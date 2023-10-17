@@ -77,6 +77,19 @@ EXIT_CODE=0
 # This allows us to continue and try to gather other boot logs.
 set +o errexit
 set -o pipefail
+
+echo "$(date -u --rfc-3339=seconds) - Gathering disk metrics"
+for VM_NAME in $(sort < "${TMPDIR}/azure-instance-names.txt" | uniq)
+do
+  metrics=( "OS Disk Queue Depth" "OS Disk Write Bytes/Sec" )
+  for m in "${metrics[@]}";
+  do
+    echo "$(date -u --rfc-3339=seconds) - Gathering metric $m for VM ${VM_NAME}"
+    az monitor metrics list --resource-type "Microsoft.Compute/virtualMachines" --resource ${VM_NAME} --resource-group "${RESOURCE_GROUP}" --offset 3h --metrics "$m" --subscription $SUBSCRIPTION_ID > $OUTPUT_DIR/disk-$VM_NAME-${m//[^[:alnum:]]/""}.json
+  done
+done
+echo "$(date -u --rfc-3339=seconds) - Gathering disk metrics complete"
+
 for VM_NAME in $(sort < "${TMPDIR}/azure-instance-names.txt" | uniq)
 do
   echo "Gathering console logs for ${VM_NAME} in resource group ${RESOURCE_GROUP}"

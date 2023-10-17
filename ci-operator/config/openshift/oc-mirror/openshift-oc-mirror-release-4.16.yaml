@@ -1,0 +1,116 @@
+base_images:
+  base:
+    name: "4.16"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.11
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: images/cli/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+  to: oc-mirror
+- dockerfile_path: images/tests/Dockerfile.integration
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+  optional: true
+  to: oc-mirror-integration
+promotion:
+  excluded_images:
+  - oc-mirror-integration
+  name: "4.16"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make build
+tests:
+- as: sanity
+  commands: make sanity
+  container:
+    from: src
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: e2e
+  commands: make test-e2e
+  container:
+    from: src
+- as: integration
+  optional: true
+  steps:
+    post:
+    - as: test-integration-delete
+      commands: cd test/integration && make ci-delete
+      credentials:
+      - mount_path: /etc/ci/aws-creds
+        name: oc-mirror-ci-aws-creds
+        namespace: test-credentials
+      - mount_path: /etc/ci/pull-secret
+        name: oc-mirror-ci-pull-secret
+        namespace: test-credentials
+      from: oc-mirror-integration
+      grace_period: 30m0s
+      resources:
+        limits:
+          cpu: 500m
+          memory: 1Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 1h0m0s
+    test:
+    - as: test-integration
+      commands: cd test/integration && make ci
+      credentials:
+      - mount_path: /etc/ci/aws-creds
+        name: oc-mirror-ci-aws-creds
+        namespace: test-credentials
+      - mount_path: /etc/ci/pull-secret
+        name: oc-mirror-ci-pull-secret
+        namespace: test-credentials
+      from: oc-mirror-integration
+      resources:
+        limits:
+          cpu: 500m
+          memory: 1Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: oc-mirror

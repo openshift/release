@@ -10,4 +10,4 @@ MENTIONED_GROUP_ID=$(cat "${SECRETS_DIR}/${WATCHER_BOT_MENTIONED_GROUP_ID_SECRET
 WEBHOOK_URL=$(cat "${SECRETS_DIR}/${WATCHER_BOT_WEBHOOK_URL_SECRET_NAME}")
 
 echo "Executing interop-ocp-watcher-bot..."
-inteorp-ocp-watcher-bot --job_file_path="${JOBS_LIST}" --mentioned_group_id="${MENTIONED_GROUP_ID}" --webhook_url="${WEBHOOK_URL}" --job_group_name="${WATCHER_BOT_JOB_GROUP_NAME}"
+interop-ocp-watcher-bot --job_file_path="${JOBS_LIST}" --mentioned_group_id="${MENTIONED_GROUP_ID}" --webhook_url="${WEBHOOK_URL}" --job_group_name="${WATCHER_BOT_JOB_GROUP_NAME}"

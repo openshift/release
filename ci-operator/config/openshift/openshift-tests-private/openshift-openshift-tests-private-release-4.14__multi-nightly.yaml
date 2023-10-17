@@ -49,8 +49,8 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: aws-ipi-disconnected-private-f14
-  cron: 36 3 11,26 * *
+- as: aws-ipi-disc-amd-mixarch-f14
+  cron: 43 1 3,18 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -66,8 +66,8 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-disconnected-private-f28-destructive
-  cron: 28 2 14 * *
+- as: aws-ipi-disc-amd-mixarch-f28-destructive
+  cron: 31 14 22 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -83,8 +83,8 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-disconnected-private-tp-f28
-  cron: 6 4 12 * *
+- as: aws-ipi-disc-tp-amd-mixarch-f14
+  cron: 4 16 3,18 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -101,8 +101,56 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-ovn-ipsec-arm64-controlplane-f14
-  cron: 36 0 3,18 * *
+- as: aws-ipi-disc-tp-amd-mixarch-f28-destructive
+  cron: 13 12 22 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@heterogeneous and @aws-ipi and @disconnected and @network-ovnkubernetes
+        and not @fips'
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      TAG_VERSION: '@4.14'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
+- as: aws-ipi-ovn-ipsec-amd-mixarch-f14
+  cron: 12 18 2,17 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @heterogeneous and @network-ovnkubernetes and not
+        @fips'
+      TAG_VERSION: '@4.14'
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: aws-ipi-ovn-ipsec-amd-mixarch-f28-destructive
+  cron: 42 7 9 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @heterogeneous and @network-ovnkubernetes and not
+        @fips'
+      TAG_VERSION: '@4.14'
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: aws-ipi-ovn-ipsec-arm-mixarch-f14
+  cron: 14 17 6,21 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -121,23 +169,44 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-ovn-ipsec-f28
-  cron: 23 21 6 * *
+- as: aws-ipi-ovn-ipsec-arm-mixarch-f28-destructive
+  cron: 58 9 10 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
       BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@aws-ipi and @heterogeneous and @network-ovnkubernetes and not
         @fips'
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.14'
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: azure-ipi-amd-mixarch-f28
+  cron: 22 0 22 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@heterogeneous and @azure-ipi and @network-ovnkubernetes and
+        not @fips'
       TAG_VERSION: '@4.14'
     test:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: azure-ipi-arm64-controlplane-f14
-  cron: 15 23 5,20 * *
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: azure-ipi-arm-mixarch-f28
+  cron: 29 9 16 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -155,25 +224,68 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-baselinecaps-v412-f28
-  cron: 45 17 25 * *
+- as: azure-ipi-baselinecaps-vset-additionalcap-arm-f14
+  cron: 45 13 10,25 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: v4.12
-      E2E_RUN_TAGS: '@heterogeneous and @azure-ipi and @network-ovnkubernetes and
-        not @fips'
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@arm64 @azure-ipi and @network-ovnkubernetes and not @fips'
+      OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
       TAG_VERSION: '@4.14'
     test:
-    - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-disconnected-fullyprivate-f28
-  cron: 4 13 13 * *
+    workflow: cucushift-installer-rehearse-azure-ipi-capability-baselinecaps-vset-additionalcaps
+- as: azure-ipi-baselinecaps-vset-additionalcap-amd-f28-destructive
+  cron: 33 22 28 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 @azure-ipi and @network-ovnkubernetes and not @fips'
+      PERSISTENT_MONITORING: "false"
+      TAG_VERSION: '@4.14'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-capability-baselinecaps-vset-additionalcaps
+- as: azure-ipi-baselinecaps-vset-amd-f14
+  cron: 2 0 10,25 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 @azure-ipi and @network-ovnkubernetes and not @fips'
+      PERSISTENT_MONITORING: "false"
+      TAG_VERSION: '@4.14'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-capability-baselinecaps-vset
+- as: azure-ipi-baselinecaps-vset-arm-f28-destructive
+  cron: 22 2 5 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@arm64 @azure-ipi and @network-ovnkubernetes and not @fips'
+      OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
+      TAG_VERSION: '@4.14'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-capability-baselinecaps-vset
+- as: azure-ipi-disc-fullypriv-amd-mixarch-f14
+  cron: 23 0 10,25 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -188,8 +300,8 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-disconnected-fullyprivate-f28-destructive
-  cron: 25 8 26 * *
+- as: azure-ipi-disc-fullypriv-amd-mixarch-f28-destructive
+  cron: 17 11 12 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -205,24 +317,109 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-ingress-custom-controller-f28
-  cron: 38 18 19 * *
+- as: azure-ipi-ingress-controller-arm-mixarch-f28
+  cron: 38 10 18 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
       E2E_RUN_TAGS: '@heterogeneous and @azure-ipi and @network-ovnkubernetes and
         not @fips'
+      OCP_ARCH: arm64
       TAG_VERSION: '@4.14'
     test:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-controller
-- as: gcp-ipi-disconnected-private-f28-destructive
-  cron: 9 6 22 * *
+- as: azure-ipi-ingress-controller-arm-mixarch-f28-destructive
+  cron: 25 21 23 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@heterogeneous and @azure-ipi and @network-ovnkubernetes and
+        not @fips'
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.14'
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-controller
+- as: azure-ipi-oidc-amd-f28-destructive
+  cron: 17 16 20 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 @azure-ipi and @network-ovnkubernetes and not @fips'
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      TAG_VERSION: '@4.14'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
+- as: azure-ipi-oidc-arm-f14
+  cron: 16 4 2,17 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@arm64 @azure-ipi and @network-ovnkubernetes and not @fips'
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.14'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
+- as: azure-ipi-disc-oidc-amd-f28-destructive
+  cron: 29 1 19 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: azure-ipi and @disconnected and @network-ovnkubernetes and not
+        @fips
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      TAG_VERSION: '@4.14'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
+- as: azure-ipi-disc-oidc-arm-f14
+  cron: 26 13 12,27 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@azure-ipi and @disconnected and @network-ovnkubernetes and not
+        @fips'
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.14'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
+- as: gcp-ipi-disc-priv-amd-mixarch-f28-destructive
+  cron: 32 23 29 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
@@ -237,8 +434,8 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
-- as: gcp-ipi-disconnected-private-workload-identity-f28
-  cron: 3 4 27 * *
+- as: gcp-ipi-disc-priv-oidc-amd-mixarch-f14
+  cron: 39 5 11,26 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
@@ -247,20 +444,21 @@ tests:
       ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
       E2E_RUN_TAGS: '@heterogeneous and @gcp-ipi and @disconnected and @network-ovnkubernetes
         and not @fips'
+      EXTRACT_MANIFEST_INCLUDED: "true"
       TAG_VERSION: '@4.14'
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
-- as: gcp-ipi-filestore-csi-f28-longduration-part3-3
-  cron: 53 19 6 * *
+- as: gcp-ipi-filestore-csi-amd-mixarch-f28-longduration-part3-3
+  cron: 22 20 6 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.13
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.14
     env:
       ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
       E2E_RUN_TAGS: '@heterogeneous and @gcp-ipi and @network-ovnkubernetes and not
@@ -272,8 +470,46 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-longduration
     workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
-- as: gcp-ipi-ovn-ipsec-arm64-controlplane-f14
-  cron: 56 18 3,18 * *
+- as: gcp-ipi-filestore-csi-arm-mixarch-f28-longduration-part3-3
+  cron: 14 9 16 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.14
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      E2E_RUN_TAGS: '@heterogeneous and @gcp-ipi and @network-ovnkubernetes and not
+        @fips'
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.14'
+      TEST_SCENARIOS: Cluster_Operator|OTA|STORAGE
+      TEST_TIMEOUT: "100"
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe-longduration
+    workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
+- as: gcp-ipi-ovn-ipsec-amd-mixarch-f28-destructive
+  cron: 3 6 7 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      E2E_RUN_TAGS: '@heterogeneous and @gcp-ipi and @network-ovnkubernetes and not
+        @fips'
+      TAG_VERSION: '@4.14'
+      TEST_ADDITIONAL: Network_Observability
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
+- as: gcp-ipi-ovn-ipsec-arm-mixarch-f14
+  cron: 5 12 11,26 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
@@ -285,21 +521,6 @@ tests:
       E2E_RUN_TAGS: '@heterogeneous and @gcp-ipi and @network-ovnkubernetes and not
         @fips'
       OCP_ARCH: arm64
-      TAG_VERSION: '@4.14'
-    test:
-    - ref: ipi-install-heterogeneous
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
-- as: gcp-ipi-ovn-ipsec-f28
-  cron: 2 21 26 * *
-  steps:
-    cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
-      E2E_RUN_TAGS: '@heterogeneous and @gcp-ipi and @network-ovnkubernetes and not
-        @fips'
       TAG_VERSION: '@4.14'
     test:
     - ref: ipi-install-heterogeneous

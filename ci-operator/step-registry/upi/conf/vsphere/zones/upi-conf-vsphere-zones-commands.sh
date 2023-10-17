@@ -63,19 +63,32 @@ else
   bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[3]' "${SUBNETS_CONFIG}")
   machine_cidr=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
 
+  printf "***** DEBUG dns: %s lb: %s bootstrap: %s cidr: %s ******\n" "$dns_server" "$lb_ip_address" "$bootstrap_ip_address" "$machine_cidr"
+
+  tempaddrs=()
   for n in $(seq "$start_master_num" "$end_master_num"); do
-    master_ips+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+    tempaddrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
   done
+  printf "**** controlplane DEBUG %s ******\n" "${tempaddrs[@]}"
 
+  printf -v control_plane_ip_addresses "\"%s\"," "${tempaddrs[@]}"
+  control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
+
+
+  printf "**** DEBUG start_worker_num: %s end_worker_num: %s ******\n" "${start_worker_num}" "${end_worker_num}"
+
+  tempaddrs=()
   for n in $(seq "$start_worker_num" "$end_worker_num"); do
-    worker_ips+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+    tempaddrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
   done
-fi
 
-printf -v control_plane_ip_addresses "\"%s\"," "${master_ips[@]}"
-control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
-printf -v compute_ip_addresses '\"%s\",' "${worker_ips[@]}"
-compute_ip_addresses="[${compute_ip_addresses%,}]"
+  printf "**** compute DEBUG %s ******\n" "${tempaddrs[@]}"
+
+  printf -v compute_ip_addresses "\"%s\"," "${tempaddrs[@]}"
+  compute_ip_addresses="[${compute_ip_addresses%,}]"
+
+
+fi
 
 export HOME=/tmp
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
@@ -238,12 +251,11 @@ networking:
 EOF
 fi
 
-
 echo "$(date -u --rfc-3339=seconds) - ***** DEBUG ***** DNS: ${dns_server}"
 
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat >"${SHARED_DIR}/terraform.tfvars" <<-EOF
-machine_cidr = "192.168.${third_octet}.0/25"
+machine_cidr = "${machine_cidr}"
 vm_template = "${vm_template}"
 vsphere_server = "${vsphere_url}"
 ipam = "ipam.vmc.ci.openshift.org"
@@ -267,21 +279,21 @@ failure_domains = [
         cluster = "vcs-mdcnc-workload-1"
         datastore = "mdcnc-ds-1"
         network = "${vsphere_portgroup}"
-        distributed_virtual_switch_uuid = "50 05 1b 07 19 2b 0b 0a-eb 90 98 54 1d c5 b5 19"
+        distributed_virtual_switch_uuid = "50 05 37 56 0d b0 eb 3a-e4 4c 68 33 1b 64 9e a2"
     },
     {
         datacenter = "IBMCloud"
         cluster = "vcs-mdcnc-workload-2"
         datastore = "mdcnc-ds-2"
         network = "${vsphere_portgroup}"
-        distributed_virtual_switch_uuid = "50 05 df b2 de b8 24 7b-db a6 e2 9b eb be 85 30"
+        distributed_virtual_switch_uuid = "50 05 37 56 0d b0 eb 3a-e4 4c 68 33 1b 64 9e a2"
     },
     {
         datacenter = "IBMCloud"
         cluster = "vcs-mdcnc-workload-3"
         datastore = "mdcnc-ds-3"
         network = "${vsphere_portgroup}"
-        distributed_virtual_switch_uuid = "50 05 f2 28 9e 27 86 0c-da 17 16 22 e9 47 20 e3"
+        distributed_virtual_switch_uuid = "50 05 37 56 0d b0 eb 3a-e4 4c 68 33 1b 64 9e a2"
     },
     {
         datacenter = "datacenter-2"

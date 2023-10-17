@@ -220,7 +220,6 @@ IGN=$(cat $BUTANE_CFG | /tmp/butane -r -d /tmp | gzip | base64 -w0)
 
 IPCFG="ip=${external_lb_ip_address}::${gateway}:${mask}:lb::none nameserver=${dns_server}"
 
-govc vm.network.change -vm ${LB_VMNAME} -net "${vsphere_portgroup}" ethernet-0
 govc vm.change -vm ${LB_VMNAME} -e "guestinfo.afterburn.initrd.network-kargs=${IPCFG}"
 govc vm.change -vm ${LB_VMNAME} -e guestinfo.ignition.config.data=$IGN
 govc vm.change -vm ${LB_VMNAME} -e guestinfo.ignition.config.data.encoding=gzip+base64

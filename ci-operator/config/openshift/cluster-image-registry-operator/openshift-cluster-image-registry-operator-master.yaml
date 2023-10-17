@@ -11,19 +11,19 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: hypershift-tests
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: cluster-image-registry-operator
 promotion:
   name: "4.15"
@@ -127,12 +127,12 @@ tests:
   optional: true
   run_if_changed: ^(.*(vsphere|baremetal).*)\.go$
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-operator
   run_if_changed: ^(.*(vsphere|baremetal).*)\.go$
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     test:
     - as: e2e-test
       commands: JUNIT_REPORT=1 make test-e2e

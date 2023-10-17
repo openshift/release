@@ -1,18 +1,18 @@
 base_images:
-  openshift_release_rhel-9-release-golang-1.20-openshift-4.14:
+  openshift_release_rhel-9-release-golang-1.20-openshift-4.15:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.20-openshift-4.14
+    tag: rhel-9-release-golang-1.20-openshift-4.15
   operator-sdk:
     name: "4.15"
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: "4.13"
+    name: "4.14"
     namespace: ocp
     tag: windows-machine-config-operator-bundle
   previous-wmco:
-    name: "4.13"
+    name: "4.14"
     namespace: ocp
     tag: windows-machine-config-operator-test
 binary_build_commands: make build
@@ -22,9 +22,9 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile.ci
   inputs:
-    openshift_release_rhel-9-release-golang-1.20-openshift-4.14:
+    openshift_release_rhel-9-release-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.20-openshift-4.15
   to: windows-machine-config-operator-test
 operator:
   bundles:
@@ -81,22 +81,22 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: aws-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: aws-e2e-operator
   steps:
     cluster_profile: aws
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
-- as: azure-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: azure-e2e-operator
   steps:
     cluster_profile: azure4
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-azure-ovn-hybrid
-- as: gcp-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: gcp-e2e-operator
   steps:
     cluster_profile: gcp
     env:
@@ -104,17 +104,18 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-gcp-ovn-hybrid
-- as: vsphere-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: vsphere-e2e-operator
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     test:
     - ref: windows-e2e-operator-test-with-custom-vxlan-port
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
 - always_run: false
   as: vsphere-e2e-upgrade
+  optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     test:
     - as: install
       cli: latest
@@ -195,8 +196,8 @@ tests:
           cpu: 1000m
           memory: 400Mi
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
-- as: aws-e2e-upgrade
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: aws-e2e-upgrade
   steps:
     cluster_profile: aws
     test:
@@ -233,17 +234,17 @@ tests:
           cpu: 1000m
           memory: 400Mi
     workflow: ipi-aws-ovn-hybrid
-- as: platform-none-vsphere-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: platform-none-vsphere-e2e-operator
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     test:
     - ref: windows-e2e-operator-test-byoh
     workflow: windows-e2e-operator-test-platform-none-vsphere
-- as: vsphere-proxy-e2e-operator
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: vsphere-proxy-e2e-operator
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     post:
     - chain: gather-network
     - ref: gather-proxy
@@ -258,10 +259,10 @@ tests:
     - chain: ipi-install-vsphere
     test:
     - ref: windows-e2e-operator-test-with-custom-vxlan-port
-- as: wicd-unit-vsphere
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: wicd-unit-vsphere
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     post:
     - chain: upi-vsphere-windows-post
     pre:
@@ -276,12 +277,12 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: community-4.14
+      DESTINATION_BRANCH: community-4.15
       SOURCE_BRANCH: master
     workflow: windows-ci-fastforward
-- as: nutanix-e2e-operator
+- always_run: false
+  as: nutanix-e2e-operator
   cluster: build01
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: nutanix
     test:

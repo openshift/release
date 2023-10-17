@@ -27,10 +27,10 @@ base_images:
     name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
-  coreos-centos-stream8:
-    name: stream8
+  coreos-centos-stream9:
+    name: stream9
     namespace: coreos
-    tag: "8"
+    tag: "9"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -43,20 +43,19 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.assisted-installer
-  from: coreos-centos-stream8
   inputs:
-    coreos-centos-stream8:
+    coreos-centos-stream9:
       as:
-      - quay.io/centos/centos:stream8
+      - quay.io/centos/centos:stream9
     openshift_release_golang-1.19:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: assisted-installer
 - dockerfile_path: Dockerfile.assisted-installer-controller
   inputs:
-    coreos-centos-stream8:
+    coreos-centos-stream9:
       as:
-      - quay.io/centos/centos:stream8
+      - quay.io/centos/centos:stream9
     openshift_release_golang-1.19:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
@@ -158,6 +157,7 @@ tests:
   skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: unit-test-postsubmit
   commands: |
+    export GOCACHE=/tmp/gocache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
@@ -197,6 +197,10 @@ tests:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
         OPENSHIFT_VERSION=4.12
+        MASTER_MEMORY=17408
+        MASTER_CPU=8
+        WORKER_MEMORY=9216
+        WORKER_CPU=4
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
   optional: true
