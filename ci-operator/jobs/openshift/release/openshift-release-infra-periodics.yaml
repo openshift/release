@@ -1289,10 +1289,11 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   labels:
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     config-type: modern
     job-architecture: amd64
     job-env: vsphere
@@ -1319,7 +1320,7 @@ periodics:
       - name: RELEASE_IMAGE_LATEST
       - name: CLUSTER_VARIANT
       - name: CLUSTER_PROFILE
-        value: vsphere
+        value: vsphere-2
       - name: CLUSTER_DURATION
         value: "9000"
       - name: BRANCH
@@ -1367,7 +1368,7 @@ periodics:
               workflow: upi-$(CLUSTER_TYPE)-clusterbot
           - as: launch-multi-zone
             steps:
-              cluster_profile: vsphere-multizone
+              cluster_profile: vsphere-multizone-2
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
               test:
@@ -1375,7 +1376,7 @@ periodics:
               workflow: openshift-e2e-$(CLUSTER_TYPE)-zones
           - as: launch-multi-zone-techpreview
             steps:
-              cluster_profile: vsphere-multizone
+              cluster_profile: vsphere-multizone-2
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
                 FEATURE_SET: TechPreviewNoUpgrade
@@ -1409,7 +1410,7 @@ periodics:
               workflow: openshift-e2e-$(CLUSTER_TYPE)-sdn
           - as: launch-dualstack
             steps:
-              cluster_profile: vsphere
+              cluster_profile: $(CLUSTER_PROFILE)
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
               test:
@@ -1417,7 +1418,7 @@ periodics:
               workflow: openshift-e2e-$(CLUSTER_TYPE)-ovn-dualstack
           - as: launch-dualstack-primaryv6
             steps:
-              cluster_profile: vsphere
+              cluster_profile: $(CLUSTER_PROFILE)
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
                 IP_FAMILIES: DualStackIPv6Primary
@@ -1426,7 +1427,7 @@ periodics:
               workflow: openshift-e2e-$(CLUSTER_TYPE)-ovn-dualstack
           - as: upgrade
             steps:
-              cluster_profile: $(CLUSTER_TYPE)
+              cluster_profile: $(CLUSTER_PROFILE)
               env:
                 TEST_SUITE: "all"
               workflow: openshift-upgrade-$(CLUSTER_TYPE)
