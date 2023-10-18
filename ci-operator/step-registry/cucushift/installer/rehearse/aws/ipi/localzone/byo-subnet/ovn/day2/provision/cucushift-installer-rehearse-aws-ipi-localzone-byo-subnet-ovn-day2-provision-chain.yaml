@@ -1,5 +1,5 @@
 chain:
-  as: cucushift-installer-rehearse-aws-ipi-localzone-byo-subnet-day2-provision
+  as: cucushift-installer-rehearse-aws-ipi-localzone-byo-subnet-ovn-day2-provision
   steps:
   - ref: ipi-install-rbac
   - ref: openshift-cluster-bot-rbac
@@ -8,12 +8,14 @@ chain:
   - ref: ipi-conf-telemetry
   - ref: ipi-conf-aws-custom-vpc
   - ref: ipi-conf-aws
+  - ref: ovn-conf
   - ref: ipi-install-monitoringpvc
   - ref: ipi-install-install-aws
   - ref: ipi-install-times-collection
   - ref: aws-provision-tags-for-byo-vpc
   - ref: enable-qe-catalogsource
   - ref: storage-conf-storageclass-set-default-storageclass
+  - chain: network-mtu-migration-decrease
   - chain: edge-nodes-provision-localzone-day2
   - ref: health-check-node-count
   - chain: cucushift-installer-check
@@ -36,6 +38,10 @@ chain:
     default: "4"
   - name: REQUIRED_DEFAULT_STORAGECLASS
     default: "gp2-csi"
+  - name: MTU_DECREASE
+    default: "7701"
+    documentation: |-
+      OVN: 9001 - 1300
   documentation: |-
     Create an IPI cluster on AWS for QE e2e tests.
     Additional worker nodes will be created in Local Zone with taints:NoSchedule on Day-2
