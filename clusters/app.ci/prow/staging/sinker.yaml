@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci-staging
+  name: sinker
+  labels:
+    app: sinker
+spec:
+  selector:
+    matchLabels:
+      app: sinker
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: sinker
+    spec:
+      serviceAccountName: "sinker"
+      containers:
+      - name: sinker
+        image: gcr.io/k8s-prow/sinker:v20221115-a6c6c84e3d
+        args:
+        - --config-path=/etc/config/config.yaml
+        - --dry-run=false
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: config

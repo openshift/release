@@ -590,7 +590,7 @@ export PATH=${OC_DIR}:$PATH
 for target in "${TARGET_RELEASES[@]}"
 do
     export TARGET="${target}"
-    TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" -o jsonpath='{.metadata.version}')"
+    TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
     extract_oc
 
     SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"

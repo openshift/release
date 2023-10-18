@@ -334,14 +334,31 @@ function init_ibmcloud() {
   fi
 
   CIS_INSTANCE_CRN=$(ibmcloud cis instances --output json | jq -r '.[].id');
+  if [ -z "${CIS_INSTANCE_CRN}" ]; then
+    echo "Error: CIS_INSTANCE_CRN is empty!"
+    exit 1
+  fi
   export CIS_INSTANCE_CRN
 
+  if [ -z "${POWERVS_SERVICE_INSTANCE_ID}" ]; then
+    echo "Error: POWERVS_SERVICE_INSTANCE_ID is empty!"
+    exit 1
+  fi
+
   SERVICE_INSTANCE_CRN="$(ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .crn')"
+  if [ -z "${SERVICE_INSTANCE_CRN}" ]; then
+    echo "Error: SERVICE_INSTANCE_CRN is empty!"
+    exit 1
+  fi
   export SERVICE_INSTANCE_CRN
 
   ibmcloud pi service-target ${SERVICE_INSTANCE_CRN}
 
   CLOUD_INSTANCE_ID="$(echo ${SERVICE_INSTANCE_CRN} | cut -d: -f8)"
+  if [ -z "${CLOUD_INSTANCE_ID}" ]; then
+    echo "Error: CLOUD_INSTANCE_ID is empty!"
+    exit 1
+  fi
   export CLOUD_INSTANCE_ID
 }
 

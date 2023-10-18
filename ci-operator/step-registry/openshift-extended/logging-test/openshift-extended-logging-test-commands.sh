@@ -150,7 +150,7 @@ ibmcloud)
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 equinix-ocp-metal|equinix-ocp-metal-qe|powervs-1)
     export TEST_PROVIDER='{"type":"skeleton"}';;
-nutanix|nutanix-qe)
+nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
 *)
     echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"

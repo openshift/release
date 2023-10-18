@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci-staging
+  name: prow-controller-manager
+  labels:
+    app: prow-controller-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prow-controller-manager
+  template:
+    metadata:
+      labels:
+        app: prow-controller-manager
+    spec:
+      serviceAccountName: prow-controller-manager
+      containers:
+      - name: prow-controller-manager
+        args:
+        - --dry-run=false
+        - --config-path=/etc/config/config.yaml
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --enable-controller=plank
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --projected-token-file=/var/sa-token/token
+        - --kubeconfig-dir=/etc/build-farm-credentials
+        - --kubeconfig-suffix=config
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-prow-github-app
+              key: appid
+        image: gcr.io/k8s-prow/prow-controller-manager:v20231011-acf4a2e26b
+        volumeMounts:
+        - name: service-account-token
+          mountPath: /var/sa-token
+        - name: github-app-credentials
+          mountPath: /etc/github
+          readOnly: true
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+      volumes:
+      - name: service-account-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-prow-github-app
+      - name: config
+        configMap:
+          name: config
+      - name: build-farm-credentials
+        secret:
+          secretName: prow-controller-manager
