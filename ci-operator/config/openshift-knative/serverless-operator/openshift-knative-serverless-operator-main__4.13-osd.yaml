@@ -102,38 +102,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tests:
-- as: e2e-osd-413-continuous
-  cron: 0 0 * * 0
-  steps:
-    cluster_profile: osd-ephemeral
-    env:
-      CLUSTER_DURATION: "10800"
-      CLUSTER_VERSION: "4.13"
-      COMPUTE_NODES: "4"
-    post:
-    - chain: gather
-    - ref: osd-delete-delete
-    pre:
-    - ref: ipi-install-rbac
-    - ref: osd-create-create
-    test:
-    - as: serverless-e2e
-      commands: make test-e2e-with-kafka test-upstream-e2e-no-upgrade
-      dependencies:
-      - env: KNATIVE_OPENSHIFT_INGRESS
-        name: knative-openshift-ingress
-      - env: KNATIVE_OPERATOR
-        name: knative-operator
-      - env: OPENSHIFT_KNATIVE_OPERATOR
-        name: openshift-knative-operator
-      from: serverless-operator-src
-      resources:
-        limits:
-          memory: 6Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift-knative
