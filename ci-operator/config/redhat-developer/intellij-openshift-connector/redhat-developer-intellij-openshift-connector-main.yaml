@@ -5,6 +5,7 @@ build_root:
       RUN yum install -y java-17-openjdk-devel git
       RUN mkdir /tmp/work
       RUN chmod +777 /tmp/work
+      RUN chmod ugo+rwx /tmp/work
       RUN export GRADLE_USER_HOME=/tmp/work
 releases:
   latest:
@@ -25,7 +26,10 @@ tests:
     cluster_profile: aws
     test:
     - as: e2e
-      commands: ./gradlew integrationTest -Dgradle.user.home=/tmp/work --no-daemon
+      commands:  |
+        chmod ugo+rwx ./gradlew
+        echo $GRADLE_USER_HOME
+        ./gradlew integrationTest -Dgradle.user.home=/tmp/work --no-daemon
       from: src
       resources:
         requests:
