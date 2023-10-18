@@ -3,8 +3,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-SOURCE_KUBEADMIN_PASSWORD_FILE="/tmp/clusters-data/aws/mtc-aws-ipi-source/auth/kubeadmin-password"
-SOURCE_KUBECONFIG="/tmp/clusters-data/aws/mtc-aws-ipi-source/auth/kubeconfig"
+SOURCE_KUBEADMIN_PASSWORD_FILE="/tmp/clusters-data/aws/mtc-aws-ipi-target/auth/kubeadmin-password"
+SOURCE_KUBECONFIG="/tmp/clusters-data/aws/mtc-aws-ipi-target/auth/kubeconfig"
 
 # Extract all tar files
 echo "Extracting cluster data, mtc-apps-deployer, and mtc-python-client."

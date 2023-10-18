@@ -18,6 +18,7 @@ ansible-playbook /mtc-interop/install-mtc.yml \
     -e version=${MTC_VERSION} \
     -e kubeconfig_path=/tmp/clusters-data/aws/mtc-aws-ipi-source/auth/kubeconfig
 
+sleep 7200
 
 # Configure the clusters prior to executing tests
 echo "Configuring the source and target clusters."
