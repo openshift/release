@@ -7,4 +7,9 @@ curl https://static.snyk.io/cli/latest/snyk-linux -o /tmp/snyk && \
     chmod +x /tmp/snyk
 
 echo Starting snyk dependencies scan
-/tmp/snyk test --project-name="$PROJECT_NAME" --org="$ORG_NAME"
+# if ALL_PROJECT is true
+if [ "$ALL_PROJECTS" = "true" ]; then
+    /tmp/snyk test --project-name="$PROJECT_NAME" --org="$ORG_NAME" --all-projects
+else
+    /tmp/snyk test --project-name="$PROJECT_NAME" --org="$ORG_NAME"
+fi
