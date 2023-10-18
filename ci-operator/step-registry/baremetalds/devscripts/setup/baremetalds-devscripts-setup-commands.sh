@@ -152,9 +152,6 @@ CIRFILE=$SHARED_DIR/cir
 EXTRAFILE=$SHARED_DIR/cir-extra
 NODESFILE=$SHARED_DIR/cir-nodes
 BMJSON=$SHARED_DIR/bm.json
-if [ -e "$CIRFILE" ] && [[ "$(cat $CIRFILE | jq -r .type)" =~ cluster.* ]] ; then
-    prepare_bmcluster
-fi
 
 # Additional mechanism to inject dev-scripts additional variables directly
 # from a multistage step configuration.
@@ -322,9 +319,13 @@ cp /root/pull-secret /root/dev-scripts/pull_secret.json
 
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
-echo "export NUM_WORKERS=3" >> /root/dev-scripts/config_root.sh
-echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
+
+# Nodes provides by MOC have 96G of RAM was have to ensure we don't exceed this
+# Limiting VMs to 15G * 6
+echo "export NUM_WORKERS=3" >> /root/dev-scripts/config_root.sh
+echo "export MASTER_MEMORY=\${MASTER_MEMORY:-15360}" >> /root/dev-scripts/config_root.sh
+echo "export WORKER_MEMORY=15360" >> /root/dev-scripts/config_root.sh
 
 # Add APPLIANCE_IMAGE only for appliance e2e tests 
 if [ "${AGENT_E2E_TEST_BOOT_MODE}" == "DISKIMAGE" ];
