@@ -102,13 +102,21 @@ tests:
 - as: e2e-openshift
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    dependencies:
+      COMPONENT_IMAGE_REF: src
     env:
-      FIPS_ENABLED: "false"
+      # FIPS_ENABLED: "false"
+      CLUSTERPOOL_GROUP_NAME: AppLifecycle
+      CLUSTERPOOL_HOST_NAMESPACE: app
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-app-clusterpool
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-aws-413
+      SKIP_COMPONENT_INSTALL: 'true'
+      CLUSTER_NAMES: none
     test:
     - as: e2e-install-operator
       cli: latest
       commands: |
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
         operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
         oc wait --for condition=Available -n openshift-operators deployment volsync-controller-manager
       dependencies:
@@ -122,7 +130,12 @@ tests:
     - as: e2e
       commands: |
         set -x -e -o pipefail
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        #export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+        #operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
+
+        oc -n openshift-operators get deploy
+        oc -n openshift-operators get pod
 
         # Install MinIO for rclone & restic
         ./hack/run-minio.sh
@@ -147,108 +160,108 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: ipi-aws
-- as: e2e-openshift-fips
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: aws
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - as: e2e-install-operator
-      cli: latest
-      commands: |
-        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
-        oc wait --for condition=Available -n openshift-operators deployment volsync-controller-manager
-      dependencies:
-      - env: OO_BUNDLE
-        name: volsync-bundle
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: e2e
-      commands: |
-        set -x -e -o pipefail
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-
-        # Install MinIO for rclone & restic
-        ./hack/run-minio.sh
-
-        # Install MinIO again w/ TLS
-        export MINIO_NAMESPACE=minio-tls
-        export MINIO_USE_TLS=1
-        ./hack/run-minio.sh
-
-        # Add .local/bin to path so we can execute Python packages we install below
-        export PATH="${PATH}:/alabama/.local/bin"
-        # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
-        export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
-        make test-e2e-install PIP_INSTALL_ARGS=
-
-        # Run tests
-        make cli
-        export BATCHES=4
-        make test-e2e
-      from: src-oc
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    workflow: ipi-aws
-- as: e2e-openshift-helm
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: aws
-    env:
-      FIPS_ENABLED: "false"
-    test:
-    - as: e2e
-      commands: |
-        set -x -e -o pipefail
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-
-        # Install MinIO for rclone & restic
-        ./hack/run-minio.sh
-
-        # Install MinIO again w/ TLS
-        export MINIO_NAMESPACE=minio-tls
-        export MINIO_USE_TLS=1
-        ./hack/run-minio.sh
-
-        # Install VolSync va Helm
-        helm upgrade --install --create-namespace -n volsync-system \
-          --debug \
-          --set image.image=${VOLSYNC_OPERATOR} \
-          --set rclone.image=${VOLSYNC_OPERATOR} \
-          --set restic.image=${VOLSYNC_OPERATOR} \
-          --set rsync.image=${VOLSYNC_OPERATOR} \
-          --set rsync-tls.image=${VOLSYNC_OPERATOR} \
-          --set syncthing.image=${VOLSYNC_OPERATOR} \
-          --set metrics.disableAuth=true \
-          --wait --timeout=5m \
-          volsync ./helm/volsync
-
-        # Add .local/bin to path so we can execute Python packages we install below
-        export PATH="${PATH}:/alabama/.local/bin"
-        # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
-        export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
-        make test-e2e-install PIP_INSTALL_ARGS=
-
-        # Run tests
-        make cli
-        export BATCHES=4
-        make test-e2e
-      dependencies:
-      - env: VOLSYNC_OPERATOR
-        name: volsync
-      from: src-oc
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    workflow: ipi-aws
+    workflow: ocm-e2e-clusterpool
+#- as: e2e-openshift-fips
+#  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+#  steps:
+#    cluster_profile: aws
+#    env:
+#      FIPS_ENABLED: "true"
+#    test:
+#    - as: e2e-install-operator
+#      cli: latest
+#      commands: |
+#        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
+#        oc wait --for condition=Available -n openshift-operators deployment volsync-controller-manager
+#      dependencies:
+#      - env: OO_BUNDLE
+#        name: volsync-bundle
+#      from: operator-sdk
+#      resources:
+#        requests:
+#          cpu: 100m
+#          memory: 200Mi
+#    - as: e2e
+#      commands: |
+#        set -x -e -o pipefail
+#        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+#
+#        # Install MinIO for rclone & restic
+#        ./hack/run-minio.sh
+#
+#        # Install MinIO again w/ TLS
+#        export MINIO_NAMESPACE=minio-tls
+#        export MINIO_USE_TLS=1
+#        ./hack/run-minio.sh
+#
+#        # Add .local/bin to path so we can execute Python packages we install below
+#        export PATH="${PATH}:/alabama/.local/bin"
+#        # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
+#        export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
+#        make test-e2e-install PIP_INSTALL_ARGS=
+#
+#        # Run tests
+#        make cli
+#        export BATCHES=4
+#        make test-e2e
+#      from: src-oc
+#      resources:
+#        requests:
+#          cpu: 500m
+#          memory: 1Gi
+#    workflow: ipi-aws
+#- as: e2e-openshift-helm
+#  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+#  steps:
+#    cluster_profile: aws
+#    env:
+#      FIPS_ENABLED: "false"
+#    test:
+#    - as: e2e
+#      commands: |
+#        set -x -e -o pipefail
+#        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+#
+#        # Install MinIO for rclone & restic
+#        ./hack/run-minio.sh
+#
+#        # Install MinIO again w/ TLS
+#        export MINIO_NAMESPACE=minio-tls
+#        export MINIO_USE_TLS=1
+#        ./hack/run-minio.sh
+#
+#        # Install VolSync va Helm
+#        helm upgrade --install --create-namespace -n volsync-system \
+#          --debug \
+#          --set image.image=${VOLSYNC_OPERATOR} \
+#          --set rclone.image=${VOLSYNC_OPERATOR} \
+#          --set restic.image=${VOLSYNC_OPERATOR} \
+#          --set rsync.image=${VOLSYNC_OPERATOR} \
+#          --set rsync-tls.image=${VOLSYNC_OPERATOR} \
+#          --set syncthing.image=${VOLSYNC_OPERATOR} \
+#          --set metrics.disableAuth=true \
+#          --wait --timeout=5m \
+#          volsync ./helm/volsync
+#
+#        # Add .local/bin to path so we can execute Python packages we install below
+#        export PATH="${PATH}:/alabama/.local/bin"
+#        # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
+#        export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
+#        make test-e2e-install PIP_INSTALL_ARGS=
+#
+#        # Run tests
+#        make cli
+#        export BATCHES=4
+#        make test-e2e
+#      dependencies:
+#      - env: VOLSYNC_OPERATOR
+#        name: volsync
+#      from: src-oc
+#      resources:
+#        requests:
+#          cpu: 500m
+#          memory: 1Gi
+#    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: backube
