@@ -59,28 +59,8 @@ class TestEntry:
         return safe_get_attr(self.raw_entry, "optional") == True
 
     @property
-    def has_always_run(self):
-        return safe_get_attr(self.raw_entry, "always_run") is not None
-
-    @property
-    def always_run(self):
-        return safe_get_attr(self.raw_entry, "always_run")
-
-    @property
     def has_run_if_changed(self):
         return safe_get_attr(self.raw_entry, "run_if_changed") is not None
-
-    @property
-    def run_if_changed(self):
-        return safe_get_attr(self.raw_entry, "run_if_changed")
-
-    @property
-    def has_skip_if_only_changed(self):
-        return safe_get_attr(self.raw_entry, "skip_if_only_changed") is not None
-
-    @property
-    def skip_if_only_changed(self):
-        return safe_get_attr(self.raw_entry, "skip_if_only_changed")
 
 
 @dataclasses.dataclass
@@ -100,10 +80,6 @@ class ConfigFile:
     @property
     def branch(self):
         return safe_get_attr(self.raw_parsed_yaml, "zz_generated_metadata.branch", coalesce_to="")
-
-    @property
-    def variant(self):
-        return safe_get_attr(self.raw_parsed_yaml, "zz_generated_metadata.variant", coalesce_to="")
 
     @property
     def build_root_tag(self):
@@ -742,42 +718,13 @@ def main():
 
     data = load_and_massage_data(config_dir)
 
-    for config in data.configs:
-        print(f"config: {config.short_filename}")
-        branch = config.branch
-        for entry in config.unordered_entries:
-            if entry.is_postsubmit or entry.is_cron:
-                continue
-            name = entry.name if config.variant == "" else f"{config.variant}-{entry.name}"
+    table = render_summary_tables(data)
+    title = render_title(data)
+    doc_content = render_doc(title, table)
 
-            print(f"\ttest: {name}")
-            if not entry.has_always_run:
-                print("\t\tmissing: always_run in config")
-
-            for job_file in data.jobs_files:
-                if not job_file.short_filename.startswith(branch):
-                    continue
-                print(f"\t\t{job_file.short_filename}")
-                for job in job_file.unordered_entries:
-                    if job.name != name:
-                        continue
-                    print(f"\t\t\tjob: {job.name}")
-                    if entry.has_always_run and entry.always_run != job.always_run:
-                        print(f"\t\t\t\tmismatch: always_run {entry.always_run} != {job.always_run}")
-
-                    if entry.has_run_if_changed and entry.run_if_changed != job.run_if_changed:
-                        print(f"\t\t\t\tmismatch: run_if_changed\n{entry.run_if_changed}\n != \n{job.run_if_changed}")
-
-                    if entry.has_skip_if_only_changed and entry.skip_if_only_changed != job.skip_if_only_changed:
-                        print(f"\t\t\t\tmismatch: skip_if_only_changed\n{entry.skip_if_only_changed}\n != \n{job.skip_if_only_changed}")
-
-    # table = render_summary_tables(data)
-    # title = render_title(data)
-    # doc_content = render_doc(title, table)
-
-    # output_file = config_dir / "summary.html"
-    # output_file.write_text(doc_content, encoding='utf-8')
-    # print(f"Summary written to {output_file}")
+    output_file = config_dir / "summary.html"
+    output_file.write_text(doc_content, encoding='utf-8')
+    print(f"Summary written to {output_file}")
 
 
 if __name__ == "__main__":
