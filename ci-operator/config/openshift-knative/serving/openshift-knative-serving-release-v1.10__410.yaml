@@ -31,6 +31,18 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-serving-controller
+- dockerfile_path: openshift/ci-operator/knative-images/domain-mapping-webhook/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-serving-domain-mapping-webhook
+- dockerfile_path: openshift/ci-operator/knative-images/domain-mapping/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-serving-domain-mapping
 - dockerfile_path: openshift/ci-operator/knative-images/migrate/Dockerfile
   inputs:
     openshift_release_golang-1.19:
@@ -154,7 +166,7 @@ images:
 promotion:
   additional_images:
     knative-serving-src: src
-  name: knative-v1.11
+  name: knative-v1.10
   namespace: openshift
 resources:
   '*':
@@ -162,14 +174,20 @@ resources:
       cpu: 500m
       memory: 4Gi
 tests:
-- as: test-e2e-aws-ocp-411
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: openshift-knative/serving
+    workflow: openshift-ci-security
+- as: test-e2e-aws-ocp-410
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.11"
+    version: "4.10"
   steps:
     allow_best_effort_post_steps: true
     post:
@@ -195,7 +213,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-e2e
+      commands: make test-e2e
       dependencies:
       - env: KNATIVE_SERVING_ACTIVATOR
         name: knative-serving-activator
@@ -205,6 +223,10 @@ tests:
         name: knative-serving-autoscaler
       - env: KNATIVE_SERVING_CONTROLLER
         name: knative-serving-controller
+      - env: KNATIVE_SERVING_DOMAIN_MAPPING_WEBHOOK
+        name: knative-serving-domain-mapping-webhook
+      - env: KNATIVE_SERVING_DOMAIN_MAPPING
+        name: knative-serving-domain-mapping
       - env: KNATIVE_SERVING_STORAGE_VERSION_MIGRATION
         name: knative-serving-storage-version-migration
       - env: KNATIVE_SERVING_QUEUE
@@ -251,14 +273,14 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-e2e-aws-ocp-411-continuous
+- as: test-e2e-aws-ocp-410-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.11"
+    version: "4.10"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -285,7 +307,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-e2e
+      commands: make test-e2e
       dependencies:
       - env: KNATIVE_SERVING_ACTIVATOR
         name: knative-serving-activator
@@ -295,6 +317,10 @@ tests:
         name: knative-serving-autoscaler
       - env: KNATIVE_SERVING_CONTROLLER
         name: knative-serving-controller
+      - env: KNATIVE_SERVING_DOMAIN_MAPPING_WEBHOOK
+        name: knative-serving-domain-mapping-webhook
+      - env: KNATIVE_SERVING_DOMAIN_MAPPING
+        name: knative-serving-domain-mapping
       - env: KNATIVE_SERVING_STORAGE_VERSION_MIGRATION
         name: knative-serving-storage-version-migration
       - env: KNATIVE_SERVING_QUEUE
@@ -341,14 +367,14 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-e2e-tls-aws-ocp-411
+- as: test-e2e-tls-aws-ocp-410
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.11"
+    version: "4.10"
   steps:
     allow_best_effort_post_steps: true
     post:
@@ -374,7 +400,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-e2e-tls
+      commands: make test-e2e-tls
       dependencies:
       - env: KNATIVE_SERVING_ACTIVATOR
         name: knative-serving-activator
@@ -384,6 +410,10 @@ tests:
         name: knative-serving-autoscaler
       - env: KNATIVE_SERVING_CONTROLLER
         name: knative-serving-controller
+      - env: KNATIVE_SERVING_DOMAIN_MAPPING_WEBHOOK
+        name: knative-serving-domain-mapping-webhook
+      - env: KNATIVE_SERVING_DOMAIN_MAPPING
+        name: knative-serving-domain-mapping
       - env: KNATIVE_SERVING_STORAGE_VERSION_MIGRATION
         name: knative-serving-storage-version-migration
       - env: KNATIVE_SERVING_QUEUE
@@ -430,14 +460,14 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-e2e-tls-aws-ocp-411-continuous
+- as: test-e2e-tls-aws-ocp-410-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.11"
+    version: "4.10"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -464,7 +494,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-e2e-tls
+      commands: make test-e2e-tls
       dependencies:
       - env: KNATIVE_SERVING_ACTIVATOR
         name: knative-serving-activator
@@ -474,6 +504,10 @@ tests:
         name: knative-serving-autoscaler
       - env: KNATIVE_SERVING_CONTROLLER
         name: knative-serving-controller
+      - env: KNATIVE_SERVING_DOMAIN_MAPPING_WEBHOOK
+        name: knative-serving-domain-mapping-webhook
+      - env: KNATIVE_SERVING_DOMAIN_MAPPING
+        name: knative-serving-domain-mapping
       - env: KNATIVE_SERVING_STORAGE_VERSION_MIGRATION
         name: knative-serving-storage-version-migration
       - env: KNATIVE_SERVING_QUEUE
@@ -521,7 +555,7 @@ tests:
       timeout: 4h0m0s
     workflow: generic-claim
 zz_generated_metadata:
-  branch: release-v1.11
+  branch: release-v1.10
   org: openshift-knative
   repo: serving
-  variant: "411"
+  variant: "410"
