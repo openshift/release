@@ -32,8 +32,7 @@ else
   echo "Did not find compatible trusted ca"
   exit 1
 fi
-
-NUTANIX_OS_ENDPOINT="${CLUSTER_PROFILE_DIR}/nutnaix_os_endpoint"
+NUTANIX_OS_ENDPOINT=$(cat "${CLUSTER_PROFILE_DIR}/nutnaix_os_endpoint")
 if [[ ${NUTANIX_OS_ENDPOINT} == "" ]]; then
   echo "Did not find nutanix os endpoint, exit now"
   exit 1
