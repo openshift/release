@@ -31,5 +31,9 @@ folder_name=$(ls -t -d /tmp/*/ | head -1)
 cp $folder_name/index_data.json ${SHARED_DIR}/index_data.json
 
 echo "{'ingress-perf': \"$CONFIG\"}" > workload.json 
-result=$(jq -s add workload.json ${SHARED_DIR}/perfscale_run.json)
-echo $result > ${SHARED_DIR}/perfscale_run.json
+if [ -f "${SHARED_DIR}/perfscale_run.json" ]; then
+    result=$(jq -s add workload.json ${SHARED_DIR}/perfscale_run.json)
+    echo $result > ${SHARED_DIR}/perfscale_run.json
+else
+    cp workload.json ${SHARED_DIR}/perfscale_run.json
+fi
