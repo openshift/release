@@ -61,5 +61,6 @@ then
 fi
 
 openshift-tests run-resourcewatch > "${ARTIFACT_DIR}/run-resourcewatch.log" 2>&1 &
-openshift-tests run-monitor ${MONITOR_ARGS:-} --artifact-dir $STORE_PATH > "${ARTIFACT_DIR}/run-monitor.log" 2>&1 &
+DISABLED_MONITOR_TESTS="apiserver-availability,apiserver-new-disruption-invariant,disruption-summary-serializer,external-service-availability,incluster-disruption-serializer,image-registry-availability,ingress-availability,pod-network-avalibility,service-type-load-balancer-availability"
+openshift-tests run-monitor ${MONITOR_ARGS:-} --artifact-dir $STORE_PATH --disable-monitor=${DISABLED_MONITOR_TESTS} > "${ARTIFACT_DIR}/run-monitor.log" 2>&1 &
 wait

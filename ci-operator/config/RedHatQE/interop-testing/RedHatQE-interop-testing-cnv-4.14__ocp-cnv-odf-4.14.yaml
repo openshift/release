@@ -1,0 +1,55 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  ocs-ci-tests:
+    name: ocs-ci-container
+    namespace: ci
+    tag: stable
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- context_dir: cnv-ci
+  dockerfile_path: Dockerfile
+  to: cnv-ci
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: cnv-odf-tests-aws-upi-ocp414
+  cron: 4 14 * * SAT
+  steps:
+    cluster_profile: aws-interop-qe
+    env:
+      BASE_DOMAIN: release-ci.cnv-qe.rhood.us
+      OCP_VERSION: "4.14"
+      ODF_OPERATOR_CHANNEL: stable-4.14
+      ODF_VERSION_MAJOR_MINOR: "4.14"
+      WORKER_INSTANCE_TYPE: c5n.metal
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-tests-deploy-odf
+    - ref: interop-tests-ocs-tests
+    - ref: interop-tests-cnv-tests-e2e-deploy
+    workflow: cucushift-installer-rehearse-aws-upi
+zz_generated_metadata:
+  branch: cnv-4.14
+  org: RedHatQE
+  repo: interop-testing
+  variant: ocp-cnv-odf-4.14
