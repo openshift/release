@@ -54,8 +54,17 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: backplane-cli-codecov-token
+- as: trigger-release
+  postsubmit: true
+  commands: |
+    bash ci-release.sh
+  container:
+    from: src
+  run_if_changed: '^VERSION.md$'
 - as: release
   postsubmit: true
+  branches:
+  - ^refs/tags/v.*$
   commands: |
     export GITHUB_TOKEN=$(cat /tmp/secret/GITHUB_TOKEN)
     make release
@@ -63,7 +72,7 @@ tests:
     from: src
   secret:
     mount_path: /tmp/secret
-    name: github-token-for-release
+    name: backplane-cli-release-token
 zz_generated_metadata:
   branch: main
   org: openshift
