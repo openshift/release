@@ -19,6 +19,10 @@ RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST:=""}
 CURRENT_VERSION=$(oc get clusterversion -ojsonpath={..desired.version})
 OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:=$RELEASE_IMAGE_LATEST}
 
+echo "{\"network-perf-v2\": \"full-run.yaml\"}" > workload.json 
+result=$(jq -s add workload.json ${SHARED_DIR}/perfscale_run.json)
+echo $result > ${SHARED_DIR}/perfscale_run.json
+
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
     echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
     exit 1

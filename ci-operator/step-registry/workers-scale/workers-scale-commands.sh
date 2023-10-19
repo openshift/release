@@ -93,3 +93,5 @@ if [[ $worker_count_num -gt 0 ]]; then
         fi
     fi
 fi
+
+echo "{'scale': $WORKER_REPLICA_COUNT}" >> ${SHARED_DIR}/perfscale_run.json

@@ -49,3 +49,7 @@ rm -f ${SHARED_DIR}/index.json
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 jq ".iterations = $JOB_ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
+
+echo "{\"$WORKLOAD\": \"$JOB_ITERATIONS\"}" > workload.json 
+result=$(jq -s add workload.json ${SHARED_DIR}/perfscale_run.json)
+echo $result > ${SHARED_DIR}/perfscale_run.json
