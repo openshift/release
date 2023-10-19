@@ -1,34 +1,34 @@
 base_images:
   base:
-    name: "4.10"
+    name: "4.11"
     namespace: ocp
     tag: base
   cli:
-    name: "4.10"
+    name: "4.11"
     namespace: ocp
     tag: cli
-  openshift_eventing-istio-src_knative-v1.10:
+  openshift_eventing-istio-src_knative-v1.11:
     name: eventing-istio-src
     namespace: openshift
-    tag: knative-v1.10
-  openshift_eventing-kafka-broker-src_knative-v1.10:
+    tag: knative-v1.11
+  openshift_eventing-kafka-broker-src_knative-v1.11:
     name: eventing-kafka-broker-src
     namespace: openshift
-    tag: knative-v1.10
-  openshift_knative-eventing-src_knative-v1.10:
+    tag: knative-v1.11
+  openshift_knative-eventing-src_knative-v1.11:
     name: knative-eventing-src
     namespace: openshift
-    tag: knative-v1.10
-  openshift_knative-serving-src_knative-v1.10:
+    tag: knative-v1.11
+  openshift_knative-serving-src_knative-v1.11:
     name: knative-serving-src
     namespace: openshift
-    tag: knative-v1.10
+    tag: knative-v1.11
   openshift_release_golang-1.19:
     name: release
     namespace: openshift
     tag: golang-1.19
   opm:
-    name: "4.10"
+    name: "4.11"
     namespace: origin
     tag: operator-registry
 build_root:
@@ -42,18 +42,18 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    openshift_eventing-istio-src_knative-v1.10:
+    openshift_eventing-istio-src_knative-v1.11:
       as:
-      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.10
-    openshift_eventing-kafka-broker-src_knative-v1.10:
+      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.11
+    openshift_eventing-kafka-broker-src_knative-v1.11:
       as:
-      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.10
-    openshift_knative-eventing-src_knative-v1.10:
+      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.11
+    openshift_knative-eventing-src_knative-v1.11:
       as:
-      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.10
-    openshift_knative-serving-src_knative-v1.10:
+      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.11
+    openshift_knative-serving-src_knative-v1.11:
       as:
-      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.10
+      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.11
   to: serverless-operator-src
 - context_dir: .
   dockerfile_path: serving/ingress/Dockerfile
@@ -95,14 +95,14 @@ images:
   to: serverless-index
 promotion:
   disabled: true
-  name: openshift-serverless-v1.31.0
+  name: openshift-serverless-nightly
   namespace: knative
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.10"
+      version: "4.11"
 resources:
   '*':
     limits:
@@ -111,14 +111,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: operator-e2e-aws-ocp-410
+- as: operator-e2e-aws-ocp-411
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.10"
+    version: "4.11"
   steps:
     allow_skip_on_success: true
     test:
@@ -139,14 +139,14 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: upstream-e2e-aws-ocp-410
+- as: upstream-e2e-aws-ocp-411
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.10"
+    version: "4.11"
   optional: true
   steps:
     allow_skip_on_success: true
@@ -168,14 +168,14 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: upstream-e2e-kafka-aws-ocp-410
+- as: upstream-e2e-kafka-aws-ocp-411
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.10"
+    version: "4.11"
   optional: true
   steps:
     allow_skip_on_success: true
@@ -197,14 +197,98 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: upgrade-tests-aws-ocp-410
+- as: e2e-aws-ocp-411-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.10"
+    version: "4.11"
+  cron: 0 0,12 * * *
+  steps:
+    test:
+    - as: serverless-e2e
+      commands: make test-e2e-with-kafka
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: upstream-e2e-kafka-aws-ocp-411-continuous
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.11"
+  cron: 0 4,16 * * *
+  steps:
+    test:
+    - as: serverless-kafka-e2e
+      commands: make test-upstream-e2e-kafka-no-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: upgrade-tests-aws-ocp-411-continuous
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.11"
+  cron: 0 2,14 * * *
+  steps:
+    test:
+    - as: serverless-e2e
+      commands: make test-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "4"
+          memory: 6Gi
+    workflow: generic-claim
+- as: upgrade-tests-aws-ocp-411
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.11"
   optional: true
   steps:
     allow_skip_on_success: true
@@ -226,14 +310,44 @@ tests:
           cpu: "4"
           memory: 6Gi
     workflow: generic-claim
-- as: upstream-e2e-mesh-aws-ocp-410
+- as: e2e-mesh-ocp-411-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 3h0m0s
-    version: "4.10"
+    version: "4.11"
+  cron: 0 4,16 * * *
+  steps:
+    test:
+    - as: serverless-e2e
+      commands: make test-upstream-e2e-mesh
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 5h0m0s
+    workflow: generic-claim
+  timeout: 5h10m0s
+- as: upstream-e2e-mesh-aws-ocp-411
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.11"
   optional: true
   steps:
     allow_skip_on_success: true
@@ -264,7 +378,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.10"
+    version: "4.11"
   run_if_changed: test/ui
   steps:
     test:
@@ -285,14 +399,141 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: e2e-kitchensink-ocp-410
+- as: ui-tests-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.10"
+    version: "4.11"
+  cron: 0 6,18 * * *
+  steps:
+    test:
+    - as: serverless-ui
+      commands: make test-ui-e2e
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: e2e-kitchensink-ocp-411-continuous
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.11"
+  cron: 0 8,20 * * *
+  steps:
+    test:
+    - as: serverless-kitchensink-e2e-setup
+      commands: make test-kitchensink-e2e-setup
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 1h0m0s
+    - as: serverless-kitchensink-e2e-broker
+      commands: make test-kitchensink-e2e-single-testonly TEST=TestBroker
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 2h0m0s
+    - as: serverless-kitchensink-e2e-channel
+      commands: make test-kitchensink-e2e-single-testonly TEST=TestChannel
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 2h0m0s
+    - as: serverless-kitchensink-e2e-flow
+      commands: make test-kitchensink-e2e-single-testonly TEST=TestFlow
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 2h0m0s
+    - as: serverless-kitchensink-e2e-source
+      commands: make test-kitchensink-e2e-single-testonly TEST=TestSource
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 2h0m0s
+    workflow: generic-claim
+  timeout: 8h0m0s
+- as: upgrade-kitchensink-ocp-411-continuous
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.11"
+  cron: 0 10,22 * * *
+  steps:
+    test:
+    - as: serverless-kitchensink-e2e
+      commands: make test-kitchensink-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 3h0m0s
+    workflow: generic-claim
+- as: e2e-kitchensink-ocp-411
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.11"
   optional: true
   steps:
     allow_skip_on_success: true
@@ -314,14 +555,14 @@ tests:
           cpu: "4"
           memory: 6Gi
     workflow: generic-claim
-- as: upgrade-kitchensink-ocp-410
+- as: upgrade-kitchensink-ocp-411
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.10"
+    version: "4.11"
   optional: true
   steps:
     allow_skip_on_success: true
@@ -344,7 +585,7 @@ tests:
           memory: 6Gi
     workflow: generic-claim
 zz_generated_metadata:
-  branch: release-1.31
+  branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: "4.10"
+  variant: "4.11"

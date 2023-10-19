@@ -490,16 +490,25 @@ function admin_ack() {
         echo "Admin ack is not required in either z-stream upgrade or 4.7 and earlier" && return
     fi
 
-    local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o jsonpath='{.data}')"
+    local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r ".data")"
     if [[ ${out} != *"ack-4.${SOURCE_MINOR_VERSION}"* ]]; then
-        echo "Admin ack not required" && return
+        echo "Admin ack not required: ${out}" && return
     fi
 
-    echo "Require admin ack"
+    echo "Require admin ack:\n ${out}"
     local wait_time_loop_var=0 ack_data
-    ack_data="$(echo ${out} | awk '{print $2}' | cut -f2 -d\")" && echo "Admin ack patch data is: ${ack_data}"
-    oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack_data}"'": "true"}}' --type=merge
 
+    ack_data="$(echo "${out}" | jq -r "keys[]")"
+    for ack in ${ack_data};
+    do
+        # e.g.: ack-4.12-kube-1.26-api-removals-in-4.13
+        if [[ "${ack}" == *"ack-4.${SOURCE_MINOR_VERSION}"* ]]
+        then
+            echo "Admin ack patch data is: ${ack}"
+            oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
+            break
+        fi
+    done
     echo "Admin-acks patch gets started"
 
     echo -e "sleep 5 min wait admin-acks patch to be valid...\n"
