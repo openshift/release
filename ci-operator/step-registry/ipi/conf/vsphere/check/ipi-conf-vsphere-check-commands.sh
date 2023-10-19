@@ -33,7 +33,6 @@ if [[ ${LEASED_RESOURCE} == *"segment"* ]]; then
   # notes: jcallen: to keep backward compatiability with existing vsphere env(s)
   vsphere_portgroup="${LEASED_RESOURCE}"
   LEASE_NUMBER=$((${LEASED_RESOURCE//[!0-9]/}))
-  vsphere_bastion_portgroup=VSPHERE_CONNECTED_LEASED_RESOURCE
 else
   LEASE_NUMBER=-1
   # notes: jcallen: split the LEASED_RESOURCE e.g. bcr01a.dal10.1153
@@ -51,6 +50,11 @@ else
     echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
     exit 1
   fi
+
+  router_2=$(awk -F. '{print $1}' <(echo "${VSPHERE_CONNECTED_LEASED_RESOURCE}"))
+  phydc_2=$(awk -F. '{print $2}' <(echo "${VSPHERE_CONNECTED_LEASED_RESOURCE}"))
+
+  vsphere_bastion_portgroup="${router_2}.${phydc_2}"
 
   vsphere_url=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].virtualcenter' "${SUBNETS_CONFIG}")
 
