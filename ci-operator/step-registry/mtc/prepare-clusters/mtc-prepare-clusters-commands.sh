@@ -28,6 +28,8 @@ oc login -u kubeadmin -p $SOURCE_KUBEADMIN_PASSWORD
 oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge && sleep 10
 export EXPOSED_REGISTRY_PATH=$(oc get route default-route  -n openshift-image-registry -o jsonpath='{.spec.host}')
 
+sleep 2500
+
 # Configure the clusters prior to executing tests
 echo "Configuring the source and target clusters."
 ansible-playbook /mtc-interop/config_mtc.yml \
