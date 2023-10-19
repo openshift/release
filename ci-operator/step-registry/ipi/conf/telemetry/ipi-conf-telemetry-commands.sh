@@ -6,7 +6,7 @@ set -o pipefail
 
 if test -z "${TELEMETRY_ENABLED}"
 then
-	if [[ "${JOB_NAME}" =~ '4.11' ]]
+	if [[ "${JOB_NAME}" =~ (^|[^[:digit:]]+)4.11([^[:digit:]]+|$) ]]
 	then
 		TELEMETRY_ENABLED=true
 		echo "TELEMETRY_ENABLED is empty, defaulting to '${TELEMETRY_ENABLED}' for the 4.11 ${JOB_NAME}"
