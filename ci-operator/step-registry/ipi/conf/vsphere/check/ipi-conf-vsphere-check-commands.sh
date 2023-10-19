@@ -33,6 +33,7 @@ if [[ ${LEASED_RESOURCE} == *"segment"* ]]; then
   # notes: jcallen: to keep backward compatiability with existing vsphere env(s)
   vsphere_portgroup="${LEASED_RESOURCE}"
   LEASE_NUMBER=$((${LEASED_RESOURCE//[!0-9]/}))
+  vsphere_bastion_portgroup=VSPHERE_CONNECTED_LEASED_RESOURCE
 else
   LEASE_NUMBER=-1
   # notes: jcallen: split the LEASED_RESOURCE e.g. bcr01a.dal10.1153
@@ -92,6 +93,7 @@ export vsphere_portgroup="${vsphere_portgroup}"
 export vlanid="${vlanid:-unset}"
 export phydc="${phydc:-unset}"
 export primaryrouterhostname="${primaryrouterhostname:-unset}"
+export vsphere_bastion_portgroup="${vsphere_bastion_portgroup}"
 EOF
 
 # shellcheck source=/dev/null

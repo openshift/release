@@ -7,6 +7,7 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 declare vsphere_portgroup
+declare vsphere_bastion_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
@@ -42,7 +43,7 @@ if [[ "$(govc vm.info ${vm_template} | wc -c)" -eq 0 ]]; then
    "InjectOvfEnv": false,
    "WaitForIP": false,
    "Name": "${vm_template}-bastion",
-   "NetworkMapping":[{"Name":"VM Network","Network":"${BASTION_HOST_SUBNET}"}]
+   "NetworkMapping":[{"Name":"VM Network","Network":"${vsphere_bastion_portgroup}"}]
 }
 EOF
 
