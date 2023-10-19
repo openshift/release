@@ -60,7 +60,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build04
+    cluster: build02
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
@@ -72,7 +72,64 @@ postsubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/backplane-cli-release-token
         - --target=release
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/backplane-cli-release-token
+          name: backplane-cli-release-token
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: backplane-cli-release-token
+        secret:
+          secretName: backplane-cli-release-token
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    cluster: build02
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-openshift-backplane-cli-main-trigger-release
+    run_if_changed: ^VERSION.md$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=trigger-release
         command:
         - ci-operator
         image: ci-operator:latest
@@ -94,9 +151,6 @@ postsubmits:
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
-        - mountPath: /tmp/secret
-          name: backplane-cli-release-token
-          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: manifest-tool-local-pusher
@@ -108,6 +162,3 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-      - name: backplane-cli-release-token
-        secret:
-          secretName: backplane-cli-release-token
