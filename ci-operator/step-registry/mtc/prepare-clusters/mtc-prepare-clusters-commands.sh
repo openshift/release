@@ -18,17 +18,18 @@ ansible-playbook /mtc-interop/install-mtc.yml \
     -e version=${MTC_VERSION} \
     -e kubeconfig_path=/tmp/clusters-data/aws/mtc-aws-ipi-source/auth/kubeconfig
 
+# Log into target cluster
+# TODO: cp /mtc-interop/oc /usr/bin/oc
 cp /mtc-interop/usr/bin/oc/oc /usr/bin/oc
-SOURCE_KUBEADMIN_PASSWORD_FILE="/tmp/clusters-data/aws/mtc-aws-ipi-target/auth/kubeadmin-password"
-SOURCE_KUBECONFIG="/tmp/clusters-data/aws/mtc-aws-ipi-target/auth/kubeconfig"
+SOURCE_KUBEADMIN_PASSWORD_FILE="/tmp/clusters-data/aws/mtc-aws-ipi-source/auth/kubeadmin-password"
+SOURCE_KUBECONFIG="/tmp/clusters-data/aws/mtc-aws-ipi-source/auth/kubeconfig"
 SOURCE_KUBEADMIN_PASSWORD=$(cat $SOURCE_KUBEADMIN_PASSWORD_FILE)
 export KUBECONFIG=$SOURCE_KUBECONFIG
 oc login -u kubeadmin -p $SOURCE_KUBEADMIN_PASSWORD
 
+echo "Retrieving target cluster exposed registry path."
 oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge && sleep 10
-export EXPOSED_REGISTRY_PATH=$(oc get route default-route  -n openshift-image-registry -o jsonpath='{.spec.host}')
-
-sleep 2500
+EXPOSED_REGISTRY_PATH=$(oc get route default-route  -n openshift-image-registry -o jsonpath='{.spec.host}')
 
 # Configure the clusters prior to executing tests
 echo "Configuring the source and target clusters."
