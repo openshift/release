@@ -8,6 +8,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 declare vsphere_portgroup
 declare vsphere_bastion_portgroup
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
@@ -18,9 +19,9 @@ if [[ ! -f "${bastion_ignition_file}" ]]; then
 fi
 bastion_ignition_base64=$(base64 -w0 <"${bastion_ignition_file}")
 
-if [[ -z "${BASTION_HOST_SUBNET}" ]]; then
-  echo "Not define env BASTION_HOST_SUBNET, bastion host will be provisioned in network defined as LEASED_RESOURCE..."
-  BASTION_HOST_SUBNET=${vsphere_portgroup}
+if [[ -z "${vsphere_bastion_portgroup}" ]]; then
+  echo "Not define env vsphere_bastion_portgroup, bastion host will be provisioned in network defined as LEASED_RESOURCE..."
+  vsphere_bastion_portgroup=${vsphere_portgroup}
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
@@ -31,8 +32,8 @@ source "${SHARED_DIR}/govc.sh"
 echo "$(date -u --rfc-3339=seconds) - Get avaiable ova template..."
 vm_template="${BASTION_OVA_URI##*/}"
 
-if [[ "$(govc vm.info ${vm_template} | wc -c)" -eq 0 ]]; then
-  if [[ "$(govc vm.info ${vm_template}-bastion | wc -c)" -eq 0 ]]; then
+if [[ "$(govc vm.info "${vm_template}" | wc -c)" -eq 0 ]]; then
+  if [[ "$(govc vm.info "${vm_template}"-bastion | wc -c)" -eq 0 ]]; then
     echo "${vm_template} and ${vm_template}-bastion does not exist, creating it from ${BASTION_OVA_URI}..."
 
     cat >/tmp/rhcos.json <<EOF
@@ -59,19 +60,19 @@ echo "ova template: ${vm_template}"
 #Create bastion host virtual machine
 echo "$(date -u --rfc-3339=seconds) - Creating bastion host..."
 vm_folder="/${GOVC_DATACENTER}/vm"
-govc vm.clone -vm ${vm_folder}/${vm_template} -on=false -net=${BASTION_HOST_SUBNET} ${bastion_name}
+govc vm.clone -vm "${vm_folder}"/"${vm_template}" -on=false -net="${vsphere_bastion_portgroup}" "${bastion_name}"
 #govc vm.customize -vm ${vm_folder}/${bastion_name} -name=${bastion_name} -ip=dhcp
-govc vm.change -vm ${vm_folder}/vm/${bastion_name} -c "4" -m "8192" -e disk.enableUUID=TRUE
-disk_name=$(govc device.info -json -vm ${vm_folder}/${bastion_name} | jq -r '.Devices[]|select(.Type == "VirtualDisk")|.Name')
-govc vm.disk.change -vm ${vm_folder}/${bastion_name} -disk.name ${disk_name} -size 100G
-govc vm.change -vm ${vm_folder}/${bastion_name} -e "guestinfo.ignition.config.data.encoding=base64"
-govc vm.change -vm ${vm_folder}/${bastion_name} -e "guestinfo.ignition.config.data=${bastion_ignition_base64}"
-govc vm.power -on ${vm_folder}/${bastion_name}
+govc vm.change -vm "${vm_folder}"/vm/"${bastion_name}" -c "4" -m "8192" -e disk.enableUUID=TRUE
+disk_name=$(govc device.info -json -vm "${vm_folder}"/"${bastion_name}" | jq -r '.Devices[]|select(.Type == "VirtualDisk")|.Name')
+govc vm.disk.change -vm "${vm_folder}"/"${bastion_name}" -disk.name "${disk_name}" -size 100G
+govc vm.change -vm "${vm_folder}"/"${bastion_name}" -e "guestinfo.ignition.config.data.encoding=base64"
+govc vm.change -vm "${vm_folder}"/"${bastion_name}" -e "guestinfo.ignition.config.data=${bastion_ignition_base64}"
+govc vm.power -on "${vm_folder}"/"${bastion_name}"
 
 loop=10
 while [ ${loop} -gt 0 ]; do
-  bastion_ip=$(govc vm.info -json ${vm_folder}/${bastion_name} | jq -r .VirtualMachines[].Summary.Guest.IpAddress)
-  if [ "x${bastion_ip}" == "x" ]; then
+  bastion_ip=$(govc vm.info -json "${vm_folder}"/"${bastion_name}" | jq -r .VirtualMachines[].Summary.Guest.IpAddress)
+  if [ "${bastion_ip}" == "" ]; then
     loop=$((loop - 1))
     sleep 30
   else
@@ -79,7 +80,7 @@ while [ ${loop} -gt 0 ]; do
   fi
 done
 
-if [ "x${bastion_ip}" == "x" ]; then
+if [ "${bastion_ip}" == "" ]; then
   echo "Unabel to get ip of bastion host instance ${bastion_name}!"
   exit 1
 fi
