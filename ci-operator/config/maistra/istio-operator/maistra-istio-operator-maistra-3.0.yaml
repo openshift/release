@@ -315,10 +315,11 @@ tests:
 - as: nightly-images
   cron: 00 03 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       RELEASE_IMAGE_LATEST: release:latest
     env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.13.14-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-nightly-images
       MAISTRA_SC_POD: maistra-nightly-images-pod
@@ -351,8 +352,8 @@ tests:
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
           sh -c \
-          "git config --global user.email 'dgrimm@redhat.com'; \
-           git config --global user.name 'Daniel Grimm'; \
+          "git config --global user.email 'jwendell@redhat.com'; \
+           git config --global user.name 'Jonh Wendell'; \
            cd /work && \
            export BUILD_WITH_CONTAINER="0" && \
            make -e GITHUB_TOKEN=${GITHUB_TOKEN} docker-push-nightly bundle-publish-nightly"
@@ -373,7 +374,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-profile
+    workflow: servicemesh-istio-e2e-hypershift
 zz_generated_metadata:
   branch: maistra-3.0
   org: maistra
