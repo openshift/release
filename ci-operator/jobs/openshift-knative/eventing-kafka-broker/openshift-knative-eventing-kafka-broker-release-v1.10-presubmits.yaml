@@ -6,16 +6,16 @@ presubmits:
     - ^release-v1\.10$
     - ^release-v1\.10-
     cluster: build02
-    context: ci/prow/411-images
+    context: ci/prow/410-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "411"
+      ci-operator.openshift.io/variant: "410"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.10-411-images
-    rerun_command: /test 411-images
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.10-410-images
+    rerun_command: /test 410-images
     spec:
       containers:
       - args:
@@ -24,7 +24,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=src
-        - --variant=411
+        - --variant=410
         command:
         - ci-operator
         image: ci-operator:latest
@@ -57,23 +57,81 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )411-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )410-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-v1\.10$
     - ^release-v1\.10-
     cluster: build02
-    context: ci/prow/411-test-conformance-aws-ocp-411
+    context: ci/prow/410-security
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "411"
+      ci-operator.openshift.io/variant: "410"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.10-411-test-conformance-aws-ocp-411
-    rerun_command: /test 411-test-conformance-aws-ocp-411
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.10-410-security
+    optional: true
+    rerun_command: /test 410-security
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=security
+        - --variant=410
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )410-security,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-v1\.10$
+    - ^release-v1\.10-
+    cluster: build02
+    context: ci/prow/410-test-conformance-aws-ocp-410
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "410"
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.10-410-test-conformance-aws-ocp-410
+    rerun_command: /test 410-test-conformance-aws-ocp-410
     spec:
       containers:
       - args:
@@ -82,8 +140,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-conformance-aws-ocp-411
-        - --variant=411
+        - --target=test-conformance-aws-ocp-410
+        - --variant=410
         command:
         - ci-operator
         image: ci-operator:latest
@@ -128,23 +186,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )411-test-conformance-aws-ocp-411,?($|\s.*)
+    trigger: (?m)^/test( | .* )410-test-conformance-aws-ocp-410,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-v1\.10$
     - ^release-v1\.10-
     cluster: build02
-    context: ci/prow/411-test-e2e-aws-ocp-411
+    context: ci/prow/410-test-e2e-aws-ocp-410
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "411"
+      ci-operator.openshift.io/variant: "410"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.10-411-test-e2e-aws-ocp-411
-    rerun_command: /test 411-test-e2e-aws-ocp-411
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.10-410-test-e2e-aws-ocp-410
+    rerun_command: /test 410-test-e2e-aws-ocp-410
     spec:
       containers:
       - args:
@@ -153,8 +211,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-e2e-aws-ocp-411
-        - --variant=411
+        - --target=test-e2e-aws-ocp-410
+        - --variant=410
         command:
         - ci-operator
         image: ci-operator:latest
@@ -199,23 +257,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )411-test-e2e-aws-ocp-411,?($|\s.*)
+    trigger: (?m)^/test( | .* )410-test-e2e-aws-ocp-410,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-v1\.10$
     - ^release-v1\.10-
     cluster: build02
-    context: ci/prow/411-test-reconciler-aws-ocp-411
+    context: ci/prow/410-test-reconciler-aws-ocp-410
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "411"
+      ci-operator.openshift.io/variant: "410"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.10-411-test-reconciler-aws-ocp-411
-    rerun_command: /test 411-test-reconciler-aws-ocp-411
+    name: pull-ci-openshift-knative-eventing-kafka-broker-release-v1.10-410-test-reconciler-aws-ocp-410
+    rerun_command: /test 410-test-reconciler-aws-ocp-410
     spec:
       containers:
       - args:
@@ -224,8 +282,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=test-reconciler-aws-ocp-411
-        - --variant=411
+        - --target=test-reconciler-aws-ocp-410
+        - --variant=410
         command:
         - ci-operator
         image: ci-operator:latest
@@ -270,7 +328,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )411-test-reconciler-aws-ocp-411,?($|\s.*)
+    trigger: (?m)^/test( | .* )410-test-reconciler-aws-ocp-410,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
