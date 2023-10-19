@@ -39,4 +39,5 @@ pushd ocp-qe-perfscale-ci
 pip install -r requirements.txt
 pushd write_to_sheet
 
-python prow_write_overall.py
+
+python prow_write_overall.py ${SHARED_DIR}/perfscale_run.json
