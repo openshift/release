@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
-
+#test the script
 #Create pvc for image registry storage
 if [[ "${SETUP_IMAGE_REGISTRY_WITH_PVC:-}" == "true" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Setting the image registry storage to use the manual setting storage..."
