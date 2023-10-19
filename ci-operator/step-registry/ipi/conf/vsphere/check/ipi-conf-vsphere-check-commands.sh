@@ -51,10 +51,8 @@ else
     exit 1
   fi
 
-  router_2=$(awk -F. '{print $1}' <(echo "${VSPHERE_CONNECTED_LEASED_RESOURCE}"))
-  phydc_2=$(awk -F. '{print $2}' <(echo "${VSPHERE_CONNECTED_LEASED_RESOURCE}"))
-
-  vsphere_bastion_portgroup="${router_2}.${phydc_2}"
+  vlanid_2=$(awk -F. '{print $3}' <(echo "${LEASED_RESOURCE}"))
+  vsphere_portgroup="ci-vlan-${vlanid_2}"
 
   vsphere_url=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].virtualcenter' "${SUBNETS_CONFIG}")
 
