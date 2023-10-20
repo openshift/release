@@ -17,15 +17,31 @@ echo "removing networking config if already exists"
 
 echo "applying dual-stack networking config"
 
-/tmp/yq e --inplace '.platform.vsphere.apiVIPs += [strenv(API_VIP), "fd65:a1a8:60ad:271c::200"]' ${SHARED_DIR}/install-config.yaml
-/tmp/yq e --inplace '.platform.vsphere.ingressVIPs += [strenv(INGRESS_VIP), "fd65:a1a8:60ad:271c::201"]' ${SHARED_DIR}/install-config.yaml
+SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+source "${SHARED_DIR}/vsphere_context.sh"
+declare vlanid
+declare primaryrouterhostname
 
-cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
+  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+  exit 1
+fi
+machine_cidr_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipv6prefix' "${SUBNETS_CONFIG}")
+
+IPV6_API_VIP="${machine_cidr_ipv6%%::*}::4"
+IPV6_INGRESS_VIP="${machine_cidr_ipv6%%::*}::5"
+export IPV6_API_VIP
+export IPV6_INGRESS_VIP
+
+/tmp/yq e --inplace '.platform.vsphere.apiVIPs += [strenv(API_VIP), strenv(IPV6_API_VIP)]' ${SHARED_DIR}/install-config.yaml
+/tmp/yq e --inplace '.platform.vsphere.ingressVIPs += [strenv(INGRESS_VIP), strenv(IPV6_INGRESS_VIP)]' ${SHARED_DIR}/install-config.yaml
+
+cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
 networking:
   networkType: OVNKubernetes
   machineNetwork:
   - cidr: 192.168.0.0/16
-  - cidr: fd65:a1a8:60ad:271c::/64
+  - cidr: ${machine_cidr_ipv6}
   clusterNetwork:
   - cidr: 10.128.0.0/14
     hostPrefix: 23
