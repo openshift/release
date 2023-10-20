@@ -236,12 +236,22 @@ agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
 echo "uploading ${agent_iso} to iso-datastore.."
 
 for ((i = 0; i < 3; i++)); do
-  if /tmp/govc datastore.upload -ds "${vsphere_datastore}" agent.x86_64.iso agent-installer-isos/"${agent_iso}"; then
-    echo "$(date -u --rfc-3339=seconds) - Agent ISO has been uploaded successfully!!"
-    status=0
-    break
+  file_upload_url="https://${vsphere_url}/folder/agent-installer-isos/${agent_iso}?dcPath=${vsphere_datacenter}&dsName=${vsphere_datastore}"
+  if response_code=$(curl -s -k -X PUT \
+    -T agent.x86_64.iso \
+    -u "${GOVC_USERNAME}":"${GOVC_PASSWORD}" "${file_upload_url}" \
+    --write-out '%{http_code}'); then
+    if [ "${response_code}" -eq 200 ]; then
+      echo "$(date -u --rfc-3339=seconds) - Agent ISO has been uploaded successfully!!"
+      status=0
+      break
+    else
+      echo "$(date -u --rfc-3339=seconds) - Failed to upload agent iso. Retrying..."
+      status=1
+      sleep 2
+    fi
   else
-    echo "$(date -u --rfc-3339=seconds) - Failed to upload agent iso. Retrying..."
+    echo "$(date -u --rfc-3339=seconds) - The upload request couldn't establish a connection with the vSphere API. Retrying..."
     status=1
     sleep 2
   fi
