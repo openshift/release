@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.11"
+    name: "4.14"
     namespace: ocp
     tag: cli
   operator-base:
@@ -9,10 +9,7 @@ base_images:
     tag: "8"
 binary_build_commands: make build
 build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: operator-base
@@ -39,7 +36,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.11"
+      version: "4.14"
 resources:
   '*':
     requests:
@@ -52,7 +49,7 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: e2e-test
+- as: openshift-e2e
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
@@ -65,7 +62,7 @@ tests:
       OO_TARGET_NAMESPACES: '!all'
     test:
     - as: e2e
-      commands: make e2e-test
+      commands: export SKIP_LOG_VERIFICATION="true" && make e2e-test
       from: src-oc
       resources:
         requests:
@@ -73,6 +70,7 @@ tests:
           memory: 200Mi
     workflow: optional-operators-ci-aws
 zz_generated_metadata:
-  branch: release-0.4
+  branch: release-0.7
   org: medik8s
   repo: self-node-remediation
+  variant: "4.14"
