@@ -16,7 +16,21 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.20-openshift-4.14
+images:
+- dockerfile_literal: |
+    FROM src as rpms
+    RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
+  inputs:
+    src:
+      as:
+      - src
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift
+  to: microshift-test-rpm
 promotion:
+  excluded_images:
+  - microshift-test-rpm
   name: "4.15"
   namespace: ocp
 releases:
@@ -67,6 +81,11 @@ tests:
   container:
     from: src
   run_if_changed: ^(rpm/*|packaging/.*|Makefile)
+- as: test-rpm
+  cluster: build02
+  commands: make rpm
+  container:
+    from: microshift-test-rpm
 - as: test-rebase
   cluster: build02
   optional: true
