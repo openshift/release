@@ -13,6 +13,12 @@ chmod +x ${SNYK_DIR}/snyk
 echo snyk installed to ${SNYK_DIR}
 ${SNYK_DIR}/snyk --version
 
+CLONE_REFS=$(echo $CLONEREFS_OPTIONS | jq -r ".refs[] | select( .base_ref == \"$(git rev-parse --abbrev-ref HEAD)\" )")
+
+if [ -z "${PROJECT_NAME}" ]; then
+    PROJECT_NAME=$(echo $CLONE_REFS | jq -r "( .org + \"/\" + .repo )")
+fi
+
 snyk_deps() {
     echo Starting snyk dependencies scan
     PARAMS=(--project-name="$PROJECT_NAME" --org="$ORG_NAME")
