@@ -27,6 +27,7 @@ PRIVATE=${PRIVATE:-false}
 PRIVATE_LINK=${PRIVATE_LINK:-false}
 PRIVATE_SUBNET_ONLY="false"
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
+OPENSHIFT_NETWORK_TYPE=${OPENSHIFT_NETWORK_TYPE:-"OVNKubernetes"}
 
 # Record Cluster Configurations
 cluster_config_file="${SHARED_DIR}/cluster-config"
@@ -416,6 +417,7 @@ ${STS_SWITCH} \
 --version ${OPENSHIFT_VERSION} \
 --channel-group ${CHANNEL_GROUP} \
 --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
+--network-type ${OPENSHIFT_NETWORK_TYPE} \
 --tags ${TAGS} \
 ${ACCOUNT_ROLES_SWITCH} \
 ${EC2_METADATA_HTTP_TOKENS_SWITCH} \
