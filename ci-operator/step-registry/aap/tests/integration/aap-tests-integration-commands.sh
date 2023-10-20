@@ -94,6 +94,8 @@ spec:
       value: ""
     - name: TESTEXPR
       value: "yolo or ansible_integration"
+    - name: PAT_GITHUB
+      value: "$(cat ${SECRETS_DIR}/PAT_GITHUB)"
     imagePullPolicy: Always
     resources:
       limits:
