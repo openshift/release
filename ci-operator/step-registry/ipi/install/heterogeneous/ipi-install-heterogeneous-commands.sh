@@ -6,6 +6,143 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+trap 'FRC=$?; createHeterogeneousJunit; debug' EXIT TERM
+
+# Print failed node, co, machine information for debug purpose
+function debug() {
+    if (( FRC != 0 )); then
+        echo -e "Describing abnormal nodes...\n"
+        oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
+        echo -e "Describing abnormal operators...\n"
+        oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
+        echo -e "Describing abnormal machines...\n"
+        oc -n openshift-machine-api get machines.machine.openshift.io --no-headers | awk '$2 != "Running" {print $1}' | while read machine; do echo -e "\n#####oc describe machines ${machine}#####\n$(oc -n openshift-machine-api describe machines.machine.openshift.io ${machine})"; done
+    fi
+}
+
+# Generate the Junit for migration
+function createHeterogeneousJunit() {
+    echo "Generating the Junit for heterogeneous"
+    filename="import-Cluster_Infrastructure"
+    testsuite="Cluster_Infrastructure"
+    subteam="Cluster_Infrastructure"
+    if [[ ${JOB_NAME} =~ "-upgrade-from-" ]] && [[ ${JOB_NAME} =~ "day2" ]]; then
+        filename="cluster upgrade"
+        testsuite="cluster upgrade"
+        subteam="OTA"
+    fi
+    if [[ ${JOB_NAME} =~ "-to-multiarch-" ]]; then
+        filename="step_cucushift-upgrade-arch-migration"
+        testsuite="step_cucushift-upgrade-arch-migration"
+        subteam="OTA"
+    fi
+    if (( FRC == 0 )); then
+        cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="1">
+  <testcase name="OCP-00001:${subteam}_leader:Adding secondary arch nodes to multi-arch cluster should succeed"/>
+</testsuite>
+EOF
+    else
+        cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="1">
+  <testcase name="OCP-00001:${subteam}_leader:Adding secondary arch nodes to multi-arch cluster should succeed">
+    <failure message="">add secondary architecture nodes failed or cluster operators abnormal after the new nodes joined the cluster</failure>
+  </testcase>
+</testsuite>
+EOF
+    fi
+}
+
+function check_clusteroperators() {
+    local tmp_ret=0 tmp_clusteroperator input column last_column_name tmp_clusteroperator_1 rc unavailable_operator degraded_operator
+
+    echo "Make sure every operator do not report empty column"
+    tmp_clusteroperator=$(mktemp /tmp/health_check-script.XXXXXX)
+    input="${tmp_clusteroperator}"
+    oc get clusteroperator >"${tmp_clusteroperator}"
+    column=$(head -n 1 "${tmp_clusteroperator}" | awk '{print NF}')
+    last_column_name=$(head -n 1 "${tmp_clusteroperator}" | awk '{print $NF}')
+    if [[ ${last_column_name} == "MESSAGE" ]]; then
+        (( column -= 1 ))
+        tmp_clusteroperator_1=$(mktemp /tmp/health_check-script.XXXXXX)
+        awk -v end=${column} '{for(i=1;i<=end;i++) printf $i"\t"; print ""}' "${tmp_clusteroperator}" > "${tmp_clusteroperator_1}"
+        input="${tmp_clusteroperator_1}"
+    fi
+
+    while IFS= read -r line
+    do
+        rc=$(echo "${line}" | awk '{print NF}')
+        if (( rc != column )); then
+            echo >&2 "The following line have empty column"
+            echo >&2 "${line}"
+            (( tmp_ret += 1 ))
+        fi
+    done < "${input}"
+    rm -f "${tmp_clusteroperator}"
+
+    echo "Make sure every operator's AVAILABLE column is True"
+    if unavailable_operator=$(oc get clusteroperator | awk '$3 == "False"' | grep "False"); then
+        echo >&2 "Some operator's AVAILABLE is False"
+        echo >&2 "$unavailable_operator"
+        (( tmp_ret += 1 ))
+    fi
+    if oc get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Available") | .status' | grep -iv "True"; then
+        echo >&2 "Some operators are unavailable, pls run 'oc get clusteroperator -o json' to check"
+        (( tmp_ret += 1 ))
+    fi
+
+    echo "Make sure every operator's PROGRESSING column is False"
+    if progressing_operator=$(oc get clusteroperator | awk '$4 == "True"' | grep "True"); then
+        echo >&2 "Some operator's PROGRESSING is True"
+        echo >&2 "$progressing_operator"
+        (( tmp_ret += 1 ))
+    fi
+    if oc get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Progressing") | .status' | grep -iv "False"; then
+        echo >&2 "Some operators are unavailable, pls run 'oc get clusteroperator -o json' to check"
+        (( tmp_ret += 1 ))
+    fi
+
+    echo "Make sure every operator's DEGRADED column is False"
+    if degraded_operator=$(oc get clusteroperator | awk '$5 == "True"' | grep "True"); then
+        echo >&2 "Some operator's DEGRADED is True"
+        echo >&2 "$degraded_operator"
+        (( tmp_ret += 1 ))
+    fi
+    if oc get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Degraded") | .status'  | grep -iv 'False'; then
+        echo >&2 "Some operators are Degraded, pls run 'oc get clusteroperator -o json' to check"
+        (( tmp_ret += 1 ))
+    fi
+
+    return $tmp_ret
+}
+
+function wait_clusteroperators_continous_success() {
+    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=20
+    while (( try < max_retries && continous_successful_check < passed_criteria )); do
+        echo "Checking #${try}"
+        if check_clusteroperators; then
+            echo "Passed #${continous_successful_check}"
+            (( continous_successful_check += 1 ))
+        else
+            echo "cluster operators are not ready yet, wait and retry..."
+            continous_successful_check=0
+        fi
+        sleep 60
+        (( try += 1 ))
+    done
+    if (( continous_successful_check != passed_criteria )); then
+        echo >&2 "Some cluster operator does not get ready or not stable"
+        echo "Debug: current CO output is:"
+        oc get co
+        return 1
+    else
+        echo "All cluster operators status check PASSED"
+        return 0
+    fi
+}
+
 function get_ready_nodes_count() {
   oc get nodes \
     -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | \
@@ -21,6 +158,9 @@ function wait_for_nodes_readiness()
   for i in $(seq 1 "${max_retries}") max; do
     if [ "${i}" == "max" ]; then
       echo "[ERROR] Timeout reached. ${expected_nodes} ready nodes expected, found ${ready_nodes}... Failing."
+      echo "[DEBUG] Current machinesets and machines output are:"
+      oc -n openshift-machine-api get machinesets.machine.openshift.io -owide
+      oc -n openshift-machine-api get machines.machine.openshift.io -owide
       return 1
     fi
     sleep "${period}m"
@@ -256,6 +396,6 @@ echo "$MACHINE_SET" | oc create -o yaml -f -
 
 echo "Wait for the nodes to become ready..."
 wait_for_nodes_readiness ${EXPECTED_NODES}
-ret="$?"
-echo "Exiting with ${ret}."
-exit ${ret}
+
+echo "Check all cluster operators get stable and ready"
+wait_clusteroperators_continous_success
