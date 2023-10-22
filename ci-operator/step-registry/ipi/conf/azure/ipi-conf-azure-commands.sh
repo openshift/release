@@ -61,7 +61,7 @@ elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
 fi
 if [ -n "${master_type_prefix}" ]; then
   if [ "${OCP_ARCH}" = "amd64" ]; then
-    master_type=${master_type_prefix}s_v3
+    master_type=${master_type_prefix}s_v5
   elif [ "${OCP_ARCH}" = "arm64" ]; then
     master_type=${master_type_prefix}ps_v5
   fi
