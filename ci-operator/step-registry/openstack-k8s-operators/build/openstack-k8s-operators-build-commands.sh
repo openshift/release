@@ -22,6 +22,12 @@ PR_REPO_NAME=$(curl -s  -X GET -H \
     https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} | \
     jq -r  '.head.repo.full_name')
 
+DEPENDS_ON=$(curl -s  -X GET -H \
+    -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} | \
+    jq -r  '.body' | grep -iE "(depends-on).*(openstack-operator)" || true)
+
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name
 BASE_OP=${REF_REPO}
@@ -85,6 +91,24 @@ function check_build_result {
   done
 }
 
+# Clone the openstack-operator and checkout
+# the requested PR
+function clone_openstack_operator {
+    git clone https://github.com/openstack-k8s-operators/openstack-operator.git
+    pushd openstack-operator
+    local pr_num=""
+    # Depends-On syntax detected in the PR description: get the PR ID
+    if [[ -n $DEPENDS_ON ]]; then
+        pr_num=$(echo "$DEPENDS_ON" | rev | cut -d"/" -f1 | rev)
+    fi
+    # make sure the PR ID we parse is a number
+    if [[ "$pr_num" == ?(-)+([0-9]) ]]; then
+        # checkout pr $pr_num
+        git fetch origin pull/"$pr_num"/head:PR"$pr_num"
+        git checkout PR"$pr_num"
+    fi
+    popd
+}
 
 # Builds and push operator image
 function build_push_operator_images {
@@ -178,7 +202,7 @@ build_push_operator_images "${BASE_OP}" "${BASE_DIR}/${BASE_OP}" "${IMAGE_TAG_BA
 if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
   pushd ${BASE_DIR}
   if [ ! -d "./openstack-operator" ]; then
-    git clone https://github.com/openstack-k8s-operators/openstack-operator.git
+    clone_openstack_operator
   fi
   pushd openstack-operator
 
@@ -201,7 +225,11 @@ if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
 
   # mod can be either /api or /apis
   MOD=$(grep github.com/${DEFAULT_ORG}/${BASE_OP}/api go.mod || true)
-  if [ -n "$MOD" ]; then
+  # check if a replace directive is already present in go.mod
+  REPLACE=$(grep -E "(^replace).*(${DEFAULT_ORG}/${BASE_OP}/api)" go.mod || true)
+  # exec the following only if mod is present AND no replace directive has already
+  # been added to go.mod
+  if [[ -n "$MOD" && -z "$REPLACE" ]]; then
     API_MOD=$(basename $MOD)
     go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/${API_MOD}=github.com/${REPO_NAME}/${API_MOD}@${API_SHA}
     go mod tidy
