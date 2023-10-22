@@ -1,7 +1,24 @@
+base_images:
+  base:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/api
+images:
+- dockerfile_path: Dockerfile.rhel8
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+  to: cluster-config-api
 promotion:
   name: 4.15-priv
   namespace: ocp-private

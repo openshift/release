@@ -1,0 +1,110 @@
+base_images:
+  cli:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: cli
+  test-bin:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: tests
+  test-runtime:
+    name: test-runtime
+    namespace: microshift
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.20-openshift-4.14
+canonical_go_repository: github.com/openshift/microshift
+promotion:
+  name: 4.14-priv
+  namespace: ocp-private
+releases:
+  nightly-amd64:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+  nightly-arm64:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.14-priv
+  namespace: ocp-private
+tests:
+- as: verify
+  cluster: build02
+  steps:
+    test:
+    - as: verify
+      commands: make verify-ci
+      env:
+      - default: /tmp/
+        name: GOLANGCI_LINT_CACHE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: test-unit
+  cluster: build02
+  commands: make test-unit
+  container:
+    from: src
+- as: test-srpm
+  cluster: build02
+  commands: make srpm
+  container:
+    from: src
+  run_if_changed: ^(rpm/*|packaging/.*|Makefile)
+- as: test-rebase
+  cluster: build02
+  optional: true
+  run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod)
+  steps:
+    env:
+      DRY_RUN: "y"
+    workflow: openshift-microshift-rebase
+- as: microshift-metal-tests
+  cluster: build02
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh|.*\.ks\.template)
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_AMI: ami-02b8534ff4b424939
+      EC2_INSTANCE_TYPE: c5n.metal
+    workflow: openshift-microshift-e2e-metal-tests
+- always_run: false
+  as: microshift-metal-tests-arm
+  cluster: build02
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_AMI: ami-06df7225cc50ee1a3
+      EC2_INSTANCE_TYPE: c6g.metal
+    workflow: openshift-microshift-e2e-metal-tests
+- as: metal-periodic-test
+  cluster: build02
+  run_if_changed: ^(test/scenarios-periodics/.*)
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_AMI: ami-02b8534ff4b424939
+      EC2_INSTANCE_TYPE: c5n.metal
+    workflow: openshift-microshift-e2e-metal-tests
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift-priv
+  repo: microshift

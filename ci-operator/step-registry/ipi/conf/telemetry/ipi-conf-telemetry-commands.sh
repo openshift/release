@@ -4,6 +4,18 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if test -z "${TELEMETRY_ENABLED}"
+then
+	if [[ "${JOB_NAME}" =~ (^|[^[:digit:]]+)4.11([^[:digit:]]+|$) ]]
+	then
+		TELEMETRY_ENABLED=true
+		echo "TELEMETRY_ENABLED is empty, defaulting to '${TELEMETRY_ENABLED}' for the 4.11 ${JOB_NAME}"
+	else
+		TELEMETRY_ENABLED=false
+		echo "TELEMETRY_ENABLED is empty, defaulting to '${TELEMETRY_ENABLED}' for the not-4.11 ${JOB_NAME}"
+	fi
+fi
+
 if test true = "${TELEMETRY_ENABLED}"
 then
 	echo "Nothing to do with TELEMETRY_ENABLED='${TELEMETRY_ENABLED}'"
