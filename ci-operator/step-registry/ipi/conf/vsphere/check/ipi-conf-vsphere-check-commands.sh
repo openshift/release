@@ -10,6 +10,8 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+sleep 10m
+exit 1
 
 declare vsphere_datacenter
 declare vsphere_datastore
