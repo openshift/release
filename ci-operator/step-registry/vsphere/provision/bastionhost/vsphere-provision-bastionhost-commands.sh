@@ -9,6 +9,8 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 
+echo "$(date -u --rfc-3339=seconds) vsphere_portgroup: ${vsphere_portgroup}"
+
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_name="${CLUSTER_NAME}-bastion"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
@@ -16,11 +18,6 @@ if [[ ! -f "${bastion_ignition_file}" ]]; then
   echo "'${bastion_ignition_file}' not found, abort." && exit 1
 fi
 bastion_ignition_base64=$(base64 -w0 <"${bastion_ignition_file}")
-
-if [[ -z "${BASTION_HOST_SUBNET}" ]]; then
-  echo "Not define env BASTION_HOST_SUBNET, bastion host will be provisioned in network defined as LEASED_RESOURCE..."
-  BASTION_HOST_SUBNET=${vsphere_portgroup}
-fi
 
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 # shellcheck source=/dev/null
@@ -42,7 +39,7 @@ if [[ "$(govc vm.info ${vm_template} | wc -c)" -eq 0 ]]; then
    "InjectOvfEnv": false,
    "WaitForIP": false,
    "Name": "${vm_template}-bastion",
-   "NetworkMapping":[{"Name":"VM Network","Network":"${BASTION_HOST_SUBNET}"}]
+   "NetworkMapping":[{"Name":"VM Network","Network":"${vsphere_portgroup}"}]
 }
 EOF
 
@@ -58,7 +55,7 @@ echo "ova template: ${vm_template}"
 #Create bastion host virtual machine
 echo "$(date -u --rfc-3339=seconds) - Creating bastion host..."
 vm_folder="/${GOVC_DATACENTER}/vm"
-govc vm.clone -vm ${vm_folder}/${vm_template} -on=false -net=${BASTION_HOST_SUBNET} ${bastion_name}
+govc vm.clone -vm ${vm_folder}/${vm_template} -on=false -net=${vsphere_portgroup} ${bastion_name}
 #govc vm.customize -vm ${vm_folder}/${bastion_name} -name=${bastion_name} -ip=dhcp
 govc vm.change -vm ${vm_folder}/vm/${bastion_name} -c "4" -m "8192" -e disk.enableUUID=TRUE
 disk_name=$(govc device.info -json -vm ${vm_folder}/${bastion_name} | jq -r '.Devices[]|select(.Type == "VirtualDisk")|.Name')
@@ -79,7 +76,7 @@ while [ ${loop} -gt 0 ]; do
 done
 
 if [ "x${bastion_ip}" == "x" ]; then
-  echo "Unabel to get ip of bastion host instance ${bastion_name}!"
+  echo "Unable to get ip of bastion host instance ${bastion_name}!"
   exit 1
 fi
 
@@ -130,6 +127,8 @@ EOF
   MIRROR_REGISTRY_URL="${bastion_host_dns}:5000"
   echo "${MIRROR_REGISTRY_URL}" >"${SHARED_DIR}/mirror_registry_url"
 fi
+
+echo "bastion ip address: ${bastion_ip}"
 
 #Save bastion information
 echo "${bastion_ip}" >"${SHARED_DIR}/bastion_private_address"
