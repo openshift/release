@@ -35,7 +35,6 @@ images:
       - registry.ci.openshift.org/stolostron/builder:go1.20-linux
   to: multicluster-global-hub-agent
 promotion:
-  disabled: true
   name: "2.10"
   namespace: stolostron
 releases:
@@ -57,13 +56,6 @@ resources:
       memory: 1Gi
 test_binary_build_commands: "true"
 tests:
-- as: gofmt
-  commands: |
-    export SELF="make"
-    export HOME="/tmp"
-    make fmt
-  container:
-    from: src
 - as: test-unit
   commands: |
     export SELF="make"
@@ -144,43 +136,62 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
   skip_if_only_changed: ^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
-- as: latest-operator-image-mirror
+- as: publish-multicluster-global-hub-operator
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: multicluster-global-hub-operator
     env:
       IMAGE_REPO: multicluster-global-hub-operator
-      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="multicluster-global-hub-operator"
+        export OSCI_PUBLISH_DELAY="0"
+        make osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: release-2100-operator-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicluster-global-hub-operator
+    env:
+      IMAGE_REPO: multicluster-global-hub-operator
+      IMAGE_TAG: v1.0.0
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: latest-manager-image-mirror
+- as: release-2100-manager-image-mirror
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: multicluster-global-hub-manager
     env:
       IMAGE_REPO: multicluster-global-hub-manager
-      IMAGE_TAG: latest
+      IMAGE_TAG: v1.0.0
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: latest-agent-image-mirror
+- as: release-2100-agent-image-mirror
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: multicluster-global-hub-agent
     env:
       IMAGE_REPO: multicluster-global-hub-agent
-      IMAGE_TAG: latest
+      IMAGE_TAG: v1.0.0
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.10
-    workflow: ocm-ci-fastforward
 zz_generated_metadata:
-  branch: main
+  branch: release-2.10
   org: stolostron
   repo: multicluster-global-hub
