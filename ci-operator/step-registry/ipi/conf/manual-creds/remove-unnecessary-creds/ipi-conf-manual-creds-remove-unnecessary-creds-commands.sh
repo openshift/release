@@ -58,7 +58,8 @@ v411="baremetal marketplace openshift-samples"
 v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
-latest_defined="v414"
+v415=" ${v414} OperatorLifecycleManager"
+latest_defined="v415"
 always_default="${!latest_defined}"
 
 # Determine vCurrent
@@ -92,6 +93,9 @@ case ${BASELINE_CAPABILITY_SET} in
   ;;
 "v4.14")
   enabled_operators="${v414}"
+  ;;
+"v4.15")
+  enabled_operators="${v415}"
   ;;
 "vCurrent")
   enabled_operators="${vCurrent}"
