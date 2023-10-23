@@ -6,6 +6,13 @@ if [[ "$JOB_NAME" == rehearse* ]]; then
     export DRY_RUN=y
 fi
 
+ls -l `which python`
+ls -L `which python`
+ls -l `which python3`
+ls -L `which python3`
+ls -l `which python3.6`
+ls -L `which python3.6`
+
 export PATH="${HOME}/.local/bin:${PATH}"
 python3 -m ensurepip --upgrade
 pip3 install setuptools-rust cryptography pyyaml pygithub gitpython
