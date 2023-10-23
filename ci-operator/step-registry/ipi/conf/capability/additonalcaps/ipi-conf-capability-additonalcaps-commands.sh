@@ -62,7 +62,9 @@ v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
 # shellcheck disable=SC2034
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
-latest_version="v414"
+# shellcheck disable=SC2034
+v415=" ${v414} OperatorLifecycleManager"
+latest_version="v415"
 
 declare "v${ocp_major_version}${ocp_minor_version}"
 v_current_version="v${ocp_major_version}${ocp_minor_version}"
@@ -94,6 +96,12 @@ fi
 if [[ "${selected_capability}" == "ImageRegistry" ]]; then
     echo "Capability 'Build' depends on Capability 'ImageRegistry', so disable Build along with ImageRegistry"
     enabled_capabilities=${enabled_capabilities/"Build"}
+fi
+
+# Disable marketplace if OperatorLifecycleManager is selected to bo disabled
+if [[ "${selected_capability}" == "OperatorLifecycleManager" ]]; then
+    echo "Capability 'marketplace' depends on Capability 'OperatorLifecycleManager', so disable marketplace along with OperatorLifecycleManager"
+    enabled_capabilities=${enabled_capabilities/"marketplace"}
 fi
 
 # apply patch to install-config
