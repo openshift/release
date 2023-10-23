@@ -1,0 +1,320 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.20-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+images:
+- dockerfile_path: build/Dockerfile.registration-operator
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - golang:1.20-bullseye
+  to: registration-operator
+- dockerfile_path: build/Dockerfile.registration
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - golang:1.20-bullseye
+  to: registration
+- dockerfile_path: build/Dockerfile.work
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - golang:1.20-bullseye
+  to: work
+- dockerfile_path: build/Dockerfile.placement
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - golang:1.20-bullseye
+  to: placement
+- dockerfile_path: build/Dockerfile.addon
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - golang:1.20-bullseye
+  to: addon-manager
+promotion:
+  name: "2.5"
+  namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    export XDG_CACHE_HOME="/tmp"
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    export XDG_CACHE_HOME="/tmp"
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: bin
+- as: unit
+  commands: |
+    make test-unit --warn-undefined-variables
+  container:
+    from: test-bin
+- as: integration
+  commands: HOME=/tmp make test-integration
+  container:
+    from: test-bin
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: ocm-e2e-test
+      commands: |
+        KUBECTL=oc
+        PATH=.:$PATH
+        export KUBECTL PATH
+        echo "OPERATOR_IMAGE_NAME=$OPERATOR_IMAGE_NAME"
+        echo "REGISTRATION_IMAGE=$REGISTRATION_IMAGE"
+        echo "WORK_IMAGE=$WORK_IMAGE"
+        echo "PLACEMENT_IMAGE=$PLACEMENT_IMAGE"
+        echo "ADDON_MANAGER_IMAGE=$ADDON_MANAGER_IMAGE"
+        make test-e2e
+      dependencies:
+      - env: OPERATOR_IMAGE_NAME
+        name: registration-operator
+      - env: REGISTRATION_IMAGE
+        name: registration
+      - env: WORK_IMAGE
+        name: work
+      - env: PLACEMENT_IMAGE
+        name: placement
+      - env: ADDON_MANAGER_IMAGE
+        name: addon-manager
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+- as: publish-registration-operator
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: registration-operator
+    env:
+      IMAGE_REPO: registration-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=registration-operator
+        export OSCI_COMPONENT_VERSION=2.5.0
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror-registration-operator
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: registration-operator
+    env:
+      IMAGE_REPO: registration-operator
+      IMAGE_TAG: backplane-2.5
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: publish-registration
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: registration
+    env:
+      IMAGE_REPO: registration
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=registration
+        export OSCI_COMPONENT_VERSION=2.5.0
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror-registration
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: registration
+    env:
+      IMAGE_REPO: registration
+      IMAGE_TAG: backplane-2.5
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: publish-work
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: work
+    env:
+      IMAGE_REPO: work
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=work
+        export OSCI_COMPONENT_VERSION=2.5.0
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror-work
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: work
+    env:
+      IMAGE_REPO: work
+      IMAGE_TAG: backplane-2.5
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: publish-placement
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: placement
+    env:
+      IMAGE_REPO: placement
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=placement
+        export OSCI_COMPONENT_VERSION=2.5.0
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror-placement
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: placement
+    env:
+      IMAGE_REPO: placement
+      IMAGE_TAG: backplane-2.5
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: publish-addon-manager
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: addon-manager
+    env:
+      IMAGE_REPO: addon-manager
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=addon-manager
+        export OSCI_COMPONENT_VERSION=2.5.0
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror-addon-manager
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: addon-manager
+    env:
+      IMAGE_REPO: addon-manager
+      IMAGE_TAG: backplane-2.5
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: backplane-2.5
+  org: stolostron
+  repo: ocm
