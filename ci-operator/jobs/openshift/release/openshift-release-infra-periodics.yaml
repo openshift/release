@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -58,6 +58,9 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: pull-secret
@@ -69,6 +72,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build01
   cron: '@yearly'
@@ -185,6 +191,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -207,8 +216,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build08
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -383,6 +395,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -405,8 +420,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build08
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -488,6 +506,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -508,8 +529,137 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci-operator.openshift.io/cluster: build01
+    config-type: modern
+    job-architecture: amd64
+    job-env: azure-stackhub
+    job-type: launch
+  name: release-openshift-origin-installer-launch-azurestack-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.9"
+      - name: CLOUD_TYPE
+        value: azurestack
+      - name: CLUSTER_TYPE
+        value: azurestack-qe
+      - name: UNRESOLVED_CONFIG
+        value: |
+          base_images:
+            upi-installer:
+              name: "$(BRANCH)"
+              namespace: ocp
+              tag: upi-installer
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-upi
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)-upi
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azurestack-qe
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -662,6 +812,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -684,6 +837,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build02
   cron: '@yearly'
@@ -861,6 +1017,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -885,6 +1044,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build05
   cron: '@yearly'
@@ -1098,6 +1260,9 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1120,11 +1285,15 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   labels:
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     config-type: modern
     job-architecture: amd64
     job-env: vsphere
@@ -1151,7 +1320,7 @@ periodics:
       - name: RELEASE_IMAGE_LATEST
       - name: CLUSTER_VARIANT
       - name: CLUSTER_PROFILE
-        value: vsphere
+        value: vsphere-2
       - name: CLUSTER_DURATION
         value: "9000"
       - name: BRANCH
@@ -1199,7 +1368,7 @@ periodics:
               workflow: upi-$(CLUSTER_TYPE)-clusterbot
           - as: launch-multi-zone
             steps:
-              cluster_profile: vsphere-multizone
+              cluster_profile: vsphere-multizone-2
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
               test:
@@ -1207,7 +1376,7 @@ periodics:
               workflow: openshift-e2e-$(CLUSTER_TYPE)-zones
           - as: launch-multi-zone-techpreview
             steps:
-              cluster_profile: vsphere-multizone
+              cluster_profile: vsphere-multizone-2
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
                 FEATURE_SET: TechPreviewNoUpgrade
@@ -1241,15 +1410,24 @@ periodics:
               workflow: openshift-e2e-$(CLUSTER_TYPE)-sdn
           - as: launch-dualstack
             steps:
-              cluster_profile: vsphere
+              cluster_profile: $(CLUSTER_PROFILE)
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)-ovn-dualstack
+          - as: launch-dualstack-primaryv6
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                IP_FAMILIES: DualStackIPv6Primary
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ovn-dualstack
           - as: upgrade
             steps:
-              cluster_profile: $(CLUSTER_TYPE)
+              cluster_profile: $(CLUSTER_PROFILE)
               env:
                 TEST_SUITE: "all"
               workflow: openshift-upgrade-$(CLUSTER_TYPE)
@@ -1281,6 +1459,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1303,8 +1484,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -1380,6 +1564,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1402,8 +1589,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build08
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -1485,6 +1675,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1504,8 +1697,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build08
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -1585,6 +1781,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1604,8 +1803,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build08
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -1685,6 +1887,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1704,8 +1909,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build08
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -1785,6 +1993,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1804,6 +2015,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build02
   cron: '@yearly'
@@ -1885,6 +2099,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1906,6 +2123,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build02
   cron: '@yearly'
@@ -1988,6 +2208,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2009,6 +2232,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build02
   cron: '@yearly'
@@ -2091,6 +2317,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2112,8 +2341,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -2182,6 +2414,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2201,6 +2436,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build02
   cron: '@yearly'
@@ -2283,6 +2521,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2304,8 +2545,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -2395,6 +2639,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2417,8 +2664,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -2485,6 +2735,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2504,8 +2757,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -2577,7 +2833,7 @@ periodics:
               workflow: openshift-e2e-$(CLUSTER_TYPE)-nfv
           - as: launch-kuryr
             steps:
-              cluster_profile: openstack-kuryr
+              cluster_profile: openstack-vh-mecha-az0
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
                 CONFIG_TYPE: minimal
@@ -2642,6 +2898,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2664,8 +2923,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build08
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -2754,6 +3016,9 @@ periodics:
       - mountPath: /etc/report
         name: result-aggregator
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2777,8 +3042,11 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build08
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -2857,6 +3125,9 @@ periodics:
       - mountPath: /etc/report
         name: result-aggregator
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2877,3 +3148,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher

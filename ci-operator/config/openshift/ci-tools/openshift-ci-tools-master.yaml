@@ -4,7 +4,7 @@ base_images:
     namespace: ci
     tag: stable
   cli:
-    name: "4.11"
+    name: "4.14"
     namespace: ocp
     tag: cli
   golangci-lint:
@@ -48,6 +48,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/pr-reminder
   to: pr-reminder
+- context_dir: images/pipeline-controller/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/pipeline-controller
+  to: pipeline-controller
 - context_dir: images/check-gh-automation/
   from: os
   inputs:
@@ -720,6 +728,10 @@ images:
         source_path: /go/bin/multi-arch-builder-controller
       - destination_dir: .
         source_path: /usr/bin/manifest-tool
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
   to: multi-arch-builder-controller
 promotion:
   namespace: ci
@@ -772,6 +784,9 @@ tests:
         namespace: test-credentials
       - mount_path: /tmp/hive
         name: hive-hive-credentials
+        namespace: test-credentials
+      - mount_path: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
         namespace: test-credentials
       from: test-bin
       resources:
@@ -855,6 +870,24 @@ tests:
   commands: make lint
   container:
     from: golangci-lint
+- as: canary-build09
+  cluster: build09
+  interval: 10m
+  steps:
+    test:
+    - as: test
+      commands: echo "here i am"
+      from: os
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: ci-tools
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift

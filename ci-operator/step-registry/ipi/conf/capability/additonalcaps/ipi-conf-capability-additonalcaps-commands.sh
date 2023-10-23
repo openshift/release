@@ -4,8 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ "${BASELINE_CAPABILITY_SET}" == "" ]]; then
-    echo "This step requires BASELINE_CAPABILITY_SET to be set!"
+baselinecaps_from_config=$(yq-go r "${SHARED_DIR}/install-config.yaml" "capabilities.baselineCapabilitySet")
+if [[ "${baselinecaps_from_config}" == "" ]]; then
+    echo "This step requires field capabilities.baselineCapabilitySet in install-config to be set!"
     exit 1
 fi
 
@@ -61,14 +62,25 @@ v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
 # shellcheck disable=SC2034
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
-
 # shellcheck disable=SC2034
+v415=" ${v414} OperatorLifecycleManager"
+latest_version="v415"
+
+declare "v${ocp_major_version}${ocp_minor_version}"
 v_current_version="v${ocp_major_version}${ocp_minor_version}"
-vcurrent_capabilities="${!v_current_version}"
+
+if [[ ${!v_current_version:-} == "" ]]; then
+  echo "vCurrent: No default value for ${v_current_version}, use default value from ${latest_version}"
+  vcurrent_capabilities=${!latest_version}
+else
+  echo "vCurrent: Use exsting value from ${v_current_version}: ${!v_current_version}"
+  vcurrent_capabilities=${!v_current_version}
+fi
 
 #Randomly select one capability to be disabled
 # shellcheck disable=SC2206
 vcurrent_capabilities_array=(${vcurrent_capabilities})
+echo "vcurrent_capabilities: ${vcurrent_capabilities_array[*]}"
 selected_capability_index=$((RANDOM % ${#vcurrent_capabilities_array[@]}))
 selected_capability="${vcurrent_capabilities_array[$selected_capability_index]}"
 echo "Selected capability to be disabled: ${selected_capability}"
@@ -84,6 +96,12 @@ fi
 if [[ "${selected_capability}" == "ImageRegistry" ]]; then
     echo "Capability 'Build' depends on Capability 'ImageRegistry', so disable Build along with ImageRegistry"
     enabled_capabilities=${enabled_capabilities/"Build"}
+fi
+
+# Disable marketplace if OperatorLifecycleManager is selected to bo disabled
+if [[ "${selected_capability}" == "OperatorLifecycleManager" ]]; then
+    echo "Capability 'marketplace' depends on Capability 'OperatorLifecycleManager', so disable marketplace along with OperatorLifecycleManager"
+    enabled_capabilities=${enabled_capabilities/"marketplace"}
 fi
 
 # apply patch to install-config

@@ -19,6 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
   tools:
     name: "4.15"
     namespace: ocp
@@ -33,6 +37,9 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: tests
 - dockerfile_path: images/hello-openshift/Dockerfile.rhel
   from: base
@@ -221,7 +228,7 @@ tests:
 - as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-vsphere-upi
@@ -313,21 +320,6 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-kuryr
-  optional: true
-  steps:
-    cluster_profile: openstack-kuryr
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: Kuryr
-      TEST_SKIPS: NodePort \| session affinity \| Services should be able to change
-        the type from ExternalName to ClusterIP \| Pods should delete a collection
-        of pods \| Kubectl client Guestbook application should create and stop a working
-        application \| Services should serve multiport endpoints from pods \| Services
-        should serve a basic endpoint from pods
-      TEST_SUITE: kubernetes/conformance
-    workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-serial
   optional: true
   steps:
@@ -369,7 +361,7 @@ tests:
 - as: e2e-vsphere-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-etcd-scaling
 - as: e2e-aws-etcd-recovery
   optional: true
@@ -400,6 +392,15 @@ tests:
   steps:
     cluster_profile: aws
     workflow: hypershift-kubevirt-conformance
+- as: e2e-baremetalds-kubevirt
+  optional: true
+  run_if_changed: ^test/extended/kubevirt/.*
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.13
+    workflow: hypershift-kubevirt-baremetalds-conformance
 zz_generated_metadata:
   branch: master
   org: openshift

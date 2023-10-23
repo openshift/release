@@ -7,11 +7,7 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.10_cli:
-    name: "4.10"
-    namespace: ocp
-    tag: cli
-  ocp_4.14_cli:
+  ocp_4.15_cli:
     name: "4.15"
     namespace: ocp
     tag: cli
@@ -19,36 +15,42 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
-  rhel-7:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-7-golang-1.16-openshift-4.10
+    tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 images:
 - build_args:
   - name: TAGS
-    value: okd
+    value: fcos
   dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: installer
 - build_args:
   - name: TAGS
-    value: okd
+    value: fcos
   dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: installer-artifacts
 - build_args:
   - name: TAGS
-    value: libvirt okd
+    value: libvirt fcos
   dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
   inputs:
@@ -58,49 +60,52 @@ images:
   to: libvirt-installer
 - build_args:
   - name: TAGS
-    value: okd
-  dockerfile_path: images/installer/Dockerfile.upi.ci
-  from: rhel-7
+    value: fcos
+  dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
+  from: base
   inputs:
-    ocp_4.10_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.10:cli
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: upi-installer
 - build_args:
   - name: TAGS
-    value: okd
+    value: fcos
   dockerfile_path: images/openstack/Dockerfile.ci
   from: base
   inputs:
-    ocp_4.14_cli:
+    ocp_4.15_cli:
       as:
-      - registry.ci.openshift.org/ocp/4.14:cli
+      - registry.ci.openshift.org/ocp/4.15:cli
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: openstack-installer
 - build_args:
   - name: TAGS
-    value: baremetal libvirt okd
+    value: baremetal libvirt fcos
   dockerfile_path: images/baremetal/Dockerfile.ci
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: baremetal-installer
 - build_args:
   - name: TAGS
-    value: okd
+    value: fcos
   dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: ovirt-installer
 promotion:
   name: "4.15"
@@ -193,7 +198,7 @@ tests:
   as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
 - as: e2e-aws-ovn-testing-stream
   cron: 30 0 * * *

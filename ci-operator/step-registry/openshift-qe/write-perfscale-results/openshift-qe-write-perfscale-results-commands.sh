@@ -27,20 +27,19 @@ echo "$sa_email"
 
 export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
 
-mkdir sandman
-
-git clone https://github.com/openshift-qe/ocp-qe-perfscale-ci.git sandman -b main
 git clone https://github.com/openshift-qe/ocp-qe-perfscale-ci.git -b write-scale-ci-results
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-pip install -r sandman/scripts/requirements.txt
+jq -r 'to_entries[] | "\(.key)\t\(.value)"' ${SHARED_DIR}/index_data.json |
+  while read key val
+  do
+    cap_key=$(echo $key | awk ' { print toupper($1) }')
+    echo "export $cap_key=$val" >> index.sh
+  done 
 
-python ./sandman/scripts/sandman.py --file "${SHARED_DIR}/${OUTPUT_FILE}" --output sh
-
-ls sandman
-
-source ./sandman/data/workload.sh
+source index.sh
+env
 
 pushd ocp-qe-perfscale-ci
 

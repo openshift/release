@@ -272,7 +272,9 @@ fi
 pushd $CNF_REPO_DIR
 if [[ "$T5CI_VERSION" == "4.15" ]]; then
     echo "Updating all submodules for >=4.15 versions"
-    git submodule update --init --force --recursive
+    # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
+    sed -i "s@https://github.com/openshift/metallb-operator.git@https://github.com/openshift/metallb-operator.git\n        branch = main@" .gitmodules
+    git submodule update --init --force --recursive --remote
     git submodule foreach --recursive 'echo $path `git config --get remote.origin.url` `git rev-parse HEAD`' | grep -v Entering > ${ARTIFACT_DIR}/hashes.txt || true
 fi
 echo "Checking out pull request for repository cnf-features-deploy if exists"
@@ -305,7 +307,7 @@ if [[ "$CNF_BRANCH" == *"4.14"* ]]; then
 fi
 if [[ "$CNF_BRANCH" == *"4.15"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
     create_tests_temp_skip_list_15
-    export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
+    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
 

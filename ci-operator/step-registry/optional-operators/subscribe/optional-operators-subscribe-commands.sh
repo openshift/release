@@ -156,7 +156,9 @@ echo "OO_PACKAGE:           $OO_PACKAGE"
 echo "OO_CHANNEL:           $OO_CHANNEL"
 echo "OO_INSTALL_NAMESPACE: $OO_INSTALL_NAMESPACE"
 echo "OO_TARGET_NAMESPACES: $OO_TARGET_NAMESPACES"
-echo "TEST_MODE: $TEST_MODE"
+echo "OO_CONFIG_ENVVARS:    $OO_CONFIG_ENVVARS"
+echo "TEST_MODE:            $TEST_MODE"
+echo "EVAL_CONFIG_ENVVARS:  $EVAL_CONFIG_ENVVARS"
 
 if [[ -f "${SHARED_DIR}/operator-install-namespace.txt" ]]; then
     OO_INSTALL_NAMESPACE=$(cat "$SHARED_DIR"/operator-install-namespace.txt)
@@ -313,6 +315,24 @@ else
   SUB_NAMESTANZA="generateName: oo-"
 fi
 
+CONFIG_ENVVARS=""
+if [ -n "${OO_CONFIG_ENVVARS}" ]; then
+    envvar_yaml=""
+    IFS=',' read -ra vars <<< "${OO_CONFIG_ENVVARS}"
+    for var in "${vars[@]}"; do
+        IFS='=' read -ra kv <<< "$var"
+        if [ ${#kv[@]} -eq 2 ]; then
+            val=${kv[1]}
+            [ -n "${EVAL_CONFIG_ENVVARS}" ] && val=$(eval echo "${kv[1]}")
+            [ -n "${envvar_yaml}" ] && envvar_yaml+=$'\n'
+            envvar_yaml+="      - name: ${kv[0]}"$'\n'"        value: ${val}"
+        fi
+    done
+    if [ -n "${envvar_yaml}" ]; then
+        CONFIG_ENVVARS="  config:"$'\n'"    env:"$'\n'"${envvar_yaml}"
+    fi
+fi
+
 SUB_MANIFEST=$(cat <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -328,9 +348,14 @@ spec:
 EOF
 )
 
-# Add startingCSV is one is provided
+# Add startingCSV if one is provided
 if [ -n "${INITIAL_CSV}" ]; then
     SUB_MANIFEST="${SUB_MANIFEST}"$'\n'"  startingCSV: ${INITIAL_CSV}"
+fi
+
+# Add config.env if any environment variable is provided
+if [ -n "${CONFIG_ENVVARS}" ]; then
+    SUB_MANIFEST="${SUB_MANIFEST}"$'\n'"${CONFIG_ENVVARS}"
 fi
 
 echo "SUB_MANIFEST : ${SUB_MANIFEST} "

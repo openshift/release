@@ -1,0 +1,62 @@
+base_images:
+  base:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.15
+binary_build_commands: make build
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/cluster-api-provider-metal3
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: base
+  inputs:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+  to: baremetal-cluster-api-controllers
+promotion:
+  name: 4.16-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.16-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.16-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make unit
+tests:
+- as: unit
+  commands: make unit
+  container:
+    from: src
+  skip_if_only_changed: (^(docs|examples|config)/)|(\.md$)|((^|/)OWNERS$)
+- as: vendor
+  commands: make vendor && git diff --exit-code
+  container:
+    from: src
+  run_if_changed: (go\.(mod|sum)$)|(^(apis|pkg/hardwareutils)/)
+- as: lint
+  commands: export GOLANGCI_LINT_CACHE=/tmp/.cache make
+  container:
+    from: src
+  skip_if_only_changed: (^(docs|examples)/)|(\.md$)|((^|/)OWNERS$)
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift-priv
+  repo: cluster-api-provider-metal3

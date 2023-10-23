@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
   os:
     name: centos
     namespace: origin
@@ -21,6 +25,9 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: operator-lifecycle-manager
 - dockerfile_path: operator-registry.Dockerfile
   from: base
@@ -28,6 +35,9 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: operator-registry
 - dockerfile_path: base.Dockerfile
   from: src
@@ -49,13 +59,6 @@ promotion:
   - olm-bumper
   name: "4.15"
   namespace: ocp
-  to:
-  - additional_images:
-      olm-bumper: olm-bumper
-    excluded_images:
-    - '*'
-    namespace: operator-lifecycle-manager
-    tag: latest
 releases:
   initial:
     integration:
@@ -111,6 +114,14 @@ tests:
     - as: test
       cli: latest
       commands: |
+        function cleanup() {
+          for child in $( jobs -p ); do
+            kill "${child}"
+          done
+          wait
+        }
+        trap cleanup EXIT
+
         export JUNIT_DIRECTORY=${ARTIFACT_DIR}
         # Skip the flake tests, which are ran in a separate job
         export SKIP='\[FLAKE\]'
@@ -118,9 +129,11 @@ tests:
         export SKIP="$SKIP|an InstallPlan step contains a deprecated resource version"
         make e2e/olm
       from: ci-image
+      grace_period: 1m0s
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-olm-flaky
   optional: true

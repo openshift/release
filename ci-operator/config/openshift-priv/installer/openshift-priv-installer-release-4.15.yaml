@@ -39,7 +39,7 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: cli
-  ocp_4.14_cli:
+  ocp_4.15_cli:
     name: 4.15-priv
     namespace: ocp-private
     tag: cli
@@ -47,6 +47,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/installer
@@ -57,6 +61,9 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
@@ -64,6 +71,9 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
@@ -75,9 +85,6 @@ images:
 - dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
   from: base
   inputs:
-    ocp_4.10_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.10:cli
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -85,9 +92,9 @@ images:
 - dockerfile_path: images/openstack/Dockerfile.ci
   from: base
   inputs:
-    ocp_4.14_cli:
+    ocp_4.15_cli:
       as:
-      - registry.ci.openshift.org/ocp/4.14:cli
+      - registry.ci.openshift.org/ocp/4.15:cli
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -98,6 +105,9 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
@@ -105,6 +115,9 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: ovirt-installer
 - dockerfile_literal: |
     FROM src
@@ -387,13 +400,6 @@ tests:
     workflow: openshift-e2e-aws-workers-rhel
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-aws-ovn-disruptive
-  optional: true
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-disruption
-  timeout: 6h0m0s
-- always_run: false
   as: e2e-gcp-upgrade
   optional: true
   steps:
@@ -534,7 +540,7 @@ tests:
   as: e2e-openstack-ccpmso-zone
   optional: true
   steps:
-    cluster_profile: openstack-kuryr
+    cluster_profile: openstack-vh-mecha-az0
     test:
     - as: openstack-test-cpms
       commands: |
@@ -559,33 +565,33 @@ tests:
 - as: e2e-vsphere-ovn
   run_if_changed: vsphere
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 - as: e2e-vsphere-static-ovn
   optional: true
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
 - as: e2e-vsphere-upi
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-upi
   timeout: 6h0m0s
 - as: e2e-vsphere-upi-zones
   optional: true
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
-    cluster_profile: vsphere-multizone
+    cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-upi-zones
   timeout: 6h0m0s
 - as: e2e-vsphere-zones
   optional: true
   run_if_changed: vsphere
   steps:
-    cluster_profile: vsphere-multizone
+    cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-zones
   timeout: 6h0m0s
 - always_run: false
@@ -616,6 +622,12 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
   timeout: 6h0m0s
+- as: e2e-aws-custom-security-groups
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-custom-security-groups
+  timeout: 6h0m0s
 - as: e2e-metal-single-node-live-iso
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
@@ -637,19 +649,6 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
-  timeout: 6h0m0s
-- as: e2e-openstack-kuryr
-  optional: true
-  run_if_changed: (openstack|gophercloud)
-  steps:
-    cluster_profile: openstack-kuryr
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: Kuryr
-    test:
-    - ref: openstack-noop
-    workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
 - as: e2e-azurestack
   optional: true

@@ -1,0 +1,140 @@
+base_images:
+  base:
+    name: "4.16"
+    namespace: ocp
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  metallb:
+    name: "4.16"
+    namespace: ocp
+    tag: metallb
+  metallb-frr:
+    name: "4.16"
+    namespace: ocp
+    tag: metallb-frr
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
+  operator-sdk:
+    name: "4.16"
+    namespace: origin
+    tag: operator-sdk
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+  to: metallb-operator
+- dockerfile_path: bundleci.Dockerfile
+  from: base
+  to: metallb-operator-bundle
+operator:
+  bundles:
+  - as: operatorbundle
+    dockerfile_path: bundleci.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift/origin-metallb:4.14
+    with: pipeline:metallb
+  - pullspec: quay.io/openshift/origin-metallb-operator:4.14
+    with: pipeline:metallb-operator
+  - pullspec: quay.io/openshift/origin-metallb-frr:4.14
+    with: pipeline:metallb-frr
+promotion:
+  name: "4.16"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-metallb-operator
+        operator-sdk run bundle -n openshift-metallb-operator "$OO_BUNDLE" # install my-operator
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-controller-manager
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-webhook-server
+      dependencies:
+      - env: OO_BUNDLE
+        name: operatorbundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: run-test
+      cli: latest
+      commands: |
+        PATH=$PATH:$(pwd)/_cache hack/validate_ocp_bundle.sh
+        export OO_INSTALL_NAMESPACE=openshift-metallb-operator
+        export USE_LOCAL_RESOURCES=true
+        export IS_OPENSHIFT=1
+        go test --tags=validationtests -v ./test/e2e/validation -ginkgo.v -junit /logs/artifacts/ -report /logs/artifacts/
+        go test --tags=e2etests -v ./test/e2e/functional -ginkgo.v -junit /logs/artifacts/ -report /logs/artifacts/
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: metallb-e2e-metal-ipi
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+      E2E_TESTS_CONFIG: |
+        IP_STACK=v4
+    workflow: baremetalds-metallb-e2e
+- as: metallb-e2e-metal-ipi-ovn
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      E2E_TESTS_CONFIG: |
+        IP_STACK=v4
+    workflow: baremetalds-metallb-e2e
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: metallb-operator

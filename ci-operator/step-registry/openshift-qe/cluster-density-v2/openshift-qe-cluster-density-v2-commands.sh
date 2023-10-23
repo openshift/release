@@ -23,10 +23,12 @@ current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/work
 iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
 export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 export WORKLOAD=cluster-density-v2
-UUID="CPT-$(uuidgen)"
-export UUID
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
-./run.sh |& tee "${SHARED_DIR}/${OUTPUT_FILE}"
+
+rm -f ${SHARED_DIR}/index.json
+./run.sh
+
+folder_name=$(ls -t -d /tmp/*/ | head -1)
+jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
