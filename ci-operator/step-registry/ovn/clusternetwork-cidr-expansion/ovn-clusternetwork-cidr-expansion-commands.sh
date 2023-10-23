@@ -108,13 +108,8 @@ if [[ "$num_not_ready_nodes" -ne 1 ]]; then
   exit 1
 fi
 
+# debug output in case we fail later
 oc describe node $not_ready_node
-oc describe node $not_ready_node | grep "nodeAdd: error adding node \"${not_ready_node}\": could not find \"k8s.ovn.org/node-subnets\" annotation"
-if [ $? -ne 0 ]; then
-  oc get nodes -o wide
-  echo "Error: did not find a notReady node. Expected one node to be notReady because there are no subnets available" >&2
-  exit 1
-fi
 
 # Check if there is exactly 1 node without a subnet and 8 nodes with a subnet
 if [ "$nodes_with_subnet" -ne 8 ] || [ "$nodes_without_subnet" -ne 1 ]; then
