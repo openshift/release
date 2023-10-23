@@ -75,10 +75,22 @@ do
 done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
 
 
+# Get env values from cir extradata
+function getExtraVal(){
+    jq -r --arg default "$2" ".$1 // \$default" $EXTRAFILE
+}
+
 # For baremetal clusters ofcir has returned details about the hardware in the cluster
 # prepare those details into a format the devscripts understands
 function prepare_bmcluster() {
     jq -r .extra < $CIRFILE > $EXTRAFILE
+
+    if ! jq .nodes < $EXTRAFILE > $NODESFILE ; then
+        # Backwards compat for nodes where extra data is just a list of nodes
+        # TODO: remove when all nodes have {"nodes":[{},{}...], "key":"value"}
+        cp $EXTRAFILE $NODESFILE
+        echo "{\"nodes\":$(cat $NODESFILE)}" > $EXTRAFILE
+    fi
 
     # dev-scripts can be used to provision baremetal (in place of the VM's it usually creates)
     # build the details of the bm nodes into a $NODES_FILE for consumption by dev-scripts
@@ -86,9 +98,13 @@ function prepare_bmcluster() {
     n=0
     _IFS=$IFS
     IFS=$'\n'
-    for DATA in $(cat $EXTRAFILE |jq '.[] | "\(.bmcip) \(.mac)"' -rc) ; do
-        IFS=" " read BMCIP MAC <<< "$(echo $DATA)"
-        NODES="$NODES{\"name\":\"openshift-$n\",\"driver\":\"ipmi\",\"resource_class\":\"baremetal\",\"driver_info\":{\"username\":\"root\",\"password\":\"calvin\",\"address\":\"ipmi://$BMCIP\",\"deploy_kernel\":\"http://172.22.0.2/images/ironic-python-agent.kernel\",\"deploy_ramdisk\":\"http://172.22.0.2/images/ironic-python-agent.initramfs\",\"disable_certificate_verification\":false},\"ports\":[{\"address\":\"$MAC\",\"pxe_enabled\":true}],\"properties\":{\"local_gb\":\"50\",\"cpu_arch\":\"x86_64\",\"boot_mode\":\"legacy\"}},"
+    for DATA in $(cat $NODESFILE |jq '.[] | "\(.bmcip) \(.mac) \(.driver) \(.system) \(.name)"' -rc) ; do
+        IFS=" " read BMCIP MAC DRIVER SYSTEM NAME<<< "$(echo $DATA)"
+        if [ "$DRIVER" == "redfish" ] ; then
+            NODES="$NODES{\"name\":\"$NAME\",\"driver\":\"redfish\",\"resource_class\":\"baremetal\",\"driver_info\":{\"username\":\"admin\",\"password\":\"password\",\"address\":\"redfish+http://$BMCIP:8000/redfish/v1/Systems/$SYSTEM\",\"deploy_kernel\":\"http://172.22.0.2/images/ironic-python-agent.kernel\",\"deploy_ramdisk\":\"http://172.22.0.2/images/ironic-python-agent.initramfs\",\"disable_certificate_verification\":false},\"ports\":[{\"address\":\"$MAC\",\"pxe_enabled\":true}],\"properties\":{\"local_gb\":\"50\",\"cpu_arch\":\"x86_64\",\"boot_mode\":\"legacy\"}},"
+        else
+            NODES="$NODES{\"name\":\"openshift-$n\",\"driver\":\"ipmi\",\"resource_class\":\"baremetal\",\"driver_info\":{\"username\":\"root\",\"password\":\"calvin\",\"address\":\"ipmi://$BMCIP\",\"deploy_kernel\":\"http://172.22.0.2/images/ironic-python-agent.kernel\",\"deploy_ramdisk\":\"http://172.22.0.2/images/ironic-python-agent.initramfs\",\"disable_certificate_verification\":false},\"ports\":[{\"address\":\"$MAC\",\"pxe_enabled\":true}],\"properties\":{\"local_gb\":\"50\",\"cpu_arch\":\"x86_64\",\"boot_mode\":\"legacy\"}},"
+        fi
         n=$((n+1))
     done
     IFS=$_IFS
@@ -103,29 +119,43 @@ EOF
 
     # In addition the the NODES_FILE, we need to configure some dev-scripts
     # properties to understand some specifics about our lab environments
+    # We have 2 baremetal cluster types and both need uniq dev-scripts config
+    # below we are getting env specific values with getExtraVal (using defaults for the lab bm envs)
     cat - <<EOF >> "${SHARED_DIR}/dev-scripts-additional-config"
+# On lab baremetal clusters DNS has been setup so that the clustername is part of the provision host long name
+# i.e. hostname == host1.clusterXX.ocpci.eng.rdu2.redhat.com
+export LOCAL_REGISTRY_DNS_NAME="$(getExtraVal LOCAL_REGISTRY_DNS_NAME '$(hostname -f)')"
+export "BASE_DOMAIN=\$(echo \$LOCAL_REGISTRY_DNS_NAME | cut -d . -f 3-)"
+export "CLUSTER_NAME=\$(echo \$LOCAL_REGISTRY_DNS_NAME | cut -d . -f 2)"
 export NODES_FILE="/root/dev-scripts/bm.json"
 export NODES_PLATFORM=baremetal
-export PRO_IF="eth3"
-export INT_IF="eth2"
+export PRO_IF="$(getExtraVal PRO_IF eth3)"
+export INT_IF="$(getExtraVal INT_IF eth2)"
 export MANAGE_BR_BRIDGE=n
-export CLUSTER_PRO_IF="enp3s0f1"
+export CLUSTER_PRO_IF="$(getExtraVal CLUSTER_PRO_IF enp3s0f1)"
 export MANAGE_INT_BRIDGE=n
 export ROOT_DISK_NAME="/dev/sda"
-export BASE_DOMAIN="ocpci.eng.rdu2.redhat.com"
-export EXTERNAL_SUBNET_V4="10.10.129.0/24"
-export ADDN_DNS="10.38.5.26"
-export PROVISIONING_HOST_EXTERNAL_IP=$IP
+export EXTERNAL_SUBNET_V4="$(getExtraVal EXTERNAL_SUBNET_V4 10.10.129.0/24)"
+export ADDN_DNS="$(getExtraVal ADDN_DNS '')"
+export PROVISIONING_HOST_EXTERNAL_IP="$(getExtraVal PROVISIONING_HOST_EXTERNAL_IP $IP)"
+export EXTERNAL_BOOTSTRAP_MAC="$(getExtraVal EXTERNAL_BOOTSTRAP_MAC '')"
 export NUM_WORKERS=2
+
+export PROV_BM_MAC=$(getExtraVal PROV_BM_MAC '')
 EOF
-    scp "${SSHOPTS[@]}" "${SHARED_DIR}/bm.json" "root@${IP}:bm.json"
+
+    scp "${SSHOPTS[@]}" "${SHARED_DIR}/bm.json" $NODESFILE "root@${IP}:"
+    if [ "$(cat $CIRFILE | jq -r .type)" == "cluster_moc" ] ; then
+        scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/esi_cloud_yaml" "root@${IP}:esi_cloud_yaml"
+    fi
 }
 
 # dev-scripts setup for baremetal clusters
 CIRFILE=$SHARED_DIR/cir
 EXTRAFILE=$SHARED_DIR/cir-extra
+NODESFILE=$SHARED_DIR/cir-nodes
 BMJSON=$SHARED_DIR/bm.json
-if [ -e "$CIRFILE" ] && [ "$(cat $CIRFILE | jq -r .type)" == "cluster" ] ; then
+if [ -e "$CIRFILE" ] && [[ "$(cat $CIRFILE | jq -r .type)" =~ cluster.* ]] ; then
     prepare_bmcluster
 fi
 
@@ -155,12 +185,112 @@ timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*
 
 set -xeuo pipefail
 
+# Prepare baremetal env for cluster
+# Ideally this could be moved to another file in the "release" repository
+function manage_baremetal_instances(){
+    . /root/dev-scripts/config_root.sh
+
+    cp /root/bm.json /root/dev-scripts/bm.json
+
+    # Lab baremetal envinronments
+    if [[ \$(hostname -f) =~ ocpci.eng.rdu2.redhat.com ]] ; then
+        nmcli --fields UUID c show | grep -v UUID | xargs -t -n 1 nmcli con delete
+        nmcli con add ifname \${CLUSTER_NAME}bm type bridge con-name \${CLUSTER_NAME}bm bridge.stp off
+        nmcli con add type ethernet ifname eth2 master \${CLUSTER_NAME}bm con-name \${CLUSTER_NAME}bm-eth2
+        nmcli con reload
+        sleep 10
+    # MOC baremetal envinronments
+    else
+
+        # Calculate MOC env specific vars
+        export PROV_BM_IP=\${EXTERNAL_SUBNET_V4%.*}.1
+        export PROV_BM_IP_APPS=\${EXTERNAL_SUBNET_V4%.*}.4
+        export PROV_BM_IP_API=\${EXTERNAL_SUBNET_V4%.*}.5
+        export PROV_BM_GATE=\${EXTERNAL_SUBNET_V4%.*}.254
+        export VLANID_PR=\${PRO_IF/*.}
+        export VLANID_BM=\${INT_IF/*.}
+
+        echo "export NTP_SERVERS=\${PROV_BM_IP}" >> /root/dev-scripts/config_root.sh
+
+        # The MOC hosts have a single net interface on which the external network is on a vlan, we need to set this up
+        # with a static net config
+        # TODO: get the details from the CIR
+        export NETWORK_CONFIG_FOLDER=/root/dev-scripts/network-configs/vlan-over-prov
+        mkdir -p network-configs/vlan-over-prov
+        while IFS=',' read -r NAME MAC ; do
+            cat - << EOF2 > network-configs/vlan-over-prov/\${NAME}.yaml
+networkConfig:
+  interfaces:
+  - name: eno1
+    type: ethernet
+    state: up
+    ipv4:
+      dhcp: true
+      enabled: true
+    ipv6:
+      enabled: true
+      dhcp: false
+  - name: eno1.\${VLANID_BM}
+    type: vlan
+    state: up
+    mac-address: "\${MAC}"
+    vlan:
+      base-iface: eno1
+      id: \${VLANID_BM}
+    ipv4:
+      dhcp: true
+      enabled: true
+  - name: enp2s0
+    type: ethernet
+    state: down
+EOF2
+        done <<< "\$(cat ~/cir-nodes | jq -r '.[] | "\( .name ),\( .bmmac )"')"
+
+        podman pull quay.io/metal3-io/ironic
+
+        nmcli c modify "System eth0" ipv4.dns \$PROV_BM_IP ipv4.ignore-auto-dns yes
+        nmcli c down "System eth0"
+        nmcli c up "System eth0"
+        nmcli connection add type vlan con-name eth0.\$VLANID_PR dev eth0 id \$VLANID_PR ipv4.method disabled ipv6.method disabled
+        nmcli con add type bridge con-name \${CLUSTER_NAME}bm ifname \${CLUSTER_NAME}bm ipv4.method manual ipv4.address "\$PROV_BM_IP/24" ipv4.gateway "\$PROV_BM_GATE" ipv4.dns \$PROV_BM_IP ipv4.ignore-auto-dns yes
+        nmcli connection add type vlan con-name eth0.\$VLANID_BM dev eth0 id \$VLANID_BM ipv4.method disabled ipv6.method disabled 802-3-ethernet.cloned-mac-address \$PROV_BM_MAC master \${CLUSTER_NAME}bm
+        nmcli con reload
+        sleep 10
+
+        mkdir ~/resources ~/.sushy-tools
+            cat - << EOF2 > ~/resources/dnsmasq.conf
+# Set the domain name
+domain=\${CLUSTER_NAME}.\${BASE_DOMAIN}
+
+server=8.8.8.8
+interface=\${CLUSTER_NAME}bm
+bind-dynamic
+
+# Add additional DNS entries
+address=/virthost.\${CLUSTER_NAME}.\${BASE_DOMAIN}/\$PROV_BM_IP
+address=/api.\${CLUSTER_NAME}.\${BASE_DOMAIN}/\$PROV_BM_IP_API
+address=/.apps.\${CLUSTER_NAME}.\${BASE_DOMAIN}/\$PROV_BM_IP_APPS
+EOF2
+        podman run --name dnsmasqbm -d --privileged --net host -v ~/resources:/conf quay.io/metal3-io/ironic dnsmasq -C /conf/dnsmasq.conf -d -q
+
+        # Start a redfish emulator, sitting in front of MOC ironic (ESI)
+        virtualenv-3.6 --python python3.9 venv
+        ./venv/bin/pip install git+https://github.com/derekhiggins/sushy-tools.git@esi python-openstackclient python-ironicclient
+        echo -e "SUSHY_EMULATOR_IRONIC_CLOUD = 'openstack'" >> ~/.sushy-tools/conf.py
+        cat ~/esi_cloud_yaml | base64 -d > clouds.yaml
+        nohup ./venv/bin/sushy-emulator --config /root/.sushy-tools/conf.py -i :: >> sushy-emulator.log 2>&1 &
+    fi
+
+    sudo firewall-cmd --reload
+}
+
 # Some Packet images have a file /usr/config left from the provisioning phase.
 # The problem is that sos expects it to be a directory. Since we don't care
 # about the Packet provisioner, remove the file if it's present.
 test -f /usr/config && rm -f /usr/config || true
 
-yum install -y git sysstat sos make
+yum install -y git sysstat sos make podman python3-virtualenv python39 jq net-tools
+
 systemctl start sysstat
 
 mkdir -p /tmp/artifacts
@@ -234,37 +364,13 @@ then
 fi
 
 if [ -e /root/bm.json ] ; then
-    cat /root/dev-scripts-additional-config >> /root/dev-scripts/config_root.sh
-
-    # On baremetal clusters DNS has been setup so that the clustername is part of the provision host long name
-    # i.e. hostname == host1.clusterXX.ocpci.eng.rdu2.redhat.com
-    export LOCAL_REGISTRY_DNS_NAME=\$(hostname -f)
-    export "CLUSTER_NAME=\$(hostname -f | cut -d . -f 2)"
-
-    echo "export LOCAL_REGISTRY_DNS_NAME=\$LOCAL_REGISTRY_DNS_NAME" >> /root/dev-scripts/config_root.sh
-    echo "export CLUSTER_NAME=\$CLUSTER_NAME" >> /root/dev-scripts/config_root.sh
-
-    cp /root/bm.json /root/dev-scripts/bm.json
-
-    nmcli --fields UUID c show | grep -v UUID | xargs -t -n 1 nmcli con delete
-    nmcli con add ifname \${CLUSTER_NAME}bm type bridge con-name \${CLUSTER_NAME}bm bridge.stp off
-    nmcli con add type ethernet ifname eth2 master \${CLUSTER_NAME}bm con-name \${CLUSTER_NAME}bm-eth2
-    nmcli con reload
-    sleep 10
-
-    # Block the public zone (where eth2 is) from allowing and traffic from the provisioning network
-    # prevents arp responses from provisioning networks on other bm environment i.e.
-    # ERROR     : [/etc/sysconfig/network-scripts/ifup-eth] Error, some other host (F8:F2:1E:B2:DA:21) already uses address 172.22.0.1.
-    echo 1 | sudo dd of=/proc/sys/net/ipv4/conf/eth2/arp_ignore
-    # TODO: remove this once all running CI jobs are updated (i.e. its only  needed until arp_ignore is set on all environments)
-    sudo firewall-cmd --zone=public --add-rich-rule='rule family="ipv4" source address="172.22.0.0/24" destination address="172.22.0.0/24" reject' --permanent
-
-    sudo firewall-cmd --reload
-
-    echo "export KUBECONFIG=/root/dev-scripts/ocp/\${CLUSTER_NAME}/auth/kubeconfig" >> /root/.bashrc
-else
-    echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
+    manage_baremetal_instances
 fi
+
+echo 'export KUBECONFIG=$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root/.bashrc
+
+# squid needs to be restarted after network changes
+podman restart --time 1 external-squid || true
 
 timeout -s 9 105m make ${DEVSCRIPTS_TARGET}
 
@@ -273,7 +379,8 @@ timeout -s 9 105m make ${DEVSCRIPTS_TARGET}
 if [ -e /root/bm.json ] ; then
     # Allow cluster nodes to use provising node as a ntp server (4.12 and above are more likely to use it vs. the dhcp set server)
     sudo firewall-cmd --add-service=ntp --zone libvirt
-    sudo firewall-cmd --add-port=8213/tcp --zone=libvirt
+    sudo firewall-cmd --add-service=ntp --zone public
+    sudo firewall-cmd --add-port=8213/tcp --zone libvirt
 fi
 EOF
 
