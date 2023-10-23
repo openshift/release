@@ -17,6 +17,7 @@ scp "${SSHOPTS[@]}" "/tmp/mce-index-image" "root@${IP}:/home/mce-index-image"
 # shellcheck disable=SC2087
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
 set -xeo pipefail
+export KUBECONFIG=$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)
 
 echo "1. Update pull-secret"
 set +x
@@ -266,3 +267,5 @@ echo "MCE local-cluster is ready!"
 
 set -x
 EOF
+
+oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]' | head -n 1 | cut -d '/' -f 1 > "${SHARED_DIR}/mirror_registry_url"
