@@ -9,6 +9,8 @@ echo "************ telco cluster setup command ************"
 #Fix user IDs in a container
 ~/fix_uid.sh
 
+date +%s > $SHARED_DIR/start_time
+
 #Set ssh path and permissions for connection to hypervisor
 SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
@@ -27,6 +29,7 @@ CLUSTER_HV_IP="10.8.34.218"
 
 export KCLI_PARAM="-P tag=${T5CI_VERSION} -P version=nightly"
 
+echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
 #Check connectivity
 ping ${CLUSTER_HV_IP} -c 10 || true
 echo "exit" | curl telnet://${CLUSTER_HV_IP}:22 && echo "SSH port is opened"|| echo "status = $?"
@@ -152,6 +155,11 @@ cat << EOF > ~/fetch-kubeconfig.yml
       regexp: '    server: https://api.*'
       replace: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
     delegate_to: localhost
+    
+  - name: Add docker auth to enable pulling containers from CI registry
+    shell: >-
+      kcli ssh root@${CLUSTER_NAME}-installer
+      'oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/root/openshift_pull.json'
 
 EOF
 
@@ -282,10 +290,10 @@ EOT
 }
 
 log_chronyd_status() {
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc version
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf30.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf31.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf32.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc version || true
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf30.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd || true
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf31.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd || true
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf32.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd || true
 }
 
 

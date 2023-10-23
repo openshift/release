@@ -37,6 +37,25 @@ tests:
     make ci-job-unit
   container:
     from: src
+- as: regression
+  steps:
+    test:
+    - as: test
+      commands: |
+        export HOME=$( mktemp -d )
+        export TEST_FOLDER=$( mktemp -d )
+        mkdir -p ${HOME}/.docker
+        cp /tmp/pull-secret/.dockerconfigjson ${HOME}/.docker/config.json
+        /usr/local/bin/regression-suite.sh --folder ${TEST_FOLDER}
+      credentials:
+      - mount_path: /tmp/pull-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
+      from: telco-ran-tools
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift-kni

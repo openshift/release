@@ -14,6 +14,12 @@ export ENABLE_PRINT_EVENT_STDOUT=true
 
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 
+# add for hosted kubeconfig in the hosted cluster env
+if test -f "${SHARED_DIR}/nested_kubeconfig"
+then
+    export GUEST_KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+fi
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 # create link for oc to kubectl
@@ -146,7 +152,7 @@ ibmcloud)
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 equinix-ocp-metal|equinix-ocp-metal-qe|powervs-1)
     export TEST_PROVIDER='{"type":"skeleton"}';;
-nutanix|nutanix-qe)
+nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
 *)
     echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
@@ -181,12 +187,11 @@ trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 # check if the cluster is ready
 oc version --client
 oc wait nodes --all --for=condition=Ready=true --timeout=15m
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
 
 # execute the cases
 function run {
     test_scenarios=""
-    hardcoded_filters="~NonUnifyCI&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PreChkUpgrade&"
+    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PreChkUpgrade&"
     echo "TEST_SCENARIOS_PREUPG: \"${TEST_SCENARIOS_PREUPG:-}\""
     echo "TEST_ADDITIONAL_PREUPG: \"${TEST_ADDITIONAL_PREUPG:-}\""
     echo "TEST_FILTERS: \"${TEST_FILTERS:-}\""
@@ -224,8 +229,13 @@ function run {
     fi
 
     if [ "W${test_additional}W" != "WW" ]; then
-        echo "test additional: ${test_additional:1:-1}"
-        test_scenarios="${test_scenarios}|${test_additional:1:-1}"
+        if [ "W${test_additional: -1}W" != "W|W" ]; then
+            echo "test additional: ${test_additional:1}"
+            test_scenarios="${test_scenarios}|${test_additional:1}"
+        else
+            echo "test additional: ${test_additional:1:-1}"
+            test_scenarios="${test_scenarios}|${test_additional:1:-1}"
+        fi
     fi
 
     echo "final scenarios: ${test_scenarios}"
@@ -259,6 +269,8 @@ function run {
     cat ./case_selected
     echo "-----------------------------------------------------"
 
+    # failures happening after this point should not be caught by the Overall CI test suite in RP
+    touch "${ARTIFACT_DIR}/skip_overall_if_fail"
     ret_value=0
     set -x
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
@@ -276,17 +288,13 @@ function run {
     echo "try to handle result"
     handle_result
     echo "done to handle result"
-    if [ "W${ret_value}W" == "W0W" ]; then
-        echo "success"
-        exit 0
-    fi
-    echo "fail"
+    [ "W${ret_value}W" == "W0W" ] && echo "success" || echo "fail"
     # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
     # please refer to the junit result for case result, not depends on step result.
     if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
-        exit 1
+        echo "do not force success exit"
+        exit $ret_value
     fi
-    exit 0
 }
 
 # select the cases per FILTERS
@@ -335,19 +343,19 @@ function handle_filters {
 
 function valid_filter {
     filter="$1"
-    if ! echo ${filter} | grep -E '^[~]?[a-zA-Z0-9]{1,}[&]?$'; then
-        echo "the filter ${filter} is not correct format. it should be ^[~]?[a-zA-Z0-9]{1,}[&]?$"
+    if ! echo ${filter} | grep -E '^[~]?[a-zA-Z0-9_]{1,}[&]?$'; then
+        echo "the filter ${filter} is not correct format. it should be ^[~]?[a-zA-Z0-9_]{1,}[&]?$"
         exit 1
     fi
     action="$(echo $filter | grep -Eo '^[~]?')"
-    value="$(echo $filter | grep -Eo '[a-zA-Z0-9]{1,}')"
+    value="$(echo $filter | grep -Eo '[a-zA-Z0-9_]{1,}')"
     logical="$(echo $filter | grep -Eo '[&]?$')"
     echo "$action--$value--$logical"
 }
 
 function handle_and_filter {
     action="$(echo $1 | grep -Eo '^[~]?')"
-    value="$(echo $1 | grep -Eo '[a-zA-Z0-9]{1,}')"
+    value="$(echo $1 | grep -Eo '[a-zA-Z0-9_]{1,}')"
 
     ret=0
     if [ "W${action}W" == "WW" ]; then
@@ -364,7 +372,7 @@ function handle_and_filter {
 
 function handle_or_filter {
     action="$(echo $1 | grep -Eo '^[~]?')"
-    value="$(echo $1 | grep -Eo '[a-zA-Z0-9]{1,}')"
+    value="$(echo $1 | grep -Eo '[a-zA-Z0-9_]{1,}')"
 
     ret=0
     if [ "W${action}W" == "WW" ]; then
@@ -412,4 +420,50 @@ function check_case_selected {
         echo "do not find case"
     fi
 }
+function cocheck_junit_generate {
+    co=$1
+    step_type=$2
+    recognize_co="yes"
+    sub_team=$(python3 ${REPORT_HANDLE_PATH}/handleresult.py -a comap -co ${co})
+    if [ "W${sub_team}W" == "WNoCOW" ]; then
+        echo "the CO ${co} is not recognized, set default as OLM with subteam so that Kui add it"
+        sub_team="OLM"
+        recognize_co="no"
+    fi
+    hcj_file="import-${sub_team}.xml"
+    resultfile=`ls -rt -1 ${hcj_file} 2>&1 || true`
+    if (echo $resultfile | grep -q -E "no matches found") || (echo $resultfile | grep -q -E "No such file or directory") ; then
+        echo "no junt xml for ${co} yet"
+        hcj_file=""
+    fi
+    hcj_ret=0
+    if [ "W${hcj_file}W" == "WW" ]; then
+        python3 ${REPORT_HANDLE_PATH}/handleresult.py -a hcj -st "${step_type}" -co "${co}" -s "${sub_team}" -r "${recognize_co}" ||  hcj_ret=$?
+    else
+        python3 ${REPORT_HANDLE_PATH}/handleresult.py -a hcj -i ${hcj_file} -st "${step_type}" -co "${co}" -s "${sub_team}" -r "${recognize_co}" || hcj_ret=$?
+    fi
+    if ! [ "W${hcj_ret}W" == "W0W" ]; then
+        echo "${co} junit file is not generated correctly"
+        rm -fr "import-${sub_team}bak.xml"
+        return
+    fi
+    cp -fr "import-${sub_team}bak.xml" "import-${sub_team}.xml"
+    rm -fr "import-${sub_team}bak.xml"
+}
+function co_check {
+    wait_co_ret=0
+    oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m  || wait_co_ret=$?
+    if ! [ "W${wait_co_ret}W" == "W0W" ]; then
+        for clusteroperator in $(oc get co -ojson|jq -r '.items[] | select(.status.conditions[] | select(.type == "Progressing" and .status == "True")) | .metadata.name')
+        do
+            echo "${clusteroperator}'s progressing status is not expected"
+            oc get co ${clusteroperator} -o yaml || true
+            cocheck_junit_generate ${clusteroperator} "preupg" || true
+        done
+        mkdir -p "${ARTIFACT_DIR}/junit/" || true
+        cp -fr import-*.xml "${ARTIFACT_DIR}/junit/" || true
+        exit $wait_co_ret
+    fi
+}
+co_check
 run

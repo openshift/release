@@ -8,27 +8,27 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-image-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -102,7 +102,7 @@ releases:
   oldest-supported-z-rollback:
     release:
       channel: candidate
-      version: 4.13.0-rc.5
+      version: 4.13.0
 resources:
   '*':
     requests:
@@ -171,6 +171,18 @@ tests:
     observers:
       enable:
       - observers-resource-watch
+    workflow: baremetalds-sno
+- as: e2e-metal-ovn-single-node-hostname-change
+  interval: 168h
+  steps:
+    cluster_profile: packet-sno
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: baremetalds-sno-hostname
+    - ref: baremetalds-sno-conf
+    - ref: baremetalds-sno-test
     workflow: baremetalds-sno
 - as: e2e-metal-ovn-single-node-with-worker-live-iso
   interval: 168h
@@ -305,17 +317,17 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-proxy
 - as: e2e-vsphere-sdn
-  cron: 0 0/12 * * *
+  interval: 144h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-8-vpn
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-sdn
 - as: e2e-vsphere-ovn-techpreview
-  cron: 0 7/12 * * *
+  interval: 146h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-8-vpn
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
@@ -336,9 +348,9 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn
 - as: e2e-vsphere-ovn
-  interval: 168h
+  interval: 148h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -347,17 +359,17 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-externallb-ovn
-  interval: 168h
+  interval: 150h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-externallb
 - as: e2e-vsphere-ovn-serial
-  cron: 0 8/12 * * *
+  interval: 152h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -366,9 +378,9 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-techpreview-serial
-  cron: 0 9/12 * * *
+  interval: 154h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-8-vpn
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -376,9 +388,9 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-upi
-  cron: 0 10/12 * * *
+  interval: 156h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -387,9 +399,9 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-ovn-upi-serial
-  cron: 0 11/12 * * *
+  interval: 158h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -398,9 +410,9 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi-serial
 - as: e2e-vsphere-ovn-csi
-  interval: 168h
+  interval: 160h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -409,15 +421,23 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-csi
 - as: e2e-vsphere-zones
-  cron: 0 6/12 * * *
+  interval: 162h
   steps:
-    cluster_profile: vsphere-multizone
+    cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-upi-zones
-  cron: 0 3/12 * * *
+  interval: 164h
   steps:
-    cluster_profile: vsphere-multizone
+    cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-upi-zones
+- as: e2e-vsphere-ovn-etcd-scaling
+  interval: 166h
+  steps:
+    cluster_profile: vsphere-8-vpn
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-etcd-scaling
 - as: e2e-aws-ovn-workers-rhel8
   cron: '@daily'
   steps:
@@ -630,9 +650,12 @@ tests:
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SKIPS: sysctl allowlist update should start a pod with custom sysctl only
+        when the sysctl is added to whitelist
       TEST_TYPE: upgrade-conformance
       TEST_UPGRADE_OPTIONS: abort-at=random
     workflow: openshift-upgrade-aws
+  timeout: 6h0m0s
 - as: credentials-request-freeze
   interval: 48h
   steps:
@@ -1003,14 +1026,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-etcd-scaling
-- as: e2e-vsphere-ovn-etcd-scaling
-  interval: 24h
-  steps:
-    cluster_profile: vsphere
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-vsphere-etcd-scaling
 - as: e2e-aws-ovn-cpu-partitioning
   interval: 6h
   steps:

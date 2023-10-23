@@ -3,6 +3,10 @@ base_images:
     name: 4.14-priv
     namespace: ocp-private
     tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -19,7 +23,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: agent-installer-utils
 promotion:
-  disabled: true
   name: 4.14-priv
   namespace: ocp-private
 releases:
@@ -41,6 +44,50 @@ resources:
       memory: 200Mi
 test_binary_build_commands: dnf install -y nmstate-devel
 tests:
+- as: e2e-agent-bad-dns
+  cluster: build05
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV4
+        AGENT_TEST_CASES=bad_dns
+    workflow: agent-e2e-generic
+  timeout: 6h0m0s
+- as: e2e-agent-compact-ipv4
+  cluster: build05
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
+  timeout: 6h0m0s
+- as: e2e-agent-sno-ipv6
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV6
+        AGENT_USE_ZTP_MANIFESTS=true
+    pre:
+    - chain: agent-pre
+    workflow: agent-e2e-generic
+  timeout: 6h0m0s
+- as: e2e-agent-ha-dualstack
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
+        MIRROR_IMAGES=true
+    workflow: agent-e2e-generic
+  timeout: 6h0m0s
 - as: gofmt
   commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
   container:
@@ -48,6 +95,11 @@ tests:
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: govet
   commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
+  container:
+    from: test-bin
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: unit
+  commands: IS_CONTAINER=TRUE ./hack/go-test.sh ./...
   container:
     from: test-bin
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)

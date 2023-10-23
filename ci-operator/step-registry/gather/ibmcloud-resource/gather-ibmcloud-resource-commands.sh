@@ -6,7 +6,7 @@ set -o errexit
 
 
 RESOURCE_DUMP_DIR="${ARTIFACT_DIR}/ibmcloud-gather-resources"
-CLUSTER_FILTER="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_FILTER="${NAMESPACE}-${UNIQUE_HASH}"
 declare -a MAIN_RESOURCES=(floating-ip image instance lb public-gateway sg subnet volume vpc)
 
 
@@ -124,7 +124,7 @@ function gather_cis {
         echo -e "# ibmcloud cis domains\n"
         command_retry "${IBMCLOUD_CLI}" cis domains --per-page 50 | awk -v filter="${DOMAIN_ID}" '$0 ~ filter'
 	echo -e "## ibmcloud cis dns-records ${DOMAIN_ID}\n"
-	# DNS Record Names do not contain the $JOB_NAME_HASH, so we filter on the $NAMESPACE only
+	# DNS Record Names do not contain the $UNIQUE_HASH, so we filter on the $NAMESPACE only
 	command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter'
 	echo -e "## ibmcloud cis dns-record ${DOMAIN_ID} <dns-record>\n"
 	command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} cis dns-record ${DOMAIN_ID} %"

@@ -1,0 +1,42 @@
+ref:
+  as: openshift-qe-loaded-upgrade
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  timeout: 8h0m0s
+  commands: openshift-qe-loaded-upgrade-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: ENABLE_FORCE
+    default: "true"
+    documentation: |-
+      Default is true, which means forcing upgrade, you can set false to disable force upgrade
+  - name: SCALE
+    default: "false"
+    documentation: |-
+      Default is false, This variable will scale the cluster up one node at the end up the upgrade
+  - name: MAX_UNAVAILABLE
+    default: "1"
+    documentation: |-
+      Default is 1, This variable will set the max number of unavailable nodes during the upgrade
+  - name: EUS_UPGRADE
+    default: "fasle"
+    documentation: |-
+      Default is false, which means IF It's EUS upgrade.
+  - name: EUS_CHANNEL
+    default: "fast"
+    documentation: |-
+      Default is fast, which means which channel EUS upgrade used, support fast,eus,candidate,stable.
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+  documentation: >-
+    This step runs the perfscale loaded-upgrade workload in the deployed cluster

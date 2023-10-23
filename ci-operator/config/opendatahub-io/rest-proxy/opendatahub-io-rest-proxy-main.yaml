@@ -4,8 +4,10 @@ base_images:
     namespace: ocp
     tag: "8"
 build_root:
-  project_image:
-    dockerfile_path: Dockerfile.develop
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
 images:
 - build_args:
   - name: COMMIT_SHA
@@ -34,34 +36,10 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: |
-    export HOME=/go
-    go mod vendor
-    make test
+  commands: HOME=/go GOFLAGS=-mod=mod make test
   container:
     from: src
   skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
-- as: fvt
-  skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
-  steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m5.2xlarge
-    test:
-    - as: modelmesh-serving-fvt
-      commands: "export HOME=/go        \ngit clone https://github.com/opendatahub-io/modelmesh-serving\ncd
-        modelmesh-serving\nTAG=fast CONTROLLERNAMESPACE=modelmesh-serving NAMESPACE=modelmesh-serving
-        NAMESPACESCOPEMODE=true CUSTOM_IMG=rest-proxy=${PR_REST_PROXY_IMAGE} make
-        e2e-test-for-odh\n"
-      dependencies:
-      - env: PR_REST_PROXY_IMAGE
-        name: rest-proxy
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 3Gi
-    workflow: ipi-aws
 - as: pr-image-mirror
   skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
   steps:

@@ -7,59 +7,27 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: cli
-  hypershift-operator-4.13:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: hypershift-operator
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
+    tag: rhel-8-golang-1.20-openshift-4.15
 binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.19
 canonical_go_repository: github.com/kubevirt/csi-driver
 images:
 - dockerfile_path: Dockerfile.openshift
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: kubevirt-csi-driver
-- build_args:
-  - name: ARCH
-    value: amd64
-  - name: ldflags
-  dockerfile_literal: |-
-    FROM src
-    COPY oc hypershift /usr/bin/
-    RUN mkdir -p /go/src/github.com/openshift && \
-        cd /go/src/github.com/openshift && \
-        git clone https://github.com/openshift/kubevirt-csi-driver && \
-        git clone https://github.com/openshift/hypershift.git && \
-        cd hypershift/ && \
-        go mod tidy && go mod vendor && \
-        make e2e && \
-        sed -i 's|global-pull-secret.json|/tmp/global-pull-secret.json|g' ./hack/ci/install-cnv.sh
-    WORKDIR /go/src/github.com/openshift/hypershift
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-    hypershift-operator-4.13:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/hypershift
-  to: hypershift-cli-e2e
 promotion:
-  excluded_images:
-  - hypershift-cli-e2e
+  disabled: true
   name: 4.15-priv
   namespace: ocp-private
 releases:
@@ -87,10 +55,10 @@ tests:
     cluster_profile: aws-virtualization
     env:
       BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
-      CNV_PRERELEASE_VERSION: "4.13"
+      CNV_PRERELEASE_VERSION: "4.14"
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
-      CONTROL_PLANE_INSTANCE_TYPE: m4.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.2xlarge
     workflow: hypershift-kubevirt-csi-e2e
 zz_generated_metadata:
   branch: release-4.15

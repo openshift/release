@@ -1,8 +1,13 @@
+base_images:
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   project_image:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi8/ubi
-      RUN yum install -y --nodocs jq python3-virtualenv python3-pip make git golang bc
+      RUN yum install -y --nodocs jq python3.11 python3.11-pip make git golang bc
       RUN ln -s /usr/bin/python3 /usr/bin/python
       RUN ln -s /cli/oc /usr/bin/kubectl
       RUN curl -Lk -o /usr/bin/yq https://github.com/mikefarah/yq/releases/download/v4.18.1/yq_linux_amd64 && chmod +x /usr/bin/yq
@@ -43,6 +48,34 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: acceptance-lp-rosa-hypershift-412
+  cron: 0 10 25 12 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "aws-*", "failure_type": "all", "classification": "Infrastructure AWS", "jira_project": "LPTOCPCI"},
+          {"step": "gather-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI"},
+          {"step": "osd-*", "failure_type": "all", "classification": "User Setup", "jira_project": "LPTOCPCI"},
+          {"step": "rosa-*", "failure_type": "all", "classification":  "Cluster Creation", "jira_project": "LPTOCPCI"},
+          {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_project": "LPTOCPCI"},
+          {"step": "cucushift-hypershift-*", "failure_type": "all", "classification": "Cluster Health Check", "jira_project": "LPTOCPCI"}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.12"
+      OPERATORS: |
+        [
+            {"name": "rh-service-binding-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators"}
+        ]
+      REGION: us-west-2
+      ROSA_LOGIN_ENV: staging
+    test:
+    - ref: install-operators
+    - ref: cucushift-hypershift-extended-health-check
+    workflow: firewatch-rosa-aws-sts-hypershift
 zz_generated_metadata:
   branch: release-v1.3.x
   org: redhat-developer

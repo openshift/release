@@ -41,7 +41,44 @@ spec:
         app: prow
         component: retester
     spec:
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --branch=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        env:
+        - name: GIT_SYNC_DEST
+          value: release
+        image: registry.k8s.io/git-sync/git-sync:v3.6.2
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
       containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --branch=master
+        - --wait=30
+        - --root=/tmp/git-sync
+        - --max-sync-failures=3
+        env:
+        - name: GIT_SYNC_DEST
+          value: release
+        image: registry.k8s.io/git-sync/git-sync:v3.6.2
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
       - image: retester:latest
         name: retester
         command:
@@ -54,9 +91,21 @@ spec:
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
         - --github-token-path=/etc/oauth/oauth
-        - --job-config-path=/etc/job-config
+        - --job-config-path=/var/repo/release/ci-operator/jobs
         - --cache-file=/cache/backoff
+        - --cache-file-on-s3=true
         - --config-file=/etc/retester/_config.yaml
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              key: AWS_ACCESS_KEY_ID
+              name: retester-aws-credentials
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: AWS_SECRET_ACCESS_KEY
+              name: retester-aws-credentials
         ports:
         - name: metrics
           containerPort: 9090
@@ -67,11 +116,8 @@ spec:
         - name: prow-config
           mountPath: /etc/config
           readOnly: true
-        - name: job-config
-          mountPath: /etc/job-config
-          readOnly: true
-        - name: cache
-          mountPath: /cache
+        - name: release
+          mountPath: /var/repo
         - name: config
           mountPath: /etc/retester
           readOnly: true
@@ -86,64 +132,8 @@ spec:
       - name: github-token
         secret:
           secretName: github-credentials-openshift-ci-robot
-      - name: job-config
-        projected:
-          sources:
-          - configMap:
-              name: job-config-misc
-          - configMap:
-              name: job-config-master-periodics
-          - configMap:
-              name: job-config-main-periodics
-          - configMap:
-              name: job-config-master-postsubmits
-          - configMap:
-              name: job-config-main-postsubmits
-          - configMap:
-              name: job-config-master-presubmits
-          - configMap:
-              name: job-config-main-presubmits
-          - configMap:
-              name: job-config-1.x
-          - configMap:
-              name: job-config-2.x
-          - configMap:
-              name: job-config-3.x
-          - configMap:
-              name: job-config-4.0
-          - configMap:
-              name: job-config-4.1
-          - configMap:
-              name: job-config-4.2
-          - configMap:
-              name: job-config-4.3
-          - configMap:
-              name: job-config-4.4
-          - configMap:
-              name: job-config-4.5
-          - configMap:
-              name: job-config-4.6
-          - configMap:
-              name: job-config-4.7
-          - configMap:
-              name: job-config-4.8
-          - configMap:
-              name: job-config-4.9
-          - configMap:
-              name: job-config-4.10
-          - configMap:
-              name: job-config-4.11
-          - configMap:
-              name: job-config-4.12
-          - configMap:
-              name: job-config-4.13
-          - configMap:
-              name: job-config-4.14
-          - configMap:
-              name: job-config-4.15
-      - name: cache
-        persistentVolumeClaim:
-          claimName: retester
+      - name: release
+        emptyDir: {}
       - name: config
         configMap:
           name: retester-config

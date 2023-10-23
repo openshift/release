@@ -10,7 +10,7 @@ trap 'rm -f /tmp/aws_cred_output /tmp/pull-secret' EXIT TERM INT
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 REGION="${LEASED_RESOURCE}"
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 function run_command() {
     local cmd="$1"
@@ -250,6 +250,11 @@ EOF
 if (( ocp_minor_version >= 11 && ocp_major_version == 4 )); then
   echo "ec2:DeletePlacementGroup" >> "${PERMISION_LIST}"
   echo "s3:GetBucketPolicy" >> "${PERMISION_LIST}"
+fi
+
+# additional permisions for 4.14+
+if (( ocp_minor_version >= 14 && ocp_major_version == 4 )); then
+  echo "ec2:DescribeSecurityGroupRules" >> "${PERMISION_LIST}"
 fi
 
 # generte policy file

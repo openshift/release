@@ -1,0 +1,91 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  operator-sdk:
+    name: "4.14"
+    namespace: origin
+    tag: operator-sdk
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+canonical_go_repository: github.com/grafana/tempo-operator
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: tempo-operator
+- context_dir: .
+  dockerfile_path: tests/Dockerfile
+  to: tempo-tests-runner
+operator:
+  bundles:
+  - as: tempo-bundle
+    context_dir: ./bundle/openshift
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: ghcr.io/grafana/tempo-operator/tempo-operator:v0.4.0
+    with: pipeline:tempo-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  steps:
+    test:
+    - as: unit
+      commands: GOFLAGS="-mod=mod" make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: tempo-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.13"
+  steps:
+    env:
+      EO_SUB_CHANNEL: stable-5.7
+      EO_SUB_SOURCE: redhat-operators
+      SKIP_TESTS: tests/e2e-openshift/red-metrics tests/e2e/custom-ca
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace tempo-operator
+        operator-sdk run bundle -n tempo-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n tempo-operator deployment tempo-operator-controller
+      dependencies:
+      - env: OO_BUNDLE
+        name: tempo-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - ref: operatorhub-subscribe-elasticsearch-operator
+    - ref: operatorhub-subscribe-amq-streams
+    - ref: distributed-tracing-install-jaeger-product
+    - ref: distributed-tracing-install-opentelemetry-product
+    - ref: distributed-tracing-tests-tempo
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: grafana-tempo-operator

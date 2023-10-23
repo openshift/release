@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build01
     context: ci/prow/code-quality-checks
     decorate: true
     decoration_config:
@@ -34,6 +34,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -42,6 +45,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -54,7 +60,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build01
     context: ci/prow/hypershift-pr-check
     decorate: true
     decoration_config:
@@ -65,7 +71,7 @@ presubmits:
     name: pull-ci-openshift-osde2e-main-hypershift-pr-check
     optional: true
     rerun_command: /test hypershift-pr-check
-    skip_if_only_changed: ^(?:docs|\.github|scripts)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+    skip_if_only_changed: ^(?:docs|\.github|scripts|test)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
     spec:
       containers:
       - args:
@@ -88,6 +94,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /secrets/osde2e-common
           name: osde2e-common
           readOnly: true
@@ -105,6 +114,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: osde2e-common
         secret:
           secretName: osde2e-common
@@ -126,7 +138,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build01
     context: ci/prow/rosa-pr-check
     decorate: true
     decoration_config:
@@ -136,7 +148,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-osde2e-main-rosa-pr-check
     rerun_command: /test rosa-pr-check
-    skip_if_only_changed: ^(?:docs|\.github|scripts)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+    skip_if_only_changed: ^(?:docs|\.github|scripts|test)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
     spec:
       containers:
       - args:
@@ -145,7 +157,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/osde2e-common
         - --secret-dir=/secrets/osde2e-credentials
-        - --secret-dir=/secrets/osde2e-rosa-stage
+        - --secret-dir=/secrets/osde2e-dev
         - --target=rosa-pr-check
         command:
         - ci-operator
@@ -159,14 +171,17 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /secrets/osde2e-common
           name: osde2e-common
           readOnly: true
         - mountPath: /secrets/osde2e-credentials
           name: osde2e-credentials
           readOnly: true
-        - mountPath: /secrets/osde2e-rosa-stage
-          name: osde2e-rosa-stage
+        - mountPath: /secrets/osde2e-dev
+          name: osde2e-dev
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -176,15 +191,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: osde2e-common
         secret:
           secretName: osde2e-common
       - name: osde2e-credentials
         secret:
           secretName: osde2e-credentials
-      - name: osde2e-rosa-stage
+      - name: osde2e-dev
         secret:
-          secretName: osde2e-rosa-stage
+          secretName: osde2e-dev
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

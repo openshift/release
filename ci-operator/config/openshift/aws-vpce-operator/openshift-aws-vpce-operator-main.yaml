@@ -1,8 +1,3 @@
-base_images:
-  osde2e:
-    name: osde2e
-    namespace: ci
-    tag: latest
 build_root:
   from_repository: true
 images:
@@ -43,29 +38,6 @@ tests:
   commands: make test
   container:
     from: src
-- as: stage-e2e-harness
-  commands: |
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="rosa,stage,test-harness"
-    export ROSA_ENV="stage"
-    export ROSA_STS="true"
-    export ROSA_AWS_REGION="random"
-    export TEST_HARNESSES="quay.io/app-sre/aws-vpce-operator-test-harness"
-    export CHANNEL="stable"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-stage"
-
-    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    clone: true
-    from: osde2e
-  postsubmit: true
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-rosa-stage
-    name: osde2e-rosa-stage
 - as: validate
   commands: make validate
   container:

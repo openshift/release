@@ -18,7 +18,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: cluster-storage-operator
 promotion:
-  disabled: true
   name: 4.14-priv
   namespace: ocp-private
 releases:
@@ -45,6 +44,10 @@ tests:
   commands: make verify
   container:
     from: src
+- as: verify-kustomize-assets
+  commands: ./hack/verify-manifest.sh
+  container:
+    from: src
 - as: e2e-aws-ovn
   steps:
     cluster_profile: aws
@@ -67,15 +70,10 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-csi
-- as: e2e-ovirt
-  optional: true
-  steps:
-    cluster_profile: ovirt
-    workflow: openshift-e2e-ovirt-csi
 - as: e2e-ovn-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -84,11 +82,17 @@ tests:
 - as: e2e-vsphere-csi
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     workflow: openshift-e2e-vsphere-csi
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-azure-ovn
   optional: true
   steps:
@@ -133,6 +137,7 @@ tests:
     workflow: openshift-e2e-openstack-ipi
 - as: hypershift-aws-e2e-external
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
 - as: verify-deps
   steps:

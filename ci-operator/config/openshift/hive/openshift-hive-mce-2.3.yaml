@@ -86,25 +86,20 @@ tests:
     - as: test
       cli: latest
       commands: |
-        # Creds for the `ci` user in the hive-team cluster
-        # TODO: Get a CI-owned account: DPTP-2348
-        export AWS_ACCESS_KEY_ID=$(cat /tmp/secret/hive-aws-creds/AWS_ACCESS_KEY_ID)
-        export AWS_SECRET_ACCESS_KEY=$(cat /tmp/secret/hive-aws-creds/AWS_SECRET_ACCESS_KEY)
+        export BASE_DOMAIN=hive-ci.devcluster.openshift.com
+        # Creds for the `ci` user in the cluster-control-plane cluster
+        export AWS_ACCESS_KEY_ID=$(cat /tmp/secret/hiveci-aws-creds/AWS_ACCESS_KEY_ID)
+        export AWS_SECRET_ACCESS_KEY=$(cat /tmp/secret/hiveci-aws-creds/AWS_SECRET_ACCESS_KEY)
         # Override default location for pull secret
         export PULL_SECRET_FILE=/tmp/secret/pull-secret/.dockerconfigjson
-        # Our AWS account is set up with this domain:
-        export BASE_DOMAIN=new-installer.openshift.com
-        # Configure a cluster name that our monitor/reaper can use to
-        # - discover clusters created by this test (prefix `hiveci-`)
-        # - know when they were created (embedded date stamp)
-        # Add the PR number for extra uniqueness.
+        # Configure a unique cluster name based on timestamp and the PR number.
         # We'll exceed the 21c cluster name cutoff at PR 1Mi or some
         # time in July of 4147, whichever comes first.
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
         CLOUD=aws make test-e2e
       credentials:
-      - mount_path: /tmp/secret/hive-aws-creds
-        name: hive-aws-creds
+      - mount_path: /tmp/secret/hiveci-aws-creds
+        name: hiveci-aws-creds
         namespace: test-credentials
       - mount_path: /tmp/secret/pull-secret
         name: ci-pull-credentials
@@ -133,27 +128,22 @@ tests:
     - as: test
       cli: latest
       commands: |
-        # Creds for the `ci` user in the hive-team cluster
-        # TODO: Get a CI-owned account: DPTP-2348
-        export AWS_ACCESS_KEY_ID=$(cat /tmp/secret/hive-aws-creds/AWS_ACCESS_KEY_ID)
-        export AWS_SECRET_ACCESS_KEY=$(cat /tmp/secret/hive-aws-creds/AWS_SECRET_ACCESS_KEY)
+        export BASE_DOMAIN=hive-ci.devcluster.openshift.com
+        # Creds for the `ci` user in the cluster-control-plane cluster
+        export AWS_ACCESS_KEY_ID=$(cat /tmp/secret/hiveci-aws-creds/AWS_ACCESS_KEY_ID)
+        export AWS_SECRET_ACCESS_KEY=$(cat /tmp/secret/hiveci-aws-creds/AWS_SECRET_ACCESS_KEY)
         # Override default location for pull secret
         export PULL_SECRET_FILE=/tmp/secret/pull-secret/.dockerconfigjson
-        # Our AWS account is set up with this domain:
-        export BASE_DOMAIN=new-installer.openshift.com
-        # Configure a cluster name that our monitor/reaper can use to
-        # - discover clusters created by this test (prefix `hiveci-`)
-        # - know when they were created (embedded date stamp)
-        # Add the PR number for extra uniqueness.
+        # Configure a unique cluster name based on timestamp and the PR number.
         # We'll exceed the 21c cluster name cutoff at PR 1Mi or some
         # time in July of 4147, whichever comes first.
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
         # Disable managed DNS (on by default, and left on for the e2e test)
-        USE_MANAGED_DNS=false
+        export USE_MANAGED_DNS=false
         CLOUD=aws make test-e2e-pool
       credentials:
-      - mount_path: /tmp/secret/hive-aws-creds
-        name: hive-aws-creds
+      - mount_path: /tmp/secret/hiveci-aws-creds
+        name: hiveci-aws-creds
         namespace: test-credentials
       - mount_path: /tmp/secret/pull-secret
         name: ci-pull-credentials
@@ -169,7 +159,6 @@ tests:
           cpu: 100m
     workflow: generic-claim
 - as: e2e-gcp
-  optional: true
   run_if_changed: gcp
   steps:
     cluster_profile: gcp
@@ -188,7 +177,6 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-azure
-  optional: true
   run_if_changed: azure
   steps:
     cluster_profile: azure4

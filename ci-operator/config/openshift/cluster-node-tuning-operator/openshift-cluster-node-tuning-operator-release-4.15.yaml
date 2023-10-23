@@ -2,7 +2,7 @@ base_images:
   base:
     name: "4.15"
     namespace: ocp
-    tag: base
+    tag: base-rhel9
   hypershift-operator:
     name: "4.15"
     namespace: ocp
@@ -11,32 +11,33 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: hypershift-tests
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
-  openshift_release_golang-1.19:
+    tag: rhel-9-golang-1.20-openshift-4.15
+  openshift_release_golang-1.20:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.20
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.19:
+    openshift_release_golang-1.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
+      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: cluster-node-tuning-operator-us-tuned
-- dockerfile_path: Dockerfile.rhel8
+- dockerfile_path: Dockerfile.rhel9
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: cluster-node-tuning-operator
 promotion:
+  disabled: true
   excluded_images:
   - cluster-node-tuning-operator-us-tuned
   name: "4.15"
@@ -57,6 +58,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: lint
+  commands: make GOLANGCI_LINT_CACHE=/tmp/.golangci-lint-cache golangci-lint
+  container:
+    from: src
+  optional: true
 - as: unit
   commands: make test-unit
   container:
@@ -71,6 +77,7 @@ tests:
     from: src
 - as: e2e-hypershift
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
 - as: e2e-aws-ovn
   steps:
@@ -119,6 +126,22 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-gcp
   timeout: 5h0m0s
+- as: e2e-gcp-pao-workloadhints
+  cluster: build03
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: CLUSTER=mcp-only make cluster-deploy-pao && make pao-functests-performance-workloadhints
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+  timeout: 4h0m0s
 - as: e2e-upgrade
   steps:
     cluster_profile: aws

@@ -1,0 +1,70 @@
+base_images:
+  ocp_builder_rhel-8-base-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.15
+  ocp_builder_rhel-9-base-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.15
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/images
+images:
+- context_dir: base
+  dockerfile_path: Dockerfile.rhel
+  inputs:
+    ocp_builder_rhel-8-base-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.15
+  to: base
+- context_dir: base
+  dockerfile_path: Dockerfile.rhel9
+  inputs:
+    ocp_builder_rhel-9-base-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.15
+  to: base-rhel9
+- context_dir: egress/router
+  from: base
+  to: egress-router
+- context_dir: egress/http-proxy
+  from: base
+  to: egress-http-proxy
+- context_dir: egress/dns-proxy
+  from: base
+  to: egress-dns-proxy
+- context_dir: ipfailover/keepalived
+  from: base
+  to: keepalived-ipfailover
+promotion:
+  name: 4.16-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.16-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.16-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-upgrade
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift-priv
+  repo: images

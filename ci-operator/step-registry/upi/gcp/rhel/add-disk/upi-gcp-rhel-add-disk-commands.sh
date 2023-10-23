@@ -5,7 +5,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
-INSTANCE_PREFIX="${NAMESPACE}-${JOB_NAME_HASH}"
+INSTANCE_PREFIX="${NAMESPACE}-${UNIQUE_HASH}"
 # $SHARED_DIR/openshift_gcp_compute_zone should be created by upi-gcp-rhel8-pre.ref
 GOOGLE_COMPUTE_ZONE="$(cat "${SHARED_DIR}"/openshift_gcp_compute_zone)"
 

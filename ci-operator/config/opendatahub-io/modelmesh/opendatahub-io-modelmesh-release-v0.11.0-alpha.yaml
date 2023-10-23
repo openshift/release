@@ -1,11 +1,17 @@
 base_images:
+  modelmesh-serving-develop:
+    name: modelmesh-serving-develop
+    namespace: opendatahub-io
+    tag: v0.11.0-alpha
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
 build_root:
-  project_image:
-    dockerfile_path: Dockerfile.develop
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
 images:
 - build_args:
   - name: COMMIT_SHA
@@ -41,14 +47,13 @@ tests:
       COMPUTE_NODE_TYPE: m5.2xlarge
     test:
     - as: modelmesh-serving-fvt
-      commands: "export HOME=/go        \ngit clone https://github.com/opendatahub-io/modelmesh-serving\ncd
-        modelmesh-serving\nSTABLE_MANIFESTS=true CONTROLLERNAMESPACE=modelmesh-serving
-        NAMESPACE=modelmesh-serving NAMESPACESCOPEMODE=true CUSTOM_IMG=modelmesh=${PR_MODELMESH_IMAGE}
-        make e2e-test-for-odh\n"
+      commands: |
+        export HOME=/go
+        STABLE_MANIFESTS=true CONTROLLERNAMESPACE=modelmesh-serving NAMESPACE=modelmesh-serving NAMESPACESCOPEMODE=true CUSTOM_IMG=modelmesh=${PR_MODELMESH_IMAGE} make e2e-test-for-odh
       dependencies:
       - env: PR_MODELMESH_IMAGE
         name: modelmesh
-      from: src
+      from: modelmesh-serving-develop
       resources:
         requests:
           cpu: 2000m

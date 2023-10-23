@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
+cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
 out=${SHARED_DIR}/install-config.yaml
 
@@ -41,6 +41,16 @@ if [ -n "${BASELINE_CAPABILITY_SET}" ]; then
 capabilities:
   baselineCapabilitySet: ${BASELINE_CAPABILITY_SET}
 EOF
+        if [ -n "${ADDITIONAL_ENABLED_CAPABILITIES}" ]; then
+            cat >> "${out}" << EOF
+  additionalEnabledCapabilities:
+EOF
+            for item in ${ADDITIONAL_ENABLED_CAPABILITIES}; do
+                cat >> "${out}" << EOF
+    - ${item}
+EOF
+            done
+        fi
 fi
 
 if [ -n "${PUBLISH}" ]; then
@@ -54,5 +64,15 @@ if [ -n "${FEATURE_SET}" ]; then
         echo "Adding 'featureSet: ...' to install-config.yaml"
         cat >> "${out}" << EOF
 featureSet: ${FEATURE_SET}
+EOF
+fi
+
+# FeatureGates must be a valid yaml list.
+# E.g. ['Feature1=true', 'Feature2=false']
+# Only supported in 4.14+.
+if [ -n "${FEATURE_GATES}" ]; then
+        echo "Adding 'featureGates: ...' to install-config.yaml"
+        cat >> "${out}" << EOF
+featureGates: ${FEATURE_GATES}
 EOF
 fi

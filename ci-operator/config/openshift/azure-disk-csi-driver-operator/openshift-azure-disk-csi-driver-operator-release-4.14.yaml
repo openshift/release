@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
 build_root:
   from_repository: true
 images:
@@ -21,7 +25,6 @@ images:
   from: src
   to: azure-disk-csi-driver-operator-test
 promotion:
-  disabled: true
   name: "4.14"
   namespace: ocp
 releases:
@@ -54,6 +57,17 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-csi
+- as: e2e-azure-ovn-upgrade
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+- as: e2e-azure-csi-extended
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_SCENARIOS: \[CSI-Driver\]|\[Azure-Disk-CSI-Driver\]|\[Azure-Disk-CSI-Driver-Operator\]
+    workflow: openshift-e2e-azure-csi-extended
 - as: e2e-azurestack-csi
   optional: true
   steps:
@@ -65,6 +79,12 @@ tests:
   steps:
     test:
     - ref: go-verify-deps
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

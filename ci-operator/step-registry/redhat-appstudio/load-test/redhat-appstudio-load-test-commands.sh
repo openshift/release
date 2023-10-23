@@ -8,7 +8,7 @@ export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
 
 export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN QUAY_OAUTH_TOKEN_RELEASE_SOURCE QUAY_OAUTH_TOKEN_RELEASE_DESTINATION OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
-    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT BYOC_KUBECONFIG GITHUB_TOKENS_LIST
+    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT BYOC_KUBECONFIG GITHUB_TOKENS_LIST OAUTH_REDIRECT_PROXY_URL PUSHGATEWAY_URL
 
 DEFAULT_QUAY_ORG=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/default-quay-org)
 DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/default-quay-org-token)
@@ -20,11 +20,13 @@ QUAY_OAUTH_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/quay-oaut
 QUAY_OAUTH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/quay-oauth-token)
 QUAY_OAUTH_TOKEN_RELEASE_SOURCE=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/quay-oauth-token-release-source)
 QUAY_OAUTH_TOKEN_RELEASE_DESTINATION=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/quay-oauth-token-release-destination)
+OAUTH_REDIRECT_PROXY_URL=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/oauth-redirect-proxy-url)
 PYXIS_STAGE_KEY=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pyxis-stage-key)
 PYXIS_STAGE_CERT=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pyxis-stage-cert)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 PREVIOUS_RATE_REMAINING=0
+PUSHGATEWAY_URL="$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/pushgateway-url)"
 
 # user stored: username:token,username:token
 IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<<"$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/github_accounts)"
@@ -91,11 +93,19 @@ cd "$(mktemp -d)"
 
 git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
 
+set -x
+if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
+    # if this is executed as PR check of github.com/redhat-appstudio/e2e-tests.git repo, switch to PR branch.
+    git fetch origin "pull/${PULL_NUMBER}/head"
+    git checkout -b "pr-${PULL_NUMBER}" FETCH_HEAD
+fi
+set +x
+
+# Collect load test results at the end
+trap './tests/load-tests/ci-scripts/collect-results.sh "$SCENARIO"; trap EXIT' SIGINT EXIT
+
 # Setup OpenShift cluster
-./tests/load-tests/ci-scripts/setup-cluster.sh $SCENARIO
+./tests/load-tests/ci-scripts/setup-cluster.sh "$SCENARIO"
 
 # Execute load test
-./tests/load-tests/ci-scripts/load-test.sh $SCENARIO
-
-# Collect load test results
-./tests/load-tests/ci-scripts/collect-results.sh $SCENARIO
+./tests/load-tests/ci-scripts/load-test.sh "$SCENARIO"

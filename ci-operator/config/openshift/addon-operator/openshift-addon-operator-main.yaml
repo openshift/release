@@ -1,9 +1,6 @@
 binary_build_commands: make
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
+  from_repository: true
 images:
 - dockerfile_path: config/docker/addon-operator-manager.Dockerfile
   inputs:
@@ -44,12 +41,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.8"
+      name: "4.11"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.8"
+      name: "4.11"
       namespace: ocp
 resources:
   '*':
@@ -59,6 +56,25 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: addon-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: addon-operator-codecov-token
 - as: unit
   commands: make test-unit
   container:

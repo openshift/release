@@ -1,0 +1,128 @@
+base_images:
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+binary_build_commands: make install
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- dockerfile_path: build/ci-tf-e2e.Dockerfile
+  to: rhcs-tf-e2e
+- dockerfile_path: build/ci-tf-bin.Dockerfile
+  to: rhcs-tf-bin
+promotion:
+  namespace: ci
+  tag: latest
+  tag_by_commit: true
+releases:
+  latest:
+    integration:
+      name: "4.13"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: |-
+    go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo@latest
+    unset GOFLAGS
+    make unit-test
+  container:
+    from: src
+- always_run: false
+  as: rosa-classic-e2e-presubmit
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      TF_FOLDER: ci/e2e/terraform_provider_rhcs_files
+      TF_VARS: |
+        url = "https://api.stage.openshift.com"
+        channel_group = "stable"
+        aws_region = "ap-northeast-1"
+        aws_availability_zones = ["ap-northeast-1a"]
+    post:
+    - ref: rosa-terraform-e2e-teardown
+    pre:
+    - ref: rosa-terraform-e2e-setup
+- as: managed-oidc-config-e2e-presubmit
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      TF_FOLDER: ci/e2e/oidc_configuration/cluster_with_managed_oidc_config
+      TF_VARS: |
+        url = "https://api.stage.openshift.com"
+        channel_group = "candidate"
+        aws_region = "ap-northeast-1"
+        aws_availability_zones = ["ap-northeast-1a"]
+    post:
+    - ref: rosa-terraform-e2e-teardown
+    pre:
+    - ref: rosa-terraform-e2e-setup
+- as: unmanaged-oidc-config-e2e-presubmit
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      TF_FOLDER: ci/e2e/oidc_configuration/cluster_with_unmanaged_oidc_config
+      TF_VARS: |
+        url = "https://api.stage.openshift.com"
+        channel_group = "stable"
+        aws_region = "ap-northeast-1"
+        aws_availability_zones = ["ap-northeast-1a"]
+    post:
+    - ref: rosa-terraform-e2e-teardown
+    pre:
+    - ref: rosa-terraform-e2e-setup
+- as: managed-oidc-config-e2e-periodic
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      POLARION_PROPERTIES: |
+        targets:
+          polarion:
+            config:
+              project: OSE
+            processing:
+              testsuite_properties:
+                polarion-testrun-id: 20230528-0959
+                polarion-custom-subteam: kni
+                polarion-custom-casecomponent: terraform-provider
+                polarion-custom-pillar: acceleration
+                polarion-custom-version: '4.13'
+                polarion-custom-products: ocp
+                polarion-custom-plannedin: OCP_4_13_Z
+      POLARION_STEP_RESULTS: openshift-extended-test/artifacts/junit
+      TEST_FILTERS: ~MicroShiftOnly&;~HyperShiftMGMT&;~CPaasrunOnly&;~NonPreRelease&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;~DisconnectedOnly&;~Disruptive&;~Serial&;ROSA&
+      TEST_SCENARIOS: OLM|Security_and_Compliance|Operator_SDK|Network_Edge|Workloads|Image_Registry|Container_Engine_Tools|MCO|ETCD|PSAP|SDN|Cluster_Infrastructure|API_Server|Authentication|Cluster_Observability|LOGGING
+      TF_FOLDER: ci/e2e/oidc_configuration/cluster_with_managed_oidc_config
+      TF_VARS: |
+        provider_source  = "terraform.local/local/rhcs"
+        provider_version =  ">= 1.1.0"
+        ocm_environment = "production"
+        url = "https://api.openshift.com"
+        channel_group = "stable"
+        aws_region = "ap-northeast-1"
+        aws_availability_zones = ["ap-northeast-1a"]
+    post:
+    - ref: rosa-terraform-e2e-teardown
+    pre:
+    - ref: rosa-terraform-e2e-setup
+    test:
+    - ref: openshift-extended-test
+    - ref: rosa-terraform-e2e-tests-upload-polarion
+zz_generated_metadata:
+  branch: main
+  org: terraform-redhat
+  repo: terraform-provider-rhcs

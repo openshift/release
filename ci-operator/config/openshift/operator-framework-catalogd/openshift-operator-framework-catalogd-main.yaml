@@ -1,45 +1,44 @@
 base_images:
   base:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.14"
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 images:
-- dockerfile_literal: |-
-    FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14 AS builder
-    WORKDIR /build
-    COPY . .
-    RUN CGO_ENABLED=0 GOOS=${GOOS} GOPROXY=${GOPROXY} go build \
-      -o catalogd-controller \
-      ./cmd/manager/main.go
-
-    FROM registry.ci.openshift.org/ocp/4.14:base
-    COPY --from=builder /build/catalogd-controller /usr/bin/catalogd-controller
-    LABEL io.k8s.display-name="OpenShift Operator Lifecycle Manager Catalog Controller" \
-          io.k8s.description="This is a component of OpenShift Container Platform that provides operator catalog support."
+- dockerfile_path: openshift/Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: olm-catalogd
+- context_dir: testdata/catalogs
+  dockerfile_path: test-catalog.Dockerfile
+  from: src
+  to: test-catalog
 promotion:
-  name: "4.14"
+  excluded_images:
+  - test-catalog
+  name: "4.15"
   namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
 resources:
   '*':
@@ -69,6 +68,36 @@ tests:
     cd openshift && make verify-deps
   container:
     from: src
+- as: verify-manifests
+  commands: make -f openshift/Makefile verify-manifests
+  container:
+    from: src
+- as: verify-commits
+  commands: make -f openshift/Makefile verify-commits
+  container:
+    from: src
+- as: verify-commits-shared
+  commands: commitchecker --start ${PULL_BASE_SHA:-main}
+  container:
+    from: commitchecker
+- as: openshift-e2e-aws
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: upstream-e2e
+      commands: make test-e2e
+      dependencies:
+      - env: TEST_CATALOG_IMAGE
+        name: test-catalog
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main
   org: openshift

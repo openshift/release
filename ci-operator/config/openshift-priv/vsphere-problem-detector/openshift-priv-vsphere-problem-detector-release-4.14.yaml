@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
 binary_build_commands: make
 build_root:
   from_repository: true
@@ -20,7 +24,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: vsphere-problem-detector
 promotion:
-  disabled: true
   name: 4.14-priv
   namespace: ocp-private
 releases:
@@ -43,12 +46,19 @@ resources:
 tests:
 - as: e2e-vsphere
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-csi-extended
+  optional: true
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      TEST_SCENARIOS: \[CSI-Driver\]|\[vSphere CSI Driver\]|\[vSphere-CSI-Driver-Operator\]|\[vSphere-Problem-Detector\]
+    workflow: openshift-e2e-vsphere-csi-extended
 - as: e2e-vsphere-zones
   optional: true
   steps:
-    cluster_profile: vsphere-multizone
+    cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-zones
 - as: unit
   commands: make test-unit

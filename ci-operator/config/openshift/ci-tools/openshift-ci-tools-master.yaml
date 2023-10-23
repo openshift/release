@@ -4,13 +4,17 @@ base_images:
     namespace: ci
     tag: stable
   cli:
-    name: "4.11"
+    name: "4.14"
     namespace: ocp
     tag: cli
   golangci-lint:
     name: golangci-lint
     namespace: ci
     tag: v1.48.0
+  hypershift:
+    name: hypershift-cli
+    namespace: ci
+    tag: latest
   os:
     name: centos
     namespace: origin
@@ -44,6 +48,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/pr-reminder
   to: pr-reminder
+- context_dir: images/pipeline-controller/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/pipeline-controller
+  to: pipeline-controller
 - context_dir: images/check-gh-automation/
   from: os
   inputs:
@@ -58,9 +70,17 @@ images:
       as:
       - registry.ci.openshift.org/ci/nginx-unprivileged:stable
   to: gh-pull-through-cache
-- context_dir: images/envoyproxy/
-  to: envoyproxy
 - context_dir: images/dptp-3312-hypershift-leaks-cleaner/
+  from: os
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    hypershift:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/hypershift
   to: dptp-3312-hypershift-leaks-cleaner
 - context_dir: images/cvp-trigger/
   from: os
@@ -150,14 +170,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/slack-bot
   to: slack-bot
-- context_dir: images/config-shard-validator/
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/config-shard-validator
-  to: config-shard-validator
 - context_dir: images/config-brancher/
   from: os
   inputs:
@@ -197,6 +209,23 @@ images:
       - destination_dir: .
         source_path: /go/bin/promoted-image-governor
   to: promoted-image-governor
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD ci-images-mirror /usr/bin/ci-images-mirror
+    ADD usr/bin/oc /usr/bin/oc
+    ENTRYPOINT ["ci-images-mirror"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-images-mirror
+    cli:
+      paths:
+      - destination_dir: usr/bin
+        source_path: /usr/bin/oc
+  to: ci-images-mirror
 - dockerfile_literal: |-
     FROM quay.io/centos/centos:stream8
     RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
@@ -345,6 +374,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/determinize-prow-config
   to: determinize-prow-config
+- context_dir: images/tide-config-manager
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/tide-config-manager
+  to: tide-config-manager
 - context_dir: images/repo-init
   from: os
   inputs:
@@ -682,6 +719,20 @@ images:
       - destination_dir: .
         source_path: /go/bin/image-graph-generator
   to: image-graph-generator
+- context_dir: images/multi-arch-builder-controller
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/multi-arch-builder-controller
+      - destination_dir: .
+        source_path: /usr/bin/manifest-tool
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: multi-arch-builder-controller
 promotion:
   namespace: ci
   tag: latest
@@ -708,7 +759,8 @@ tests:
   commands: make integration
   container:
     from: test-bin
-- as: e2e
+- always_run: false
+  as: e2e
   steps:
     test:
     - as: e2e
@@ -732,6 +784,9 @@ tests:
         namespace: test-credentials
       - mount_path: /tmp/hive
         name: hive-hive-credentials
+        namespace: test-credentials
+      - mount_path: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
         namespace: test-credentials
       from: test-bin
       resources:
@@ -815,6 +870,24 @@ tests:
   commands: make lint
   container:
     from: golangci-lint
+- as: canary-build09
+  cluster: build09
+  interval: 10m
+  steps:
+    test:
+    - as: test
+      commands: echo "here i am"
+      from: os
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: ci-tools
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift

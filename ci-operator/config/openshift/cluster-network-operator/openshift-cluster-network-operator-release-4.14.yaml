@@ -10,7 +10,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.48.0
+    tag: v1.53.1
   hypershift-operator:
     name: "4.14"
     namespace: ocp
@@ -35,7 +35,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: cluster-network-operator
 promotion:
-  disabled: true
   name: "4.14"
   namespace: ocp
 releases:
@@ -130,18 +129,25 @@ tests:
 - as: e2e-vsphere-ovn
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-ovn-dualstack
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       TEST_SKIPS: Services Secondary IP Family \[LinuxOnly\] should function for pod-Service\|
         Services Secondary IP Family \[LinuxOnly\] should function for node-Service\|
         Services Secondary IP Family \[LinuxOnly\] should function for endpoint-Service\|
         Services Secondary IP Family \[LinuxOnly\] should function for service endpoints
         using hostNetwork\| should have ipv4 and ipv6 internal node ip
+    workflow: openshift-e2e-vsphere-ovn-dualstack
+- as: e2e-vsphere-ovn-dualstack-primaryv6
+  optional: true
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      IP_FAMILIES: DualStackIPv6Primary
     workflow: openshift-e2e-vsphere-ovn-dualstack
 - as: e2e-azure-ovn
   optional: true
@@ -153,20 +159,26 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ovn-dualstack
+- always_run: false
+  as: e2e-azure-ovn-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-gcp-ovn
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-ovn
 - as: e2e-vsphere-ovn-windows
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     test:
     - ref: windows-e2e-operator-test-with-custom-vxlan-port
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
 - as: e2e-openstack-kuryr
   optional: true
   steps:
-    cluster_profile: openstack-kuryr
+    cluster_profile: openstack-vh-mecha-az0
     env:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
@@ -242,6 +254,11 @@ tests:
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-clusternetwork-cidr-expansion
+  cron: 0 3 * * 0,2,4,6
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-cidr-expansion
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
@@ -249,6 +266,7 @@ tests:
     workflow: openshift-e2e-aws-single-node
 - as: e2e-hypershift-ovn
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
 - as: lint
   commands: |
@@ -298,6 +316,89 @@ tests:
     - chain: network-mtu-migration-increase
     - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-sdn
+  timeout: 5h0m0s
+- as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
+- as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      GATEWAY_MODE: local
+    workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+- as: e2e-aws-hypershift-ovn-kubevirt
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: hypershift-kubevirt-conformance
+- always_run: false
+  as: qe-perfscale-aws-ovn-medium-cluster-density
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SIZE_VARIANT: large
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-cluster-density-v2
+  timeout: 5h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-small-cluster-density
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-cluster-density-v2
+  timeout: 5h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-medium-node-density-cni
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SIZE_VARIANT: large
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-cluster-density-v2
+  timeout: 5h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-small-node-density-cni
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-4.14

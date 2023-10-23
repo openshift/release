@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
@@ -51,10 +51,6 @@ base_images:
     name: "4.13"
     namespace: origin
     tag: cli
-  rhel-7:
-    name: builder
-    namespace: ocp
-    tag: rhel-7-golang-1.16-openshift-4.10
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/installer
@@ -86,8 +82,8 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: libvirt-installer
-- dockerfile_path: images/installer/Dockerfile.upi.ci
-  from: rhel-7
+- dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
+  from: base
   inputs:
     ocp_4.10_cli:
       as:
@@ -267,6 +263,18 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-sharednetwork
+  timeout: 6h0m0s
+- as: e2e-aws-ovn-shared-vpc-localzones
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws-local-zones
+    env:
+      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
+    leases:
+    - env: LEASED_RESOURCE
+      resource_type: aws-local-zones-quota-slice
+    workflow: openshift-e2e-aws-local-zones-byo-vpc
   timeout: 6h0m0s
 - as: e2e-aws-ovn-imdsv2
   optional: true
@@ -477,6 +485,14 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-nfv-intel
+  optional: true
+  run_if_changed: openstack
+  steps:
+    cluster_profile: openstack-nfv
+    workflow: openshift-e2e-openstack-nfv
+  timeout: 6h0m0s
 - as: e2e-openstack-proxy
   optional: true
   run_if_changed: openstack
@@ -488,6 +504,8 @@ tests:
   optional: true
   steps:
     cluster_profile: openstack-vh-mecha-central
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-openstack-external-lb
   timeout: 6h0m0s
 - as: openstack-manifests
@@ -499,27 +517,27 @@ tests:
 - as: e2e-vsphere-ovn
   run_if_changed: vsphere
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 - as: e2e-vsphere-upi
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-upi
   timeout: 6h0m0s
 - as: e2e-vsphere-upi-zones
   optional: true
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
-    cluster_profile: vsphere-multizone
+    cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-upi-zones
   timeout: 6h0m0s
 - as: e2e-vsphere-zones
   optional: true
   run_if_changed: vsphere
   steps:
-    cluster_profile: vsphere-multizone
+    cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-zones
   timeout: 6h0m0s
 - as: e2e-crc
@@ -582,7 +600,7 @@ tests:
   optional: true
   run_if_changed: (openstack|gophercloud)
   steps:
-    cluster_profile: openstack-kuryr
+    cluster_profile: openstack-vh-mecha-az0
     env:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal

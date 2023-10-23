@@ -11,6 +11,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: openstack-installer
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.10
   sriov-cni:
     name: "4.14"
     namespace: ocp
@@ -53,7 +57,10 @@ images:
   to: sriov-network-webhook
 operator:
   bundles:
-  - dockerfile_path: bundleci.Dockerfile
+  - as: sriov-network-operator-bundle
+    base_index: operator-index
+    dockerfile_path: bundleci.Dockerfile
+    update_graph: replaces
   substitutions:
   - pullspec: quay.io/openshift/origin-sriov-dp-admission-controller:4.11
     with: pipeline:sriov-dp-admission-controller
@@ -70,7 +77,6 @@ operator:
   - pullspec: quay.io/openshift/origin-sriov-network-operator:4.11
     with: pipeline:sriov-network-operator
 promotion:
-  disabled: true
   name: "4.14"
   namespace: ocp
 releases:
@@ -109,7 +115,7 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: ci-index-sriov-network-operator-bundle
     env:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
@@ -129,20 +135,20 @@ tests:
   steps:
     cluster_profile: openstack-nfv
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: ci-index-sriov-network-operator-bundle
     env:
       OPENSTACK_DPDK_NETWORK: intel-dpdk
-    workflow: openshift-e2e-openstack-sriov
+    workflow: openshift-e2e-openstack-sriov-cgroupsv1
 - as: e2e-openstack-nfv-hwoffload
   optional: true
   steps:
     cluster_profile: openstack-hwoffload
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: ci-index-sriov-network-operator-bundle
     env:
       ADDITIONAL_WORKERS_NETWORKS: ""
       OPENSTACK_SRIOV_NETWORK: mellanox-hwoffload
-    workflow: openshift-e2e-openstack-sriov
+    workflow: openshift-e2e-openstack-sriov-cgroupsv1
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

@@ -1,12 +1,12 @@
 base_images:
   base:
-    name: 4.14-priv
+    name: 4.15-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-monitoring-operator
@@ -14,26 +14,26 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: cluster-monitoring-operator
 - dockerfile_literal: |
     FROM src
   from: src
   to: cluster-monitoring-operator-src
 promotion:
-  name: 4.14-priv
+  name: 4.15-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.14-priv
+      name: 4.15-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
+      name: 4.15-priv
       namespace: ocp-private
 resources:
   '*':
@@ -66,7 +66,7 @@ tests:
   container:
     from: src
 - as: versions
-  commands: INTERACTIVE=false make versions && git diff --exit-code
+  commands: make check-versions
   container:
     from: src
   optional: true
@@ -76,6 +76,13 @@ tests:
     from: src
 - as: unit
   commands: make test-unit
+  container:
+    from: src
+- as: golangci-lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    make golangci-lint
   container:
     from: src
 - as: e2e-aws-ovn

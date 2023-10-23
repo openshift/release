@@ -101,8 +101,9 @@ spec:
       initrd_add_dir=
       # overrides cpu-partitioning cmdline
       cmdline_cpu_part=+nohz=on rcu_nocbs=\${isolated_cores} tuned.non_isolcpus=\${not_isolated_cpumask} intel_pstate=disable nosoftlockup
-      cmdline_realtime=+tsc=nowatchdog intel_iommu=on iommu=pt isolcpus=managed_irq,\${isolated_cores} systemd.cpu_affinity=\${not_isolated_cores_expanded}
+      cmdline_realtime=+intel_iommu=on iommu=pt isolcpus=managed_irq,\${isolated_cores} systemd.cpu_affinity=\${not_isolated_cores_expanded}
       cmdline_additionalArg=+ nmi_watchdog=0 audit=0 mce=off processor.max_cstate=1 idle=poll intel_idle.max_cstate=0 nohz_full=\${isolated_cores}
+      cmdline_network_latency=skew_tick=1 tsc=reliable rcupdate.rcu_normal_after_boot=1
     name: openshift-node-performance-manual
   recommend:
   - machineConfigLabels:

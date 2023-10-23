@@ -73,7 +73,7 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: powervs-ipi-e2e-test-qe
+- as: powervs-ipi-f7
   cluster: build01
   cron: 0 18 * * 2
   steps:
@@ -86,7 +86,24 @@ tests:
         @fips'
       TAG_VERSION: '@4.14'
     test:
+    - ref: enable-qe-catalogsource
     - chain: openshift-e2e-test-qe
+    workflow: ipi-powervs
+- as: powervs-ipi-f7-destructive
+  cluster: build01
+  cron: 0 22 * * 2
+  steps:
+    cluster_profile: powervs-1
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+    env:
+      BASE_DOMAIN: ocp-dev-ppc64le.com
+      E2E_RUN_TAGS: '@ppc64le and @baremetal-upi and @network-ovnkubernetes and not
+        @fips'
+      TAG_VERSION: '@4.14'
+    test:
+    - ref: enable-qe-catalogsource
+    - chain: openshift-e2e-test-qe-destructive
     workflow: ipi-powervs
 zz_generated_metadata:
   branch: release-4.14

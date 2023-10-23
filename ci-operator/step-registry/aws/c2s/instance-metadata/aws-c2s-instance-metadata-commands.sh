@@ -70,3 +70,41 @@ EOF
 
 create_mco_config_for_c2s_instance_metadata "${SHARED_DIR}/manifest_instance_metadata_master.yaml" master
 create_mco_config_for_c2s_instance_metadata "${SHARED_DIR}/manifest_instance_metadata_worker.yaml" worker
+
+
+# ----------------------------------------------------------------------
+# C2S: workaround for C2S emulator
+# https://bugzilla.redhat.com/show_bug.cgi?id=1911257#c6
+# update Feb. 10
+# per https://bugzilla.redhat.com/show_bug.cgi?id=1923956#c3
+#   this is a fix for metadata issue on C2S emulator
+# per https://bugzilla.redhat.com/show_bug.cgi?id=1926975
+#   a non-empty cloud config is required for 4.9 and below
+# ----------------------------------------------------------------------
+
+cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+rm /tmp/pull-secret
+
+ca_file=`mktemp`
+cat "${CLUSTER_PROFILE_DIR}/shift-ca-chain.cert.pem" > ${ca_file}
+cat "/var/run/vault/mirror-registry/client_ca.crt" >> ${ca_file}
+
+if (( ocp_minor_version <= 9 && ocp_major_version == 4 )); then
+  echo "C2S: workaround for C2S emulator (BZ#1926975)"
+  cat << EOF > ${SHARED_DIR}/manifest_c2s_emulator_patch_cloud-provider-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloud-provider-config
+  namespace: openshift-config
+data:
+  ca-bundle.pem: |
+`cat ${ca_file} | sed -e 's/^/    /'`
+  config: |
+    [Global]
+EOF
+fi

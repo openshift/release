@@ -156,7 +156,8 @@ tests:
         extract should extract\| Image info should display\| Image layer subresource\|
         oc tag should change image\| when installed on the cluster should\| OpenShift
         alerting rules\| The HAProxy router should\| egressrouter cni resources\|
-        pod should start\| pod sysctls
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod
     workflow: openshift-e2e-aws-heterogeneous
 - as: ocp-e2e-serial-aws-ovn-heterogeneous
   cron: 19 23 * * 2
@@ -303,9 +304,22 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
     workflow: openshift-e2e-azure-ovn
+- as: ocp-e2e-upgrade-azure-ovn-arm64
+  interval: 72h
+  steps:
+    cluster_profile: azure-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: ci.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+      TEST_SUITE: upgrade-conformance
+    workflow: openshift-upgrade-azure
 - as: ocp-e2e-ovn-remote-libvirt-s390x
   cluster: build01
-  interval: 96h
+  cron: 0 1/8 * * 1-5
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -314,11 +328,12 @@ tests:
       ARCH: s390x
       BRANCH: "4.13"
       NODE_TUNING: "true"
+      STATIC_POD_CHECK_WORKAROUND: "true"
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-libvirt
 - as: ocp-image-ecosystem-ovn-remote-libvirt-s390x
   cluster: build01
-  cron: 15 15 29 * *
+  cron: 0 12 * * 0
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -330,7 +345,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-jenkins-e2e-ovn-remote-libvirt-s390x
   cluster: build01
-  cron: 19 18 24 * *
+  cron: 0 13 * * 0
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -342,7 +357,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-e2e-serial-ovn-remote-libvirt-s390x
   cluster: build01
-  cron: 43 4 26 * *
+  cron: 0 12 * * 6
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -350,11 +365,12 @@ tests:
     env:
       ARCH: s390x
       BRANCH: "4.13"
+      STATIC_POD_CHECK_WORKAROUND: "true"
       TEST_TYPE: conformance-serial
     workflow: openshift-e2e-libvirt
 - as: ocp-fips-ovn-remote-libvirt-s390x
   cluster: build01
-  cron: 51 6 * * */6
+  cron: 0 14 * * 6
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -371,7 +387,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-e2e-compact-ovn-remote-libvirt-s390x
   cluster: build01
-  cron: '@yearly'
+  cron: 0 13 * * 6
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -381,6 +397,7 @@ tests:
       BRANCH: "4.13"
       MASTER_DISK: "64424509440"
       MASTER_MEMORY: "32768"
+      STATIC_POD_CHECK_WORKAROUND: "true"
       TEST_TYPE: conformance-parallel
       WORKER_DISK: "64424509440"
       WORKER_MEMORY: "32768"
@@ -388,7 +405,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-e2e-ovn-remote-libvirt-ppc64le
   cluster: build01
-  interval: 96h
+  cron: 0 1/8 * * 1-5
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -396,11 +413,12 @@ tests:
     env:
       ARCH: ppc64le
       BRANCH: "4.13"
+      STATIC_POD_CHECK_WORKAROUND: "true"
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-libvirt
 - as: ocp-image-ecosystem-ovn-remote-libvirt-ppc64le
   cluster: build01
-  cron: 10 14 15 * *
+  cron: 0 12 * * 0
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -412,7 +430,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-jenkins-e2e-ovn-remote-libvirt-ppc64le
   cluster: build01
-  cron: 20 20 17 * *
+  cron: 0 13 * * 0
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -424,7 +442,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-e2e-serial-ovn-remote-libvirt-ppc64le
   cluster: build01
-  cron: 30 13 10 * *
+  cron: 0 12 * * 6
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -432,11 +450,12 @@ tests:
     env:
       ARCH: ppc64le
       BRANCH: "4.13"
+      STATIC_POD_CHECK_WORKAROUND: "true"
       TEST_TYPE: conformance-serial
     workflow: openshift-e2e-libvirt
 - as: ocp-fips-ovn-remote-libvirt-ppc64le
   cluster: build01
-  cron: 51 6 * * */6
+  cron: 0 14 * * 6
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -452,7 +471,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-e2e-compact-ovn-remote-libvirt-ppc64le
   cluster: build01
-  cron: '@yearly'
+  cron: 0 13 * * 6
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -462,6 +481,7 @@ tests:
       BRANCH: "4.13"
       MASTER_DISK: "64424509440"
       MASTER_MEMORY: "32768"
+      STATIC_POD_CHECK_WORKAROUND: "true"
       TEST_TYPE: conformance-parallel
       WORKER_DISK: "64424509440"
       WORKER_MEMORY: "32768"
@@ -469,7 +489,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-e2e-ovn-ppc64le-powervs
   cluster: build01
-  cron: 0 2,8,14,20 * * *
+  cron: 0 12,18 * * *
   steps:
     cluster_profile: powervs-2
     dependencies:
@@ -477,11 +497,13 @@ tests:
     env:
       ARCH: ppc64le
       BRANCH: "4.13"
+      INSTALLER: powervs
+      STATIC_POD_CHECK_WORKAROUND: "true"
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-powervs-ipi
 - as: ocp-e2e-serial-ovn-ppc64le-powervs
   cluster: build01
-  cron: 0 3,9,15,21 * * *
+  cron: 0 13,19 * * *
   steps:
     cluster_profile: powervs-2
     dependencies:
@@ -489,6 +511,7 @@ tests:
     env:
       ARCH: ppc64le
       BRANCH: "4.13"
+      STATIC_POD_CHECK_WORKAROUND: "true"
       TEST_TYPE: conformance-serial
     workflow: openshift-e2e-powervs-ipi
 - as: ocp-e2e-azure-ovn-heterogeneous
@@ -511,7 +534,8 @@ tests:
         extract should extract\| Image info should display\| Image layer subresource\|
         oc tag should change image\| when installed on the cluster should\| OpenShift
         alerting rules\| The HAProxy router should\| egressrouter cni resources\|
-        pod should start\| pod sysctls
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod
     test:
     - ref: ipi-install-heterogeneous
     - ref: openshift-e2e-test

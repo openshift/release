@@ -1,0 +1,40 @@
+build_root:
+  image_stream_tag:
+    name: maistra-builder
+    namespace: ci
+    tag: "2.5"
+  use_build_cache: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: xns-informer-unit-2-5
+  commands: |
+    make test \
+    GOBIN="/gobin" \
+    GOCACHE="/tmp/cache" \
+    GOMODCACHE="/tmp/cache" \
+    XDG_CACHE_HOME="/tmp/cache"
+  container:
+    from: src
+- as: xns-informer-gencheck-2-5
+  commands: |
+    make gen-check \
+    GOBIN="/gobin" \
+    GOCACHE="/tmp/cache" \
+    GOMODCACHE="/tmp/cache" \
+    XDG_CACHE_HOME="/tmp/cache"
+  container:
+    from: src
+- as: xns-informer-lint-2-5
+  commands: make lint
+  container:
+    from: src
+zz_generated_metadata:
+  branch: maistra-2.5
+  org: maistra
+  repo: xns-informer

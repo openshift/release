@@ -15,10 +15,6 @@ base_images:
     name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-controller
-  assisted-test-infra:
-    name: ocm-2.7
-    namespace: edge-infrastructure
-    tag: assisted-test-infra
   cli:
     name: "4.11"
     namespace: ocp
@@ -398,46 +394,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: e2e-metal-assisted-kube-api-net-suite
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.7
-        KUBE_API=true
-        ENABLE_KUBE_API=true
-        NUM_MASTERS=1
-        ISO_IMAGE_TYPE=minimal-iso
-        STATIC_IPS=true
-        TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="test_kube_api_parallel"
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-late-binding-single-node
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.7
-      POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_late_binding_kube_api_sno
-        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_kube_api_parallel
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.7
-      POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_late_binding_kube_api_sno
-        export HOLD_INSTALLATION=true
-        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_kube_api_parallel
-    workflow: assisted-baremetal
 - as: e2e-ai-operator-ztp
   run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|deploy/assisted-controller/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
@@ -449,7 +405,7 @@ tests:
       ALLOW_CONVERGED_FLOW: "False"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-periodic
-  cron: 00 00 */1 * 0-5
+  cron: 00 00 */1 * 0,2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -472,7 +428,7 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters-periodic
-  cron: 00 00 */1 * 0-5
+  cron: 00 00 */1 * 0,2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -489,7 +445,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ALLOW_CONVERGED_FLOW: "False"
@@ -497,11 +453,11 @@ tests:
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected-periodic
-  cron: 00 00 */1 * 0-5
+  cron: 00 00 */1 * 0,2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ALLOW_CONVERGED_FLOW: "False"
@@ -552,7 +508,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-periodic
-  cron: 05 00 */1 * 0-5
+  cron: 05 00 */1 * 0,2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -581,7 +537,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
-  cron: 25 00 */1 * 0-5
+  cron: 25 00 */1 * 0,2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -638,7 +594,7 @@ tests:
       ALLOW_CONVERGED_FLOW: "False"
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-capi-periodic
-  cron: 25 00 */1 * 0-5
+  cron: 25 00 */1 * 0,2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -673,7 +629,7 @@ tests:
       IP_STACK: v4v6
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-sno-periodic
-  cron: 05 01 */1 * 0-5
+  cron: 05 01 */1 * 0,2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -713,7 +669,7 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-3masters-periodic
-  cron: 45 01 */1 * 0-5
+  cron: 45 01 */1 * 0,2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -755,9 +711,9 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=1
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-hypershift-zero-nodes
+- always_run: false
+  as: e2e-ai-operator-ztp-hypershift-zero-nodes
   optional: true
-  run_if_changed: ^(deploy/operator/hypershift/.*|api/.*|internal/controller/controllers/.*agentserviceconfig.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -767,27 +723,6 @@ tests:
     env:
       ALLOW_CONVERGED_FLOW: "False"
     workflow: assisted-baremetal-operator-hypershift
-- as: e2e-ai-operator-ztp-hypershift-zero-nodes-periodic
-  cron: 00 02 */1 * 1-4
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      HYPERSHIFT_IMAGE: hypershift-operator
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ALLOW_CONVERGED_FLOW: "False"
-    workflow: assisted-baremetal-operator-hypershift
-- as: e2e-ai-operator-ztp-converged
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ALLOW_CONVERGED_FLOW: "True"
-    workflow: assisted-baremetal-operator-ztp
 zz_generated_metadata:
   branch: release-ocm-2.7
   org: openshift

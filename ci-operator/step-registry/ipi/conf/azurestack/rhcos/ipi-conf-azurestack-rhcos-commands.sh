@@ -33,5 +33,12 @@ fi
 
 vhd_blob_url="https://$storage_account.blob.$suffix_endpoint/$container/$vhd_fn"
 
-# shellcheck disable=SC2016
-yq --arg url "${vhd_blob_url}" -i -y '.platform.azure.ClusterOSImage=$url' "${SHARED_DIR}/install-config.yaml"
+PATCH="/tmp/install-config-clusterosimage.yaml.patch"
+# create a patch with ClusterOSImage configuration
+cat > "${PATCH}" << EOF
+platform:
+  azure:
+    ClusterOSImage: ${vhd_blob_url}
+EOF
+# apply patch to install-config
+yq-go m -x -i "${SHARED_DIR}/install-config.yaml" "${PATCH}"

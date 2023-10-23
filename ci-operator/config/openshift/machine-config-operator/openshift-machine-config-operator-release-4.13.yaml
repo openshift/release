@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
@@ -43,6 +43,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.13
+  ocp_builder_rhel-9-golang-1.19-openshift-4.13:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.19-openshift-4.13
   ocp_os:
     name: "4.13"
     namespace: ocp
@@ -56,6 +60,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+    ocp_builder_rhel-9-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.13
   to: machine-config-operator
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
@@ -96,7 +103,6 @@ tests:
     from: src
 - as: e2e-alibabacloud-ovn
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: alibabacloud
     workflow: openshift-e2e-alibabacloud
@@ -236,7 +242,7 @@ tests:
 - as: e2e-vsphere-upi
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-metal-ipi
   cluster: build05
@@ -274,12 +280,12 @@ tests:
 - as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-upgrade
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-upgrade-vsphere
 - as: e2e-ovn-step-registry
   optional: true
@@ -369,6 +375,7 @@ tests:
 - as: e2e-hypershift
   optional: true
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: release-4.13

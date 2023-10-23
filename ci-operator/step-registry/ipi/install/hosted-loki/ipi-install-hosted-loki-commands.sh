@@ -16,7 +16,9 @@ then
   exit 0
 fi
 
-if [[ "$JOB_NAME" =~ .*proxy.* ]]
+# Some kinds of jobs need to skip installing loki by default; but to make
+# sure we rightfully skip them, we have two different conditions.
+if [[ "$JOB_NAME" =~ .*proxy.* ]] || test -f "${SHARED_DIR}/proxy-conf.sh"
 then
   echo "Clusters using a proxy are not yet supported for loki"
   exit 0
@@ -112,80 +114,64 @@ data:
     positions:
       filename: "/run/promtail/positions.yaml"
     scrape_configs:
-    - job_name: kubernetes
+    - job_name: kubernetes-pods
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
       - cri: {}
+      - static_labels:
+          type: pod
+      # Special match for the logs from the event-exporter pod, which logs json lines for each kube event.
+      # For these we want to extract the namespace from metadata.namespace, rather than using the one
+      # from the pod which did the logging. (openshift-e2e-loki)
+      # This will allow us to search events globally with a namespace label that matches the actual event.
       - match:
           selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
-          action: drop
-      - labeldrop:
-        - filename
-      - pack:
-          labels:
-          - namespace
-          - pod_name
-          - container_name
-          - app
+          stages:
+            # Two json stages to access the nested metadata.namespace field:
+            - json:
+                expressions:
+                  metadata:
+            - json:
+                expressions:
+                  namespace:
+                source: metadata
+            - labels:
+                namespace:
+            - static_labels:
+                type: kube-event
+      # For anything that is outside an openshift- namespace, we will pack it into the entry to
+      # dramatically improve cardinality. These would typically be temporary namespaces with random
+      # names created by e2e tests. We still keep their logs, you just don't get a fast label filter
+      # to find them globally by namespace.
+      #
+      # We had to resort to a fixed list here because there are a lot of openshift-RAND namespaces created.
+      # (must-gather, debug, amq, test, etc) If you want your namespaces to get it's own indexed namespace
+      # label, add it here, in alphabetical order, and to the near identical line below with =~ instead of !~.
+      - match:
+          selector: '{namespace!~"openshift-addon-operator|openshift-apiserver|openshift-apiserver-operator|openshift-authentication|openshift-authentication-operator|openshift-cloud-controller-manager|openshift-cloud-controller-manager-operator|openshift-cloud-credential-operator|openshift-cloud-ingress-operator|openshift-cloud-network-config-controller|openshift-cluster-csi-drivers|openshift-cluster-machine-approver|openshift-cluster-node-tuning-operator|openshift-cluster-samples-operator|openshift-cluster-storage-operator|openshift-cluster-version|openshift-config|openshift-config-managed|openshift-config-operator|openshift-console|openshift-console-operator|openshift-console-user-settings|openshift-controller-manager|openshift-controller-manager-operator|openshift-custom-domains-operator|openshift-dns|openshift-dns-operator|openshift-etcd|openshift-etcd-operator|openshift-host-network|openshift-image-registry|openshift-infra|openshift-ingress|openshift-ingress-canary|openshift-ingress-operator|openshift-insights|openshift-kni-infra|openshift-kube-apiserver|openshift-kube-apiserver-operator|openshift-kube-controller-manager|openshift-kube-controller-manager-operator|openshift-kube-scheduler|openshift-kube-scheduler-operator|openshift-kube-storage-version-migrator|openshift-kube-storage-version-migrator-operator|openshift-logging|openshift-machine-api|openshift-machine-config-operator|openshift-managed-node-metadata-operator|openshift-managed-upgrade-operator|openshift-marketplace|openshift-monitoring|openshift-multus|openshift-network-diagnostics|openshift-network-operator|openshift-node|openshift-nutanix-infra|openshift-oauth-apiserver|openshift-observability-operator|openshift-ocm-agent-operator|openshift-openstack-infra|openshift-operator-lifecycle-manager|openshift-operators|openshift-operators-redhat|openshift-osd-metrics|openshift-ovirt-infra|openshift-package-operator|openshift-priv|openshift-rbac-permissions|openshift-route-controller-manager|openshift-route-monitor-operator|openshift-sdn|openshift-security|openshift-service-ca|openshift-service-ca-operator|openshift-service-catalog-removed|openshift-user-workload-monitoring|openshift-validation-webhook|openshift-vsphere-infra"}'
+          stages:
+          - pack:
+              labels:
+              - namespace
+              - app
+              - container
+              - host
+              - pod
+      # If this entry is in an openshift- namespace, we don't pack the namespace (it remains a real label):
+      - match:
+          selector: '{namespace=~"openshift-addon-operator|openshift-apiserver|openshift-apiserver-operator|openshift-authentication|openshift-authentication-operator|openshift-cloud-controller-manager|openshift-cloud-controller-manager-operator|openshift-cloud-credential-operator|openshift-cloud-ingress-operator|openshift-cloud-network-config-controller|openshift-cluster-csi-drivers|openshift-cluster-machine-approver|openshift-cluster-node-tuning-operator|openshift-cluster-samples-operator|openshift-cluster-storage-operator|openshift-cluster-version|openshift-config|openshift-config-managed|openshift-config-operator|openshift-console|openshift-console-operator|openshift-console-user-settings|openshift-controller-manager|openshift-controller-manager-operator|openshift-custom-domains-operator|openshift-dns|openshift-dns-operator|openshift-etcd|openshift-etcd-operator|openshift-host-network|openshift-image-registry|openshift-infra|openshift-ingress|openshift-ingress-canary|openshift-ingress-operator|openshift-insights|openshift-kni-infra|openshift-kube-apiserver|openshift-kube-apiserver-operator|openshift-kube-controller-manager|openshift-kube-controller-manager-operator|openshift-kube-scheduler|openshift-kube-scheduler-operator|openshift-kube-storage-version-migrator|openshift-kube-storage-version-migrator-operator|openshift-logging|openshift-machine-api|openshift-machine-config-operator|openshift-managed-node-metadata-operator|openshift-managed-upgrade-operator|openshift-marketplace|openshift-monitoring|openshift-multus|openshift-network-diagnostics|openshift-network-operator|openshift-node|openshift-nutanix-infra|openshift-oauth-apiserver|openshift-observability-operator|openshift-ocm-agent-operator|openshift-openstack-infra|openshift-operator-lifecycle-manager|openshift-operators|openshift-operators-redhat|openshift-osd-metrics|openshift-ovirt-infra|openshift-package-operator|openshift-priv|openshift-rbac-permissions|openshift-route-controller-manager|openshift-route-monitor-operator|openshift-sdn|openshift-security|openshift-service-ca|openshift-service-ca-operator|openshift-service-catalog-removed|openshift-user-workload-monitoring|openshift-validation-webhook|openshift-vsphere-infra"}'
+          stages:
+          - pack:
+              labels:
+              - app
+              - container
+              - host
+              - pod
       - labelallow:
-          - host
           - invoker
-          - audit
-      relabel_configs:
-      - action: drop
-        regex: ''
-        source_labels:
-        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
-      - source_labels:
-        - __meta_kubernetes_pod_label_name
-        target_label: __service__
-      - source_labels:
-        - __meta_kubernetes_pod_node_name
-        target_label: __host__
-      - action: replace
-        replacement:
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __service__
-        target_label: job
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: namespace
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_name
-        target_label: pod_name
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_container_name
-        target_label: container_name
-      - replacement: "/var/log/pods/*\$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_uid
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
-    - job_name: kubernetes-pods-static
-      pipeline_stages:
-      - cri: {}
-      - labeldrop:
-        - filename
-      - pack:
-          labels:
           - namespace
-          - pod_name
-          - container_name
-          - app
-      - labelallow:
-          - host
-          - invoker
-      kubernetes_sd_configs:
-      - role: pod
+          - type
       relabel_configs:
       - action: drop
         regex: ''
@@ -195,15 +181,11 @@ data:
         - __meta_kubernetes_pod_label_name
         target_label: __service__
       - source_labels:
+        - __meta_kubernetes_pod_label_app
+        target_label: app
+      - source_labels:
         - __meta_kubernetes_pod_node_name
-        target_label: __host__
-      - action: replace
-        replacement:
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __service__
-        target_label: job
+        target_label: host
       - action: replace
         source_labels:
         - __meta_kubernetes_namespace
@@ -211,11 +193,11 @@ data:
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_name
-        target_label: pod_name
+        target_label: pod
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_container_name
-        target_label: container_name
+        target_label: container
       - replacement: /var/log/pods/*\$1/*.log
         separator: /
         source_labels:
@@ -233,45 +215,40 @@ data:
       - labeldrop:
         - filename
         - stream
-      - pack:
-          labels:
-          - boot_id
-          - systemd_unit
+      - match:
+          # To get labels for a new systemd_unit exclude it by adding it in the selector here and include
+          # it by adding it in the selector below.  For any systemd_units, besides these, we will pack
+          # (i.e., no label) to avoid high cardinality.
+          selector: '{systemd_unit!~"auditd.service|crio.service|kubelet.service|NetworkManager.service|ovs-vswitchd.service|ovs-configuration.service|ovsdb-server.service"}'
+          stages:
+          - pack:
+              labels:
+              - boot_id
+              - systemd_unit
+              - host
+      - match:
+          # These systemd_units will get a systemd_unit label; if you add one, be sure to monitor number of
+          # Active Streams in Loki Dashboard to avoid over burdening our instance of Promtail/Loki.
+          selector: '{systemd_unit=~"auditd.service|crio.service|kubelet.service|NetworkManager.service|ovs-vswitchd.service|ovs-configuration.service|ovsdb-server.service"}'
+          stages:
+          - pack:
+              labels:
+              - boot_id
+              - host
       - labelallow:
-          - host
           - invoker
+          - systemd_unit
+      - static_labels:
+          type: journal
       relabel_configs:
       - action: labelmap
         regex: __journal__(.+)
-    - job_name: events
-      kubernetes_sd_configs:
-      - role: pod
-      pipeline_stages:
-      - cri: {}
-      - match:
-          selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
-          stages:
-          - static_labels:
-              audit: events
-      - labelallow:
-          - host
-          - invoker
-          - audit
-      relabel_configs:
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: namespace
-      - replacement: "/var/log/pods/*\$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_uid
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
+      - source_labels:
+        - __journal__hostname
+        target_label: host
     server:
       http_listen_port: 3101
+      log_level: warn
     target_config:
       sync_period: 10s
 EOF
@@ -314,7 +291,7 @@ spec:
       containers:
       - command:
         - promtail
-        - -client.external-labels=host=\$(HOSTNAME),invoker=\$(INVOKER)
+        - -client.external-labels=invoker=\$(INVOKER)
         - -config.file=/etc/promtail/promtail.yaml
         env:
         - name: HOSTNAME

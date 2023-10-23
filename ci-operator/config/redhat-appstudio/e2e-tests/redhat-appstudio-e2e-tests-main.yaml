@@ -1,13 +1,8 @@
-base_images:
-  hypershift-operator:
-    name: "4.12"
-    namespace: ocp
-    tag: hypershift-operator
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.19-openshift-4.13
 images:
 - dockerfile_literal: |-
     FROM src
@@ -16,12 +11,13 @@ images:
     ENV YQ_VERSION=v4.25.2
     ENV KUBELOGIN_VERSION=v1.25.3
 
-    # Install yq and kubectl
+    # Install jq, yq and kubectl
+    RUN curl -Lso /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /usr/local/bin/jq
     RUN curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64 && chmod +x /usr/local/bin/yq
     RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
-    RUN yum install -y httpd-tools
+    RUN yum install -y httpd-tools graphviz
     RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh
-    RUN curl -L -o vcluster "https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64" && install -c -m 0755 vcluster /usr/local/bin && rm -f vcluster
+    RUN curl -L -o vcluster "https://github.com/loft-sh/vcluster/releases/download/v0.15.0/vcluster-linux-amd64" && install -c -m 0755 vcluster /usr/local/bin && rm -f vcluster
     RUN vcluster --version && helm version
   from: src
   to: e2e-test-runner
@@ -43,12 +39,13 @@ resources:
       memory: 200Mi
 tests:
 - as: redhat-appstudio-e2e
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^tests/release/pipelines/|^tests/load-tests/|^cmd/loadTests.go$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.19-multi
-      HYPERSHIFT_NODE_COUNT: "6"
+      COMPUTE_NODE_TYPE: m6i.4xlarge
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.26-multi
+      HYPERSHIFT_NODE_COUNT: "3"
     test:
     - ref: redhat-appstudio-e2e
     workflow: redhat-appstudio-install
@@ -88,6 +85,46 @@ tests:
       SCENARIO: ci-10u-10t
     workflow: redhat-appstudio-load-test
   timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-10u-10t-go
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: ci-10u-10t-go
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-10u-10t-java
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: ci-10u-10t-java
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-10u-10t-nodejs
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: ci-10u-10t-nodejs
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-10u-10t-python
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: ci-10u-10t-python
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-10u-10t-quarkus
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: ci-10u-10t-quarkus
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
 - as: load-test-ci-daily-10u-10t
   cron: 0 4,16 * * *
   steps:
@@ -95,6 +132,38 @@ tests:
     env:
       SCENARIO: ci-daily-10u-10t
     workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- as: load-test-max-concurrency-basic
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: ci-daily-max-concurrency-basic
+    workflow: redhat-appstudio-load-test-max-concurrency
+  timeout: 8h0m0s
+- as: load-test-max-concurrency-advanced
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: ci-daily-max-concurrency-advanced
+    workflow: redhat-appstudio-load-test-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-basic
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: max-concurrency-basic
+    workflow: redhat-appstudio-load-test-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-advanced
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: max-concurrency-advanced
+    workflow: redhat-appstudio-load-test-max-concurrency
   timeout: 8h0m0s
 - always_run: false
   as: load-test-ci-5u-20t
@@ -119,6 +188,30 @@ tests:
     env:
       SCENARIO: ci-1u-100t
     workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-tekton-tuning-base
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: tekton-tuning-base
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-tekton-tuning-tuned
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: tekton-tuning-tuned
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-max-concurrency-basic-tekton-tuned
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: max-concurrency-basic-tekton-tuned
+    workflow: redhat-appstudio-load-test-max-concurrency
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main

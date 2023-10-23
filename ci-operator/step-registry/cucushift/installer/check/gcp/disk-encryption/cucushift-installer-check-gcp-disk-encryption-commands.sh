@@ -8,7 +8,7 @@ if [[ "${KMS_KEY_RING}" == "" ]] || [[ "${KMS_KEY_RING_LOCATION}" == "" ]] || [[
   echo "$(date -u --rfc-3339=seconds) - Invalid OS disk custom encryption settings, abort." && exit 1
 fi
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"

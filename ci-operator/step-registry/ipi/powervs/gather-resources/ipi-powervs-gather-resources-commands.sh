@@ -15,7 +15,7 @@ set -o errexit
 
 
 RESOURCE_DUMP_DIR="${ARTIFACT_DIR}/ibmcloud-gather-resources"
-CLUSTER_FILTER="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_FILTER="${NAMESPACE}-${UNIQUE_HASH}"
 declare -a MAIN_RESOURCES=(floating-ip image instance lb public-gateway sg subnet volume vpc)
 
 # Plugin power-iaas is required for the Powervs environment

@@ -1,6 +1,10 @@
 workflow:
   as: redhat-appstudio-install
   steps:
+    # https://docs.ci.openshift.org/docs/architecture/step-registry/#marking-post-steps-best-effort
+    allow_best_effort_post_steps: true
+    # https://docs.ci.openshift.org/docs/architecture/step-registry/#skipping-post-steps-on-success
+    allow_skip_on_success: true
     pre:
     - ref: openshift-cluster-bot-rbac
     - chain: hypershift-hostedcluster-create
@@ -8,7 +12,11 @@ workflow:
     - ref: redhat-appstudio-gather
     - ref: redhat-appstudio-hypershift-gather
     - chain: hypershift-hostedcluster-dump
+    # https://docs.ci.openshift.org/docs/architecture/step-registry/#skipping-post-steps-on-success
+      optional_on_success: true
     - chain: hypershift-hostedcluster-destroy
+    # https://docs.ci.openshift.org/docs/architecture/step-registry/#marking-post-steps-best-effort
+      best_effort: true
   documentation: |-
     The HyperShift aws cluster workflow provides pre- and post- steps that provision and
     deprovision a HostedCluster which is given to the end user via cluster bot.

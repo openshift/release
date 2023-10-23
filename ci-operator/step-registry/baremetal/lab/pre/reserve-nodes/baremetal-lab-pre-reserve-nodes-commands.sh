@@ -20,7 +20,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 gnu_arch=$(echo "${architecture}" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
 
 # The hostname of nodes and the cluster names have limited length for BM.
-# Other profiles add to the cluster_name the suffix "-${JOB_NAME_HASH}".
+# Other profiles add to the cluster_name the suffix "-${UNIQUE_HASH}".
 echo "${NAMESPACE}" > "${SHARED_DIR}/cluster_name"
 CLUSTER_NAME="${NAMESPACE}"
 
@@ -70,6 +70,8 @@ scp "${SSHOPTS[@]}" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/*.yaml" "${SHA
 more "${SHARED_DIR}"/*.yaml |& sed 's/pass.*$/pass ** HIDDEN **/g'
 
 echo "${AUX_HOST}" >> "${SHARED_DIR}/bastion_public_address"
+echo "root" > "${SHARED_DIR}/bastion_ssh_user"
+
 
 # Example host element from the list in the hosts.yaml file:
 # - mac: 34:73:5a:9d:eb:e1 # The mac address of the interface connected to the baremetal network

@@ -16,7 +16,7 @@ PATH=$PATH:/tmp/go/bin
 #  Setup env variables
 
 export  OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD QONTRACT_BASE_URL \
-     QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN CYPRESS_HAC_BASE_URL
+     QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN CYPRESS_HAC_BASE_URL CYPRESS_GH_TOKEN
 
 QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_password)
 QONTRACT_USERNAME=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_username)
@@ -24,6 +24,7 @@ QONTRACT_BASE_URL="https://app-interface.devshift.net/graphql"
 export CYPRESS_USERNAME=user1
 export CYPRESS_PASSWORD=user1
 export CYPRESS_PERIODIC_RUN=true
+CYPRESS_GH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
 HAC_SA_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/c-rh-ceph_SA_bot)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
@@ -52,8 +53,13 @@ EOF
   fi
 
 # Install HAC in ephemeral cluster
+REF=main
+if [ -n "$PULL_PULL_SHA" ] && [ "$REPO_NAME" = "infra-deployments" ]; then
+  REF=$PULL_PULL_SHA
+fi
+echo $REF
+curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/$REF/hack/hac/installHac.sh -o installHac.sh
 
-curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/main/hack/hac/installHac.sh -o installHac.sh
 chmod +x installHac.sh
 HAC_KUBECONFIG=/tmp/hac.kubeconfig
 oc login --kubeconfig=$HAC_KUBECONFIG --token=$HAC_SA_TOKEN --server=https://api.c-rh-c-eph.8p0c.p1.openshiftapps.com:6443
@@ -61,8 +67,21 @@ echo "=== INSTALLING HAC ==="
 HAC_NAMESPACE=$(./installHac.sh -ehk $HAC_KUBECONFIG -sk $KUBECONFIG |grep "Eph cluster namespace: " | sed "s/Eph cluster namespace: //g")
 echo "=== HAC INSTALLED ==="
 echo "HAC NAMESPACE: $HAC_NAMESPACE"
-CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.hostname}")/hac/stonesoup"
+CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.hostname}")/application-pipeline"
 echo "Cypress Base url: $CYPRESS_HAC_BASE_URL"
+
+echo "Deploying proxy plugin for tekton-results"
+oc apply --kubeconfig=$KUBECONFIG -f - <<EOF
+apiVersion: toolchain.dev.openshift.com/v1alpha1
+kind: ProxyPlugin
+metadata:
+  name: tekton-results
+  namespace: toolchain-host-operator
+spec:
+  openShiftRouteTargetEndpoint:
+    name: tekton-results
+    namespace: tekton-results
+EOF
 
 # Register user `user1`
 

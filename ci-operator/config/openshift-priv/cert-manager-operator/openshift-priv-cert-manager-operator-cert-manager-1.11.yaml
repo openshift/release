@@ -1,0 +1,104 @@
+base_images:
+  cert-manager-cainjector:
+    name: cert-manager-cainjector
+    namespace: ci
+    tag: v1.11.5
+  cert-manager-controller:
+    name: cert-manager-controller
+    namespace: ci
+    tag: v1.11.5
+  cert-manager-webhook:
+    name: cert-manager-webhook
+    namespace: ci
+    tag: v1.11.5
+  ocp_builder_rhel-9-golang-1.19-openshift-4.13:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.19-openshift-4.13
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/cert-manager-operator
+images:
+- dockerfile_path: images/ci/Dockerfile
+  from: ubi
+  inputs:
+    ocp_builder_rhel-9-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.13
+  to: cert-manager-operator
+operator:
+  bundles:
+  - as: cert-manager-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: openshift.io/cert-manager-operator:latest
+    with: pipeline:cert-manager-operator
+  - pullspec: quay.io/jetstack/cert-manager-controller:v1.11.5
+    with: cert-manager-controller
+  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.11.5
+    with: cert-manager-webhook
+  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.11.5
+    with: cert-manager-cainjector
+promotion:
+  disabled: true
+  name: 4.14-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.14-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.14-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: src
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: unit
+  commands: |
+    make test --warn-undefined-variables
+  container:
+    from: src
+- as: e2e-operator
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-cert-manager-operator-bundle
+    env:
+      OO_CHANNEL: stable-v1
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_PACKAGE: cert-manager-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: cert-manager-1.11
+  org: openshift-priv
+  repo: cert-manager-operator

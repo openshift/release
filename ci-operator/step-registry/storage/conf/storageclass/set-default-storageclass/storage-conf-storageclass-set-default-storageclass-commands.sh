@@ -29,7 +29,19 @@ function get_default_sc() {
 }
 
 function remove_all_default_sc_annotations () {
-  run_command "oc annotate sc storageclass.kubernetes.io/is-default-class=false --all --overwrite"
+  # Temporarily avoid known issue: https://issues.redhat.com/browse/OCPBUGS-14824
+  for i in $(seq 1 6); do
+    run_command "oc annotate sc storageclass.kubernetes.io/is-default-class=false --all --overwrite"
+    get_default_sc
+    if [ "${CURRENT_DEFAULT_SC}" == "" ] ; then
+        echo "Remove all default storage classes successfully after retry $((i - 1)) times"
+        break
+    fi
+    sleep 5
+  done
+  if [ "${CURRENT_DEFAULT_SC}" != "" ] ; then
+    echo "Remove all default storage classes failed" && exit 1
+  fi
 }
 
 function set_required_sc_as_default () {

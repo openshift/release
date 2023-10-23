@@ -6,17 +6,17 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/opp-ocp4.12-interop-images
+    context: ci/prow/opp-ocp4.13-interop-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: opp-ocp4.12-interop
+      ci-operator.openshift.io/variant: opp-ocp4.13-interop
       ci.openshift.io/generator: prowgen
-      job-release: "4.12"
+      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-policy-collection-main-opp-ocp4.12-interop-images
-    rerun_command: /test opp-ocp4.12-interop-images
+    name: pull-ci-stolostron-policy-collection-main-opp-ocp4.13-interop-images
+    rerun_command: /test opp-ocp4.13-interop-images
     spec:
       containers:
       - args:
@@ -24,7 +24,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=opp-ocp4.12-interop
+        - --variant=opp-ocp4.13-interop
         command:
         - ci-operator
         image: ci-operator:latest
@@ -37,6 +37,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -45,10 +48,13 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )opp-ocp4.12-interop-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )opp-ocp4.13-interop-images,?($|\s.*)

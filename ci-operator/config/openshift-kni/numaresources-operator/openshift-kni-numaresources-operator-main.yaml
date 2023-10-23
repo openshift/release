@@ -1,15 +1,18 @@
 base_images:
-  os-min8:
+  os-min9:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
+    tag: "9"
 binary_build_commands: make generate fmt vet binary binary-rte binary-e2e-all binary-numacell
 build_root:
   project_image:
     dockerfile_path: Dockerfile.tools
 images:
+- dockerfile_path: Dockerfile.must-gather
+  from: os-min9
+  to: numaresources-must-gather
 - dockerfile_path: Dockerfile.openshift
-  from: os-min8
+  from: os-min9
   inputs:
     bin:
       paths:
@@ -19,7 +22,7 @@ images:
         source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
   to: numaresources-operator
 - dockerfile_path: Dockerfile.openshift.rte
-  from: os-min8
+  from: os-min9
   inputs:
     bin:
       paths:
@@ -27,7 +30,7 @@ images:
         source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
   to: resource-topology-exporter
 - dockerfile_path: Dockerfile.openshift.tests
-  from: os-min8
+  from: os-min9
   inputs:
     bin:
       paths:
@@ -38,7 +41,7 @@ operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/openshift-kni/numaresources-operator:4.14.999-snapshot
+  - pullspec: quay.io/openshift-kni/numaresources-operator:4.15.999-snapshot
     with: numaresources-operator
 promotion:
   name: numaresources-operator
@@ -48,12 +51,12 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.15"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.15"
 resources:
   '*':
     requests:

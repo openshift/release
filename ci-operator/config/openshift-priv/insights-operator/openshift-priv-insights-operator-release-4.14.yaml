@@ -10,7 +10,7 @@ base_images:
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
-    tag: latest
+    tag: "4.14"
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -26,7 +26,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: insights-operator
 promotion:
-  disabled: true
   name: 4.14-priv
   namespace: ocp-private
 releases:
@@ -51,9 +50,14 @@ tests:
   container:
     from: src
 - as: unit
-  commands: make test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make unit
   container:
     from: src
+  secret:
+    mount_path: /tmp/secret
+    name: insights-operator-codecov-token
 - as: e2e
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
@@ -74,7 +78,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -m "not ui"
+      commands: pytest.sh -m "not ui and not tp_only"
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -84,8 +88,31 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-metal-ipi-ovn-ipv6
+- as: e2e-gcp-ovn-techpreview
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: insights-live
+    test:
+    - as: test
+      cli: latest
+      commands: pytest.sh -m "not ui and techpreview"
+      credentials:
+      - mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      from: insights-operator-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
+  optional: true
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: equinix-ocp-metal

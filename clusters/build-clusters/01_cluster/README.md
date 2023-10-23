@@ -44,7 +44,7 @@ $ make set-up-ci-admins
 We use aws-region `us-east-1` for our clusters: They are 6 zones in it:
 
 ```
-$ aws ec2 describe-availability-zones --region us-east-1 | jq -r .AvailabilityZones[].ZoneName
+$ aws ec2 describe-availability-zones --region us-east-1 --filter Name=zone-type,Values=availability-zone | jq -r .AvailabilityZones[].ZoneName
 us-east-1a
 ...
 us-east-1f

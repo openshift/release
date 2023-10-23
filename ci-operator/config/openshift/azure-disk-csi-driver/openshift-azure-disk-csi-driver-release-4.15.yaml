@@ -3,10 +3,18 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.14"
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
 build_root:
   from_repository: true
 canonical_go_repository: github.com/kubernetes-sigs/azuredisk-csi-driver
@@ -14,11 +22,12 @@ images:
 - dockerfile_path: Dockerfile.openshift.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: azure-disk-csi-driver
 promotion:
+  disabled: true
   name: "4.15"
   namespace: ocp
 releases:
@@ -55,6 +64,28 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-csi
+- as: e2e-azure-ovn-upgrade
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+- as: e2e-azure-csi-extended
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_SCENARIOS: \[CSI-Driver\]|\[Azure-Disk-CSI-Driver\]
+    workflow: openshift-e2e-azure-csi-extended
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
+  container:
+    from: commitchecker
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

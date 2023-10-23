@@ -1,34 +1,31 @@
 base_images:
   base:
-    name: 4.8-priv
+    name: 4.15-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
+    tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
+  from_repository: true
 canonical_go_repository: github.com/openshift/apiserver-network-proxy
 images:
 - dockerfile_path: Dockerfile.openshift
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: apiserver-network-proxy
 promotion:
-  name: 4.14-priv
+  name: 4.15-priv
   namespace: ocp-private
 releases:
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
+      name: 4.15-priv
       namespace: ocp-private
 resources:
   '*':
@@ -48,6 +45,7 @@ tests:
     from: src
 - as: e2e-hypershift
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-conformance
 zz_generated_metadata:
   branch: master

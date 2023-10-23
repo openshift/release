@@ -6,7 +6,7 @@ they should be deployed to the cluster.
 There are currently two ways to manager secrets:
 
 * DPTP-managed Secrets: We store secrets in a private secret storage system: [Bitwarden](https://bitwarden.com/).
-To add new secrets to this storage please reach out to `#forum-testplatform` on Slack
+To add new secrets to this storage please reach out to `#forum-ocp-testplatform` on Slack
 and be prepared to encrypt your data with our GPG keys. DPTP uses [ci-secret-bootstrap](../core-services/ci-secret-bootstrap)
 to populate secrets from Bitwarden to the clusters in CI-infrastructure.
 

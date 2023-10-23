@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euox pipefail
+set -euo pipefail
 
 echo HyperShift CLI version
 /usr/bin/hypershift version
@@ -41,13 +41,17 @@ else
   cp /etc/ci-pull-credentials/.dockerconfigjson /tmp/pull-secret.json
 fi
 
+if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
+  COMPUTE_NODE_TYPE="m5.xlarge"
+fi
+
 echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
 /usr/bin/hypershift create cluster aws \
   ${EXTRA_ARGS} \
   --name ${CLUSTER_NAME} \
   --infra-id ${INFRA_ID} \
   --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
-  --instance-type=m5.xlarge \
+  --instance-type=${COMPUTE_NODE_TYPE} \
   --base-domain ${DOMAIN} \
   --region ${HYPERSHIFT_AWS_REGION} \
   --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
@@ -56,9 +60,12 @@ echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
   --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
   --release-image ${RELEASE_IMAGE} \
   --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
+  --node-selector "hypershift.openshift.io/control-plane=true" \
   --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
   --annotations "prow.k8s.io/job=${JOB_NAME}" \
   --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
+  --annotations resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m \
+  --annotations hypershift.openshift.io/cleanup-cloud-resources="false" \
   --additional-tags "prow.k8s.io/job=${JOB_NAME}" \
   --additional-tags "prow.k8s.io/build-id=${BUILD_ID}"
 
@@ -87,15 +94,21 @@ oc wait --timeout=120m --for=condition=Available --namespace=clusters hostedclus
   exit 1
 }
 echo "Cluster became available, creating kubeconfig"
-bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig || {
+KUBECONFIG_NAME=""
+while [[ -z "${KUBECONFIG_NAME}" ]]; do
+  echo "Still waiting for kubeconfig to be available"
+  sleep 10
+  KUBECONFIG_NAME=$(oc get hc/${CLUSTER_NAME} -n clusters -o jsonpath='{ .status.kubeconfig.name }')
+done
+
+bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} > ${SHARED_DIR}/nested_kubeconfig || {
   echo "Failed to create kubeconfig"
-  exit 1
 }
 
 # Data for cluster bot.
-# The kubeadmin-password secret is reconciled only after the kas is available so we will wait up to 2 minutes for it to become available
+# The kubeadmin-password secret is reconciled only after the kas is available so we will wait up to 5 minutes for it to become available
 echo "Retrieving kubeadmin password"
-for _ in {1..8}; do
+for _ in {1..50}; do
   kubeadmin_pwd=`oc get secret --namespace=clusters ${CLUSTER_NAME}-kubeadmin-password --template='{{.data.password}}' | base64 -d` || true
   if [ -z $kubeadmin_pwd ]; then
     echo "kubeadmin password is not ready yet, waiting 15s"
@@ -124,3 +137,4 @@ done
 
 # Data for cluster bot.
 echo "https://$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "created-at=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"

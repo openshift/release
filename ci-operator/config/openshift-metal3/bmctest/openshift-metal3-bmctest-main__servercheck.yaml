@@ -1,0 +1,98 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test-upstream
+  cluster: build05
+  cron: 0 1 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CLUSTERTYPE: lab-small
+    post:
+    - ref: ofcir-release
+    pre:
+    - ref: ofcir-acquire
+    test:
+    - as: test
+      commands: |
+        SERVER_IP="$(cat ${SHARED_DIR}/server-ip)"
+        SSH_KEY="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+        SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "$SSH_KEY")
+        SSHCMD="sudo dnf install --nobest --refresh -y git jq python3-pip epel-release;
+          sudo python3 -m pip install yq;
+          yq -y . /tmp/bmctest-upstream > /tmp/bmctest-upstream.yaml;
+          git clone https://github.com/openshift-metal3/bmctest;
+          cd bmctest;
+          DEFINT=\$(ip r | grep '^default' | awk '{print \$5}');
+          ./bmctest.sh -I \$DEFINT -c /tmp/bmctest-upstream.yaml"
+        scp "${SSHOPTS[@]}"  /var/run/bmctest-upstream/config  "centos@${SERVER_IP}:/tmp/bmctest-upstream"
+        ssh "${SSHOPTS[@]}" "centos@${SERVER_IP}" "${SSHCMD}"
+      credentials:
+      - mount_path: /var/run/bmctest-upstream
+        name: bmctest-upstream
+        namespace: test-credentials
+      from: dev-scripts
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: test-openshift
+  cluster: build05
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CLUSTERTYPE: lab-small
+    post:
+    - ref: ofcir-release
+    pre:
+    - ref: ofcir-acquire
+    test:
+    - as: test
+      commands: |
+        SERVER_IP="$(cat ${SHARED_DIR}/server-ip)"
+        SSH_KEY="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+        SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "$SSH_KEY")
+        SSHCMD="sudo dnf install --nobest --refresh -y git jq python3-pip epel-release;
+          sudo python3 -m pip install yq;
+          yq -y . /tmp/bmctest-openshift > /tmp/bmctest-openshift.yaml;
+          DEFINT=\$(ip r | grep '^default' | awk '{print \$5}');
+          yq -iy .platform.baremetal.provisioningBridge\=\\\"\$DEFINT\\\" /tmp/bmctest-openshift.yaml;
+          git clone https://github.com/openshift-metal3/bmctest;
+          cd bmctest;
+          ./ocpbmctest.sh -s /tmp/pull-secret -c /tmp/bmctest-openshift.yaml"
+        scp "${SSHOPTS[@]}"  /var/run/bmctest-openshift/config  "centos@${SERVER_IP}:/tmp/bmctest-openshift"
+        scp "${SSHOPTS[@]}"  "${CLUSTER_PROFILE_DIR}/pull-secret"  "centos@${SERVER_IP}:/tmp/pull-secret"
+        ssh "${SSHOPTS[@]}" "centos@${SERVER_IP}" "${SSHCMD}"
+      credentials:
+      - mount_path: /var/run/bmctest-openshift
+        name: bmctest-openshift
+        namespace: test-credentials
+      from: dev-scripts
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift-metal3
+  repo: bmctest
+  variant: servercheck

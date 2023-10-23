@@ -2,13 +2,13 @@ base_images:
   go-builder:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.19-openshift-4.13
+    tag: rhel-9-golang-1.19-openshift-4.14
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.48.0
+    tag: v1.53.1
   operator-sdk:
-    name: "4.13"
+    name: "4.14"
     namespace: origin
     tag: operator-sdk
 binary_build_commands: make manager
@@ -36,11 +36,19 @@ images:
   to: kernel-module-management-signimage
 - dockerfile_path: Dockerfile.must-gather
   to: kernel-module-management-must-gather
+- dockerfile_path: Dockerfile.worker
+  to: kernel-module-management-worker
 - dockerfile_literal: |
     FROM ubi9-minimal
     RUN rm -rf /etc/yum.repos.d/*
-    RUN curl http://base-4-13-rhel9.ocp.svc > /etc/yum.repos.d/base-4-13-rhel9.repo
+    RUN curl http://base-4-14-rhel9.ocp.svc > /etc/yum.repos.d/base-4-14-rhel9.repo
   to: ubi9-minimal-entitled
+- dockerfile_literal: |
+    FROM src
+    RUN wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && \
+      chmod +x /usr/bin/yq
+  from: src
+  to: e2e-hub-yq
 operator:
   bundles:
   - as: operator-bundle
@@ -56,9 +64,12 @@ operator:
     with: pipeline:kernel-module-management-operator-hub
   - pullspec: quay.io/edge-infrastructure/kernel-module-management-signimage:latest
     with: pipeline:kernel-module-management-signimage
+  - pullspec: quay.io/edge-infrastructure/kernel-module-management-worker:latest
+    with: pipeline:kernel-module-management-worker
 promotion:
   excluded_images:
   - ubi9-minimal-entitled
+  - e2e-hub-yq
   namespace: edge-infrastructure
   tag: latest
   tag_by_commit: true
@@ -66,7 +77,7 @@ releases:
   latest:
     release:
       channel: fast
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -139,14 +150,14 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-- as: e2e-in-cluster-build
+- as: e2e
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.13"
   steps:
     test:
     - as: install
@@ -154,7 +165,7 @@ tests:
       commands: |
         oc create namespace openshift-kmm
         operator-sdk run bundle -n openshift-kmm "$OO_BUNDLE"
-        oc wait --for condition=Available -n openshift-kmm deployment kmm-operator-controller-manager
+        oc wait --for=condition=Available -n openshift-kmm --timeout=1m deployment/kmm-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: operator-bundle
@@ -169,6 +180,33 @@ tests:
         oc project default
         SKIP_MAKE_DEPLOY=true ./ci/prow/e2e-incluster-build
       from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: generic-claim
+- as: e2e-hub
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  steps:
+    test:
+    - as: run-test
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        oc project default
+        ./ci/prow/e2e-hub-spoke-incluster-build
+      dependencies:
+      - env: IMG
+        name: kernel-module-management-operator
+      - env: HUB_IMG
+        name: kernel-module-management-operator-hub
+      from: e2e-hub-yq
       resources:
         requests:
           cpu: 1000m

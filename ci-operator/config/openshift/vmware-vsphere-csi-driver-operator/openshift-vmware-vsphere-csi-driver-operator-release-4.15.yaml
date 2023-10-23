@@ -3,24 +3,29 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.openshift
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: vsphere-csi-driver-operator
 - dockerfile_path: Dockerfile.test
   from: src
   to: vsphere-csi-driver-operator-test
 promotion:
+  disabled: true
   name: "4.15"
   namespace: ocp
 releases:
@@ -51,18 +56,29 @@ tests:
     from: src
 - as: e2e-vsphere
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-csi
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     workflow: openshift-e2e-vsphere-csi
+- as: e2e-vsphere-ovn-upgrade
+  steps:
+    cluster_profile: vsphere-2
+    workflow: openshift-upgrade-vsphere
+- as: e2e-vsphere-csi-extended
+  optional: true
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      TEST_SCENARIOS: \[CSI-Driver\]|\[vSphere CSI Driver\]|\[vSphere-CSI-Driver-Operator\]
+    workflow: openshift-e2e-vsphere-csi-extended
 - as: verify-deps
   steps:
     test:

@@ -7,15 +7,43 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: cli
+  shellcheck:
+    name: shellcheck
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
 images:
-- dockerfile_path: images/Dockerfile
+- context_dir: images/prow-image
+  dockerfile_path: Dockerfile
   from: cli
   to: baremetal-qe-base
+- context_dir: images/fcos-base-image
+  dockerfile_path: Containerfile
+  to: fcos-base
+- context_dir: images/fcos-auxiliary-image
+  dockerfile_path: Containerfile
+  from: fcos-base
+  to: fcos-auxiliary
+- context_dir: images/fcos-bastion-image
+  dockerfile_path: Containerfile
+  from: fcos-base
+  to: fcos-bastion
+- context_dir: images/bind9
+  dockerfile_path: Dockerfile
+  from: fcos-bastion
+  to: bmqe-bind9
+- context_dir: images/tang
+  dockerfile_path: Containerfile
+  from: fcos-bastion
+  to: bmqe-tang
+- context_dir: images/dhcp
+  dockerfile_path: Containerfile
+  from: fcos-bastion
+  to: bmqe-dnsmasq
 promotion:
   namespace: ci
   tag: latest
@@ -38,6 +66,11 @@ tests:
   container:
     clone: false
     from: centos
+- as: shellcheck
+  commands: for f in $(git diff --name-only "$PULL_BASE_SHA..$PULL_PULL_SHA" | grep
+    -E ".*.sh$"); do echo -e "\nVerifying $f..."; shellcheck -s bash "$f"; done
+  container:
+    from: shellcheck
 zz_generated_metadata:
   branch: master
   org: openshift-qe

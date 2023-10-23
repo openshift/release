@@ -12,12 +12,15 @@ fi
 
 source "${SHARED_DIR}/govc.sh"
 
-echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${LEASED_RESOURCE} and destroy"
+declare vsphere_portgroup
+source "${SHARED_DIR}/vsphere_context.sh"
 
-govc ls -json "/${GOVC_DATACENTER}/network/${LEASED_RESOURCE}" |\
-    jq '.elements[]?.Object.Vm[]?.Value' |\
-    xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |\
-    jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |\
+echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${vsphere_portgroup} and destroy"
+
+govc ls -json "/${GOVC_DATACENTER}/network/${vsphere_portgroup}" |
+    jq '.elements[]?.Object.Vm[]?.Value' |
+    xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |
+    jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |
     xargs -I {} --no-run-if-empty govc vm.destroy {}
 
 agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)

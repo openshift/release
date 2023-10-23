@@ -13,6 +13,8 @@ fi
 workers=3
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
     workers=0
+elif [ -n "${WORKERS}" ]; then
+    workers="${WORKERS}"
 fi
 
 master_type=null
@@ -51,6 +53,15 @@ credentialsMode: Manual
 platform:
   ibmcloud:
     region: ${REGION}
+EOF
+
+if [[ "${RESOURCE_GROUP}" ]]; then
+cat >> "${CONFIG}" << EOF
+    resourceGroupName: ${RESOURCE_GROUP}
+EOF
+fi
+
+cat >> "${CONFIG}" << EOF
 controlPlane:
   name: master
   platform:
@@ -66,3 +77,16 @@ compute:
       zones: ${ZONES_STR}
   replicas: ${workers}
 EOF
+
+if [ ${RT_ENABLED} = "true" ]; then
+	cat > "${SHARED_DIR}/manifest_mc-kernel-rt.yml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: realtime-worker
+spec:
+  kernelType: realtime
+EOF
+fi

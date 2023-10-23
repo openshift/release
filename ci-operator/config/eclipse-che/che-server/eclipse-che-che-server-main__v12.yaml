@@ -32,6 +32,39 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- as: gitlab-no-pat-oauth-flow-raw-devfile-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: /bin/bash .ci/openshift-ci/test-gitlab-no-pat-oauth-flow-raw-devfile-url.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: gitlab-no-pat-oauth-flow-ssh-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export GITLAB_PRIVATE_KEY=$(cat /usr/local/ci-secrets/gitlab/gitlab-private-key)
+        export GITLAB_PUBLIC_KEY=$(cat /usr/local/ci-secrets/gitlab/gitlab-public-key)
+        /bin/bash .ci/openshift-ci/test-gitlab-no-pat-oauth-flow-ssh-url.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/gitlab
+        name: gitlab
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
 - as: bitbucket-no-pat-oauth-flow
   steps:
     cluster_profile: gcp
@@ -39,6 +72,39 @@ tests:
     - as: che-server-test
       cli: latest
       commands: /bin/bash .ci/openshift-ci/test-bitbucket-no-pat-oauth-flow.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: bitbucket-no-pat-oauth-flow-raw-devfile-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: /bin/bash .ci/openshift-ci/test-bitbucket-no-pat-oauth-flow-raw-devfile-url.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: bitbucket-no-pat-oauth-flow-ssh-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export BITBUCKET_PRIVATE_KEY=$(cat /usr/local/ci-secrets/bitbucket/bitbucket-private-key)
+        export BITBUCKET_PUBLIC_KEY=$(cat /usr/local/ci-secrets/bitbucket/bitbucket-public-key)
+        /bin/bash .ci/openshift-ci/test-bitbucket-no-pat-oauth-flow-ssh-url.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/bitbucket
+        name: bitbucket
+        namespace: test-credentials
       from: src
       resources:
         requests:
@@ -58,6 +124,39 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- as: github-no-pat-oauth-flow-raw-devfile-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: /bin/bash .ci/openshift-ci/test-github-no-pat-oauth-flow-raw-devfile-url.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: github-no-pat-oauth-flow-ssh-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export GITHUB_PRIVATE_KEY=$(cat /usr/local/ci-secrets/github/github-private-key)
+        export GITHUB_PUBLIC_KEY=$(cat /usr/local/ci-secrets/github/github-public-key)
+        /bin/bash .ci/openshift-ci/test-github-no-pat-oauth-flow-ssh-url.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/github
+        name: github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
 - as: github-with-pat-setup-flow
   steps:
     cluster_profile: gcp
@@ -65,8 +164,9 @@ tests:
     - as: che-server-test
       cli: latest
       commands: |
-        export GITHUB_USER_ID=$(cat /usr/local/ci-secrets/github/gh-user-id)
         export GITHUB_PAT=$(cat /usr/local/ci-secrets/github/gh-pat)
+        export GITHUB_PRIVATE_KEY=$(cat /usr/local/ci-secrets/github/github-private-key)
+        export GITHUB_PUBLIC_KEY=$(cat /usr/local/ci-secrets/github/github-public-key)
         /bin/bash .ci/openshift-ci/test-github-with-pat-setup-flow.sh
       credentials:
       - mount_path: /usr/local/ci-secrets/github
@@ -85,12 +185,119 @@ tests:
     - as: che-server-test
       cli: latest
       commands: |
-        export GITLAB_USER_ID=$(cat /usr/local/ci-secrets/gitlab/gl-user-id)
         export GITLAB_PAT=$(cat /usr/local/ci-secrets/gitlab/gl-pat)
+        export GITLAB_PRIVATE_KEY=$(cat /usr/local/ci-secrets/gitlab/gitlab-private-key)
+        export GITLAB_PUBLIC_KEY=$(cat /usr/local/ci-secrets/gitlab/gitlab-public-key)
         /bin/bash .ci/openshift-ci/test-gitlab-with-pat-setup-flow.sh
       credentials:
       - mount_path: /usr/local/ci-secrets/gitlab
         name: gitlab
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: azure-with-pat-setup-flow
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export AZURE_PAT=$(cat /usr/local/ci-secrets/azure/azure-pat)
+        export AZURE_PRIVATE_KEY=$(cat /usr/local/ci-secrets/azure/azure-private-key)
+        export AZURE_PUBLIC_KEY=$(cat /usr/local/ci-secrets/azure/azure-public-key)
+        /bin/bash .ci/openshift-ci/test-azure-with-pat-setup-flow.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/azure
+        name: dev-azure
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: azure-no-pat-oauth-flow
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: /bin/bash .ci/openshift-ci/test-azure-no-pat-oauth-flow.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: azure-no-pat-oauth-flow-raw-devfile-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: /bin/bash .ci/openshift-ci/test-azure-no-pat-oauth-flow-raw-devfile-url.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: azure-no-pat-oauth-flow-ssh-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export AZURE_PRIVATE_KEY=$(cat /usr/local/ci-secrets/azure/azure-private-key)
+        export AZURE_PUBLIC_KEY=$(cat /usr/local/ci-secrets/azure/azure-public-key)
+        /bin/bash .ci/openshift-ci/test-azure-no-pat-oauth-flow-ssh-url.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/azure
+        name: dev-azure
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: gitea-no-pat-oauth-flow
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export GITEA_PRIVATE_KEY=$(cat /usr/local/ci-secrets/gitea/gitea-private-key)
+        export GITEA_PUBLIC_KEY=$(cat /usr/local/ci-secrets/gitea/gitea-public-key)
+        /bin/bash .ci/openshift-ci/test-gitea-no-pat-oauth-flow.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/gitea
+        name: gitea
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: gitea-with-pat-setup-flow
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export GITEA_PAT=$(cat /usr/local/ci-secrets/gitea/gitea-pat)
+        /bin/bash .ci/openshift-ci/test-gitea-with-pat-setup-flow.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/gitea
+        name: gitea
         namespace: test-credentials
       from: src
       resources:

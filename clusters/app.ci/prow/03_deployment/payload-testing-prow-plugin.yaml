@@ -74,7 +74,44 @@ items:
           app: prow
           component: payload-testing-prow-plugin
       spec:
+        initContainers:
+        - name: git-sync-init
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --root=/tmp/git-sync
+          - --one-time=true
+          - --depth=1
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: registry.k8s.io/git-sync/git-sync:v3.6.2
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
         containers:
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --wait=30
+          - --root=/tmp/git-sync
+          - --max-sync-failures=3
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: registry.k8s.io/git-sync/git-sync:v3.6.2
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
         - name: payload-testing-prow-plugin
           image: ' '
           args:
@@ -85,7 +122,7 @@ items:
           - --github-graphql-endpoint=http://ghproxy/graphql
           - --github-app-id=$(GITHUB_APP_ID)
           - --github-app-private-key-path=/etc/github/cert
-          - --ci-op-config-dir=/etc/configs/master
+          - --ci-op-config-dir=/var/repo/release/ci-operator/config
           - --log-level=debug
           env:
           - name: GITHUB_APP_ID
@@ -103,11 +140,8 @@ items:
           - name: github-app-credentials
             mountPath: /etc/github
             readOnly: true
-          - name: configs
-            mountPath: /etc/configs/master
-            readOnly: true
-          - name: tmp
-            mountPath: /tmp
+          - name: release
+            mountPath: /var/repo
           resources:
             requests:
               memory: "300Mi"
@@ -130,12 +164,5 @@ items:
         - name: github-app-credentials
           secret:
             secretName: openshift-prow-github-app
-        - name: configs
-          projected:
-            sources:
-            - configMap:
-                name: ci-operator-master-configs
-            - configMap:
-                name: ci-operator-main-configs
-        - name: tmp
+        - name: release
           emptyDir: {}

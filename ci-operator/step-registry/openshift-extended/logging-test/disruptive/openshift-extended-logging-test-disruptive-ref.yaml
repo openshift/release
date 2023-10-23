@@ -1,0 +1,56 @@
+ref:
+  as: openshift-extended-logging-test-disruptive
+  from: tests-private
+  grace_period: 10m
+  commands: openshift-extended-logging-test-disruptive-commands.sh
+  cli: latest
+  timeout: 12h0m0s
+  env:
+  - name: TEST_SCENARIOS
+    default: |
+      sig-openshift-logging
+    documentation: |-
+      Select the test case. It's a RE pattern and is passed to the 'grep -E'
+  - name: TEST_ADDITIONAL
+    default: ""
+    documentation: |
+      It is additional scenario to combine the TEST_SCENARIOS to make final scenarios.
+  - name: TEST_FILTERS
+    default: "Disruptive"
+    documentation: |
+      It is filters to select case based on some case attribution which is in case title.
+  - name: FILTERS_ADDITIONAL
+    default: ""
+    documentation: |
+      It is additional filters to combine the TEST_FILTERS to make final filters.
+  - name: TEST_IMPORTANCE
+    default: ""
+    documentation: it means case IMPORTANCE.
+  - name: TEST_TIMEOUT
+    default: "30"
+    documentation: it means the duration of one case execution.
+  - name: TEST_PARALLEL
+    default: "6"
+    documentation: it means the number of case execution in parallel.
+  - name: TEST_ROSA_LOGIN_ENV
+    default: "staging"
+    documentation: The environment for rosa login. The supported values are [production, staging].
+  - name: FORCE_SUCCESS_EXIT
+    default: "yes"
+    documentation: |-
+      Setting this to 'yes' will allow some statements in the scripts not to let the step fail, and further steps can
+      run. Setting it to 'no' will disable this behavior, letting any of those optional to succeed statements 
+      to stop the job and trigger the deprovisioning steps. Default: yes.
+      See https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
+  resources:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+    limits:
+      memory: 6Gi
+  credentials:
+  - namespace: test-credentials
+    name: ext-grafana-loki
+    mount_path: /var/run/ext-loki
+  documentation: |-
+    The openshift-tests-private extended step executes the common extended test.

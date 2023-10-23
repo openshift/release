@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
+  cluster: build03
   cron: 2 12 12 */12 *
   decorate: true
   decoration_config:
@@ -12,10 +12,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/variant: ocp-4.6
+    ci-operator.openshift.io/variant: ocp-4.10
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-bridge-operator-master-ocp-4.6-nightly-quay-3-7-unstable-e2e
+  name: periodic-ci-quay-quay-bridge-operator-master-ocp-4.10-nightly-quay-3-10-unstable-e2e
   spec:
     containers:
     - args:
@@ -24,9 +24,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/nightly-quay-3-7-unstable-e2e-cluster-profile
-      - --target=nightly-quay-3-7-unstable-e2e
-      - --variant=ocp-4.6
+      - --secret-dir=/usr/local/nightly-quay-3-10-unstable-e2e-cluster-profile
+      - --target=nightly-quay-3-10-unstable-e2e
+      - --variant=ocp-4.10
       command:
       - ci-operator
       image: ci-operator:latest
@@ -42,10 +42,13 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/nightly-quay-3-7-unstable-e2e-cluster-profile
+      - mountPath: /usr/local/nightly-quay-3-10-unstable-e2e-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
@@ -67,6 +70,9 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-aws
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -74,7 +80,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build03
   cron: 42 10 */1 * 1-5
   decorate: true
   decoration_config:
@@ -89,7 +95,7 @@ periodics:
     ci-operator.openshift.io/variant: ocp-latest
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-bridge-operator-master-ocp-latest-nightly-quay-3-7-unstable-e2e
+  name: periodic-ci-quay-quay-bridge-operator-master-ocp-latest-nightly-quay-3-10-unstable-e2e
   spec:
     containers:
     - args:
@@ -98,8 +104,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/nightly-quay-3-7-unstable-e2e-cluster-profile
-      - --target=nightly-quay-3-7-unstable-e2e
+      - --secret-dir=/usr/local/nightly-quay-3-10-unstable-e2e-cluster-profile
+      - --target=nightly-quay-3-10-unstable-e2e
       - --variant=ocp-latest
       command:
       - ci-operator
@@ -116,10 +122,13 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/nightly-quay-3-7-unstable-e2e-cluster-profile
+      - mountPath: /usr/local/nightly-quay-3-10-unstable-e2e-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
@@ -141,6 +150,9 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-aws
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

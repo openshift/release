@@ -15,10 +15,14 @@ base_images:
     name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-service
   assisted-service-index:
     name: assisted-service-index
     namespace: edge-infrastructure
-    tag: latest
+    tag: ocm-2.8
   assisted-service-scripts:
     name: ocm-2.8
     namespace: edge-infrastructure
@@ -68,21 +72,24 @@ tests:
 - as: e2e-aws-ovn
   cron: 0 */6 * * *
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-e2e-metrics
 - as: e2e-aws-ovn-conformance-serial
   cron: 0 1 * * *
   steps:
+    cluster_profile: hypershift
     env:
       TEST_SUITE: openshift/conformance/serial
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-conformance
   cron: 0 2 * * *
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
   cron: 0 3 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: hypershift
     workflow: hypershift-aws-conformance-proxy
 - as: e2e-powervs
   cron: 0 4 * * *
@@ -122,13 +129,6 @@ tests:
     dependencies:
       INDEX_IMAGE: assisted-service-index
     workflow: hypershift-agent-conformance
-- as: e2e-kubevirt-conformance
-  cron: 0 4 * * *
-  steps:
-    cluster_profile: aws
-    env:
-      CNV_PRERELEASE_VERSION: "4.13"
-    workflow: hypershift-kubevirt-conformance
 - as: e2e-kubevirt-mce-conformance
   cron: 0 4 * * *
   steps:
@@ -136,14 +136,17 @@ tests:
     env:
       CNV_PRERELEASE_VERSION: "4.13"
       MCE_VERSION: "2.3"
+      TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-mce-kubevirt-conformance
-- as: e2e-kubevirt-baremetalds-conformance
-  cron: 0 8 * * *
+- as: e2e-kubevirt-mce-baremetalds-conformance
+  cron: 0 4 * * *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       CNV_PRERELEASE_VERSION: "4.13"
-    workflow: hypershift-kubevirt-baremetalds-conformance
+      MCE_VERSION: "2.3"
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    workflow: hypershift-mce-kubevirt-baremetalds-conformance
 zz_generated_metadata:
   branch: release-4.13
   org: openshift

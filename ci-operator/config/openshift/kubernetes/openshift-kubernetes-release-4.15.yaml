@@ -11,6 +11,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: cli
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.14"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -23,10 +27,22 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: oc-rpms
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_4.15_base-rhel9:
+    name: "4.15"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_4.15_tools:
+    name: "4.15"
+    namespace: ocp
+    tag: tools
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.15
   rhel-coreos-base:
     name: "4.15"
     namespace: ocp
@@ -41,21 +57,24 @@ build_root:
 canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_4.15_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
-  from: tools
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_4.15_tools:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/4.15:tools
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: kubernetes-tests
 - context_dir: openshift-hack/images/os/
-  from: base
   inputs:
     base-machine-with-rpms:
       as:
@@ -86,15 +105,21 @@ images:
   to: rhel-coreos
 - context_dir: build/pause
   dockerfile_path: Dockerfile.Rhel
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_4.15_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: pod
 promotion:
   additional_images:
     artifacts: artifacts
+  disabled: true
   excluded_images:
   - machine-os-content
   - rhel-coreos
@@ -219,9 +244,10 @@ tests:
   container:
     from: src
 - as: verify-commits
-  commands: ARTIFACTS="${ARTIFACT_DIR}" openshift-hack/verify-commits.sh
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
   container:
-    from: src
+    from: commitchecker
 - as: k8s-e2e-gcp-ovn
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -320,7 +346,7 @@ tests:
 - as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-vsphere
@@ -420,6 +446,10 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-crun
+- as: e2e-aws-crun-wasm
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-crun-wasm
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

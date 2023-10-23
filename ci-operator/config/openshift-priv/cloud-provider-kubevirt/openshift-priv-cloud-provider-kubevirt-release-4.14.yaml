@@ -3,6 +3,10 @@ base_images:
     name: 4.14-priv
     namespace: ocp-private
     tag: base
+  hypershift-operator:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: hypershift-operator
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -20,7 +24,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: kubevirt-cloud-controller-manager
 promotion:
-  disabled: true
   name: 4.14-priv
   namespace: ocp-private
 releases:
@@ -46,6 +49,14 @@ tests:
   commands: GOFLAGS="-mod=readonly" make test
   container:
     from: src
+- as: e2e-kubevirt-aws-ovn
+  steps:
+    cluster_profile: aws-virtualization
+    env:
+      BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: c5n.metal
+    workflow: hypershift-kubevirt-conformance
 zz_generated_metadata:
   branch: release-4.14
   org: openshift-priv

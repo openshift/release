@@ -156,7 +156,9 @@ echo "OO_PACKAGE:           $OO_PACKAGE"
 echo "OO_CHANNEL:           $OO_CHANNEL"
 echo "OO_INSTALL_NAMESPACE: $OO_INSTALL_NAMESPACE"
 echo "OO_TARGET_NAMESPACES: $OO_TARGET_NAMESPACES"
-echo "TEST_MODE: $TEST_MODE"
+echo "OO_CONFIG_ENVVARS:    $OO_CONFIG_ENVVARS"
+echo "TEST_MODE:            $TEST_MODE"
+echo "EVAL_CONFIG_ENVVARS:  $EVAL_CONFIG_ENVVARS"
 
 if [[ -f "${SHARED_DIR}/operator-install-namespace.txt" ]]; then
     OO_INSTALL_NAMESPACE=$(cat "$SHARED_DIR"/operator-install-namespace.txt)
@@ -212,6 +214,8 @@ else
     OG_OPERATION=create
     if [[ "${TEST_MODE}" == "msp" ]]; then
       OG_NAMESTANZA="name: redhat-layered-product-og"
+    elif [[ "${TEST_MODE}" == "qe-ci" ]]; then
+      OG_NAMESTANZA="generateName: qe-ci-"
     else
       OG_NAMESTANZA="generateName: oo-"
     fi
@@ -234,6 +238,9 @@ echo "Creating CatalogSource"
 
 if [[ "${TEST_MODE}" == "msp" ]]; then
   CS_NAMESTANZA="name: addon-$OO_PACKAGE-catalog"
+  CS_NAMESPACE="openshift-marketplace"
+elif [[ "${TEST_MODE}" == "qe-ci" ]]; then
+  CS_NAMESTANZA="name: qe-app-registry"
   CS_NAMESPACE="openshift-marketplace"
 else
   CS_NAMESTANZA="generateName: oo-"
@@ -260,8 +267,14 @@ EOF
 )
 fi
 
-create_catalogsource
-wait_for_catalogsource
+# qe-ci test mode using enable-qe-catalogsource create the catalogsource then no need to create extra catalogsource again
+if [[ "${TEST_MODE}" == "qe-ci" ]]; then
+  IS_CATSRC_CREATED=true
+  echo "TEST_MODE is qe-ci, using the exist qe-app-registry catalog install the optional operator, skipped create catalogSource"  
+else
+  create_catalogsource
+  wait_for_catalogsource
+fi
 
 retry_attempts_catalogsource=2
 while [[ "$IS_CATSRC_CREATED" = false && "$retry_attempts_catalogsource" -ne 0 ]]; do
@@ -294,8 +307,30 @@ echo "Creating Subscription"
 
 if [[ "${TEST_MODE}" == "msp" ]]; then
   SUB_NAMESTANZA="name: addon-$OO_PACKAGE"
+elif [[ "${TEST_MODE}" == "qe-ci" ]]; then
+  SUB_NAMESTANZA="generateName: qe-ci-"
+  CATSRC="qe-app-registry"
+  CS_NAMESPACE="openshift-marketplace"
 else
   SUB_NAMESTANZA="generateName: oo-"
+fi
+
+CONFIG_ENVVARS=""
+if [ -n "${OO_CONFIG_ENVVARS}" ]; then
+    envvar_yaml=""
+    IFS=',' read -ra vars <<< "${OO_CONFIG_ENVVARS}"
+    for var in "${vars[@]}"; do
+        IFS='=' read -ra kv <<< "$var"
+        if [ ${#kv[@]} -eq 2 ]; then
+            val=${kv[1]}
+            [ -n "${EVAL_CONFIG_ENVVARS}" ] && val=$(eval echo "${kv[1]}")
+            [ -n "${envvar_yaml}" ] && envvar_yaml+=$'\n'
+            envvar_yaml+="      - name: ${kv[0]}"$'\n'"        value: ${val}"
+        fi
+    done
+    if [ -n "${envvar_yaml}" ]; then
+        CONFIG_ENVVARS="  config:"$'\n'"    env:"$'\n'"${envvar_yaml}"
+    fi
 fi
 
 SUB_MANIFEST=$(cat <<EOF
@@ -313,9 +348,14 @@ spec:
 EOF
 )
 
-# Add startingCSV is one is provided
+# Add startingCSV if one is provided
 if [ -n "${INITIAL_CSV}" ]; then
     SUB_MANIFEST="${SUB_MANIFEST}"$'\n'"  startingCSV: ${INITIAL_CSV}"
+fi
+
+# Add config.env if any environment variable is provided
+if [ -n "${CONFIG_ENVVARS}" ]; then
+    SUB_MANIFEST="${SUB_MANIFEST}"$'\n'"${CONFIG_ENVVARS}"
 fi
 
 echo "SUB_MANIFEST : ${SUB_MANIFEST} "

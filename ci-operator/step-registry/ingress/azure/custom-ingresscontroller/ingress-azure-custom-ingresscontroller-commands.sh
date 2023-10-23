@@ -6,7 +6,7 @@ set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 AZURE_REGION="${LEASED_RESOURCE}"
 echo "Azure region: ${AZURE_REGION}"
@@ -21,7 +21,7 @@ az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIEN
 
 AZURE_BASE_DOMAIN="$(oc get -o jsonpath='{.spec.baseDomain}' dns.config cluster)"
 Infra_ID=$(oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster)
-canary_host=$(oc get route canary -n openshift-ingress-canary -o jsonpath='{.spec.host}')
+canary_host=$(oc get route canary -n openshift-ingress-canary -o jsonpath='{.status.ingress[0].host}')
 Image_ID=$(oc get machines -n openshift-machine-api -o jsonpath='{.items[0].spec.providerSpec.value.image.resourceID}')
 
 echo "$(date -u --rfc-3339=seconds) Create a new subnet for the infrastructure nodes"

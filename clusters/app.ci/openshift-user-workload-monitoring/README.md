@@ -20,5 +20,5 @@ The metrics and the alerts defined here are for the TP team. CI users has [a mor
 
 ## Dashboards
 
-Currently there is [no dashboard support in UWM](https://coreos.slack.com/archives/C0VMT03S5/p1670228152637209?thread_ts=1670008515.321099&cid=C0VMT03S5).
+Currently there is [no dashboard support in UWM](https://redhat-internal.slack.com/archives/C0VMT03S5/p1670228152637209?thread_ts=1670008515.321099&cid=C0VMT03S5).
 Dashboards for ci-monitoring based on those metrics are deployed in [ci-grafana](../ci-grafana).

@@ -1,12 +1,12 @@
 base_images:
   base:
-    name: 4.14-priv
+    name: 4.15-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
 binary_build_commands: make binaries
 build_root:
   from_repository: true
@@ -15,29 +15,29 @@ images:
 - dockerfile_path: openshift-hack/images/cloud-controller-manager-openshift.Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: azure-cloud-controller-manager
 - dockerfile_path: openshift-hack/images/cloud-node-manager-openshift.Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: azure-cloud-node-manager
 promotion:
-  name: 4.14-priv
+  name: 4.15-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.14-priv
+      name: 4.15-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
+      name: 4.15-priv
       namespace: ocp-private
 resources:
   '*':
@@ -72,27 +72,6 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
-- as: e2e-azure-ovn-ccm
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: azure4
-    workflow: openshift-e2e-azure-ccm
-- as: openshift-e2e-azure-ovn-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: azure4
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    workflow: openshift-e2e-azure
-- as: openshift-e2e-azure-ovn-techpreview-upgrade
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: azure4
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    workflow: openshift-e2e-azure-upgrade
 zz_generated_metadata:
   branch: master
   org: openshift-priv

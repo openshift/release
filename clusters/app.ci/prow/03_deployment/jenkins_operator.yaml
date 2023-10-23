@@ -49,9 +49,46 @@ items:
           component: kata-jenkins-operator
       spec:
         serviceAccountName: jenkins-operator
+        initContainers:
+        - name: git-sync-init
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --root=/tmp/git-sync
+          - --one-time=true
+          - --depth=1
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: registry.k8s.io/git-sync/git-sync:v3.6.2
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
         containers:
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --wait=30
+          - --root=/tmp/git-sync
+          - --max-sync-failures=3
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: registry.k8s.io/git-sync/git-sync:v3.6.2
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
         - name: kata-jenkins-operator
-          image: gcr.io/k8s-prow/jenkins-operator:v20230523-2834e18241
+          image: gcr.io/k8s-prow/jenkins-operator:v20231018-4cb554d1ed
           args:
           - --jenkins-url=http://jenkins.katacontainers.io/
           - --jenkins-user=katabuilder
@@ -63,7 +100,7 @@ items:
           - --label-selector=master=jenkins.katacontainers.io
           - --csrf-protect=true
           - --dry-run=false
-          - --job-config-path=/etc/job-config
+          - --job-config-path=/var/repo/release/ci-operator/jobs
           ports:
           - name: main
             containerPort: 8080
@@ -79,9 +116,8 @@ items:
           - name: config
             mountPath: /etc/config
             readOnly: true
-          - name: job-config
-            mountPath: /etc/job-config
-            readOnly: true
+          - name: release
+            mountPath: /var/repo
           resources:
             requests:
               memory: "2.2Gi"
@@ -97,56 +133,5 @@ items:
         - name: config
           configMap:
             name: config
-        - name: job-config
-          projected:
-            sources:
-            - configMap:
-                name: job-config-misc
-            - configMap:
-                name: job-config-master-periodics
-            - configMap:
-                name: job-config-main-periodics
-            - configMap:
-                name: job-config-master-postsubmits
-            - configMap:
-                name: job-config-main-postsubmits
-            - configMap:
-                name: job-config-master-presubmits
-            - configMap:
-                name: job-config-main-presubmits
-            - configMap:
-                name: job-config-1.x
-            - configMap:
-                name: job-config-2.x
-            - configMap:
-                name: job-config-3.x
-            - configMap:
-                name: job-config-4.1
-            - configMap:
-                name: job-config-4.2
-            - configMap:
-                name: job-config-4.3
-            - configMap:
-                name: job-config-4.4
-            - configMap:
-                name: job-config-4.5
-            - configMap:
-                name: job-config-4.6
-            - configMap:
-                name: job-config-4.7
-            - configMap:
-                name: job-config-4.8
-            - configMap:
-                name: job-config-4.9
-            - configMap:
-                name: job-config-4.10
-            - configMap:
-                name: job-config-4.11
-            - configMap:
-                name: job-config-4.12
-            - configMap:
-                name: job-config-4.13
-            - configMap:
-                name: job-config-4.14
-            - configMap:
-                name: job-config-4.15
+        - name: release
+          emptyDir: {}

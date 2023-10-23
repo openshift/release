@@ -1,30 +1,34 @@
 base_images:
   base:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-9-golang-1.20-openshift-4.15
   openstack-installer:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: openstack-installer
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.10
   sriov-cni:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: sriov-cni
   sriov-dp-admission-controller:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: sriov-dp-admission-controller
   sriov-infiniband-cni:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: sriov-infiniband-cni
   sriov-network-device-plugin:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: sriov-network-device-plugin
 build_root:
@@ -33,27 +37,30 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: sriov-network-operator
 - dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: sriov-network-config-daemon
 - dockerfile_path: Dockerfile.webhook.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: sriov-network-webhook
 operator:
   bundles:
-  - dockerfile_path: bundleci.Dockerfile
+  - as: sriov-network-operator-bundle
+    base_index: operator-index
+    dockerfile_path: bundleci.Dockerfile
+    update_graph: replaces
   substitutions:
   - pullspec: quay.io/openshift/origin-sriov-dp-admission-controller:4.11
     with: pipeline:sriov-dp-admission-controller
@@ -70,17 +77,17 @@ operator:
   - pullspec: quay.io/openshift/origin-sriov-network-operator:4.11
     with: pipeline:sriov-network-operator
 promotion:
-  name: "4.14"
+  name: "4.15"
   namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
 resources:
   '*':
@@ -108,7 +115,7 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: ci-index-sriov-network-operator-bundle
     env:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
@@ -128,20 +135,20 @@ tests:
   steps:
     cluster_profile: openstack-nfv
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: ci-index-sriov-network-operator-bundle
     env:
       OPENSTACK_DPDK_NETWORK: intel-dpdk
-    workflow: openshift-e2e-openstack-sriov
+    workflow: openshift-e2e-openstack-sriov-cgroupsv1
 - as: e2e-openstack-nfv-hwoffload
   optional: true
   steps:
     cluster_profile: openstack-hwoffload
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: ci-index-sriov-network-operator-bundle
     env:
       ADDITIONAL_WORKERS_NETWORKS: ""
       OPENSTACK_SRIOV_NETWORK: mellanox-hwoffload
-    workflow: openshift-e2e-openstack-sriov
+    workflow: openshift-e2e-openstack-sriov-cgroupsv1
 zz_generated_metadata:
   branch: master
   org: openshift

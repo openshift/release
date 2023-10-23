@@ -9,16 +9,15 @@ images:
 - dockerfile_path: prow/Dockerfile
   from: os
   to: krkn-hub
+promotion:
+  namespace: chaos
+  tag: latest
 releases:
-  initial:
-    integration:
-      name: "4.13"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.13"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -27,17 +26,23 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: krkn-hub-tests
+- as: krkn-hub-tests-413
   cron: 0 8 */2 * *
   steps:
     cluster_profile: aws
     env:
-      SPOT_INSTANCES: "false"
+      SPOT_INSTANCES: "true"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
     post:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
-    workflow: redhat-chaos-krkn-hub-tests
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
+    - chain: redhat-chaos-krkn-hub-tests
+    - chain: redhat-chaos-hog-scenarios
 zz_generated_metadata:
   branch: main
   org: redhat-chaos

@@ -20,9 +20,46 @@ spec:
     spec:
       serviceAccountName: statusreconciler
       terminationGracePeriodSeconds: 180
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --branch=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        env:
+        - name: GIT_SYNC_DEST
+          value: release
+        image: registry.k8s.io/git-sync/git-sync:v3.6.2
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
       containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --branch=master
+        - --wait=30
+        - --root=/tmp/git-sync
+        - --max-sync-failures=3
+        env:
+        - name: GIT_SYNC_DEST
+          value: release
+        image: registry.k8s.io/git-sync/git-sync:v3.6.2
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
       - name: statusreconciler
-        image: gcr.io/k8s-prow/status-reconciler:v20230523-2834e18241
+        image: gcr.io/k8s-prow/status-reconciler:v20231018-4cb554d1ed
         imagePullPolicy: IfNotPresent
         args:
         - --dry-run=false
@@ -36,7 +73,7 @@ spec:
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
-        - --job-config-path=/etc/job-config
+        - --job-config-path=/var/repo/release/ci-operator/jobs
         - --projected-token-file=/var/sa-token/token
         env:
         - name: GITHUB_APP_ID
@@ -56,9 +93,8 @@ spec:
         - name: config
           mountPath: /etc/config
           readOnly: true
-        - name: job-config
-          mountPath: /etc/job-config
-          readOnly: true
+        - name: release
+          mountPath: /var/repo
         - name: plugins
           mountPath: /etc/plugins
           readOnly: true
@@ -78,61 +114,8 @@ spec:
       - name: config
         configMap:
           name: config
-      - name: job-config
-        projected:
-          sources:
-          - configMap:
-              name: job-config-misc
-          - configMap:
-              name: job-config-master-periodics
-          - configMap:
-              name: job-config-main-periodics
-          - configMap:
-              name: job-config-master-postsubmits
-          - configMap:
-              name: job-config-main-postsubmits
-          - configMap:
-              name: job-config-master-presubmits
-          - configMap:
-              name: job-config-main-presubmits
-          - configMap:
-              name: job-config-1.x
-          - configMap:
-              name: job-config-2.x
-          - configMap:
-              name: job-config-3.x
-          - configMap:
-              name: job-config-4.0
-          - configMap:
-              name: job-config-4.1
-          - configMap:
-              name: job-config-4.2
-          - configMap:
-              name: job-config-4.3
-          - configMap:
-              name: job-config-4.4
-          - configMap:
-              name: job-config-4.5
-          - configMap:
-              name: job-config-4.6
-          - configMap:
-              name: job-config-4.7
-          - configMap:
-              name: job-config-4.8
-          - configMap:
-              name: job-config-4.9
-          - configMap:
-              name: job-config-4.10
-          - configMap:
-              name: job-config-4.11
-          - configMap:
-              name: job-config-4.12
-          - configMap:
-              name: job-config-4.13
-          - configMap:
-              name: job-config-4.14
-          - configMap:
-              name: job-config-4.15
+      - name: release
+        emptyDir: {}
       - name: plugins
         configMap:
           name: plugins

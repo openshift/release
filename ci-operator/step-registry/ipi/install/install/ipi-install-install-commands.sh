@@ -4,6 +4,100 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function set-cluster-version-spec-update-service() {
+    local payload_version
+    local jsonpath_flag
+
+    if oc adm release info --help | grep "\-\-output=" -A 1 | grep -q jsonpath; then
+        jsonpath_flag=true
+    else
+        echo "this oc does not support jsonpath output"
+        oc adm release info --help | grep "\-o, \-\-output=" -A 1
+        jsonpath_flag=false
+    fi
+
+    if [[ "${jsonpath_flag}" == "true" ]]; then
+        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.version}")"
+    else
+        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" | grep -oP '(?<=^  Version:  ).*$')"
+    fi
+    echo "Release payload version: ${payload_version}"
+
+    if [[ ! -f ${dir}/manifests/cvo-overrides.yaml ]]; then
+        echo "No CVO overrides file found, will not configure OpenShift Update Service"
+        return
+    fi
+
+    # Using OSUS in upgrade jobs would be tricky (we would need to know the channel with both versions)
+    # and the use case has little benefits (not many jobs that update between two released versions)
+    # so we do not need to support it. We still need to channel clear to avoid tripping the
+    # CannotRetrieveUpdates alert on one of the versions.
+    # Not all steps that use this script expose OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE so we need to default it
+    # If we are in a step that exposes it and it differs from OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE, we are likely
+    # running an upgrade job.
+    if [[ -n "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}" ]] &&
+       [[ "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" != "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+        echo "This is likely an upgrade job (OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE differs from nonempty OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE)"
+        echo "Cluster cannot query OpenShift Update Service (OSUS/Cincinnati), cleaning the channel"
+        sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+        return
+    fi
+
+    # Determine architecture that Cincinnati would use: check metadata for release.openshift.io/architecture key
+    # and fall back to manifest-declared architecture
+    local payload_arch
+    if [[ "${jsonpath_flag}" == "true" ]]; then
+        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.metadata.release\.openshift\.io/architecture}")"
+        if [[ -z "${payload_arch}" ]]; then
+            echo 'Payload architecture not found in .metadata.metadata["release.openshift.io/architecture"], using .config.architecture'
+            payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.config.architecture}")"
+        fi
+    else
+        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" | grep "^OS/Arch: " | cut -d/ -f3)"
+    fi
+    local payload_arch_param
+    if [[ -n "${payload_arch}" ]]; then
+        echo "Release payload architecture: ${payload_arch}"
+        payload_arch_param="&arch=${payload_arch}"
+    else
+        echo "Unable to determine payload architecture"
+        payload_arch_param=""
+    fi
+
+
+    local channel
+    if ! channel="$(grep -E --only-matching '(stable|eus|fast|candidate)-4.[0-9]+' "${dir}/manifests/cvo-overrides.yaml")"; then
+        echo "No known OCP channel found in CVO manifest, clearing the channel"
+        sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+        return
+    fi
+
+    # The candidate channel is most likely to contain the versions we are interested in, so transfer the current channel
+    # into a candidate one.
+    echo "Original channel from CVO manifest: ${channel}"
+    local candidate_channel
+    candidate_channel="$(echo "${channel}" | sed -E 's/(stable|eus|fast)/candidate/')"
+    echo "Matching candidate channel: ${candidate_channel}"
+
+    # If the version is known to OSUS, it is safe for the CI cluster to query it, so we will query the integration OSUS
+    # instance maintained by OTA team. Otherwise, the cluster would trip the CannotRetrieveUpdates alert, so we need
+    # to clear the channel to make the cluster *not* query any OSUS instance.
+    local query
+    query="https://api.integration.openshift.com/api/upgrades_info/graph?channel=${candidate_channel}${payload_arch_param}"
+    echo "Querying $query for version ${payload_version}"
+    if curl --silent "$query" | grep --quiet '"version":"'"$payload_version"'"'; then
+        echo "Version ${payload_version} is available in ${candidate_channel}, cluster can query OpenShift Update Service (OSUS/Cincinnati)"
+        echo "Setting channel to $candidate_channel and upstream to https://api.integration.openshift.com/api/upgrades_info/graph "
+        sed -i "s|^  channel: .*|  channel: $candidate_channel|" "${dir}/manifests/cvo-overrides.yaml"
+        echo '  upstream: https://api.integration.openshift.com/api/upgrades_info/graph' >> "${dir}/manifests/cvo-overrides.yaml"
+    else
+        echo "Version ${payload_version} is not available in ${candidate_channel}"
+        echo "Cluster cannot query OpenShift Update Service (OSUS/Cincinnati)"
+        echo "Clearing the channel"
+        sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+    fi
+}
+
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
@@ -272,7 +366,7 @@ EOF
 
   cp "${dir}/bootstrap.ign" "${config_dir}/bootstrap_initial.ign"
   # We're using ancient fcct as glibc in installer container is 1.28
-  curl -sL https://github.com/coreos/butane/releases/download/v0.7.0/fcct-x86_64-unknown-linux-gnu >/tmp/fcct && chmod ug+x /tmp/fcct
+  curl -sL https://github.com/coreos/butane/releases/download/v0.7.0/fcct-"$(uname -m)"-unknown-linux-gnu >/tmp/fcct && chmod ug+x /tmp/fcct
   /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
 }
 
@@ -281,7 +375,8 @@ function inject_boot_diagnostics() {
   local dir=${1}
 
   if [ ! -f /tmp/yq ]; then
-    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+    curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$( get_arch )" \
+    -o /tmp/yq && chmod +x /tmp/yq
   fi
 
   PATCH="${SHARED_DIR}/machinesets-boot-diagnostics.yaml.patch"
@@ -306,7 +401,8 @@ function inject_spot_instance_config() {
   local dir=${1}
 
   if [ ! -f /tmp/yq ]; then
-    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+    curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$( get_arch )" \
+    -o /tmp/yq && chmod +x /tmp/yq
   fi
 
   PATCH="${SHARED_DIR}/machinesets-spot-instances.yaml.patch"
@@ -325,6 +421,35 @@ EOF
   done
 
   echo "Enabled AWS Spot instances for worker nodes"
+}
+
+# enable_efa_pg_instance_config is an AWS specific option that enables one worker machineset in a placement group and with EFA Network Interface Type, other worker machinesets will be ENA Network Interface Type by default.....
+function enable_efa_pg_instance_config() {
+  local dir=${1}
+  #sed -i 's/          instanceType: .*/          networkInterfaceType: EFA\n          placementGroupName: pgcluster\n          instanceType: c5n.9xlarge/' "$dir/openshift/99_openshift-cluster-api_worker-machineset-0.yaml"
+  pip3 install pyyaml --user
+  pushd "${dir}/openshift"
+  python -c '
+import os
+import yaml
+
+for manifest_name in os.listdir("./"):
+    if "worker-machineset" in manifest_name:
+      data = yaml.safe_load(open(manifest_name))
+      data["spec"]["template"]["spec"]["providerSpec"]["value"]["networkInterfaceType"] = "EFA"
+      data["spec"]["template"]["spec"]["providerSpec"]["value"]["instanceType"] = "c5n.9xlarge"
+      data["spec"]["template"]["spec"]["providerSpec"]["value"]["placementGroupName"] = "pgcluster"
+      open(manifest_name, "w").write(yaml.dump(data, default_flow_style=False))
+      print("Patched efa pg into ",  manifest_name)
+      break
+' || return 1
+  popd
+
+}
+
+function get_arch() {
+  ARCH=$(uname -m | sed -e 's/aarch64/arm64/' -e 's/x86_64/amd64/')
+  echo "${ARCH}"
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -381,13 +506,13 @@ gcp)
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions.json"
     fi
     ;;
-ibmcloud)
+ibmcloud*)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
     ;;
 alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini;;
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
-vsphere)
+vsphere*)
     export VSPHERE_PERSIST_SESSION=true
     export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
     ;;
@@ -402,6 +527,10 @@ esac
 dir=/tmp/installer
 mkdir "${dir}/"
 cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
+
+echo "install-config.yaml"
+echo "-------------------"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
 
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure
@@ -420,10 +549,13 @@ aws|aws-arm64|aws-usgov)
     if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
       inject_spot_instance_config ${dir}
     fi
+    if [[ "${ENABLE_AWS_EFA_PG_INSTANCE:-}"  == 'true' ]]; then
+      enable_efa_pg_instance_config ${dir}
+    fi
     ;;
 esac
 
-sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+set-cluster-version-spec-update-service
 
 echo "Will include manifests:"
 find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
@@ -450,10 +582,6 @@ if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
   inject_promtail_service
 fi
 
-echo "install-config.yaml"
-echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
-
 if [ "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY:-}" == "true" ]; then
 	echo "Cluster will be created with public subnets only"
 fi
@@ -465,7 +593,7 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 # forcing a retest of the entire job, try the installation again if
 # the installer exits with 4, indicating an infra problem.
 case $JOB_NAME in
-  *vsphere*)
+  *vsphere)
     # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
     max=1
     ;;

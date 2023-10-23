@@ -18,10 +18,13 @@ fi
 
 export E2E_RUN_TAGS="${E2E_RUN_TAGS}"
 echo "E2E_RUN_TAGS is '${E2E_RUN_TAGS}'"
-## determine if running against managed service
+## determine if running against managed service or smoke scenarios
 if [[ ($E2E_RUN_TAGS == *"@osd_ccs"*) || ($E2E_RUN_TAGS == *"@rosa"*) ]]; then
   echo "Testing against online cluster"
   ./console-test-osd.sh || exit 0
+elif [[ $E2E_RUN_TAGS == *"@smoke"* ]]; then
+  echo "only run smoke scenarios"
+  ./console-test-frontend.sh --tags @smoke || exit 0
 fi
 
 ## determine if it is hypershift guest cluster or not

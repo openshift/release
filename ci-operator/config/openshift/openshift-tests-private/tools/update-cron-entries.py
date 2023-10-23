@@ -7,6 +7,13 @@ import os
 import subprocess
 from datetime import datetime
 
+#import yaml
+#To avoid yaml.load change doulbe-quotes values to sigle-quote, use ruamel.yaml module instead of yaml
+#yum install python3-ruamel-yaml.x86_64
+from ruamel.yaml import YAML
+yaml=YAML()
+yaml.default_flow_style = False
+yaml.preserve_quotes = True
 
 def shell(cmd, debug=False, env_=dict(os.environ)):
     """
@@ -78,7 +85,8 @@ if __name__ == "__main__":
         print("Updating %s" % (target_file))
 
         with open(target_file, 'r') as file:
-            all_data = yaml.safe_load(file)
+            #all_data = yaml.safe_load(file)
+            all_data = yaml.load(file)
         file.close()
 
         all_tests_list = all_data['tests']
@@ -86,7 +94,7 @@ if __name__ == "__main__":
         for test in all_tests_list:
             test_name = test['as']
             print("updating test job - %s" % test_name)
-            command = "generate-cron-entry.sh %s %s %s" % (test_name, target_file,
+            command = "generate-cron-entry.sh %s %s %s" % (test_name, os.path.basename(target_file),
                                                            "--force" if force_generation else "")
             cron_output = shell(command)["out"]
             if cron_output.startswith(cron_prefix):

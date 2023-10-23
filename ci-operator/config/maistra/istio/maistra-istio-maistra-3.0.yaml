@@ -37,9 +37,10 @@ tests:
 - as: nightly-images-3-0
   cron: 00 03 * * *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-nightly-images
       MAISTRA_SC_POD: maistra-nightly-images-pod
@@ -102,9 +103,10 @@ tests:
     workflow: servicemesh-istio-e2e-profile
 - as: maistra-istio-unit-3-0
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -144,9 +146,10 @@ tests:
     workflow: servicemesh-istio-e2e-profile
 - as: integ-pilot-3-0
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -187,9 +190,10 @@ tests:
     workflow: servicemesh-istio-e2e-profile
 - as: integ-telemetry-3-0
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -230,9 +234,10 @@ tests:
     workflow: servicemesh-istio-e2e-profile
 - as: integ-security-3-0
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -273,9 +278,10 @@ tests:
     workflow: servicemesh-istio-e2e-profile
 - as: integ-helm-3-0
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -300,6 +306,7 @@ tests:
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           bash -c \
           "cd /work;
+          export DOCKER_CONFIG='' ;
           entrypoint \
           prow/integ-suite-kind.sh \
           test.integration.helm.kube.presubmit"
@@ -331,6 +338,17 @@ tests:
       '-t [maistra-3.0] Automator: Update charts from maistra/istio' \
       -m update_charts_istio_3.0 \
       -b maistra-3.0
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /creds-github
+    name: github-token
+- as: update-proxy
+  commands: |
+    export GITHUB_TOKEN=$(cat /creds-github/token)
+    git clone --depth=1 --single-branch -b maistra-3.0-pre https://github.com/maistra/proxy.git
+    ./proxy/update-proxy.sh
   container:
     from: src
   postsubmit: true

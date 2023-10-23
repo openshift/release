@@ -8,7 +8,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 workdir=`mktemp -d`
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_ignition_file="${workdir}/${CLUSTER_NAME}-bastion.ign"
 
 function patch_ignition_file()
@@ -90,6 +90,7 @@ acl authenticated proxy_auth REQUIRED
 acl CONNECT method CONNECT
 http_access allow authenticated
 http_port 3128
+dns_v4_first on
 EOF
 
 ## PROXY Service
@@ -344,9 +345,9 @@ done
 patch_file=$(mktemp)
 
 # patch proxy for 6001 quay.io
-reg_quay_url=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.url')
-reg_quay_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
-reg_quay_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
+reg_quay_url=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.url')
+reg_quay_user=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.user')
+reg_quay_password=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.password')
 cat > "${patch_file}" << EOF
 proxy:
   remoteurl: "${reg_quay_url}"

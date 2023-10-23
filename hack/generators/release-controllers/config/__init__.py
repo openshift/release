@@ -26,6 +26,9 @@ class RCPaths:
         self.path_rc_deployments = self.path_base.joinpath('clusters/app.ci/release-controller')
         self.path_rc_rpms = self.path_base.joinpath('clusters/build-clusters/common/release-controller')
 
+        # CRT Resources
+        self.path_crt_resources = self.path_base.joinpath('clusters/app.ci/crt')
+
         # TRT Resources
         self.path_trt_resources = self.path_base.joinpath('clusters/app.ci/trt')
 
@@ -42,6 +45,7 @@ class Config:
         self.arches = ('x86_64', 's390x', 'ppc64le', 'arm64', 'multi')
         self.paths = RCPaths(git_clone_dir)
         self.releases = self._get_releases()
+        self.scos_releases = self._get_scos_releases()
         self.rpc_release_namespace = "ocp"
 
     def _get_releases(self):
@@ -52,6 +56,17 @@ class Config:
             bn = os.path.splitext(os.path.basename(name))[0]  # e.g. openshift-release-release-4.4-periodics
             major_minor = bn.split('-')[-2]  # 4.4
             releases.append(major_minor)
+
+        releases.sort()  # Glob does provide any guarantees on ordering, so force an order by sorting.
+        return releases
+
+    def _get_scos_releases(self):
+        releases = []
+
+        # SCOS support was introduced in 4.12
+        for version in self.releases:
+            if int(version.split('.')[1]) >= 12:
+                releases.append(f'scos-{version}')
 
         releases.sort()  # Glob does provide any guarantees on ordering, so force an order by sorting.
         return releases

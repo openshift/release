@@ -43,7 +43,7 @@ EOF
 
 function create_catalog_sources() {
     # get cluster Major.Minor version
-    ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+    ocp_version=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
     index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
 
     echo "create QE catalogsource: qe-app-registry"
@@ -89,6 +89,10 @@ EOF
     fi
     set -e
 }
+
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 if [[ $SKIP_HYPERSHIFT_PULL_SECRET_UPDATE == "true" ]]; then
   echo "SKIP ....."

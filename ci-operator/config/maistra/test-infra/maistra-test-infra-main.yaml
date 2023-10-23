@@ -22,6 +22,11 @@ resources:
       cpu: "2"
       memory: 4Gi
 tests:
+- as: lint
+  commands: |
+    make lint
+  container:
+    from: src
 - as: sync-upstream-envoy-2.3
   commands: |
     ./tools/automator-main.sh \
@@ -30,7 +35,7 @@ tests:
     --branch=maistra-2.3 \
     --token-path=/creds-github/token \
     '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
-    "--labels=merge strategy" \
+    "--labels=tide/merge-method-merge" \
     --modifier=merge_upstream_envoy_2_3 \
     --merge-repository=https://github.com/envoyproxy/envoy \
     --merge-branch=release/v1.22 \
@@ -50,7 +55,7 @@ tests:
     --branch=maistra-2.4 \
     --token-path=/creds-github/token \
     '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
-    "--labels=merge strategy" \
+    "--labels=tide/merge-method-merge" \
     --modifier=merge_upstream_envoy_2_4 \
     --merge-repository=https://github.com/envoyproxy/envoy \
     --merge-branch=release/v1.24 \
@@ -62,7 +67,7 @@ tests:
   secrets:
   - mount_path: /creds-github
     name: github-token
-- as: merge-upstream-istio-2.4
+- as: sync-upstream-istio-2.4
   commands: |
     ./tools/automator-main.sh \
     --org=maistra \
@@ -70,11 +75,32 @@ tests:
     --branch=maistra-2.4 \
     --token-path=/creds-github/token \
     '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
-    "--labels=merge strategy" \
+    "--labels=tide/merge-method-merge" \
     --modifier=merge_upstream_istio_1_16 \
     --merge-repository=https://github.com/istio/istio \
     --merge-branch=release-1.16 \
     --merge-failure-notify=@maistra/release-managers-2-4 \
+    --merge-strategy=merge \
+    --fetch-tags
+  container:
+    from: src
+  cron: 00 05 * * 1-5
+  secrets:
+  - mount_path: /creds-github
+    name: github-token
+- as: sync-upstream-istio-3.0
+  commands: |
+    ./tools/automator-main.sh \
+    --org=maistra \
+    --repo=istio \
+    --branch=maistra-3.0 \
+    --token-path=/creds-github/token \
+    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
+    "--labels=tide/merge-method-merge" \
+    --modifier=merge_upstream_istio_master \
+    --merge-repository=https://github.com/istio/istio \
+    --merge-branch=master \
+    --merge-failure-notify=@maistra/release-managers-3-0 \
     --merge-strategy=merge
   container:
     from: src
@@ -82,143 +108,24 @@ tests:
   secrets:
   - mount_path: /creds-github
     name: github-token
-- as: test-infra-build-containers-2-1
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
-  run_if_changed: ^docker/maistra-.*builder_2\.1\.Dockerfile|^docker/scripts
-  steps:
-    env:
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.1
-      MAISTRA_NAMESPACE: maistra-e2e-test
-      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-    test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 20m0s
-    - as: build-containers-2-1
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          entrypoint \
-          make build-containers-2.1
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    - as: build-proxy-containers-2-1
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          entrypoint \
-          make maistra-proxy-builder_2.1
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-claim
-- as: test-infra-push-containers-2-1
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
-  postsubmit: true
-  run_if_changed: ^docker/maistra-.*builder_2\.1\.Dockerfile|^docker/scripts
-  steps:
-    env:
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.1
-      MAISTRA_NAMESPACE: maistra-e2e-test
-      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-    test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 20m0s
-    - as: push-containers-2-1
-      cli: latest
-      commands: |
-        export QUAY_PASS=$(cat /maistra-secrets/password)
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-        entrypoint \
-        sh -c \
-        "docker login -u='maistra-dev+prow' \
-        -p=${QUAY_PASS} quay.io; \
-        make maistra-builder_2.1.push"
-      credentials:
-      - mount_path: /maistra-secrets
-        name: maistra-dev-prow
-        namespace: test-credentials
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    - as: push-proxy-containers-2-1
-      cli: latest
-      commands: |
-        export QUAY_PASS=$(cat /maistra-secrets/password)
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-        entrypoint \
-        sh -c \
-        "docker login -u='maistra-dev+prow' \
-        -p=${QUAY_PASS} quay.io; \
-        make maistra-proxy-builder_2.1.push"
-      credentials:
-      - mount_path: /maistra-secrets
-        name: maistra-dev-prow
-        namespace: test-credentials
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-claim
+- as: update-istio-builder-image
+  commands: |
+    export NEW_IMAGE=$(curl -sL https://raw.githubusercontent.com/istio/common-files/master/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
+    ./tools/automator-main.sh \
+    --org=openshift \
+    --repo=release \
+    --branch=master \
+    --token-path=/creds-github/token \
+    '--title=Update maistra/istio builder image' \
+    --modifier=update_istio_builder_image_master \
+    '--cmd=sed -i "s|\(gcr.io/istio-testing/build-tools\):.* \(registry.ci.openshift.org/ci/maistra-builder:upstream-master\)|\1:$NEW_IMAGE \2|" core-services/image-mirroring/supplemental-ci-images/mapping_supplemental_ci_images_ci' \
+    '--body=cc @jwendell'
+  container:
+    from: src
+  cron: 00 05 * * 1-5
+  secrets:
+  - mount_path: /creds-github
+    name: github-token
 - as: test-infra-build-containers-2-2
   cluster_claim:
     architecture: amd64
@@ -502,6 +409,105 @@ tests:
         "docker login -u='maistra-dev+prow' \
         -p=${QUAY_PASS} quay.io; \
         make maistra-builder_2.4.push"
+      credentials:
+      - mount_path: /maistra-secrets
+        name: maistra-dev-prow
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-claim
+- as: test-infra-build-containers-2-5
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  run_if_changed: ^docker/maistra-builder_2\.5\.Dockerfile|^docker/scripts
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: build-containers-2-5
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          make build-containers-2.5
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-claim
+- as: test-infra-push-containers-2-5
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  postsubmit: true
+  run_if_changed: ^docker/maistra-builder_2\.5\.Dockerfile|^docker/scripts
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: push-containers-2-5
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /maistra-secrets/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+        entrypoint \
+        sh -c \
+        "docker login -u='maistra-dev+prow' \
+        -p=${QUAY_PASS} quay.io; \
+        make maistra-builder_2.5.push"
       credentials:
       - mount_path: /maistra-secrets
         name: maistra-dev-prow

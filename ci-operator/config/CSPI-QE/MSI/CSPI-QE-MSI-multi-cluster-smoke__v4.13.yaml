@@ -1,0 +1,42 @@
+base_images:
+  managed-services-integration-tests:
+    name: managed-services-integration-tests
+    namespace: ci
+    tag: latest
+  openshift-cli-installer:
+    name: openshift-cli-installer
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: multicluster-aws-4.13-nightly-hypershift-4.13-candidate-smoke
+  steps:
+    cluster_profile: aws-managed-cspi-qe
+    env:
+      CLUSTER1_CONFIG: name=ci-hyper;platform=hypershift;region=us-west-2;version=4.13;channel-group=candidate;compute-machine-type=m5.4xlarge;replicas=2;expiration-time=4h;timeout=1h;ocm-env=stage
+      CLUSTER1_KUBECONFIG_PATH: /tmp/clusters-data/hypershift/ci-hyper/auth/kubeconfig
+      CLUSTER2_CONFIG: name=ci-aws-ipi;base_domain=aws.interop.ccitredhat.com;platform=aws;region=us-east-2;version=4.13;stream=nightly;worker_flavor=m5.xlarge
+      CLUSTER2_KUBECONFIG_PATH: /tmp/clusters-data/aws/ci-aws-ipi/auth/kubeconfig
+      PULL_SECRET_NAME: pull-secret
+      S3_BUCKET_NAME: openshift-cli-installer
+      S3_BUCKET_PATH: openshift-ci
+    test:
+    - ref: cluster-msi-tests
+    workflow: cluster
+zz_generated_metadata:
+  branch: multi-cluster-smoke
+  org: CSPI-QE
+  repo: MSI
+  variant: v4.13

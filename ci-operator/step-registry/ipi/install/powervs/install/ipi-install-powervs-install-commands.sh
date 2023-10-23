@@ -223,7 +223,7 @@ function install_required_tools() {
   export HOME=/tmp
 
   if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.15.0/IBM_Cloud_CLI_2.15.0_amd64.tar.gz
+    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.20.0/IBM_Cloud_CLI_2.20.0_amd64.tar.gz
     tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
 
     if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]; then
@@ -334,14 +334,31 @@ function init_ibmcloud() {
   fi
 
   CIS_INSTANCE_CRN=$(ibmcloud cis instances --output json | jq -r '.[].id');
+  if [ -z "${CIS_INSTANCE_CRN}" ]; then
+    echo "Error: CIS_INSTANCE_CRN is empty!"
+    exit 1
+  fi
   export CIS_INSTANCE_CRN
 
+  if [ -z "${POWERVS_SERVICE_INSTANCE_ID}" ]; then
+    echo "Error: POWERVS_SERVICE_INSTANCE_ID is empty!"
+    exit 1
+  fi
+
   SERVICE_INSTANCE_CRN="$(ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .crn')"
+  if [ -z "${SERVICE_INSTANCE_CRN}" ]; then
+    echo "Error: SERVICE_INSTANCE_CRN is empty!"
+    exit 1
+  fi
   export SERVICE_INSTANCE_CRN
 
   ibmcloud pi service-target ${SERVICE_INSTANCE_CRN}
 
   CLOUD_INSTANCE_ID="$(echo ${SERVICE_INSTANCE_CRN} | cut -d: -f8)"
+  if [ -z "${CLOUD_INSTANCE_ID}" ]; then
+    echo "Error: CLOUD_INSTANCE_ID is empty!"
+    exit 1
+  fi
   export CLOUD_INSTANCE_ID
 }
 
@@ -385,6 +402,32 @@ function check_resources() {
   if [ "$flag_destroy_resources" = true ] ; then
     destroy_resources
   fi
+}
+
+function delete_network() {
+  NETWORK_NAME=$1
+  echo "delete_network(${NETWORK_NAME})"
+
+  (
+    while read UUID
+    do
+      echo ibmcloud pi network-delete ${UUID}
+      ibmcloud pi network-delete ${UUID}
+    done
+  ) < <(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID')
+
+  for (( TRIES=0; TRIES<20; TRIES++ ))
+  do
+    LINES=$(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID' | wc -l)
+    echo "LINES=${LINES}"
+    if (( LINES == 0 ))
+    then
+      return 0
+    fi
+    sleep 15s
+  done
+
+  return 1
 }
 
 function destroy_resources() {
@@ -454,15 +497,20 @@ EOF
   done
 
   #
-  # Clean up leftover networks
+  # Clean up leftover networks from a previous OpenShift cluster
   #
-  (
-    while read UUID
-    do
-      echo ibmcloud pi network-delete ${UUID}
-      ibmcloud pi network-delete ${UUID}
-    done
-  ) < <(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("rdr-multiarch-'${POWERVS_ZONE}'")) | .networkID')
+  if ! delete_network "rdr-multiarch-${POWERVS_ZONE}"
+  then
+      DESTROY_SUCCEEDED=false
+  fi
+
+  #
+  # Clean up the public-192_168_XXX_XX-XX-VLAN_XXXX network
+  #
+  if ! delete_network "public-192_168"
+  then
+      DESTROY_SUCCEEDED=false
+  fi
 
   if ! ${DESTROY_SUCCEEDED}
   then

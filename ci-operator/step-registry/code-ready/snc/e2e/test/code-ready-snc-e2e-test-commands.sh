@@ -11,7 +11,7 @@ if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
   exit 1
 fi
 
-INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
+INSTANCE_PREFIX="${NAMESPACE}"-"${UNIQUE_HASH}"
 
 mkdir -p "${HOME}"/.ssh
 mock-nss.sh
