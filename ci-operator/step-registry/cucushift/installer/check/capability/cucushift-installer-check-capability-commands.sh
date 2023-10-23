@@ -35,6 +35,8 @@ function cvoCapabilityCheck() {
             else
                 echo "ERROR: ${expected_status} capabilities does not match with cvo ${cvo_field}!"
                 echo -e "cvo_caps: ${cvo_caps_str}\n${expected_status} capability set: ${capability_set}"
+                echo "diff [cvo_caps] [${expected_status} capability set]"
+                diff <( echo $cvo_caps_str | tr " " "\n" | sort | uniq) <( echo $capability_set | tr " " "\n" | sort | uniq )
                 result=1
             fi
         fi
@@ -84,6 +86,7 @@ caps_operator[Storage]="storage"
 caps_operator[NodeTuning]="node-tuning"
 caps_operator[MachineAPI]="machine-api control-plane-machine-set cluster-autoscaler"
 caps_operator[ImageRegistry]="image-registry"
+caps_operator[OperatorLifecycleManager]="operator-lifecycle-manager operator-lifecycle-manager-catalog operator-lifecycle-manager-packageserver"
 
 # Mapping between optional capability and resources
 # Need to be updated when new resource marks as optional
@@ -97,7 +100,8 @@ v411="baremetal marketplace openshift-samples"
 v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
-latest_defined="v414"
+v415=" ${v414} OperatorLifecycleManager"
+latest_defined="v415"
 always_default="${!latest_defined}"
 
 # Determine vCurrent
@@ -131,6 +135,9 @@ case ${baselinecaps_from_config} in
   ;;
 "v4.14")
   enabled_capability_set="${v414}"
+  ;;
+"v4.15")
+  enabled_capability_set="${v415}"
   ;;
 "vCurrent")
   enabled_capability_set="${vCurrent}"
