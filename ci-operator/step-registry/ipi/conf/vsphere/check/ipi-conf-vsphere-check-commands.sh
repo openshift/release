@@ -10,7 +10,6 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-
 declare vsphere_datacenter
 declare vsphere_datastore
 declare vsphere_cluster
@@ -93,6 +92,14 @@ export vlanid="${vlanid:-unset}"
 export phydc="${phydc:-unset}"
 export primaryrouterhostname="${primaryrouterhostname:-unset}"
 EOF
+
+if [[ -n "${VSPHERE_CONNECTED_LEASED_RESOURCE:-}" ]]; then
+  vlanid_2=$(awk -F. '{print $3}' <(echo "${VSPHERE_CONNECTED_LEASED_RESOURCE}"))
+  vsphere_connected_portgroup="ci-vlan-${vlanid_2}"
+  cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
+  export vsphere_connected_portgroup="${vsphere_connected_portgroup}"
+EOF
+fi
 
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
