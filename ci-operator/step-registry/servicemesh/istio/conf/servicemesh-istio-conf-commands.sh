@@ -5,13 +5,20 @@ set -o errexit
 set -o pipefail
 
 function create_user() {
-  # create htpasswd file
-  htpasswd -c -B -b users.htpasswd "${USER_NAME}" "${USER_PASS}"
+  # cluster-add-user: Add user jenkins (cluster admin)
+  local HTPASSWD_DATA='$2y$05$wuKjys.Isib68LFUPYlOfuE4/URAFwy4bVZZxAdhKy2v8N4qGwgIW'
+  oc apply -f <(cat <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: htpasswd
+  namespace: openshift-config
+data:
+  htpasswd: "${HTPASSWD_DATA}"
+type: Opaque
+EOF
+)
 
-  # create htpasswd secret
-  oc -n openshift-config create secret generic htpass-secret --from-file=htpasswd=users.htpasswd
-
-  # update oauth
   oc apply -f <(cat <<EOF
 apiVersion: config.openshift.io/v1
 kind: OAuth
@@ -20,17 +27,18 @@ metadata:
 spec:
   identityProviders:
   - name: my_htpasswd_provider
-    mappingMethod: claim
     type: HTPasswd
+    mappingMethod: claim
     htpasswd:
       fileData:
-        name: htpass-secret
+        name: htpasswd
 EOF
 )
 
   # create cluster admin user
+  sleep 10
   oc adm policy add-cluster-role-to-user cluster-admin jenkins
 }
 
 create_user
-echo "Created admin user ${USER_NAME}"
+echo "Created admin user jenkins"
