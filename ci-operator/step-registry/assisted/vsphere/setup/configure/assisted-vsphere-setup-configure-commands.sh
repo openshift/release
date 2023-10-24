@@ -4,8 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+
+declare
+
+
 
 SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
 
@@ -38,13 +44,13 @@ export PLATFORM=vsphere
 export VIP_DHCP_ALLOCATION=false
 export VSPHERE_PARENT_FOLDER=assisted-test-infra-ci
 export VSPHERE_FOLDER="build-${BUILD_ID}"
-export VSPHERE_CLUSTER="${vsphere_cluster}"
+export VSPHERE_CLUSTER="${vsphere_cluster:?}"
 export VSPHERE_USERNAME="${GOVC_USERNAME}"
-export VSPHERE_NETWORK="${vsphere_portgroup}"
+export VSPHERE_NETWORK="${vsphere_portgroup:?}"
 
-export VSPHERE_VCENTER="${vsphere_url}"
-export VSPHERE_DATACENTER="${vsphere_datacenter}"
-export VSPHERE_DATASTORE="${vsphere_datastore}"
+export VSPHERE_VCENTER="${vsphere_url:?}"
+export VSPHERE_DATACENTER="${vsphere_datacenter:?}"
+export VSPHERE_DATASTORE="${vsphere_datastore:?}"
 export VSPHERE_PASSWORD='${GOVC_PASSWORD}'
 export BASE_DOMAIN="vmc-ci.devcluster.openshift.com"
 export CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
