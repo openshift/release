@@ -31,13 +31,11 @@ if [ -z "${CLUSTER_DATA_FILES}" ] ; then
 fi
 
 NUM_CLUSTERS=0
-CLUSTER_DATA_CMD="--destroy-clusters-from-s3-config-files "
-for data_file in $CLUSTER_DATA_FILES; do
-  CLUSTER_DATA_CMD+="$(dirname "${data_file}"),"
+for _ in $CLUSTER_DATA_FILES; do
   NUM_CLUSTERS=$(( NUM_CLUSTERS + 1))
 done
 
-RUN_COMMAND+=$(echo "${CLUSTER_DATA_CMD}" | sed 's/,$//g')
+RUN_COMMAND+=" --destroy-clusters-from-install-data-directory $CLUSTER_DATA_DIR "
 
 if [ "${CLUSTERS_RUN_IN_PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
     RUN_COMMAND+=" --parallel"
