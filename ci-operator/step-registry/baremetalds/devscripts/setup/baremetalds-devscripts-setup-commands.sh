@@ -83,14 +83,11 @@ function getExtraVal(){
 # For baremetal clusters ofcir has returned details about the hardware in the cluster
 # prepare those details into a format the devscripts understands
 function prepare_bmcluster() {
+    # Get Extra data from CIR
     jq -r .extra < $CIRFILE > $EXTRAFILE
 
-    if ! jq .nodes < $EXTRAFILE > $NODESFILE ; then
-        # Backwards compat for nodes where extra data is just a list of nodes
-        # TODO: remove when all nodes have {"nodes":[{},{}...], "key":"value"}
-        cp $EXTRAFILE $NODESFILE
-        echo "{\"nodes\":$(cat $NODESFILE)}" > $EXTRAFILE
-    fi
+    # Get BM nodes list from extra data
+    jq .nodes < $EXTRAFILE > $NODESFILE
 
     # dev-scripts can be used to provision baremetal (in place of the VM's it usually creates)
     # build the details of the bm nodes into a $NODES_FILE for consumption by dev-scripts
