@@ -286,62 +286,67 @@ function wait_clusteroperators_continous_success() {
     fi
 }
 
-function check_latest_machineconfig_applied() {
-    local role="$1" cmd latest_machineconfig applied_machineconfig_machines ready_machines
+function check_mcp() {
+    local updating_mcp unhealthy_mcp
 
-    cmd="oc get machineconfig"
-    echo "Command: $cmd"
-    eval "$cmd"
-
-    echo "Checking $role machines are applied with latest $role machineconfig..."
-    latest_machineconfig=$(oc get mcp/$role -o json | jq -r '.spec.configuration.name')
-    if [[ ${latest_machineconfig} == "" ]]; then
-        echo >&2 "Did not found ${role} render machineconfig"
-        return 1
-    else
-        echo "latest ${role} machineconfig: ${latest_machineconfig}"
-    fi
-
-    applied_machineconfig_machines=$(oc get node -l "node-role.kubernetes.io/${role}" -o json | jq -r --arg mc_name "${latest_machineconfig}" '.items[] | select(.metadata.annotations."machineconfiguration.openshift.io/state" == "Done" and .metadata.annotations."machineconfiguration.openshift.io/currentConfig" == $mc_name) | .metadata.name' | sort)
-    ready_machines=$(oc get node -l "node-role.kubernetes.io/${role}" -o json | jq -r '.items[].metadata.name' | sort)
-    if [[ ${applied_machineconfig_machines} == "${ready_machines}" ]]; then
-        echo "latest machineconfig - ${latest_machineconfig} is already applied to ${ready_machines}"
-        return 0
-    else
-        echo "latest machineconfig - ${latest_machineconfig} is applied to ${applied_machineconfig_machines}, but expected ready node lists: ${ready_machines}"
+    updating_mcp=$(oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status --no-headers | grep -v "False")
+    if [[ -n "${updating_mcp}" ]]; then
+        echo "Some mcp is updating..."
+        echo "${updating_mcp}"
         return 1
     fi
+
+    # Do not check UPDATED on purpose, beause some paused mcp would not update itself until unpaused
+    unhealthy_mcp=$(oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount --no-headers | grep -v "False.*False.*0")
+    if [[ -n "${unhealthy_mcp}" ]]; then
+        echo "Detected unhealthy mcp:"
+        echo "${unhealthy_mcp}"
+        echo "Real-time detected unhealthy mcp:"
+        oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount | grep -v "False.*False.*0"
+        echo "Real-time full mcp output:"
+        oc get mcp
+        echo ""
+        unhealthy_mcp_names=$(echo "${unhealthy_mcp}" | awk '{print $1}')
+        echo "Using oc describe to check status of unhealthy mcp ..."
+        for mcp_name in ${unhealthy_mcp_names}; do
+          echo "Name: $mcp_name"
+          oc describe mcp $mcp_name || echo "oc describe mcp $mcp_name failed"
+        done
+        return 2
+    fi
+    return 0
 }
 
-function wait_machineconfig_applied() {
-    local role="${1}" try=0 interval=30
-    num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l)
-    local max_retries; max_retries=$(expr $num \* 10 \* 60 \/ $interval) # Wait 10 minutes for each node, try 60/interval times per minutes
-
-    local mcp_try=0 mcp_status=''
-    local max_try_between_updated_and_updating; max_try_between_updated_and_updating=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
-    while [ $mcp_try -lt $max_try_between_updated_and_updating ] && [ $try -lt $max_retries ]
-    do
-        sleep ${interval}
+function wait_mcp_continous_success() {
+    local try=0 continous_successful_check=0 passed_criteria max_retries ret=0 interval=30
+    num=$(oc get node --no-headers | wc -l)
+    max_retries=$(expr $num \* 20 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
+    passed_criteria=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
+    while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
-        mcp_status=$(oc get mcp/$role -o json | jq -r '.status.conditions[] | select(.type == "Updated") | .status')
-        if [[ X"$mcp_status" != X"True" ]]; then
-            mcp_try=0
+        ret=0
+        check_mcp || ret=$?
+        if [[ "$ret" == "0" ]]; then
+            echo "Passed #${continous_successful_check}"
+            (( continous_successful_check += 1 ))
+        elif [[ "$ret" == "1" ]]; then
+            echo "Some machines are updating..."
+            continous_successful_check=0
+        else
+            echo "Some machines are degraded..."
+            break
         fi
-        (( mcp_try += 1 ))
+        echo "wait and retry..."
+        sleep ${interval}
         (( try += 1 ))
     done
-    echo "MCP ${role} status is ${mcp_status}"
-    if [[ X"$mcp_status" != X"True" ]]; then
-        echo "Timeout waiting for mcp updated"
-        return 1
-    fi
-    
-    if ! check_latest_machineconfig_applied "${role}"; then
-        echo >&2 "Timeout waiting for all $role machineconfigs are applied"
+    if (( continous_successful_check != passed_criteria )); then
+        echo >&2 "Some mcp does not get ready or not stable"
+        echo "Debug: current mcp output is:"
+        oc get mcp
         return 1
     else
-        echo "All ${role} machineconfigs check PASSED"
+        echo "All mcp status check PASSED"
         return 0
     fi
 }
@@ -370,20 +375,15 @@ function check_pod() {
 }
 
 function health_check() {
-    #1. Make sure all machines are applied with latest machineconfig
-    echo "Step #1: Make sure all machines are applied with latest machineconfig"
-    wait_machineconfig_applied "master"
-    wait_machineconfig_applied "worker"
+    echo "Step #1: Make sure no degrated or updating mcp"
+    wait_mcp_continous_success
 
-    #2. Check all cluster operators get stable and ready
     echo "Step #2: check all cluster operators get stable and ready"
     wait_clusteroperators_continous_success
 
-    #3. Make sure every machine is in 'Ready' status
     echo "Step #3: Make sure every machine is in 'Ready' status"
     check_node
 
-    #4. All pods are in status running or complete
     echo "Step #4: check all pods are in status running or complete"
     check_pod
 }
