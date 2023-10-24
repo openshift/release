@@ -20,6 +20,12 @@ releases:
       include_built_images: true
       name: "4.15"
       namespace: ocp
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -160,6 +166,26 @@ tests:
   steps:
     cluster_profile: gcp
     test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-multi-operator-periodic
+  interval: 72h
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+    test:
+    - ref: ipi-install-heterogeneous
     - as: test
       cli: latest
       commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
