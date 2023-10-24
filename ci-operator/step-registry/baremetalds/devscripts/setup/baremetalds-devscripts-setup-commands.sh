@@ -367,7 +367,7 @@ if [ -e /root/bm.json ] ; then
     manage_baremetal_instances
 fi
 
-echo 'export KUBECONFIG=$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root/.bashrc
+echo 'export KUBECONFIG=\$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root/.bashrc
 
 # squid needs to be restarted after network changes
 podman restart --time 1 external-squid || true
