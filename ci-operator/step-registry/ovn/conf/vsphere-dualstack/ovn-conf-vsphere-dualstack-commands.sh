@@ -4,6 +4,7 @@ set -o nounset
 set -o pipefail
 
 echo "saving ipv4 vip configuration"
+curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 
 API_VIP=$(/tmp/yq e '.platform.vsphere.apiVIP' "${SHARED_DIR}/install-config.yaml")
 INGRESS_VIP=$(/tmp/yq e '.platform.vsphere.ingressVIP' "${SHARED_DIR}/install-config.yaml")
