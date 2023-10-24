@@ -22,7 +22,9 @@ tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=$CLUSTER_DATA_DIR
 
 RUN_COMMAND="poetry run python openshift_cli_installer/cli.py \
             --ocm-token=$OCM_TOKEN \
-            --s3-bucket-name=$S3_BUCKET_NAME "
+            --s3-bucket-name=$S3_BUCKET_NAME \
+            --clusters-install-data-directory=$CLUSTER_DATA_DIR \
+            --destroy-clusters-from-install-data-directory "
 
 CLUSTER_DATA_FILES=$(find $CLUSTER_DATA_DIR -name $DATA_FILENAME)
 if [ -z "${CLUSTER_DATA_FILES}" ] ; then
@@ -34,8 +36,6 @@ NUM_CLUSTERS=0
 for _ in $CLUSTER_DATA_FILES; do
   NUM_CLUSTERS=$(( NUM_CLUSTERS + 1))
 done
-
-RUN_COMMAND+=" --destroy-clusters-from-install-data-directory $CLUSTER_DATA_DIR "
 
 if [ "${CLUSTERS_RUN_IN_PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
     RUN_COMMAND+=" --parallel"
