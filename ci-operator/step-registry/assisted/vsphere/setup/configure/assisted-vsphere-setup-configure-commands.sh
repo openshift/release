@@ -29,18 +29,19 @@ else
   echo Scheduling job on AWS VMC Cloud instance
 fi
 
+vsphere_cluster="$(cat ${SECRET_DIR}/vsphere_cluster)"
+vsphere_datacenter="$(cat ${SECRET_DIR}/vsphere_datacenter)"
+vsphere_datastore="$(cat ${SECRET_DIR}/vsphere_datastore)"
+vsphere_password="$(cat ${SECRET_DIR}/vsphere_password)"
+vsphere_user="$(cat ${SECRET_DIR}/vsphere_username)"
+vsphere_resource_pool="$(cat ${SECRET_DIR}/vsphere_resource_pool)"
+vsphere_dev_network="$(cat ${SECRET_DIR}/vsphere_dev_network)"
+
 if [[ ${LEASED_RESOURCE} == *"segment"* ]]; then
   # notes: jcallen: to keep backward compatibility with existing vsphere env(s)
   vsphere_portgroup="${LEASED_RESOURCE}"
   vsphere_url="$(cat ${SECRET_DIR}/vsphere_url)"
-  vsphere_cluster="$(cat ${SECRET_DIR}/vsphere_cluster)"
-  vsphere_datacenter="$(cat ${SECRET_DIR}/vsphere_datacenter)"
-  vsphere_datastore="$(cat ${SECRET_DIR}/vsphere_datastore)"
-  vsphere_password="$(cat ${SECRET_DIR}/vsphere_password)"
-  vsphere_user="$(cat ${SECRET_DIR}/vsphere_username)"
-  vsphere_resource_pool="$(cat ${SECRET_DIR}/vsphere_resource_pool)"
   dns_server="$(cat ${SECRET_DIR}/dns_server)"
-  vsphere_dev_network="$(cat ${SECRET_DIR}/vsphere_dev_network)"
 else
   # notes: jcallen: split the LEASED_RESOURCE e.g. bcr01a.dal10.1153
   # into: primary router hostname, datacenter and vlan id
@@ -70,24 +71,24 @@ echo "$(date -u --rfc-3339=seconds) - Creating govc.sh file..."
 cat >>"${SHARED_DIR}/govc.sh" <<EOF
 export GOVMOMI_HOME="${SHARED_DIR}/govc"
 export GOVC_URL="${vsphere_url}"
-export GOVC_USERNAME="${vsphere_user:-unset}"
-export GOVC_PASSWORD='${vsphere_password:-unset}'
+export GOVC_USERNAME="${vsphere_user}"
+export GOVC_PASSWORD='${vsphere_password}'
 export GOVC_INSECURE=1
-export GOVC_DATACENTER="${vsphere_datacenter:-unset}"
-export GOVC_DATASTORE="${vsphere_datastore:-unset}"
-export GOVC_RESOURCE_POOL="${vsphere_resource_pool:-unset}"
+export GOVC_DATACENTER="${vsphere_datacenter}"
+export GOVC_DATASTORE="${vsphere_datastore}"
+export GOVC_RESOURCE_POOL="${vsphere_resource_pool}"
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Creating vsphere_context.sh file..."
 cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
 export vsphere_url="${vsphere_url}"
-export vsphere_cluster="${vsphere_cluster:-unset}"
-export vsphere_resource_pool="${vsphere_resource_pool:-unset}"
+export vsphere_cluster="${vsphere_cluster}"
+export vsphere_resource_pool="${vsphere_resource_pool}"
 export dns_server="${dns_server}"
 export cloud_where_run="${cloud_where_run}"
-export vsphere_dev_network="${vsphere_dev_network:-unset}"
-export vsphere_datacenter="${vsphere_datacenter:-unset}"
-export vsphere_datastore="${vsphere_datastore:-unset}"
+export vsphere_dev_network="${vsphere_dev_network}"
+export vsphere_datacenter="${vsphere_datacenter}"
+export vsphere_datastore="${vsphere_datastore}"
 
 export vsphere_portgroup="${vsphere_portgroup}"
 export vlanid="${vlanid:-unset}"
@@ -124,14 +125,14 @@ export PLATFORM=vsphere
 export VIP_DHCP_ALLOCATION=false
 export VSPHERE_PARENT_FOLDER=assisted-test-infra-ci
 export VSPHERE_FOLDER="build-${BUILD_ID}"
-export VSPHERE_CLUSTER="${vsphere_cluster:-unset}"
-export VSPHERE_USERNAME="${vsphere_user:-unset}"
+export VSPHERE_CLUSTER="${vsphere_cluster}"
+export VSPHERE_USERNAME="${vsphere_user}"
 export VSPHERE_NETWORK="${vsphere_portgroup}"
 
 export VSPHERE_VCENTER="${vsphere_url}"
-export VSPHERE_DATACENTER="${vsphere_datacenter:-unset}"
-export VSPHERE_DATASTORE="${vsphere_datastore:-unset}"
-export VSPHERE_PASSWORD='${vsphere_password:-unset}'
+export VSPHERE_DATACENTER="${vsphere_datacenter}"
+export VSPHERE_DATASTORE="${vsphere_datastore}"
+export VSPHERE_PASSWORD='${vsphere_password}'
 export BASE_DOMAIN="vmc-ci.devcluster.openshift.com"
 export CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 EOF
