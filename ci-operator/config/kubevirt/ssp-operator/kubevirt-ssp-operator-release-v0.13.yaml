@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
 images:
 - dockerfile_path: Dockerfile
   to: ssp-operator-container
@@ -38,12 +38,11 @@ tests:
           memory: 200Mi
 - as: e2e-functests
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-virtualization
     test:
     - as: e2e-functests
       cli: latest
       commands: |
-        ./automation/e2e-functests/setup.sh
         export GOFLAGS=
         ./automation/e2e-functests/run.sh
       dependencies:
@@ -62,12 +61,11 @@ tests:
     workflow: ipi-gcp
 - as: e2e-upgrade-functests
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-virtualization
     test:
     - as: e2e-upgrade-functests
       cli: latest
       commands: |
-        ./automation/e2e-upgrade-functests/setup.sh
         export GOFLAGS=
         ./automation/e2e-upgrade-functests/run.sh
       dependencies:
@@ -86,13 +84,12 @@ tests:
     workflow: ipi-gcp
 - as: e2e-single-node-functests
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-virtualization
     test:
     - as: e2e-single-node-functests
       cli: latest
       commands: |
         export TOPOLOGY_MODE=SingleReplica
-        ./automation/e2e-functests/setup.sh
         export GOFLAGS=
         ./automation/e2e-functests/run.sh
       dependencies:
