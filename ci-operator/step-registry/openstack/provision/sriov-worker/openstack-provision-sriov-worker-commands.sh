@@ -131,3 +131,5 @@ fi
 
 echo "${WORKER_NODE}" > "${SHARED_DIR}/sriov-worker-node"
 echo "SR-IOV worker node is ready!"
+
+sleep 5000
