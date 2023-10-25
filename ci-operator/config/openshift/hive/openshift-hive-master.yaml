@@ -7,7 +7,7 @@ base_images:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.20-openshift-4.14
-binary_build_commands: make build
+binary_build_commands: GO_COMPLIANCE_INFO=0 make build
 build_root:
   project_image:
     dockerfile_path: build/build-image/Dockerfile
@@ -44,19 +44,19 @@ resources:
       memory: 4Gi
 tests:
 - as: unit
-  commands: make test
+  commands: GO_COMPLIANCE_INFO=0 make test
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: verify
-  commands: make verify
+  commands: GO_COMPLIANCE_INFO=0 make verify
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
-    make coverage
+    GO_COMPLIANCE_INFO=0 make coverage
   container:
     from: src
   run_if_changed: \.go$
@@ -66,7 +66,7 @@ tests:
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
-    make coverage
+    GO_COMPLIANCE_INFO=0 make coverage
   container:
     from: src
   postsubmit: true
@@ -105,7 +105,7 @@ tests:
         # We'll exceed the 21c cluster name cutoff at PR 1Mi or some
         # time in July of 4147, whichever comes first.
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
-        CLOUD=aws make test-e2e
+        GO_COMPLIANCE_INFO=0 CLOUD=aws make test-e2e
       credentials:
       - mount_path: /tmp/secret/hiveci-aws-creds
         name: hiveci-aws-creds
@@ -152,7 +152,7 @@ tests:
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
         # Disable managed DNS (on by default, and left on for the e2e test)
         export USE_MANAGED_DNS=false
-        CLOUD=aws make test-e2e-pool
+        GO_COMPLIANCE_INFO=0 CLOUD=aws make test-e2e-pool
       credentials:
       - mount_path: /tmp/secret/hiveci-aws-creds
         name: hiveci-aws-creds
@@ -178,7 +178,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: CLOUD=gcp make test-e2e
+      commands: GO_COMPLIANCE_INFO=0 CLOUD=gcp make test-e2e
       dependencies:
       - env: HIVE_IMAGE
         name: hive
@@ -196,7 +196,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: CLOUD=azure make test-e2e
+      commands: GO_COMPLIANCE_INFO=0 CLOUD=azure make test-e2e
       dependencies:
       - env: HIVE_IMAGE
         name: hive
