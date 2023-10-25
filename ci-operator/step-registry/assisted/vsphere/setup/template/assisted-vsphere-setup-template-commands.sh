@@ -9,7 +9,7 @@ echo "************ vsphere assisted test-infra setup template command **********
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 echo "Data center is ${GOVC_DATACENTER}"
-if govc "object.collect /${GOVC_DATACENTER}/vm/assisted-test-infra-ci/assisted-test-infra-machine-template"; then
+if govc object.collect "/${GOVC_DATACENTER}/vm/assisted-test-infra-ci/assisted-test-infra-machine-template"; then
     printf 'Assisted service ci template already exist - skipping \n'
     exit 0
 fi
