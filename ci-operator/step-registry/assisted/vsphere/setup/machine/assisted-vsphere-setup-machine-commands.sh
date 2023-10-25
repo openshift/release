@@ -37,8 +37,9 @@ template_name = "assisted-test-infra-machine-template"
 build_id = "${BUILD_ID}"
 EOF
 
-terraform init -input=false
-terraform apply -var-file=vsphere-params.hcl -input=false -auto-approve
+export TF_LOG=DEBUG
+terraform init -input=false -no-color
+terraform apply -var-file=vsphere-params.hcl -input=false -auto-approve -no-color
 IP=$(terraform output ip_address)
 
 cd ..
