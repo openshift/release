@@ -21,11 +21,6 @@ if [[ ! -f "${bastion_ignition_file}" ]]; then
 fi
 bastion_ignition_base64=$(base64 -w0 <"${bastion_ignition_file}")
 
-if [[ -z "${vsphere_connected_portgroup}" ]]; then
-  echo "Not defined vsphere_connected_portgroup, bastion host will be provisioned in network defined as LEASED_RESOURCE..."
-  vsphere_connected_portgroup=${vsphere_portgroup}
-fi
-
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
