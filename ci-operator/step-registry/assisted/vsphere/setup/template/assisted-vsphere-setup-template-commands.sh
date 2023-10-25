@@ -6,24 +6,21 @@ set -o pipefail
 
 echo "************ vsphere assisted test-infra setup template command ************"
 
-# ensure LEASED_RESOURCE is set
-if [[ -z "${LEASED_RESOURCE}" ]]; then
-  echo "Failed to acquire lease"
-  exit 1
-fi
-
-source ${SHARED_DIR}/govc.sh
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc.sh"
 echo "Data center is ${GOVC_DATACENTER}"
-if govc object.collect /${GOVC_DATACENTER}/vm/assisted-test-infra-ci/assisted-test-infra-machine-template; then
+if govc "object.collect /${GOVC_DATACENTER}/vm/assisted-test-infra-ci/assisted-test-infra-machine-template"; then
     printf 'Assisted service ci template already exist - skipping \n'
     exit 0
 fi
 
 printf 'Assisted service ci template does not exist - creating using packer\n'
 
-export vsphere_cluster=""
-export vsphere_dev_network=""
-source $SHARED_DIR/vsphere_context.sh
+declare vsphere_cluster
+declare vsphere_portgroup
+
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/vsphere_context.sh"
 SSH_PUBLIC_KEY="$(cat /var/run/vault/sshkeys/public_key)"
 
 mkdir -p build/packer
@@ -38,7 +35,7 @@ vsphere_password = "${GOVC_PASSWORD}"
 vsphere_datacenter = "${GOVC_DATACENTER}"
 vsphere_datastore = "${GOVC_DATASTORE}"
 vsphere_cluster = "${vsphere_cluster}"
-vsphere_network = "${vsphere_dev_network}"
+vsphere_network = "${vsphere_portgroup}"
 vsphere_folder = "assisted-test-infra-ci"
 vm_name = "assisted-test-infra-machine-template"
 ssh_public_key = "${SSH_PUBLIC_KEY}"
