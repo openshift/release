@@ -19,12 +19,18 @@ snyk_deps() {
     if [ "$ALL_PROJECTS" = "true" ]; then
         PARAMS+=(--all-projects)
     fi
+    if [ "$SNYK_DEPS_ADDITIONAL_ARGS" ]; then
+        read -a PARAMS <<<"$SNYK_DEPS_ADDITIONAL_ARGS"
+    fi
     ${SNYK_DIR}/snyk test "${PARAMS[@]}"
 }
 
 snyk_code() {
     echo Starting snyk code scan
     PARAMS=(--project-name="$PROJECT_NAME" --org="$ORG_NAME"  --sarif-file-output="${ARTIFACT_DIR}/snyk.sarif.json" --report)
+    if [ "$SNYK_CODE_ADDITIONAL_ARGS" ]; then
+        read -a PARAMS <<<"$SNYK_CODE_ADDITIONAL_ARGS"
+    fi
     ${SNYK_DIR}/snyk code test "${PARAMS[@]}"
     local rc=$?
     echo Full vulnerabilities report is available at ${ARTIFACT_DIR}/snyk.sarif.json

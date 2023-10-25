@@ -1,27 +1,27 @@
-presubmits:
-  package-operator/package-operator:
+postsubmits:
+  openshift/check-payload:
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
-    - ^main-
-    cluster: build05
-    context: ci/prow/unit
+    cluster: build03
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-package-operator-package-operator-main-unit
-    rerun_command: /test unit
+    max_concurrency: 1
+    name: branch-ci-openshift-check-payload-main-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit
+        - --target=[images]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -40,6 +40,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -51,7 +54,9 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
