@@ -97,7 +97,7 @@ if [[ -n "${VSPHERE_CONNECTED_LEASED_RESOURCE:-}" ]]; then
   vlanid_2=$(awk -F. '{print $3}' <(echo "${VSPHERE_CONNECTED_LEASED_RESOURCE}"))
   vsphere_connected_portgroup="ci-vlan-${vlanid_2}"
   cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
-  export vsphere_connected_portgroup="${vsphere_connected_portgroup}"
+export vsphere_connected_portgroup="${vsphere_connected_portgroup}"
 EOF
 fi
 
