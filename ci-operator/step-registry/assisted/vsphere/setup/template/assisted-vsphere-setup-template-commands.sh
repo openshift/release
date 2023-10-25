@@ -40,9 +40,11 @@ vsphere_folder = "assisted-test-infra-ci"
 vm_name = "assisted-test-infra-machine-template"
 ssh_public_key = "${SSH_PUBLIC_KEY}"
 ssh_private_key_file = "/var/run/vault/sshkeys/private_key"
+iso_url = "http://rep-centos-il.upress.io/8-stream/isos/x86_64/CentOS-Stream-8-20231023.2-x86_64-boot.iso"
+iso_checksum = "7d1967869643a66c83cedd5580cb45c0810ca9f6f47a8e36a8efbcf4824219a8"
 EOF
 
-export PACKER_CONFIG_DIR=/home/assisted-test-infra/build/packer/config
-export PACKER_CACHE_DIR=$PACKER_CONFIG_DIR/cache
+export PACKER_CONFIG_DIR="/home/assisted-test-infra/build/packer/config"
+export PACKER_CACHE_DIR="${PACKER_CONFIG_DIR}/cache"
 packer.io init .
 packer.io build -on-error=cleanup -var-file=vsphere-params.hcl .
