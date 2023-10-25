@@ -22,7 +22,7 @@ spec:
       storage: 10Gi
 EOF
   oc create -f "${SHARED_DIR}/registry-pvc.yaml" -n openshift-image-registry &&
-  oc patch config.imageregistry.operator.openshift.io/cluster --type=merge -p '{"spec":{"managementState":"Managed","rolloutStrategy":"Recreate","replicas":1,"storage":{"managementState":"Managed","pvc":{"claim":"registry-pvc"}}}}'
+  oc patch config.imageregistry.operator.openshift.io/cluster --type=merge -p '{"spec":{"managementState":"Managed","rolloutStrategy":"Recreate","replicas":2,"storage":{"managementState":"Managed","pvc":{"claim":"registry-pvc"}}}}'
 else
   echo "$(date -u --rfc-3339=seconds) - Configuring image registry with emptyDir..."
   oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
