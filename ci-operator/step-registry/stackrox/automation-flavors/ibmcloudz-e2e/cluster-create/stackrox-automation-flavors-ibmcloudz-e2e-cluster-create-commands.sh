@@ -22,5 +22,5 @@ KUBECONFIG_FILE="${SHARED_DIR}/kubeconfig"
 # The ocpmanager script creates/deletes OCP clusters on IBM Z via IBM Cloud [https://github.ibm.com/Ganesh-Bhure2/stackrox-ci]
 # The script runs on an intermediate node [IP 163.74.90.40] on IBM Cloud
 SSH_CMD="/root/ocpmanager create"
-ssh $SSH_ARGS root@163.74.90.40 "export BUILD_ID=$BUILD_ID && $SSH_CMD" > $KUBECONFIG_FILE
+ssh $SSH_ARGS root@163.74.90.40 "export BUILD_ID=$BUILD_ID && export IBM_CLOUD_OPENSHIFT_CHANNEL=$IBM_CLOUD_OPENSHIFT_CHANNEL && $SSH_CMD" > $KUBECONFIG_FILE
 KUBECONFIG="$KUBECONFIG_FILE" ./kubectl get nodes
