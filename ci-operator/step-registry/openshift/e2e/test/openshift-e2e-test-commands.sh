@@ -131,6 +131,7 @@ azure4|azure-arm64) export TEST_PROVIDER=azure;;
 azurestack)
     export TEST_PROVIDER="none"
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
+    export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
     ;;
 vsphere)
     # shellcheck disable=SC1090
