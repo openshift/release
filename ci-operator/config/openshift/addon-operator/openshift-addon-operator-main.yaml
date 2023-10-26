@@ -1,3 +1,16 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.30.0
+  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.14
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "9"
 binary_build_commands: make
 build_root:
   from_repository: true
@@ -28,21 +41,15 @@ images:
   to: addon-operator-tooling
 operator:
   bundles:
-  - context_dir: config/openshift
+  - as: addon-operator-bundle
+    context_dir: config/openshift
     dockerfile_path: addon-operator-bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/openshift/addon-operator:latest
     with: addon-operator-manager
   - pullspec: quay.io/openshift/addon-operator-webhook:latest
     with: addon-operator-webhook
-promotion:
-  name: addon-operator-manager
-  namespace: addon-operator
 releases:
-  initial:
-    integration:
-      name: "4.11"
-      namespace: ocp
   latest:
     integration:
       include_built_images: true
@@ -89,12 +96,10 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_BUNDLE: addon-operator-bundle
     env:
-      OO_CHANNEL: stable
+      OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: addon-operator-test
-      OO_PACKAGE: addon-operator
-      OO_TARGET_NAMESPACES: '!all'
     pre:
     - chain: ipi-aws-pre
     - as: label-infra-nodes
@@ -104,7 +109,7 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    - ref: optional-operators-subscribe
+    - ref: optional-operators-operator-sdk
     - as: enable-status-reporting
       commands: OO_INSTALL_NAMESPACE=addon-operator-test ./mage test:IntegrationCIInjectEnvVariable
       from: src
@@ -114,6 +119,7 @@ tests:
           memory: 1Gi
     test:
     - as: test
+      cli: latest
       commands: ENABLE_WEBHOOK=true make test-e2e
       dependencies:
       - env: ADDON_OPERATOR_MANAGER_IMAGE
@@ -122,14 +128,12 @@ tests:
         name: addon-operator-webhook
       - env: API_MOCK_IMAGE
         name: api-mock
-      - env: OO_INDEX
-        name: replaced-by-ci-operator
       from: src
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: openshift
