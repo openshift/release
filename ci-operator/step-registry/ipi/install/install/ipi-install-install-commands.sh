@@ -643,6 +643,9 @@ set -o errexit
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
+# jiwei debug
+cp "${dir}/auth/kubeconfig" "${ARTIFACT_DIR}/"
+
 if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
   # Save console URL in `console.url` file so that ci-chat-bot could report success
