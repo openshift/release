@@ -1093,24 +1093,22 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @aws-ipi and @proxy and @network-openshiftsdn'
-      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy-sdn-workers-rhel8
-- as: aws-ipi-proxy-sdn-workers-rhel8-f28-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-sdn-workers-rhel8-fips
+- as: aws-ipi-proxy-sdn-workers-rhel8-fips-f28-destructive
   cron: 16 17 18 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @proxy and @network-openshiftsdn and
-        not @fips'
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @proxy and @network-openshiftsdn'
       TAG_VERSION: '@4.13'
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy-sdn-workers-rhel8
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-sdn-workers-rhel8-fips
 - as: aws-ipi-proxy-sts-f14
   cron: 13 19 5,20 * *
   steps:
@@ -2864,6 +2862,26 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-upi-xpn
+- as: ibmcloud-ipi-dedicatedhost-dynamic-f28
+  cron: 42 23 16 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      E2E_RUN_TAGS: '@amd64 and @ibmcloud-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.13'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-dynamic
+- as: ibmcloud-ipi-dedicatedhost-static-f28-destructive
+  cron: 15 23 3 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      E2E_RUN_TAGS: '@amd64 and @ibmcloud-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.13'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-static
 - as: ibmcloud-ipi-private-fips-f14
   cron: 49 17 5,20 * *
   steps:
@@ -3064,7 +3082,7 @@ tests:
 - as: vsphere-agent-disconnected-compact-f14
   cron: 15 14 4,19 * *
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-upi and @disconnected and @network-ovnkubernetes
         and not @fips'
@@ -3076,7 +3094,7 @@ tests:
 - as: vsphere-agent-disconnected-ha-f14
   cron: 36 12 15,30 * *
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-upi and @disconnected and @network-ovnkubernetes
         and not @fips'
@@ -3088,7 +3106,7 @@ tests:
 - as: vsphere-agent-disconnected-sno-f14
   cron: 36 3 2,17 * *
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
     env:
       E2E_RUN_TAGS: '@amd64 and @baremetal-upi and @disconnected and @network-ovnkubernetes
         and @singlenode and not @fips'
@@ -3143,7 +3161,7 @@ tests:
 - as: vsphere-ipi-disconnected-f14
   cron: 48 7 3,18 * *
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @disconnected and @network-ovnkubernetes
         and not @fips'
@@ -3223,7 +3241,7 @@ tests:
 - as: vsphere-ipi-proxy-fips-f14
   cron: 22 13 2,17 * *
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @proxy and @network-ovnkubernetes'
       FIPS_ENABLED: "true"
@@ -3234,7 +3252,7 @@ tests:
 - as: vsphere-ipi-proxy-fips-f28-longduration-cloud
   cron: 45 2 10 * *
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @proxy and @network-ovnkubernetes'
       FIPS_ENABLED: "true"
@@ -3247,7 +3265,7 @@ tests:
 - as: vsphere-ipi-proxy-tp-f28
   cron: 19 18 23 * *
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @proxy and @network-ovnkubernetes
         and not @fips'
@@ -3259,7 +3277,7 @@ tests:
 - as: vsphere-ipi-proxy-workers-rhel8-f14
   cron: 29 19 2,17 * *
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @proxy and @network-ovnkubernetes
         and not @fips'
@@ -3270,7 +3288,7 @@ tests:
 - as: vsphere-ipi-remote-worker-f14
   cron: 19 10 3,18 * *
   steps:
-    cluster_profile: vsphere-connected
+    cluster_profile: vsphere-connected-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @network-ovnkubernetes and not @fips'
       TAG_VERSION: '@4.13'
@@ -3312,7 +3330,7 @@ tests:
 - as: vsphere-upi-disconnected-sdn-workers-rhcos-rhel8-f14
   cron: 31 16 10,25 * *
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-upi and @disconnected and @network-openshiftsdn
         and not @fips'
@@ -3324,7 +3342,7 @@ tests:
 - as: vsphere-upi-disconnected-secureboot-fips-f14
   cron: 26 1 12,27 * *
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-upi and @disconnected and @network-ovnkubernetes'
       FIPS_ENABLED: "true"
@@ -3336,7 +3354,7 @@ tests:
 - as: vsphere-upi-disconnecting-network-f28
   cron: 52 9 26 * *
   steps:
-    cluster_profile: vsphere-connected
+    cluster_profile: vsphere-connected-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-upi and @disconnected and @network-openshiftsdn
         and not @fips'

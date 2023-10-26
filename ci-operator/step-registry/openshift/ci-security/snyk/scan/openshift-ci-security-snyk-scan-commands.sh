@@ -13,11 +13,20 @@ chmod +x ${SNYK_DIR}/snyk
 echo snyk installed to ${SNYK_DIR}
 ${SNYK_DIR}/snyk --version
 
+CLONE_REFS=$(echo $CLONEREFS_OPTIONS | jq -r ".refs | map(select(.base_ref == \"$(git rev-parse --abbrev-ref HEAD)\")) | if length > 1 then del(.[] | select(.repo == \"release\" and .org == \"openshift\")) else . end | .[]")
+
+if [ -z "${PROJECT_NAME}" ]; then
+    PROJECT_NAME=$(echo $CLONE_REFS | jq -r "( .org + \"/\" + .repo )")
+fi
+
 snyk_deps() {
     echo Starting snyk dependencies scan
     PARAMS=(--project-name="$PROJECT_NAME" --org="$ORG_NAME")
     if [ "$ALL_PROJECTS" = "true" ]; then
         PARAMS+=(--all-projects)
+    fi
+    if [ "$SNYK_DEPS_ADDITIONAL_ARGS" ]; then
+        read -a PARAMS <<<"$SNYK_DEPS_ADDITIONAL_ARGS"
     fi
     ${SNYK_DIR}/snyk test "${PARAMS[@]}"
 }
@@ -25,6 +34,9 @@ snyk_deps() {
 snyk_code() {
     echo Starting snyk code scan
     PARAMS=(--project-name="$PROJECT_NAME" --org="$ORG_NAME"  --sarif-file-output="${ARTIFACT_DIR}/snyk.sarif.json" --report)
+    if [ "$SNYK_CODE_ADDITIONAL_ARGS" ]; then
+        read -a PARAMS <<<"$SNYK_CODE_ADDITIONAL_ARGS"
+    fi
     ${SNYK_DIR}/snyk code test "${PARAMS[@]}"
     local rc=$?
     echo Full vulnerabilities report is available at ${ARTIFACT_DIR}/snyk.sarif.json
