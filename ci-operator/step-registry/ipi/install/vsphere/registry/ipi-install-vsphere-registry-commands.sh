@@ -16,7 +16,7 @@ metadata:
   name: registry-pvc
 spec:
   accessModes:
-  - ReadWriteOnce
+  - ReadWriteMany
   resources:
     requests:
       storage: 10Gi
