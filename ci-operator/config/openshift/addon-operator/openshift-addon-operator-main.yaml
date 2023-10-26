@@ -6,11 +6,7 @@ base_images:
   ocp_builder_rhel-9-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.14
-  ubi:
-    name: ubi
-    namespace: ocp
-    tag: "9"
+    tag: rhel-8-golang-1.20-openshift-4.14
 binary_build_commands: make
 build_root:
   from_repository: true
@@ -92,9 +88,16 @@ tests:
   container:
     from: addon-operator-tooling
 - as: operator-e2e
+  cluster_claim:
+    architecture: amd64
+    as: latest
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.11"
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws
     dependencies:
       OO_BUNDLE: addon-operator-bundle
     env:
