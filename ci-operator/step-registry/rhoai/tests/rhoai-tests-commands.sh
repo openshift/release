@@ -25,5 +25,5 @@ export CLUSTER_ID
 
 mkdir "$ARTIFACT_DIR/results"
 
-# running RHODS testsuite
+# running RHOAI testsuite
 ./ods_ci/build/run.sh
