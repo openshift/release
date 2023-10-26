@@ -4,18 +4,28 @@ set -euox pipefail
 echo "Set KUBECONFIG to Hive cluster"
 export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
 
-AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-if [[ ! -f "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" ]]; then
-  echo "AWS credentials file ${AWS_GUEST_INFRA_CREDENTIALS_FILE} not found"
+DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
+if [[ "${PLATFORM}" == "aws" ]]; then
+  AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+  if [[ ! -f "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" ]]; then
+    echo "AWS credentials file ${AWS_GUEST_INFRA_CREDENTIALS_FILE} not found"
+    exit 1
+  fi
+  if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
+    AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+    DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
+  fi
+elif [[ "${PLATFORM}" == "powervs" ]]; then
+  export IBMCLOUD_CREDENTIALS="${CLUSTER_PROFILE_DIR}/.powervscred"
+  if [[ ! -f "${IBMCLOUD_CREDENTIALS}" ]]; then
+      echo "PowerVS credentials file ${IBMCLOUD_CREDENTIALS} not found"
+      exit 1
+  fi
+else
+  echo "Unsupported platform. Cluster deletion failed."
   exit 1
 fi
 
-DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
-
-if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
-  AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-  DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
-fi
 DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
 
 HOSTED_CLUSTER_FILE="$SHARED_DIR/hosted_cluster.txt"
@@ -32,7 +42,7 @@ else
 fi
 
 createdAt=`oc -n clusters get hostedclusters $CLUSTER_NAME -o jsonpath='{.metadata.annotations.created-at}'`
-if [ -z $createdAt ]; then
+if [ -z $createdAt ] && [ "${PLATFORM}" == "aws" ]; then
   echo Cluster is broken, skipping...
   oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "broken=true"
   exit 0
@@ -40,19 +50,60 @@ fi
 echo Cluster successfully created at $createdAt
 
 echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
-
-for _ in {1..10}; do
-  bin/hypershift destroy cluster aws \
-    --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
-    --name ${CLUSTER_NAME} \
-    --infra-id ${INFRA_ID} \
-    --region ${HYPERSHIFT_AWS_REGION} \
-    --base-domain ${DOMAIN} \
-    --cluster-grace-period 40m
-  if [ $? == 0 ]; then
-    break
-  else
-    echo 'Failed to delete the cluster, retrying...'
+if [[ "${PLATFORM}" == "aws" ]]; then
+  for _ in {1..10}; do
+   bin/hypershift destroy cluster aws \
+     --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
+     --name ${CLUSTER_NAME} \
+     --infra-id ${INFRA_ID} \
+     --region ${HYPERSHIFT_AWS_REGION} \
+     --base-domain ${DOMAIN} \
+     --cluster-grace-period 40m
+   if [ $? == 0 ]; then
+     break
+   else
+     echo 'Failed to delete the cluster, retrying...'
+   fi
+  done
+elif [[ "${PLATFORM}" == "powervs" ]]; then
+  if [[ -z "${POWERVS_GUID}" ]]; then
+    POWERVS_GUID=$(jq -r '.cloudInstanceID' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
   fi
-done
+  if [[ -z "${POWERVS_VPC}" ]]; then
+    POWERVS_VPC=$(jq -r '.vpc' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+  fi
+  if [[ -z "${POWERVS_CLOUD_CONNECTION}" ]]; then
+    POWERVS_CLOUD_CONNECTION=$(jq -r '.cloudConnection' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+  fi
+  if [[ -z "${POWERVS_REGION}" ]]; then
+    POWERVS_REGION=$(jq -r '.region' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+  fi
+  if [[ -z "${POWERVS_ZONE}" ]]; then
+    POWERVS_ZONE=$(jq -r '.zone' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+  fi
+  if [[ -z "${POWERVS_VPC_REGION}" ]]; then
+    POWERVS_VPC_REGION=$(jq -r '.vpc-region' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+  fi
+  for _ in {1..10}; do
+   bin/hypershift destroy cluster powervs \
+     --name ${CLUSTER_NAME} \
+     --infra-id ${INFRA_ID} \
+     --region ${POWERVS_REGION} \
+     --zone ${POWERVS_ZONE} \
+     --vpc-region ${POWERVS_VPC_REGION} \
+     --resource-group ${POWERVS_RESOURCE_GROUP} \
+     --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
+     --cloud-instance-id ${POWERVS_GUID} \
+     --vpc ${POWERVS_VPC} \
+     --cloud-connection ${POWERVS_CLOUD_CONNECTION}
+   if [ $? == 0 ]; then
+      break
+   else
+      echo 'Failed to delete the cluster, retrying...'
+   fi
+  done
+else
+  echo "Unsupported platform. Cluster deletion failed."
+  exit 1
+fi
 echo "$(date) Finished deleting cluster"

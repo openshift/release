@@ -12,7 +12,7 @@ suffix_endpoint=$(cat "${SHARED_DIR}/SUFFIX_ENDPOINT")
 chmod +x "${SHARED_DIR}/azurestack-login-script.sh"
 source ${SHARED_DIR}/azurestack-login-script.sh
 
-# Hard-coded storage account info for PPE3 environment.
+# Hard-coded storage account info for WWT environment.
 # The resource group, storage account, & container are expected to exist.
 resource_group=${RHCOS_VHD_RESOURCE_GROUP}
 storage_account=${RHCOS_VHD_STORAGE_ACCOUNT}

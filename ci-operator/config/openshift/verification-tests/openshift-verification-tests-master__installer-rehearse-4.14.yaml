@@ -43,12 +43,12 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      SLEEP_DURATION: 2h
+      SLEEP_DURATION: 4h
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-aws-ipi-provision
+    - chain: cucushift-installer-rehearse-aws-ipi-proxy-sdn-workers-rhel8-fips-provision
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
@@ -83,13 +83,19 @@ tests:
   cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe
-    env:
-      RT_ENABLED: "true"
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-static
+- as: installer-rehearse-ibmcloud-dynamic
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-dynamic
 - as: installer-rehearse-vsphere-dis
   cron: '@yearly'
   steps:
     cluster_profile: vsphere-dis-2
+    leases:
+    - env: VSPHERE_CONNECTED_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnected
 - as: installer-rehearse-vsphere-ipi-template
   cron: '@yearly'

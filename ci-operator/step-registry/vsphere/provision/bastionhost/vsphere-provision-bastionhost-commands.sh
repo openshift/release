@@ -7,6 +7,8 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 declare vsphere_portgroup
+declare vsphere_connected_portgroup
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 
 echo "$(date -u --rfc-3339=seconds) vsphere_portgroup: ${vsphere_portgroup}"
@@ -39,7 +41,7 @@ if [[ "$(govc vm.info ${vm_template} | wc -c)" -eq 0 ]]; then
    "InjectOvfEnv": false,
    "WaitForIP": false,
    "Name": "${vm_template}-bastion",
-   "NetworkMapping":[{"Name":"VM Network","Network":"${vsphere_portgroup}"}]
+   "NetworkMapping":[{"Name":"VM Network","Network":"${vsphere_connected_portgroup}"}]
 }
 EOF
 
@@ -55,7 +57,7 @@ echo "ova template: ${vm_template}"
 #Create bastion host virtual machine
 echo "$(date -u --rfc-3339=seconds) - Creating bastion host..."
 vm_folder="/${GOVC_DATACENTER}/vm"
-govc vm.clone -vm ${vm_folder}/${vm_template} -on=false -net=${vsphere_portgroup} ${bastion_name}
+govc vm.clone -vm ${vm_folder}/${vm_template} -on=false -net=${vsphere_connected_portgroup} ${bastion_name}
 #govc vm.customize -vm ${vm_folder}/${bastion_name} -name=${bastion_name} -ip=dhcp
 govc vm.change -vm ${vm_folder}/vm/${bastion_name} -c "4" -m "8192" -e disk.enableUUID=TRUE
 disk_name=$(govc device.info -json -vm ${vm_folder}/${bastion_name} | jq -r '.Devices[]|select(.Type == "VirtualDisk")|.Name')
