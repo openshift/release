@@ -46,19 +46,22 @@ resources:
       memory: 200Mi
 tests:
 - as: kepler-operator-e2e
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.13"
   steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
+      architecture: amd64
     test:
     - as: install
       cli: latest
       commands: |
+        # echo "${OO_BUNDLE}"
+        # echo "Sleeping for 2hrs" && sleep 7200
         operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-operators \
+        --timeout=300s deployment kepler-operator-controller-manager
+        oc logs -n openshift-operators \
+        deployment/kepler-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: kepler-bundle
@@ -68,7 +71,7 @@ tests:
           cpu: 100m
           memory: 400Mi
     - ref: openshift-power-monitoring-tests-kepler
-    workflow: generic-claim
+    workflow: baremetal-lab-upi
 zz_generated_metadata:
   branch: v1alpha1
   org: openshift-power-monitoring

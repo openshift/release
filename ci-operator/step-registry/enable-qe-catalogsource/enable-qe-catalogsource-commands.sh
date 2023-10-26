@@ -227,11 +227,15 @@ set_proxy
 run_command "oc whoami"
 run_command "oc version -o yaml"
 check_olm_capability
+echo "Before Sleeping for 30m"
+sleep 1800
 update_global_auth
-sleep 5
+echo "Sleeping for 30m"
+sleep 1800
 create_icsp_connected
 check_marketplace
 create_catalog_sources
-
+echo "After Sleeping for 30m"
+sleep 1800
 #support hypershift config guest cluster's icsp
 oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_iscp.yaml && yq-go r /tmp/mgmt_iscp.yaml 'items[*].spec.repositoryDigestMirrors' -  | sed  '/---*/d' > ${SHARED_DIR}/mgmt_iscp.yaml
