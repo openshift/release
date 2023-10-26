@@ -13,6 +13,16 @@ chmod +x ${SNYK_DIR}/snyk
 echo snyk installed to ${SNYK_DIR}
 ${SNYK_DIR}/snyk --version
 
+# install jq if not installed
+if ! [ -x "$(command -v jq)" ]; then
+    JQ_DIR=/tmp/jq
+    mkdir -p ${JQ_DIR}
+
+    curl -Lo ${JQ_DIR}/jq "https://github.com/jqlang/jq/releases/download/jq-1.7/jq-linux-amd64"
+    chmod +x ${JQ_DIR}/jq
+    export PATH=${PATH}:${JQ_DIR}
+fi
+
 CLONE_REFS=$(echo $CLONEREFS_OPTIONS | jq -r ".refs | map(select(.base_ref == \"$(git rev-parse --abbrev-ref HEAD)\")) | if length > 1 then del(.[] | select(.repo == \"release\" and .org == \"openshift\")) else . end | .[]")
 
 if [ -z "${PROJECT_NAME}" ]; then
