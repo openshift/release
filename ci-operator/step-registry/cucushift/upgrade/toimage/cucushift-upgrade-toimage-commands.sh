@@ -503,7 +503,6 @@ function admin_ack() {
         then
             echo "Admin ack patch data is: ${ack}"
             oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
-            break
         fi
     done
     echo "Admin-acks patch gets started"
