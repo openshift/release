@@ -22,6 +22,8 @@ source "${SHARED_DIR}/vsphere_context.sh"
 declare vlanid
 declare primaryrouterhostname
 
+machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
+
 if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
   echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
   exit 1
@@ -40,7 +42,7 @@ cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
 networking:
   networkType: OVNKubernetes
   machineNetwork:
-  - cidr: 192.168.0.0/16
+  - cidr: ${machine_cidr}
   - cidr: ${machine_cidr_ipv6}
   clusterNetwork:
   - cidr: 10.128.0.0/14
