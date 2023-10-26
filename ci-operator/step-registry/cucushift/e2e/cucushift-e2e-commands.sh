@@ -32,8 +32,9 @@ source "${SHARED_DIR}/runtime_env"
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
-
-export E2E_RUN_TAGS="${E2E_RUN_TAGS} and ${TAG_VERSION}"
+if [[ -n "$TAG_VERSION" ]] ; then
+    export E2E_RUN_TAGS="${E2E_RUN_TAGS} and ${TAG_VERSION}"
+fi
 for tag in ${FORCE_SKIP_TAGS} ; do
     if ! [[ "${E2E_SKIP_TAGS}" =~ $tag ]] ; then
         export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not $tag"
@@ -44,7 +45,7 @@ echo "E2E_SKIP_TAGS is '${E2E_SKIP_TAGS}'"
 
 cd verification-tests
 # run normal tests
-export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel/normal"
+export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-normal"
 timestamp_start="$(date +%s)"
 parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
     'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
@@ -53,7 +54,7 @@ parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
 show_time_used "$timestamp_start" 'normal'
 
 # run admin tests
-export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel/admin"
+export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-admin"
 timestamp_start="$(date +%s)"
 parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
     'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));

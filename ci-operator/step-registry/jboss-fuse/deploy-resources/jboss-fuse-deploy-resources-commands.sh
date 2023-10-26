@@ -240,6 +240,7 @@ metadata:
   namespace: ${1}
   labels:
     application: xpaas-qe
+    deploymentConfig: nginx
 spec:
   strategy:
     type: Recreate

@@ -34,6 +34,13 @@ images:
 
     ENV PRE_COMMIT_HOME=/.cache/precommit
     ENV GOLANGCI_LINT_CACHE=/.cache/golangci
+
+    # Snyk
+    ENV SNYK_DIR=/tmp/snyk
+    RUN mkdir -p ${SNYK_DIR}
+    RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
+    RUN chmod +x ${SNYK_DIR}/snyk
+    ENV PATH=$PATH:${SNYK_DIR}
   from: ubi_minimal
   inputs:
     root:
@@ -95,6 +102,26 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvm-operator-codecov-token
+- as: snyk-code
+  commands: |
+    SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-code
+  container:
+    clone: true
+    from: lvms-pre-commit
+  optional: true
+  secret:
+    mount_path: /tmp/secret
+    name: lvms-snyk-token
+- as: snyk-deps
+  commands: |
+    SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-deps
+  container:
+    clone: true
+    from: lvms-pre-commit
+  optional: true
+  secret:
+    mount_path: /tmp/secret
+    name: lvms-snyk-token
 - as: lvm-operator-e2e-aws-sno
   steps:
     cluster_profile: aws

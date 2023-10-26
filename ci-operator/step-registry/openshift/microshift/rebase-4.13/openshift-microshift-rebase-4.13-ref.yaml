@@ -1,0 +1,27 @@
+ref:
+  as: openshift-microshift-rebase-4.13
+  from: rebase-payload
+  cli: latest
+  grace_period: 30m
+  commands: openshift-microshift-rebase-4.13-commands.sh
+  env:
+  - name: DRY_RUN
+    default: ""
+  dependencies:
+  - name: "release:nightly-amd64"
+    env: "OPENSHIFT_RELEASE_IMAGE"
+  - name: "release:nightly-arm64"
+    env: "OPENSHIFT_RELEASE_IMAGE_ARM"
+  resources:
+    requests:
+      cpu: 800m
+      memory: 1800Mi
+  credentials:
+    - name: pull-secret
+      namespace: test-credentials
+      mount_path: /secrets/ci-pull-secret
+    - name: pr-creds
+      namespace: test-credentials
+      mount_path: /secrets/pr-creds
+  documentation: |-
+    This step rebases MicroShift to release:nightly-amd64 and release:nightly-arm64, respectively. Requires a pull-secret for the app.ci registry and credentials to push a branch and create a PR on MicroShift repository.
