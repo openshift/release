@@ -1,12 +1,12 @@
 base_images:
-  cli-operator-sdk:
-    name: cli-operator-sdk
+  cli:
+    name: "4.14"
     namespace: ocp
-    tag: v1.30.0
-  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: cli
+  operator-sdk:
+    name: "4.14"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make
 build_root:
   from_repository: true
@@ -100,11 +100,8 @@ tests:
     allow_skip_on_success: true
     dependencies:
       OO_BUNDLE: addon-operator-bundle
-    env:
-      OO_INSTALL_MODE: AllNamespaces
-      OO_INSTALL_NAMESPACE: addon-operator-test
     pre:
-    - chain: ipi-aws-pre
+    - ref: ipi-install-rbac
     - as: label-infra-nodes
       commands: ./mage test:integrationciprepare
       from: src
@@ -112,7 +109,21 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    - ref: optional-operators-operator-sdk
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace addon-operator-test
+        operator-sdk run bundle -n addon-operator-test "$OO_BUNDLE" --install-mode AllNamespaces
+        oc wait --for condition=Available -n addon-operator-test deployment addon-operator-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: addon-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
     - as: enable-status-reporting
       commands: OO_INSTALL_NAMESPACE=addon-operator-test ./mage test:IntegrationCIInjectEnvVariable
       from: src
@@ -120,7 +131,6 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    test:
     - as: test
       cli: latest
       commands: ENABLE_WEBHOOK=true make test-e2e
@@ -136,7 +146,7 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-operator-sdk-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
