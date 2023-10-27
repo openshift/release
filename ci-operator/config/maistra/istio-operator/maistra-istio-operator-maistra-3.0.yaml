@@ -184,21 +184,16 @@ tests:
     - as: integration-ocp
       cli: latest
       commands: |
-        export QUAY_PASS=$(cat /maistra-secrets/password)
+        export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')"
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
           sh -c \
           "export KUBECONFIG=/work/ci-kubeconfig && \
           export TAG=PR-${PULL_NUMBER} && \
-          docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
           cd /work && \
           export BUILD_WITH_CONTAINER="0" && \
           make test.integration.ocp"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      credentials:
-      - mount_path: /maistra-secrets
-        name: maistra-dev-prow
-        namespace: test-credentials
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
