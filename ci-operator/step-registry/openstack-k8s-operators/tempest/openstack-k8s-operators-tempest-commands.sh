@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -ex
+set -ex -o pipefail
 
 NS_SERVICES=${NS_SERVICES:-"openstack"}
 
@@ -16,8 +16,19 @@ cat > ~/.config/openstack/clouds.yaml << EOF
 $(oc get cm openstack-config -o json | jq -r '.data["clouds.yaml"]')
 EOF
 
-# Disable TLS CA verification for now
-yq -i ".clouds.default.verify = False" ~/.config/openstack/clouds.yaml
+TLSCA_SECRET_NAME="combined-ca-bundle"
+if oc get -o name secret/${TLSCA_SECRET_NAME} > /dev/null 2>&1; then
+  oc get secret/${TLSCA_SECRET_NAME} -o "jsonpath={.data.tls-ca-bundle\.pem}" | base64 -d > ~/.config/openstack/cabundle.pem
+fi
+
+if [ -s ~/.config/openstack/cabundle.pem ]; then
+  TEMPEST_CONF_TLS="identity.ca_certificates_file \"${HOME}/.config/openstack/cabundle.pem\""
+  yq -i ".clouds.default.cacert = \"${HOME}/.config/openstack/cabundle.pem\"" ~/.config/openstack/clouds.yaml
+else
+  TEMPEST_CONF_TLS='identity.disable_ssl_certificate_validation true'
+  yq -i ".clouds.default.verify = False" ~/.config/openstack/clouds.yaml
+fi
+
 
 export OS_CLOUD=default
 KEYSTONE_SECRET_NAME=$(oc get keystoneapi keystone -o json | jq -r .spec.secret)
@@ -42,7 +53,7 @@ TEMPEST_CONF_OVERRIDES=${TEMPEST_CONF_OVERRIDES:-}
 
 discover-tempest-config --os-cloud ${OS_CLOUD} --debug --create \
 identity.v3_endpoint_type public \
-identity.disable_ssl_certificate_validation true \
+${TEMPEST_CONF_TLS} \
 dashboard.disable_ssl_certificate_validation true ${TEMPEST_CONF_OVERRIDES}
 
 # Generate skiplist and allow list
