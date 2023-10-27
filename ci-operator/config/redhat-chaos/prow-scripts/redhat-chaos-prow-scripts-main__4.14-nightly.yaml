@@ -24,7 +24,7 @@ resources:
       memory: 200Mi
 tests:
 - as: krkn-hub-tests-414
-  cron: 0 8 * * 1
+  cron: 0 8 * * 1,4
   steps:
     cluster_profile: aws-chaos
     env:
@@ -41,19 +41,18 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     - chain: redhat-chaos-hog-scenarios
-- as: krkn-hub-cloud-api-tests
-  cron: 0 6 */7 * MON
+- as: krkn-hub-tests-414-gcp
+  cron: 29 5 * * 2
   steps:
-    cluster_profile: aws-chaos
-    env:
-      BASE_DOMAIN: aws.rhperfscale.org
-      SPOT_INSTANCES: "false"
+    cluster_profile: gcp-qe
     post:
-    - chain: ipi-aws-post
+    - chain: ipi-gcp-post
     pre:
-    - chain: ipi-aws-pre
+    - chain: ipi-gcp-pre
     - chain: create-infra-move-ingress-monitoring-registry
-    workflow: redhat-chaos-krkn-hub-cloud-tests
+    test:
+    - chain: redhat-chaos-krkn-hub-tests
+    - chain: redhat-chaos-hog-scenarios
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
