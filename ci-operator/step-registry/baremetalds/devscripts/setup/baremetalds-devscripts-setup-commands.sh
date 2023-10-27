@@ -286,7 +286,7 @@ EOF2
 # about the Packet provisioner, remove the file if it's present.
 test -f /usr/config && rm -f /usr/config || true
 
-yum install -y git sysstat sos make podman python3-virtualenv python39 jq net-tools
+yum install -y git sysstat sos make podman python3-virtualenv python39 jq net-tools gcc
 
 systemctl start sysstat
 
