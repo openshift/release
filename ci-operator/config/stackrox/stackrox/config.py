@@ -867,18 +867,19 @@ def main():
             print("""
 A configuration error was found in one or more config/ or jobs/ files.
 This script enforces the following rules for the stackrox/stackrox repo for
-postsubmit jobs:
+presubmit jobs:
 - config/ jobs must have one of always_run, run_if_changed or skip_if_only_changed.
 - The config/ and jobs/ values of always_run for a job must match. `make jobs`
   will not update this.
 - The config/ and jobs/ values of run_if_changed and skip_if_only_changed for a job
   must match. `make jobs` will update config/ to jobs/ but it will not update config/
-  if the value is not present.
+  from jobs/ if the value is not present in config/.
 Ref: https://docs.ci.openshift.org/docs/architecture/ci-operator/#pre-submit-tests""")
             sys.exit(1)
 
     if not args.summarize and not args.check:
         parser.error('One of --summarize or --check is expected')
+
 
 if __name__ == "__main__":
     main()
