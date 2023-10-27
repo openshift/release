@@ -184,14 +184,13 @@ tests:
     - as: integration-ocp
       cli: latest
       commands: |
-        export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')"
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          entrypoint \
-          sh -c \
-          "export KUBECONFIG=/work/ci-kubeconfig && \
-          export TAG=PR-${PULL_NUMBER} && \
-          cd /work && \
+          sh -c "\
+          export KUBECONFIG=/work/ci-kubeconfig && \
+          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
           export BUILD_WITH_CONTAINER="0" && \
+          cd /work && \
+          entrypoint \
           make test.integration.ocp"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
