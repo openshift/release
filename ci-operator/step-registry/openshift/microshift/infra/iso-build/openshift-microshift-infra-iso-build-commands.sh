@@ -41,7 +41,7 @@ cp /tmp/pull-secret "\${PULL_SECRET}"
 
 cd ~/microshift
 
-export CI_JOB_TYPE="${JOB_TYPE}"
+export CI_JOB_NAME="${JOB_NAME}"
 ./test/bin/ci_phase_iso_build.sh
 
 sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
