@@ -42,7 +42,10 @@ PLAYLOADIMAGE=\$(oc get clusterversion version -ojsonpath='{.status.desired.imag
 
 EXTRA_ARGS=""
 if [[ "\$DISCONNECTED" == "true" ]]; then
-  EXTRA_ARGS+=\$(echo "--annotations=hypershift.openshift.io/control-plane-operator-image=\$(cat "/home/ho_operator_image") ")
+  PLAYLOADIMAGE=\$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
+  HO_OPERATOR_IMAGE="\${PLAYLOADIMAGE//@sha256:[^ ]*/@\$(oc adm release info "\$PLAYLOADIMAGE" | grep hypershift | awk '{print \$2}')}"
+  podman pull "\$HO_OPERATOR_IMAGE"
+  EXTRA_ARGS+=\$(echo "--annotations=hypershift.openshift.io/control-plane-operator-image=\$HO_OPERATOR_IMAGE ")
   EXTRA_ARGS+=\$(echo "--additional-trust-bundle /etc/pki/ca-trust/source/anchors/registry.2.crt ")
 fi
 
