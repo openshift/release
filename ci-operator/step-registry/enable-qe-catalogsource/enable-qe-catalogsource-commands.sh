@@ -208,9 +208,25 @@ EOF
 
 }
 
+# from OCP 4.15, the OLM is optional, details: https://issues.redhat.com/browse/OCPVE-634
+function check_olm_capability(){
+    # check if OLM capability is added 
+    knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+    if [[ ${knownCaps} =~ "OperatorLifecycleManager" ]]; then
+        echo "knownCapabilities contains OperatorLifecycleManager"
+        # check if OLM capability enabled
+        enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+          if [[ ! ${enabledCaps} =~ "OperatorLifecycleManager" ]]; then
+              echo "OperatorLifecycleManager capability is not enabled, skip the following tests..."
+              exit 0
+          fi
+    fi
+}
+
 set_proxy
 run_command "oc whoami"
 run_command "oc version -o yaml"
+check_olm_capability
 update_global_auth
 sleep 5
 create_icsp_connected

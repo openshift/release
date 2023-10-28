@@ -24,7 +24,6 @@ echo "$(date -u --rfc-3339=seconds) - Setting up external load balancer"
 
 SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
 if [[ ${vsphere_portgroup} == *"segment"* ]]; then
-  LEASE_NUMBER=$((${LEASED_RESOURCE//[!0-9]/}))
   third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${vsphere_portgroup}"))
 
   gateway="192.168.${third_octet}.1"
@@ -37,7 +36,6 @@ if [[ ${vsphere_portgroup} == *"segment"* ]]; then
   echo "192.168.${third_octet}.0/25" >>"${SHARED_DIR}"/machinecidr.txt
 
 else
-  LEASE_NUMBER=-1
   if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
     echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
     exit 1
@@ -208,8 +206,8 @@ curl -sSL "https://mirror2.openshift.com/pub/openshift-v4/clients/butane/latest/
 
 LB_VMNAME="${cluster_name}-lb"
 export GOVC_NETWORK="${vsphere_portgroup}"
-# LEASE_NUMBER between 151 and 157 will use profile:vsphere-multizone
-if [ ${LEASE_NUMBER} -ge 151 ] && [ ${LEASE_NUMBER} -le 157 ]; then
+# vlanid between 1287 and 1302 will use profile:vsphere-multizone-2
+if [ ${vlanid} -ge 1287 ] && [ ${vlanid} -le 1302 ]; then
   govc vm.clone -on=false -dc=/${vsphere_datacenter} -ds /${vsphere_datacenter}/datastore/mdcnc-ds-shared -pool=/IBMCloud/host/vcs-mdcnc-workload-1/Resources -vm="${vm_template}" ${LB_VMNAME}
   govc vm.network.change -dc=/${vsphere_datacenter} -vm ${LB_VMNAME} -net /${vsphere_datacenter}/host/vcs-mdcnc-workload-1/"${vsphere_portgroup}" ethernet-0
 else
