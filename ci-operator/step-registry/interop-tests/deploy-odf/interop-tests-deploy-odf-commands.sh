@@ -11,7 +11,7 @@ ODF_SUBSCRIPTION_NAME="${ODF_SUBSCRIPTION_NAME:-'odf-operator'}"
 ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp2-csi'}"
 ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-50}Gi"
 
-readonly ODF_CATALOG_IMAGE="quay.io/rhceph-dev/ocs-registry:latest-${ODF_VERSION_MAJOR_MINOR}"
+readonly ODF_CATALOG_IMAGE="quay.io/rhceph-dev/ocs-registry:latest-stable-${ODF_VERSION_MAJOR_MINOR}"
 readonly ODF_CATALOG_NAME=odf-catalogsource
 
 
@@ -124,6 +124,9 @@ echo "⏳ Wait for CatalogSource to be ready"
 sleep 30
 oc wait catalogSource/${ODF_CATALOG_NAME} -n openshift-marketplace \
   --for=jsonpath='{.status.connectionState.lastObservedState}=READY' --timeout='5m'
+
+echo "🏷 Set label on ODF CatalogSource (required for ocs-ci tests)"
+oc label CatalogSource/${ODF_CATALOG_NAME} -n openshift-marketplace ocs-operator-internal=true
 
 echo "Subscribe to the operator"
 SUB=$(

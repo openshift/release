@@ -15,6 +15,8 @@ echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..
 declare vsphere_datacenter
 declare vsphere_url
 declare vsphere_portgroup
+declare multizone_portgroup_1
+declare multizone_portgroup_2
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
@@ -23,6 +25,10 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
+if [[ -z "${multizone_portgroup_1}" ]] || [[ -z "${multizone_portgroup_2}" ]]; then
+   echo "The required extra leases is 2 at leaset, exit"
+   exit 1
+fi	
 cat >>"${CONFIG}" <<EOF
 baseDomain: $base_domain
 controlPlane:
@@ -69,7 +75,7 @@ platform:
       topology:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-2
         networks:
-        - ocp-ci-seg-20
+        - ${multizone_portgroup_1}
         datastore: mdcnc-ds-shared
     - name: us-east-3
       region: us-east
@@ -77,7 +83,7 @@ platform:
       topology:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-3
         networks:
-        - ocp-ci-seg-21
+        - ${multizone_portgroup_2}
         datastore: mdcnc-ds-shared
     - name: us-west-1
       region: us-west
@@ -93,7 +99,6 @@ networking:
   machineNetwork:
   - cidr: "${machine_cidr}"
 EOF
-
 # TODO: Add this back in once we have an vsphere
 # environment that will support topology storage
 

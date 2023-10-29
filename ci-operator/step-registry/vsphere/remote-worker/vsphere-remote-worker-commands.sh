@@ -8,7 +8,10 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 remote_machineset_name="remote-worker"
 remote_worker_number="${REMOTEWORKER_NUMBER}"
-remote_network_name="${REMOTENETWORK_NAME}"
+declare vsphere_connected_portgroup
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/vsphere_context.sh"
+remote_network_name="${vsphere_connected_portgroup}"
 
 # Get machineset name to generate a generic template
 ref_machineset_name=$(oc -n openshift-machine-api get -o 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' machinesets | grep worker | head -n1)

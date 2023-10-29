@@ -2167,7 +2167,8 @@ presubmits:
       timeout: 6h0m0s
     labels:
       ci-operator.openshift.io/cloud: azurestack
-      ci-operator.openshift.io/cloud-cluster-profile: azurestack
+      ci-operator.openshift.io/cloud-cluster-profile: azurestack-qe
+      ci-operator.openshift.io/cluster: build01
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.15-e2e-azurestack
@@ -2226,7 +2227,7 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
-          secretName: cluster-secrets-azurestack
+          secretName: cluster-secrets-azurestack-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2249,7 +2250,8 @@ presubmits:
       timeout: 6h0m0s
     labels:
       ci-operator.openshift.io/cloud: azurestack
-      ci-operator.openshift.io/cloud-cluster-profile: azurestack
+      ci-operator.openshift.io/cloud-cluster-profile: azurestack-qe
+      ci-operator.openshift.io/cluster: build01
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.15-e2e-azurestack-upi
@@ -2308,7 +2310,7 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
-          secretName: cluster-secrets-azurestack
+          secretName: cluster-secrets-azurestack-qe
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -5058,6 +5060,88 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
+    cluster: vsphere02
+    context: ci/prow/e2e-vsphere-zones-techpreview
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-multizone-2
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.15-e2e-vsphere-zones-techpreview
+    optional: true
+    rerun_command: /test e2e-vsphere-zones-techpreview
+    run_if_changed: vsphere
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-vsphere-zones-techpreview-cluster-profile
+        - --target=e2e-vsphere-zones-techpreview
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-vsphere-zones-techpreview-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-vsphere
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-vsphere-zones-techpreview,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.15$
+    - ^release-4\.15-
     cluster: build01
     context: ci/prow/gofmt
     decorate: true
@@ -5352,6 +5436,89 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-e2e-agent-compact-ipv4,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.15$
+    - ^release-4\.15-
+    cluster: build05
+    context: ci/prow/okd-e2e-agent-ha-dualstack
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cluster: build05
+      ci-operator.openshift.io/variant: okd
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.15-okd-e2e-agent-ha-dualstack
+    optional: true
+    rerun_command: /test okd-e2e-agent-ha-dualstack
+    run_if_changed: /agent/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-agent-ha-dualstack-cluster-profile
+        - --target=e2e-agent-ha-dualstack
+        - --variant=okd
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-agent-ha-dualstack-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-equinix-ocp-metal
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )okd-e2e-agent-ha-dualstack,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
