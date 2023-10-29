@@ -5,6 +5,9 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
+# Extract clusters archive from SHARED_DIR
+tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=$CLUSTER_DATA_DIR
+
 CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
 BREW_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/brew-token)
