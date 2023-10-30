@@ -16,6 +16,7 @@ BREW_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/brew-token)
 CLUSTER_DATA_DIR="/tmp/clusters-data"
 RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py --action install --ocm-token ${OCM_TOKEN} "
 
+# For multi-cluster scenarios, `cluster-name` should be passed as part of addon configuration
 if [ "$CLUSTER_NAME" ]; then
   RUN_COMMAND+=" --cluster-name ${CLUSTER_NAME} "
 fi
