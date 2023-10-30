@@ -5,11 +5,20 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
+CLUSTER_NAME_FILENAME="${SHARED_DIR}/cluster-name"
+
+if [ -f "$CLUSTER_NAME_FILENAME" ]; then
+  CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
+fi
+
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
 BREW_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/brew-token)
-RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py --action install --cluster-name ${CLUSTER_NAME} --ocm-token ${OCM_TOKEN} "
 CLUSTER_DATA_DIR="/tmp/clusters-data"
+RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py --action install --ocm-token ${OCM_TOKEN} "
+
+if [ "$CLUSTER_NAME" ]; then
+  RUN_COMMAND+=" --cluster-name ${CLUSTER_NAME} "
+fi
 
 export AWS_CONFIG_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export OCM_TOKEN
