@@ -23,24 +23,28 @@ resources:
       memory: 200Mi
 tests:
 - as: appstudio-hac-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
   optional: true
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^components/(authentication|quality-dashboard|hac-pact-broker|tekton-ci)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-rhtap-qe
-    env:
-      BASE_DOMAIN: ci.stonesoupengineering.com
-      COMPUTE_NODE_TYPE: m6i.4xlarge
-      HYPERSHIFT_AWS_REGION: us-east-2
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.26-multi
-      HYPERSHIFT_NODE_COUNT: "3"
     test:
     - ref: redhat-appstudio-install-rhtap
     - ref: redhat-appstudio-hac-e2e
-    workflow: redhat-appstudio-install
+    workflow: redhat-appstudio-claim
 - as: appstudio-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
+    labels:
+      region: us-east-2
     owner: rhtap
     product: ocp
     timeout: 1h0m0s
@@ -61,18 +65,20 @@ tests:
     workflow: redhat-appstudio-load-test
   timeout: 8h0m0s
 - as: appstudio-e2e-tests-periodic
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
   cron: 0 */24 * * *
   steps:
-    cluster_profile: aws-rhtap-qe
-    env:
-      BASE_DOMAIN: ci.stonesoupengineering.com
-      COMPUTE_NODE_TYPE: m6i.4xlarge
-      HYPERSHIFT_AWS_REGION: us-east-2
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.26-multi
-      HYPERSHIFT_NODE_COUNT: "3"
     test:
     - ref: redhat-appstudio-e2e
-    workflow: redhat-appstudio-install
+    workflow: redhat-appstudio-claim
 zz_generated_metadata:
   branch: main
   org: redhat-appstudio
