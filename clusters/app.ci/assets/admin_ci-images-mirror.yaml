@@ -112,6 +112,8 @@ spec:
         ports:
         - name: http
           containerPort: 8090
+        - name: metrics
+          containerPort: 8080
         volumeMounts:
         - name: release
           mountPath: /var/repo
@@ -129,3 +131,20 @@ spec:
       - name: push-credentials
         secret:
           secretName: registry-push-credentials-ci-images-mirror
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app: ci-images-mirror
+  name: ci-images-mirror
+  namespace: ci
+spec:
+  jobLabel: app
+  selector:
+    matchLabels:
+      app: ci-images-mirror
+  podMetricsEndpoints:
+  - port: metrics
+    scheme: http
+    scrapeTimeout: 20s
