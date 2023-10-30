@@ -38,7 +38,15 @@ fi
 
 # Support to create the account-roles with the higher version 
 VERSION_SWITCH=""
-if [[ "$CHANNEL_GROUP" != "stable" ]] && [[ ! -z "$OPENSHIFT_VERSION" ]]; then
+if [[ "$CHANNEL_GROUP" != "stable" ]]; then
+  if [[ -z "$OPENSHIFT_VERSION" ]]; then
+    versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq -r '.[].raw_id')
+    if [[ "$HOSTED_CP" == "true" ]]; then
+      versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} --hosted-cp -o json | jq -r '.[].raw_id')
+    fi
+    OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
+  fi
+
   OPENSHIFT_VERSION=$(echo "${OPENSHIFT_VERSION}" | cut -d '.' -f 1,2)
   VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
 fi
@@ -48,12 +56,19 @@ if [[ "$HOSTED_CP" == "true" ]]; then
    CLUSTER_SWITCH="--hosted-cp"
 fi
 
+ARN_PATH_SWITCH=""
+if [[ ! -z "$ARN_PATH" ]]; then
+   ARN_PATH_SWITCH="--path ${ARN_PATH}"
+fi
+
 # Whatever the account roles with the prefix exist or not, do creation.
 echo "Create the ${CLUSTER_SWITCH} account roles with the prefix '${ACCOUNT_ROLES_PREFIX}'"
+echo "rosa create account-roles -y --mode auto --prefix ${ACCOUNT_ROLES_PREFIX} ${CLUSTER_SWITCH} ${VERSION_SWITCH} ${ARN_PATH_SWITCH}"
 rosa create account-roles -y --mode auto \
                           --prefix ${ACCOUNT_ROLES_PREFIX} \
                           ${CLUSTER_SWITCH} \
-                          ${VERSION_SWITCH}
+                          ${VERSION_SWITCH} \
+                          ${ARN_PATH_SWITCH}
 
 # Store the account-role-prefix for the next pre steps and the account roles deletion
 echo "Store the account-role-prefix and the account-roles-arn ..."
