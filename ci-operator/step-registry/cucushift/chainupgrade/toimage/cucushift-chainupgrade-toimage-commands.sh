@@ -420,11 +420,10 @@ function admin_ack() {
     for ack in ${ack_data};
     do
         # e.g.: ack-4.12-kube-1.26-api-removals-in-4.13
-        if [[ "${ack}" == *"ack-4.${SOURCE_MINOR_VERSION}"* ]] 
+        if [[ "${ack}" == *"ack-4.${SOURCE_MINOR_VERSION}"* ]]
         then
             echo "Admin ack patch data is: ${ack}"
             oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
-            break
         fi
     done
 
