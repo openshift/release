@@ -49,10 +49,3 @@ sleep 1m
 export ARCHIVE_NAME=cluster-terraform-archive
 export TF_FOLDER="${TF_FOLDER_SAVE}"
 make apply_folder
-
-
-cp ${SHARED_DIR}/kubeconfig ${ARTIFACT_DIR}/
-export KUBECONFIG=${SHARED_DIR}/kubeconfig
-oc wait clusterversion version --for condition=Available --timeout=20m
-cp ${SHARED_DIR}/kubeconfig ${ARTIFACT_DIR}/
-oc get clusterversion version

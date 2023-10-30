@@ -100,4 +100,6 @@ ocm get /api/clusters_mgmt/v1/clusters/${cluster_id}/credentials | jq -r .admin.
 cp ${SHARED_DIR}/kubeconfig ${ARTIFACT_DIR}/
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
-oc wait clusterversion version --for condition=Available --timeout=20m
+oc wait nodes --all --for=condition=Ready=true --timeout=30m &
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=30m &
+wait
