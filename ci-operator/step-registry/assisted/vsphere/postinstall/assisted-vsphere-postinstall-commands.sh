@@ -81,3 +81,46 @@ until \
     echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
     sleep 1s
 done
+
+echo "$(date --rfc-3339=seconds) Clusteroperators are ready"
+oc get clusteroperator
+
+# Test if the CSI driver is able to provison a volume
+
+cat <<EOF | oc create -f -
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+ name: vsphere-sc
+provisioner: kubernetes.io/vsphere-volume
+parameters:
+ datastore: "${VSPHERE_DATASTORE}"
+ diskformat: thin
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+EOF
+
+cat <<EOF | oc create -f -
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+ name: test-pvc
+ namespace: openshift-config
+ annotations:
+   volume.beta.kubernetes.io/storage-provisioner: kubernetes.io/vsphere-volume
+ finalizers:
+   - kubernetes.io/pvc-protection
+spec:
+ accessModes:
+   - ReadWriteOnce
+ resources:
+   requests:
+    storage: 10Gi
+ storageClassName: vsphere-sc
+ volumeMode: Filesystem
+EOF
+
+oc wait pvc/test-pvc -n openshift-config --for=jsonpath='{.status.phase}'=Bound --timeout=5m
+
+# cleanup
+oc delete pvc/test-pvc
