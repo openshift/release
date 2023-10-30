@@ -55,11 +55,8 @@ fi
 
 cd "\${REPO_DIR}/deploy/operator"
 
-cat << VARS >> /root/config
 export DISCONNECTED="${DISCONNECTED:-}"
-VARS
-
-source /root/config
+export IP_STACK="${IP_STACK:-}"
 
 curl https://raw.githubusercontent.com/LiangquanLi930/deployhypershift/main/config_agentserviceconfig.sh | bash -x
 set -x
