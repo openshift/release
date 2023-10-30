@@ -15,6 +15,10 @@ mkdir -p ~/.config/openstack
 cat > ~/.config/openstack/clouds.yaml << EOF
 $(oc get cm openstack-config -o json | jq -r '.data["clouds.yaml"]')
 EOF
+
+# Disable TLS CA verification for now
+yq -i ".clouds.default.verify = False" ~/.config/openstack/clouds.yaml
+
 export OS_CLOUD=default
 KEYSTONE_SECRET_NAME=$(oc get keystoneapi keystone -o json | jq -r .spec.secret)
 KEYSTONE_PASSWD_SELECT=$(oc get keystoneapi keystone -o json | jq -r .spec.passwordSelectors.admin)

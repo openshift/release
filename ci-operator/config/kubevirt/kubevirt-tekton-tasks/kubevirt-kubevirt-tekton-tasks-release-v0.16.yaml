@@ -1,0 +1,87 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.15
+images:
+- dockerfile_path: automation/generatetasks/build/Dockerfile
+  to: base-tests
+- dockerfile_path: build/Containerfile
+  to: tekton-tasks
+- dockerfile_path: build/Containerfile.DiskVirt
+  to: tekton-task-disk-virt
+releases:
+  initial:
+    integration:
+      name: "4.15"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.15"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit-tests:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+  yaml-consistency-tests:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+test_binary_build_commands: automation/build-test.sh
+tests:
+- as: unit-tests
+  commands: |
+    make test-with-reports
+  container:
+    from: test-bin
+- as: yaml-consistency-tests
+  commands: |
+    /usr/local/bin/entrypoint
+
+    make test-yaml-consistency
+  container:
+    from: base-tests
+- as: e2e-tests
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: |
+        # KUBECONFIG is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L "${KUBECONFIG}" /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+
+        if ! hash kubectl 2>/dev/null; then
+          pushd $(dirname $(which oc))
+          ln -s oc kubectl
+          popd
+        fi
+        automation/build-test.sh
+        export PATH=$PATH:$(pwd)/go/bin
+        NUM_NODES=4 \
+          make e2e-tests
+      dependencies:
+      - env: TEKTON_TASKS_IMAGE
+        name: tekton-tasks
+      - env: TEKTON_TASKS_DISK_VIRT_IMAGE
+        name: tekton-task-disk-virt
+      from: base-tests
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: release-v0.16
+  org: kubevirt
+  repo: kubevirt-tekton-tasks
