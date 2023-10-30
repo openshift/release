@@ -9,6 +9,8 @@ CLUSTER_NAME_FILENAME="${SHARED_DIR}/cluster-name"
 
 if [ -f "$CLUSTER_NAME_FILENAME" ]; then
   CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
+else
+  CLUSTER_NAME=""
 fi
 
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
@@ -17,7 +19,7 @@ CLUSTER_DATA_DIR="/tmp/clusters-data"
 RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py --action install --ocm-token ${OCM_TOKEN} "
 
 # For multi-cluster scenarios, `cluster-name` should be passed as part of addon configuration
-if [ "$CLUSTER_NAME" ]; then
+if [ -n "$CLUSTER_NAME" ]; then
   RUN_COMMAND+=" --cluster-name ${CLUSTER_NAME} "
 fi
 
