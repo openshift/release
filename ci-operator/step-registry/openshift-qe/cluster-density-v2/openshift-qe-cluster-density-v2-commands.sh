@@ -17,15 +17,19 @@ ES_USERNAME=$(cat "/secret/username")
 
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking --depth=1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+export WORKLOAD=cluster-density-v2
 
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
+# Run a non-indexed warmup for scheduling inconsistencies
+ES_SERVER="" ITERATIONS=${current_worker_count} CHURN=false ./run.sh
+
+# The measurable run
 iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
 export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
-export WORKLOAD=cluster-density-v2
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-
+export EXTRA_FLAGS+=" --gc-metrics=true "
 
 rm -f ${SHARED_DIR}/index.json
 ./run.sh
