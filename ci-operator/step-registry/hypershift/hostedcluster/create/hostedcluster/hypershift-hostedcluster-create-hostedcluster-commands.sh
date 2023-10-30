@@ -100,7 +100,7 @@ case "${PLATFORM}" in
       POWERVS_ZONE=$(jq -r '.zone' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
     fi
     if [[ -z "${POWERVS_VPC_REGION}" ]]; then
-      POWERVS_VPC_REGION=$(jq -r '.vpc-region' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
+      POWERVS_VPC_REGION=$(jq -r '.vpcRegion' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
     fi
 
     bin/hypershift create cluster powervs \
