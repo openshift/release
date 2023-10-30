@@ -132,6 +132,9 @@ azurestack)
     export TEST_PROVIDER="none"
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
     export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
+    export AZURE_CLIENT_ID="$(cat ${AZURE_AUTH_LOCATION} | jq -r .clientId)"
+    export AZURE_CLIENT_SECRET="$(cat ${AZURE_AUTH_LOCATION} | jq -r .clientSecret)"
+    export AZURE_TENANT_ID="$(cat ${AZURE_AUTH_LOCATION} | jq -r .tenantId)"
     ;;
 vsphere)
     # shellcheck disable=SC1090

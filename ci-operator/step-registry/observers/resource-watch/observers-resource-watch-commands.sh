@@ -60,6 +60,12 @@ then
   echo "using additional run-monitor args ${MONITOR_ARGS}"
 fi
 
+# Set up access for azure sdk
+AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+export AZURE_CLIENT_ID="$(cat ${AZURE_AUTH_LOCATION} | jq -r .clientId)"
+export AZURE_CLIENT_SECRET="$(cat ${AZURE_AUTH_LOCATION} | jq -r .clientSecret)"
+export AZURE_TENANT_ID="$(cat ${AZURE_AUTH_LOCATION} | jq -r .tenantId)"
+
 openshift-tests run-resourcewatch > "${ARTIFACT_DIR}/run-resourcewatch.log" 2>&1 &
 DISABLED_MONITOR_TESTS="apiserver-availability,apiserver-new-disruption-invariant,disruption-summary-serializer,external-service-availability,incluster-disruption-serializer,image-registry-availability,ingress-availability,pod-network-avalibility,service-type-load-balancer-availability"
 openshift-tests run-monitor ${MONITOR_ARGS:-} --artifact-dir $STORE_PATH --disable-monitor=${DISABLED_MONITOR_TESTS} > "${ARTIFACT_DIR}/run-monitor.log" 2>&1 &
