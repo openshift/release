@@ -7,7 +7,7 @@ set -o pipefail
 echo "Create secrets"
 SECRETS_DIR="/tmp/secrets/ci"
 
-echo $(cat ${SECRETS_DIR}/QUAY_USER)
+echo "${SECRETS_DIR}/QUAY_USER"
 
 #SNYK_DIR="/snyk-credentials"
 
