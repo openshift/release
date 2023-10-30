@@ -1,0 +1,32 @@
+ref:
+  as: openshift-pipelines-scaling-pipelines
+  best_effort: true
+  grace_period: 300s
+  cli: latest
+  timeout: 8h0m0s
+  commands: openshift-pipelines-scaling-pipelines-commands.sh
+  env:
+    - name: DEPLOYMENT_TYPE
+      default: "downstream"
+      documentation: Is this supposed to install downstream or upstream?
+    - name: DEPLOYMENT_VERSION
+      default: "1.12"
+      documentation: For downstream this is "1.12" or so, for upstream either "stable" or "nightly"
+    - name: TEST_TOTAL
+      default: "100"
+      documentation: Total number of PipelineRuns test should do.
+    - name: TEST_CONCURRENT
+      default: "10"
+      documentation: Max PipelineRuns concurrency test should allow.
+    - name: TEST_RUN
+      default: "./run.yaml"
+      documentation: PipelineRun YAML test should use as a template.
+  credentials:
+    - mount_path: /usr/local/ci-secrets/openshift-pipelines-perfscale
+      name: openshift-pipelines-perfscale
+      namespace: test-credentials
+  from: openshift-pipelines-performance-runner
+  resources:
+    requests:
+      cpu: 3000m
+      memory: 6Gi

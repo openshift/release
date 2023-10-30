@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -659,7 +659,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -744,7 +744,6 @@ periodics:
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
                 BASELINE_CAPABILITY_SET: None
-                ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
                 PERSISTENT_MONITORING: "false"
               test:
               - ref: clusterbot-wait
@@ -1289,10 +1288,11 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   labels:
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     config-type: modern
     job-architecture: amd64
     job-env: vsphere
@@ -1319,7 +1319,7 @@ periodics:
       - name: RELEASE_IMAGE_LATEST
       - name: CLUSTER_VARIANT
       - name: CLUSTER_PROFILE
-        value: vsphere
+        value: vsphere-2
       - name: CLUSTER_DURATION
         value: "9000"
       - name: BRANCH
@@ -1367,7 +1367,7 @@ periodics:
               workflow: upi-$(CLUSTER_TYPE)-clusterbot
           - as: launch-multi-zone
             steps:
-              cluster_profile: vsphere-multizone
+              cluster_profile: vsphere-multizone-2
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
               test:
@@ -1375,7 +1375,7 @@ periodics:
               workflow: openshift-e2e-$(CLUSTER_TYPE)-zones
           - as: launch-multi-zone-techpreview
             steps:
-              cluster_profile: vsphere-multizone
+              cluster_profile: vsphere-multizone-2
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
                 FEATURE_SET: TechPreviewNoUpgrade
@@ -1409,7 +1409,7 @@ periodics:
               workflow: openshift-e2e-$(CLUSTER_TYPE)-sdn
           - as: launch-dualstack
             steps:
-              cluster_profile: vsphere
+              cluster_profile: $(CLUSTER_PROFILE)
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
               test:
@@ -1417,7 +1417,7 @@ periodics:
               workflow: openshift-e2e-$(CLUSTER_TYPE)-ovn-dualstack
           - as: launch-dualstack-primaryv6
             steps:
-              cluster_profile: vsphere
+              cluster_profile: $(CLUSTER_PROFILE)
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
                 IP_FAMILIES: DualStackIPv6Primary
@@ -1426,7 +1426,7 @@ periodics:
               workflow: openshift-e2e-$(CLUSTER_TYPE)-ovn-dualstack
           - as: upgrade
             steps:
-              cluster_profile: $(CLUSTER_TYPE)
+              cluster_profile: $(CLUSTER_PROFILE)
               env:
                 TEST_SUITE: "all"
               workflow: openshift-upgrade-$(CLUSTER_TYPE)
@@ -1487,7 +1487,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -2344,7 +2344,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -2548,7 +2548,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -2667,7 +2667,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -2760,7 +2760,7 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -3151,15 +3151,15 @@ periodics:
       secret:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build05
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
     config-type: modern
-    job-architecture: multi
+    job-architecture: amd64
     job-env: hypershift-hosted-powervs
     job-type: launch
-  name: release-openshift-origin-installer-launch-hypershift-hosted-powervs
+  name: release-openshift-origin-installer-launch-hypershift-powervs
   spec:
     containers:
     - args:
@@ -3176,21 +3176,18 @@ periodics:
       command:
       - ci-operator
       env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
       - name: CLUSTER_DURATION
         value: "9000"
       - name: BRANCH
         value: "4.14"
       - name: JOB_NAME_SAFE
         value: launch
+      - name: NAMESPACE
       - name: UNRESOLVED_CONFIG
         value: |
-          releases:
-            multi-latest:
-              candidate:
-                architecture: multi
-                product: ocp
-                stream: nightly
-                version: "4.14"
           resources:
             '*':
               limits:
@@ -3206,16 +3203,10 @@ periodics:
                 PLATFORM: powervs
                 HYPERSHIFT_BASE_DOMAIN: hypershift-ppc64le.com
                 HYPERSHIFT_NODE_COUNT: 2
-                POWERVS_REGION: lon
-                POWERVS_ZONE: lon06
-                POWERVS_VPC_REGION: eu-gb
                 POWERVS_RESOURCE_GROUP: ibm-hypershift-dev
                 POWERVS_PROC_TYPE: shared
                 POWERVS_PROCESSORS: 0.5
                 POWERVS_SYS_TYPE: e980
-                POWERVS_GUID: 2313fc87-f7e9-4df6-969e-c0d37b8818a3
-                VPC: hypershift-clusterbot-ci-lon-vpc
-                CLOUD_CONNECTION: hypershift-clusterbot-ci-lon-cc
               workflow: hypershift-hostedcluster-workflow
               test:
               - ref: clusterbot-wait
@@ -3243,6 +3234,9 @@ periodics:
       - mountPath: /etc/report
         name: result-aggregator
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -3263,3 +3257,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher

@@ -222,7 +222,7 @@ def _add_osd_rc_deployment(gendoc):
 
     # Creating Cluster Groups for the AMD64 jobs...
     if context.arch == 'x86_64':
-        extra_rc_args.append('--cluster-group=build02,build03,build04,build05')
+        extra_rc_args.append('--cluster-group=build01,build02,build03,build04,build05')
         extra_rc_args.append('--cluster-group=vsphere')
 
     gendoc.append({
@@ -250,62 +250,62 @@ def _add_osd_rc_deployment(gendoc):
                 },
                 'spec': {
                     "initContainers": [
-                            {
-                                "name": "git-sync-init",
-                                "command": ["/git-sync"],
-                                "args": [
-                                    "--repo=https://github.com/openshift/release.git",
-                                    "--branch=master",
-                                    "--root=/tmp/git-sync",
-                                    "--one-time=true",
-                                    "--depth=1"
-                                ],
-                                "env": [
-                                    {
-                                        "name": "GIT_SYNC_DEST",
-                                        "value": "release"
-                                    }
-                                ],
-                                "image": "registry.k8s.io/git-sync/git-sync:v3.6.2",
-                                "volumeMounts": [
-                                    {
-                                        "name": "release",
-                                        "mountPath": "/tmp/git-sync"
-                                    }
-                                ]
-                            }
-                        ],
-                        "containers": [
-                            {
-                                "name": "git-sync",
-                                "command": ["/git-sync"],
-                                "args": [
-                                    "--repo=https://github.com/openshift/release.git",
-                                    "--branch=master",
-                                    "--wait=30",
-                                    "--root=/tmp/git-sync",
-                                    "--max-sync-failures=3"
-                                ],
-                                "env": [
-                                    {
-                                        "name": "GIT_SYNC_DEST",
-                                        "value": "release"
-                                    }
-                                ],
-                                "image": "registry.k8s.io/git-sync/git-sync:v3.6.2",
-                                "volumeMounts": [
-                                    {
-                                        "name": "release",
-                                        "mountPath": "/tmp/git-sync"
-                                    }
-                                ],
-                                "resources": {
-                                  "requests": {
+                        {
+                            "name": "git-sync-init",
+                            "command": ["/git-sync"],
+                            "args": [
+                                "--repo=https://github.com/openshift/release.git",
+                                "--branch=master",
+                                "--root=/tmp/git-sync",
+                                "--one-time=true",
+                                "--depth=1"
+                            ],
+                            "env": [
+                                {
+                                    "name": "GIT_SYNC_DEST",
+                                    "value": "release"
+                                }
+                            ],
+                            "image": "registry.k8s.io/git-sync/git-sync:v3.6.2",
+                            "volumeMounts": [
+                                {
+                                    "name": "release",
+                                    "mountPath": "/tmp/git-sync"
+                                }
+                            ]
+                        }
+                    ],
+                    "containers": [
+                        {
+                            "name": "git-sync",
+                            "command": ["/git-sync"],
+                            "args": [
+                                "--repo=https://github.com/openshift/release.git",
+                                "--branch=master",
+                                "--wait=30",
+                                "--root=/tmp/git-sync",
+                                "--max-sync-failures=3"
+                            ],
+                            "env": [
+                                {
+                                    "name": "GIT_SYNC_DEST",
+                                    "value": "release"
+                                }
+                            ],
+                            "image": "registry.k8s.io/git-sync/git-sync:v3.6.2",
+                            "volumeMounts": [
+                                {
+                                    "name": "release",
+                                    "mountPath": "/tmp/git-sync"
+                                }
+                            ],
+                            "resources": {
+                                "requests": {
                                     "memory": "1Gi",
                                     "cpu": "0.5",
-                                  }
                                 }
-                            },
+                            }
+                        },
                         *_get_osd_rc_deployment_sidecars(context),
                         {
                             "resources": {
@@ -335,7 +335,8 @@ def _add_osd_rc_deployment(gendoc):
                                         '--supplemental-plugin-config-dir=/etc/plugins',
                                         '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.',
                                         f'--art-suffix={context.art_suffix}',
-                                        "--process-legacy-results"
+                                        "--process-legacy-results",
+                                        "--manifest-list-mode"
                                         ],
                             'image': 'release-controller:latest',
                             'name': 'controller',

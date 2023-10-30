@@ -144,6 +144,9 @@ CONFIG = {
     'gcp-quota-slice': {
         'us-central1': 80,
     },
+    'gcp-3-quota-slice': {
+        'us-central1': 80,
+    },
     'gcp-openshift-gce-devel-ci-2-quota-slice': {
         'us-central1': 80,
     },
@@ -197,24 +200,18 @@ CONFIG = {
         'default': 5
     },
     'vsphere-2-quota-slice':{},
-    'vsphere-8-quota-slice':{
-        'default': 5
-    },
+    'vsphere-8-quota-slice':{},
     'vsphere-ibm-7-quota-slice':{
         'default': 5
     },
     'vsphere-dis-quota-slice':{},
-    'vsphere-dis-2-quota-slice':{
-        'default': 5
-    },
+    'vsphere-dis-2-quota-slice':{},
     'vsphere-clusterbot-quota-slice':{},
     'vsphere-clusterbot-2-quota-slice':{
         'default': 5
     },
     'vsphere-connected-quota-slice':{},
-    'vsphere-connected-2-quota-slice':{
-        'default': 5
-    },
+    'vsphere-connected-2-quota-slice':{},
     'vsphere-multizone-quota-slice':{
         'default': 5
     },
@@ -346,17 +343,26 @@ for i in [1148,1197,1207,1225,1227,1229,1232,1233,1234,1235,1237,1238,1240,1243,
 for i in range(230,235):
     CONFIG['vsphere-dis-quota-slice']['devqe-segment-{}-disconnected'.format(i)] = 1
 
+for i in [990,1169,1166,1164,1146]:
+    CONFIG['vsphere-dis-2-quota-slice']['bcr01a.dal12.{}'.format(i)] = 1
+
 for i in range(50,54):
     CONFIG['vsphere-clusterbot-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(223,229):
     CONFIG['vsphere-connected-quota-slice']['devqe-segment-{}'.format(i)] = 1
 
+for i in [871,991,1165,1154,1148,1140]:
+    CONFIG['vsphere-connected-2-quota-slice']['bcr01a.dal12.{}'.format(i)] = 1
+
 for i in [1287,1289,1296,1298,1300,1302]:
     CONFIG['vsphere-multizone-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
 
 for i in [1153,1179,1211,1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274,1283,1285,1305,1309,758,902]:
     CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
+
+for i in range(200,213):
+    CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 
 config = {

@@ -18,15 +18,9 @@ AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 if [ "$cloud_name" == "AzureStackCloud" ]; then
     AZURE_AUTH_LOCATION="${SHARED_DIR}/osServicePrincipal.json"
 
-	AZURESTACK_ENDPOINT=$(cat ${SHARED_DIR}/AZURESTACK_ENDPOINT)
-	SUFFIX_ENDPOINT=$(cat ${SHARED_DIR}/SUFFIX_ENDPOINT)
-
-	az cloud register \
-		-n PPE \
-		--endpoint-resource-manager "${AZURESTACK_ENDPOINT}" \
-		--suffix-storage-endpoint "${SUFFIX_ENDPOINT}" 
-	az cloud set -n PPE
-	az cloud update --profile 2019-03-01-hybrid
+	# Login using the shared dir scripts created in the ipi-conf-azurestack-commands.sh
+	chmod +x "${SHARED_DIR}/azurestack-login-script.sh"
+	source ${SHARED_DIR}/azurestack-login-script.sh
 fi
 
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"

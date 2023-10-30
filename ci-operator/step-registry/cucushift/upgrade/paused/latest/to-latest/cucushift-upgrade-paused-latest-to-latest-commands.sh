@@ -5,26 +5,34 @@ set -o errexit
 set -o pipefail
 
 # Check if admin ack is required before upgrade
-function admin_ack() {     
+function admin_ack() {
     local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r ".data")"
-    if [[ ${out} != *"ack-4"* ]]; then
+    if [[ ${out} != *"ack-4.${SOURCE_MINOR_VERSION}"* ]]; then
         echo "Admin ack not required" && return
-    fi        
-    
+    fi
+
     echo "Require admin ack"
-    local wait_time_loop_var=0 ack_data 
-    ack_data="$(echo ${out} | awk '{print $2}' | cut -f2 -d\")" && echo "Admin ack patch data is: ${ack_data}"
-    oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack_data}"'": "true"}}' --type=merge
-    
+    local wait_time_loop_var=0 ack_data
+    ack_data="$(echo "${out}" | jq -r "keys[]")"
+    for ack in ${ack_data};
+    do
+        # e.g.: ack-4.12-kube-1.26-api-removals-in-4.13
+        if [[ "${ack}" == *"ack-4.${SOURCE_MINOR_VERSION}"* ]]
+        then
+            echo "Admin ack patch data is: ${ack}"
+            oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
+        fi
+    done
+
     echo "Admin-acks patch gets started"
-            
+
     echo -e "sleep 5 min wait admin-acks patch to be valid...\n"
     while (( wait_time_loop_var < 5 )); do
         sleep 1m
         echo -e "wait_time_passed=${wait_time_loop_var} min.\n"
         if ! oc adm upgrade | grep "AdminAckRequired"; then
             echo -e "Admin-acks patch PASSED\n"
-            return 0              
+            return 0
         else
             echo -e "Admin-acks patch still in processing, waiting...\n"
         fi
@@ -51,22 +59,30 @@ function upgrade() {
 # Monitor the upgrade status
 function check_upgrade_status() {
     local wait_upgrade="${TIMEOUT}" out avail progress
+    echo "Starting the upgrade checking on $(date "+%F %T")"
     while (( wait_upgrade > 0 )); do
-        echo "oc get clusterversion" && oc get clusterversion
-        out="$(oc get clusterversion --no-headers)"
+        sleep 5m
+        wait_upgrade=$(( wait_upgrade - 5 ))
+        if ! ( run_command "oc get clusterversion" ); then
+            continue
+        fi
+        if ! out="$(oc get clusterversion --no-headers)"; then continue; fi
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${TARGET_Y_VERSION}"* ]]; then
-            echo -e "Upgrade succeed\n\n"
+            echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
             return 0
-        else
-            sleep 5m
-            (( wait_upgrade -= 5 ))
-        fi        
+        fi
     done
-    if (( wait_upgrade <= 0 )); then
-        echo >&2 "Upgrade timeout, exiting" && return 1
+    if [[ ${wait_upgrade} -le 0 ]]; then
+        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
     fi
+}
+
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
 }
 
 function run_command_oc_retries() {
@@ -208,7 +224,7 @@ function check_mcp() {
         updated="$(echo "${out}" | awk '{print $3}')"
         updating="$(echo "${out}" | awk '{print $4}')"
         degraded="$(echo "${out}" | awk '{print $5}')"
-    
+
         if [[ ${i} == "master" ]]; then
             if [[ ${updated} == "True" && ${updating} == "False" && ${degraded} == "False" ]]; then
                 echo "Master pool status check passed"
@@ -220,9 +236,9 @@ function check_mcp() {
                 echo "Worker pool status check passed"
             else
                 echo >&2 "Worker pool status check failed" && return 1
-            fi 
-        fi   
-    done      
+            fi
+        fi
+    done
 }
 
 function health_check() {
@@ -240,7 +256,9 @@ fi
 
 TARGET_VERSION="$(oc adm release info "${RELEASE_IMAGE_TARGET}" --output=json | jq -r '.metadata.version')"
 TARGET_Y_VERSION="$(echo "${TARGET_VERSION}" | cut -f1,2 -d.)"
+SOURCE_MINOR_VERSION=$(oc get clusterversion --no-headers | awk '{print $2}' | cut -f2 -d.)
 export TARGET_Y_VERSION
+export SOURCE_MINOR_VERSION
 
 export OC="run_command_oc_retries"
 

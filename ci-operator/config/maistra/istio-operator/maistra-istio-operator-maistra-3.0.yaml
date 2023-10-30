@@ -26,12 +26,6 @@ releases:
     release:
       channel: stable
       version: "4.12"
-  multi-latest:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
-      version: "4.14"
 resources:
   '*':
     limits:
@@ -74,7 +68,7 @@ tests:
   container:
     from: src-test
   timeout: 20m0s
-- as: update-common
+- as: update-deps
   commands: |
     # load test-infra automator.sh script
     git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git
@@ -87,9 +81,9 @@ tests:
       -o maistra \
       -r istio-operator \
       -f /creds-github/token \
-      '-c make update-common' \
-      '-t [maistra-3.0] Automator: Update common-files' \
-      -m update_common_3.0 \
+      '-c ./tools/update_deps.sh' \
+      '-t [maistra-3.0] Automator: Update dependencies' \
+      -m update_deps_3.0 \
       -l auto-merge \
       -b maistra-3.0
   container:
@@ -190,21 +184,15 @@ tests:
     - as: integration-ocp
       cli: latest
       commands: |
-        export QUAY_PASS=$(cat /maistra-secrets/password)
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          entrypoint \
-          sh -c \
-          "export KUBECONFIG=/work/ci-kubeconfig && \
-          export TAG=PR-${PULL_NUMBER} && \
-          docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
-          cd /work && \
+          sh -c "\
+          export KUBECONFIG=/work/ci-kubeconfig && \
+          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
           export BUILD_WITH_CONTAINER="0" && \
+          cd /work && \
+          entrypoint \
           make test.integration.ocp"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      credentials:
-      - mount_path: /maistra-secrets
-        name: maistra-dev-prow
-        namespace: test-credentials
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -321,10 +309,11 @@ tests:
 - as: nightly-images
   cron: 00 03 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       RELEASE_IMAGE_LATEST: release:latest
     env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.13.14-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-nightly-images
       MAISTRA_SC_POD: maistra-nightly-images-pod
@@ -357,8 +346,8 @@ tests:
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
           sh -c \
-          "git config --global user.email 'dgrimm@redhat.com'; \
-           git config --global user.name 'Daniel Grimm'; \
+          "git config --global user.email 'jwendell@redhat.com'; \
+           git config --global user.name 'Jonh Wendell'; \
            cd /work && \
            export BUILD_WITH_CONTAINER="0" && \
            make -e GITHUB_TOKEN=${GITHUB_TOKEN} docker-push-nightly bundle-publish-nightly"
@@ -379,7 +368,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-profile
+    workflow: servicemesh-istio-e2e-hypershift
 zz_generated_metadata:
   branch: maistra-3.0
   org: maistra
