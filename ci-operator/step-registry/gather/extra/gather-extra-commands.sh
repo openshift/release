@@ -361,13 +361,37 @@ ${t_all}     cluster:usage:cpu:total:seconds:quantile      label_replace(quantil
 ${t_install} cluster:usage:cpu:install:seconds:quantile    label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/"}[90s:30s]))[${d_all}:${d_test}]),"quantile","0.95","","")
 ${t_test}    cluster:usage:cpu:test:seconds:quantile       label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/"}[90s:30s]))[${d_test}:]),"quantile","0.95","","")
 
+${t_all}     cluster:usage:cpu:kubelet:total:seconds:quantile      label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[90s:30s]))[${d_all}:]),"quantile","0.95","","")
+${t_install} cluster:usage:cpu:kubelet:install:seconds:quantile    label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[90s:30s]))[${d_all}:${d_test}]),"quantile","0.95","","")
+${t_test}    cluster:usage:cpu:kubelet:test:seconds:quantile       label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[90s:30s]))[${d_test}:]),"quantile","0.95","","")
+
+${t_all}     cluster:usage:cpu:crio:total:seconds:quantile      label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[90s:30s]))[${d_all}:]),"quantile","0.95","","")
+${t_install} cluster:usage:cpu:crio:install:seconds:quantile    label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[90s:30s]))[${d_all}:${d_test}]),"quantile","0.95","","")
+${t_test}    cluster:usage:cpu:crio:test:seconds:quantile       label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[90s:30s]))[${d_test}:]),"quantile","0.95","","")
+
 ${t_all}     cluster:usage:cpu:total:seconds   sum(increase(container_cpu_usage_seconds_total{id="/"}[${d_all}]))
 ${t_install} cluster:usage:cpu:install:seconds sum(increase(container_cpu_usage_seconds_total{id="/"}[${d_install}]))
 ${t_test}    cluster:usage:cpu:test:seconds    sum(increase(container_cpu_usage_seconds_total{id="/"}[${d_test}]))
 
+${t_all}     cluster:usage:cpu:kubelet:total:seconds   sum(increase(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[${d_all}]))
+${t_install} cluster:usage:cpu:kubelet:install:seconds sum(increase(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[${d_install}]))
+${t_test}    cluster:usage:cpu:kubelet:test:seconds    sum(increase(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[${d_test}]))
+
+${t_all}     cluster:usage:cpu:crio:total:seconds   sum(increase(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[${d_all}]))
+${t_install} cluster:usage:cpu:crio:install:seconds sum(increase(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[${d_install}]))
+${t_test}    cluster:usage:cpu:crio:test:seconds    sum(increase(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[${d_test}]))
+
 ${t_all}     cluster:usage:cpu:total:rate   sum(rate(container_cpu_usage_seconds_total{id="/"}[${d_all}]))
 ${t_install} cluster:usage:cpu:install:rate sum(rate(container_cpu_usage_seconds_total{id="/"}[${d_install}]))
 ${t_test}    cluster:usage:cpu:test:rate    sum(rate(container_cpu_usage_seconds_total{id="/"}[${d_test}]))
+
+${t_all}     cluster:usage:cpu:kubelet:total:rate   sum(rate(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[${d_all}]))
+${t_install} cluster:usage:cpu:kubelet:install:rate sum(rate(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[${d_install}]))
+${t_test}    cluster:usage:cpu:kubelet:test:rate    sum(rate(container_cpu_usage_seconds_total{id="/system.slice/kubelet.service"}[${d_test}]))
+
+${t_all}     cluster:usage:cpu:crio:total:rate   sum(rate(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[${d_all}]))
+${t_install} cluster:usage:cpu:crio:install:rate sum(rate(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[${d_install}]))
+${t_test}    cluster:usage:cpu:crio:test:rate    sum(rate(container_cpu_usage_seconds_total{id="/system.slice/crio.service"}[${d_test}]))
 
 ${t_all}     cluster:usage:cpu:control_plane:total:avg   avg(rate(container_cpu_usage_seconds_total{id="/"}[${d_all}]) * on(node) group_left() group by (node) (kube_node_role{role="master"}))
 ${t_install} cluster:usage:cpu:control_plane:install:avg avg(rate(container_cpu_usage_seconds_total{id="/"}[${d_install}]) * on(node) group_left() group by (node) (kube_node_role{role="master"}))
@@ -397,9 +421,33 @@ ${t_all}     cluster:usage:mem:rss:control_plane:quantile label_replace(max(quan
 ${t_all}     cluster:usage:mem:rss:control_plane:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_rss{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.9", "", "")
 ${t_all}     cluster:usage:mem:rss:control_plane:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_rss{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.5", "", "")
 
+${t_all}     cluster:usage:mem:rss:kubelet:quantile label_replace(max(quantile_over_time(0.99, ((container_memory_rss{id="/system.slice/kubelet.service"}))[${d_all}:1s] )), "quantile", "0.99", "", "")
+${t_all}     cluster:usage:mem:rss:kubelet:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_rss{id="/system.slice/kubelet.service"}))[${d_all}:1s] )), "quantile", "0.9", "", "")
+${t_all}     cluster:usage:mem:rss:kubelet:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_rss{id="/system.slice/kubelet.service"}))[${d_all}:1s] )), "quantile", "0.5", "", "")
+
+${t_all}     cluster:usage:mem:rss:crio:quantile label_replace(max(quantile_over_time(0.99, ((container_memory_rss{id="/system.slice/crio.service"}))[${d_all}:1s] )), "quantile", "0.99", "", "")
+${t_all}     cluster:usage:mem:rss:crio:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_rss{id="/system.slice/crio.service"}))[${d_all}:1s] )), "quantile", "0.9", "", "")
+${t_all}     cluster:usage:mem:rss:crio:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_rss{id="/system.slice/crio.service"}))[${d_all}:1s] )), "quantile", "0.5", "", "")
+
 ${t_all}     cluster:usage:mem:working_set:control_plane:quantile label_replace(max(quantile_over_time(0.99, ((container_memory_working_set_bytes{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.99", "", "")
 ${t_all}     cluster:usage:mem:working_set:control_plane:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_working_set_bytes{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.9", "", "")
 ${t_all}     cluster:usage:mem:working_set:control_plane:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_working_set_bytes{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.5", "", "")
+
+${t_all}     cluster:usage:mem:working_set:kubelet:quantile label_replace(max(quantile_over_time(0.99, ((container_memory_working_set_bytes{id="/system.slice/kubelet.service"}))[${d_all}:1s] )), "quantile", "0.99", "", "")
+${t_all}     cluster:usage:mem:working_set:kubelet:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_working_set_bytes{id="/system.slice/kubelet.service"}))[${d_all}:1s] )), "quantile", "0.9", "", "")
+${t_all}     cluster:usage:mem:working_set:kubelet:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_working_set_bytes{id="/system.slice/kubelet.service"}))[${d_all}:1s] )), "quantile", "0.5", "", "")
+
+${t_all}     cluster:usage:mem:working_set:crio:quantile label_replace(max(quantile_over_time(0.99, ((container_memory_working_set_bytes{id="/system.slice/crio.service"}))[${d_all}:1s] )), "quantile", "0.99", "", "")
+${t_all}     cluster:usage:mem:working_set:crio:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_working_set_bytes{id="/system.slice/crio.service"}))[${d_all}:1s] )), "quantile", "0.9", "", "")
+${t_all}     cluster:usage:mem:working_set:crio:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_working_set_bytes{id="/system.slice/crio.service"}))[${d_all}:1s] )), "quantile", "0.5", "", "")
+
+${t_all}     cluster:usage:memory:kubelet:total:avg   avg(sum(rate(container_memory_working_set_bytes{id="/system.slice/kubelet.service"}[${t_all}])) by (node))
+${t_install} cluster:usage:memory:kubelet:total:avg   avg(sum(rate(container_memory_working_set_bytes{id="/system.slice/kubelet.service"}[${t_install}])) by (node))
+${t_test}    cluster:usage:memory:kubelet:total:avg   avg(sum(rate(container_memory_working_set_bytes{id="/system.slice/kubelet.service"}[${t_test}])) by (node))
+
+${t_all}     cluster:usage:memory:crio:total:avg   avg(sum(rate(container_memory_working_set_bytes{id="/system.slice/crio.service"}[${t_all}])) by (node))
+${t_install} cluster:usage:memory:crio:total:avg   avg(sum(rate(container_memory_working_set_bytes{id="/system.slice/crio.service"}[${t_install}])) by (node))
+${t_test}    cluster:usage:memory:crio:total:avg   avg(sum(rate(container_memory_working_set_bytes{id="/system.slice/crio.service"}[${t_test}])) by (node))
 
 ${t_all}     cluster:usage:memory:kube_apiserver:total:avg   avg(sum(rate(container_memory_working_set_bytes{pod=~"kube-apiserver-ip.*", namespace="openshift-kube-apiserver"}[${d_all}])) by (pod))
 ${t_install} cluster:usage:memory:kube_apiserver:install:avg avg(sum(rate(container_memory_working_set_bytes{pod=~"kube-apiserver-ip.*", namespace="openshift-kube-apiserver"}[${d_install}])) by (pod))
