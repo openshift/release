@@ -32,9 +32,11 @@ logger = logging.getLogger()
 
 
 def generate_app_ci_content(config, git_clone_dir):
+    namespaces = []
     for private in (False, True):
         for arch in config.arches:
             context = Context(config, arch, private)
+            namespaces.append(context.is_namespace)
 
             with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'admin_deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
                 content.add_imagestream_namespace_rbac(gendoc)
@@ -115,6 +117,9 @@ def generate_app_ci_content(config, git_clone_dir):
 
     # Release Payload Controller
     content.add_release_payload_controller_resources(config, context)
+
+    # Release Reimport Controller
+    content.add_release_reimport_controller_resources(config, context, namespaces)
 
 
 def run(git_clone_dir, bump=False):
