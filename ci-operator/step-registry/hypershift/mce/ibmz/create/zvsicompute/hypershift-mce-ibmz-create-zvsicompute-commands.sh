@@ -286,4 +286,5 @@ echo "$(date) All the agents are attached as compute nodes to the hosted control
 # Verifying the compute nodes status
 echo "$(date) Checking the compute nodes in the hosted control plane"
 oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=30m
 echo "$(date) Successfully completed the e2e creation chain"
