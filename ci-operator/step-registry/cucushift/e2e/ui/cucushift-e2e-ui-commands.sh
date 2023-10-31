@@ -42,14 +42,17 @@ set +x
 
 # summarize test results
 echo "Summarizing test result..."
-mapfile -t test_suite_failures < <(grep -r -E 'testsuite.*failures="[1-9][0-9]*"' "${ARTIFACT_DIR}" | grep -o -E 'failures="[0-9]+"' | sed -E 's/failures="([0-9]+)"/\1/')
-failures=0
-for (( i=0; i<${#test_suite_failures[@]}; ++i ))
-do
-    let failures+=${test_suite_failures[$i]}
-done
-if [ $((failures)) == 0 ]; then
-    echo "All tests have passed"
-else
-    echo "${failures} failures in cucushift-e2e-ui" | tee -a "${SHARED_DIR}/cucushift-e2e-failures"
+failures=0 errors=0 skipped=0 tests=0
+grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
+while read -a row ; do
+    # if the last ARG of command `let` evaluates to 0, `let` returns 1
+    let failures+=${row[0]} errors+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
+done < /tmp/zzz-tmp.log
+
+TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results"
+echo "failures: $failures, errors: $errors, skipped: $skipped, tests: $tests in cucushift-e2e-ui" | tee -a "${TEST_RESULT_FILE}"
+if [ $((failures)) != 0 ] ; then
+    echo "Failing Scenarios:" | tee -a "${TEST_RESULT_FILE}"
+    grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | grep -v grep | cut -d'#' -f2 | sort -t':' -k3 | tee -a "${TEST_RESULT_FILE}" || true
 fi
+cp "${TEST_RESULT_FILE}" "${SHARED_DIR}/openshift-e2e-test-qe-report-cucushift-results" || true
