@@ -15,8 +15,8 @@ echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..
 declare vsphere_datacenter
 declare vsphere_url
 declare vsphere_portgroup
-declare multizone_portgroup_1
-declare multizone_portgroup_2
+declare vsphere_extra_portgroup_1
+declare vsphere_extra_portgroup_2
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
@@ -25,7 +25,7 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
-if [[ -z "${multizone_portgroup_1}" ]] || [[ -z "${multizone_portgroup_2}" ]]; then
+if [[ -z "${vsphere_extra_portgroup_1}" ]] || [[ -z "${vsphere_extra_portgroup_2}" ]]; then
    echo "The required extra leases is 2 at leaset, exit"
    exit 1
 fi	
@@ -75,7 +75,7 @@ platform:
       topology:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-2
         networks:
-        - ${multizone_portgroup_1}
+        - ${vsphere_extra_portgroup_1}
         datastore: mdcnc-ds-shared
     - name: us-east-3
       region: us-east
@@ -83,7 +83,7 @@ platform:
       topology:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-3
         networks:
-        - ${multizone_portgroup_2}
+        - ${vsphere_extra_portgroup_2}
         datastore: mdcnc-ds-shared
     - name: us-west-1
       region: us-west
