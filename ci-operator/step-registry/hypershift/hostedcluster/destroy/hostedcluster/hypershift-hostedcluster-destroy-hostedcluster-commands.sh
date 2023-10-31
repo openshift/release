@@ -55,6 +55,7 @@ else
   echo Cluster was successfully created at $createdAt
 fi
 
+set +e
 echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
 if [[ "${PLATFORM}" == "aws" ]]; then
   for _ in {1..10}; do
@@ -103,6 +104,7 @@ elif [[ "${PLATFORM}" == "powervs" ]]; then
      --vpc ${POWERVS_VPC} \
      --cloud-connection ${POWERVS_CLOUD_CONNECTION}
    if [ $? == 0 ]; then
+      echo "breaking"
       break
    else
       echo 'Failed to delete the cluster, retrying...'
