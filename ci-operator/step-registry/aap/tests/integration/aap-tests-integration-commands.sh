@@ -7,6 +7,7 @@ set -o pipefail
 
 echo "Run secuirty vulnerability testing..."
 IMAGE_NAME=quay.io/aap-ci/ansible-tests-integration-agent
+SECRETS_DIR="/tmp/secrets/ci"
 
 SNYK_TOKEN="$(cat $SNYK_TOKEN_PATH)"
 export SNYK_TOKEN
