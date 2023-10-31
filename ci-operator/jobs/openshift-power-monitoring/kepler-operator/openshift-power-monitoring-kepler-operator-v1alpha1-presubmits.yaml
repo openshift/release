@@ -188,16 +188,16 @@ presubmits:
     - ^v1alpha1$
     - ^v1alpha1-
     cluster: build02
-    context: ci/prow/post-submits-aws-ci-index-kepler-bundle
+    context: ci/prow/post-submit-ci-index-kepler-bundle
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: post-submits-aws
+      ci-operator.openshift.io/variant: post-submit
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-power-monitoring-kepler-operator-v1alpha1-post-submits-aws-ci-index-kepler-bundle
-    rerun_command: /test post-submits-aws-ci-index-kepler-bundle
+    name: pull-ci-openshift-power-monitoring-kepler-operator-v1alpha1-post-submit-ci-index-kepler-bundle
+    rerun_command: /test post-submit-ci-index-kepler-bundle
     spec:
       containers:
       - args:
@@ -205,7 +205,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=ci-index-kepler-bundle
-        - --variant=post-submits-aws
+        - --variant=post-submit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -238,23 +238,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )post-submits-aws-ci-index-kepler-bundle,?($|\s.*)
+    trigger: (?m)^/test( | .* )post-submit-ci-index-kepler-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^v1alpha1$
     - ^v1alpha1-
     cluster: build02
-    context: ci/prow/post-submits-aws-images
+    context: ci/prow/post-submit-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: post-submits-aws
+      ci-operator.openshift.io/variant: post-submit
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-power-monitoring-kepler-operator-v1alpha1-post-submits-aws-images
-    rerun_command: /test post-submits-aws-images
+    name: pull-ci-openshift-power-monitoring-kepler-operator-v1alpha1-post-submit-images
+    rerun_command: /test post-submit-images
     spec:
       containers:
       - args:
@@ -262,7 +262,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=post-submits-aws
+        - --variant=post-submit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -295,118 +295,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )post-submits-aws-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^v1alpha1$
-    - ^v1alpha1-
-    cluster: build02
-    context: ci/prow/post-submits-gcp-ci-index-kepler-bundle
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: post-submits-gcp
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-power-monitoring-kepler-operator-v1alpha1-post-submits-gcp-ci-index-kepler-bundle
-    rerun_command: /test post-submits-gcp-ci-index-kepler-bundle
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index-kepler-bundle
-        - --variant=post-submits-gcp
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )post-submits-gcp-ci-index-kepler-bundle,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^v1alpha1$
-    - ^v1alpha1-
-    cluster: build02
-    context: ci/prow/post-submits-gcp-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: post-submits-gcp
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-power-monitoring-kepler-operator-v1alpha1-post-submits-gcp-images
-    rerun_command: /test post-submits-gcp-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=post-submits-gcp
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )post-submits-gcp-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )post-submit-images,?($|\s.*)
