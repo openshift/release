@@ -1210,6 +1210,8 @@ periodics:
     org: openshift
     repo: hypershift
   labels:
+    ci-operator.openshift.io/cloud: hypershift-powervs-cb
+    ci-operator.openshift.io/cloud-cluster-profile: hypershift-powervs-cb
     ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
     job-release: "4.14"
@@ -1220,8 +1222,10 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-powervs-cluster-profile
       - --target=e2e-powervs
       - --variant=periodics
       command:
@@ -1233,9 +1237,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
+      - mountPath: /usr/local/e2e-powervs-cluster-profile
+        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -1250,9 +1259,18 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-hypershift-powervs-cb
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
