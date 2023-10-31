@@ -6,19 +6,11 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   to: console-pipelines-plugin
-promotion:
-  name: "4.16"
-  namespace: ocp
 releases:
-  initial:
-    integration:
-      name: "4.16"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.16"
-      namespace: ocp
+    release:
+      channel: fast
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -27,17 +19,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: lint-aws-plugin
-  steps:
-    test:
-    - as: lint
-      commands: yarn install && yarn run lint
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: e2e-aws-plugin
+- as: e2e-tests-aws
+  optional: true
   steps:
     cluster_profile: aws
     test:
@@ -55,6 +38,7 @@ tests:
       timeout: 3h0m0s
     workflow: openshift-e2e-aws
 zz_generated_metadata:
-  branch: release-4.16
+  branch: main
   org: openshift-pipelines
   repo: console-plugin
+  variant: "4.12"
