@@ -8,10 +8,15 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 remote_machineset_name="remote-worker"
 remote_worker_number="${REMOTEWORKER_NUMBER}"
-declare vsphere_connected_portgroup
+declare vsphere_extra_portgroup_1
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
-remote_network_name="${vsphere_connected_portgroup}"
+remote_network_name="${vsphere_extra_portgroup_1}"
+
+if [[ -z "${remote_network_name}" ]]; then
+   echo "The required extra leases is not defined!"
+   exit 1
+fi
 
 # Get machineset name to generate a generic template
 ref_machineset_name=$(oc -n openshift-machine-api get -o 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' machinesets | grep worker | head -n1)

@@ -53,16 +53,15 @@ else
 
 fi
 
-#to support vsphere-ipi-zones-multisubnets-external-lb, which need 3 different subnets, add these var to specify the multisubnets portgroups.
-if [[ -n "${VSPHERE_MULTIZONE_LEASED_RESOURCE:-}" ]]; then
+if [[ -n "${VSPHERE_EXTRA_LEASED_RESOURCE:-}" ]]; then
     i=0
-    for multizone_leased_resource in ${VSPHERE_MULTIZONE_LEASED_RESOURCE}; do    
-	 multizone_vlanid=$(awk -F. '{print $3}' <(echo "${multizone_leased_resource}"))
-	 multizone_portgroup="ci-vlan-${multizone_vlanid}"
+    for extra_leased_resource in ${VSPHERE_EXTRA_LEASED_RESOURCE}; do
+	 extra_vlanid=$(awk -F. '{print $3}' <(echo "${extra_leased_resource}"))
+	 extra_portgroup="ci-vlan-${extra_vlanid}"
 	 i=$((i + 1))
-	 portgroup_list+=("${multizone_portgroup}")
+	 portgroup_list+=("${extra_portgroup}")
 	 cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
-export multizone_portgroup_${i}="${multizone_portgroup}"
+export vsphere_extra_portgroup_${i}="${extra_portgroup}"
 EOF
     done
 fi    
@@ -103,13 +102,13 @@ export phydc="${phydc:-unset}"
 export primaryrouterhostname="${primaryrouterhostname:-unset}"
 EOF
 
-if [[ -n "${VSPHERE_CONNECTED_LEASED_RESOURCE:-}" ]]; then
-  vlanid_2=$(awk -F. '{print $3}' <(echo "${VSPHERE_CONNECTED_LEASED_RESOURCE}"))
-  vsphere_connected_portgroup="ci-vlan-${vlanid_2}"
+if [[ -n "${VSPHERE_BASTION_LEASED_RESOURCE:-}" ]]; then
+  vlanid_2=$(awk -F. '{print $3}' <(echo "${VSPHERE_BASTION_LEASED_RESOURCE}"))
+  vsphere_bastion_portgroup="ci-vlan-${vlanid_2}"
   cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
-export vsphere_connected_portgroup="${vsphere_connected_portgroup}"
+export vsphere_bastion_portgroup="${vsphere_bastion_portgroup}"
 EOF
-  portgroup_list+=("${vsphere_connected_portgroup}")
+  portgroup_list+=("${vsphere_bastion_portgroup}")
 fi
 
 # shellcheck source=/dev/null
