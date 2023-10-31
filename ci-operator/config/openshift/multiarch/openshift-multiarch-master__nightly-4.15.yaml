@@ -317,6 +317,40 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-serial
+- as: ocp-e2e-ibmcloud-ovn-multi-ppc64le
+  cron: 20 7,17 * * *
+  steps:
+    cluster_profile: ibmcloud-multi-ppc64le
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: ppc64le
+      BASE_DOMAIN: ocp-dev-ppc64le.com
+      GO_VERSION: 1.20.7
+      JQ_VERSION: "1.6"
+      LOKI_ENABLED: "false"
+      OCP_VERSION: "4.15"
+      RESOURCE_GROUP: ipi-cicd-resource-group
+      SIZE_VARIANT: large
+      TERRAFORM_VERSION: 1.5.5
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| Managed cluster should have same number of
+        Machines and Nodes \| Managed cluster should have machine resources \| should
+        not have pod creation failures during install \| DNS should answer queries
+        using the local DNS endpoint \| not repeat pathologically for ns/openshift-etcd
+        \| egressFirewall should have no impact outside its namespace
+      WORKERS: "2"
+      YQ_VERSION: 4.30.5
+    workflow: openshift-e2e-ibmcloud-heterogeneous-upi
+  timeout: 6h0m0s
 - as: ocp-e2e-azure-ovn-arm64
   interval: 72h
   steps:
