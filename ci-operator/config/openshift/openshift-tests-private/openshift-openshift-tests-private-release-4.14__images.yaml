@@ -29,7 +29,20 @@ images:
         yum clean all && rm -rf /var/cache/yum/*
   from: src
   to: tests-private-ui
+- dockerfile_literal: |
+    FROM src
+    RUN echo "it is debug to get image optional"
+  from: src
+  optional: true
+  to: tests-private-base
+- dockerfile_literal: |
+    FROM tests-private-base
+    RUN echo "it is debug"
+  from: tests-private-base
+  to: tests-private-optional-debug
 promotion:
+  excluded_images:
+  - tests-private-optional-debug
   namespace: ci
   tag: "4.14"
 resources:
