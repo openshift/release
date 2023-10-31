@@ -17,7 +17,7 @@ images:
   context_dir: .
   dockerfile_path: Dockerfile
   from: ubi_minimal
-  to: modelmesh
+  to: modelmesh-runtime-adapter
 promotion:
   namespace: opendatahub-io
   tag: v0.11.0
@@ -35,22 +35,27 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: unit
+  commands: HOME=/go GOFLAGS=-mod=mod make test
+  container:
+    from: src
+  skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
 - as: pr-image-mirror
   skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: modelmesh
+      SOURCE_IMAGE_REF: modelmesh-runtime-adapter
     env:
-      IMAGE_REPO: modelmesh
+      IMAGE_REPO: modelmesh-runtime-adapter
     workflow: opendatahub-io-ci-image-mirror
 - as: stable-image-mirror
   postsubmit: true
   skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: modelmesh
+      SOURCE_IMAGE_REF: modelmesh-runtime-adapter
     env:
-      IMAGE_REPO: modelmesh
+      IMAGE_REPO: modelmesh-runtime-adapter
       RELEASE_VERSION: stable
     workflow: opendatahub-io-ci-image-mirror
 - as: branch-image-mirror
@@ -58,12 +63,12 @@ tests:
   skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: modelmesh
+      SOURCE_IMAGE_REF: modelmesh-runtime-adapter
     env:
-      IMAGE_REPO: modelmesh
+      IMAGE_REPO: modelmesh-runtime-adapter
       IMAGE_TAG: v0.11.0
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
-  branch: release-0.11
+  branch: release-0.11.0
   org: opendatahub-io
-  repo: modelmesh
+  repo: modelmesh-runtime-adapter
