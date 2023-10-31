@@ -62,9 +62,10 @@ fi
 
 # Set up access for azure sdk
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
-export AZURE_CLIENT_ID="$(cat ${AZURE_AUTH_LOCATION} | jq -r .clientId)"
-export AZURE_CLIENT_SECRET="$(cat ${AZURE_AUTH_LOCATION} | jq -r .clientSecret)"
-export AZURE_TENANT_ID="$(cat ${AZURE_AUTH_LOCATION} | jq -r .tenantId)"
+AZURE_CLIENT_ID="$(cat ${AZURE_AUTH_LOCATION} | jq -r .clientId)"
+AZURE_CLIENT_SECRET="$(cat ${AZURE_AUTH_LOCATION} | jq -r .clientSecret)"
+AZURE_TENANT_ID="$(cat ${AZURE_AUTH_LOCATION} | jq -r .tenantId)"
+export AZURE_AUTH_LOCATION AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_TENANT_ID
 
 openshift-tests run-resourcewatch > "${ARTIFACT_DIR}/run-resourcewatch.log" 2>&1 &
 DISABLED_MONITOR_TESTS="apiserver-availability,apiserver-new-disruption-invariant,disruption-summary-serializer,external-service-availability,incluster-disruption-serializer,image-registry-availability,ingress-availability,pod-network-avalibility,service-type-load-balancer-availability"
