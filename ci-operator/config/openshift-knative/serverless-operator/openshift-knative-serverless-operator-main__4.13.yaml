@@ -454,17 +454,27 @@ tests:
         limits:
           memory: 6Gi
         requests:
-          cpu: 100m
+          cpu: "4"
           memory: 200Mi
       timeout: 1h0m0s
-    - as: serverless-kitchensink-e2e-broker
-      commands: make test-kitchensink-e2e-single-testonly TEST=TestBroker
+    - as: serverless-kitchensink-e2e-broker-broker
+      commands: make test-kitchensink-e2e-single-testonly TEST=TestBrokerReadinessBrokerDLS
       from: serverless-operator-src
       resources:
         limits:
           memory: 6Gi
         requests:
-          cpu: 100m
+          cpu: "4"
+          memory: 200Mi
+      timeout: 2h0m0s
+    - as: serverless-kitchensink-e2e-broker-trigger
+      commands: make test-kitchensink-e2e-single-testonly TEST=TestBrokerReadinessTriggerDLS
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "4"
           memory: 200Mi
       timeout: 2h0m0s
     - as: serverless-kitchensink-e2e-channel
@@ -474,7 +484,7 @@ tests:
         limits:
           memory: 6Gi
         requests:
-          cpu: 100m
+          cpu: "4"
           memory: 200Mi
       timeout: 2h0m0s
     - as: serverless-kitchensink-e2e-flow
@@ -484,7 +494,7 @@ tests:
         limits:
           memory: 6Gi
         requests:
-          cpu: 100m
+          cpu: "4"
           memory: 200Mi
       timeout: 2h0m0s
     - as: serverless-kitchensink-e2e-source
@@ -494,7 +504,7 @@ tests:
         limits:
           memory: 6Gi
         requests:
-          cpu: 100m
+          cpu: "4"
           memory: 200Mi
       timeout: 2h0m0s
     workflow: generic-claim
@@ -511,8 +521,8 @@ tests:
   steps:
     allow_skip_on_success: true
     test:
-    - as: serverless-e2e
-      commands: make test-kitchensink-e2e
+    - as: serverless-kitchensink-e2e-setup
+      commands: make test-kitchensink-e2e-setup
       dependencies:
       - env: KNATIVE_OPENSHIFT_INGRESS
         name: knative-openshift-ingress
@@ -526,8 +536,60 @@ tests:
           memory: 6Gi
         requests:
           cpu: "4"
+          memory: 200Mi
+      timeout: 1h0m0s
+    - as: serverless-kitchensink-e2e-broker-broker
+      commands: make test-kitchensink-e2e-single-testonly TEST=TestBrokerReadinessBrokerDLS
+      from: serverless-operator-src
+      resources:
+        limits:
           memory: 6Gi
+        requests:
+          cpu: "4"
+          memory: 200Mi
+      timeout: 2h0m0s
+    - as: serverless-kitchensink-e2e-broker-trigger
+      commands: make test-kitchensink-e2e-single-testonly TEST=TestBrokerReadinessTriggerDLS
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "4"
+          memory: 200Mi
+      timeout: 2h0m0s
+    - as: serverless-kitchensink-e2e-channel
+      commands: make test-kitchensink-e2e-single-testonly TEST=TestChannel
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "4"
+          memory: 200Mi
+      timeout: 2h0m0s
+    - as: serverless-kitchensink-e2e-flow
+      commands: make test-kitchensink-e2e-single-testonly TEST=TestFlow
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "4"
+          memory: 200Mi
+      timeout: 2h0m0s
+    - as: serverless-kitchensink-e2e-source
+      commands: make test-kitchensink-e2e-single-testonly TEST=TestSource
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "4"
+          memory: 200Mi
+      timeout: 2h0m0s
     workflow: generic-claim
+  timeout: 8h0m0s
 - as: upgrade-kitchensink-ocp-413
   cluster_claim:
     architecture: amd64
