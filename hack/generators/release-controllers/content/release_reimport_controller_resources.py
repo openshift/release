@@ -25,7 +25,7 @@ def _cluster_scoped_rbac_resources(gendoc):
             'apiVersion': 'rbac.authorization.k8s.io/v1',
             'kind': 'ClusterRole',
             'metadata': {
-                'name': 'release-payload-controller',
+                'name': 'release-reimport-controller',
             },
             'rules': [
                 {
