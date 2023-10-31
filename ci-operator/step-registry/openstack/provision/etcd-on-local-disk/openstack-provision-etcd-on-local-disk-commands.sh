@@ -30,6 +30,9 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+# for debug
+sleep 5000
+
 oc replace -f - <<EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
