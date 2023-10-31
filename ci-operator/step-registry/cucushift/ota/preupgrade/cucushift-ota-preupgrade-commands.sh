@@ -38,8 +38,9 @@ function pre-ocp-66839(){
 
     # There should be only enabled cap annotaion in all extracted manifests
     curCap=$(grep -rh "capability.openshift.io/name:" "${manifestsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-    if [[ "${curCap}" != "${ADDITIONAL_ENABLED_CAPABILITIES}" ]]; then
-        echo "Caps in extracted manifests found: ${curCap}, but expected ${ADDITIONAL_ENABLED_CAPABILITIES}"
+    expectedCap=$(echo ${ADDITIONAL_ENABLED_CAPABILITIES} | sort -u|xargs)
+    if [[ "${curCap}" != "${expectedCap}" ]]; then
+        echo "Caps in extracted manifests found: ${curCap}, but expected ${expectedCap}"
         return 1
     fi
 
@@ -69,8 +70,8 @@ function pre-ocp-66839(){
 
     if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "" ]]; then
         curCapInCR=$(grep -rh "capability.openshift.io/name:" "${preCredsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-        if [[ "${curCapInCR}" != "${ADDITIONAL_ENABLED_CAPABILITIES}" ]]; then
-            echo "Extracted CRs has cap annotation: ${curCapInCR}, but expected ${ADDITIONAL_ENABLED_CAPABILITIES}"
+        if [[ "${curCapInCR}" != "${expectedCap}" ]]; then
+            echo "Extracted CRs has cap annotation: ${curCapInCR}, but expected ${expectedCap}"
             return 1
         fi
     else
@@ -86,8 +87,9 @@ function pre-ocp-66839(){
         return 1
     fi
     tobecap=$(grep -rh "capability.openshift.io/name:" "${tobeCredsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-    if [[ "${tobecap}" != "${CAPABILITIES_IN_CREDENTIALREQUEST}" ]]; then
-        echo "CRs with cap annotation: ${tobecap}, but expected: ${CAPABILITIES_IN_CREDENTIALREQUEST}"
+    expectedCapCR=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST} | sort -u|xargs)
+    if [[ "${tobecap}" != "${expectedCapCR}" ]]; then
+        echo "CRs with cap annotation: ${tobecap}, but expected: ${expectedCapCR}"
         return 1
     fi
     echo "Test Passed: ${FUNCNAME[0]}"
