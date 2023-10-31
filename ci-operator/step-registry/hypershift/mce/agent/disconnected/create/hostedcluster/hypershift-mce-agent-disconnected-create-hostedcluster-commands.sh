@@ -43,8 +43,8 @@ PLAYLOADIMAGE=\$(oc get clusterversion version -ojsonpath='{.status.desired.imag
 EXTRA_ARGS=""
 if [[ "\$DISCONNECTED" == "true" ]]; then
   PLAYLOADIMAGE=\$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
-  HO_OPERATOR_IMAGE="\${PLAYLOADIMAGE//@sha256:[^ ]*/@\$(oc adm release info "\$PLAYLOADIMAGE" | grep hypershift | awk '{print \$2}')}"
-  podman pull "\$HO_OPERATOR_IMAGE"
+  HO_OPERATOR_IMAGE="\${PLAYLOADIMAGE//@sha256:[^ ]*/@\$(oc adm release info -a /tmp/.dockerconfigjson "\$PLAYLOADIMAGE" | grep hypershift | awk '{print \$2}')}"
+  podman pull --authfile /tmp/.dockerconfigjson "\$HO_OPERATOR_IMAGE"
   EXTRA_ARGS+=\$(echo "--annotations=hypershift.openshift.io/control-plane-operator-image=\$HO_OPERATOR_IMAGE ")
   EXTRA_ARGS+=\$(echo "--additional-trust-bundle /etc/pki/ca-trust/source/anchors/registry.2.crt ")
 fi
@@ -53,13 +53,20 @@ if [[ "\${IP_STACK}" == "v6" ]]; then
   EXTRA_ARGS+="--cluster-cidr fd03::/48 --service-cidr fd04::/112 "
 fi
 
+if [[ "\${IP_STACK}" == "v4v6" ]]; then
+  EXTRA_ARGS+="--cluster-cidr 10.132.0.0/14 --cluster-cidr fd03::/48 --service-cidr 172.31.0.0/16 --service-cidr fd04::/112 "
+fi
+
+if [[ "\${IP_STACK}" != "v4v6" ]]; then
+  EXTRA_ARGS+=\$(echo "--api-server-address=api.\${CLUSTER_NAME}.\${BASEDOMAIN} ")
+fi
+
 /tmp/hcp create cluster agent \${EXTRA_ARGS} \
   --name=\${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \
   --agent-namespace="\${CLUSTER_NAMESPACE}" \
   --namespace local-cluster \
   --base-domain=\${BASEDOMAIN} \
-  --api-server-address=api.\${CLUSTER_NAME}.\${BASEDOMAIN} \
   --image-content-sources "/home/mgmt_iscp.yaml" \
   --release-image \${PLAYLOADIMAGE}
 
