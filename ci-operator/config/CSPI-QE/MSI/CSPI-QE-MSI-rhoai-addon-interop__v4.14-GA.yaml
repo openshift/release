@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.13"
+    name: "4.14"
     namespace: ocp
     tag: cli
   ocp-addons-operators-cli:
@@ -11,20 +11,16 @@ base_images:
     name: openshift-cli-installer
     namespace: ci
     tag: latest
-  rhods-addon-tests:
+  rhoai-tests:
     name: ods-ci
     namespace: ci
     tag: stable
-  upi-installer:
-    name: "4.13"
-    namespace: ocp
-    tag: upi-installer
 releases:
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -33,12 +29,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: smoke-rosa-rhods-hypershift
+- as: smoke-rosa-rhods-addon-baseline-fips
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
+      ADDON1_CONFIG: name=managed-odh;notification-email=interop-qe-ms@redhat.com;ocm-env=stage
+      ADDONS_OPERATORS_RUN_IN_PARALLEL: "false"
       CLUSTER_NAME_PREFIX: rhods
-      CLUSTER1_CONFIG: platform=hypershift;region=us-east-2;version=4.13;channel-group=stable;compute-machine-type=m5.4xlarge;timeout=90m;replicas=6;fips=false;ocm-env=stage
+      CLUSTER1_CONFIG: platform=rosa;region=us-east-2;version=4.14;channel-group=candidate;compute-machine-type=g4dn.2xlarge;timeout=90m;replicas=2;fips=true;ocm-env=stage
       FIREWATCH_CONFIG: |
         [
           {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
@@ -46,18 +44,23 @@ tests:
           {"step": "addon-tests-*", "failure_type": "all", "classification": "Addons tests", "jira_project": "RHODS", "jira_epic": "RHODS-10718"},
           {"step": "cluster-install-*", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435", "group": {"name": "cluster-provision", "priority": 1}},
           {"step": "cluster-uninstall-*", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435", "group": {"name": "cluster-provision", "priority": 2}},
-          {"job_success": true, "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-556"}
+          {"job_success": true, "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-553"}
         ]
       FIREWATCH_DEFAULT_JIRA_PROJECT: MSINTEROP
       FIREWATCH_JIRA_API_TOKEN_PATH: /tmp/secrets/jira/access_token_msi
-      OPERATOR1_CONFIG: name=rhods-operator;namespace=redhat-ods-operator
+      OPERATOR1_CONFIG: name=gpu-operator-certified;namespace=nvidia-gpu-operator;source=certified-operators;target-namespaces=nvidia-gpu-operator,
+      OPERATOR2_CONFIG: name=servicemeshoperator
+      OPERATOR3_CONFIG: name=serverless-operator;namespace=openshift-serverless
+      OPERATOR4_CONFIG: name=openshift-pipelines-operator-rh;namespace=openshift-pipelines;channel=latest
+      OPERATOR5_CONFIG: name=nfd;namespace=openshift-nfd;target-namespaces=openshift-nfd,
+      PULL_SECRET_NAME: pull-secret
       S3_BUCKET_NAME: openshift-cli-installer
       S3_BUCKET_PATH: openshift-ci
     test:
-    - ref: addon-tests-rhods
-    workflow: operator
+    - ref: rhoai-tests
+    workflow: addons-and-operators
 zz_generated_metadata:
-  branch: rhods-operator
+  branch: rhoai-addon-interop
   org: CSPI-QE
   repo: MSI
-  variant: v4.13-hypershift-GA-stage
+  variant: v4.14-GA
