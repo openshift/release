@@ -1,0 +1,63 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.19-openshift-4.12
+images:
+- dockerfile_path: Dockerfile
+  to: vm-console-proxy-container
+releases:
+  initial:
+    integration:
+      name: "4.13"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.13"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unittests
+  skip_if_only_changed: ^\.github/|^docs/|^example-client/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^LICENSE$
+  steps:
+    cluster_profile: gcp-virtualization
+    test:
+    - as: unittests
+      commands: export GOFLAGS= && make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: e2e-functests
+  skip_if_only_changed: ^\.github/|^docs/|^example-client/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^LICENSE$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-functests
+      cli: latest
+      commands: |
+        export GOFLAGS=
+        ./automation/e2e-functests/run.sh
+      dependencies:
+      - env: CI_IMG
+        name: vm-console-proxy-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: release-v0.3
+  org: kubevirt
+  repo: vm-console-proxy

@@ -173,7 +173,7 @@ tests:
     from: src
 - as: e2e-aws-ovn
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: (fcos|okd)
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
@@ -183,7 +183,8 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-aws-ovn-upgrade
+- always_run: false
+  as: e2e-aws-ovn-upgrade
   optional: true
   steps:
     cluster_profile: aws
@@ -216,6 +217,13 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
+- as: e2e-agent-ha-dualstack
+  cluster: build05
+  optional: true
+  run_if_changed: /agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-ha-dualstack
 - as: e2e-agent-sno-ipv6
   cluster: build05
   optional: true

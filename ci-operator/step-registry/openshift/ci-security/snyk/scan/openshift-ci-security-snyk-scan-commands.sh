@@ -52,6 +52,12 @@ snyk_code() {
     if [ "$SNYK_CODE_ADDITIONAL_ARGS" ]; then
         read -a PARAMS <<<"$SNYK_CODE_ADDITIONAL_ARGS"
     fi
+
+    if [ -z "${TARGET_REFERENCE}" ]; then
+        TARGET_REFERENCE=$(echo $CLONE_REFS | jq -r .base_ref)
+    fi
+    PARAMS+=(--target-reference="${TARGET_REFERENCE}")
+
     ${SNYK_DIR}/snyk code test "${PARAMS[@]}"
     local rc=$?
     echo Full vulnerabilities report is available at ${ARTIFACT_DIR}/snyk.sarif.json
