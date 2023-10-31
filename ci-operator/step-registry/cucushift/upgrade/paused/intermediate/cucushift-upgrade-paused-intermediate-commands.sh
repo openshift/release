@@ -284,14 +284,14 @@ function check_mcp() {
                 echo "Worker pool status check passed"
             else
                 echo >&2 "Worker pool status check failed" && return 1
-            fi 
-        fi 
-    done      
+            fi
+        fi
+    done
 }
 
 function health_check() {
-    check_mcp
     wait_clusteroperators_continous_success
+    check_mcp
     check_node
 }
 
