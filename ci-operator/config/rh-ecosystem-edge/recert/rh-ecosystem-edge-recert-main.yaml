@@ -3,6 +3,14 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.13"
 build_root:
   image_stream_tag:
     name: release
@@ -93,6 +101,23 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node-recert
+- always_run: false
+  as: e2e-aws-ovn-single-node-recert-openshift-e2e-test-qe
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and @singlenode
+        and not @fips'
+      FILTERS_ADDITIONAL: ~LSO&
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: enable-qe-catalogsource
+    - chain: openshift-e2e-test-qe
+    workflow: openshift-e2e-aws-single-node-recert
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
