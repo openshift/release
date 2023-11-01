@@ -3,6 +3,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  tests-private-base-optional:
+    name: tests-private-base
+    namespace: ci
+    tag: "4.14"
   tools:
     name: "4.14"
     namespace: ocp
@@ -29,19 +33,9 @@ images:
         yum clean all && rm -rf /var/cache/yum/*
   from: src
   to: tests-private-ui
-- dockerfile_literal: |
-    FROM src
-    RUN echo "it is debug to get image optional"
-  from: src
+- dockerfile_path: images/Dockerfile.base
   to: tests-private-base
-- dockerfile_literal: |
-    FROM tests-private-base
-    RUN echo "it is debug"
-  from: tests-private-base
-  to: tests-private-optional-debug
 promotion:
-  excluded_images:
-  - tests-private-optional-debug
   namespace: ci
   tag: "4.14"
 resources:
