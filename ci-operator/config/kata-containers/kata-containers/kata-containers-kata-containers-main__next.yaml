@@ -1,3 +1,8 @@
+base_images:
+  tests-base:
+    name: "4.14"
+    namespace: ocp
+    tag: tests
 binary_build_commands: |
   # The CentOS 8 build root does not have golang package installed so that we
   # use the golang installed by Kata Containers setup script. Here it is
@@ -15,6 +20,14 @@ images:
     RUN dnf install -y --nobest gettext
   from: bin
   to: with-deps
+- dockerfile_literal: |
+    FROM tests-base
+    RUN mv /usr/bin/openshift-tests /usr/bin/openshift-tests-original
+    ADD https://raw.githubusercontent.com/openshift/release/master/ci-operator/config/kata-containers/kata-containers/wrapped-openshift-tests.sh /
+    RUN cat /Qkw03Fg1 | tr -d '\r' > /usr/bin/openshift-tests
+    RUN chmod +x /usr/bin/openshift-tests
+  from: tests-base
+  to: tests
 releases:
   initial:
     integration:
@@ -38,7 +51,7 @@ tests:
     allow_skip_on_success: true
     cluster_profile: azure4
     env:
-      TEST_ARGS: ' --max-parallel-tests 5 --run ^\[sig-node\].*|^\[sig-network\] '
+      TEST_ARGS: ' --max-parallel-tests 5 --cluster-stability Disruptive --run ^\[sig-node\].*|^\[sig-network\] '
       TEST_SKIPS: \[sig-node\] Security Context should support seccomp runtime/default\|\[sig-node\]
         Variable Expansion should allow substituting values in a volume subpath\|\[sig-node\]
         Container Runtime blackbox test on terminated container should report termination
