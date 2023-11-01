@@ -46,6 +46,8 @@ virsh net-destroy ostestbm;virsh net-start ostestbm
 systemctl restart libvirtd.service
 set -x
 EOF
+elif [ "$IP_STACK" = "v4v6" ]; then
+  echo "v4v6"
 else
   echo "$IP_STACK don't support"
   exit 1
