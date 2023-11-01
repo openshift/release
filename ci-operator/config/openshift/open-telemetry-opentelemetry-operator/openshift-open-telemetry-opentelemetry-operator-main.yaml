@@ -7,7 +7,7 @@ base_images:
     name: "4.14"
     namespace: origin
     tag: operator-sdk
-binary_build_commands: make manager
+binary_build_commands: make manager && go mod vendor
 build_root:
   image_stream_tag:
     name: builder
@@ -70,6 +70,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: opentelemetry-operator
+    workflow: openshift-ci-security
 - as: opentelemetry-e2e-tests
   cluster_claim:
     architecture: amd64

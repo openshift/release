@@ -10,7 +10,7 @@ base_images:
 binary_build_commands: LD_FLAGS="-X github.com/jaegertracing/jaeger-operator/pkg/version".version=1.49.0
   -X github.com/jaegertracing/jaeger-operator/pkg/version".buildDate=2023-09-29T02:01:34Z
   -X github.com/jaegertracing/jaeger-operator/pkg/version".defaultJaeger="1.49.0"
-  make build
+  make build && go mod vendor
 build_root:
   image_stream_tag:
     name: builder
@@ -55,6 +55,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: jaeger-operator
+    workflow: openshift-ci-security
 - as: jaeger-e2e-tests
   cluster_claim:
     architecture: amd64
