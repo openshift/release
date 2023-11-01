@@ -1,0 +1,63 @@
+base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.15"
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
+  os:
+    name: centos
+    namespace: origin
+    tag: stream8
+binary_build_commands: GO111MODULE=on GOPROXY=https://proxy.golang.org make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: v0.Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/operator-framework-tooling/v0
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+  to: olm-v0-bumper
+promotion:
+  namespace: operator-lifecycle-manager
+  tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  steps:
+    test:
+    - as: test
+      commands: GO111MODULE=on GOPROXY=https://proxy.golang.org make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: lint
+  steps:
+    test:
+    - as: lint
+      commands: GO111MODULE=on GOPROXY=https://proxy.golang.org make lint
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: operator-framework-tooling
