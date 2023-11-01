@@ -87,6 +87,9 @@ CONFIG = {
     'aws-rhtap-qe-quota-slice': {
         'us-west-2': 10
     },
+    'aws-rhtap-performance-quota-slice': {
+        'us-west-2': 10
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
