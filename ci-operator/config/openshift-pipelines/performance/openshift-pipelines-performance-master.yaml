@@ -32,11 +32,25 @@ resources:
       cpu: 1000m
       memory: 2Gi
 tests:
-- as: scaling-pipelines-daily
-  cron: 0 2,14 * * *
+- as: scaling-pipelines-upstream-stable-daily
+  cron: 0 2 * * *
   steps:
     cluster_profile: aws
     env:
+      DEPLOYMENT_TYPE: upstream
+      DEPLOYMENT_VERSION: stable
+      TEST_CONCURRENT: "100"
+      TEST_RUN: ./run.yaml
+      TEST_TOTAL: "1000"
+    workflow: openshift-pipelines-scaling-pipelines
+  timeout: 8h0m0s
+- as: scaling-pipelines-upstream-nightly-daily
+  cron: 0 14 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      DEPLOYMENT_TYPE: upstream
+      DEPLOYMENT_VERSION: nightly
       TEST_CONCURRENT: "100"
       TEST_RUN: ./run.yaml
       TEST_TOTAL: "1000"
@@ -56,6 +70,26 @@ tests:
     cluster_profile: aws
     env:
       DEPLOYMENT_VERSION: "1.11"
+    workflow: openshift-pipelines-scaling-pipelines
+  timeout: 8h0m0s
+- always_run: false
+  as: scaling-pipelines-upstream-stable
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      DEPLOYMENT_TYPE: upstream
+      DEPLOYMENT_VERSION: stable
+    workflow: openshift-pipelines-scaling-pipelines
+  timeout: 8h0m0s
+- always_run: false
+  as: scaling-pipelines-upstream-nightly
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      DEPLOYMENT_TYPE: upstream
+      DEPLOYMENT_VERSION: nightly
     workflow: openshift-pipelines-scaling-pipelines
   timeout: 8h0m0s
 zz_generated_metadata:
