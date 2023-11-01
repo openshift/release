@@ -36,8 +36,9 @@ function post-ocp-66839(){
     fi
     # New gained cap annotation should be in extracted creds 
     newCap=$(grep -rh "capability.openshift.io/name:" "${credsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-    if [[ "${newCap}" != "MachineAPI ImageRegistry" ]] && [[ "${newCap}" != "ImageRegistry MachineAPI" ]]; then
-        echo "Tobe gained CRs with cap annotation: ${newCap}, but expected: MachineAPI and ImageRegistry"
+    expectedCapCR=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST} | sort -u|xargs)
+    if [[ "${newCap}" != "${expectedCapCR}" ]]; then
+        echo "CRs with cap annotation: ${newCap}, but expected: ${expectedCapCR}"
         return 1
     fi
     echo "Test Passed: ${FUNCNAME[0]}"
