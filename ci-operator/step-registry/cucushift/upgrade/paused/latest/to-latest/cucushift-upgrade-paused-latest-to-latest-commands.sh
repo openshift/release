@@ -242,8 +242,8 @@ function check_mcp() {
 }
 
 function health_check() {
-    check_mcp
     wait_clusteroperators_continous_success
+    check_mcp
     check_node
 }
 
