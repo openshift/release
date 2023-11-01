@@ -8,6 +8,13 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
 # Recycling BASTION_FLAVOR as it's a small flavor we can re-use.
 TESTING_FLAVOR="${TESTING_FLAVOR:-$(<"${SHARED_DIR}/BASTION_FLAVOR")}"
+ZONES="${ZONES:-$(<"${SHARED_DIR}/ZONES")}"
+
+AZ_ARG=""
+if [ -n "${ZONES}" ]; then
+  IFS=' ' read -ra ZONES <<< "$ZONES"
+  AZ_ARG="-z ${ZONES[0]}"
+fi
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -22,7 +29,7 @@ fi
 
 set +e
 echo "DEBUG: Running liveliness check script..."
-./server.sh -d -t -l -f ${TESTING_FLAVOR} -i ${TESTING_IMAGE} -e ${OPENSTACK_EXTERNAL_NETWORK} shiftstack-ci-${CLUSTER_NAME}
+./server.sh -d -t -l -f ${TESTING_FLAVOR} -i ${TESTING_IMAGE} -e ${OPENSTACK_EXTERNAL_NETWORK} ${AZ_ARG} shiftstack-ci-${CLUSTER_NAME}
 RC=$?
 set -e
 
