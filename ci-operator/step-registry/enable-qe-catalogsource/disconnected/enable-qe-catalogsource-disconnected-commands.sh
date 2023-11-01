@@ -57,7 +57,7 @@ function check_mcp_status() {
 }
 
 # set the registry auths for the cluster
-function set_cluster_auth () {
+function set_cluster_auth() {
     # get the registry configures of the cluster
     run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
     if [[ $ret -eq 0 ]]; then 
@@ -98,7 +98,7 @@ function set_cluster_auth () {
     fi
 }
 
-function disable_default_catalogsource () {
+function disable_default_catalogsource() {
     run_command "oc patch operatorhub cluster -p '{\"spec\": {\"disableAllDefaultSources\": true}}' --type=merge"; ret=$?
     if [[ $ret -eq 0 ]]; then
         echo "disable default Catalog Source successfully."
@@ -108,76 +108,184 @@ function disable_default_catalogsource () {
     fi
 }
 
-# Create the ICSP for optional operators dynamiclly, but we don't use it here
-# function create_icsp_by_olm () {
-#     mirror_auths="${SHARED_DIR}/mirror_auths"
-#     # Don't mirror OLM operators images, but create the ICSP for them.
-#     echo "===>>> create ICSP for OLM operators"
-#     run_command "oc adm catalog mirror -a ${mirror_auths} quay.io/openshift-qe-optional-operators/ocp4-index:latest ${MIRROR_REGISTRY_HOST} --manifests-only --to-manifests=/tmp/olm_mirror"; ret=$?
-#     if [[ $ret -eq 0 ]]; then
-#         run_command "cat /tmp/olm_mirror/imageContentSourcePolicy.yaml"
-#         run_command "oc create -f /tmp/olm_mirror/imageContentSourcePolicy.yaml"; ret=$?
-#         if [[ $ret -eq 0 ]]; then
-#             echo "create the ICSP resource successfully"
-#         else
-#             echo "!!! fail to create the ICSP resource"
-#             return 1
-#         fi
-#     else
-#         echo "!!! fail to generate the ICSP for OLM operators"
-#         # cat ${mirror_auths}
-#         return 1
-#     fi
-#     rm -rf /tmp/olm_mirror 
-# }
-
 # this func only used when the cluster not set the Proxy registy, such as C2S, SC2S clusters
-function mirror_optional_images () {
-    registry_cred=`head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0`
+function mirror_optional_images() {
+    echo "## oc-mirror operators images to local registry"
+    work_dir="/tmp/oc-mirror-$(date +%s)"
+    mkdir "$work_dir"
+    export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-$work_dir}"
+    export REGISTRY_AUTH_FILE="${REGISTRY_AUTH_FILE:-$work_dir/containers/auth.json}"
+
+    mirror_token=`head -n 1 "/var/run/vault/mirror-registry/registry_creds"`
+    mirror_user=${mirror_token%:*}
+    mirror_password=${mirror_token#*:}
 
     optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
     optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
-    qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
-
-    openshifttest_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.user')
-    openshifttest_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.password')
-    openshifttest_registry_auth=`echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0`
 
     brew_auth_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
     brew_auth_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
-    brew_registry_auth=`echo -n "${brew_auth_user}:${brew_auth_password}" | base64 -w 0`
 
-    stage_auth_user=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.user')
-    stage_auth_password=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.password')
-    stage_registry_auth=`echo -n "${stage_auth_user}:${stage_auth_password}" | base64 -w 0`
+    #openshifttest_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.user')
+    #openshifttest_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.password')
+    #openshifttest_registry_auth=`echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0`
 
-    redhat_auth_user=$(cat "/var/run/vault/mirror-registry/registry_redhat.json" | jq -r '.user')
-    redhat_auth_password=$(cat "/var/run/vault/mirror-registry/registry_redhat.json" | jq -r '.password')
-    redhat_registry_auth=`echo -n "${redhat_auth_user}:${redhat_auth_password}" | base64 -w 0`
+    #stage_auth_user=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.user')
+    #stage_auth_password=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.password')
+    #stage_registry_auth=`echo -n "${stage_auth_user}:${stage_auth_password}" | base64 -w 0`
+
+    #redhat_auth_user=$(cat "/var/run/vault/mirror-registry/registry_redhat.json" | jq -r '.user')
+    #redhat_auth_password=$(cat "/var/run/vault/mirror-registry/registry_redhat.json" | jq -r '.password')
+    #redhat_registry_auth=`echo -n "${redhat_auth_user}:${redhat_auth_password}" | base64 -w 0`
 
     # run_command "cat ${CLUSTER_PROFILE_DIR}/pull-secret"
-    # Running Command: cat /tmp/.dockerconfigjson
-    # {"auths":{"ec2-3-92-162-185.compute-1.amazonaws.com:5000":{"auth":"XXXXXXXXXXXXXXXX"}}}
-    run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
-    if [[ $ret -eq 0 ]]; then 
-        jq --argjson a "{\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}, \"brew.registry.redhat.io\": {\"auth\": \"$brew_registry_auth\"}, \"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
-    else
-        echo "!!! fail to extract the auth of the cluster"
-        return 1
-    fi
-    
     unset_proxy
-    ret=0
-    # Running Command: oc adm catalog mirror -a "/tmp/new-dockerconfigjson" ec2-3-90-59-26.compute-1.amazonaws.com:5000/openshift-qe-optional-operators/aosqe-index:v4.12 ec2-3-90-59-26.compute-1.amazonaws.com:5000 --continue-on-error --to-manifests=/tmp/olm_mirror
-    # error: unable to read image ec2-3-90-59-26.compute-1.amazonaws.com:5000/openshift-qe-optional-operators/aosqe-index:v4.12: Get "https://ec2-3-90-59-26.compute-1.amazonaws.com:5000/v2/": x509: certificate signed by unknown authority
-    run_command "oc adm catalog mirror  --insecure=true  --skip-verification=true -a \"/tmp/new-dockerconfigjson\" ${origin_index_image} ${MIRROR_REGISTRY_HOST} --to-manifests=/tmp/olm_mirror" || ret=$?
-    if [[ $ret -eq 0 ]]; then
-        echo "mirror optional operators' images successfully"
-    else
-        run_command "cat /tmp/olm_mirror/imageContentSourcePolicy.yaml"
-        run_command "cat /tmp/olm_mirror/mapping.txt"
+    env
+    /usr/bin/skopeo --version
+    /usr/bin/skopeo help
+    /usr/bin/skopeo login -u $brew_auth_user -p $brew_auth_password brew.registry.redhat.io 
+    if [[ "$?" != "0" ]]  ;then
+        echo "Error, skopeo login brew.registry.redhat.io failed"
         return 1
     fi
+    /usr/bin/skopeo login -u $mirror_user -p $mirror_password ${MIRROR_REGISTRY_HOST}
+    if [[ "$?" != "0" ]]  ;then
+        echo "Error, skopeo login ${MIRROR_REGISTRY_HOST} failed"
+        return 1
+    fi
+    /usr/bin/skopeo login -u $optional_auth_user -p $optional_auth_password quay.io
+    if [[ "$?" != "0" ]]  ;then
+        echo "Error, skopeo login quay.io failed"
+        return 1
+    fi
+
+    echo "skopeo copy docker://${origin_index_image} oci:///${work_dir}oci-local-catalog --remove-signatures"
+    skopeo copy docker://${origin_index_image} "oci:///${work_dir}/oci-local-catalog" --remove-signatures
+    if [[ "$?" != "0" ]]  ;then
+        echo "Error, skopeo copy docker://${origin_index_image} oci:///${work_dir}/oci-local-catalog failed"
+        return 1
+    fi
+
+    #if [[ $ret -eq 0 ]]; then
+    #    jq --argjson a "{\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}, \"brew.registry.redhat.io\": {\"auth\": \"$brew_registry_auth\"}, \"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
+    #else
+    #    echo "!!! fail to extract the auth of the cluster"
+    #    return 1
+    #fi
+
+    echo "extract oc-mirror from image oc-mirror:v4.13.9"
+    #oc_mirror_image=$(oc adm release info -image-for='oc-mirror' quay.io/openshift-release-dev/ocp-release:4.13.9-x86_64 )
+    #Note: The script can only be running on x86
+    oc_mirror_image="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:278b6167e214992b2a40dd2fb44e8588f4a9ef100a70ec20cada58728350dd02"
+    oc image extract $oc_mirror_image --path /usr/bin/oc-mirror:$work_dir --confirm
+    if ls $work_dir/oc-mirror >/dev/null ;then
+        chmod +x ${work_dir}/oc-mirror
+    else
+        echo "Error, can not find oc-mirror binary"
+        return 1
+    fi
+
+    echo "oc-mirror --config $work_dir/imageset-config.yaml docker://${MIRROR_REGISTRY_HOST} --include-local-oci-catalogs --oci-registries-config=${work_dir}/registry.conf --continue-on-error --skip-missing"
+    catalog_image="aosqe/aosqe-index"
+    catalog_tag=$(date +%s)
+
+    if [[ X"${MIRROR_OSUS_ONLY}" == X"yes" ]]; then
+        cat <<EOF |tee "${work_dir}/imageset-config.yaml"
+kind: ImageSetConfiguration
+apiVersion: mirror.openshift.io/v1alpha2
+mirror:
+  operators:
+  - catalog: "oci:///${work_dir}/oci-local-catalog"
+    targetCatalog: ${catalog_image} 
+    targetTag: "${catalog_tag}"
+    packages:
+    - name: cincinnati-operator
+EOF
+    else
+        cat <<EOF |tee "${work_dir}/imageset-config.yaml"
+kind: ImageSetConfiguration
+apiVersion: mirror.openshift.io/v1alpha2
+mirror:
+  operators:
+  - catalog: "oci:///${work_dir}/oci-local-catalog"
+    targetCatalog: ${catalog_image} 
+    targetTag: "${catalog_tag}"
+EOF
+    fi
+
+    cat <<EOF |tee "${work_dir}/registry.conf"
+[[registry]]
+ location = "registry.redhat.io"
+ insecure = true
+ blocked = false
+ mirror-by-digest-only = false
+ [[registry.mirror]]
+    location = "brew.registry.redhat.io"
+    insecure = true
+[[registry]]
+ location = "registry.stage.redhat.io"
+ insecure = true
+ blocked = false
+ mirror-by-digest-only = false
+ [[registry.mirror]]
+    location = "brew.registry.redhat.io"
+    insecure = true
+EOF
+    #chdir to writable directory as oc-mirror will generate files under current directory.
+    pushd $work_dir
+    $work_dir/oc-mirror --config "${work_dir}/imageset-config.yaml" docker://${MIRROR_REGISTRY_HOST} --include-local-oci-catalogs --oci-registries-config="${work_dir}/registry.conf" --continue-on-error --skip-missing
+    if [[ "$?" != "0" ]] ;then 
+        echo "Warning, mirror failed, abort !!!"
+        popd
+        return 1
+    fi
+    popd
+
+    echo "Create imageconentsourcepolicy aosqe-disconnect-test and catalogsource qe-app-regitry"
+    #gen_resource_dir=$(tail -10 .oc-mirror.log  |grep "Writing ICSP manifests to"|awk '{print $NF}')
+    #gen_catalog_file=${gen_resource_dir}/catalogSource-aosqe-index.yaml
+    #gen_icsp_file=${gen_resource_dir}/imageContentSourcePolicy.yaml
+    #Todo: use generated catalogsouce and imageContentSourcePolicy.yaml in future. there is a bug now
+
+    cat <<EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: qe-app-registry
+  namespace: openshift-marketplace
+spec:
+  sourceType: grpc
+  image: ${MIRROR_REGISTRY_HOST}/${catalog_image}:${catalog_tag}
+  publisher: OpenShift QE
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 15m
+EOF
+
+   cat <<EOF| oc apply -f -
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: image-policy-aosqe
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - ${MIRROR_REGISTRY_HOST}
+    source: registry.redhat.io
+  - mirrors:
+    - ${MIRROR_REGISTRY_HOST}
+    source: brew.registry.redhat.io
+  - mirrors:
+    - ${MIRROR_REGISTRY_HOST}
+    source: registry.stage.redhat.io
+  - mirrors:
+    - ${MIRROR_REGISTRY_HOST}/openshift-qe-optional-operators
+    source: quay.io/openshift-qe-optional-operators
+  - mirrors:
+    - ${MIRROR_REGISTRY_HOST}
+    source: registry-proxy.engineering.redhat.com
+EOF
     set_proxy
 }
 
@@ -227,7 +335,7 @@ function set_CA_for_nodes () {
 
 # Create the fixed ICSP for optional operators
 function create_settled_icsp () {
-    cat <<EOF | oc create -f -
+    cat <<EOF | oc apply -f -
     apiVersion: operator.openshift.io/v1alpha1
     kind: ImageContentSourcePolicy
     metadata:
@@ -264,10 +372,10 @@ EOF
     fi
 }
 
-function create_catalog_sources()
+function create_settled_aosqe_catalogsource()
 {    
     echo "create QE catalogsource: qe-app-registry"
-    cat <<EOF | oc create -f -
+    cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -282,6 +390,11 @@ spec:
     registryPoll:
       interval: 15m
 EOF
+}
+
+function check_aosqe_catalog_sources()
+{    
+    echo "check QE catalogsource qe-app-registry status"
     COUNTER=0
     while [ $COUNTER -lt 600 ]
     do
@@ -295,7 +408,7 @@ EOF
         fi
     done
     if [[ $STATUS != "READY" ]]; then
-        echo "!!! fail to create QE CatalogSource"
+        echo "!!! QE CatalogSource can not be ready in given time"
         # ImagePullBackOff nothing with the imagePullSecrets 
         # run_command "oc get operatorgroup -n openshift-marketplace"
         # run_command "oc get sa qe-app-registry -n openshift-marketplace -o yaml"
@@ -314,7 +427,6 @@ EOF
         return 1
     fi
 }
-
 
 function check_default_catalog () {
     COUNTER=0
@@ -416,26 +528,28 @@ echo "MIRROR_REGISTRY_HOST: ${MIRROR_REGISTRY_HOST}"
 echo "MIRROR_PROXY_REGISTRY_QUAY: ${MIRROR_PROXY_REGISTRY_QUAY}"
 echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
 
-set_CA_for_nodes
+set_CA_for_nodes  || exit 1
 # get cluster Major.Minor version
 ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 origin_index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
 mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
 
 if [ $mirror -eq 1 ]; then
-    mirror_optional_images
+    echo "mirror the head operator images as this cluster is a C2S or SC2S cluster"
+    mirror_optional_images || exit 1
 else
     # no need to set auth for the MIRROR_REGISTRY_HOST
-    set_cluster_auth
+    set_cluster_auth  || exit 1
+    create_settled_icsp || exit 1
+    create_settled_aosqe_catalogsource || exit 1
 fi 
 
-create_settled_icsp
 check_marketplace
 # No need to disable the default OperatorHub when marketplace disabled as default.
 if [ $marketplace -eq 0 ]; then
     disable_default_catalogsource
 fi
-create_catalog_sources
+check_aosqe_catalog_sources
 # For now(2022-07-19), the Proxy registry can only proxy the `brew.registry.redhat.io` image, 
 # but the default CatalogSource use `registry.redhat.io` image, such as registry.redhat.io/redhat/redhat-operator-index:v4.11
 # And, there is no brew.registry.redhat.io/redhat/redhat-operator-index:v4.11 , so disable the default CatalogSources.
