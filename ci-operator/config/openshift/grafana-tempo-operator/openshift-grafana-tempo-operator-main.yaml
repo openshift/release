@@ -7,7 +7,7 @@ base_images:
     name: "4.14"
     namespace: origin
     tag: operator-sdk
-binary_build_commands: make build
+binary_build_commands: make build && go mod vendor
 build_root:
   image_stream_tag:
     name: builder
@@ -41,6 +41,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: tempo-operator
+    workflow: openshift-ci-security
 - as: test
   steps:
     test:
