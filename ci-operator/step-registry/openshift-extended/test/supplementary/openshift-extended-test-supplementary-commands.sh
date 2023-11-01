@@ -315,12 +315,12 @@ function run {
     done < /tmp/zzz-tmp.log
 
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results"
-    echo "failures: $failures, errors: $errors, skipped: $skipped, tests: $tests in openshift-extended-test-supplementary" | tee -a "${TEST_RESULT_FILE}"
+    echo -e "\nfailures: $failures, errors: $errors, skipped: $skipped, tests: $tests in openshift-extended-test-supplementary" | tee -a "${TEST_RESULT_FILE}"
     if [ $((failures)) != 0 ] ; then
         echo "Failing Scenarios:" | tee -a "${TEST_RESULT_FILE}"
         grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | grep -v grep | cut -d'"' -f2 | sort -t':' -k2 | uniq | tee -a "${TEST_RESULT_FILE}" || true
     fi
-    cp "${TEST_RESULT_FILE}" "${SHARED_DIR}/openshift-e2e-test-qe-report-openshift-extended-test-results" || true
+    cat "${TEST_RESULT_FILE}" >> "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
 
     # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
     # please refer to the junit result for case result, not depends on step result.

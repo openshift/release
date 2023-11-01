@@ -80,9 +80,9 @@ while read -a row ; do
 done < /tmp/zzz-tmp.log
 
 TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results"
-echo "failures: $failures, errors: $errors, skipped: $skipped, tests: $tests in cucushift-e2e-devel" | tee -a "${TEST_RESULT_FILE}"
+echo -e "\nfailures: $failures, errors: $errors, skipped: $skipped, tests: $tests in cucushift-e2e-devel" | tee -a "${TEST_RESULT_FILE}"
 if [ $((failures)) != 0 ] ; then
     echo "Failing Scenarios:" | tee -a "${TEST_RESULT_FILE}"
     grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | grep -v grep | cut -d'#' -f2 | sort -t':' -k3 | tee -a "${TEST_RESULT_FILE}" || true
 fi
-cp "${TEST_RESULT_FILE}" "${SHARED_DIR}/openshift-e2e-test-qe-report-cucushift-results" || true
+cat "${TEST_RESULT_FILE}" >> "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
