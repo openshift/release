@@ -35,12 +35,15 @@ function pre-ocp-66839(){
         echo "Failed to extract manifests!"
         return 1
     fi
-    # There should not be any cap annotation in all extracted manifests 
-    curCap=$(grep -rh "capability.openshift.io/name:" "${manifestsDir}"|awk -F": " '{print $NF}'|sort -u)
-    if [[ "${curCap}" != "" ]]; then
-        echo "Caps in extracted manifests found: ${curCap}, but expected nothing"
+
+    # There should be only enabled cap annotaion in all extracted manifests
+    curCap=$(grep -rh "capability.openshift.io/name:" "${manifestsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
+    expectedCap=$(echo ${ADDITIONAL_ENABLED_CAPABILITIES} | sort -u|xargs)
+    if [[ "${curCap}" != "${expectedCap}" ]]; then
+        echo "Caps in extracted manifests found: ${curCap}, but expected ${expectedCap}"
         return 1
     fi
+
     # No featureset or only Default featureset annotation in all extarcted manifests
     curFS=$(grep -rh "release.openshift.io/feature-set:" "${manifestsDir}"|awk -F": " '{print $NF}'|sort -u)
     if [[ "${curFS}" != "Default" ]] && [[ "${curFS}" != "" ]]; then
@@ -64,18 +67,29 @@ function pre-ocp-66839(){
         echo "Failed to extract CRs from live cluster!"
         return 1
     fi
-    if grep -r "capability.openshift.io/name:" "${preCredsDir}"; then
-        echo "Extracted CRs has cap annotation, but expected nothing"
-        return 1
+
+    if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "" ]]; then
+        curCapInCR=$(grep -rh "capability.openshift.io/name:" "${preCredsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
+        if [[ "${curCapInCR}" != "${expectedCap}" ]]; then
+            echo "Extracted CRs has cap annotation: ${curCapInCR}, but expected ${expectedCap}"
+            return 1
+        fi
+    else
+        if grep -r "capability.openshift.io/name:" "${preCredsDir}"; then
+            echo "Extracted CRs has cap annotation, but expected nothing"
+            return 1
+        fi
     fi
+
     # Extract all CRs from tobe upgrade release payload with --included
     if ! oc adm release extract --to "${tobeCredsDir}" --included --credentials-requests "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"; then
         echo "Failed to extract CRs from tobe upgrade release payload!"
         return 1
     fi
     tobecap=$(grep -rh "capability.openshift.io/name:" "${tobeCredsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-    if [[ "${tobecap}" != "MachineAPI ImageRegistry" ]] && [[ "${tobecap}" != "ImageRegistry MachineAPI" ]]; then
-        echo "Tobe gained CRs with cap annotation: ${tobecap}, but expected: MachineAPI and ImageRegistry"
+    expectedCapCR=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST} | sort -u|xargs)
+    if [[ "${tobecap}" != "${expectedCapCR}" ]]; then
+        echo "CRs with cap annotation: ${tobecap}, but expected: ${expectedCapCR}"
         return 1
     fi
     echo "Test Passed: ${FUNCNAME[0]}"
@@ -102,7 +116,6 @@ function run_ota_single_case(){
 }
 report_file="${ARTIFACT_DIR}/ota-test-result.txt"
 export PATH=/tmp:${PATH}
-extract_oc
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
@@ -114,8 +127,10 @@ set +e
 if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
   exit 0
 elif [[ "${ENABLE_OTA_TEST}" == "true" ]]; then
+  extract_oc
   run_ota_multi_test
 else
+  extract_oc
   run_ota_single_case ${ENABLE_OTA_TEST}
 fi
 
