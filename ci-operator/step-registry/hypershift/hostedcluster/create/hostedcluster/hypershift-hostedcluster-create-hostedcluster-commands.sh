@@ -4,6 +4,8 @@ set -euo pipefail
 echo HyperShift CLI version
 /usr/bin/hypershift version
 
+echo "this should affect the workflow, thus the rehearsals"
+
 echo Generating pull secret to current build farm
 oc registry login --to=${SHARED_DIR}/pull-secret-build-farm.json
 echo "Set KUBECONFIG to Hive cluster"
