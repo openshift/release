@@ -1,9 +1,26 @@
+base_images:
+  golang:
+    name: release
+    namespace: openshift
+    tag: "1.19.13"
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8.8"
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi8/ubi
-      RUN yum install -y --nodocs make git golang
+      FROM registry.access.redhat.com/ubi8/go-toolset:1.19.13
+      RUN yum install -y --nodocs make git
       RUN ln -s /cli/oc /usr/bin/kubectl
+images:
+- dockerfile_path: Dockerfile
+  from: ubi_minimal
+  inputs:
+    golang:
+      as:
+      - registry.access.redhat.com/ubi8/go-toolset:1.19.13
+  to: codeflare-operator
 releases:
   latest:
     release:
@@ -37,14 +54,20 @@ tests:
         git clone https://github.com/opendatahub-io/distributed-workloads.git
         cd distributed-workloads
         make install-opendatahub-operator
-        # To be removed once https://github.com/opendatahub-io/opendatahub-operator/issues/600 is implemented and new ODH version is released
-        make install-codeflare-operator
+
+
+        IMAGE_PATH="image-registry.openshift-image-registry.svc:5000/openshift-operators/codeflare-operator"
+
+        ### Q: are we patching the env var from CFO repo for now? Will need to patch before building I think
+        cd ..
+        sed -i "s|odh-codeflare-operator-controller-image=.*|odh-codeflare-operator-controller-image=${IMAGE_PATH}|" ./config/manifests/bases/params.env
+
         if [[ "${REPO_OWNER}" == "openshift" ]]; then
           echo -e "Running in openshift repo, it means that this is PJ rehearsal, using latest main for CodeFlare manifest \n"
-          sed -i "s|<DW PR tarball URI>|https://api.github.com/repos/opendatahub-io/distributed-workloads/tarball/main|" ./contrib/configuration/basic-dsc.yaml
+          sed -i "s|<CFO PR tarball URI>|https://api.github.com/repos/opendatahub-io/codeflare-operator/tarball/main|" ./contrib/configuration/basic-dsc.yaml
         else
           echo -e "Running PR ${PULL_NUMBER} \n"
-          sed -i "s|<DW PR tarball URI>|https://api.github.com/repos/opendatahub-io/distributed-workloads/tarball/pull/${PULL_NUMBER}/head|" ./contrib/configuration/basic-dsc.yaml
+          sed -i "s|<CFO PR tarball URI>|https://api.github.com/repos/opendatahub-io/codeflare-operator/tarball/pull/${PULL_NUMBER}/head|" ./contrib/configuration/basic-dsc.yaml
         fi
         oc apply -f ./contrib/configuration/basic-dsc.yaml -n opendatahub
         cat ./contrib/configuration/basic-dsc.yaml
