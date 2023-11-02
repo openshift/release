@@ -7,7 +7,7 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 declare vsphere_portgroup
-declare vsphere_connected_portgroup
+declare vsphere_bastion_portgroup
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 
@@ -21,9 +21,9 @@ if [[ ! -f "${bastion_ignition_file}" ]]; then
 fi
 bastion_ignition_base64=$(base64 -w0 <"${bastion_ignition_file}")
 
-if [[ -z "${vsphere_connected_portgroup:-}" ]]; then
-  echo "Not defined vsphere_connected_portgroup, bastion host will be provisioned in network defined as vsphere_portgroup..."
-  vsphere_connected_portgroup=${vsphere_portgroup}
+if [[ -z "${vsphere_bastion_portgroup:-}" ]]; then
+  echo "Not defined vsphere_bastion_portgroup, bastion host will be provisioned in network defined as vsphere_portgroup..."
+  vsphere_bastion_portgroup=${vsphere_portgroup}
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
@@ -46,7 +46,7 @@ if [[ "$(govc vm.info ${vm_template} | wc -c)" -eq 0 ]]; then
    "InjectOvfEnv": false,
    "WaitForIP": false,
    "Name": "${vm_template}-bastion",
-   "NetworkMapping":[{"Name":"VM Network","Network":"${vsphere_connected_portgroup}"}]
+   "NetworkMapping":[{"Name":"VM Network","Network":"${vsphere_bastion_portgroup}"}]
 }
 EOF
 
@@ -62,7 +62,7 @@ echo "ova template: ${vm_template}"
 #Create bastion host virtual machine
 echo "$(date -u --rfc-3339=seconds) - Creating bastion host..."
 vm_folder="/${GOVC_DATACENTER}/vm"
-govc vm.clone -vm ${vm_folder}/${vm_template} -on=false -net=${vsphere_connected_portgroup} ${bastion_name}
+govc vm.clone -vm ${vm_folder}/${vm_template} -on=false -net=${vsphere_bastion_portgroup} ${bastion_name}
 #govc vm.customize -vm ${vm_folder}/${bastion_name} -name=${bastion_name} -ip=dhcp
 govc vm.change -vm ${vm_folder}/vm/${bastion_name} -c "4" -m "8192" -e disk.enableUUID=TRUE
 disk_name=$(govc device.info -json -vm ${vm_folder}/${bastion_name} | jq -r '.Devices[]|select(.Type == "VirtualDisk")|.Name')
