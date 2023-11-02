@@ -8,7 +8,6 @@ fi
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
-oc get secret -n "local-cluster-$CLUSTER_NAME" kubeadmin-password --template='{{.data.password | base64decode}}' > "$SHARED_DIR/hostedcluster_kubeadmin_password"
 echo "https://$(oc --kubeconfig="$SHARED_DIR"/nested_kubeconfig -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "$SHARED_DIR/hostedcluster_console.url"
 echo "hostedcluster_console.url path:$SHARED_DIR/hostedcluster_console.url"
 cat "$SHARED_DIR/hostedcluster_console.url"
