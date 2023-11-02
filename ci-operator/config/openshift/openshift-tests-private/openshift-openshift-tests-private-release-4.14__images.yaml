@@ -1,4 +1,8 @@
 base_images:
+  ocp_4.14_tools:
+    name: "4.14"
+    namespace: ocp
+    tag: tools
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -29,20 +33,13 @@ images:
         yum clean all && rm -rf /var/cache/yum/*
   from: src
   to: tests-private-ui
-- dockerfile_literal: |
-    FROM src
-    RUN echo "it is debug to get image optional"
-  from: src
-  optional: true
+- dockerfile_path: images/Dockerfile.base
+  inputs:
+    ocp_4.14_tools:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:tools
   to: tests-private-base
-- dockerfile_literal: |
-    FROM tests-private-base
-    RUN echo "it is debug"
-  from: tests-private-base
-  to: tests-private-optional-debug
 promotion:
-  excluded_images:
-  - tests-private-optional-debug
   namespace: ci
   tag: "4.14"
 resources:
