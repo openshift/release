@@ -23,8 +23,10 @@ workflow:
       MP_REPLICAS: "1"
       LOCAL_ZONE: "true"
       LOCALZONE_WORKER_ASSIGN_PUBLIC_IP: "no"
+      ADDITIONAL_SECURITY_GROUP: "false"
     pre:
     - ref: aws-provision-vpc-shared
+    - ref: aws-provision-security-group
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
     - chain: aws-provision-bastionhost
     - chain: rosa-sts-oidc-config-create
@@ -40,6 +42,7 @@ workflow:
     - chain: rosa-cluster-deprovision
     - ref: rosa-sts-kms-key-delete
     - chain: rosa-sts-oidc-config-delete
+    - ref: aws-deprovision-security-group
     - ref: aws-deprovision-s3buckets
     - ref: aws-deprovision-stacks
   documentation: |-

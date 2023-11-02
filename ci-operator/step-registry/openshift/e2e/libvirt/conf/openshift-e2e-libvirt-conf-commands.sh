@@ -267,10 +267,10 @@ elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "s390x" ]; then
 "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage] PersistentVolumes GCEPD should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
-# Skip the following network tests in 4.13 & 4.14 jobs until the below defect is fixed
+# Skip the following network tests in 4.13 to 4.15 jobs until the below defect is fixed
 # https://issues.redhat.com/browse/OCPBUGS-12841
 # The underlying issue is same for below mentioned sig-network tests
-elif ([ "${BRANCH}" == "4.13" ] || [ "${BRANCH}" == "4.14" ]) && [ "${ARCH}" == "ppc64le" ]; then
+elif [[ "${BRANCH#4.}" -ge 13 ]] && [ "${ARCH}" == "ppc64le" ]; then
       cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage][Feature:DisableStorageClass][Serial] should remove the StorageClass when StorageClassState is Removed [Suite:openshift/conformance/serial]"

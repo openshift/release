@@ -27,6 +27,8 @@ PRIVATE=${PRIVATE:-false}
 PRIVATE_LINK=${PRIVATE_LINK:-false}
 PRIVATE_SUBNET_ONLY="false"
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
+ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
+ADDITIONAL_SECURITY_GROUP=${ADDITIONAL_SECURITY_GROUP:-false}
 
 # Record Cluster Configurations
 cluster_config_file="${SHARED_DIR}/cluster-config"
@@ -49,18 +51,27 @@ function record_cluster() {
   fi
 }
 
-# Define cluster name
-prefix="ci-rosa"
+# The rosa hypershift must be a STS cluster.
 if [[ "$HOSTED_CP" == "true" ]]; then
-  # The rosa hypershift must be a STS cluster.
   STS="true"
-  prefix="ci-rosa-h"  
-elif [[ "$STS" == "true" ]]; then
-  prefix="ci-rosa-s"
 fi
-subfix=$(openssl rand -hex 2)
-CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
-echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+
+# Define cluster name
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]] && [[ -e "${SHARED_DIR}/cluster-name" ]]; then
+  # For Shared VPC cluster, cluster name is determined in step aws-provision-route53-private-hosted-zone
+  #   as Private Hosted Zone needs to be ready before installing Shared VPC cluster
+  CLUSTER_NAME=$(head -n 1 "${SHARED_DIR}/cluster-name")
+else
+  prefix="ci-rosa"
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    prefix="ci-rosa-h"
+  elif [[ "$STS" == "true" ]]; then
+    prefix="ci-rosa-s"
+  fi
+  subfix=$(openssl rand -hex 2)
+  CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
+  echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+fi
 
 # Configure aws
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
@@ -329,6 +340,13 @@ if [[ "$ENABLE_BYOVPC" == "true" ]]; then
     record_cluster "subnets" "public_subnet_ids" ${PUBLIC_SUBNET_IDs}
   fi
 fi
+# Additional security groups options
+SECURITY_GROUP_ID_SWITCH=""
+if [[ "$ADDITIONAL_SECURITY_GROUP" == "true" ]]; then
+  SECURITY_GROUP_IDs=$(cat ${SHARED_DIR}/security_groups_ids | xargs |sed 's/ /,/g')
+  SECURITY_GROUP_ID_SWITCH="--additional-compute-security-group-ids ${SECURITY_GROUP_IDs}"
+  record_cluster "security_groups" "enabled" ${SECURITY_GROUP_IDs}
+fi
 
 # STS options
 STS_SWITCH="--non-sts"
@@ -373,6 +391,61 @@ if [[ "$STS" == "true" ]]; then
   fi
 fi
 
+SHARED_VPC_SWITCH=""
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+  SAHRED_VPC_HOSTED_ZONE_ID=$(head -n 1 "${SHARED_DIR}/hosted_zone_id")
+  SAHRED_VPC_ROLE_ARN=$(head -n 1 "${SHARED_DIR}/hosted_zone_role_arn")
+  SAHRED_VPC_BASE_DOMAIN=$(head -n 1 "${SHARED_DIR}/rosa_dns_domain")
+
+  SHARED_VPC_SWITCH=" --private-hosted-zone-id ${SAHRED_VPC_HOSTED_ZONE_ID} "
+  SHARED_VPC_SWITCH+=" --shared-vpc-role-arn ${SAHRED_VPC_ROLE_ARN} "
+  SHARED_VPC_SWITCH+=" --base-domain ${SAHRED_VPC_BASE_DOMAIN} "
+
+  record_cluster "aws.sts" "private_hosted_zone_id" ${SAHRED_VPC_HOSTED_ZONE_ID}
+  record_cluster "aws.sts" "private_hosted_zone_role_arn" ${SAHRED_VPC_ROLE_ARN}
+  record_cluster "dns" "base_domain" ${SAHRED_VPC_BASE_DOMAIN}
+
+  # update shared-role policy for Shared-VPC cluster
+  #
+  if [[ ! -e "${CLUSTER_PROFILE_DIR}/.awscred_shared_account" ]]; then
+    echo "No Shared VPC account found. Exit now."
+    exit 1
+  fi
+
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+
+  installer_role_arn=$(grep "Installer-Role" "${SHARED_DIR}/account-roles-arns")
+  ingress_role_arn=$(grep "ingress-operator" "${SHARED_DIR}/operator-roles-arns")
+  shared_vpc_updated_trust_policy=$(mktemp)
+  cat > $shared_vpc_updated_trust_policy <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+      {
+          "Effect": "Allow",
+          "Principal": {
+              "AWS": [
+                "${installer_role_arn}",
+                "${ingress_role_arn}"
+              ]
+          },
+          "Action": "sts:AssumeRole",
+          "Condition": {}
+      }
+  ]
+}
+EOF
+  aws iam update-assume-role-policy --role-name "$(echo ${SAHRED_VPC_ROLE_ARN} | cut -d '/' -f2)"  --policy-document file://${shared_vpc_updated_trust_policy}
+  echo "Updated Shared VPC role trust policy:"
+  cat $shared_vpc_updated_trust_policy
+  
+  echo "Sleeping 120s to make sure the policy is ready."
+  sleep 120
+
+  echo "Change AWS profile back to cluster owner"
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+fi
+
 DRY_RUN_SWITCH=""
 if [[ "$DRY_RUN" == "true" ]]; then
   DRY_RUN_SWITCH="--dry-run"
@@ -399,12 +472,20 @@ echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Enable Byovpc: ${ENABLE_BYOVPC}"
 echo "  Enable audit log: ${ENABLE_AUDIT_LOG}"
 echo "  Cluster Tags: ${TAGS}"
+echo "  Additional Security groups: ${ADDITIONAL_SECURITY_GROUP}"
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
   echo "  Min replicas: ${MIN_REPLICAS}"
   echo "  Min replicas: ${MAX_REPLICAS}"  
 else
   echo "  Replicas: ${REPLICAS}"
+fi
+
+echo "  Enable Shared VPC: ${ENABLE_SHARED_VPC}"
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+  echo "    SAHRED_VPC_HOSTED_ZONE_ID: ${SAHRED_VPC_HOSTED_ZONE_ID}"
+  echo "    SAHRED_VPC_ROLE_ARN: ${SAHRED_VPC_ROLE_ARN}"
+  echo "    SAHRED_VPC_BASE_DOMAIN: ${SAHRED_VPC_BASE_DOMAIN}"
 fi
 
 echo -e "
@@ -436,6 +517,8 @@ ${STORAGE_ENCRYPTION_SWITCH} \
 ${AUDIT_LOG_SWITCH} \
 ${COMPUTER_NODE_ZONES_SWITCH} \
 ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
+${SHARED_VPC_SWITCH} \
+${SECURITY_GROUP_ID_SWITCH} \
 ${DRY_RUN_SWITCH}
 "
 
@@ -473,6 +556,8 @@ rosa create cluster -y \
                     ${AUDIT_LOG_SWITCH} \
                     ${COMPUTER_NODE_ZONES_SWITCH} \
                     ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
+                    ${SHARED_VPC_SWITCH} \
+                    ${SECURITY_GROUP_ID_SWITCH} \
                     ${DRY_RUN_SWITCH} \
                     > "${CLUSTER_INFO}"
 
