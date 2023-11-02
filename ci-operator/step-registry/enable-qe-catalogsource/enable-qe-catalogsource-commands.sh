@@ -24,7 +24,7 @@ function run_command() {
 function check_mcp_status() {
     machineCount=$(oc get mcp worker -o=jsonpath='{.status.machineCount}')
     COUNTER=0
-    while [ $COUNTER -lt 1200 ]
+    while [ $COUNTER -lt 2400 ]
     do
         sleep 20
         COUNTER=`expr $COUNTER + 20`
