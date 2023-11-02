@@ -123,6 +123,7 @@ tests:
     - ref: openshift-extended-test
     - ref: rosa-terraform-e2e-tests-upload-polarion
 - as: rosa-sts-ad-critical-high-f3
+  cluster: build05
   cron: 38 11 3,6,9,12,15,18,21,23,27,30 * *
   steps:
     cluster_profile: aws-qe
@@ -130,10 +131,26 @@ tests:
       CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-ad
+      POLARION_PROPERTIES: |
+        targets:
+          polarion:
+            config:
+              project: OSE
+            processing:
+              testsuite_properties:
+                polarion-testrun-id: 20231009-0541
+                polarion-custom-subteam: kni
+                polarion-custom-casecomponent: terraform-provider
+                polarion-custom-pillar: acceleration
+                polarion-custom-version: '4.14'
+                polarion-custom-products: ocp
+                polarion-custom-plannedin: OCP_4_14_Z
+      POLARION_STEP_RESULTS: rhcs-e2e-tests/artifacts
       REGION: us-east-1
       RHCS_ENV: staging
     test:
     - ref: rhcs-e2e-tests
+    - ref: rosa-terraform-e2e-tests-upload-polarion
     workflow: rhcs-aws-sts
 zz_generated_metadata:
   branch: main
