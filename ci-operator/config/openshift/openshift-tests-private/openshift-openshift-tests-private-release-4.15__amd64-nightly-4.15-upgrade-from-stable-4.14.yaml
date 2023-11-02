@@ -117,12 +117,13 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-byo-kms-etcd-encryption
-- as: aws-ipi-byo-route53-f28
+- as: aws-ipi-byo-route53-compact-f28
   cron: 24 1 17 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      SIZE_VARIANT: compact
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @aws-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @aws-ipi and not @fips'
     test:
@@ -194,9 +195,12 @@ tests:
       ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
       BASE_DOMAIN: qe.devcluster.openshift.com
       BASELINE_CAPABILITY_SET: None
+      ENABLE_OTA_TEST: "66839"
+      EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST: MachineAPI
       FIPS_ENABLED: "true"
       PERSISTENT_MONITORING: "false"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CCO_MANUAL_MODE: oidc
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @aws-ipi and @disconnected'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @aws-ipi and @disconnected'
     test:
@@ -653,17 +657,17 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
-- as: vsphere-ipi-compact-f28
-  cron: 37 8 18 * *
+- as: vsphere-ipi-compact-etcd-encryption-f28
+  cron: 13 20 11 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       SIZE_VARIANT: compact
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @vsphere-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @vsphere-ipi and not @fips'
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-vsphere-ipi
+    workflow: cucushift-installer-rehearse-vsphere-ipi-etcd-encryption
 - as: vsphere-ipi-disconnected-f28
   cron: 2 4 3 * *
   steps:
@@ -698,18 +702,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-external-lb-post
-- as: vsphere-ipi-ovn-etcd-encryption-f28
-  cron: 14 20 24 * *
-  steps:
-    cluster_profile: vsphere-2
-    env:
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @vsphere-ipi and not @fips
-        and @network-ovnkubernetes'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @vsphere-ipi and not @fips
-        and @network-ovnkubernetes'
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-etcd-encryption
 - as: vsphere-ipi-ovn-ipsec-f14
   cron: 12 10 6,21 * *
   steps:
@@ -747,7 +739,7 @@ tests:
 - as: vsphere-ipi-sdn-f28
   cron: 29 3 25 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @vsphere-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @vsphere-ipi and not @fips'
