@@ -49,6 +49,42 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
+- as: aws-ipi-disc-sno-baselinecaps-none-amd-f28
+  cron: 5 11 1 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @disconnected and @network-ovnkubernetes
+        and @singlenode and not @fips and not @console and not @storage'
+      PERSISTENT_MONITORING: "false"
+      TAG_VERSION: '@4.13'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
+- as: aws-ipi-disc-sno-baselinecaps-none-arm-f28-destructive
+  cron: 18 2 7 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.2xlarge
+      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @disconnected and @network-ovnkubernetes
+        and @singlenode and not @fips and not @console and not @storage'
+      OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
+      TAG_VERSION: '@4.13'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
 - as: aws-ipi-ovn-ipsec-amd-mixarch-f14
   cron: 3 19 12,27 * *
   steps:
@@ -170,6 +206,41 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-sdn-mtu-migrate
+- as: aws-upi-baselinecaps-none-amd-f28
+  cron: 21 22 17 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      E2E_RUN_TAGS: '@amd64 and @aws-upi and @network-ovnkubernetes and not @fips
+        and not @console and not @storage'
+      PERSISTENT_MONITORING: "false"
+      TAG_VERSION: '@4.13'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-upi
+- as: aws-upi-baselinecaps-none-arm-f28-destructive
+  cron: 37 13 19 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      E2E_RUN_TAGS: '@arm64 and @aws-upi and @network-ovnkubernetes and not @fips
+        and not @console and not @storage'
+      OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
+      TAG_VERSION: '@4.13'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-upi
 - as: azure-ipi-amd-mixarch-f14
   cron: 26 14 9,24 * *
   steps:
