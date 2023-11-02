@@ -98,7 +98,22 @@ if ! wait $!; then
   exit 1
 fi
 
-## Monitor for cluster completion
+if [ "${MASTERS}" -ne 1 ]; then
+  # Remove the Taint manually
+  oc wait --for=condition=Ready node --all --timeout=15m
+  node_count="$(oc get nodes -o json | jq -r '.items | length')"
+  if [ "$node_count" -eq $total_host ]; then
+    nodes=$(oc get nodes -o wide | awk '{print $1}' | tail -n +2)
+    for NODE in $nodes; do
+      oc adm taint nodes "$NODE" node.cloudprovider.kubernetes.io/uninitialized:NoSchedule- || true
+    done
+  else
+    echo "$(date -u --rfc-3339=seconds) - Waiting for all nodes to be ready. Currently, $node_count are ready, but the expected number of nodes is $total_host."
+    sleep 15
+  fi
+fi
+
+## Monitor for cluster completion/.
 echo "$(date -u --rfc-3339=seconds) - Monitoring for cluster completion..."
 
 # When using line-buffering there is a potential issue that the buffer is not filled (or no new line) and this waits forever
