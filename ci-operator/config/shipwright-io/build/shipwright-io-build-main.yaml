@@ -30,8 +30,16 @@ images:
         curl -LO https://storage.googleapis.com/kubernetes-release/release/v$KUBECTL_VERSION/bin/linux/amd64/kubectl && \
         chmod +x ./kubectl && mv ./kubectl /usr/local/bin && \
         kubectl version --client=true
+
+    # Install ko
+    RUN VERSION=0.15.0 OS=Linux ARCH=x86_64 && \
+        curl -sSfL "https://github.com/ko-build/ko/releases/download/v${VERSION}/ko_${VERSION}_${OS}_${ARCH}.tar.gz" > ko.tar.gz && \
+        tar xzf ko.tar.gz ko && chmod +x ./ko && mv ./ko /usr/local/bin
   from: src
   to: src-kubectl
+promotion:
+  name: "4.14"
+  namespace: ocp
 releases:
   initial:
     integration:
@@ -51,10 +59,25 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: |
-    make test
-  container:
-    from: src-kubectl
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test-unit
+      cli: latest
+      commands: |
+        export PROJECT=`oc project -q`
+        make install IMAGE_HOST=image-registry.openshift-image-registry.svc:5000 IMAGE_NAMESPACE=${PROJECT}/build TEST_IMAGE_REPO=image-registry.openshift-image-registry.svc:5000/${PROJECT}/build-e2e GO_ARCH=amd64
+        oc --namespace shipwright-build adm policy add-scc-to-user privileged -z shipwright-build-controller
+        oc --namespace shipwright-build adm policy add-scc-to-user privileged -z shipwright-build-webhook
+        sh hack/setup-webhook-cert.sh
+        oc --namespace shipwright-build get all
+        make install-strategies
+        make test
+      from: src-kubectl
+      resources:
+        requests:
+          cpu: 200m
+    workflow: ipi-aws
 - as: test-integration
   steps:
     cluster_profile: aws
@@ -78,28 +101,6 @@ tests:
       resources:
         requests:
           cpu: 200m
-    workflow: ipi-aws
-- as: test-e2e
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test-e2e
-      cli: latest
-      commands: "echo \"----NAMESPACE---\"\necho $NAMESPACE       \n# oc create serviceaccount
-        pipeline\n# oc adm policy add-scc-to-user privileged -z default\n# oc adm
-        policy add-role-to-user edit -z default\n# oc adm policy add-scc-to-user privileged
-        -z pipeline\n# oc adm policy add-role-to-user edit -z pipeline\n# echo \"---
-        oc whoami ---\"\n# oc whoami\n# echo \"--- oc whoami -t ---\"\n# oc whoami
-        -t\n# oc registry login\nexport TEST_IMAGE_REPO=image-registry.openshift-image-registry.svc:5000/ci-op-y20fk3hi/build-e2e
-        \nmake install-apis\nkubectl apply -R -f samples/buildstrategy/buildah\nkubectl
-        apply -R -f samples/buildstrategy/buildkit\nkubectl apply -R -f samples/buildstrategy/buildpacks-v3/buildstrategy_buildpacks-v3-heroku_cr.yaml\nkubectl
-        apply -R -f samples/buildstrategy/buildpacks-v3/buildstrategy_buildpacks-v3_cr.yaml\nkubectl
-        apply -R -f samples/buildstrategy/kaniko\nkubectl apply -R -f samples/buildstrategy/ko\nkubectl
-        apply -R -f samples/buildstrategy/source-to-image\nmake test-e2e-plain\n"
-      from: src-kubectl
-      resources:
-        requests:
-          cpu: 100m
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main
