@@ -1,0 +1,28 @@
+binary_build_commands: make server-binaries
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.14
+resources:
+  '*':
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: |
+    dnf install -y podman podman-docker jq; make ci-presubmit
+  container:
+    from: src
+- as: build-artifacts
+  commands: |
+    dnf install -y podman podman-docker jq; make release-artifacts
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: jetstack-cert-manager
