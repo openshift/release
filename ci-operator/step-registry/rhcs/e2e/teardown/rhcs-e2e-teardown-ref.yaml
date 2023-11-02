@@ -1,0 +1,34 @@
+ref:
+  as: rhcs-e2e-teardown
+  from_image:
+    namespace: ci
+    name: rhcs-tf-e2e
+    tag: latest
+  grace_period: 10m
+  commands: rhcs-e2e-teardown-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 2h0m0s
+  env:
+  - name: GATEWAY_URL
+    default: ''
+  - name: RHCS_ENV
+    default: "staging"
+  - name: CHANNEL_GROUP
+    default: "stable"
+  - name: "VERSION"
+    default: "latest"
+  - name: "CLUSTER_PROFILE"
+    default: "rosa-sts-ad"
+  - name: "REGION"
+    default: "" # Set a region once want to overriten the one in profile
+  documentation: |-
+    This step for destroying a rosa sts cluster with multi configurations.
+    Detailed configuration check https://github.com/terraform-redhat/terraform-provider-rhcs/blob/main/tests/ci/profiles/tf_cluster_profile.yml.
+    RHCS_ENV can be set to staging, production, integration
+    GATEWAY_URL will overwrite RHCS_ENV if it is set for a sandbox env maybe
+    VERSION is set to latest by default, it will list the supported versions and then use the latest. Or you can set a uniqe value like 4.14.0
+    REAGION will use the value set in profile configuration. Otherwise it will use the one in env settings
+

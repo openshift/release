@@ -1,13 +1,25 @@
 base_images:
   cluster-logging-operator:
+    name: "5.9"
+    namespace: logging
+    tag: cluster-logging-operator
+  cluster-logging-operator-5-8:
     name: "5.8"
     namespace: logging
     tag: cluster-logging-operator
   cluster-logging-operator-e2e:
+    name: "5.9"
+    namespace: logging
+    tag: cluster-logging-operator-e2e
+  cluster-logging-operator-e2e-5-8:
     name: "5.8"
     namespace: logging
     tag: cluster-logging-operator-e2e
   cluster-logging-operator-registry:
+    name: "5.9"
+    namespace: logging
+    tag: cluster-logging-operator-registry
+  cluster-logging-operator-registry-5-8:
     name: "5.8"
     namespace: logging
     tag: cluster-logging-operator-registry
@@ -40,17 +52,9 @@ base_images:
     namespace: logging
     tag: logging-kibana6
   oauth-proxy:
-    name: "4.13"
+    name: "4.14"
     namespace: ocp
     tag: oauth-proxy
-  ubi8-minimal:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
-  ubi8-ruby31:
-    name: ubi-ruby-31
-    namespace: ocp
-    tag: "8"
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -68,14 +72,6 @@ images:
 - dockerfile_path: Dockerfile.unit
   from: ubi9-ruby31
   to: test-unit-fluentd
-- context_dir: fluentd
-  dockerfile_path: Dockerfile
-  from: ubi8-minimal
-  inputs:
-    ubi8-ruby31:
-      as:
-      - registry.access.redhat.com/ubi9/ruby-31
-  to: fluentd-ubi8-ruby31
 - context_dir: fluentd
   dockerfile_path: Dockerfile
   from: ubi9-minimal
@@ -107,14 +103,14 @@ tests:
   commands: make lint
   container:
     from: src
-- as: clo-e2e-ubi9-ruby31
+- as: clo-e2e
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    owner: cvp
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.14"
   steps:
     test:
     - as: test
@@ -152,7 +148,7 @@ tests:
       timeout: 3h0m0s
     workflow: generic-claim
   timeout: 5h0m0s
-- as: clo-functional-ubi9-ruby31
+- as: clo-functional
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -192,14 +188,14 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
-- as: clo-e2e-ubi8-ruby31
+- as: clo-e2e-5-8
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    owner: cvp
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.14"
   steps:
     test:
     - as: test
@@ -209,9 +205,9 @@ tests:
         make test-e2e-olm
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
-        name: pipeline:cluster-logging-operator-registry
+        name: pipeline:cluster-logging-operator-registry-5-8
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR
-        name: pipeline:cluster-logging-operator
+        name: pipeline:cluster-logging-operator-5-8
       - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
         name: pipeline:elasticsearch-operator-registry
       - env: IMAGE_ELASTICSEARCH_OPERATOR
@@ -219,7 +215,7 @@ tests:
       - env: IMAGE_OAUTH_PROXY
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_FLUENTD
-        name: pipeline:fluentd-ubi8-ruby31
+        name: pipeline:logging-fluentd
       - env: IMAGE_ELASTICSEARCH_PROXY
         name: pipeline:elasticsearch-proxy
       - env: IMAGE_ELASTICSEARCH6
@@ -230,21 +226,21 @@ tests:
         name: pipeline:logging-eventrouter
       - env: IMAGE_LOG_FILE_METRIC_EXPORTER
         name: pipeline:log-file-metric-exporter
-      from: pipeline:cluster-logging-operator-e2e
+      from: pipeline:cluster-logging-operator-e2e-5-8
       resources:
         requests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: generic-claim
   timeout: 5h0m0s
-- as: clo-functional-ubi8-ruby31
+- as: clo-functional-5-8
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    owner: cvp
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.14"
   steps:
     test:
     - as: test
@@ -253,13 +249,13 @@ tests:
         make test-functional
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
-        name: pipeline:cluster-logging-operator-registry
+        name: pipeline:cluster-logging-operator-registry-5-8
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR
-        name: pipeline:cluster-logging-operator
+        name: pipeline:cluster-logging-operator-5-8
       - env: IMAGE_OAUTH_PROXY
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_FLUENTD
-        name: pipeline:fluentd-ubi8-ruby31
+        name: pipeline:logging-fluentd
       - env: IMAGE_ELASTICSEARCH_OPERATOR
         name: pipeline:elasticsearch-operator
       - env: IMAGE_ELASTICSEARCH_PROXY
@@ -272,7 +268,7 @@ tests:
         name: pipeline:logging-eventrouter
       - env: IMAGE_LOG_FILE_METRIC_EXPORTER
         name: pipeline:log-file-metric-exporter
-      from: pipeline:cluster-logging-operator-e2e
+      from: pipeline:cluster-logging-operator-e2e-5-8
       resources:
         requests:
           cpu: 100m
