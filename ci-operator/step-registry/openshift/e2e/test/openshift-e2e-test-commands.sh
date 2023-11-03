@@ -206,7 +206,7 @@ function upgrade() {
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
-        --disable-monitor "apiserver-new-disruption-invariant,pod-network-avalibility,upload-to-loki-serializer" \
+        --disable-monitor "'apiserver-new-disruption-invariant,pod-network-avalibility,upload-to-loki-serializer'" \
         --junit-dir "${ARTIFACT_DIR}/junit" &
     wait "$!" &&
     set +x
