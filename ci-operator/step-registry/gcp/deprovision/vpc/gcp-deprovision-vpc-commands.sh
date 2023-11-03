@@ -4,8 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-python3 --version 
-export CLOUDSDK_PYTHON=python3
+python3.8 --version 
+export CLOUDSDK_PYTHON=python3.8
 
 if [ ! -f "${SHARED_DIR}/vpc-destroy.sh" ]; then
   echo "No 'vpc-destroy.sh' found, aborted." && exit 0

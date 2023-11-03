@@ -4,8 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-python3 --version 
-export CLOUDSDK_PYTHON=python3
+python3.8 --version 
+export CLOUDSDK_PYTHON=python3.8
 
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
