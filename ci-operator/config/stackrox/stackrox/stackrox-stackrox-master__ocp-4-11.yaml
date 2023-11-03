@@ -25,17 +25,17 @@ tests:
   steps:
     env:
       COLLECTION_METHOD: core_bpf
-      OCP_VERSION: ocp/stable-4.10
+      OCP_VERSION: ocp/stable-4.11
       TEST_SUITE: ocp-qa-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
-- always_run: false
-  as: ebpf-qa-e2e-tests
+- as: ebpf-qa-e2e-tests
   optional: true
+  run_if_changed: ^COLLECTOR_VERSION
   steps:
     env:
       COLLECTION_METHOD: ebpf
-      OCP_VERSION: ocp/stable-4.10
+      OCP_VERSION: ocp/stable-4.11
       TEST_SUITE: ocp-qa-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
@@ -44,7 +44,7 @@ tests:
   run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
   steps:
     env:
-      OCP_VERSION: ocp/stable-4.10
+      OCP_VERSION: ocp/stable-4.11
       TEST_SUITE: ocp-operator-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
@@ -54,7 +54,7 @@ tests:
   steps:
     env:
       COLLECTION_METHOD: core_bpf
-      OCP_VERSION: ocp/stable-4.10
+      OCP_VERSION: ocp/stable-4.11
       TEST_SUITE: ocp-sensor-integration-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
@@ -64,7 +64,7 @@ tests:
   steps:
     env:
       COLLECTION_METHOD: core_bpf
-      OCP_VERSION: ocp/stable-4.10
+      OCP_VERSION: ocp/stable-4.11
       TEST_SUITE: ocp-ui-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
@@ -74,33 +74,46 @@ tests:
   steps:
     env:
       COLLECTION_METHOD: core_bpf
-      OCP_VERSION: ocp/stable-4.10
+      OCP_VERSION: ocp/stable-4.11
       TEST_SUITE: ocp-compliance-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
-- as: merge-qa-e2e-tests
-  postsubmit: true
+- always_run: false
+  as: sensor-profiling
+  optional: true
   steps:
     env:
       COLLECTION_METHOD: core_bpf
-      OCP_VERSION: ocp/stable-4.10
+      OCP_VERSION: ocp/stable-4.11
+      TEST_SUITE: ocp-sensor-profiling
+    workflow: stackrox-automation-flavors-ocp-4-e2e
+  timeout: 2h0m0s
+- as: merge-qa-e2e-tests
+  postsubmit: true
+  skip_if_only_changed: ^ui/
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      OCP_VERSION: ocp/stable-4.11
       TEST_SUITE: ocp-qa-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: merge-ebpf-qa-e2e-tests
   postsubmit: true
+  run_if_changed: ^COLLECTOR_VERSION
   steps:
     env:
       COLLECTION_METHOD: ebpf
-      OCP_VERSION: ocp/stable-4.10
+      OCP_VERSION: ocp/stable-4.11
       TEST_SUITE: ocp-qa-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: merge-operator-e2e-tests
   postsubmit: true
+  run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
   steps:
     env:
-      OCP_VERSION: ocp/stable-4.10
+      OCP_VERSION: ocp/stable-4.11
       TEST_SUITE: ocp-operator-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
@@ -109,21 +122,22 @@ tests:
   steps:
     env:
       COLLECTION_METHOD: core_bpf
-      OCP_VERSION: ocp/stable-4.10
+      OCP_VERSION: ocp/stable-4.11
       TEST_SUITE: ocp-ui-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: merge-compliance-e2e-tests
   postsubmit: true
+  run_if_changed: ^(compliance|central\/compliance.*)
   steps:
     env:
       COLLECTION_METHOD: core_bpf
-      OCP_VERSION: ocp/stable-4.10
+      OCP_VERSION: ocp/stable-4.11
       TEST_SUITE: ocp-compliance-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 zz_generated_metadata:
-  branch: release-x.y
+  branch: master
   org: stackrox
   repo: stackrox
-  variant: ocp-4-10
+  variant: ocp-4-11
