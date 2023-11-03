@@ -1,0 +1,61 @@
+base_images:
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: dockerfiles/interop/Dockerfile
+  to: mta-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: mta-interop-aws
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPINTEROP", "jira_additional_labels": ["4.15-lp","self-managed-lp","mta-lp"]},
+          {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_project": "LPINTEROP", "jira_additional_labels": ["4.15-lp","self-managed-lp","mta-lp"]},
+          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "jira_project": "LPINTEROP", "jira_additional_labels": ["4.15-lp","self-managed-lp","mta-lp"]},
+          {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPINTEROP", "jira_additional_labels": ["4.15-lp","self-managed-lp","mta-lp"]},
+          {"step": "mta-deploy-tackle", "failure_type": "all", "classification":  "Infrastructure Provisioning - Deploy Tackle", "jira_project": "LPINTEROP", "jira_additional_labels": ["4.15-lp","self-managed-lp","mta-lp","interop-tests"]},
+          {"step": "mta-tests-ui", "failure_type": "pod_failure", "classification": "Test Execution", "jira_project": "LPINTEROP", "jira_additional_labels": ["4.15-lp","self-managed-lp","mta-lp","interop-tests"]},
+          {"step": "mta-tests-ui", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "MTA", "jira_additional_labels": ["4.15-lp","self-managed-lp","mta-lp","interop-tests"]}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OPERATORS: |
+        [
+            {"name": "mta-operator", "source": "redhat-operators", "channel": "stable-v6.1", "install_namespace": "mta", "operator_group":"mta-operator-group", "target_namespaces": "mta"}
+        ]
+      USER_TAGS: |
+        scenario mta
+    test:
+    - ref: install-operators
+    - ref: mta-deploy-tackle
+    - ref: mta-tests-ui
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: mta_6.1.1
+  org: konveyor
+  repo: tackle-ui-tests
+  variant: mta-ocp4.15-lp-interop

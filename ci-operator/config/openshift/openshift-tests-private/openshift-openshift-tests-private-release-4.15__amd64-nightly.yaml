@@ -144,36 +144,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
-- as: aws-ipi-baselinecaps-none-custom-sg-f14
-  cron: 3 8 4,19 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and not @fips
-        and not @console and not @storage and not @workloads'
-      PERSISTENT_MONITORING: "false"
-      TAG_VERSION: '@4.15'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-custom-security-groups
-- as: aws-ipi-baselinecaps-none-custom-sg-f28-destructive
-  cron: 24 11 26 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and not @fips
-        and not @console and not @storage and not @workloads'
-      PERSISTENT_MONITORING: "false"
-      TAG_VERSION: '@4.15'
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-custom-security-groups
 - as: aws-ipi-byo-iam-role-fips-f14
   cron: 31 1 10,25 * *
   steps:
@@ -318,40 +288,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-longduration
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-disconnected-private-sno-baselinecaps-none-f28
-  cron: 28 7 27 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @disconnected and @network-ovnkubernetes
-        and @singlenode and not @fips and not @console and not @storage and not @workloads'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      PERSISTENT_MONITORING: "false"
-      TAG_VERSION: '@4.15'
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
-- as: aws-ipi-disconnected-private-sno-baseline-f28-destructive
-  cron: 39 2 25 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @disconnected and @network-ovnkubernetes
-        and @singlenode and not @fips and not @console and not @storage and not @workloads'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      PERSISTENT_MONITORING: "false"
-      TAG_VERSION: '@4.15'
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
 - as: aws-ipi-disconnected-private-sno-f14
   cron: 15 13 7,22 * *
   steps:
@@ -1271,8 +1207,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
-- as: aws-ipi-usertags-fips-f28
-  cron: 34 4 30 * *
+- as: aws-ipi-usertags-custom-sg-fips-f28
+  cron: 14 0 30 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -1282,9 +1218,9 @@ tests:
       TAG_VERSION: '@4.15'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-usertags
-- as: aws-ipi-usertags-fips-f28-destructive
-  cron: 43 18 5 * *
+    workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
+- as: aws-ipi-usertags-custom-sg-fips-f28-destructive
+  cron: 4 21 11 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -1294,7 +1230,7 @@ tests:
       TAG_VERSION: '@4.15'
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-usertags
+    workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
 - as: aws-ipi-workers-marketplace-f28
   cron: 21 10 14 * *
   steps:
@@ -3315,9 +3251,9 @@ tests:
     - chain: openshift-e2e-test-qe-ui
     workflow: cucushift-agent-vsphere-install-sno
 - as: vsphere-ipi-compact-etcd-encryption-f28
-  cron: 7 16 12 * *
+  cron: 7 11 9 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @network-ovnkubernetes and not @fips'
       SIZE_VARIANT: compact
@@ -3326,9 +3262,9 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi-etcd-encryption
 - as: vsphere-ipi-compact-etcd-encryption-f28-destructive
-  cron: 5 11 9 * *
+  cron: 46 10 14 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @network-ovnkubernetes and not @fips'
       SIZE_VARIANT: compact
@@ -3579,7 +3515,7 @@ tests:
 - as: vsphere-ipi-remote-worker-f28
   cron: 22 9 17 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @network-ovnkubernetes and not @fips'
       TAG_VERSION: '@4.15'
@@ -3592,7 +3528,7 @@ tests:
 - as: vsphere-ipi-remote-worker-f28-destructive
   cron: 43 5 27 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @network-ovnkubernetes and not @fips'
       TAG_VERSION: '@4.15'
@@ -3605,7 +3541,7 @@ tests:
 - as: vsphere-ipi-sdn-f28
   cron: 48 21 7 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @network-openshiftsdn and not @fips'
       TAG_VERSION: '@4.15'
@@ -3615,7 +3551,7 @@ tests:
 - as: vsphere-ipi-sdn-f28-destructive
   cron: 38 3 26 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @network-openshiftsdn and not @fips'
       TAG_VERSION: '@4.15'
@@ -3637,7 +3573,7 @@ tests:
 - as: vsphere-ipi-static-ip-tp-f28
   cron: 29 6 16 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @network-ovnkubernetes and not @fips'
       FEATURE_SET: TechPreviewNoUpgrade
@@ -3648,7 +3584,7 @@ tests:
 - as: vsphere-ipi-static-ip-tp-f28-destructive
   cron: 41 21 7 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @network-ovnkubernetes and not @fips'
       FEATURE_SET: TechPreviewNoUpgrade
@@ -3659,7 +3595,7 @@ tests:
 - as: vsphere-ipi-template-f28
   cron: 11 11 8 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @network-ovnkubernetes and not @fips'
       TAG_VERSION: '@4.15'
@@ -3669,7 +3605,7 @@ tests:
 - as: vsphere-ipi-template-f28-destructive
   cron: 23 12 19 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @network-ovnkubernetes and not @fips'
       TAG_VERSION: '@4.15'
@@ -3787,7 +3723,7 @@ tests:
 - as: vsphere-upi-disconnecting-network-f28
   cron: 41 7 23 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-upi and @disconnected and @network-ovnkubernetes
         and not @fips'
@@ -3799,7 +3735,7 @@ tests:
 - as: vsphere-upi-disconnecting-network-f28-destructive
   cron: 29 6 8 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-upi and @disconnected and @network-ovnkubernetes
         and not @fips'

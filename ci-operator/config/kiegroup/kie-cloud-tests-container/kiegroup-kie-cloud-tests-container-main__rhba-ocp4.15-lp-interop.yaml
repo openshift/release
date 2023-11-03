@@ -1,0 +1,53 @@
+base_images:
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: rhba-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 2Gi
+tests:
+- as: rhba-interop-aws
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPINTEROP", "jira_additional_labels": ["4.15-lp","self-managed-lp","rhba-lp"]},
+          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "jira_project": "LPINTEROP", "jira_additional_labels": ["4.15-lp","self-managed-lp","rhba-lp"]},
+          {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPINTEROP", "jira_additional_labels": ["4.15-lp","self-managed-lp","rhba-lp"]},
+          {"step": "rhba-interop-tests", "failure_type": "pod_failure", "classification": "Test Execution", "jira_project": "LPINTEROP", "jira_additional_labels": ["4.15-lp","self-managed-lp","rhba-lp","interop-tests"]},
+          {"step": "rhba-interop-tests", "failure_type": "test_failure", "classification": "OCP Interop Test Failure", "jira_project": "RHPAM", "jira_component": "Cloud", "jira_additional_labels": ["4.15-lp","self-managed-lp","rhba-lp","ocp-interop", "interop-tests"]}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      USER_TAGS: |
+        scenario rhba
+    test:
+    - ref: rhba-interop-tests
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: kiegroup
+  repo: kie-cloud-tests-container
+  variant: rhba-ocp4.15-lp-interop

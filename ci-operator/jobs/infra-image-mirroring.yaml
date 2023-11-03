@@ -1,1441 +1,1491 @@
 periodics:
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  decoration_config:
-    timeout: 5h0m0s
-  labels:
-    ci.openshift.io/area: knative
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-knative
-  reporter_config:
-    slack:
-      channel: '#serverless-dev'
-      job_states_to_report:
-      - failure
-      report_template: Job {{.Spec.Job}} failed
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_knative*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay.io-openshift-knative
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: 1 1 12 */12 *
-  decorate: true
-  labels:
-    ci.openshift.io/area: open-cluster-management
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-open-cluster-management
-  spec:
-    automountServiceAccountToken: true
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        cp ~/.docker/config.json /tmp/config.json
-        oc registry login --to /tmp/config.json
-        failures=0
-        for mapping in /etc/imagemirror/mapping_open_cluster_management*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -a /tmp/config.json -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay.io-open-cluster-management
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: openshift-azure
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-openshift-azure
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_openshift_azure*; do
-          echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: quay.io/openshift/origin-cli:4.3
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: .dockerconfigjson
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay.io-openshift-azure
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: openshift
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-openshift
-  spec:
-    automountServiceAccountToken: true
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        cp ~/.docker/config.json /tmp/config.json
-        oc registry login --to /tmp/config.json
-        failures=0
-        for mapping in /etc/imagemirror/mapping_origin*; do
-          if [ ! -s "${mapping}" ]; then continue; fi
-          attempts=3
-          for attempt in $( seq $attempts ); do
-            echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes --continue-on-error --max-per-registry=3"
-            if oc image mirror --keep-manifest-list -a /tmp/config.json -f="$mapping" --skip-multiple-scopes --continue-on-error --max-per-registry=3; then
-              break
-            fi
-            if [[ $attempt -eq $attempts ]]; then
-              echo "ERROR: Failed to mirror images from $mapping after $attempts attempts"
-              failures=$((failures+1))
-            fi
-          done
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: .dockerconfigjson
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-openshift
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: 13 3 28 */12 *
-  decorate: true
-  labels:
-    ci.openshift.io/area: tekton
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-tekton
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_tekton*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay.io-openshift-pipeline
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: 15 1 22 */12 *
-  decorate: true
-  labels:
-    ci.openshift.io/area: toolchain
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-toolchain
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_toolchain*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay.io-openshiftio
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: kubefed
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-kubefed
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_kubefed*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay.io
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: 13 21 19 */12 *
-  decorate: true
-  labels:
-    ci.openshift.io/area: codeready-toolchain
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-codeready-toolchain
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_codeready_toolchain*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay.io-codeready-toolchain
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: openshift-container-storage
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-red-hat-storage
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_red-hat-storage_*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: .dockerconfigjson
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay.io-ocs-dev
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: 15 2 12 */12 *
-  decorate: true
-  labels:
-    ci.openshift.io/area: openshift-container-storage
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-ceph-csi
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_ceph-csi*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: .dockerconfigjson
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay.io-ocs-dev
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: integr8ly
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-integr8ly
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_integr8ly*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay.io-integr8ly
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: openshift-kni
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-openshift-kni
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_openshift-kni*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay.io-openshift-kni
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: openshift-psap
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-openshift-psap
-  spec:
-    automountServiceAccountToken: true
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        cp ~/.docker/config.json /tmp/config.json
-        oc registry login --to /tmp/config.json
-        failures=0
-        for mapping in /etc/imagemirror/mapping_openshift-psap*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: .dockerconfigjson
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay.io-openshift-psap
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: ovirt
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-ovirt
-  spec:
-    automountServiceAccountToken: true
-    containers:
-    - args:
-      - -c
-      - |
-        set -euxo pipefail
-        cp ~/.docker/config.json /tmp/config.json
-        oc registry login --to /tmp/config.json
-        failures=0
-        for mapping in /etc/imagemirror/mapping_ovirt_*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay.io-ovirt
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@every 20m'
-  decorate: true
-  labels:
-    ci.openshift.io/area: redhat-developer
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-redhat-developer
-  spec:
-    automountServiceAccountToken: true
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        cp ~/.docker/config.json /tmp/config.json
-        oc registry login --to /tmp/config.json
-        failures=0
-        for mapping in /etc/imagemirror/mapping_redhat-developer*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay.io-redhat-developer
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: openshift-logging
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-openshift-logging
-  reporter_config:
-    slack:
-      channel: '#announce-logging'
-      job_states_to_report:
-      - failure
-      report_template: Job {{.Spec.Job}} failed
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_logging*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: openshiftlogging-ci-to-quay
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: addon-operator-dev
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-addon-operator
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_addon_operator*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: app-sre-push-pull-secret
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: reference-addon-dev
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-reference-addon
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_reference_addon*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: app-sre-push-pull-secret
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: supplemental-ci-images
-    ci.openshift.io/role: infra
-  name: periodic-image-mirroring-supplemental-ci-images
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_supplemental_ci_images_*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          attempts=3
-          for attempt in $( seq $attempts ); do
-            if oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-              break
-            fi
-            if [[ $attempt -eq $attempts ]]; then
-              echo "ERROR: Failed to mirror images from $mapping after $attempts attempts"
-              failures=$((failures+1))
-            fi
-          done
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: .dockerconfigjson
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-ci-central
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: supplemental-ci-private-images-redhat
-    ci.openshift.io/role: infra
-  name: periodic-image-mirroring-supplemental-ci-private-images-redhat
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_supplemental_ci_private_images_redhat_*; do
-          echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: .dockerconfigjson
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: mirror-redhat-io-to-ci-central-registry-credentials
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: edge-infrastructure
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-edge-infrastructure
-  reporter_config:
-    slack:
-      channel: '#forum-edge-infra-alerts'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
-        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_edge_infrastructure*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay-openshift-edge-infrastructure
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: hypershift
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-hypershift
-  spec:
-    automountServiceAccountToken: true
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        cp ~/.docker/config.json /tmp/config.json
-        oc registry login --to /tmp/config.json
-        failures=0
-        for mapping in /etc/imagemirror/mapping_hypershift*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -a /tmp/config.json -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quayio-hypershift
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: coreos
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-cosa
-  spec:
-    automountServiceAccountToken: true
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_coreos_assembler*; do
-          # Remove --keep-manifest-list option for now until the internal
-          # registry supports it. https://issues.redhat.com/browse/IR-192
-          echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: .dockerconfigjson
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-ci-central
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: konveyor
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-konveyor
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_konveyor*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay-io-konveyor
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: node-observability-operator
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-node-observability-operator
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_node_observability_operator*; do
-          ciimage=$(cat ${mapping} | cut -d ' ' -f1)
-          quayimage=$(cat ${mapping} | cut -d ' ' -f2)
-          digest=$(oc image info ${ciimage} | grep 'Digest:' | tr -d ' ' | cut -d ':' -f2-)
-          shorttag=$(echo ${digest} | cut -d: -f2 | grep -oP '^.{12}')
-          quayimageshort=${quayimage/:*/:${shorttag}}
-          echo "Running: oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping to ${quayimageshort}"
-            failures=$((failures+1))
-          fi
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay-io-node-observability-optr
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: external-dns-operator
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-external-dns-operator
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_external_dns_operator*; do
-          ciimage=$(cat ${mapping} | cut -d ' ' -f1)
-          quayimage=$(cat ${mapping} | cut -d ' ' -f2)
-          digest=$(oc image info ${ciimage} | grep 'Digest:' | tr -d ' ' | cut -d ':' -f2-)
-          shorttag=$(echo ${digest} | cut -d: -f2 | grep -oP '^.{12}')
-          quayimageshort=${quayimage/:*/:${shorttag}}
-          echo "Running: oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping to ${quayimageshort}"
-            failures=$((failures+1))
-          fi
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay-io-external-dns-optr
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: aws-load-balancer-operator
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-aws-load-balancer-operator
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_aws_load_balancer_operator*; do
-          ciimage=$(cat ${mapping} | cut -d ' ' -f1)
-          quayimage=$(cat ${mapping} | cut -d ' ' -f2)
-          digest=$(oc image info ${ciimage} | grep 'Digest:' | tr -d ' ' | cut -d ':' -f2-)
-          shorttag=$(echo ${digest} | cut -d: -f2 | grep -oP '^.{12}')
-          quayimageshort=${quayimage/:*/:${shorttag}}
-          echo "Running: oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping to ${quayimageshort}"
-            failures=$((failures+1))
-          fi
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay-io-albo
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  decoration_config:
-    timeout: 2h0m0s
-  labels:
-    ci.openshift.io/area: osa
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-osa
-  reporter_config:
-    slack:
-      channel: '#forum-osa-infra-alerts'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs>
-  spec:
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_osa*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.12:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay-io-osa
-    - configMap:
-        name: image-mirror-mappings
-      name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    decoration_config:
+      timeout: 5h0m0s
+    labels:
+      ci.openshift.io/area: knative
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-knative
+    reporter_config:
+      slack:
+        channel: "#serverless-dev"
+        job_states_to_report:
+          - failure
+        report_template: Job {{.Spec.Job}} failed
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_knative*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay.io-openshift-knative
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: 1 1 12 */12 *
+    decorate: true
+    labels:
+      ci.openshift.io/area: open-cluster-management
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-open-cluster-management
+    spec:
+      automountServiceAccountToken: true
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              cp ~/.docker/config.json /tmp/config.json
+              oc registry login --to /tmp/config.json
+              failures=0
+              for mapping in /etc/imagemirror/mapping_open_cluster_management*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -a /tmp/config.json -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay.io-open-cluster-management
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: openshift-azure
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-openshift-azure
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_openshift_azure*; do
+                echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: quay.io/openshift/origin-cli:4.3
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: .dockerconfigjson
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay.io-openshift-azure
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: openshift
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-openshift
+    spec:
+      automountServiceAccountToken: true
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              cp ~/.docker/config.json /tmp/config.json
+              oc registry login --to /tmp/config.json
+              failures=0
+              for mapping in /etc/imagemirror/mapping_origin*; do
+                if [ ! -s "${mapping}" ]; then continue; fi
+                attempts=3
+                for attempt in $( seq $attempts ); do
+                  echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes --continue-on-error --max-per-registry=3"
+                  if oc image mirror --keep-manifest-list -a /tmp/config.json -f="$mapping" --skip-multiple-scopes --continue-on-error --max-per-registry=3; then
+                    break
+                  fi
+                  if [[ $attempt -eq $attempts ]]; then
+                    echo "ERROR: Failed to mirror images from $mapping after $attempts attempts"
+                    failures=$((failures+1))
+                  fi
+                done
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: .dockerconfigjson
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-openshift
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: 13 3 28 */12 *
+    decorate: true
+    labels:
+      ci.openshift.io/area: tekton
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-tekton
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_tekton*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay.io-openshift-pipeline
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: 15 1 22 */12 *
+    decorate: true
+    labels:
+      ci.openshift.io/area: toolchain
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-toolchain
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_toolchain*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay.io-openshiftio
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: kubefed
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-kubefed
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_kubefed*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay.io
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: 13 21 19 */12 *
+    decorate: true
+    labels:
+      ci.openshift.io/area: codeready-toolchain
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-codeready-toolchain
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_codeready_toolchain*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay.io-codeready-toolchain
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: openshift-container-storage
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-red-hat-storage
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_red-hat-storage_*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: .dockerconfigjson
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay.io-ocs-dev
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: 15 2 12 */12 *
+    decorate: true
+    labels:
+      ci.openshift.io/area: openshift-container-storage
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-ceph-csi
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_ceph-csi*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: .dockerconfigjson
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay.io-ocs-dev
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: integr8ly
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-integr8ly
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_integr8ly*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay.io-integr8ly
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: openshift-kni
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-openshift-kni
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_openshift-kni*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay.io-openshift-kni
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: openshift-psap
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-openshift-psap
+    spec:
+      automountServiceAccountToken: true
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              cp ~/.docker/config.json /tmp/config.json
+              oc registry login --to /tmp/config.json
+              failures=0
+              for mapping in /etc/imagemirror/mapping_openshift-psap*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: .dockerconfigjson
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay.io-openshift-psap
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: ovirt
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-ovirt
+    spec:
+      automountServiceAccountToken: true
+      containers:
+        - args:
+            - -c
+            - |
+              set -euxo pipefail
+              cp ~/.docker/config.json /tmp/config.json
+              oc registry login --to /tmp/config.json
+              failures=0
+              for mapping in /etc/imagemirror/mapping_ovirt_*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay.io-ovirt
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@every 20m"
+    decorate: true
+    labels:
+      ci.openshift.io/area: redhat-developer
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-redhat-developer
+    spec:
+      automountServiceAccountToken: true
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              cp ~/.docker/config.json /tmp/config.json
+              oc registry login --to /tmp/config.json
+              failures=0
+              for mapping in /etc/imagemirror/mapping_redhat-developer*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay.io-redhat-developer
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: openshift-logging
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-openshift-logging
+    reporter_config:
+      slack:
+        channel: "#announce-logging"
+        job_states_to_report:
+          - failure
+        report_template: Job {{.Spec.Job}} failed
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_logging*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: openshiftlogging-ci-to-quay
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: addon-operator-dev
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-addon-operator
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_addon_operator*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: app-sre-push-pull-secret
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: reference-addon-dev
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-reference-addon
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_reference_addon*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: app-sre-push-pull-secret
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: supplemental-ci-images
+      ci.openshift.io/role: infra
+    name: periodic-image-mirroring-supplemental-ci-images
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_supplemental_ci_images_*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                attempts=3
+                for attempt in $( seq $attempts ); do
+                  if oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                    break
+                  fi
+                  if [[ $attempt -eq $attempts ]]; then
+                    echo "ERROR: Failed to mirror images from $mapping after $attempts attempts"
+                    failures=$((failures+1))
+                  fi
+                done
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: .dockerconfigjson
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-ci-central
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: supplemental-ci-private-images-redhat
+      ci.openshift.io/role: infra
+    name: periodic-image-mirroring-supplemental-ci-private-images-redhat
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_supplemental_ci_private_images_redhat_*; do
+                echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: .dockerconfigjson
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: mirror-redhat-io-to-ci-central-registry-credentials
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: edge-infrastructure
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-edge-infrastructure
+    reporter_config:
+      slack:
+        channel: "#forum-edge-infra-alerts"
+        job_states_to_report:
+          - failure
+          - error
+        report_template:
+          "<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
+          *{{.Status.State}}*. <{{.Status.URL}}|View logs>"
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_edge_infrastructure*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay-openshift-edge-infrastructure
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: hypershift
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-hypershift
+    spec:
+      automountServiceAccountToken: true
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              cp ~/.docker/config.json /tmp/config.json
+              oc registry login --to /tmp/config.json
+              failures=0
+              for mapping in /etc/imagemirror/mapping_hypershift*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -a /tmp/config.json -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quayio-hypershift
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: coreos
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-cosa
+    spec:
+      automountServiceAccountToken: true
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_coreos_assembler*; do
+                # Remove --keep-manifest-list option for now until the internal
+                # registry supports it. https://issues.redhat.com/browse/IR-192
+                echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: .dockerconfigjson
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-ci-central
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: konveyor
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-konveyor
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_konveyor*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay-io-konveyor
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: node-observability-operator
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-node-observability-operator
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_node_observability_operator*; do
+                ciimage=$(cat ${mapping} | cut -d ' ' -f1)
+                quayimage=$(cat ${mapping} | cut -d ' ' -f2)
+                digest=$(oc image info ${ciimage} | grep 'Digest:' | tr -d ' ' | cut -d ':' -f2-)
+                shorttag=$(echo ${digest} | cut -d: -f2 | grep -oP '^.{12}')
+                quayimageshort=${quayimage/:*/:${shorttag}}
+                echo "Running: oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping to ${quayimageshort}"
+                  failures=$((failures+1))
+                fi
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay-io-node-observability-optr
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: external-dns-operator
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-external-dns-operator
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_external_dns_operator*; do
+                ciimage=$(cat ${mapping} | cut -d ' ' -f1)
+                quayimage=$(cat ${mapping} | cut -d ' ' -f2)
+                digest=$(oc image info ${ciimage} | grep 'Digest:' | tr -d ' ' | cut -d ':' -f2-)
+                shorttag=$(echo ${digest} | cut -d: -f2 | grep -oP '^.{12}')
+                quayimageshort=${quayimage/:*/:${shorttag}}
+                echo "Running: oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping to ${quayimageshort}"
+                  failures=$((failures+1))
+                fi
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay-io-external-dns-optr
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: aws-load-balancer-operator
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-aws-load-balancer-operator
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_aws_load_balancer_operator*; do
+                ciimage=$(cat ${mapping} | cut -d ' ' -f1)
+                quayimage=$(cat ${mapping} | cut -d ' ' -f2)
+                digest=$(oc image info ${ciimage} | grep 'Digest:' | tr -d ' ' | cut -d ':' -f2-)
+                shorttag=$(echo ${digest} | cut -d: -f2 | grep -oP '^.{12}')
+                quayimageshort=${quayimage/:*/:${shorttag}}
+                echo "Running: oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping to ${quayimageshort}"
+                  failures=$((failures+1))
+                fi
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay-io-albo
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    labels:
+      ci.openshift.io/area: lvms
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-lvms
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_lvms*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay-io-lvms-dev
+        - configMap:
+            name: image-mirror-mappings
+          name: config
+  - agent: kubernetes
+    cluster: app.ci
+    cron: "@hourly"
+    decorate: true
+    decoration_config:
+      timeout: 2h0m0s
+    labels:
+      ci.openshift.io/area: osa
+      ci.openshift.io/role: image-mirroring
+    name: periodic-image-mirroring-osa
+    reporter_config:
+      slack:
+        channel: "#forum-osa-infra-alerts"
+        job_states_to_report:
+          - failure
+          - error
+        report_template:
+          Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+          logs>
+    spec:
+      containers:
+        - args:
+            - -c
+            - |
+              set -o errexit
+              failures=0
+              for mapping in /etc/imagemirror/mapping_osa*; do
+                echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+                if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+                  echo "ERROR: Failed to mirror images from $mapping"
+                  failures=$((failures+1))
+                fi
+              done
+              exit $failures
+          command:
+            - /bin/bash
+          env:
+            - name: HOME
+              value: /home/mirror
+          image: registry.ci.openshift.org/ocp/4.12:cli
+          imagePullPolicy: Always
+          name: ""
+          resources:
+            requests:
+              cpu: 500m
+          volumeMounts:
+            - mountPath: /home/mirror/.docker/config.json
+              name: push
+              readOnly: true
+              subPath: config.json
+            - mountPath: /etc/imagemirror
+              name: config
+      volumes:
+        - name: push
+          secret:
+            secretName: registry-push-credentials-quay-io-osa
+        - configMap:
+            name: image-mirror-mappings
+          name: config
