@@ -35,6 +35,14 @@ fips: true
 EOF
 fi
 
+if [ -n "${NETWORK_TYPE}"]; then
+  echo "Adding Networking Type to the install-config.yaml"
+  cat >> "${out}" << EOF
+networking:
+  networkType: ${NETWORK_TYPE}
+EOF
+fi
+
 if [ -n "${BASELINE_CAPABILITY_SET}" ]; then
 	echo "Adding 'capabilities: ...' to install-config.yaml"
 	cat >> "${out}" << EOF
