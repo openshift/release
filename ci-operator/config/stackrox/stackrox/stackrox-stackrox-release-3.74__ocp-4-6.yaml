@@ -1,4 +1,8 @@
 base_images:
+  ocp-4:
+    name: automation-flavors
+    namespace: stackrox
+    tag: openshift-4-0.8.7
   ubi-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -8,11 +12,6 @@ build_root:
     name: apollo-ci
     namespace: stackrox
     tag: stackrox-test-0.3.57.1
-releases:
-  latest:
-    release:
-      channel: fast
-      version: "4.6"
 resources:
   '*':
     requests:
@@ -23,44 +22,36 @@ tests:
 - as: qa-e2e-tests
   optional: true
   steps:
-    cluster_profile: aws
     env:
+      OCP_VERSION: ocp/stable-4.6
       QA_TEST_TARGET: test
       TEST_SUITE: openshift-4-qa-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
+    workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: operator-e2e-tests
   optional: true
   steps:
-    cluster_profile: aws
     env:
+      OCP_VERSION: ocp/stable-4.6
       TEST_SUITE: openshift-4-operator-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
+    workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: merge-qa-e2e-tests
   postsubmit: true
   steps:
-    cluster_profile: aws
     env:
+      OCP_VERSION: ocp/stable-4.6
       QA_TEST_TARGET: test
       TEST_SUITE: openshift-newest-qa-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
+    workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: merge-operator-e2e-tests
   postsubmit: true
   steps:
-    cluster_profile: aws
     env:
+      OCP_VERSION: ocp/stable-4.6
       TEST_SUITE: openshift-4-operator-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
+    workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-3.74
