@@ -11,12 +11,17 @@ workflow:
     env:
       COMPUTE_NODE_TYPE: c5n.metal
       COMPUTE_NODE_REPLICAS: "1"
+      ODF_VOLUME_SIZE: "500"
       CONTROL_PLANE_INSTANCE_TYPE: "m6i.2xlarge"
       HYPERSHIFT_NODE_COUNT: "2"
       ZONES_COUNT: "3"
+    leases:
+      - env: LEASED_RESOURCE
+        resource_type: aws-3-quota-slice
     pre:
     - chain: ipi-aws-ovn-pre
     - chain: ipi-install
+    - ref: hypershift-kubevirt-install-odf
     - ref: hypershift-kubevirt-install
     - ref: hypershift-install
     - chain: hypershift-kubevirt-custom-capk

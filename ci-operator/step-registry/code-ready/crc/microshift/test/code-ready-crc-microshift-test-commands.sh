@@ -39,11 +39,13 @@ mkdir -p /tmp/artifacts
 
 function run-tests() {
   pushd crc
+  cp -r test/testdata ${HOME}/testdata
   set +e
-  export PULL_SECRET_FILE=--pull-secret-file="${HOME}"/pull-secret
-  export BUNDLE_LOCATION=--bundle-location=""
-  export CRC_BINARY=--crc-binary=/tmp/
-  make e2e-story-microshift
+  /tmp/e2e.test --pull-secret-file="${HOME}"/pull-secret \
+                --bundle-location="" \
+                --crc-binary=/tmp \
+                --godog.tags="linux && @microshift" \
+                --godog.paths test/e2e/features/
   if [[ $? -ne 0 ]]; then
     exit 1
     popd
@@ -73,6 +75,12 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse /bin/crc packer@"${INSTANCE_PREFIX}":/tmp/crc
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse /bin/e2e.test packer@"${INSTANCE_PREFIX}":/tmp/e2e.test
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \

@@ -1,4 +1,8 @@
 base_images:
+  ocp_4.14_tools:
+    name: "4.14"
+    namespace: ocp
+    tag: tools
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -7,7 +11,6 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: tools
-binary_build_commands: make all
 build_root:
   image_stream_tag:
     name: builder
@@ -30,6 +33,20 @@ images:
         yum clean all && rm -rf /var/cache/yum/*
   from: src
   to: tests-private-ui
+- dockerfile_path: images/Dockerfile.base
+  inputs:
+    ocp_4.14_tools:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:tools
+  optional: true
+  to: tests-private-base
+- dockerfile_path: images/Dockerfile.builder
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  optional: true
+  to: tests-private-builder
 promotion:
   namespace: ci
   tag: "4.14"
@@ -40,7 +57,6 @@ resources:
     requests:
       cpu: "1"
       memory: 4Gi
-test_binary_build_commands: make test
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

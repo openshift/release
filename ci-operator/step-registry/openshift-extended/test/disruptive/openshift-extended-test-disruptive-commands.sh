@@ -144,10 +144,13 @@ vsphere)
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/govc.sh"
     export VSPHERE_CONF_FILE="${SHARED_DIR}/vsphere.conf"
-    oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE"
-    # The test suite requires a vSphere config file with explicit user and password fields.
-    sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
-    sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+    error_code=0
+    oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE" || error_code=$?
+    if [ "W${error_code}W" == "W0W" ]; then
+        # The test suite requires a vSphere config file with explicit user and password fields.
+        sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
+        sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+    fi
     export TEST_PROVIDER=vsphere;;
 openstack*)
     # shellcheck disable=SC1090
@@ -300,17 +303,21 @@ function run {
 
     # summarize test results
     echo "Summarizing test result..."
-    mapfile -t test_suite_failures < <(grep -r -E 'testsuite.*failures="[1-9][0-9]*"' "${ARTIFACT_DIR}" | grep -o -E 'failures="[0-9]+"' | sed -E 's/failures="([0-9]+)"/\1/')
-    failures=0
-    for (( i=0; i<${#test_suite_failures[@]}; ++i ))
-    do
-        let failures+=${test_suite_failures[$i]}
-    done
-    if [ $((failures)) == 0 ]; then
-        echo "All tests have passed"
-    else
-        echo "${failures} failures in openshift-extended-test" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report-openshift-extended-test-failures"
+    failures=0 errors=0 skipped=0 tests=0
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
+    while read -a row ; do
+        # if the last ARG of command `let` evaluates to 0, `let` returns 1
+        let errors+=${row[0]} failures+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
+    done < /tmp/zzz-tmp.log
+
+    TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results"
+    echo -e "\nfailures: $failures, errors: $errors, skipped: $skipped, tests: $tests in openshift-extended-test-disruptive" | tee -a "${TEST_RESULT_FILE}"
+    if [ $((failures)) != 0 ] ; then
+        echo "Failing Scenarios:" | tee -a "${TEST_RESULT_FILE}"
+        grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | grep -v grep | cut -d'"' -f2 | sort -t':' -k2 | uniq | tee -a "${TEST_RESULT_FILE}" || true
     fi
+    cat "${TEST_RESULT_FILE}" >> "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
+
     # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
     # please refer to the junit result for case result, not depends on step result.
     if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then

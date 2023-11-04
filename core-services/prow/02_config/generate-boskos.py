@@ -87,6 +87,9 @@ CONFIG = {
     'aws-rhtap-qe-quota-slice': {
         'us-west-2': 10
     },
+    'aws-rhtap-performance-quota-slice': {
+        'us-west-2': 10
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
@@ -109,7 +112,7 @@ CONFIG = {
         'ppe3': 2
     },
    'azurestack-qe-quota-slice': {
-        'mtcazs': 2
+        'mtcazs': 4
     },
     'azuremag-quota-slice': {
         'usgovvirginia': 5
@@ -142,6 +145,9 @@ CONFIG = {
         'us-central1': 30,
     },
     'gcp-quota-slice': {
+        'us-central1': 80,
+    },
+    'gcp-3-quota-slice': {
         'us-central1': 80,
     },
     'gcp-openshift-gce-devel-ci-2-quota-slice': {

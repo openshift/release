@@ -92,12 +92,6 @@ else
     echo "WARNING: MachineAPI is selected, but it requires on IPI, so no capability to be disabled!"
 fi
 
-# Disable Build if ImageRegistry is selected to bo disabled
-if [[ "${selected_capability}" == "ImageRegistry" ]]; then
-    echo "Capability 'Build' depends on Capability 'ImageRegistry', so disable Build along with ImageRegistry"
-    enabled_capabilities=${enabled_capabilities/"Build"}
-fi
-
 # Disable marketplace if OperatorLifecycleManager is selected to bo disabled
 if [[ "${selected_capability}" == "OperatorLifecycleManager" ]]; then
     echo "Capability 'marketplace' depends on Capability 'OperatorLifecycleManager', so disable marketplace along with OperatorLifecycleManager"

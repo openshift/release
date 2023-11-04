@@ -4,6 +4,23 @@ chain:
   - as: conformance-tests
     from: tests
     commands: |-
+      function mirror_test_images() {
+        echo "### Mirroring test images"
+      
+        DEVSCRIPTS_TEST_IMAGE_REPO=${DS_REGISTRY}/localimages/local-test-image
+      
+        openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
+        scp "${SSHOPTS[@]}" /tmp/mirror "root@${IP}:/tmp/mirror"
+      
+        # shellcheck disable=SC2087
+        ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+      oc image mirror -f /tmp/mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json
+      oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/amd64.*" registry.k8s.io/pause:3.8  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-28-registry-k8s-io-pause-3-8-aP7uYsw5XCmoDy5W
+      oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/amd64.*" registry.k8s.io/pause:3.9  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-27-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
+      EOF
+        TEST_ARGS+=$(echo " --from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} ")
+      }
+      
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
@@ -13,6 +30,12 @@ chain:
       if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
         source "${SHARED_DIR}/proxy-conf.sh"
       fi
+      if [ -f "${SHARED_DIR}/ds-vars.conf" ] ; then
+        source "${SHARED_DIR}/ds-vars.conf"
+      fi  
+      if [ -f "${SHARED_DIR}/packet-conf.sh" ] ; then
+        source "${SHARED_DIR}/packet-conf.sh"
+      fi  
 
       CLUSTER_TYPE="$(oc get infrastructure cluster -ojsonpath='{.status.platform}'|tr '[:upper:]' '[:lower:]')"
       case "${CLUSTER_TYPE}" in
@@ -48,7 +71,13 @@ chain:
           ;;
       ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
       none)
-          export TEST_PROVIDER='{"type":"baremetal","disconnected":true}'
+          if [[ "${DS_IP_STACK}" != "v6" ]];
+          then
+            export TEST_PROVIDER='{"type":"baremetal"}'
+          else
+            mirror_test_images
+            export TEST_PROVIDER='{"type":"baremetal","disconnected":true}'
+          fi
           ;;
       ibmcloud)
           export TEST_PROVIDER='{"type":"ibmcloud"}'

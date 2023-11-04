@@ -89,22 +89,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: azure-ipi-f30
-  cron: 15 7 10 * *
+- as: gcp-ipi-proxy-f30
+  cron: 31 7 18 * *
   steps:
-    cluster_profile: azure-qe
+    cluster_profile: gcp-qe
     env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      LOKI_ENABLED: "false"
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @azure-ipi and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @azure-ipi and not @fips'
-    post:
-    - chain: cucushift-installer-rehearse-azure-ipi-deprovision
-    pre:
-    - ref: ipi-conf
-    - ref: ipi-conf-telemetry
-    - ref: ipi-conf-azure
-    - chain: ipi-install
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @gcp-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @gcp-ipi and not @fips'
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE46},${RELEASE_IMAGE_INTERMEDIATE47},${RELEASE_IMAGE_INTERMEDIATE48},${RELEASE_IMAGE_INTERMEDIATE49},${RELEASE_IMAGE_INTERMEDIATE410},${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_TARGET}"
@@ -135,6 +126,7 @@ tests:
           memory: 200Mi
     - ref: cucushift-chainupgrade-toimage
     - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

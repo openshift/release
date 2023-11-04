@@ -12,14 +12,74 @@ periodics:
   labels:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-shiftstack-shiftstack-ci-main-liveliness-mecha-az0
+  reporter_config:
+    slack:
+      channel: '#shiftstack-bot'
+      job_states_to_report:
+      - failure
+      report_template: ':alert-siren: mecha az0 cloud liveliness check failed. <{{
+        .Status.URL }}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=liveliness-mecha-az0
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build04
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: shiftstack
+    repo: shiftstack-ci
+  interval: 1h
+  labels:
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-shiftstack-shiftstack-ci-main-liveliness-mecha-central
   reporter_config:
     slack:
       channel: '#shiftstack-bot'
       job_states_to_report:
       - failure
-      report_template: ':alert-siren: mecha cloud liveliness check failed. <{{ .Status.URL
-        }}|View logs>'
+      report_template: ':alert-siren: mecha central cloud liveliness check failed.
+        <{{ .Status.URL }}|View logs>'
   spec:
     containers:
     - args:
@@ -556,7 +616,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -912,7 +972,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1001,7 +1061,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1179,7 +1239,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1357,7 +1417,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1616,7 +1676,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2150,7 +2210,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2239,7 +2299,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2417,7 +2477,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2595,7 +2655,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2951,7 +3011,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3485,7 +3545,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3574,7 +3634,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3663,7 +3723,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3841,7 +3901,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3930,7 +3990,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -4108,7 +4168,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -4553,7 +4613,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -5087,7 +5147,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -5176,7 +5236,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -5265,7 +5325,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -5443,7 +5503,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -5532,7 +5592,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -5710,7 +5770,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -5888,7 +5948,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -6424,7 +6484,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -6958,7 +7018,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7047,7 +7107,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7136,7 +7196,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7225,7 +7285,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7403,7 +7463,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7492,7 +7552,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7759,7 +7819,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7937,7 +7997,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -8473,7 +8533,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -8829,7 +8889,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -8918,7 +8978,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9007,7 +9067,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9096,7 +9156,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9274,7 +9334,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9363,7 +9423,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9452,7 +9512,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9541,7 +9601,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9630,7 +9690,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9897,7 +9957,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9986,7 +10046,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -10075,7 +10135,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -10334,7 +10394,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -10423,7 +10483,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -10601,7 +10661,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -10771,7 +10831,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -11127,7 +11187,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -11216,7 +11276,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -11394,7 +11454,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -11572,7 +11632,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   decorate: true
   decoration_config:
     skip_cloning: true

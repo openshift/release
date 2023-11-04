@@ -12,8 +12,8 @@ GCP_REGION="${LEASED_RESOURCE}"
 
 masters="${CONTROL_PLANE_REPLICAS}"
 
-workers=3
-if [[ "${SIZE_VARIANT}" == "compact" ]]; then
+workers=${COMPUTE_NODE_REPLICAS:-3}
+if [ "${COMPUTE_NODE_REPLICAS}" -le 0 ] || [ "${SIZE_VARIANT}" = "compact" ]; then
   workers=0
 fi
 

@@ -40,7 +40,7 @@ function create_dc_and_xpaas_pod()
     name: ${namespace}
     namespace: jboss-fuse-interop
     labels:
-      application: xpaas-qe
+      deploymentConfig: xpaas-qe
   spec:
     strategy:
       type: Recreate
@@ -195,18 +195,19 @@ function restartPodAfterFailure() {
   currentTest=$(echo $currentPod | awk -F"[-]" '{print $1}')
 
   oc rollout latest dc/nginx-server -n jboss-fuse-interop || true
-  oc wait pods -n jboss-fuse-interop -l deploymentConfig=nginx --for condition=Ready --timeout=120s
+  oc wait pods -n jboss-fuse-interop -l deploymentConfig=nginx --for jsonpath="{status.phase}"=Running --timeout=120s
   sleep 30
   echo "NGINX Route deletion ..."
   NGINX_ROUTE=$(oc get routes nginx -n jboss-fuse-interop --no-headers=true | awk '{print $2}')
   oc delete route nginx -n jboss-fuse-interop
-  oc expose svc/nginx --hostname=${NGINX_ROUTE}
+  oc expose svc/nginx --hostname=${NGINX_ROUTE} -n jboss-fuse-interop
   echo "NGINX Route recreated."
   if [[ "$podFailures" -lt $maxFailures ]]; then
     oc exec $currentPod -n jboss-fuse-interop -- /bin/bash -c 'rm -rf /tmp/log/'$currentPod'' || true
     oc exec $currentPod -n jboss-fuse-interop -- /bin/bash -c 'rm -rf /tmp/surefire-reports/'$currentPod'' || true
     oc delete pod $currentPod -n jboss-fuse-interop
     oc wait --for=delete pod/$currentPod -n jboss-fuse-interop --timeout=120s
+    sleep 60
   else
     echo "max retries reached for $currentTest --- get surefire xml pod reports"
     oc -n jboss-fuse-interop exec $currentPod -- /bin/bash -c 'cp -rf /deployments/xpaas-qe/test-fuse/target/surefire-reports/*.xml /tmp/reports' || true
@@ -220,8 +221,8 @@ function restartPodAfterFailure() {
 
 function copy_logs() {
   oc rollout latest dc/nginx-server -n jboss-fuse-interop
-  oc wait pods -n jboss-fuse-interop -l deploymentConfig=nginx --for condition=Ready
-  sleep 60
+  oc wait pods -n jboss-fuse-interop -l deploymentConfig=nginx --for jsonpath="{status.phase}"=Running --timeout=120s
+  sleep 30
   NGINX_POD=$(oc get pods -n jboss-fuse-interop -l deploymentConfig=nginx --no-headers=true | awk '{print $1}')
   echo "get logs from pod ${NGINX_POD} at /tmp/reports"
   export kubeadminpwd

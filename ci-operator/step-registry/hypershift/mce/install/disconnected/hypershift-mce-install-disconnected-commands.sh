@@ -248,6 +248,16 @@ echo "wait for mce to Available"
 oc wait --timeout=20m --for=condition=Available MultiClusterEngine/multiclusterengine-sample
 
 oc apply -f - <<END
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: hypershift-operator-install-flags
+  namespace: local-cluster
+data:
+  installFlagsToAdd: ""
+  installFlagsToRemove: "--enable-uwm-telemetry-remote-write"
+END
+oc apply -f - <<END
 apiVersion: cluster.open-cluster-management.io/v1
 kind: ManagedCluster
 metadata:
@@ -266,3 +276,5 @@ echo "MCE local-cluster is ready!"
 
 set -x
 EOF
+
+oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]' | head -n 1 | cut -d '/' -f 1 > "${SHARED_DIR}/mirror_registry_url"
