@@ -35,7 +35,7 @@ fips: true
 EOF
 fi
 
-if [ -n "${NETWORK_TYPE}"]; then
+if [ -n "${NETWORK_TYPE}" ]; then
   echo "Adding Networking Type to the install-config.yaml"
   cat >> "${out}" << EOF
 networking:
