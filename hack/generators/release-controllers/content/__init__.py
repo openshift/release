@@ -14,5 +14,6 @@ from content.osd_rc_rbac import add_osd_rc_service_account_resources
 from content.rbac_resources import generate_release_admin_rbac
 from content.redirect_resources import add_redirect_resources
 from content.release_payload_controller_resources import add_release_payload_controller_resources
+from content.release_reimport_controller_resources import add_release_reimport_controller_resources
 from content.signer_resources import generate_signer_resources
 from content.trt_rbac import generate_trt_rbac
