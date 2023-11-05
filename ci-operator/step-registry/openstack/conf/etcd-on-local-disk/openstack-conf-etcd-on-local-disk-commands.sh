@@ -23,9 +23,9 @@ if [[ "${USE_RAMFS}" == "true" ]]; then
     exit 0
 fi
 
-# We require at least 7GiB of ephemeral disk space for etcd on local disk
-if ! openstack flavor show "${OPENSTACK_CONTROLPLANE_FLAVOR}" -f value -c "OS-FLV-EXT-DATA:ephemeral" | grep -qE '^[7-9]$|^1[0-9]$|^20$'; then
-    echo "ERROR: Flavor ${OPENSTACK_CONTROLPLANE_FLAVOR} does not have enough ephemeral disk space. It must have at least 7GiB of ephemeral disk space."
+# We require at least 10GiB of ephemeral disk space for etcd on local disk
+if ! openstack flavor show "${OPENSTACK_CONTROLPLANE_FLAVOR}" -f value -c "OS-FLV-EXT-DATA:ephemeral" | grep -qE '^(10|[1-9]\d+)$'; then
+    echo "ERROR: Flavor ${OPENSTACK_CONTROLPLANE_FLAVOR} does not have enough ephemeral disk space. It must have at least 10GiB of ephemeral disk space."
     exit 1
 fi
 

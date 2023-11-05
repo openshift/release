@@ -28,6 +28,7 @@ PRIVATE_LINK=${PRIVATE_LINK:-false}
 PRIVATE_SUBNET_ONLY="false"
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
+ADDITIONAL_SECURITY_GROUP=${ADDITIONAL_SECURITY_GROUP:-false}
 
 # Record Cluster Configurations
 cluster_config_file="${SHARED_DIR}/cluster-config"
@@ -339,6 +340,13 @@ if [[ "$ENABLE_BYOVPC" == "true" ]]; then
     record_cluster "subnets" "public_subnet_ids" ${PUBLIC_SUBNET_IDs}
   fi
 fi
+# Additional security groups options
+SECURITY_GROUP_ID_SWITCH=""
+if [[ "$ADDITIONAL_SECURITY_GROUP" == "true" ]]; then
+  SECURITY_GROUP_IDs=$(cat ${SHARED_DIR}/security_groups_ids | xargs |sed 's/ /,/g')
+  SECURITY_GROUP_ID_SWITCH="--additional-compute-security-group-ids ${SECURITY_GROUP_IDs}"
+  record_cluster "security_groups" "enabled" ${SECURITY_GROUP_IDs}
+fi
 
 # STS options
 STS_SWITCH="--non-sts"
@@ -464,6 +472,7 @@ echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Enable Byovpc: ${ENABLE_BYOVPC}"
 echo "  Enable audit log: ${ENABLE_AUDIT_LOG}"
 echo "  Cluster Tags: ${TAGS}"
+echo "  Additional Security groups: ${ADDITIONAL_SECURITY_GROUP}"
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
   echo "  Min replicas: ${MIN_REPLICAS}"
@@ -509,6 +518,7 @@ ${AUDIT_LOG_SWITCH} \
 ${COMPUTER_NODE_ZONES_SWITCH} \
 ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
 ${SHARED_VPC_SWITCH} \
+${SECURITY_GROUP_ID_SWITCH} \
 ${DRY_RUN_SWITCH}
 "
 
@@ -547,6 +557,7 @@ rosa create cluster -y \
                     ${COMPUTER_NODE_ZONES_SWITCH} \
                     ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
                     ${SHARED_VPC_SWITCH} \
+                    ${SECURITY_GROUP_ID_SWITCH} \
                     ${DRY_RUN_SWITCH} \
                     > "${CLUSTER_INFO}"
 
