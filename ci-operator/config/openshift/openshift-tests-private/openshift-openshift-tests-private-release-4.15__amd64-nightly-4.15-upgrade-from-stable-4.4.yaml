@@ -1,10 +1,10 @@
 base_images:
   ansible:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: ansible
   cli:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: cli
   dev-scripts:
@@ -14,13 +14,13 @@ base_images:
   tests-private-postupg:
     name: tests-private
     namespace: ci
-    tag: "4.14"
+    tag: "4.15"
   tests-private-preupg:
     name: tests-private
     namespace: ci
-    tag: "4.13"
+    tag: "4.14"
   tools:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: tools
   verification-tests:
@@ -28,11 +28,6 @@ base_images:
     namespace: ci
     tag: latest
 releases:
-  intermediate44:
-    release:
-      architecture: amd64
-      channel: fast
-      version: "4.4"
   intermediate45:
     release:
       architecture: amd64
@@ -78,17 +73,22 @@ releases:
       architecture: amd64
       channel: fast
       version: "4.13"
+  intermediate414:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.14"
   latest:
     release:
       architecture: amd64
       channel: fast
-      version: "4.3"
+      version: "4.4"
   target:
     candidate:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -96,27 +96,26 @@ resources:
       memory: 200Mi
 tests:
 - as: aws-ipi-f30
-  cluster: build04
-  cron: 22 13 19 * *
+  cron: 16 13 14 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       LOKI_ENABLED: "false"
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi and not @fips'
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @aws-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @aws-ipi and not @fips'
     post:
     - chain: cucushift-installer-rehearse-aws-ipi-deprovision
     pre:
-    - ref: ipi-conf
-    - ref: ipi-conf-telemetry
-    - ref: ipi-conf-aws
+    - chain: ipi-conf-aws
     - chain: ipi-install
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE44},${RELEASE_IMAGE_INTERMEDIATE45},${RELEASE_IMAGE_INTERMEDIATE46},${RELEASE_IMAGE_INTERMEDIATE47},${RELEASE_IMAGE_INTERMEDIATE48},${RELEASE_IMAGE_INTERMEDIATE49},${RELEASE_IMAGE_INTERMEDIATE410},${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE45},${RELEASE_IMAGE_INTERMEDIATE46},${RELEASE_IMAGE_INTERMEDIATE47},${RELEASE_IMAGE_INTERMEDIATE48},${RELEASE_IMAGE_INTERMEDIATE49},${RELEASE_IMAGE_INTERMEDIATE410},${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE414
+        name: release:intermediate414
       - env: RELEASE_IMAGE_INTERMEDIATE413
         name: release:intermediate413
       - env: RELEASE_IMAGE_INTERMEDIATE412
@@ -135,8 +134,6 @@ tests:
         name: release:intermediate46
       - env: RELEASE_IMAGE_INTERMEDIATE45
         name: release:intermediate45
-      - env: RELEASE_IMAGE_INTERMEDIATE44
-        name: release:intermediate44
       - env: RELEASE_IMAGE_TARGET
         name: release:target
       from: cli
@@ -147,7 +144,7 @@ tests:
     - ref: cucushift-chainupgrade-toimage
     - chain: openshift-upgrade-qe-test
 zz_generated_metadata:
-  branch: release-4.14
+  branch: release-4.15
   org: openshift
   repo: openshift-tests-private
-  variant: amd64-nightly-4.14-upgrade-from-stable-4.3
+  variant: amd64-nightly-4.15-upgrade-from-stable-4.4
