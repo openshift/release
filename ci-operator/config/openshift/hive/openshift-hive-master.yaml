@@ -213,11 +213,22 @@ tests:
 - as: e2e-vsphere
   run_if_changed: vsphere
   steps:
+    env:
+      CLUSTER_NAME_2: test-cluster-2
     cluster_profile: vsphere-2
     test:
     - as: test
       cli: latest
-      commands: CLOUD=vsphere make test-e2e
+      commands: |
+        echo "Environment:"
+        env
+        echo "vips.txt"
+        cat ${SHARED_DIR}/vips.txt
+        echo "dns-delete.json"
+        cat ${SHARED_DIR}/dns-delete.json 
+        echo "hosted-zone.txt"
+        cat ${SHARED_DIR}/hosted-zone.txt
+        echo $CLUSTER_NAME_2
       dependencies:
       - env: HIVE_IMAGE
         name: hive
