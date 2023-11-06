@@ -1,6 +1,10 @@
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+images:
+- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+  from: src
+  to: knative-eventing-istio-source-image
 promotion:
   additional_images:
     eventing-istio-src: src
@@ -28,7 +32,7 @@ tests:
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-eventing-istio-source-image
       resources:
         requests:
           cpu: 100m
@@ -37,7 +41,7 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-eventing-istio-source-image
       resources:
         requests:
           cpu: 100m
@@ -46,7 +50,10 @@ tests:
     - as: test
       cli: latest
       commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make e2e-tests
-      from: src
+      dependencies:
+      - env: KNATIVE_EVENTING_ISTIO_SOURCE_IMAGE
+        name: knative-eventing-istio-source-image
+      from: knative-eventing-istio-source-image
       resources:
         requests:
           cpu: 100m
@@ -69,7 +76,7 @@ tests:
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-eventing-istio-source-image
       resources:
         requests:
           cpu: 100m
@@ -78,7 +85,7 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-eventing-istio-source-image
       resources:
         requests:
           cpu: 100m
@@ -87,7 +94,10 @@ tests:
     - as: test
       cli: latest
       commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make e2e-tests
-      from: src
+      dependencies:
+      - env: KNATIVE_EVENTING_ISTIO_SOURCE_IMAGE
+        name: knative-eventing-istio-source-image
+      from: knative-eventing-istio-source-image
       resources:
         requests:
           cpu: 100m

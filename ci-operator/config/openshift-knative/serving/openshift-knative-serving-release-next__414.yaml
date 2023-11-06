@@ -133,6 +133,12 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-serving-test-singlethreaded
+- dockerfile_path: openshift/ci-operator/knative-test-images/slowstart/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-serving-test-slowstart
 - dockerfile_path: openshift/ci-operator/knative-test-images/timeout/Dockerfile
   inputs:
     openshift_release_golang-1.19:
@@ -151,25 +157,28 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-serving-test-wsserver
+- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+  from: src
+  to: knative-serving-source-image
 promotion:
   additional_images:
     knative-serving-src: src
   namespace: openshift
-  tag: knative-v1.11
+  tag: knative-nightly
 resources:
   '*':
     requests:
       cpu: 500m
       memory: 4Gi
 tests:
-- as: test-e2e-aws-ocp-413
+- as: test-e2e-aws-ocp-414
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.14"
   steps:
     allow_best_effort_post_steps: true
     post:
@@ -178,7 +187,7 @@ tests:
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -187,7 +196,7 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -239,26 +248,30 @@ tests:
         name: knative-serving-test-sidecarcontainer
       - env: KNATIVE_SERVING_TEST_SINGLETHREADED
         name: knative-serving-test-singlethreaded
+      - env: KNATIVE_SERVING_TEST_SLOWSTART
+        name: knative-serving-test-slowstart
       - env: KNATIVE_SERVING_TEST_TIMEOUT
         name: knative-serving-test-timeout
       - env: KNATIVE_SERVING_TEST_VOLUMES
         name: knative-serving-test-volumes
       - env: KNATIVE_SERVING_TEST_WSSERVER
         name: knative-serving-test-wsserver
-      from: src
+      - env: KNATIVE_SERVING_SOURCE_IMAGE
+        name: knative-serving-source-image
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-e2e-aws-ocp-413-continuous
+- as: test-e2e-aws-ocp-414-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.14"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -268,7 +281,7 @@ tests:
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -277,7 +290,7 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -329,26 +342,30 @@ tests:
         name: knative-serving-test-sidecarcontainer
       - env: KNATIVE_SERVING_TEST_SINGLETHREADED
         name: knative-serving-test-singlethreaded
+      - env: KNATIVE_SERVING_TEST_SLOWSTART
+        name: knative-serving-test-slowstart
       - env: KNATIVE_SERVING_TEST_TIMEOUT
         name: knative-serving-test-timeout
       - env: KNATIVE_SERVING_TEST_VOLUMES
         name: knative-serving-test-volumes
       - env: KNATIVE_SERVING_TEST_WSSERVER
         name: knative-serving-test-wsserver
-      from: src
+      - env: KNATIVE_SERVING_SOURCE_IMAGE
+        name: knative-serving-source-image
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-e2e-tls-aws-ocp-413
+- as: test-e2e-tls-aws-ocp-414
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.14"
   steps:
     allow_best_effort_post_steps: true
     post:
@@ -357,7 +374,7 @@ tests:
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -366,7 +383,7 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -418,26 +435,30 @@ tests:
         name: knative-serving-test-sidecarcontainer
       - env: KNATIVE_SERVING_TEST_SINGLETHREADED
         name: knative-serving-test-singlethreaded
+      - env: KNATIVE_SERVING_TEST_SLOWSTART
+        name: knative-serving-test-slowstart
       - env: KNATIVE_SERVING_TEST_TIMEOUT
         name: knative-serving-test-timeout
       - env: KNATIVE_SERVING_TEST_VOLUMES
         name: knative-serving-test-volumes
       - env: KNATIVE_SERVING_TEST_WSSERVER
         name: knative-serving-test-wsserver
-      from: src
+      - env: KNATIVE_SERVING_SOURCE_IMAGE
+        name: knative-serving-source-image
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-e2e-tls-aws-ocp-413-continuous
+- as: test-e2e-tls-aws-ocp-414-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.14"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -447,7 +468,7 @@ tests:
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -456,7 +477,7 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -508,20 +529,24 @@ tests:
         name: knative-serving-test-sidecarcontainer
       - env: KNATIVE_SERVING_TEST_SINGLETHREADED
         name: knative-serving-test-singlethreaded
+      - env: KNATIVE_SERVING_TEST_SLOWSTART
+        name: knative-serving-test-slowstart
       - env: KNATIVE_SERVING_TEST_TIMEOUT
         name: knative-serving-test-timeout
       - env: KNATIVE_SERVING_TEST_VOLUMES
         name: knative-serving-test-volumes
       - env: KNATIVE_SERVING_TEST_WSSERVER
         name: knative-serving-test-wsserver
-      from: src
+      - env: KNATIVE_SERVING_SOURCE_IMAGE
+        name: knative-serving-source-image
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
 zz_generated_metadata:
-  branch: release-v1.11
+  branch: release-next
   org: openshift-knative
   repo: serving
-  variant: "413"
+  variant: "414"

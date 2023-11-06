@@ -49,6 +49,42 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-serving-webhook
+- dockerfile_path: openshift/ci-operator/knative-perf-images/dataplane-probe/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-serving-dataplane-probe
+- dockerfile_path: openshift/ci-operator/knative-perf-images/load-test/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-serving-load-test
+- dockerfile_path: openshift/ci-operator/knative-perf-images/real-traffic-test/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-serving-real-traffic-test
+- dockerfile_path: openshift/ci-operator/knative-perf-images/reconciliation-delay/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-serving-reconciliation-delay
+- dockerfile_path: openshift/ci-operator/knative-perf-images/rollout-probe/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-serving-rollout-probe
+- dockerfile_path: openshift/ci-operator/knative-perf-images/scale-from-zero/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-serving-scale-from-zero
 - dockerfile_path: openshift/ci-operator/knative-test-images/autoscale/Dockerfile
   inputs:
     openshift_release_golang-1.19:
@@ -157,25 +193,28 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-serving-test-wsserver
+- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+  from: src
+  to: knative-serving-source-image
 promotion:
   additional_images:
     knative-serving-src: src
+  name: knative-v1.12
   namespace: openshift
-  tag: knative-nightly
 resources:
   '*':
     requests:
       cpu: 500m
       memory: 4Gi
 tests:
-- as: test-e2e-aws-ocp-413
+- as: test-e2e-aws-ocp-411
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.11"
   steps:
     allow_best_effort_post_steps: true
     post:
@@ -184,7 +223,7 @@ tests:
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -193,7 +232,7 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -217,6 +256,18 @@ tests:
         name: knative-serving-queue
       - env: KNATIVE_SERVING_WEBHOOK
         name: knative-serving-webhook
+      - env: KNATIVE_SERVING_DATAPLANE_PROBE
+        name: knative-serving-dataplane-probe
+      - env: KNATIVE_SERVING_LOAD_TEST
+        name: knative-serving-load-test
+      - env: KNATIVE_SERVING_REAL_TRAFFIC_TEST
+        name: knative-serving-real-traffic-test
+      - env: KNATIVE_SERVING_RECONCILIATION_DELAY
+        name: knative-serving-reconciliation-delay
+      - env: KNATIVE_SERVING_ROLLOUT_PROBE
+        name: knative-serving-rollout-probe
+      - env: KNATIVE_SERVING_SCALE_FROM_ZERO
+        name: knative-serving-scale-from-zero
       - env: KNATIVE_SERVING_TEST_AUTOSCALE
         name: knative-serving-test-autoscale
       - env: KNATIVE_SERVING_TEST_FAILING
@@ -253,20 +304,22 @@ tests:
         name: knative-serving-test-volumes
       - env: KNATIVE_SERVING_TEST_WSSERVER
         name: knative-serving-test-wsserver
-      from: src
+      - env: KNATIVE_SERVING_SOURCE_IMAGE
+        name: knative-serving-source-image
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-e2e-aws-ocp-413-continuous
+- as: test-e2e-aws-ocp-411-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.11"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -276,7 +329,7 @@ tests:
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -285,7 +338,7 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -309,6 +362,18 @@ tests:
         name: knative-serving-queue
       - env: KNATIVE_SERVING_WEBHOOK
         name: knative-serving-webhook
+      - env: KNATIVE_SERVING_DATAPLANE_PROBE
+        name: knative-serving-dataplane-probe
+      - env: KNATIVE_SERVING_LOAD_TEST
+        name: knative-serving-load-test
+      - env: KNATIVE_SERVING_REAL_TRAFFIC_TEST
+        name: knative-serving-real-traffic-test
+      - env: KNATIVE_SERVING_RECONCILIATION_DELAY
+        name: knative-serving-reconciliation-delay
+      - env: KNATIVE_SERVING_ROLLOUT_PROBE
+        name: knative-serving-rollout-probe
+      - env: KNATIVE_SERVING_SCALE_FROM_ZERO
+        name: knative-serving-scale-from-zero
       - env: KNATIVE_SERVING_TEST_AUTOSCALE
         name: knative-serving-test-autoscale
       - env: KNATIVE_SERVING_TEST_FAILING
@@ -345,20 +410,22 @@ tests:
         name: knative-serving-test-volumes
       - env: KNATIVE_SERVING_TEST_WSSERVER
         name: knative-serving-test-wsserver
-      from: src
+      - env: KNATIVE_SERVING_SOURCE_IMAGE
+        name: knative-serving-source-image
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-e2e-tls-aws-ocp-413
+- as: test-e2e-tls-aws-ocp-411
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.11"
   steps:
     allow_best_effort_post_steps: true
     post:
@@ -367,7 +434,7 @@ tests:
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -376,7 +443,7 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -400,6 +467,18 @@ tests:
         name: knative-serving-queue
       - env: KNATIVE_SERVING_WEBHOOK
         name: knative-serving-webhook
+      - env: KNATIVE_SERVING_DATAPLANE_PROBE
+        name: knative-serving-dataplane-probe
+      - env: KNATIVE_SERVING_LOAD_TEST
+        name: knative-serving-load-test
+      - env: KNATIVE_SERVING_REAL_TRAFFIC_TEST
+        name: knative-serving-real-traffic-test
+      - env: KNATIVE_SERVING_RECONCILIATION_DELAY
+        name: knative-serving-reconciliation-delay
+      - env: KNATIVE_SERVING_ROLLOUT_PROBE
+        name: knative-serving-rollout-probe
+      - env: KNATIVE_SERVING_SCALE_FROM_ZERO
+        name: knative-serving-scale-from-zero
       - env: KNATIVE_SERVING_TEST_AUTOSCALE
         name: knative-serving-test-autoscale
       - env: KNATIVE_SERVING_TEST_FAILING
@@ -436,20 +515,22 @@ tests:
         name: knative-serving-test-volumes
       - env: KNATIVE_SERVING_TEST_WSSERVER
         name: knative-serving-test-wsserver
-      from: src
+      - env: KNATIVE_SERVING_SOURCE_IMAGE
+        name: knative-serving-source-image
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-e2e-tls-aws-ocp-413-continuous
+- as: test-e2e-tls-aws-ocp-411-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.11"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -459,7 +540,7 @@ tests:
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -468,7 +549,7 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -492,6 +573,18 @@ tests:
         name: knative-serving-queue
       - env: KNATIVE_SERVING_WEBHOOK
         name: knative-serving-webhook
+      - env: KNATIVE_SERVING_DATAPLANE_PROBE
+        name: knative-serving-dataplane-probe
+      - env: KNATIVE_SERVING_LOAD_TEST
+        name: knative-serving-load-test
+      - env: KNATIVE_SERVING_REAL_TRAFFIC_TEST
+        name: knative-serving-real-traffic-test
+      - env: KNATIVE_SERVING_RECONCILIATION_DELAY
+        name: knative-serving-reconciliation-delay
+      - env: KNATIVE_SERVING_ROLLOUT_PROBE
+        name: knative-serving-rollout-probe
+      - env: KNATIVE_SERVING_SCALE_FROM_ZERO
+        name: knative-serving-scale-from-zero
       - env: KNATIVE_SERVING_TEST_AUTOSCALE
         name: knative-serving-test-autoscale
       - env: KNATIVE_SERVING_TEST_FAILING
@@ -528,14 +621,16 @@ tests:
         name: knative-serving-test-volumes
       - env: KNATIVE_SERVING_TEST_WSSERVER
         name: knative-serving-test-wsserver
-      from: src
+      - env: KNATIVE_SERVING_SOURCE_IMAGE
+        name: knative-serving-source-image
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
 zz_generated_metadata:
-  branch: release-next
+  branch: release-v1.12
   org: openshift-knative
   repo: serving
-  variant: "413"
+  variant: "411"
