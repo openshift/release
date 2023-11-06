@@ -54,17 +54,17 @@ else
 fi
 
 if [[ -n "${VSPHERE_EXTRA_LEASED_RESOURCE:-}" ]]; then
-    i=0
-    for extra_leased_resource in ${VSPHERE_EXTRA_LEASED_RESOURCE}; do
-	 extra_vlanid=$(awk -F. '{print $3}' <(echo "${extra_leased_resource}"))
-	 extra_portgroup="ci-vlan-${extra_vlanid}"
-	 i=$((i + 1))
-	 portgroup_list+=("${extra_portgroup}")
-	 cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
+  i=0
+  for extra_leased_resource in ${VSPHERE_EXTRA_LEASED_RESOURCE}; do
+    extra_vlanid=$(awk -F. '{print $3}' <(echo "${extra_leased_resource}"))
+    extra_portgroup="ci-vlan-${extra_vlanid}"
+    i=$((i + 1))
+    portgroup_list+=("${extra_portgroup}")
+    cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
 export vsphere_extra_portgroup_${i}="${extra_portgroup}"
 EOF
-    done
-fi    
+  done
+fi
 source /var/run/vault/vsphere-config/load-vsphere-env-config.sh
 
 declare vcenter_usernames
@@ -138,7 +138,7 @@ for i in "${!DATACENTERS[@]}"; do
   echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${vsphere_portgroup} in DC ${DATACENTERS[$i]} and destroy"
   DATACENTER=$(echo -n ${DATACENTERS[$i]} | tr -d '\n')
   for portgroup in "${portgroup_list[@]}"; do
-     govc ls -json "/${DATACENTER}/network/${portgroup}" |
+    govc ls -json "/${DATACENTER}/network/${portgroup}" |
       jq '.elements[]?.Object.Vm[]?.Value' |
       xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |
       jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |
