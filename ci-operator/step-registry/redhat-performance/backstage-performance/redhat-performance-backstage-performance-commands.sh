@@ -37,6 +37,14 @@ fi
 cd "$(mktemp -d)"
 git clone --branch main https://github.com/redhat-performance/backstage-performance.git .
 
+set -x
+if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]] && [ "$USE_PR_BRANCH" == "true" ]; then
+    # if this is executed as PR check of github.com/redhat-appstudio/e2e-tests.git repo, switch to PR branch.
+    git fetch origin "pull/${PULL_NUMBER}/head"
+    git checkout -b "pr-${PULL_NUMBER}" FETCH_HEAD
+fi
+set +x
+
 # Collect load test results at the end
 trap './ci-scripts/collect-results.sh; trap EXIT' SIGINT EXIT
 
