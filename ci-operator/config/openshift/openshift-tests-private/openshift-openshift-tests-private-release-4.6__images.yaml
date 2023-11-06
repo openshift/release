@@ -1,4 +1,8 @@
 base_images:
+  ocp_4.6_tools:
+    name: "4.6"
+    namespace: ocp
+    tag: tools
   ocp_builder_rhel-8-golang-1.15-openshift-4.6:
     name: builder
     namespace: ocp
@@ -29,6 +33,18 @@ images:
         yum clean all && rm -rf /var/cache/yum/*
   from: src
   to: tests-private-ui
+- dockerfile_path: images/Dockerfile.base
+  inputs:
+    ocp_4.6_tools:
+      as:
+      - registry.ci.openshift.org/ocp/4.6:tools
+  to: tests-private-base
+- dockerfile_path: images/Dockerfile.builder
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+  to: tests-private-builder
 promotion:
   namespace: ci
   tag: "4.6"
