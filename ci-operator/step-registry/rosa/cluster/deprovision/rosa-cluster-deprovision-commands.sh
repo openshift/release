@@ -8,6 +8,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 
+sleep 21600
 # Configure aws
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
