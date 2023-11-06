@@ -23,20 +23,7 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
-  to: installer
-- build_args:
-  - name: TAGS
-    value: altinfra
-  dockerfile_path: images/installer-artifacts/Dockerfile.rhel
-  from: installer
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
-  to: installer-artifacts
-- dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
-  from: base
-  to: upi-installer
+  to: installer-altinfra
 - dockerfile_literal: |
     FROM src
     COPY oc /usr/bin/oc
@@ -52,7 +39,6 @@ images:
         source_path: /usr/bin/oc
   to: src-oc
 promotion:
-  disabled: true
   excluded_images:
   - src-oc
   name: "4.15"
@@ -72,29 +58,10 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-  govet:
-    requests:
-      cpu: "3"
-      memory: 5Gi
   installer:
     requests:
       cpu: "3"
       memory: 5Gi
-  installer-artifacts:
-    requests:
-      cpu: "3"
-      memory: 5Gi
-  unit:
-    requests:
-      cpu: "3"
-      memory: 5Gi
-  upi-installer:
-    requests:
-      cpu: "3"
-      memory: 5Gi
-test_binary_build_commands: |
-  # Some agent-based installer tests require nmstatectl
-  dnf install -y nmstate
 tests:
 - always_run: false
   as: e2e-aws-ovn
