@@ -83,6 +83,8 @@ tests:
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
     workflow: openshift-ci-security
 - as: e2e
+  env:
+    CLUSTER_NAME=test_cluster
   cluster_claim:
     architecture: amd64
     as: unused
@@ -211,13 +213,24 @@ tests:
           cpu: 100m
     workflow: ipi-azure
 - as: e2e-vsphere
+  env:
+    CLUSTER_NAME_2: test_cluster_2
   run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-2
     test:
     - as: test
       cli: latest
-      commands: CLOUD=vsphere make test-e2e
+      commands: |
+        echo "Environment:"
+        env
+        echo "vips.txt"
+        cat ${SHARED_DIR}/vips.txt
+        echo ${SHARED_DIR}"/dns-delete.json 
+        echo "hosted-zone.txt"
+        cat ${SHARED_DIR}/hosted-zone.txt
+        echo $CLUSTER_NAME
+        echo $CLUSTER_NAME_2
       dependencies:
       - env: HIVE_IMAGE
         name: hive
