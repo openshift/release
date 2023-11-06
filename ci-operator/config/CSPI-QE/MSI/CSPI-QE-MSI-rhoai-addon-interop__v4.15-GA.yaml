@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.13"
+    name: "4.15"
     namespace: ocp
     tag: cli
   ocp-addons-operators-cli:
@@ -15,21 +15,12 @@ base_images:
     name: ods-ci
     namespace: ci
     tag: stable
-  rhoam-addon-tests:
-    name: integreatly-operator-test-external
-    namespace: ci
-    tag: master
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
 releases:
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "4.13"
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -38,16 +29,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: co-exist-rosa-rhods-rhoam
-  cron: '@yearly'
+- as: smoke-rosa-rhods-addon-baseline-fips
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
       ADDON1_CONFIG: name=managed-odh;notification-email=interop-qe-ms@redhat.com;ocm-env=stage
-      ADDON2_CONFIG: name=managed-api-service;addon-managed-api-service=1;rosa-cli-required=true;notification-email=interop-qe-ms@redhat.com;rosa=true
       ADDONS_OPERATORS_RUN_IN_PARALLEL: "false"
-      CLUSTER_NAME_PREFIX: coexist
-      CLUSTER1_CONFIG: platform=rosa;region=us-east-2;version=4.13;channel-group=stable;compute-machine-type=m5.4xlarge;timeout=90m;replicas=6;fips=false;ocm-env=stage
+      CLUSTER_NAME_PREFIX: rhods
+      CLUSTER1_CONFIG: platform=rosa;region=us-east-2;version=4.15;channel-group=candidate;compute-machine-type=g4dn.2xlarge;timeout=90m;replicas=2;fips=true;ocm-env=stage
       FIREWATCH_CONFIG: |
         [
           {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
@@ -59,15 +48,19 @@ tests:
         ]
       FIREWATCH_DEFAULT_JIRA_PROJECT: MSINTEROP
       FIREWATCH_JIRA_API_TOKEN_PATH: /tmp/secrets/jira/access_token_msi
+      OPERATOR1_CONFIG: name=gpu-operator-certified;namespace=nvidia-gpu-operator;source=certified-operators;target-namespaces=nvidia-gpu-operator,
+      OPERATOR2_CONFIG: name=servicemeshoperator
+      OPERATOR3_CONFIG: name=serverless-operator;namespace=openshift-serverless
+      OPERATOR4_CONFIG: name=openshift-pipelines-operator-rh;namespace=openshift-pipelines;channel=latest
+      OPERATOR5_CONFIG: name=nfd;namespace=openshift-nfd;target-namespaces=openshift-nfd,
+      PULL_SECRET_NAME: pull-secret
       S3_BUCKET_NAME: openshift-cli-installer
       S3_BUCKET_PATH: openshift-ci
-      TEST_MARKER: RHOAM-RHODS
     test:
-    - ref: addon-tests-rhoam
     - ref: rhoai-tests
-    workflow: addon
+    workflow: addons-and-operators
 zz_generated_metadata:
-  branch: rhods-rhoam
+  branch: rhoai-addon-interop
   org: CSPI-QE
   repo: MSI
-  variant: v4.13-stage
+  variant: v4.15-GA
