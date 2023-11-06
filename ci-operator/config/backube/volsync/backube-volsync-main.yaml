@@ -102,13 +102,20 @@ tests:
 - as: e2e-openshift
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    dependencies:
+      COMPONENT_IMAGE_REF: src
     env:
-      FIPS_ENABLED: "false"
+      CLUSTER_NAMES: none
+      CLUSTERPOOL_GROUP_NAME: AppLifecycle
+      CLUSTERPOOL_HOST_NAMESPACE: app
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-app-clusterpool
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-small-aws-414
+      SKIP_COMPONENT_INSTALL: "true"
     test:
     - as: e2e-install-operator
       cli: latest
       commands: |
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
         operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
         oc wait --for condition=Available -n openshift-operators deployment volsync-controller-manager
       dependencies:
@@ -122,7 +129,10 @@ tests:
     - as: e2e
       commands: |
         set -x -e -o pipefail
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+
+        oc -n openshift-operators get deploy
+        oc -n openshift-operators get pod
 
         # Install MinIO for rclone & restic
         ./hack/run-minio.sh
@@ -147,17 +157,24 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: ipi-aws
+    workflow: ocm-e2e-clusterpool
 - as: e2e-openshift-fips
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    dependencies:
+      COMPONENT_IMAGE_REF: src
     env:
-      FIPS_ENABLED: "true"
+      CLUSTER_NAMES: none
+      CLUSTERPOOL_GROUP_NAME: AppLifecycle
+      CLUSTERPOOL_HOST_NAMESPACE: app
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-app-clusterpool
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-small-fips-aws-414
+      SKIP_COMPONENT_INSTALL: "true"
     test:
     - as: e2e-install-operator
       cli: latest
       commands: |
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
         operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
         oc wait --for condition=Available -n openshift-operators deployment volsync-controller-manager
       dependencies:
@@ -171,7 +188,10 @@ tests:
     - as: e2e
       commands: |
         set -x -e -o pipefail
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+
+        oc -n openshift-operators get deploy
+        oc -n openshift-operators get pod
 
         # Install MinIO for rclone & restic
         ./hack/run-minio.sh
@@ -196,18 +216,24 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: ipi-aws
+    workflow: ocm-e2e-clusterpool
 - as: e2e-openshift-helm
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    dependencies:
+      COMPONENT_IMAGE_REF: src
     env:
-      FIPS_ENABLED: "false"
+      CLUSTER_NAMES: none
+      CLUSTERPOOL_GROUP_NAME: AppLifecycle
+      CLUSTERPOOL_HOST_NAMESPACE: app
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-app-clusterpool
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-small-aws-414
+      SKIP_COMPONENT_INSTALL: "true"
     test:
     - as: e2e
       commands: |
         set -x -e -o pipefail
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
 
         # Install MinIO for rclone & restic
         ./hack/run-minio.sh
@@ -230,6 +256,9 @@ tests:
           --wait --timeout=5m \
           volsync ./helm/volsync
 
+        oc -n volsync-system get deploy
+        oc -n volsync-system get pod
+
         # Add .local/bin to path so we can execute Python packages we install below
         export PATH="${PATH}:/alabama/.local/bin"
         # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
@@ -248,7 +277,7 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: ipi-aws
+    workflow: ocm-e2e-clusterpool
 zz_generated_metadata:
   branch: main
   org: backube
