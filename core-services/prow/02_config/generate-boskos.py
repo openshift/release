@@ -261,6 +261,9 @@ CONFIG = {
     'powervs-3-quota-slice': {
         'dal10': 1,
     },
+    'ibmcloud-cspi-qe-quota-slice': {
+        'us-east': 10,
+    },
     'ibmcloud-quota-slice': {
         'us-east': 7,
     },
