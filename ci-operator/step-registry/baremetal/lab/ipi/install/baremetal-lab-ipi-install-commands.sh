@@ -159,7 +159,7 @@ cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 # We can create the installation dir with the manifests and, finally, the ignition configs
 
 # Also get a sanitized copy of the install-config.yaml as an artifact for debugging purposes
-grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml"
+grep -v "password\|username\|pullSecret\|{\"auths\":{" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml"
 
 ### Create manifests
 echo "[INFO] Creating manifests..."
