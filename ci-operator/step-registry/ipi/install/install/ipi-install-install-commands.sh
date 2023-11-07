@@ -396,34 +396,6 @@ EOF
   done
 }
 
-function inject_etcd_local_disk_for_openstack(){
-  local dir=${1}
-
-  if [ ! -f /tmp/yq ]; then
-    curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$( get_arch )" \
-    -o /tmp/yq && chmod +x /tmp/yq
-  fi
-
-  PATCH="${SHARED_DIR}/cpms-etcd-on-local-disk.yaml.patch"
-  cat > "${PATCH}" << EOF
-spec:
-  template:
-    machines_v1beta1_machine_openshift_io:
-      spec:
-        providerSpec:
-          value:
-            additionalBlockDevices:
-            - name: etcd
-              sizeGiB: 10
-              storage:
-                type: Local
-EOF
-
-  /tmp/yq m -x -i "$dir/openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml" "${PATCH}"
-
-  echo "Configuring an additional block device for etcd in the CPMS manifest for OpenStack"
-}
-
 # inject_spot_instance_config is an AWS specific option that enables the use of AWS spot instances for worker nodes
 function inject_spot_instance_config() {
   local dir=${1}
@@ -582,11 +554,6 @@ aws|aws-arm64|aws-usgov)
     fi
     if [[ "${ENABLE_AWS_EFA_PG_INSTANCE:-}"  == 'true' ]]; then
       enable_efa_pg_instance_config ${dir}
-    fi
-    ;;
-openstack*)
-    if [[ "${ETCD_ON_LOCAL_DISK:-}" == "true" ]]; then
-      inject_etcd_local_disk_for_openstack ${dir}
     fi
     ;;
 esac
