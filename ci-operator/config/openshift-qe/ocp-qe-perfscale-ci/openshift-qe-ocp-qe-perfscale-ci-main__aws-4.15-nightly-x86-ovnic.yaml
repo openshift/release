@@ -5,7 +5,7 @@ build_root:
     tag: latest
 images:
 - dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-aws-414-ovnic
+  to: ocp-qe-perfscale-ci-aws-415-ovnic
 promotion:
   namespace: ci
   tag: latest
@@ -14,24 +14,24 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.15"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ocp-qe-perfscale-aws-ci-cdv2-test-252nodes-scale-ovnic
+- as: cluster-density-v2-252nodes
   cron: 0 1 * * 1,3
   steps:
     cluster_profile: aws-perfscale
     env:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "252"
-      COMPUTE_NODE_TYPE: m5.2xlarge
+      COMPUTE_NODE_TYPE: m6i.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.8xlarge
       ITERATION_MULTIPLIER_ENV: "6"
       MUST_GATHER_TIMEOUT: 90m
-      SIZE_VARIANT: xlarge
     post:
     - chain: ipi-aws-post
     pre:
@@ -39,17 +39,17 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-cluster-density-v2
   timeout: 8h0m0s
-- as: ocp-qe-perfscale-aws-cni-120ppn-test-252nodes-scale-ovnic
+- as: node-density-cni-252nodes-120ppn
   cron: 0 12 * * 1,3
   steps:
     cluster_profile: aws-perfscale
     env:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "252"
-      COMPUTE_NODE_TYPE: m5.2xlarge
+      COMPUTE_NODE_TYPE: m6i.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.8xlarge
       MUST_GATHER_TIMEOUT: 90m
       PODS_PER_NODE: "120"
-      SIZE_VARIANT: xlarge
     post:
     - chain: ipi-aws-post
     pre:
@@ -57,17 +57,17 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
   timeout: 8h0m0s
-- as: ocp-qe-perfscale-aws-cni-220ppn-test-252nodes-scale-ovnic
+- as: node-density-cni-252nodes-220ppn
   cron: 0 19 * * 1,3
   steps:
     cluster_profile: aws-perfscale
     env:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "252"
-      COMPUTE_NODE_TYPE: m5.2xlarge
+      COMPUTE_NODE_TYPE: m6i.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.8xlarge
       MUST_GATHER_TIMEOUT: 90m
       PODS_PER_NODE: "220"
-      SIZE_VARIANT: xlarge
     post:
     - chain: ipi-aws-post
     pre:
@@ -79,4 +79,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-qe
   repo: ocp-qe-perfscale-ci
-  variant: aws-4.14-nightly-x86-ovnic
+  variant: aws-4.15-nightly-x86-ovnic
