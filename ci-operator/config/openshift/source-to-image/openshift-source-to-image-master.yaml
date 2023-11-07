@@ -1,20 +1,26 @@
+base_images:
+  base:
+    name: "4.15"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
 binary_build_commands: make build
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
+  from_repository: true
 resources:
   '*':
     requests:
-      cpu: "3"
-      memory: 1Gi
+      cpu: 100m
+      memory: 200Mi
 tests:
 - as: verify
   commands: |
     make verify > ${ARTIFACT_DIR}/verify.log
   container:
-    from: bin
+    from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: |
@@ -28,6 +34,12 @@ tests:
     make test-dockerfile > ${ARTIFACT_DIR}/test-dockerfile.log
   container:
     from: bin
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: build-cross-platform
+  commands: |
+    S2I_BUILD_COMMAND=docker make release > ${ARTIFACT_DIR}/build-cross-platform.log
+  container:
+    from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: security
   optional: true
