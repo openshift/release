@@ -58,9 +58,22 @@ tests:
   cluster: build05
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     cluster_profile: equinix-ocp-metal
-    workflow: agent-e2e-compact-ipv4
-  timeout: 6h0m0s
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        FIPS_MODE=false
+      DEVSCRIPTS_TARGET: agent
+      TEST_SUITE: openshift/conformance/parallel
+    post:
+    - chain: agent-post
+    pre:
+    - chain: agent-pre
+    test:
+    - ref: baremetalds-e2e-test
+  timeout: 8h0m0s
 - as: e2e-agent-sno-ipv6
   cluster: build05
   optional: true
