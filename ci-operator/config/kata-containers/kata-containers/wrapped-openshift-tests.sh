@@ -12,6 +12,7 @@
 # into this file.
 
 OUT=$(/usr/bin/openshift-tests-original $@)
+OUT=$(/usr/bin/openshift-tests-original $@ 2>&1)
 RET=$?
 
 echo "$OUT"
