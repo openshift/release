@@ -35,3 +35,20 @@ else
     ./console-test-frontend.sh --tags @smoke || true
   fi
 fi
+
+# summarize test results
+echo "Summarizing test result..."
+failures=0 errors=0 skipped=0 tests=0
+grep -r -E -h -o 'testsuite[^>]+' "${ARTIFACT_DIR}/gui_test_screenshots/console-cypress.xml" 2>/dev/null | tr -d '[A-Za-z="_]' > /tmp/zzz-tmp.log
+while read -a row ; do
+    # if the last ARG of command `let` evaluates to 0, `let` returns 1
+    let errors+=${row[0]} failures+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
+done < /tmp/zzz-tmp.log
+
+TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results"
+echo -e "\nfailures: $failures, errors: $errors, skipped: $skipped, tests: $tests in openshift-extended-web-tests" | tee -a "${TEST_RESULT_FILE}"
+if [ $((failures)) != 0 ] ; then
+    echo "Failing Scenarios:" | tee -a "${TEST_RESULT_FILE}"
+    find "${ARTIFACT_DIR}" -name 'cypress_report*.json' -exec yq '.results[].suites[].tests[] | select(.fail == true) | .fullTitle' {} \; | sed -E 's/^( +)?/  /' | tee -a "${TEST_RESULT_FILE}" || true
+fi
+cat "${TEST_RESULT_FILE}" >> "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
