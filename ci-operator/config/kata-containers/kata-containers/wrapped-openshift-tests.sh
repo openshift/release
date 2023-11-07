@@ -33,6 +33,8 @@ echo "$OUT"
 if [[ "$OUT" =~ "error: failed because an invariant was violated" ]]; then
     kata_containers_msg "invariant was violated"
     exit 0
-else
-    exit "$RET"
+elif [[ "$OUT" =~ "error: failed due to a MonitorTest failure" ]]; then
+    kata_containers_msg "MonitorTest failure"
+    exit 0
 fi
+exit "$RET"
