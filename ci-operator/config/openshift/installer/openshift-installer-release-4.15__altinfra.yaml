@@ -1,0 +1,159 @@
+base_images:
+  base:
+    name: "4.15"
+    namespace: ocp
+    tag: base
+  ocp_4.10_cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
+build_root:
+  from_repository: true
+images:
+- build_args:
+  - name: TAGS
+    value: altinfra
+  dockerfile_path: images/installer/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+  to: installer-altinfra
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN dnf install -y nmstate
+    # Cache dir must be accessible when running the integration tests
+    RUN mkdir /.cache -m 0777
+  from: src
+  inputs:
+    ocp_4.10_cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-oc
+promotion:
+  disabled: true
+  excluded_images:
+  - src-oc
+  name: "4.15"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.15"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.15"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- always_run: false
+  as: e2e-aws-ovn
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-shared-vpc
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-sharednetwork
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-shared-vpc-localzones
+  optional: true
+  steps:
+    cluster_profile: aws-local-zones
+    env:
+      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
+    workflow: openshift-e2e-aws-local-zones-byo-vpc
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-localzones
+  optional: true
+  steps:
+    cluster_profile: aws-local-zones
+    env:
+      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
+    workflow: openshift-e2e-aws-local-zones
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-imdsv2
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      AWS_METADATA_SERVICE_AUTH: Required
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-ovn
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-ovn-shared-vpc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-sharednetwork
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-ovn-resourcegroup
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-resourcegroup
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-2
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-static-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-8-vpn
+    workflow: openshift-e2e-vsphere-staticip
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-zones
+  optional: true
+  steps:
+    cluster_profile: vsphere-multizone-2
+    workflow: openshift-e2e-vsphere-zones
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: release-4.15
+  org: openshift
+  repo: installer
+  variant: altinfra
