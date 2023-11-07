@@ -64,6 +64,40 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-conc-builds
   timeout: 5h0m0s
+- as: sdn-to-ovn-24nodes
+  cron: 0 12 * * 6
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m6.xlarge
+      OVN_SDN_MIGRATION_TIMEOUT: 3600s
+      ZONES_COUNT: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-sdn-pre
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - ref: ovn-sdn-migration
+- as: sdn-to-ovn-120nodes
+  cron: 0 14 * * 0
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m6.xlarge
+      OVN_SDN_MIGRATION_TIMEOUT: 7200s
+      ZONES_COUNT: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-sdn-pre
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - ref: ovn-sdn-migration
 - always_run: false
   as: router-perf-24nodes
   steps:
