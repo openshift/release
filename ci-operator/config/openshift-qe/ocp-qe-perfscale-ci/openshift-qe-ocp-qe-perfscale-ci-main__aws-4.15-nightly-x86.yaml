@@ -71,14 +71,16 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
-      COMPUTE_NODE_TYPE: m6.xlarge
+      COMPUTE_NODE_TYPE: m6i.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.xlarge
       OVN_SDN_MIGRATION_TIMEOUT: 3600s
       ZONES_COUNT: "3"
     post:
     - chain: ipi-aws-post
     pre:
-    - chain: ipi-aws-pre
-    - chain: ipi-aws-sdn-pre
+    - chain: ipi-conf-aws
+    - ref: sdn-conf
+    - chain: ipi-install
     test:
     - ref: openshift-qe-cluster-density-v2
     - ref: ovn-sdn-migration
@@ -89,14 +91,16 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "120"
-      COMPUTE_NODE_TYPE: m6.xlarge
+      COMPUTE_NODE_TYPE: m6i.xlarge
       OVN_SDN_MIGRATION_TIMEOUT: 7200s
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.4xlarge
       ZONES_COUNT: "3"
     post:
     - chain: ipi-aws-post
     pre:
-    - chain: ipi-aws-pre
-    - chain: ipi-aws-sdn-pre
+    - chain: ipi-conf-aws
+    - ref: sdn-conf
+    - chain: ipi-install
     test:
     - ref: openshift-qe-cluster-density-v2
     - ref: ovn-sdn-migration
