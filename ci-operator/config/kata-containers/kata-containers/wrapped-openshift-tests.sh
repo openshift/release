@@ -11,7 +11,17 @@
 # use pastebin version, verify it's passing and then push the change
 # into this file.
 
-OUT=$(/usr/bin/openshift-tests-original $@)
+function kata_containers_msg() {
+    echo
+    echo
+    echo "error: ---< kata-containers CI >---"
+    echo "error: Overriding exit code because: $*"
+    echo "error: Previous exit code was: $RET"
+    echo "error: ---< END kata-containers CI >---"
+    echo
+    echo
+}
+
 OUT=$(/usr/bin/openshift-tests-original $@ 2>&1)
 RET=$?
 
@@ -21,9 +31,7 @@ echo "$OUT"
 
 # Only report failure on actual test failures (ignore invariants)
 if [[ "$OUT" =~ "error: failed because an invariant was violated" ]]; then
-    # This message is reported when only invariant tests fail
-    # currently we are aware this is happenning with kata-containers
-    # so keep the junit results but report pass
+    kata_containers_msg "invariant was violated"
     exit 0
 else
     exit "$RET"
