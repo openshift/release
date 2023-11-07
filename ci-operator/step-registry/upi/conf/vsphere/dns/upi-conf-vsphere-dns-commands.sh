@@ -4,12 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if command -v pwsh &> /dev/null
+declare base_domain="vmc-ci.devcluster.openshift.com"
+
+if ! command -v pwsh &> /dev/null
 then
-  echo "vmc-ci.devcluster.openshift.com" > "${SHARED_DIR}"/basedomain.txt
+  echo "Skipping DNS setting due to falling back to Terraform."
+  exit 0
+else
+  echo "${base_domain}" > "${SHARED_DIR}"/basedomain.txt
 
   cluster_name=${NAMESPACE}-${UNIQUE_HASH}
-  base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
   cluster_domain="${cluster_name}.${base_domain}"
 
   export AWS_DEFAULT_REGION=us-west-2  # TODO: Derive this?
@@ -20,7 +24,7 @@ then
 
   if ! command -v aws &> /dev/null
   then
-      echo "$(date -u --rfc-3339=seconds) - Install AWS cli..."
+      echo "AWS cli not found.  Installing AWS cli..."
       export PATH="${HOME}/.local/bin:${PATH}"
       if command -v pip3 &> /dev/null
       then
@@ -31,7 +35,7 @@ then
             easy_install --user 'pip<21'
             pip install --user awscli
           else
-            echo "$(date -u --rfc-3339=seconds) - No pip available exiting..."
+            echo "No pip available exiting..."
             exit 1
           fi
       fi
@@ -41,7 +45,13 @@ then
   # 0: API
   # 1: Ingress
   declare -a vips
-  mapfile -t vips < "${SHARED_DIR}"/vips.txt
+  if [ -f "${SHARED_DIR}/vips.txt" ]
+  then
+    mapfile -t vips < "${SHARED_DIR}"/vips.txt
+  else
+    echo "Unable to find vips.txt"
+    exit 1
+  fi
 
   hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
               --dns-name "${base_domain}" \
@@ -68,7 +78,7 @@ then
   echo "Creating DNS records..."
   cat > "${SHARED_DIR}"/dns-create.json <<EOF
 {
-"Comment": "Create public OpenShift DNS records for VSphere IPI CI install",
+"Comment": "Create public OpenShift DNS records for VSphere UPI CI install",
 "Changes": [{
     "Action": "UPSERT",
     "ResourceRecordSet": {
@@ -100,7 +110,7 @@ EOF
 
   cat > "${SHARED_DIR}"/dns-delete.json <<EOF
 {
-"Comment": "Delete public OpenShift DNS records for VSphere IPI CI install",
+"Comment": "Delete public OpenShift DNS records for VSphere UPI CI install",
 "Changes": [{
     "Action": "DELETE",
     "ResourceRecordSet": {
@@ -133,6 +143,4 @@ EOF
   aws route53 wait resource-record-sets-changed --id "$id"
 
   echo "DNS records created."
-else
-  echo "Skipping DNS setting due to falling back to Terraform."
 fi

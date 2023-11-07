@@ -66,8 +66,11 @@ cp -t "${installer_dir}/auth" \
     "${SHARED_DIR}/kubeadmin-password" \
     "${SHARED_DIR}/kubeconfig"
 
-cp -t "${installer_dir}/secrets" \
-    "${SHARED_DIR}/vcenter-crds.xml" \
+if command -v pwsh &> /dev/null
+then
+  cp -t "${installer_dir}/secrets" \
+      "${SHARED_DIR}/vcenter-crds.xml"
+fi
 
 # Copy sample UPI files
 cp -rt "${installer_dir}" \
