@@ -40,13 +40,6 @@ images:
   from: src
   to: tests-private-ui
 - dockerfile_literal: |
-    FROM src
-    RUN unset GOFLAGS && \
-        go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1 && \
-        which golangci-lint
-  from: src
-  to: tests-private-cck
-- dockerfile_literal: |
     FROM bin
     RUN sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" >/etc/yum.repos.d/azure-cli.repo' && \
         PACKAGES="azure-cli openssh-clients httpd-tools skopeo java-11-openjdk-headless" && \
@@ -62,7 +55,6 @@ promotion:
   - tests-private
   - tests-private-ui
   - tests-private-pr
-  - tests-private-cck
   name: 4.12-priv
   namespace: ocp-private
 releases:
@@ -93,9 +85,13 @@ tests:
   container:
     from: src
 - as: code-check
-  commands: make check-code
+  commands: |
+    unset GOFLAGS
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1 2> /dev/null
+    which golangci-lint
+    make check-code
   container:
-    from: tests-private-cck
+    from: src
   optional: true
 - as: e2e-aws
   optional: true
