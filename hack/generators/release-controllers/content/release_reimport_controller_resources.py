@@ -93,6 +93,11 @@ def _library_go_rbac(gendoc):
                     'resources': ['replicasets'],
                     'verbs': ['get', 'list', 'watch']
                 },
+                {
+                    'apiGroups': ['config.openshift.io'],
+                    'resources': ['infrastructures'],
+                    'verbs': ['get', 'list', 'watch']
+                },
             ]
         },
         {
@@ -118,11 +123,13 @@ def _library_go_rbac(gendoc):
 def _namespace_scoped_rbac_resources(gendoc):
     _library_go_rbac(gendoc)
 
+
 def _namespace_list(namespaces):
     namespace_list = []
     for namespace in namespaces:
-        namespace_list.append("--namespaces="+namespace+",")
+        namespace_list.append("--namespaces=" + namespace + ",")
     return namespace_list
+
 
 def _deployment_resources(gendoc, namespaces):
     context = gendoc.context
@@ -165,11 +172,11 @@ def _deployment_resources(gendoc, namespaces):
                                     },
                                 },
                                 'command': [
-                                    '/usr/bin/release-reimport-controller',
-                                    'start',
-                                    '--dry-run',
-                                    '-v=4',
-                                ]+_namespace_list(namespaces),
+                                               '/usr/bin/release-reimport-controller',
+                                               'start',
+                                               '--dry-run',
+                                               '-v=4',
+                                           ] + _namespace_list(namespaces),
                                 'image': 'release-reimport-controller:latest',
                                 'name': 'controller',
                             }
