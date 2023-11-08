@@ -21,6 +21,14 @@ source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 
+declare -a vips
+mapfile -t vips < "${SHARED_DIR}"/vips.txt
+APIVIP=${vips[0]}
+INGRESSVIP=${vips[1]}
+export APIVIP
+export INGRESSVIP
+
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
@@ -136,3 +144,15 @@ EOF
 #        spec:
 #          storageClassName: sc-zone-us-east-1a
 #EOF
+
+# if loadbalancer is UserManaged, it's mean using external LB, 
+# then keepalived and haproxy will not deployed, but coredns still keep 
+
+if [ ${LB_TYPE} = "UserManaged" ]; then
+  if [ ! -f /tmp/yq ]; then
+    curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+  fi 
+  /tmp/yq e --inplace '.platform.vsphere.apiVIPs += [strenv(APIVIP)],.platform.vsphere.ingressVIPs += [strenv(INGRESSVIP)]' ${CONFIG}
+  /tmp/yq e --inplace '.platform.vsphere.loadBalancer.type += "UserManaged"' ${CONFIG}
+  /tmp/yq e --inplace '.featureSet += "TechPreviewNoUpgrade"' ${CONFIG}
+fi
