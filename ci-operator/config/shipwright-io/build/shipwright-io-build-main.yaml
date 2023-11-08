@@ -23,7 +23,7 @@ images:
     COPY --from=builder /go/bin/ginkgo /usr/bin/ginkgo
     COPY --from=builder /go/bin/gocov /usr/bin/gocov
 
-    RUN yum -y install httpd-tools
+    RUN yum -y install httpd-tools jq
 
     # Install kubectl
     RUN KUBECTL_VERSION=1.24.3 && \
@@ -32,8 +32,8 @@ images:
         kubectl version --client=true
 
     # Install ko
-    RUN VERSION=0.15.0 OS=Linux ARCH=x86_64 && \
-        curl -sSfL "https://github.com/ko-build/ko/releases/download/v${VERSION}/ko_${VERSION}_${OS}_${ARCH}.tar.gz" > ko.tar.gz && \
+    RUN KO_VERSION=0.15.0 OS=Linux ARCH=x86_64 && \
+        curl -sSfL "https://github.com/ko-build/ko/releases/download/v${KO_VERSION}/ko_${KO_VERSION}_${OS}_${ARCH}.tar.gz" > ko.tar.gz && \
         tar xzf ko.tar.gz ko && chmod +x ./ko && mv ./ko /usr/local/bin
   from: src
   to: src-kubectl
@@ -59,49 +59,154 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
   steps:
-    cluster_profile: aws
     test:
     - as: test-unit
       cli: latest
       commands: |
-        export PROJECT=`oc project -q`
-        make install IMAGE_HOST=image-registry.openshift-image-registry.svc:5000 IMAGE_NAMESPACE=${PROJECT}/build TEST_IMAGE_REPO=image-registry.openshift-image-registry.svc:5000/${PROJECT}/build-e2e GO_ARCH=amd64
+        export IMAGE_HOST=quay.io IMAGE_NAMESPACE=pipeline-integrations \
+          TEST_IMAGE_REPO=quay.io/pipeline-integrations/openshift-ci-e2e GO_ARCH=amd64
+        mkdir -p ${HOME}/.docker
+        cp /tmp/secret/.dockerconfigjson ${HOME}/.docker/config.json
+        echo "------------------------------install-tekton------------------------------"
+        oc apply -f - <<EOF
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: openshift-pipelines-operator
+          namespace: openshift-operators
+        spec:
+          channel: latest
+          name: openshift-pipelines-operator-rh
+          source: redhat-operators
+          sourceNamespace: openshift-marketplace
+        EOF
+        sleep 10
+        echo "------------------------------install-controller------------------------------"
+        make install-controller
         oc --namespace shipwright-build adm policy add-scc-to-user privileged -z shipwright-build-controller
         oc --namespace shipwright-build adm policy add-scc-to-user privileged -z shipwright-build-webhook
+        oc --namespace shipwright-build rollout restart deployment/shipwright-build-controller
+        oc --namespace shipwright-build rollout restart deployment/shipwright-build-webhook
+        sleep 10
+        echo "------------------------------setup-webhook------------------------------"
         sh hack/setup-webhook-cert.sh
-        oc --namespace shipwright-build get all
+        echo "------------------------------install-strategies------------------------------"
+        oc new-project test-shipwright
         make install-strategies
+        echo "------------------------------run-unit-tests------------------------------"
         make test
+      credentials:
+      - mount_path: /tmp/secret/
+        name: dockerconfigjson
+        namespace: test-credentials
       from: src-kubectl
       resources:
         requests:
           cpu: 200m
-    workflow: ipi-aws
-- as: test-integration
+    workflow: generic-claim
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
   steps:
-    cluster_profile: aws
+    test:
+    - as: test-e2e
+      cli: latest
+      commands: |
+        export IMAGE_HOST=quay.io IMAGE_NAMESPACE=pipeline-integrations \
+          TEST_IMAGE_REPO=quay.io/pipeline-integrations/openshift-ci-e2e GO_ARCH=amd64
+        oc projects
+        echo "checking for route in registry"
+        oc project openshift-image-registry
+        oc get all
+        oc get svc
+        mkdir -p ${HOME}/.docker
+        cp /tmp/secret/.dockerconfigjson ${HOME}/.docker/config.json
+        echo "------------------------------install-tekton------------------------------"
+        oc apply -f - <<EOF
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: openshift-pipelines-operator
+          namespace: openshift-operators
+        spec:
+          channel: latest
+          name: openshift-pipelines-operator-rh
+          source: redhat-operators
+          sourceNamespace: openshift-marketplace
+        EOF
+        sleep 10
+        echo "------------------------------install-controller------------------------------"
+        make install-controller
+        oc --namespace shipwright-build adm policy add-scc-to-user privileged -z shipwright-build-controller
+        oc --namespace shipwright-build adm policy add-scc-to-user privileged -z shipwright-build-webhook
+        oc --namespace shipwright-build rollout restart deployment/shipwright-build-controller
+        oc --namespace shipwright-build rollout restart deployment/shipwright-build-webhook
+        sleep 10
+        echo "------------------------------setup-webhook------------------------------"
+        sh hack/setup-webhook-cert.sh
+        echo "------------------------------install-strategies------------------------------"
+        oc project default
+        oc adm policy add-scc-to-user privileged -z pipeline
+        oc create secret docker-registry registry-credential --docker-server=image-registry.openshift-image-registry.svc:5000 --docker-username=kubeadmin --docker-password=`oc whoami -t`
+        make install-strategies
+        echo "------------------------------run-e2e-tests------------------------------"
+        make IMAGE_HOST=image-registry.openshift-image-registry.svc:5000 IMAGE_NAMESPACE=default TEST_IMAGE_REPO=image-registry.openshift-image-registry.svc:5000/default TEST_IMAGE_REPO_SECRET=registry-credential test-e2e
+      credentials:
+      - mount_path: /tmp/secret
+        name: dockerconfigjson
+        namespace: test-credentials
+      from: src-kubectl
+      resources:
+        requests:
+          cpu: 200m
+    workflow: generic-claim
+- as: test-integration
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  steps:
     test:
     - as: test-integration
       cli: latest
       commands: |
-        echo "--- NAMESPACE---"
-        oc project
-        # echo "----ALL PROJECTS----"
-        # oc projects
-        # echo  "----SERVICE ACCOUNTS----"
-        # oc get sa
-        # oc create serviceaccount pipeline
-        # oc adm policy add-scc-to-user privileged -z default
-        # oc adm policy add-role-to-user edit -z default
-        # oc adm policy add-scc-to-user privileged -z pipeline
-        # oc adm policy add-role-to-user edit -z pipeline
-        make test-integration
+        export IMAGE_HOST=quay.io IMAGE_NAMESPACE=pipeline-integrations\
+          TEST_IMAGE_REPO=quay.io/pipeline-integrations GO_ARCH=amd64
+        echo "------------------------------setup-creds------------------------------"
+        mkdir -p ${HOME}/.docker
+        cat /tmp/secret/.dockerconfigjson
+        cp /tmp/secret/.dockerconfigjson ${HOME}/.docker/config.json
+        # oc new-project test-shipwright
+        oc project default
+        oc adm policy add-scc-to-user privileged -z pipeline
+        oc create secret docker-registry registry-credential --docker-server=quay.io --docker-username=pipeline-integrations+openshift_ci --docker-password=`cat /tmp/secret/password.secrets.sh`
+        echo "------------------------------run-integration-tests------------------------------"
+        make TEST_IMAGE_REPO_SECRET=registry-credential test-integration
+      credentials:
+      - mount_path: /tmp/secret
+        name: dockerconfigjson
+        namespace: test-credentials
       from: src-kubectl
       resources:
         requests:
           cpu: 200m
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: shipwright-io
