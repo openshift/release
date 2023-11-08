@@ -36,6 +36,8 @@ if [[ ${LEASED_RESOURCE} == *"segment"* ]]; then
   third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
   machine_cidr="192.168.${third_octet}.0/25"
+  netmask="255.255.255.128"
+  gateway="192.168.${third_octet}.1"
   bootstrap_ip_address="192.168.${third_octet}.3"
   lb_ip_address="192.168.${third_octet}.2"
 
@@ -57,6 +59,8 @@ else
   # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
 
   dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
+  gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
+  netmask=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].mask' "${SUBNETS_CONFIG}")
 
   lb_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[2]' "${SUBNETS_CONFIG}")
   bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[3]' "${SUBNETS_CONFIG}")
@@ -85,6 +89,10 @@ else
   compute_ip_addresses="[${compute_ip_addresses%,}]"
 
 fi
+
+# First one for api, second for apps.
+echo "${lb_ip_address}" >>"${SHARED_DIR}"/vips.txt
+echo "${lb_ip_address}" >>"${SHARED_DIR}"/vips.txt
 
 export HOME=/tmp
 #export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
@@ -218,12 +226,56 @@ compute_ip_addresses = ${compute_ip_addresses}
 control_plane_ip_addresses = ${control_plane_ip_addresses}
 EOF
 
+echo "$(date -u --rfc-3339=seconds) - Create variables.ps1 ..."
+cat >"${SHARED_DIR}/variables.ps1" <<-EOF
+\$clustername = "${cluster_name}"
+\$basedomain = "${base_domain}"
+\$clusterdomain = "${cluster_domain}"
+\$sshkeypath = "${ssh_pub_key_path}"
+
+\$machine_cidr = "${machine_cidr}"
+
+\$vm_template = "${vm_template}"
+\$vcenter = "${vsphere_url}"
+\$portgroup = "${vsphere_portgroup}"
+\$datastore = "${vsphere_datastore}"
+\$datacenter = "${vsphere_datacenter}"
+\$cluster = "${vsphere_cluster}"
+\$vcentercredpath = "secrets/vcenter-creds.xml"
+
+\$ipam = "ipam.vmc.ci.openshift.org"
+
+\$dns = "${dns_server}"
+\$gateway = "${gateway}"
+\$netmask ="${netmask}"
+
+\$bootstrap_ip_address = "${bootstrap_ip_address}"
+\$lb_ip_address = "${lb_ip_address}"
+
+\$control_plane_memory = 16384
+\$control_plane_num_cpus = 4
+\$control_plane_count = 3
+\$control_plane_ip_addresses = ${control_plane_ip_addresses}
+\$control_plane_hostnames = "control-plane-0", "control-plane-1", "control-plane-2"
+
+\$compute_memory = 16384
+\$compute_num_cpus = 4
+\$compute_count = 3
+\$compute_ip_addresses = ${compute_ip_addresses}
+\$control_plane_hostnames = "compute-0", "compute-1", "compute-2"
+EOF
+
 echo "$(date -u --rfc-3339=seconds) - Create secrets.auto.tfvars..."
 cat >"${SHARED_DIR}/secrets.auto.tfvars" <<-EOF
 vsphere_password="${GOVC_PASSWORD}"
 vsphere_user="${GOVC_USERNAME}"
 ipam_token=""
 EOF
+
+if command -v pwsh &> /dev/null
+then
+  pwsh -command "\$User='${GOVC_USERNAME}';\$Password=ConvertTo-SecureString -String '${GOVC_PASSWORD}' -AsPlainText -Force;\$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList \$User, \$Password;\$Credential | Export-Clixml ${SHARED_DIR}/vcenter-creds.xml"
+fi
 
 dir=/tmp/installer
 mkdir "${dir}/"

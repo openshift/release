@@ -49,6 +49,7 @@ set -e
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
 
 mkdir -p "${installer_dir}/auth"
+mkdir -p "${installer_dir}/secrets"
 pushd ${installer_dir}
 
 cp -t "${installer_dir}" \
@@ -56,6 +57,7 @@ cp -t "${installer_dir}" \
     "${SHARED_DIR}/metadata.json" \
     "${SHARED_DIR}/terraform.tfvars" \
     "${SHARED_DIR}/secrets.auto.tfvars" \
+    "${SHARED_DIR}/variables.ps1" \
     "${SHARED_DIR}/bootstrap.ign" \
     "${SHARED_DIR}/worker.ign" \
     "${SHARED_DIR}/master.ign"
@@ -64,17 +66,30 @@ cp -t "${installer_dir}/auth" \
     "${SHARED_DIR}/kubeadmin-password" \
     "${SHARED_DIR}/kubeconfig"
 
+if command -v pwsh &> /dev/null
+then
+  cp -t "${installer_dir}/secrets" \
+      "${SHARED_DIR}/vcenter-crds.xml"
+fi
+
 # Copy sample UPI files
 cp -rt "${installer_dir}" \
     /var/lib/openshift-install/upi/"${CLUSTER_TYPE}"/*
 
-tar -xf "${SHARED_DIR}/terraform_state.tar.xz"
+if ! command -v pwsh &> /dev/null
+then
+  tar -xf "${SHARED_DIR}/terraform_state.tar.xz"
 
-rm -rf .terraform || true
-terraform init -input=false -no-color
-# In some instances either the IPAM records or AWS DNS records
-# are removed before teardown is executed causing terraform destroy
-# to fail - this is causing resource leaks. Do not refresh the state.
-terraform destroy -refresh=false -auto-approve -no-color &
-wait "$!"
+  rm -rf .terraform || true
+  terraform init -input=false -no-color
+
+  # In some instances either the IPAM records or AWS DNS records
+  # are removed before teardown is executed causing terraform destroy
+  # to fail - this is causing resource leaks. Do not refresh the state.
+  terraform destroy -refresh=false -auto-approve -no-color &
+  wait "$!"
+else
+  pwsh -file upi-destroy.ps1 &
+  wait "$!"
+fi
 
