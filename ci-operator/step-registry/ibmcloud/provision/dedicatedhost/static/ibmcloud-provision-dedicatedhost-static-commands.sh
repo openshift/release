@@ -37,6 +37,7 @@ function createDH() {
     run_command "${IBMCLOUD_CLI} is dedicated-host-group-create --zone $zone --family $family --class $class --name ${dhg}"
     
     ${IBMCLOUD_CLI} is dedicated-host-create --profile $dProfile --name $dhName --dhg $dhg --output JSON
+    set -xv
     echo "${dhName}" > "${file}"
 
     waitingStatus ${dhName}
