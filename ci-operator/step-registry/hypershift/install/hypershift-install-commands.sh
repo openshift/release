@@ -13,6 +13,10 @@ if [ "${ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-defaulting-webhook=true"
 fi
 
+if [ "${ENABLE_HYPERSHIFT_OPERATOR_VALIDATING_WEBHOOK}" = "true" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --enable-validating-webhook=true"
+fi
+
 bin/hypershift install --hypershift-image="${OPERATOR_IMAGE}" \
 --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
 --oidc-storage-provider-s3-bucket-name=hypershift-ci-oidc \
