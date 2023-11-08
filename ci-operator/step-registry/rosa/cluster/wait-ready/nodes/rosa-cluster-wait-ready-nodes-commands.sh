@@ -229,3 +229,4 @@ else
     echo "Exiting test!"
     exit 1
 fi
+sleep 14400
