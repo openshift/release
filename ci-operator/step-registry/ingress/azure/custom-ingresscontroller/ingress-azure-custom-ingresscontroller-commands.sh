@@ -230,5 +230,8 @@ do
     az network nic ip-config address-pool add --address-pool ${Infra_ID}-ingress --nic-name ${node}-nic -g ${Infra_ID}-rg -n pipConfig --lb-name ${Infra_ID}-ingress || exit 4
 done
 
+echo "Wait for debugging..... "
+sleep 72000
+
 echo "Check the route reachability via the custom ingresscontroller LB"
 curl -kI --resolve ${canary_host}:443:${custom_public_ip} https://${canary_host}
