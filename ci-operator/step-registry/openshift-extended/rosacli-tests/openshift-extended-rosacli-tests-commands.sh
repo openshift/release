@@ -274,3 +274,4 @@ function check_case_selected {
 }
 
 do_run
+sleep 14400
