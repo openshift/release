@@ -53,6 +53,10 @@ if [[ "\${IP_STACK}" == "v6" ]]; then
   EXTRA_ARGS+="--cluster-cidr fd03::/48 --service-cidr fd04::/112 "
 fi
 
+if [[ "\${IP_STACK}" == "v4v6" ]]; then
+  EXTRA_ARGS+="--cluster-cidr fd03::/48 --cluster-cidr 10.132.0.0/14 --service-cidr fd04::/112 --service-cidr 172.31.0.0/16 "
+fi
+
 /tmp/hcp create cluster agent \${EXTRA_ARGS} \
   --name=\${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \
