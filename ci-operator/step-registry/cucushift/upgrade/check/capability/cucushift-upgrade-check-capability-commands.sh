@@ -242,8 +242,8 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
 fi
 
 baselinecaps_from_cluster=$(oc get clusterversion version -ojson | jq -r '.spec.capabilities.baselineCapabilitySet')
-if [[ "${baselinecaps_from_cluster}" == "" ]]; then
-    echo "spec.capabilities.baselineCapabilitySet is not set, skip the check!"
+if [[ -z "${baselinecaps_from_cluster}" || "${baselinecaps_from_cluster}" == "null" ]]; then
+    echo "spec.capabilities.baselineCapabilitySet is not set or is null, skip the check!"
     exit 0
 fi
 echo "baselinecaps_from_cluster: ${baselinecaps_from_cluster}"
