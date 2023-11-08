@@ -24,6 +24,7 @@ installer_dir=/tmp/installer
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
 
 mkdir -p "${installer_dir}/auth"
+mkdir -p "${installer_dir}/secrets"
 pushd ${installer_dir}
 
 cp -t "${installer_dir}" \
@@ -31,6 +32,7 @@ cp -t "${installer_dir}" \
     "${SHARED_DIR}/metadata.json" \
     "${SHARED_DIR}/terraform.tfvars" \
     "${SHARED_DIR}/secrets.auto.tfvars" \
+    "${SHARED_DIR}/variables.ps1" \
     "${SHARED_DIR}/bootstrap.ign" \
     "${SHARED_DIR}/worker.ign" \
     "${SHARED_DIR}/master.ign"
@@ -38,6 +40,12 @@ cp -t "${installer_dir}" \
 cp -t "${installer_dir}/auth" \
     "${SHARED_DIR}/kubeadmin-password" \
     "${SHARED_DIR}/kubeconfig"
+
+if command -v pwsh &> /dev/null
+then
+    cp -t "${installer_dir}/secrets" \
+        "${SHARED_DIR}/vcenter-crds.xml"
+fi
 
 # Copy sample UPI files
 cp -rt "${installer_dir}" \
@@ -171,18 +179,32 @@ fi
 
 date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
-echo "$(date -u --rfc-3339=seconds) - terraform init..."
-terraform init -input=false -no-color &
-wait "$!"
+if ! command -v pwsh &> /dev/null
+then
+  echo "$(date -u --rfc-3339=seconds) - terraform init..."
+  terraform init -input=false -no-color &
+  wait "$!"
+fi
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-echo "$(date -u --rfc-3339=seconds) - terraform apply..."
-terraform apply -auto-approve -no-color &
-wait "$!"
+
+if ! command -v pwsh &> /dev/null
+then
+  echo "$(date -u --rfc-3339=seconds) - terraform apply..."
+  terraform apply -auto-approve -no-color &
+  wait "$!"
+else
+  echo "$(date -u --rfc-3339=seconds) - pwsh upi.ps1..."
+  pswh -f upi.ps1 &
+  wait "$!"
+fi
 
 # The terraform state could be larger than the maximum 1mb
 # in a secret
-tar -Jcf "${SHARED_DIR}/terraform_state.tar.xz" terraform.tfstate
+if ! command -v pwsh &> /dev/null
+then
+  tar -Jcf "${SHARED_DIR}/terraform_state.tar.xz" terraform.tfstate
+fi
 
 ## Monitor for `bootstrap-complete`
 echo "$(date -u --rfc-3339=seconds) - Monitoring for bootstrap to complete"
