@@ -447,8 +447,8 @@ generate-hypershift-deployment: TAG ?= latest
 generate-hypershift-deployment:
 	@:$(call check_defined, MGMT_AWS_CONFIG_PATH)
 
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/${GO_ARCH} registry.ci.openshift.org/ci/hypershift-cli:${TAG}
-	$(CONTAINER_ENGINE) run $(CONTAINER_USER) --platform linux/${GO_ARCH} \
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull ${CONTAINER_ENGINE_OPTS} registry.ci.openshift.org/ci/hypershift-cli:${TAG}
+	$(CONTAINER_ENGINE) run $(CONTAINER_USER) ${CONTAINER_ENGINE_OPTS} \
 		--rm \
 		-v "$(MGMT_AWS_CONFIG_PATH):/mgmt-aws$(VOLUME_MOUNT_FLAGS)" \
 		registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
