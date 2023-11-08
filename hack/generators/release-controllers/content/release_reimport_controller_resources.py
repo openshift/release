@@ -33,6 +33,11 @@ def _cluster_scoped_rbac_resources(gendoc):
                     'resources': ['imagestreams'],
                     'verbs': ['*']
                 },
+                {
+                    'apiGroups': ['config.openshift.io'],
+                    'resources': ['infrastructures'],
+                    'verbs': ['get', 'list', 'watch']
+                },
             ]
         },
         {
@@ -91,11 +96,6 @@ def _library_go_rbac(gendoc):
                 {
                     'apiGroups': ['apps'],
                     'resources': ['replicasets'],
-                    'verbs': ['get', 'list', 'watch']
-                },
-                {
-                    'apiGroups': ['config.openshift.io'],
-                    'resources': ['infrastructures'],
                     'verbs': ['get', 'list', 'watch']
                 },
             ]
