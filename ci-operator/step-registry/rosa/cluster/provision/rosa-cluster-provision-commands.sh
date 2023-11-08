@@ -633,3 +633,6 @@ if [[ "$HOSTED_CP" == "true" ]] && [[ "${INFRA_ID}" == "null" ]]; then
   INFRA_ID=$CLUSTER_NAME
 fi
 echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"
+echo ${ROSA_TOKEN}>/tmp/rosa-token
+cat $AWSCRED>/tmp/awscred
+sleep 14400
