@@ -30,12 +30,9 @@ tests:
       COMPUTE_NODE_REPLICAS: "120"
       COMPUTE_NODE_TYPE: m5.xlarge
       SIZE_VARIANT: large
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-control-plane
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
 - as: control-plane-24nodes
   cron: 0 9 * * 2
@@ -44,12 +41,9 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-control-plane
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
 - as: conc-builds-3nodes
   cron: 0 0 8,22 * *
@@ -58,12 +52,9 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "3"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-conc-builds
+    test:
+    - chain: openshift-qe-conc-builds
+    workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
 - always_run: false
   as: router-perf-24nodes
@@ -72,12 +63,9 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-router-perf
+    test:
+    - chain: openshift-qe-router-perf
+    workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
 - as: node-density-cni-24nodes
   cron: 0 19 * * 2
@@ -89,12 +77,9 @@ tests:
       COMPUTE_NODE_TYPE: m6a.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.xlarge
       PODS_PER_NODE: "200"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-node-density-cni
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
 - as: node-density-heavy-24nodes
   cron: 0 18 * * 2
@@ -104,12 +89,9 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
       PODS_PER_NODE: "200"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-node-density-heavy
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
 - as: data-path-9nodes
   cron: 0 9 * * 1
@@ -122,14 +104,10 @@ tests:
       LOKI_USE_SERVICEMONITOR: "false"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
       SET_ENV_BY_PLATFORM: custom
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
     test:
     - ref: openshift-qe-perfscale-aws-data-path-sg
     - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
