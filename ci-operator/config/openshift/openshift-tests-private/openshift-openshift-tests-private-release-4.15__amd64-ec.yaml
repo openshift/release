@@ -193,8 +193,8 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
-- as: aws-ipi-usertags-fips-f14
-  cron: 26 15 15,30 * *
+- as: aws-ipi-usertags-custom-sg-fips-f14
+  cron: 1 18 6,20 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -202,7 +202,7 @@ tests:
       FIPS_ENABLED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-aws-ipi-usertags
+    workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
 - as: aws-ocm-osd-ccs-f14
   cron: 34 0 3,18 * *
   steps:
@@ -432,6 +432,9 @@ tests:
   cron: 52 19 5,20 * *
   steps:
     cluster_profile: vsphere-dis-2
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
@@ -448,13 +451,16 @@ tests:
     cluster_profile: vsphere-dis-2
     env:
       FIPS_ENABLED: "true"
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-zones-f14
   cron: 56 17 14,29 * *
   steps:
-    cluster_profile: vsphere-multizone
+    cluster_profile: vsphere-multizone-2
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones

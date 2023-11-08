@@ -16,7 +16,7 @@ export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD
 echo "$(date -u --rfc-3339=seconds) - Configuring gcloud..."
 
 if ! gcloud --version; then
-  GCLOUD_TAR="google-cloud-sdk-256.0.0-linux-x86_64.tar.gz"
+  GCLOUD_TAR="google-cloud-sdk-447.0.0-linux-x86_64.tar.gz"
   GCLOUD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$GCLOUD_TAR"
   echo "$(date -u --rfc-3339=seconds) - gcloud not installed: installing from $GCLOUD_URL"
   pushd ${HOME}

@@ -64,23 +64,52 @@ snyk_code() {
     return $rc
 }
 
-declare -A commands
-commands=( ["snyk_deps"]="snyk dependencies scan failed" ["snyk_code"]="snyk code scan failed" )
-
-declare -A results
-all_successful=true
-for cmd in "${!commands[@]}"; do
-    if $cmd; then
-        results["$cmd"]=0
+pre_execution_hook_cmd() {
+    local rc=0
+    echo "Running pre-execution hook"
+    if [ "$SNYK_PRE_EXECUTION_HOOK_CMD" ]; then
+        eval "$SNYK_PRE_EXECUTION_HOOK_CMD"
+        rc=$?
     else
-        results["$cmd"]=1
-        all_successful=false
+        echo "No pre-execution hook defined"
     fi
-done
+    echo "Pre-execution hook completed"
+    return "$rc"
+}
 
-for cmd in "${!results[@]}"; do
-    if [ ${results["$cmd"]} -ne 0 ]; then
-        echo "${commands["$cmd"]}"
+pre_execution_hook_script() {
+    local rc=0
+    echo "Running pre-execution hook script"
+    if [ "$SNYK_PRE_EXECUTION_HOOK_SCRIPT" ] && [ -f "$SNYK_PRE_EXECUTION_HOOK_SCRIPT" ]; then
+        # shellcheck source=/dev/null
+        source "$SNYK_PRE_EXECUTION_HOOK_SCRIPT"
+        rc=$?
+    else
+        echo "No pre-execution hook script defined"
+    fi
+    echo "Pre-execution hook script completed"
+    return "$rc"
+}
+
+declare -a cmd_order=(
+    pre_execution_hook_cmd
+    pre_execution_hook_script
+    snyk_deps
+    snyk_code
+)
+
+declare -a error_messages=(
+    "pre-execution hook command failed"
+    "pre-execution hook script failed"
+    "snyk dependencies scan failed"
+    "snyk code scan failed"
+)
+
+all_successful=true
+for idx in "${!cmd_order[@]}"; do
+    if ! ${cmd_order[idx]}; then
+        all_successful=false
+        echo "${error_messages[idx]}"
     fi
 done
 

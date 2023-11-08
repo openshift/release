@@ -87,6 +87,17 @@ CONFIG = {
     'aws-rhtap-qe-quota-slice': {
         'us-west-2': 10
     },
+    'aws-rhtap-performance-quota-slice': {
+        'us-west-2': 10
+    },
+    'aws-opendatahub-quota-slice': {
+        # Wild guesses. We can re-configure later
+        # https://docs.ci.openshift.org/docs/architecture/quota-and-leases/#adding-a-new-type-of-resource
+        'us-east-1': 40,
+        'us-east-2': 40,
+        'us-west-1': 40,
+        'us-west-2': 40,
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
@@ -109,7 +120,7 @@ CONFIG = {
         'ppe3': 2
     },
    'azurestack-qe-quota-slice': {
-        'mtcazs': 2
+        'mtcazs': 4
     },
     'azuremag-quota-slice': {
         'usgovvirginia': 5
@@ -249,6 +260,9 @@ CONFIG = {
     },
     'powervs-3-quota-slice': {
         'dal10': 1,
+    },
+    'ibmcloud-cspi-qe-quota-slice': {
+        'us-east': 10,
     },
     'ibmcloud-quota-slice': {
         'us-east': 7,
