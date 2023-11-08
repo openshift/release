@@ -3,6 +3,10 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: cli
+  kepler-bundle-old:
+    name: kepler-operator-bundle
+    namespace: ci
+    tag: old
   operator-sdk:
     name: "4.13"
     namespace: origin
@@ -58,7 +62,19 @@ tests:
     - as: install
       cli: latest
       commands: |
-        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE_OLD"
+      dependencies:
+      - env: OO_BUNDLE_OLD
+        name: kepler-bundle-old
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 400Mi
+    - as: upgrade
+      cli: latest
+      commands: |
+        operator-sdk run bundle-upgrade -n openshift-operators "$OO_BUNDLE" --timeout=10m
       dependencies:
       - env: OO_BUNDLE
         name: kepler-bundle
