@@ -1,16 +1,16 @@
 base_images:
+  ci_tests-private-base_4.11:
+    name: tests-private-base
+    namespace: ci
+    tag: "4.11"
+  ci_tests-private-builder_4.11:
+    name: tests-private-builder
+    namespace: ci
+    tag: "4.11"
   cli:
     name: "4.11"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
-  tools:
-    name: "4.11"
-    namespace: ocp
-    tag: tools
   upi-installer:
     name: "4.11"
     namespace: ocp
@@ -22,12 +22,12 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.18-openshift-4.11
 images:
-- dockerfile_path: images/Dockerfile
-  from: tools
+- dockerfile_path: images/Dockerfile.go
+  from: ci_tests-private-base_4.11
   inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    ci_tests-private-builder_4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
+      - registry.ci.openshift.org/ci/tests-private-builder:4.11
   to: tests-private
 - dockerfile_literal: |
     FROM src
@@ -38,13 +38,6 @@ images:
         yum clean all && rm -rf /var/cache/yum/*
   from: src
   to: tests-private-ui
-- dockerfile_literal: |
-    FROM src
-    RUN unset GOFLAGS && \
-        go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1 && \
-        which golangci-lint
-  from: src
-  to: tests-private-cck
 - dockerfile_literal: |
     FROM bin
     RUN sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" >/etc/yum.repos.d/azure-cli.repo' && \
@@ -61,7 +54,6 @@ promotion:
   - tests-private
   - tests-private-ui
   - tests-private-pr
-  - tests-private-cck
   name: "4.11"
   namespace: ocp
 releases:
@@ -92,9 +84,13 @@ tests:
   container:
     from: src
 - as: code-check
-  commands: make check-code
+  commands: |
+    unset GOFLAGS
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1 2> /dev/null
+    which golangci-lint
+    make check-code
   container:
-    from: tests-private-cck
+    from: src
   optional: true
 - as: e2e-aws
   optional: true

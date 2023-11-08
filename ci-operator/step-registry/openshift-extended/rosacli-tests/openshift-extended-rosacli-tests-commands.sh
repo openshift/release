@@ -121,17 +121,32 @@ function do_run {
     echo "done to handle result"
     if [ "W${ret_value}W" == "W0W" ]; then
         echo "success"
-        exit 0
+    else
+        echo "fail"
     fi
-    echo "fail"
+    # summarize test results
+    echo "Summarizing test result..."
+    failures=0 errors=0 skipped=0 tests=0
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
+    while read -a row ; do
+        # if the last ARG of command `let` evaluates to 0, `let` returns 1
+        let errors+=${row[0]} failures+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
+    done < /tmp/zzz-tmp.log
+
+    TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results"
+    echo -e "\nfailures: $failures, errors: $errors, skipped: $skipped, tests: $tests in openshift-extended-rosacli-tests" | tee -a "${TEST_RESULT_FILE}"
+    if [ $((failures)) != 0 ] ; then
+        echo "Failing Scenarios:" | tee -a "${TEST_RESULT_FILE}"
+        grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | grep -v grep | cut -d'"' -f2 | sort -t':' -k2 | uniq | sed -E 's/^( +)?/  /' | tee -a "${TEST_RESULT_FILE}" || true
+    fi
+    cat "${TEST_RESULT_FILE}" >> "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
+
     # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
     # please refer to the junit result for case result, not depends on step result.
     if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
         echo "force success exit"
         exit 1
     fi
-    echo "normal exit"
-    exit 0
 }
 
 # select the cases per FILTERS
