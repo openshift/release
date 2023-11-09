@@ -60,23 +60,28 @@ tests:
   container:
     from: src
 - as: e2e
-  cluster_claim:
-    architecture: amd64
-    as: custom
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.12"
   steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: managedcluster-import-controller
+    env:
+      CLUSTER_NAMES: none
+      CLUSTERPOOL_GROUP_NAME: Server Foundation
+      CLUSTERPOOL_HOST_NAMESPACE: server-foundation
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-sf-clusterpool
+      CLUSTERPOOL_LIFETIME: 2h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      SKIP_COMPONENT_INSTALL: "true"
     test:
     - as: e2e
       cli: latest
       commands: |
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
         KUBECTL=oc
         OCM_VERSION=backplane-2.4
         export KUBECTL OCM_VERSION
-        make e2e-test-prow
+        set -o pipefail
+        make e2e-test-prow 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
+        set +o pipefail
       dependencies:
       - env: IMPORT_CONTROLLER_IMAGE_NAME
         name: managedcluster-import-controller
@@ -85,7 +90,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: generic-claim
+    workflow: ocm-e2e-clusterpool
 - as: pr-image-mirror
   steps:
     dependencies:
