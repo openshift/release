@@ -80,7 +80,7 @@ if [[ "$LOCAL_ZONE" == "true" ]]; then
   # Unify rosa localzones macnine pool config with ocp
   LABELS="${LABELS},node-role.kubernetes.io/edge="
   # if taint variable is empty, add taint flag to command link
-  if [[ ! -z "$TAINTS"  ]]; then
+  if [[ -z "$TAINTS"  ]]; then
     TAINTS="--taints "
   else
     TAINTS+=","
