@@ -25,6 +25,18 @@ images:
     COPY . .
   from: base
   to: crio-crio-base-src
+- dockerfile_literal: |
+    FROM base
+    RUN dnf install -y jq git openssl python3.11 google-cloud-cli-447.0.0-1 gzip jq unzip openssh-clients openssl bind-utils util-linux xz && \
+        alternatives --set python3 /usr/bin/python3.11 && \
+        dnf clean all
+  from: base
+  to: crio-gcloud-base
+promotion:
+  excluded_images:
+  - crio-crio-base-src
+  namespace: ci
+  tag: latest
 releases:
   initial:
     integration:
