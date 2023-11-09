@@ -15,6 +15,8 @@ unset NAMESPACE
 # Check org and project from job's spec
 REF_REPO=$(echo ${JOB_SPEC} | jq -r '.refs.repo')
 REF_ORG=$(echo ${JOB_SPEC} | jq -r '.refs.org')
+REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+
 # PR SHA
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
 
@@ -25,13 +27,15 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
     echo "Not a ${ORG} job. Checking if isn't a rehearsal job..."
     EXTRA_REF_REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
     EXTRA_REF_ORG=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].org')
-    #EXTRA_REF_BASE_REF=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
+    REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
     if [[ "$EXTRA_REF_ORG" != "$ORG" ]]; then
       echo "Failing since this step supports only ${ORG} changes."
       exit 1
     fi
     BASE_OP=${EXTRA_REF_REPO}
 fi
+# sets default branch for install_yamls
+export OPENSTACK_K8S_BRANCH=${REF_BRANCH}
 
 # custom per project ENV variables
 # shellcheck source=/dev/null
@@ -72,7 +76,7 @@ export OPENSTACK_BUNDLE_IMG=${REGISTRY}/${ORGANIZATION}/${META_OPERATOR}-bundle:
 if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   if [ ! -d "${HOME}/install_yamls" ]; then
     cd ${HOME}
-    git clone https://github.com/openstack-k8s-operators/install_yamls.git
+    git clone https://github.com/openstack-k8s-operators/install_yamls.git -b ${REF_BRANCH}
   fi
 
   cd ${HOME}/install_yamls
