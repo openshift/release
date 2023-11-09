@@ -274,6 +274,7 @@ EOF
 
 if command -v pwsh &> /dev/null
 then
+  echo "Creating powercli credentials file"
   pwsh -command "\$User='${GOVC_USERNAME}';\$Password=ConvertTo-SecureString -String '${GOVC_PASSWORD}' -AsPlainText -Force;\$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList \$User, \$Password;\$Credential | Export-Clixml ${SHARED_DIR}/vcenter-creds.xml"
 fi
 
