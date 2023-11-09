@@ -3,24 +3,24 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.19-linux:
+  stolostron_builder_go1.20-linux:
     name: builder
     namespace: stolostron
-    tag: go1.19-linux
+    tag: go1.20-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.19-linux
+    tag: go1.20-linux
 images:
-- dockerfile_path: build/Dockerfile
+- dockerfile_path: build/Dockerfile.example
   from: base
   inputs:
-    stolostron_builder_go1.19-linux:
+    stolostron_builder_go1.20-linux:
       as:
-      - golang:1.19
-  to: addon-manager
+      - golang:1.20-bullseye
+  to: addon-examples
 releases:
   initial:
     integration:
@@ -43,18 +43,18 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: addon-manager
+      SOURCE_IMAGE_REF: addon-examples
     env:
-      IMAGE_REPO: addon-manager
+      IMAGE_REPO: addon-examples
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: pr-merge-image-mirror
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: addon-manager
+      SOURCE_IMAGE_REF: addon-examples
     env:
-      IMAGE_REPO: addon-manager
+      IMAGE_REPO: addon-examples
       IMAGE_TAG: main
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
@@ -79,12 +79,6 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: backplane-2.4
-    workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main
   org: stolostron
