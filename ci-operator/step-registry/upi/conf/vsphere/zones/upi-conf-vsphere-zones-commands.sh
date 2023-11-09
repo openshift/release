@@ -39,6 +39,8 @@ if [[ ${LEASED_RESOURCE} == *"segment"* ]]; then
   third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${vsphere_portgroup}"))
 
   machine_cidr="192.168.${third_octet}.0/25"
+  netmask="255.255.255.128"
+  gateway="192.168.${third_octet}.1"
   bootstrap_ip_address="192.168.${third_octet}.3"
   lb_ip_address="192.168.${third_octet}.2"
 
@@ -58,6 +60,8 @@ else
   fi
 
   dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
+  gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
+  netmask=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].mask' "${SUBNETS_CONFIG}")
 
   lb_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[2]' "${SUBNETS_CONFIG}")
   bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[3]' "${SUBNETS_CONFIG}")
@@ -89,6 +93,10 @@ else
 
 
 fi
+
+# First one for api, second for apps.
+echo "${lb_ip_address}" >>"${SHARED_DIR}"/vips.txt
+echo "${lb_ip_address}" >>"${SHARED_DIR}"/vips.txt
 
 export HOME=/tmp
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
@@ -303,6 +311,69 @@ failure_domains = [
         distributed_virtual_switch_uuid = "50 05 92 5b 73 ea fd cb-1c 02 ad e4 df fd fb 8c"
     }
 ]
+"@
+EOF
+
+echo "$(date -u --rfc-3339=seconds) - Create variables.ps1 ..."
+cat >"${SHARED_DIR}/variables.ps1" <<-EOF
+\$clustername = "${cluster_name}"
+\$basedomain = "${base_domain}"
+\$clusterdomain = "${cluster_domain}"
+\$sshkeypath = "${ssh_pub_key_path}"
+
+\$machine_cidr = "${machine_cidr}"
+
+\$vm_template = "${vm_template}"
+\$vcenter = "${vsphere_url}"
+\$vcentercredpath = "secrets/vcenter-creds.xml"
+
+\$ipam = "ipam.vmc.ci.openshift.org"
+
+\$dns = "${dns_server}"
+\$gateway = "${gateway}"
+\$netmask ="${netmask}"
+
+\$bootstrap_ip_address = "${bootstrap_ip_address}"
+\$lb_ip_address = "${lb_ip_address}"
+
+\$control_plane_memory = 16384
+\$control_plane_num_cpus = 4
+\$control_plane_count = ${MASTER_REPLICAS}
+\$control_plane_ip_addresses = ${control_plane_ip_addresses}
+
+\$compute_memory = 16384
+\$compute_num_cpus = 4
+\$compute_count = ${WORKER_REPLICAS}
+\$compute_ip_addresses = ${compute_ip_addresses}
+
+\$failure_domains = @"
+[
+    {
+        "datacenter": "IBMCloud",
+        "cluster": "vcs-mdcnc-workload-1",
+        "datastore": "mdcnc-ds-1",
+        "network": "${vsphere_portgroup}"
+    },
+    {
+        "datacenter": "IBMCloud",
+        "cluster": "vcs-mdcnc-workload-2",
+        "datastore": "mdcnc-ds-2",
+        "network": "${vsphere_portgroup}"
+    },
+    {
+        "datacenter": "IBMCloud",
+        "cluster": "vcs-mdcnc-workload-3",
+        "datastore": "mdcnc-ds-3",
+        "network": "${vsphere_portgroup}"
+    },
+    {
+        "datacenter": "datacenter-2",
+        "cluster": "vcs-mdcnc-workload-4",
+        "datastore": "mdcnc-ds-4",
+        "network": "${vsphere_portgroup}"
+    }
+]
+"@
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Create secrets.auto.tfvars..."
@@ -311,6 +382,11 @@ vsphere_password="${GOVC_PASSWORD}"
 vsphere_user="${GOVC_USERNAME}"
 ipam_token=""
 EOF
+
+if command -v pwsh &> /dev/null
+then
+  pwsh -command "\$User='${GOVC_USERNAME}';\$Password=ConvertTo-SecureString -String '${GOVC_PASSWORD}' -AsPlainText -Force;\$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList \$User, \$Password;\$Credential | Export-Clixml ${SHARED_DIR}/vcenter-creds.xml"
+fi
 
 dir=/tmp/installer
 mkdir "${dir}/"

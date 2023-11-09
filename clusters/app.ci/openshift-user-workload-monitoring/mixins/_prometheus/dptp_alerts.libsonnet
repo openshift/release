@@ -61,6 +61,22 @@
         ],
       },
       {
+        name: 'quay-io-image-mirroring',
+        rules: [
+          {
+            alert: 'quay-io-image-mirroring-failures',
+            expr: 'sum(rate(quay_io_ci_images_distributor_image_mirroring_duration_seconds_bucket{state="failure"}[10m])) > 0.5',
+            'for': '1m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'Many mirroring tasks to quay.io have been failed in the last minute. Please check errors in the pod logs to figure out the cause.',
+            },
+          },
+        ],
+      },
+      {
         name: 'cluster-client-creation-failure',
         rules: [
           {
