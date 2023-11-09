@@ -72,6 +72,7 @@ function config_mirror_auth () {
 }
 
 function set_CA_for_nodes () {
+    local ret
     ca_name=$(oc get image.config.openshift.io/cluster -o=jsonpath="{.spec.additionalTrustedCA.name}")
     if [ $ca_name ] && [ $ca_name = "registry-config" ] ; then
         echo "CA is ready, skip config..."
@@ -126,7 +127,7 @@ registry.redhat.io/rhel8/httpd-24:latest=MIRROR_REGISTRY_PLACEHOLDER/rhel8/httpd
 
 function check_mirror_registry () {
     run_command "oc adm new-project sample-test"
-    ret=0
+    local ret=0
     run_command "oc import-image mytestimage --from=quay.io/openshifttest/busybox@sha256:c5439d7db88ab5423999530349d327b04279ad3161d7596d2126dfb5b02bfd1f --confirm -n sample-test" || ret=$?
     if [[ $ret -eq 0 ]]; then
       echo "mirror registry works well."
@@ -140,7 +141,26 @@ function check_mirror_registry () {
     fi
 }
 
+# from OCP 4.14, the ImageRegistry is optional, details: https://issues.redhat.com/browse/IR-351
+function check_imageregistry_capability(){
+    # check if  ImageRegistry capability is added 
+    knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+    if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
+        echo "knownCapabilities contains ImageRegistry"
+        # check if ImageRegistry capability enabled
+        enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+          if [[ ! ${enabledCaps} =~ "ImageRegistry" ]]; then
+              echo "ImageRegistry capability is not enabled, skip the following tests..."
+              exit 0
+          fi
+    fi
+}
+
 set_proxy
+run_command "oc whoami"
+run_command "oc version -o yaml"
+check_imageregistry_capability
+
 ret=0
 run_command "oc get config.samples.operator.openshift.io cluster" || ret=$?
 if [[ $ret -eq 0 ]]; then
