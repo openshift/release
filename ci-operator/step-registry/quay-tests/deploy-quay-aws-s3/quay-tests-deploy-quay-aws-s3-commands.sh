@@ -126,6 +126,7 @@ DISTRIBUTED_STORAGE_CONFIG:
       s3_access_key: $QUAY_AWS_ACCESS_KEY
       s3_secret_key: $QUAY_AWS_SECRET_KEY
       host: s3.us-east-2.amazonaws.com
+      s3_region: us-east-2
 EOF
 
 oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
