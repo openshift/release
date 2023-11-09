@@ -6,11 +6,12 @@ build_root:
 images:
 - dockerfile_path: Containerfile
   to: ci-tools-nvidia-gpu-operator
-- dockerfile_path: Containerfile.osde2e
-  to: ci-tools-nvidia-gpu-operator-osde2e
-promotion:
-  name: latest
-  namespace: ci-tools-nvidia-gpu-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -19,43 +20,6 @@ resources:
       cpu: 2000m
       memory: 2Gi
 tests:
-- as: lint
-  commands: make lint
-  container:
-    from: ci-tools-nvidia-gpu-operator
-- as: test-commit
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.14"
-  steps:
-    test:
-    - as: scale-gpu-nodes
-      commands: make scale_aws_gpu_nodes
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
-      from: ci-tools-nvidia-gpu-operator
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
-    - as: test-commit
-      commands: hack/test_commit.sh
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
-      from: ci-tools-nvidia-gpu-operator
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
-    workflow: generic-claim
 - as: nvidia-gpu-operator-e2e
   cluster_claim:
     architecture: amd64
@@ -63,7 +27,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h30m0s
-    version: "4.14"
+    version: "4.15"
   steps:
     test:
     - as: scale-gpu-nodes
@@ -78,7 +42,7 @@ tests:
           cpu: 2000m
           memory: 2Gi
     - as: gpu-operator-e2e
-      commands: make e2e_gpu_test
+      commands: make e2e_gpu_test CHANNEL=v23.9
       credentials:
       - mount_path: /var/run/nvidia-ci-secrets
         name: nvidia-ci-secrets
@@ -88,18 +52,12 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: generic-claim
-- as: master-branch-gpu-e2e
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.14"
+- as: nvidia-gpu-operator-e2e-master
+  cron: 0 */23 * * 6
   steps:
+    cluster_profile: aws
     test:
-    - as: scale-gpu-nodes
+    - as: weekly-scale-gpu-nodes
       commands: make scale_aws_gpu_nodes
       credentials:
       - mount_path: /var/run/nvidia-ci-secrets
@@ -110,7 +68,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-    - as: master-branch-gpu-operator-e2e
+    - as: weekly-gpu-operator-e2e
       commands: make master_e2e_gpu_test
       credentials:
       - mount_path: /var/run/nvidia-ci-secrets
@@ -121,28 +79,65 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: generic-claim
-- as: mirror-vcsref-image
-  postsubmit: true
+    workflow: ipi-aws
+- as: nvidia-gpu-operator-e2e-23-6-x
+  cron: 0 */23 * * 6
   steps:
-    dependencies:
-      SOURCE_IMAGE_REF: ci-tools-nvidia-gpu-operator
-    env:
-      IMAGE_REPO: ci-tools-nvidia-gpu-operator
-      IMAGE_TAG: latest
+    cluster_profile: aws
     test:
-    - ref: assisted-baremetal-images-publish
-- as: mirror-vcsref-image-osde2e
-  postsubmit: true
+    - as: weekly-scale-gpu-nodes
+      commands: make scale_aws_gpu_nodes
+      credentials:
+      - mount_path: /var/run/nvidia-ci-secrets
+        name: nvidia-ci-secrets
+        namespace: test-credentials
+      from: ci-tools-nvidia-gpu-operator
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    - as: weekly-gpu-operator-e2e
+      commands: make e2e_gpu_test CHANNEL=v23.6
+      credentials:
+      - mount_path: /var/run/nvidia-ci-secrets
+        name: nvidia-ci-secrets
+        namespace: test-credentials
+      from: ci-tools-nvidia-gpu-operator
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    workflow: ipi-aws
+- as: nvidia-gpu-operator-e2e-23-9-x
+  cron: 0 */23 * * 6
   steps:
-    dependencies:
-      SOURCE_IMAGE_REF: ci-tools-nvidia-gpu-operator-osde2e
-    env:
-      IMAGE_REPO: ci-tools-nvidia-gpu-operator
-      IMAGE_TAG: osde2e
+    cluster_profile: aws
     test:
-    - ref: assisted-baremetal-images-publish
+    - as: weekly-scale-gpu-nodes
+      commands: make scale_aws_gpu_nodes
+      credentials:
+      - mount_path: /var/run/nvidia-ci-secrets
+        name: nvidia-ci-secrets
+        namespace: test-credentials
+      from: ci-tools-nvidia-gpu-operator
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    - as: weekly-gpu-operator-e2e
+      commands: make e2e_gpu_test CHANNEL=v23.9
+      credentials:
+      - mount_path: /var/run/nvidia-ci-secrets
+        name: nvidia-ci-secrets
+        namespace: test-credentials
+      from: ci-tools-nvidia-gpu-operator
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
   repo: ci-tools-nvidia-gpu-operator
+  variant: "4.15"
