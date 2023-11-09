@@ -1,6 +1,9 @@
+arch_in_hostname = {'arm64': 'arm64', 'ppc64le': 'ppc64le', 'multi': 'multi', 'x86_64':'amd64', 's390x':'s390x'}
+
 def add_imagestream_namespace_rbac(gendoc):
     resources = gendoc
     context = gendoc.context
+    hostname_prefix = arch_in_hostname[context.arch]
 
     puller_subjects = []
     if not context.private:
@@ -364,7 +367,8 @@ def add_imagestream_namespace_rbac(gendoc):
         'kind': 'ServiceAccount',
         'metadata': {
             'annotations': {} if not context.private else {
-                f'serviceaccounts.openshift.io/oauth-redirectreference.{context.rc_serviceaccount_name}': f'{{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{{"kind":"Route","name":"{context.rc_route_name}"}}}}'
+                f'serviceaccounts.openshift.io/oauth-redirectreference.{context.rc_serviceaccount_name}': f'{{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{{"kind":"Route","name":"{context.rc_route_name}"}}}}',
+                f'serviceaccounts.openshift.io/oauth-redirecturi.{context.rc_serviceaccount_name}-ingress': f'https://{hostname_prefix}.ocp.internal.releases.ci.openshift.org'
             },
             'name': context.rc_serviceaccount_name,
             'namespace': context.config.rc_deployment_namespace,
