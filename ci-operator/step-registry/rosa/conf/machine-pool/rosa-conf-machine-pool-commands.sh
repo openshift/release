@@ -51,9 +51,9 @@ if [[ ! -z "$MP_LABELS" ]]; then
   LABELS="${LABELS},${MP_LABELS}"
 fi
 
-TAINTS="prowci=true:NoSchedule"
+TAINTS=""
 if [[ ! -z "$MP_TAINTS" ]]; then
-  TAINTS="${MP_TAINTS}"
+  TAINTS="--taints ${MP_TAINTS}"
 fi
 
 MP_NODES_SWITCH=""
@@ -79,7 +79,13 @@ if [[ "$LOCAL_ZONE" == "true" ]]; then
   LOCAL_ZONE_SWITCH=""
   # Unify rosa localzones macnine pool config with ocp
   LABELS="${LABELS},node-role.kubernetes.io/edge="
-  TAINTS="${TAINTS},node-role.kubernetes.io/edge=:NoSchedule"
+  # if taint variable is empty, add taint flag to command link
+  if [[ ! -z "$TAINTS"  ]]; then
+    TAINTS="--taints "
+  else
+    TAINTS+=","
+  fi 
+  TAINTS="${TAINTS}node-role.kubernetes.io/edge=:NoSchedule"
   localzone_subnet_id=$(head -n 1 "${SHARED_DIR}/localzone_subnet_id")
   if [[ -z "${localzone_subnet_id}" ]]; then
     echo -e "The localzone_subnet_id is mandatory."
@@ -116,7 +122,7 @@ rosa create machinepool -y \
 --name ${MP_NAME} \
 --instance-type ${MP_MACHINE_TYPE} \
 --labels ${LABELS} \
---taints ${TAINTS} \
+${TAINTS} \
 ${MP_NODES_SWITCH} \
 ${TUNING_CONFIG_SWITCH} \
 ${SPOT_INSTANCES_SWITCH} \
@@ -131,7 +137,7 @@ rosa create machinepool -y \
                         --name ${MP_NAME} \
                         --instance-type ${MP_MACHINE_TYPE} \
                         --labels ${LABELS} \
-                        --taints ${TAINTS} \
+                        ${TAINTS} \
                         ${MP_NODES_SWITCH} \
                         ${TUNING_CONFIG_SWITCH} \
                         ${SPOT_INSTANCES_SWITCH} \
