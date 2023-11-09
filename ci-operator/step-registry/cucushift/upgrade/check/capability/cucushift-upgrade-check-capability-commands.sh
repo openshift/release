@@ -152,7 +152,9 @@ function get_new_caps() {
     done
 
     # Combine the extra elements into a space-separated string
-    echo "${extra_caps[*]}"
+    if (( ${#extra_caps[@]} != 0 )); then
+        echo "${extra_caps[*]}"
+    fi
     #echo "Expected implicitly enabled capabilities list is ${expected_implicit_caps}"
 }
 
