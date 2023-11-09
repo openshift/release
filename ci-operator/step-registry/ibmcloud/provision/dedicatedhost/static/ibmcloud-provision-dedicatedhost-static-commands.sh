@@ -65,7 +65,7 @@ function waitingStatus() {
             return 0
         fi
     done
-    echo "get unexpected status: ${status} !!"
+    echo "get unexpected status of the dedicated host: ${status} !!"
     return 1
 }
 
