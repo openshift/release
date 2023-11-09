@@ -59,7 +59,7 @@ echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
 # based on the runner architecture. We might need to change this in the future if we want to ship different versions of
 # the installer for different architectures in the same single-arch payload (and then support using a remote libvirt uri
 # for the provisioning host).
-oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+oc adm release extract -a "$PULL_SECRET_PATH" "${MULTI_RELEASE_IMAGE}" \
   --command=openshift-baremetal-install --to=/tmp
 
 # We change the payload image to the one in the mirror registry only when the mirroring happens.
@@ -69,6 +69,21 @@ if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-icsp.ya
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 fi
 file /tmp/openshift-baremetal-install
+
+VIPS_FILE="vips.yaml"
+
+# if loadbalancer type is UserManaged, it's mean using external LB, 
+# then keepalived and haproxy will not deployed, but coredns still keep 
+if [ ${LB_TYPE} = "UserManaged" ]; then
+  VIPS_FILE="external_vips.yaml"
+  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
+featureSet: TechPreviewNoUpgrade
+platform:
+  baremetal:
+    loadBalancer:
+      type: UserManaged
+"      
+fi
 
 echo "[INFO] Processing the install-config.yaml..."
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
@@ -95,8 +110,10 @@ platform:
   baremetal:
     libvirtURI: >-
       qemu+ssh://root@${PROVISIONING_HOST}/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1
-    apiVIP: $(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
-    ingressVIP: $(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")
+    apiVIPs: 
+    - $(yq ".api_vip" "${SHARED_DIR}/${VIPS_FILE}")
+    ingressVIPs: 
+    - $(yq ".ingress_vip" "${SHARED_DIR}/${VIPS_FILE}")
     provisioningBridge: $(<"${SHARED_DIR}/provisioning_bridge")
     provisioningNetworkCIDR: $(<"${SHARED_DIR}/provisioning_network")
     hosts: []

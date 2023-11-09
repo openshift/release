@@ -22,6 +22,7 @@ SSH_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-key"
 IFS=, read -r -a SWITCH_PORTS <<< \
   "$(yq e '[.[].switch_port_v2]|@csv' < "${SHARED_DIR}"/hosts.yaml),$(<"${CLUSTER_PROFILE_DIR}/other-switch-ports")"
 
+set -x
 echo "[INFO] Configuring the VLAN tags on the switches' ports"
 python3 - \
   "${SSH_KEY_PATH}" "${CLUSTER_NAME}" "${VLAN_ID}" "${SWITCH_PORTS[@]}" <<'EOF'
@@ -44,6 +45,10 @@ ports = sys.argv[4:]
 # However, the rollback mechanism of the tests in Prow will take care of reverting the changes in the post steps.
 # and we can safely change the configuration of each switch independently.
 
+if not vlan_id.isdigit():
+  print(f"The vlan_id is not an integer: {vlan_id}. Verify that the reservation step allocated VIPs for the cluster (use RESERVE_BOOTSTRAP: 'false' in your test config)")
+  sys.exit(1)
+
 # Let's group the ports by switch stack in a dictionary
 switches = {}
 for port in ports:
@@ -62,6 +67,7 @@ for switch_address in switches:
     switch_port = switch_address.split(":")[1]
     with Device(host=switch_hostname, port=switch_port, user='admin', ssh_private_key_file=ssh_key_path) as dev:
         with Config(dev, mode="private") as cu:
+            print(f"Create the vlan {vlan_name} vlan-id {vlan_id}")
             # Create the vlan
             cu.load(f"set vlans {vlan_name} vlan-id {vlan_id}")
             for port in switches[switch_address]:
