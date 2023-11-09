@@ -10,28 +10,28 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ocp-self-managed-layered-product-interop
+- as: ocp-self-managed-layered-product-interop-415
   cron: 0 6 * * 1
   steps:
     cluster_profile: aws-cspi-qe
     env:
       FIREWATCH_CONFIG: |
         [
-          {"step": "trigger-jobs", "failure_type": "all", "classification": "self-managed Trigger Failure", "jira_project": "LPTOCPCI"}
+          {"step": "trigger-jobs", "failure_type": "all", "classification": "self-managed Trigger Failure", "jira_project": "LPINTEROP", "jira_additional_labels": ["4.15-lp","self-managed-lp","weekly-trigger-lp"]}
         ]
-      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_JIRA_SERVER: https://issues.redhat.com
-      JSON_TRIGGER_LIST: self-managed-lp-interop-jobs
+      JSON_TRIGGER_LIST: self-managed-lp-interop-jobs-415
     post:
     - ref: firewatch-report-issues
     test:
     - ref: trigger-jobs
-- as: ocp-self-managed-lp-watcher-bot-message
+- as: ocp-self-managed-lp-watcher-bot-message-415
   cron: 0 14 * * 1
   steps:
     cluster_profile: aws-cspi-qe
     env:
-      WATCHER_BOT_JOB_FILE: self-managed-lp-interop-jobs
+      WATCHER_BOT_JOB_FILE: self-managed-lp-interop-jobs-415
       WATCHER_BOT_JOB_GROUP_NAME: OCP Self Managed Layered Product Scenarios
     test:
     - ref: trigger-jobs-interop-ocp-watcher-bot-send-message

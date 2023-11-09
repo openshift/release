@@ -11,10 +11,14 @@ base_images:
     name: openshift-cli-installer
     namespace: ci
     tag: latest
-  rhods-addon-tests:
+  rhoai-tests:
     name: ods-ci
     namespace: ci
     tag: stable
+  rhoam-addon-tests:
+    name: integreatly-operator-test-external
+    namespace: ci
+    tag: master
 build_root:
   image_stream_tag:
     name: release
@@ -43,7 +47,7 @@ tests:
       ADDON2_CONFIG: name=managed-api-service;addon-managed-api-service=1;rosa-cli-required=true;notification-email=interop-qe-ms@redhat.com;rosa=true
       ADDONS_OPERATORS_RUN_IN_PARALLEL: "false"
       CLUSTER_NAME_PREFIX: coexist
-      CLUSTER1_CONFIG: platform=rosa;region=us-east-2;version=4.14;channel-group=candidate;compute-machine-type=m5.4xlarge;timeout=90m;replicas=6;fips=false;ocm-env=stage
+      CLUSTER1_CONFIG: platform=rosa;region=us-east-2;version=4.14;channel-group=stable;compute-machine-type=m5.4xlarge;timeout=90m;replicas=6;fips=false;ocm-env=stage
       FIREWATCH_CONFIG: |
         [
           {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
@@ -60,7 +64,7 @@ tests:
       TEST_MARKER: RHOAM-RHODS
     test:
     - ref: addon-tests-rhoam
-    - ref: addon-tests-rhods
+    - ref: rhoai-tests
     workflow: addon
 zz_generated_metadata:
   branch: rhods-rhoam
