@@ -96,7 +96,7 @@ trap 'finalize' EXIT
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} || true; wait; fi' TERM
 
 SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios"
-if [[ "$JOB_NAME" =~ .*periodic.* ]]; then
+if [[ "$JOB_NAME" =~ .*periodic.* ]] && [[ ! "$JOB_NAME" =~ .*nightly-presubmit.* ]]; then
   SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios-periodics"
 fi
 
