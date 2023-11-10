@@ -195,7 +195,7 @@ then
   wait "$!"
 else
   echo "$(date -u --rfc-3339=seconds) - pwsh upi.ps1..."
-  pswh -f upi.ps1 &
+  pwsh -f upi.ps1 &
   wait "$!"
 fi
 
