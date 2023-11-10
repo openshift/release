@@ -12,11 +12,6 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM base
-    COPY . .
-  from: crio-gcloud-base
-  to: crio-crio-base-src
-- dockerfile_literal: |
-    FROM base
     RUN dnf install -y jq git openssl python3.11 gzip jq unzip openssh-clients openssl bind-utils util-linux xz && \
         alternatives  --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
         dnf clean all
@@ -26,13 +21,9 @@ images:
       && rm -f /tmp/google-cloud-sdk.tar.gz
     ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
     WORKDIR /src
+    COPY . .
   from: base
-  to: crio-gcloud-base
-promotion:
-  excluded_images:
-  - crio-crio-base-src
-  namespace: ci
-  tag: latest
+  to: crio-crio-base-src
 releases:
   initial:
     integration:
