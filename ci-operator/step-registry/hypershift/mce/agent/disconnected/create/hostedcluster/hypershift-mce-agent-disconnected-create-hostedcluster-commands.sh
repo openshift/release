@@ -65,7 +65,8 @@ fi
   --base-domain=\${BASEDOMAIN} \
   --api-server-address=api.\${CLUSTER_NAME}.\${BASEDOMAIN} \
   --image-content-sources "/home/mgmt_iscp.yaml" \
-  --release-image \${PLAYLOADIMAGE}
+  --release-image \${PLAYLOADIMAGE} \
+  --generate-ssh
 
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/\${CLUSTER_NAME}
