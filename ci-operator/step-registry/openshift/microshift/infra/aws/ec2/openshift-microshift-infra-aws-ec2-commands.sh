@@ -57,9 +57,11 @@ Mappings:
    MetalMachine:
      PrimaryVolumeSize: "300"
      SecondaryVolumeSize: "0"
+     Throughput: 500
    VirtualMachine:
      PrimaryVolumeSize: "200"
      SecondaryVolumeSize: "10"
+     Throughput: 125
 Parameters:
   EC2Type:
     Default: 'VirtualMachine'
@@ -249,10 +251,32 @@ Resources:
         CidrIp: 0.0.0.0/0
       VpcId: !Ref RHELVPC
 
+  rhelLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: ${stack_name}-launch-template
+      LaunchTemplateData:
+        BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, PrimaryVolumeSize]
+            VolumeType: gp3
+            Throughput: !FindInMap [VolumeSize, !Ref EC2Type, Throughput]
+        - !If
+          - AddSecondaryVolume
+          - DeviceName: /dev/sdc
+            Ebs:
+              VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, SecondaryVolumeSize]
+              VolumeType: gp3
+          - !Ref AWS::NoValue
+
   RHELInstance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Ref AmiId
+      LaunchTemplate:
+        LaunchTemplateName: ${stack_name}-launch-template
+        Version: !GetAtt rhelLaunchTemplate.LatestVersionNumber
       IamInstanceProfile: !Ref RHELInstanceProfile
       InstanceType: !Ref HostInstanceType
       NetworkInterfaces:
@@ -264,18 +288,6 @@ Resources:
       Tags:
       - Key: Name
         Value: !Join ["", [!Ref Machinename]]
-      BlockDeviceMappings:
-      - DeviceName: /dev/sda1
-        Ebs:
-          VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, PrimaryVolumeSize]
-          VolumeType: gp3
-      - !If
-        - AddSecondaryVolume
-        - DeviceName: /dev/sdc
-          Ebs:
-            VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, SecondaryVolumeSize]
-            VolumeType: gp3
-        - !Ref AWS::NoValue
       PrivateDnsNameOptions:
         EnableResourceNameDnsARecord: true
         HostnameType: resource-name
