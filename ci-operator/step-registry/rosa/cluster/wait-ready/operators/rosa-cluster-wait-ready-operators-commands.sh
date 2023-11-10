@@ -22,7 +22,7 @@ set_proxy
 # still progressing. The ocp e2e test scenarios requires PROGRESSING=False for each cluster operator.
 echo "Wait for cluster operators' progressing ready..."
 CO_STATUS_LOG="${ARTIFACT_DIR}/co_status.log"
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=60m > "${CO_STATUS_LOG}" 2>&1 || true
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=240m > "${CO_STATUS_LOG}" 2>&1 || true
 cat "${CO_STATUS_LOG}"
 
 ## If waiting operators timeout, call ocm-qe to analyze the root cause.
