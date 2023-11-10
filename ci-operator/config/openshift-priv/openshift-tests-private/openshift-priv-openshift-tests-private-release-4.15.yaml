@@ -3,6 +3,10 @@ base_images:
     name: tests-private-base
     namespace: ci
     tag: "4.15"
+  ci_tests-private-builder_4.15:
+    name: tests-private-builder
+    namespace: ci
+    tag: "4.15"
   cli:
     name: 4.15-priv
     namespace: ocp-private
@@ -19,8 +23,12 @@ build_root:
     tag: rhel-8-golang-1.20-openshift-4.15
 canonical_go_repository: github.com/openshift/openshift-tests-private
 images:
-- dockerfile_path: images/Dockerfile.go
+- dockerfile_path: images/Dockerfile.golang
   from: ci_tests-private-base_4.15
+  inputs:
+    ci_tests-private-builder_4.15:
+      as:
+      - registry.ci.openshift.org/ci/tests-private-builder:4.15
   to: tests-private
 - dockerfile_literal: |
     FROM src
@@ -32,6 +40,22 @@ images:
   from: src
   to: tests-private-ui
 - dockerfile_literal: |
+    FROM bin AS builder
+    FROM registry.ci.openshift.org/ci/tests-private-base:4.15
+    RUN mkdir -p /go/src/github.com/openshift
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+    RUN chmod go+w /go/src/github.com/openshift/openshift-tests-private && \
+        rm -rf /usr/bin/oc /usr/bin/kubectl
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+  inputs:
+    bin:
+      as:
+      - bin
+    ci_tests-private-base_4.15:
+      as:
+      - registry.ci.openshift.org/ci/tests-private-base:4.15
+  to: tests-private-newpr
+- dockerfile_literal: |
     FROM bin
     RUN sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" >/etc/yum.repos.d/azure-cli.repo' && \
         PACKAGES="azure-cli openssh-clients httpd-tools skopeo java-11-openjdk-headless" && \
@@ -41,6 +65,7 @@ images:
     RUN pip3 install --upgrade setuptools pip && pip3 install dotmap minio pyyaml==5.4.1 requests python-openstackclient
     RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && unzip -q awscliv2.zip && ./aws/install -b /bin && rm -rf ./aws awscliv2.zip
   from: bin
+  optional: true
   to: tests-private-pr
 promotion:
   disabled: true
@@ -48,6 +73,7 @@ promotion:
   - tests-private
   - tests-private-ui
   - tests-private-pr
+  - tests-private-newpr
   name: 4.15-priv
   namespace: ocp-private
 releases:
@@ -137,8 +163,8 @@ tests:
           ln -s "$(which oc)" ${HOME}/kubectl
         fi
 
-        make pr-test
-      from: tests-private-pr
+        python3 ./hack/pr.py
+      from: tests-private-newpr
       resources:
         limits:
           memory: 6Gi
