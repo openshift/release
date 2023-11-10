@@ -37,6 +37,15 @@ images:
         yum clean all && rm -rf /var/cache/yum/*
   from: src
   to: tests-private-ui
+- dockerfile_literal: |
+    FROM root
+    RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
+        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
+        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib" && \
+        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
+        yum clean all && rm -rf /var/cache/yum/*
+  from: root
+  to: tests-private-baseui
 - dockerfile_path: images/Dockerfile.base
   inputs:
     ocp_4.6_tools:
