@@ -497,7 +497,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp-3
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-windows-machine-config-operator-master-gcp-e2e-operator
@@ -562,9 +562,9 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-gcp-3
+              name: cluster-secrets-gcp
           - configMap:
-              name: cluster-profile-gcp-3
+              name: cluster-profile-gcp
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -883,7 +883,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )(platform-none-vsphere-e2e-operator|remaining-required),?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
@@ -899,8 +899,10 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-windows-machine-config-operator-master-security
+    optional: true
     path_alias: github.com/openshift/windows-machine-config-operator
     rerun_command: /test security
+    skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
