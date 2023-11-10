@@ -1,5 +1,45 @@
 #!/bin/bash
 
+dns_reserve_and_defer_cleanup() {
+  idx=$1
+  hostname=$2
+
+  if [ "${JOB_NAME_SAFE}" = "launch" ]; then
+    if [ "$idx" -eq 0 ]; then
+      # setup DNS records for clusterbot to point to the IBM VIP
+      dns_target='"TTL": 60,
+      "ResourceRecords": [{"Value": "'${vips[0]}'"}, {"Value": "169.48.190.20"}]'
+    elif [ "$idx" -eq 1 ]; then
+      dns_target='"TTL": 60,
+      "ResourceRecords": [{"Value": "169.48.190.20"}]'
+    fi 
+  else
+    dns_target='"TTL": 60,
+    "ResourceRecords": [{"Value": "'${vips[$idx]}'"}]'
+  fi 
+
+  json_create='{
+    "Action": "UPSERT",
+    "ResourceRecordSet": {
+      "Name": '${hostname}',
+      "Type": "A",
+      '$dns_target'
+      }
+    }'
+    jq --argjson json_create "$json_create" '.Changes += [$json_create]' "${SHARED_DIR}"/dns-create.json > "${SHARED_DIR}"/tmp.json && mv "${SHARED_DIR}"/tmp.json "${SHARED_DIR}"/dns-create.json
+
+  json_delete='{
+    "Action": "DELETE",
+    "ResourceRecordSet": {
+      "Name": '${hostname}',
+      "Type": "A",
+      '$dns_target'
+      }
+    }'
+    jq --argjson json_delete "$json_delete" '.Changes += [$json_delete]' "${SHARED_DIR}"/dns-delete.json > "${SHARED_DIR}"/tmp.json && mv "${SHARED_DIR}"/tmp.json "${SHARED_DIR}"/dns-delete.json
+
+}
+
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -47,49 +87,14 @@ hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
             --output text)"
 echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 
-if [ "${JOB_NAME_SAFE}" = "launch" ]; then
-  # setup DNS records for clusterbot to point to the IBM VIP
-  api_dns_target='"TTL": 60,
-    "ResourceRecords": [{"Value": "'${vips[0]}'"}, {"Value": "169.48.190.20"}]'
-  apps_dns_target='"TTL": 60,
-    "ResourceRecords": [{"Value": "169.48.190.20"}]'
-else
-  # Configure DNS direct to respective VIP
-  api_dns_target='"TTL": 60,
-        "ResourceRecords": [{"Value": "'${vips[0]}'"}]'
-  apps_dns_target='"TTL": 60,
-        "ResourceRecords": [{"Value": "'${vips[1]}'"}]'
-fi
-
 # api-int record is needed just for Windows nodes
 # TODO: Remove the api-int entry in future
 echo "Creating DNS records..."
 cat > "${SHARED_DIR}"/dns-create.json <<EOF
 {
 "Comment": "Create public OpenShift DNS records for VSphere IPI CI install",
-"Changes": [{
-    "Action": "UPSERT",
-    "ResourceRecordSet": {
-      "Name": "api.$cluster_domain.",
-      "Type": "A",
-      $api_dns_target
-      }
-    },{
-    "Action": "UPSERT",
-    "ResourceRecordSet": {
-      "Name": "api-int.$cluster_domain.",
-      "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${vips[0]}"}]
-      }
-    },{
-    "Action": "UPSERT",
-    "ResourceRecordSet": {
-      "Name": "*.apps.$cluster_domain.",
-      "Type": "A",
-      $apps_dns_target
-      }
-}]}
+"Changes": []
+}
 EOF
 
 # api-int record is needed for Windows nodes
@@ -99,30 +104,21 @@ echo "Creating batch file to destroy DNS records"
 cat > "${SHARED_DIR}"/dns-delete.json <<EOF
 {
 "Comment": "Delete public OpenShift DNS records for VSphere IPI CI install",
-"Changes": [{
-    "Action": "DELETE",
-    "ResourceRecordSet": {
-      "Name": "api.$cluster_domain.",
-      "Type": "A",
-      $api_dns_target
-      }
-    },{
-    "Action": "DELETE",
-    "ResourceRecordSet": {
-      "Name": "api-int.$cluster_domain.",
-      "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${vips[0]}"}]
-      }
-    },{
-    "Action": "DELETE",
-    "ResourceRecordSet": {
-      "Name": "*.apps.$cluster_domain.",
-      "Type": "A",
-      $apps_dns_target
-      }
-}]}
+"Changes": []
+}
 EOF
+
+HOSTNAMES=("api.'$cluster_domain'." "*.apps.'$cluster_domain'.")
+for cluster in "${VSPHERE_ADDITIONAL_BASEDOMAINS[@]}"; do
+  HOSTNAMES+=("api.${cluster}.${basedomain}." "*.apps.${cluster}.${basedomain}.")
+done
+
+for ((i = 0; i < ${#HOSTNAMES[@]}; i++)); do
+  dns_reserve_and_defer_cleanup $i ${HOSTNAMES[$i]}  # $i is the index in vips.txt
+done
+# Snowflake for the default api-int, which shares a vip with the default api.
+dns_reserve_and_defer_cleanup 0 "api-int.$cluster_domain"
+
 
 id=$(aws route53 change-resource-record-sets --hosted-zone-id "$hosted_zone_id" --change-batch file:///"${SHARED_DIR}"/dns-create.json --query '"ChangeInfo"."Id"' --output text)
 
