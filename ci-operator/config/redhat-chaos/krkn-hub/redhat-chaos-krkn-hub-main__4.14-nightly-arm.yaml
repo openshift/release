@@ -1,4 +1,8 @@
 base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
   os:
     name: centos
     namespace: openshift
@@ -8,16 +12,22 @@ build_root:
 images:
 - dockerfile_path: prow/Dockerfile
   from: os
-  to: krkn-hub
-promotion:
-  namespace: chaos
-  tag: latest
+  to: krkn-hub-arm
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-prow-arm
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.14"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -26,11 +36,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: krkn-hub-tests-413
+- as: krkn-hub-tests-arm
   cron: 0 8 */2 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      OCP_ARCH: arm64
       SPOT_INSTANCES: "true"
     observers:
       enable:
@@ -40,10 +54,9 @@ tests:
     pre:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
-    test:
-    - chain: redhat-chaos-krkn-hub-tests
-    - chain: redhat-chaos-hog-scenarios
+    workflow: redhat-chaos-krkn-hub-tests
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
   repo: krkn-hub
+  variant: 4.14-nightly-arm
