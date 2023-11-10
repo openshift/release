@@ -16,6 +16,8 @@ pushd krkn-hub/
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
 oc config view --flatten > /tmp/config
+telemetry_password=$(cat "/secret/telemetry/telemetry_password")
+export TELEMETRY_PASSWORD=$telemetry_password
 
 export KUBECONFIG=/tmp/config
 export ACTION=$ACTION
