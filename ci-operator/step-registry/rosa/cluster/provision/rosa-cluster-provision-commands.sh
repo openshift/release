@@ -635,4 +635,5 @@ fi
 echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"
 echo ${ROSA_TOKEN}>/tmp/rosa-token
 cat $AWSCRED>/tmp/awscred
+#test
 sleep 14400
