@@ -4,6 +4,7 @@ set -x
 set -o nounset
 set -o errexit
 set -o pipefail
+export PS4='+ $(date "+%T.%N") \011'
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 #Save stacks events

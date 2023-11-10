@@ -1,5 +1,6 @@
 #!/bin/bash
 set -xeuo pipefail
+export PS4='+ $(date "+%T.%N") \011'
 
 finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
