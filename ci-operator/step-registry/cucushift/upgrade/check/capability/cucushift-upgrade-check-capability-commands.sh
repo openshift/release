@@ -152,7 +152,9 @@ function get_new_caps() {
     done
 
     # Combine the extra elements into a space-separated string
-    echo "${extra_caps[*]}"
+    if (( ${#extra_caps[@]} != 0 )); then
+        echo "${extra_caps[*]}"
+    fi
     #echo "Expected implicitly enabled capabilities list is ${expected_implicit_caps}"
 }
 
@@ -242,8 +244,8 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
 fi
 
 baselinecaps_from_cluster=$(oc get clusterversion version -ojson | jq -r '.spec.capabilities.baselineCapabilitySet')
-if [[ "${baselinecaps_from_cluster}" == "" ]]; then
-    echo "spec.capabilities.baselineCapabilitySet is not set, skip the check!"
+if [[ -z "${baselinecaps_from_cluster}" || "${baselinecaps_from_cluster}" == "null" ]]; then
+    echo "spec.capabilities.baselineCapabilitySet is not set or is null, skip the check!"
     exit 0
 fi
 echo "baselinecaps_from_cluster: ${baselinecaps_from_cluster}"
