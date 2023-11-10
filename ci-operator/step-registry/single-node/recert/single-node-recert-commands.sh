@@ -33,7 +33,7 @@ function stop_containers {
 }
 
 function recert {
-  local release_image="${RELEASE_IMAGE:-quay.io/openshift-release-dev/ocp-release:4.13.6-x86_64}"
+  local release_image="${RELEASE_IMAGE:-quay.io/openshift-release-dev/ocp-release:4.14.2-x86_64}"
   local etcd_image="\$(oc adm release extract --from="\${release_image}" --file=image-references | jq '.spec.tags[] | select(.name == "etcd").from.name' -r)"
   local recert_image="${RECERT_IMAGE:-quay.io/edge-infrastructure/recert:latest}"
 
@@ -57,11 +57,15 @@ function recert {
       -v /etc/kubernetes:/kubernetes \
       -v /var/lib/kubelet:/kubelet \
       -v /etc/machine-config-daemon:/machine-config-daemon \
+      -v /etc/cni/multus:/multus \
+      -v /var/lib/ovn-ic:/ovn-ic \
       \${recert_image} \
       --etcd-endpoint localhost:2379 \
       --static-dir /kubernetes \
       --static-dir /kubelet \
       --static-dir /machine-config-daemon \
+      --static-dir /multus \
+      --static-dir /ovn-ic \
       --use-cert /certs/admin-kubeconfig-client-ca.crt \
       --use-key "kube-apiserver-localhost-signer /keys/localhost-serving-signer.key" \
       --use-key "kube-apiserver-lb-signer /keys/loadbalancer-serving-signer.key" \
