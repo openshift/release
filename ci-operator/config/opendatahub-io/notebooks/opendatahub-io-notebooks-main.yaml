@@ -113,10 +113,10 @@ images:
 - context_dir: base/c9s-python-3.9
   dockerfile_path: Dockerfile
   to: base-c9s-python-3.9
-- context_dir: codeserver/c9s-python-3.9
+- context_dir: codeserver/ubi9-python-3.9
   dockerfile_path: Dockerfile
-  from: base-c9s-python-3.9
-  to: codeserver-c9s-python-3.9
+  from: base-ubi9-python-3.9
+  to: codeserver-ubi9-python-3.9
 - context_dir: rstudio/c9s-python-3.9
   dockerfile_path: Dockerfile
   from: base-c9s-python-3.9
@@ -687,25 +687,25 @@ tests:
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: base-c9s-python-3.9
     workflow: opendatahub-io-ci-image-mirror
-- as: notebook-codeserver-c9s-python-3-9-image-mirror
+- as: notebook-codeserver-ubi9-python-3-9-image-mirror
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: codeserver-c9s-python-3.9
+      SOURCE_IMAGE_REF: codeserver-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
-      RELEASE_VERSION: codeserver-c9s-python-3.9
+      RELEASE_VERSION: codeserver-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
-- as: notebook-codeserver-c9s-python-3-9-pr-image-mirror
-  run_if_changed: (base\/c9s-python-3.9\/*)|(codeserver\/c9s-python-3.9\/*)
+- as: notebook-codeserver-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (base\/ubi9-python-3.9\/*)|(codeserver\/ubi9-python-3.9\/*)
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: codeserver-c9s-python-3.9
+      SOURCE_IMAGE_REF: codeserver-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
-      RELEASE_VERSION: codeserver-c9s-python-3.9
+      RELEASE_VERSION: codeserver-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: notebook-rstudio-c9s-python-3-9-image-mirror
   postsubmit: true
@@ -1078,18 +1078,18 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: codeserver-c9s-python-3.9-test-e2e
+    - as: codeserver-ubi9-python-3.9-test-e2e
       cli: latest
       commands: |
-        oc new-project codeserver-c9s-python-3-9
+        oc new-project codeserver-ubi9-python-3-9
         IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${CODE_SERVER_IMAGE}"
-        make deploy-c9s-codeserver-c9s-python-3.9 \
+        make deploy-ubi9-codeserver-ubi9-python-3.9 \
             -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make validate-codeserver-image image=codeserver-c9s-python-3.9
-        make undeploy-c9s-codeserver-c9s-python-3.9
+        make validate-codeserver-image image=codeserver-ubi9-python-3.9
+        make undeploy-ubi9-codeserver-ubi9-python-3.9
       dependencies:
       - env: CODE_SERVER_IMAGE
-        name: codeserver-c9s-python-3.9
+        name: codeserver-ubi9-python-3.9
       from: src
       resources:
         requests:
