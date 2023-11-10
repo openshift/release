@@ -69,6 +69,6 @@ for scenario in $TEST_SCENARIOS; do
     rm -f tests/scaling-pipelines/benchmark-tekton.json
     ci-scripts/load-test.sh
     ARTIFACT_DIR="$artifacts" ci-scripts/collect-results.sh
-    oc delete namespace/benchmark
+    oc delete --cascade=foreground --timeout=30m namespace/benchmark
     sleep 60
 done
