@@ -24,7 +24,7 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
-  to: installer-altinfra
+  to: installer
 - dockerfile_literal: |
     FROM src
     COPY oc /usr/bin/oc
@@ -40,8 +40,11 @@ images:
         source_path: /usr/bin/oc
   to: src-oc
 promotion:
+  additional_images:
+    installer-altinfra: installer
   disabled: true
   excluded_images:
+  - installer
   - src-oc
   name: 4.15-priv
   namespace: ocp-private
@@ -65,6 +68,13 @@ resources:
       cpu: "3"
       memory: 5Gi
 tests:
+- as: e2e-aws-custom-security-groups
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-custom-security-groups
+  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn
   optional: true
@@ -76,6 +86,53 @@ tests:
         keyB valueB
         keyC valueC
     workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- as: e2e-aws-ovn-fips
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/parallel
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-imdsv2
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      AWS_METADATA_SERVICE_AUTH: Required
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-localzones
+  optional: true
+  steps:
+    cluster_profile: aws-local-zones
+    env:
+      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
+    workflow: openshift-e2e-aws-local-zones
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-proxy
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-proxy
+  timeout: 6h0m0s
+- as: e2e-aws-ovn-public-subnets
+  optional: true
+  run_if_changed: /aws/subnet.go
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-publicsubnets
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-shared-vpc
@@ -93,23 +150,32 @@ tests:
       BASE_DOMAIN: vmc-ci.devcluster.openshift.com
     workflow: openshift-e2e-aws-local-zones-byo-vpc
   timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-ovn-localzones
+- as: e2e-aws-ovn-single-node
   optional: true
+  run_if_changed: aws
   steps:
-    cluster_profile: aws-local-zones
-    env:
-      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
-    workflow: openshift-e2e-aws-local-zones
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-single-node
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-aws-ovn-imdsv2
+  as: e2e-aws-ovn-upgrade
   optional: true
   steps:
     cluster_profile: aws
-    env:
-      AWS_METADATA_SERVICE_AUTH: Required
-    workflow: openshift-e2e-aws
+    workflow: openshift-upgrade-aws-latestinstaller
+  timeout: 6h0m0s
+- as: e2e-aws-ovn-upi
+  run_if_changed: ^(upi/aws/.*)|^(images/installer/Dockerfile\.upi.*)
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-upi
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-upi-proxy
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-upi-proxy
   timeout: 6h0m0s
 - always_run: false
   as: e2e-azure-ovn
