@@ -164,6 +164,9 @@ CONFIG = {
     'gcp-arm64-quota-slice': {
         'us-central1': 30,
     },
+    'gcp-opendatahub-quota-slice': {
+        'us-central1': 30,
+    },
     'libvirt-s390x-quota-slice': {},
     'libvirt-ppc64le-quota-slice': {},
     'metal-quota-slice': {
