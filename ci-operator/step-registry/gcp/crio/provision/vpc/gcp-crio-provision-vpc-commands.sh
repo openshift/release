@@ -4,17 +4,18 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-python3 --version 
+python3 --version
 export CLOUDSDK_PYTHON=python3
 
-GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
+GOOGLE_PROJECT_ID="$(<${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
-if ! gcloud auth list | grep -E "\*\s+${sa_email}"
-then
-  gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
-  gcloud config set project "${GOOGLE_PROJECT_ID}"
+if ! gcloud auth list | grep -E "\*\s+${sa_email}"; then
+	gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
+	gcloud config set project "${GOOGLE_PROJECT_ID}"
 fi
+
+cd /tmp
 
 ## Create the VPC
 echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
@@ -24,7 +25,64 @@ REGION="${LEASED_RESOURCE}"
 MASTER_SUBNET_CIDR='10.0.0.0/19'
 WORKER_SUBNET_CIDR='10.0.32.0/19'
 
-cat <<EOF > 01_vpc.yaml
+cat <<EOF >01_vpc.py
+def GenerateConfig(context):
+
+    resources = [{
+        'name': context.properties['infra_id'] + '-network',
+        'type': 'compute.v1.network',
+        'properties': {
+            'region': context.properties['region'],
+            'autoCreateSubnetworks': False
+        }
+    }, {
+        'name': context.properties['infra_id'] + '-master-subnet',
+        'type': 'compute.v1.subnetwork',
+        'properties': {
+            'region': context.properties['region'],
+            'network': '$(ref.' + context.properties['infra_id'] + '-network.selfLink)',
+            'ipCidrRange': context.properties['master_subnet_cidr']
+        }
+    }, {
+        'name': context.properties['infra_id'] + '-worker-subnet',
+        'type': 'compute.v1.subnetwork',
+        'properties': {
+            'region': context.properties['region'],
+            'network': '$(ref.' + context.properties['infra_id'] + '-network.selfLink)',
+            'ipCidrRange': context.properties['worker_subnet_cidr']
+        }
+    }, {
+        'name': context.properties['infra_id'] + '-router',
+        'type': 'compute.v1.router',
+        'properties': {
+            'region': context.properties['region'],
+            'network': '$(ref.' + context.properties['infra_id'] + '-network.selfLink)',
+            'nats': [{
+                'name': context.properties['infra_id'] + '-nat-master',
+                'natIpAllocateOption': 'AUTO_ONLY',
+                'minPortsPerVm': 7168,
+                'sourceSubnetworkIpRangesToNat': 'LIST_OF_SUBNETWORKS',
+                'subnetworks': [{
+                    'name': '$(ref.' + context.properties['infra_id'] + '-master-subnet.selfLink)',
+                    'sourceIpRangesToNat': ['ALL_IP_RANGES']
+                }]
+            }, {
+                'name': context.properties['infra_id'] + '-nat-worker',
+                'natIpAllocateOption': 'AUTO_ONLY',
+                'minPortsPerVm': 512,
+                'sourceSubnetworkIpRangesToNat': 'LIST_OF_SUBNETWORKS',
+                'subnetworks': [{
+                    'name': '$(ref.' + context.properties['infra_id'] + '-worker-subnet.selfLink)',
+                    'sourceIpRangesToNat': ['ALL_IP_RANGES']
+                }]
+            }]
+        }
+    }]
+
+    return {'resources': resources}
+EOF
+
+cat <<EOF >01_vpc.yaml
 imports:
 - path: 01_vpc.py
 resources:
@@ -38,19 +96,19 @@ resources:
 EOF
 
 gcloud deployment-manager deployments create "${CLUSTER_NAME}-vpc" --config 01_vpc.yaml
-cat > "${SHARED_DIR}/vpc-destroy.sh" << EOF
+cat >"${SHARED_DIR}/vpc-destroy.sh" <<EOF
 gcloud deployment-manager deployments delete -q "${CLUSTER_NAME}-vpc"
 EOF
 
 if [[ "${RESTRICTED_NETWORK}" = "yes" ]]; then
-  echo "Updating the VPC into a disconnected network (removing NAT and enabling Private Google Access)..."
-  gcloud compute routers nats delete -q "${CLUSTER_NAME}-nat-master" --router "${CLUSTER_NAME}-router" --region "${REGION}"
-  gcloud compute routers nats delete -q "${CLUSTER_NAME}-nat-worker" --router "${CLUSTER_NAME}-router" --region "${REGION}"
-  gcloud compute networks subnets update "${CLUSTER_NAME}-master-subnet" --region "${REGION}" --enable-private-ip-google-access
-  gcloud compute networks subnets update "${CLUSTER_NAME}-worker-subnet" --region "${REGION}" --enable-private-ip-google-access
+	echo "Updating the VPC into a disconnected network (removing NAT and enabling Private Google Access)..."
+	gcloud compute routers nats delete -q "${CLUSTER_NAME}-nat-master" --router "${CLUSTER_NAME}-router" --region "${REGION}"
+	gcloud compute routers nats delete -q "${CLUSTER_NAME}-nat-worker" --router "${CLUSTER_NAME}-router" --region "${REGION}"
+	gcloud compute networks subnets update "${CLUSTER_NAME}-master-subnet" --region "${REGION}" --enable-private-ip-google-access
+	gcloud compute networks subnets update "${CLUSTER_NAME}-worker-subnet" --region "${REGION}" --enable-private-ip-google-access
 fi
 
-cat > "${SHARED_DIR}/customer_vpc_subnets.yaml" << EOF
+cat >"${SHARED_DIR}/customer_vpc_subnets.yaml" <<EOF
 platform:
   gcp:
     network: ${CLUSTER_NAME}-network
