@@ -55,26 +55,6 @@ tests:
   container:
     from: modelmesh-serving-develop
   run_if_changed: ^(apis/.*|controllers/.*|pkg/.*|Dockerfile|main\.go|go\.mod|go\.sum)
-- as: fvt-odh-manifests
-  run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|go\.mod|go\.sum|opendatahub/odh-manifests)
-  steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m5.2xlarge
-    test:
-    - as: fvt-odh-manifests
-      commands: |
-        export HOME=/go
-        TAG=fast CONTROLLERNAMESPACE=modelmesh-serving NAMESPACE=modelmesh-serving NAMESPACESCOPEMODE=true CUSTOM_IMG=odh-modelmesh-controller=${PR_MODELMESH_SERVING_IMAGE} make e2e-test-for-odh
-      dependencies:
-      - env: PR_MODELMESH_SERVING_IMAGE
-        name: modelmesh-serving
-      from: modelmesh-serving-develop
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 3Gi
-    workflow: ipi-aws
 - as: pr-image-mirror
   run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|version|go\.mod|go\.sum)
   steps:

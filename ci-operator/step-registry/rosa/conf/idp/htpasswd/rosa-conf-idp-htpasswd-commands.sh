@@ -8,6 +8,17 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 
+function set_proxy () {
+    if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
+        echo "setting the proxy"
+        # cat "${SHARED_DIR}/proxy-conf.sh"
+        echo "source ${SHARED_DIR}/proxy-conf.sh"
+        source "${SHARED_DIR}/proxy-conf.sh"
+    else
+        echo "no proxy setting."
+    fi
+}
+
 # Configure aws
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -66,6 +77,7 @@ echo "oc login ${API_URL} -u ${IDP_USER} -p ${IDP_PASSWD} --insecure-skip-tls-ve
 rosa grant user cluster-admin --user=${IDP_USER} --cluster=${CLUSTER_ID}
 
 echo "Waiting for idp ready..."
+set_proxy
 IDP_LOGIN_LOG="${ARTIFACT_DIR}/htpasswd_login.log"
 start_time=$(date +"%s")
 while true; do

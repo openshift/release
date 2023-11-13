@@ -79,10 +79,6 @@ releases:
     release:
       channel: candidate
       version: 4.11.0-fc.0
-  oldest-supported-z-rollback:
-    release:
-      channel: candidate
-      version: 4.11.0
 resources:
   '*':
     requests:
@@ -220,12 +216,12 @@ tests:
 - as: e2e-vsphere
   interval: 336h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-techpreview
   interval: 338h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
@@ -241,32 +237,32 @@ tests:
 - as: e2e-vsphere-ovn
   interval: 340h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-serial
   interval: 342h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-techpreview-serial
   interval: 344h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-techpreview-serial
 - as: e2e-vsphere-upi
   interval: 346h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-upi-serial
   interval: 348h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-upi-serial
 - as: e2e-vsphere-csi
   interval: 350h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -340,12 +336,12 @@ tests:
 - as: e2e-gcp-csi
   cron: 29 19 */1 * 1-5
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     workflow: openshift-e2e-gcp-csi
 - as: e2e-gcp-csi-migration
   interval: 48h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     workflow: openshift-e2e-gcp-csi-migration
 - as: e2e-azure-fips-serial
   interval: 48h
@@ -374,7 +370,7 @@ tests:
 - as: e2e-gcp-fips-serial
   interval: 48h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -408,18 +404,6 @@ tests:
       COMPUTE_NODE_TYPE: n2-standard-8
       RT_ENABLED: "true"
     workflow: openshift-e2e-gcp-realtime
-- as: e2e-aws-upgrade-rollback-oldest-supported
-  interval: 48h
-  steps:
-    cluster_profile: aws-2
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      TEST_TYPE: upgrade-conformance
-      TEST_UPGRADE_OPTIONS: abort-at=random
-    workflow: openshift-upgrade-aws
 - as: credentials-request-freeze
   interval: 48h
   steps:
@@ -621,6 +605,7 @@ tests:
       T5CI_JOB_TYPE: cnftests
       T5CI_VERSION: "4.11"
     workflow: telco5g-cnf
+  timeout: 6h0m0s
 - as: e2e-telco5g-ptp
   cluster: build05
   cron: 00 13 * * 6,0

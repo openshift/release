@@ -12,15 +12,21 @@ GCP_REGION="${LEASED_RESOURCE}"
 
 masters="${CONTROL_PLANE_REPLICAS}"
 
-workers=3
-if [[ "${SIZE_VARIANT}" == "compact" ]]; then
+workers=${COMPUTE_NODE_REPLICAS:-3}
+if [ "${COMPUTE_NODE_REPLICAS}" -le 0 ] || [ "${SIZE_VARIANT}" = "compact" ]; then
   workers=0
 fi
 
 # Do not change the default family type without consulting with cloud financial operations as their may
 # be active savings plans targeting this machine class.
 master_type=""
-master_type_suffix="-standard-4"
+# Temporary test to see if this helps the consistent high CPU alerts and random test failures
+master_type_suffix="-custom-6-16384"
+# TODO: remove if block and revert master_type_suffix back to standard if/when we switch back to standard
+# custom sizes are not supported by arm64 VMs
+if [ "${OCP_ARCH}" = "arm64" ]; then
+  master_type_suffix="-standard-4"
+fi
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
   master_type_suffix="-standard-32"
 elif [[ "${SIZE_VARIANT}" == "large" ]]; then

@@ -29,10 +29,10 @@ function unpause() {
 
 function check_mcp() {
     local out updated updating degraded try=0 max_retries=30
-    echo -e "oc get mcp\n$(oc get mcp)"
     while (( try < max_retries )); 
     do
         echo "Checking worker pool status #${try}..."
+        echo -e "oc get mcp\n$(oc get mcp)"
         out="$(oc get mcp worker --no-headers)"
         updated="$(echo "${out}" | awk '{print $3}')"
         updating="$(echo "${out}" | awk '{print $4}')"
@@ -41,7 +41,7 @@ function check_mcp() {
         if [[ ${updated} == "True" && ${updating} == "False" && ${degraded} == "False" ]]; then
             echo "Worker pool status check passed" && return 0
         fi  
-        sleep 60
+        sleep 120
         (( try += 1 ))
     done  
     echo >&2 "Worker pool status check failed" && return 1

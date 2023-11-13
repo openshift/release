@@ -1,0 +1,136 @@
+base_images:
+  os-min9:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make generate fmt vet binary binary-rte binary-e2e-all binary-numacell
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.tools
+images:
+- dockerfile_path: Dockerfile.must-gather
+  from: os-min9
+  to: numaresources-must-gather
+- dockerfile_path: Dockerfile.openshift
+  from: os-min9
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/manager
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
+  to: numaresources-operator
+- dockerfile_path: Dockerfile.openshift.rte
+  from: os-min9
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
+  to: resource-topology-exporter
+- dockerfile_path: Dockerfile.openshift.tests
+  from: os-min9
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
+  to: numaresources-operator-tests
+operator:
+  bundles:
+  - dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift-kni/numaresources-operator:4.14.999-snapshot
+    with: numaresources-operator
+promotion:
+  name: numaresources-operator-4.14
+  namespace: ocp-kni
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 150m
+      memory: 250Mi
+tests:
+- as: ci-unit
+  commands: make test-unit
+  container:
+    from: src
+- as: ci-install-e2e
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: numaresources-operator
+      OO_PACKAGE: numaresources-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-install-test
+      cli: latest
+      commands: make test-install-e2e
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+- as: ci-e2e
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-numaresources
+      OO_PACKAGE: numaresources-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: make test-e2e
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+- as: ci-must-gather-e2e
+  cron: 42 0 * * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-numaresources
+      OO_PACKAGE: numaresources-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: must-gather-e2e-test
+      cli: latest
+      commands: make test-must-gather-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift-kni
+  repo: numaresources-operator

@@ -5,12 +5,124 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build05
+    context: ci/prow/4.14-cloud-tests-nightly-images
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: 4.14-cloud-tests-nightly
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-krkn-hub-main-4.14-cloud-tests-nightly-images
+    rerun_command: /test 4.14-cloud-tests-nightly-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=4.14-cloud-tests-nightly
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.14-cloud-tests-nightly-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/4.14-nightly-arm-images
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: 4.14-nightly-arm
+      ci.openshift.io/generator: prowgen
+      job-release: "4.14"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-krkn-hub-main-4.14-nightly-arm-images
+    rerun_command: /test 4.14-nightly-arm-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=4.14-nightly-arm
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.14-nightly-arm-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/4.14-nightly-images
     decorate: true
     labels:
       ci-operator.openshift.io/variant: 4.14-nightly
       ci.openshift.io/generator: prowgen
+      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-chaos-krkn-hub-main-4.14-nightly-images
     rerun_command: /test 4.14-nightly-images
@@ -34,6 +146,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -42,6 +157,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -54,15 +172,16 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
-    context: ci/prow/4.14-nightly-x86-64-images
+    cluster: build05
+    context: ci/prow/4.15-nightly-images
     decorate: true
     labels:
-      ci-operator.openshift.io/variant: 4.14-nightly-x86-64
+      ci-operator.openshift.io/variant: 4.15-nightly
       ci.openshift.io/generator: prowgen
+      job-release: "4.15"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-chaos-krkn-hub-main-4.14-nightly-x86-64-images
-    rerun_command: /test 4.14-nightly-x86-64-images
+    name: pull-ci-redhat-chaos-krkn-hub-main-4.15-nightly-images
+    rerun_command: /test 4.15-nightly-images
     spec:
       containers:
       - args:
@@ -70,7 +189,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=4.14-nightly-x86-64
+        - --variant=4.15-nightly
         command:
         - ci-operator
         image: ci-operator:latest
@@ -83,55 +202,8 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.14-nightly-x86-64-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build02
-    context: ci/prow/arm-images
-    decorate: true
-    labels:
-      ci-operator.openshift.io/variant: arm
-      ci.openshift.io/generator: prowgen
-      job-release: "4.13"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-chaos-krkn-hub-main-arm-images
-    rerun_command: /test arm-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=arm
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -141,24 +213,28 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )arm-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.15-nightly-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build05
     context: ci/prow/aro-4.13-nightly-images
     decorate: true
     labels:
       ci-operator.openshift.io/variant: aro-4.13-nightly
       ci.openshift.io/generator: prowgen
+      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-chaos-krkn-hub-main-aro-4.13-nightly-images
     rerun_command: /test aro-4.13-nightly-images
@@ -182,6 +258,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -190,6 +269,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -202,14 +284,18 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
-    context: ci/prow/images
+    cluster: build05
+    context: ci/prow/rosa-4.14-nightly-images
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: rosa-4.14-nightly
       ci.openshift.io/generator: prowgen
+      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-chaos-krkn-hub-main-images
-    rerun_command: /test images
+    name: pull-ci-redhat-chaos-krkn-hub-main-rosa-4.14-nightly-images
+    rerun_command: /test rosa-4.14-nightly-images
     spec:
       containers:
       - args:
@@ -217,6 +303,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --variant=rosa-4.14-nightly
         command:
         - ci-operator
         image: ci-operator:latest
@@ -229,6 +316,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -237,28 +327,33 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )rosa-4.14-nightly-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build02
-    context: ci/prow/rosa-4.12-nightly-images
+    cluster: build05
+    context: ci/prow/rosa-4.15-nightly-images
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: rosa-4.12-nightly
+      ci-operator.openshift.io/variant: rosa-4.15-nightly
       ci.openshift.io/generator: prowgen
-      job-release: "4.12"
+      job-release: "4.15"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-chaos-krkn-hub-main-rosa-4.12-nightly-images
-    rerun_command: /test rosa-4.12-nightly-images
+    name: pull-ci-redhat-chaos-krkn-hub-main-rosa-4.15-nightly-images
+    rerun_command: /test rosa-4.15-nightly-images
     spec:
       containers:
       - args:
@@ -266,7 +361,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=rosa-4.12-nightly
+        - --variant=rosa-4.15-nightly
         command:
         - ci-operator
         image: ci-operator:latest
@@ -279,55 +374,8 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-4.12-nightly-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build02
-    context: ci/prow/rosa-4.13-nightly-images
-    decorate: true
-    labels:
-      ci-operator.openshift.io/variant: rosa-4.13-nightly
-      ci.openshift.io/generator: prowgen
-      job-release: "4.13"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-chaos-krkn-hub-main-rosa-4.13-nightly-images
-    rerun_command: /test rosa-4.13-nightly-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=rosa-4.13-nightly
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -337,10 +385,13 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rosa-4.13-nightly-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )rosa-4.15-nightly-images,?($|\s.*)

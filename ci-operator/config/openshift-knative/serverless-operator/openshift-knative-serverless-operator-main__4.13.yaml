@@ -7,27 +7,39 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: cli
-  openshift_eventing-istio-src_knative-v1.10:
+  ocp_4.13_base:
+    name: "4.13"
+    namespace: ocp
+    tag: base
+  ocp_4.13_cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  openshift_eventing-istio-src_knative-v1.11:
     name: eventing-istio-src
     namespace: openshift
-    tag: knative-v1.10
-  openshift_eventing-kafka-broker-src_knative-v1.10:
+    tag: knative-v1.11
+  openshift_eventing-kafka-broker-src_knative-v1.11:
     name: eventing-kafka-broker-src
     namespace: openshift
-    tag: knative-v1.10
-  openshift_knative-eventing-src_knative-v1.10:
+    tag: knative-v1.11
+  openshift_knative-eventing-src_knative-v1.11:
     name: knative-eventing-src
     namespace: openshift
-    tag: knative-v1.10
-  openshift_knative-serving-src_knative-v1.10:
+    tag: knative-v1.11
+  openshift_knative-serving-src_knative-v1.11:
     name: knative-serving-src
     namespace: openshift
-    tag: knative-v1.10
+    tag: knative-v1.11
   openshift_release_golang-1.19:
     name: release
     namespace: openshift
     tag: golang-1.19
   opm:
+    name: "4.13"
+    namespace: origin
+    tag: operator-registry
+  origin_4.13_operator-registry:
     name: "4.13"
     namespace: origin
     tag: operator-registry
@@ -42,18 +54,21 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    openshift_eventing-istio-src_knative-v1.10:
+    ocp_4.13_cli:
       as:
-      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.10
-    openshift_eventing-kafka-broker-src_knative-v1.10:
+      - registry.ci.openshift.org/ocp/4.13:cli
+    openshift_eventing-istio-src_knative-v1.11:
       as:
-      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.10
-    openshift_knative-eventing-src_knative-v1.10:
+      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.11
+    openshift_eventing-kafka-broker-src_knative-v1.11:
       as:
-      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.10
-    openshift_knative-serving-src_knative-v1.10:
+      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.11
+    openshift_knative-eventing-src_knative-v1.11:
       as:
-      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.10
+      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.11
+    openshift_knative-serving-src_knative-v1.11:
+      as:
+      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.11
   to: serverless-operator-src
 - context_dir: .
   dockerfile_path: serving/ingress/Dockerfile
@@ -87,11 +102,18 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: metadata-webhook
-- context_dir: olm-catalog/serverless-operator
+- dockerfile_path: olm-catalog/serverless-operator/Dockerfile
   from: base
   to: serverless-bundle
-- context_dir: olm-catalog/serverless-operator/index
+- dockerfile_path: olm-catalog/serverless-operator/index/Dockerfile
   from: opm
+  inputs:
+    ocp_4.13_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.13:base
+    origin_4.13_operator-registry:
+      as:
+      - registry.ci.openshift.org/origin/4.13:operator-registry
   to: serverless-index
 promotion:
   name: openshift-serverless-nightly
@@ -291,7 +313,6 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.13"
-  optional: true
   skip_if_only_changed: test/ui
   steps:
     allow_skip_on_success: true
@@ -453,12 +474,13 @@ tests:
       from: serverless-operator-src
       resources:
         limits:
-          memory: 6Gi
+          memory: 16Gi
         requests:
-          cpu: 100m
-          memory: 200Mi
-      timeout: 3h0m0s
+          cpu: "4"
+          memory: 12Gi
+      timeout: 5h50m0s
     workflow: generic-claim
+  timeout: 6h0m0s
 - as: e2e-kitchensink-ocp-413
   cluster_claim:
     architecture: amd64
@@ -471,7 +493,7 @@ tests:
   steps:
     allow_skip_on_success: true
     test:
-    - as: serverless-e2e
+    - as: serverless-kitchensink-e2e
       commands: make test-kitchensink-e2e
       dependencies:
       - env: KNATIVE_OPENSHIFT_INGRESS
@@ -483,11 +505,13 @@ tests:
       from: serverless-operator-src
       resources:
         limits:
-          memory: 6Gi
+          memory: 16Gi
         requests:
           cpu: "4"
-          memory: 6Gi
+          memory: 12Gi
+      timeout: 5h50m0s
     workflow: generic-claim
+  timeout: 6h0m0s
 - as: upgrade-kitchensink-ocp-413
   cluster_claim:
     architecture: amd64

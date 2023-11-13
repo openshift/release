@@ -1,21 +1,21 @@
 base_images:
+  ci_tests-private-base_4.10:
+    name: tests-private-base
+    namespace: ci
+    tag: "4.10"
+  ci_tests-private-builder_4.10:
+    name: tests-private-builder
+    namespace: ci
+    tag: "4.10"
   cli:
     name: 4.10-priv
     namespace: ocp-private
     tag: cli
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
-  tools:
-    name: 4.10-priv
-    namespace: ocp-private
-    tag: tools
   upi-installer:
     name: 4.10-priv
     namespace: ocp-private
     tag: upi-installer
-binary_build_commands: make all
+binary_build_commands: make go-mod-tidy;make all
 build_root:
   image_stream_tag:
     name: builder-priv
@@ -23,12 +23,12 @@ build_root:
     tag: rhel-8-golang-1.17-openshift-4.10
 canonical_go_repository: github.com/openshift/openshift-tests-private
 images:
-- dockerfile_path: images/Dockerfile
-  from: tools
+- dockerfile_path: images/Dockerfile.golang
+  from: ci_tests-private-base_4.10
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    ci_tests-private-builder_4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+      - registry.ci.openshift.org/ci/tests-private-builder:4.10
   to: tests-private
 - dockerfile_literal: |
     FROM src
@@ -105,7 +105,7 @@ tests:
   optional: true
   run_if_changed: frontend/
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     test:
     - ref: enable-qe-catalogsource
     - as: console-test

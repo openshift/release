@@ -5,7 +5,6 @@ set -Eeuo pipefail
 CLUSTER_TYPE="${CLUSTER_TYPE_OVERRIDE:-$CLUSTER_TYPE}"
 
 declare -A external_network=(
-	['openstack-kuryr']='external'
 	['openstack-vexxhost']='public'
         ['openstack-operators-vexxhost']='public'
 	['openstack-vh-mecha-central']='external'
@@ -15,7 +14,6 @@ declare -A external_network=(
 	)
 
 declare -A controlplane_flavor=(
-	['openstack-kuryr']='m1.xlarge'
 	['openstack-vexxhost']='ci.m1.xlarge'
         ['openstack-operators-vexxhost']='ci.m1.large'
 	['openstack-vh-mecha-central']='m1.xlarge'
@@ -25,7 +23,6 @@ declare -A controlplane_flavor=(
 	)
 
 declare -A controlplane_flavor_alternate=(
-	['openstack-kuryr']='m1.xlarge.2'
 	['openstack-vexxhost']='ci.m2.xlarge'
 	['openstack-vh-mecha-central']='m1.xlarge.2'
 	['openstack-vh-mecha-az0']='m1.xlarge.2'
@@ -34,7 +31,6 @@ declare -A controlplane_flavor_alternate=(
 	)
 
 declare -A compute_flavor=(
-	['openstack-kuryr']='m1.xlarge'
 	['openstack-vexxhost']='ci.m1.xlarge'
         ['openstack-operators-vexxhost']='ci.m1.large'
 	['openstack-vh-mecha-central']='m1.xlarge'
@@ -44,7 +40,6 @@ declare -A compute_flavor=(
 	)
 
 declare -A compute_azs=(
-	['openstack-kuryr']='az0'
 	['openstack-vexxhost']=''
         ['openstack-operators-vexxhost']=''
 	['openstack-vh-mecha-central']=''
@@ -54,7 +49,6 @@ declare -A compute_azs=(
 	)
 
 declare -A bastion_flavor=(
-	['openstack-kuryr']='m1.small'
 	['openstack-vexxhost']='1vcpu_2gb'
         ['openstack-operators-vexxhost']='ci.m1.small'
 	['openstack-vh-mecha-central']='m1.small'

@@ -95,6 +95,10 @@ releases:
       product: ocp
       stream: nightly
       version: "4.14"
+  oldest-supported-z-rollback:
+    release:
+      channel: candidate
+      version: 4.14.0-rc.0
 resources:
   '*':
     requests:
@@ -299,7 +303,7 @@ tests:
 - as: e2e-vsphere-sdn
   interval: 168h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     observers:
       enable:
       - observers-resource-watch
@@ -307,7 +311,7 @@ tests:
 - as: e2e-vsphere-ovn-techpreview
   interval: 166h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
@@ -330,7 +334,7 @@ tests:
 - as: e2e-vsphere-ovn
   interval: 164h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -341,7 +345,7 @@ tests:
 - as: e2e-vsphere-externallb-ovn
   interval: 162h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     observers:
       enable:
       - observers-resource-watch
@@ -349,7 +353,7 @@ tests:
 - as: e2e-vsphere-ovn-serial
   interval: 160h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -360,7 +364,7 @@ tests:
 - as: e2e-vsphere-ovn-techpreview-serial
   interval: 158h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -370,7 +374,7 @@ tests:
 - as: e2e-vsphere-ovn-upi
   interval: 156h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -381,7 +385,7 @@ tests:
 - as: e2e-vsphere-ovn-upi-serial
   interval: 154h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -392,7 +396,7 @@ tests:
 - as: e2e-vsphere-ovn-csi
   interval: 154h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -403,17 +407,17 @@ tests:
 - as: e2e-vsphere-zones
   interval: 152h
   steps:
-    cluster_profile: vsphere-multizone
+    cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-upi-zones
   interval: 150h
   steps:
-    cluster_profile: vsphere-multizone
+    cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-vsphere-ipi-ovn-cgroupsv1
   cron: '@daily'
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     observers:
       enable:
       - observers-resource-watch
@@ -485,7 +489,7 @@ tests:
 - as: e2e-gcp-sdn-upgrade
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       TEST_TYPE: upgrade-conformance
     observers:
@@ -557,6 +561,19 @@ tests:
     - chain: ipi-gcp-pre
     - ref: fips-check
     workflow: openshift-e2e-gcp-sdn
+- as: e2e-aws-ovn-upgrade-rollback-oldest-supported
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=100
+    workflow: openshift-upgrade-aws
+  timeout: 6h0m0s
 - as: console-aws
   interval: 168h
   steps:
@@ -847,6 +864,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-cnf
+  timeout: 6h0m0s
 - as: e2e-telco5g-sno-cnftests
   cluster: build05
   cron: 07 22 */1 * 1-5
@@ -981,7 +999,7 @@ tests:
 - as: e2e-vsphere-ovn-etcd-scaling
   interval: 148h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     observers:
       enable:
       - observers-resource-watch
@@ -996,7 +1014,7 @@ tests:
 - as: e2e-gcp-graceful-shutdown
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     workflow: openshift-e2e-gcp-graceful-shutdown
 - as: e2e-aws-ovn-shared-vpc-phz-techpreview
   interval: 8h
@@ -1068,35 +1086,35 @@ tests:
     cluster_profile: packet-sno
     env:
       SKEW: +30d
-    workflow: openshift-e2e-cert-rotation-suspend-sno
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-60d
   cron: '@weekly'
   steps:
     cluster_profile: packet-sno
     env:
       SKEW: +60d
-    workflow: openshift-e2e-cert-rotation-suspend-sno
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-90d
   cron: '@weekly'
   steps:
     cluster_profile: packet-sno
     env:
       SKEW: +90d
-    workflow: openshift-e2e-cert-rotation-suspend-sno
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-180d
   cron: '@weekly'
   steps:
     cluster_profile: packet-sno
     env:
       SKEW: +180d
-    workflow: openshift-e2e-cert-rotation-suspend-sno
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-360d
   cron: '@weekly'
   steps:
     cluster_profile: packet-sno
     env:
       SKEW: +360d
-    workflow: openshift-e2e-cert-rotation-suspend-sno
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-ha-cert-rotation-suspend-30d
   cron: '@weekly'
   steps:
@@ -1174,6 +1192,18 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-crun-wasm
+- as: e2e-aws-ovn-ha-cert-rotation-suspend-30d
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-2
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      BASELINE_CAPABILITY_SET: None
+      PERSISTENT_MONITORING: "false"
+      SKEW: +30d
+    workflow: openshift-e2e-aws-cert-rotation
+  timeout: 4h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -1,5 +1,6 @@
 #!/bin/bash
 set -xeuo pipefail
+export PS4='+ $(date "+%T.%N") \011'
 
 IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
 HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
@@ -28,8 +29,10 @@ if ! sudo subscription-manager status >&/dev/null; then
         --activationkey="\$(cat /tmp/subscription-manager-act-key)"
 fi
 
+sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
+
 chmod 0755 ~
-tar -xf /tmp/microshift.tgz -C ~
+tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 
 cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
 cp /tmp/ssh-privatekey ~/.ssh/id_rsa
@@ -41,12 +44,12 @@ cp /tmp/pull-secret "\${PULL_SECRET}"
 
 cd ~/microshift
 
+export CI_JOB_NAME="${JOB_NAME}"
 ./test/bin/ci_phase_iso_build.sh
-sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
 EOF
 chmod +x /tmp/iso.sh
 
-tar czf /tmp/microshift.tgz /microshift
+tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 
 scp \
     /tmp/iso.sh \

@@ -14,11 +14,8 @@ die_modlist() {
 echo "Checking that all modules can be resolved offline"
 go list -mod=readonly -m all || die_modlist
 
-COMPAT=
-# Relax compat for go 1.17
-if grep -q "^go 1.17" go.mod; then
-    COMPAT="-compat=1.17"
-fi
+# Allow setting explicit -compat argument for go mod tidy
+COMPAT=${COMPAT:-""}
 
 echo "Checking that vendor/ is correct"
 go mod tidy $COMPAT

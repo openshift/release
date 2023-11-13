@@ -19,8 +19,13 @@ export GSHEET_KEY_LOCATION
 
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
-export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE"
 export WORKLOAD=node-density-heavy
+
+# A non-indexed warmup run
+ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50" ./run.sh
+
+# The measurable run
+export EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE"
 
 export CLEANUP_WHEN_FINISH=true
 
@@ -29,5 +34,8 @@ export COMPARISON_CONFIG="clusterVersion.json podLatency.json containerMetrics.j
 export GEN_CSV=true
 export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
 
-rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
-./run.sh |& tee "${SHARED_DIR}/${OUTPUT_FILE}"
+rm -f ${SHARED_DIR}/index.json
+./run.sh
+
+folder_name=$(ls -t -d /tmp/*/ | head -1)
+jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json

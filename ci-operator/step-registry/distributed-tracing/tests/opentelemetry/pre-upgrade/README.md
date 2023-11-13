@@ -62,6 +62,10 @@ Use to execute the `OpenTelemetry E2E tests before running operator upgrade` [op
 - `TARGETALLOCATOR_IMG`
   - **Definition**: The Target Allocator image used in testing".
   - **If left empty**: No image is set.
+  
+- `PRE_UPG_SKIP_TESTS`
+  - **Definition**: Space seperated test cases to skip from the test run. Example "tests/e2e/smoke-targetallocator tests/e2e/prometheus-config-validation".
+  - **If left empty**: tests/e2e-autoscale/autoscale tests/e2e/instrumentation-sdk tests/e2e/instrumentation-go tests/e2e/instrumentation-apache-multicontainer tests/e2e/instrumentation-apache-httpd tests/e2e/route tests/e2e/targetallocator-features tests/e2e/prometheus-config-validation tests/e2e/smoke-targetallocator tests/e2e-openshift/otlp-metrics-traces tests/e2e/instrumentation-nodejs tests/e2e/instrumentation-python tests/e2e/instrumentation-java tests/e2e/instrumentation-dotnet tests/e2e/smoke-init-containers will be skipped.
 
 ### Other:
 

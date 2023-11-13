@@ -16,11 +16,18 @@ ES_USERNAME=$(cat "/secret/username")
 
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
-export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE"
-
 export WORKLOAD=node-density-cni
+
+# A non-indexed warmup run
+ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50" ./run.sh
+
+# The measurable run
+export EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
-./run.sh |& tee "${SHARED_DIR}/${OUTPUT_FILE}"
+rm -f ${SHARED_DIR}/index.json
+./run.sh
+
+folder_name=$(ls -t -d /tmp/*/ | head -1)
+jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json

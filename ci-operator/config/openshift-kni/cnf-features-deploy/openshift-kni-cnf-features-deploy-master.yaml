@@ -11,6 +11,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
   os-min8:
     name: ubi-minimal
     namespace: ocp
@@ -27,6 +31,9 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: cnf-tests
 - context_dir: tools/s2i-dpdk/
   dockerfile_path: Dockerfile
@@ -93,21 +100,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws-ovn
-- as: e2e-gcp-ovn-periodic
-  cron: 0 */8 * * *
-  steps:
-    cluster_profile: gcp
-    env:
-      COMPUTE_NODE_TYPE: n2-standard-8
-    test:
-    - as: e2e-gcp-ovn-periodic
-      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" make functests-on-ci
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: openshift-e2e-gcp-ovn
 zz_generated_metadata:
   branch: master
   org: openshift-kni

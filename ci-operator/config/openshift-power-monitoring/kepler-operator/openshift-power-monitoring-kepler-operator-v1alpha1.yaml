@@ -22,6 +22,9 @@ images:
   context_dir: .
   dockerfile_path: Dockerfile
   to: kepler-operator
+- context_dir: .
+  dockerfile_path: tests/Dockerfile
+  to: kepler-tests-runner
 operator:
   bundles:
   - as: kepler-bundle
@@ -56,10 +59,6 @@ tests:
       cli: latest
       commands: |
         operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
-        oc wait --for condition=Available -n openshift-operators \
-        --timeout=300s deployment kepler-operator-controller-manager
-        oc logs -n openshift-operators \
-        deployment/kepler-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: kepler-bundle
@@ -68,7 +67,6 @@ tests:
         requests:
           cpu: 100m
           memory: 400Mi
-    - ref: openshift-power-monitoring-install-kepler
     - ref: openshift-power-monitoring-tests-kepler
     workflow: generic-claim
 zz_generated_metadata:

@@ -52,9 +52,12 @@ if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
   source "${SHARED_DIR}/unset-proxy.sh"
 fi
 
+echo "Installed locales"
+locale -a
+
 cat "${TMPDIR}/node-provider-IDs.txt" | sort | grep . | uniq | while read -r INSTANCE_ID
 do
 	echo "Gathering console logs for ${INSTANCE_ID}"
-	LC_ALL=en_US.UTF-8 aws --region "${REGION}" ec2 get-console-output --instance-id "${INSTANCE_ID}" --output text > "${ARTIFACT_DIR}/${INSTANCE_ID}" &
+	LC_ALL=C.utf8 aws --region "${REGION}" ec2 get-console-output --instance-id "${INSTANCE_ID}" --output text > "${ARTIFACT_DIR}/${INSTANCE_ID}" &
 	wait "$!"
 done

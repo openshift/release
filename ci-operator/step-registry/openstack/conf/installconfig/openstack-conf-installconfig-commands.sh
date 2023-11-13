@@ -107,6 +107,16 @@ case "$CONFIG_TYPE" in
 			| .platform.openstack.controlPlanePort.network.name = \"${CONTROL_PLANE_NETWORK}\"
 			| .platform.openstack.controlPlanePort.network.name = \"${CONTROL_PLANE_NETWORK}\"
 		" "$INSTALL_CONFIG"
+
+		if [[ "${CONFIG_TYPE}" == "dualstack-v6primary" ]]; then
+			yq --yaml-output --in-place ".
+				| .platform.openstack.apiVIPs = (.platform.openstack.apiVIPs | reverse)
+				| .platform.openstack.ingressVIPs = (.platform.openstack.ingressVIPs | reverse)
+				| .networking.machineNetwork = (.networking.machineNetwork | reverse)
+				| .networking.clusterNetwork = (.networking.clusterNetwork | reverse)
+				| .networking.serviceNetwork = (.networking.serviceNetwork | reverse)
+			" "$INSTALL_CONFIG"
+		fi
 		;;
 	*)
 		echo "No valid install config type specified. Please check CONFIG_TYPE"

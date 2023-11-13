@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build01
     context: ci/prow/e2e-openstack
     decorate: true
     labels:
@@ -46,6 +46,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -66,6 +69,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-openstack-vexxhost
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -79,17 +85,17 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build02
-    context: ci/prow/e2e-openstack-dualstack-techpreview
+    context: ci/prow/e2e-openstack-dualstack
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: openstack-hwoffload
       ci-operator.openshift.io/cloud-cluster-profile: openstack-hwoffload
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-machine-api-provider-openstack-master-e2e-openstack-dualstack-techpreview
+    name: pull-ci-openshift-machine-api-provider-openstack-master-e2e-openstack-dualstack
     optional: true
     path_alias: sigs.k8s.io/machine-api-provider-openstack
-    rerun_command: /test e2e-openstack-dualstack-techpreview
+    rerun_command: /test e2e-openstack-dualstack
     spec:
       containers:
       - args:
@@ -98,8 +104,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-openstack-dualstack-techpreview-cluster-profile
-        - --target=e2e-openstack-dualstack-techpreview
+        - --secret-dir=/usr/local/e2e-openstack-dualstack-cluster-profile
+        - --target=e2e-openstack-dualstack
         command:
         - ci-operator
         image: ci-operator:latest
@@ -115,10 +121,13 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-openstack-dualstack-techpreview-cluster-profile
+        - mountPath: /usr/local/e2e-openstack-dualstack-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -140,13 +149,16 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-openstack-hwoffload
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openstack-dualstack-techpreview,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-openstack-dualstack,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -194,6 +206,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -214,6 +229,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-openstack-nfv
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -268,6 +286,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -288,6 +309,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-openstack-vh-mecha-central
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -328,6 +352,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -336,6 +363,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -376,6 +406,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -384,6 +417,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -424,6 +460,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -432,6 +471,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -472,6 +514,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -480,6 +525,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -521,6 +569,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -529,6 +580,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -569,6 +623,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -577,6 +634,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

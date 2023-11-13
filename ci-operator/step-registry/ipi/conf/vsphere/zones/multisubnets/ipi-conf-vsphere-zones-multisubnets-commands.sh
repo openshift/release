@@ -14,17 +14,22 @@ echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..
 # shellcheck source=/dev/null
 declare vsphere_datacenter
 declare vsphere_url
+declare vsphere_portgroup
+declare vsphere_extra_portgroup_1
+declare vsphere_extra_portgroup_2
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
-
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
-
-cat >> "${CONFIG}" << EOF
+if [[ -z "${vsphere_extra_portgroup_1}" ]] || [[ -z "${vsphere_extra_portgroup_2}" ]]; then
+   echo "The required extra leases is 2 at leaset, exit"
+   exit 1
+fi	
+cat >>"${CONFIG}" <<EOF
 baseDomain: $base_domain
 controlPlane:
   name: "master"
@@ -51,7 +56,7 @@ platform:
     vCenter: "${vsphere_url}"
     username: "${GOVC_USERNAME}"
     password: ${GOVC_PASSWORD}
-    network: ${LEASED_RESOURCE}
+    network: ${vsphere_portgroup}
     datacenter: "${vsphere_datacenter}"
     cluster: vcs-mdcnc-workload-1
     defaultDatastore: mdcnc-ds-shared
@@ -62,7 +67,7 @@ platform:
       topology:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-1
         networks:
-        - ${LEASED_RESOURCE}
+        - ${vsphere_portgroup}
         datastore: mdcnc-ds-shared
     - name: us-east-2
       region: us-east
@@ -70,7 +75,7 @@ platform:
       topology:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-2
         networks:
-        - ocp-ci-seg-20
+        - ${vsphere_extra_portgroup_1}
         datastore: mdcnc-ds-shared
     - name: us-east-3
       region: us-east
@@ -78,7 +83,7 @@ platform:
       topology:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-3
         networks:
-        - ocp-ci-seg-21
+        - ${vsphere_extra_portgroup_2}
         datastore: mdcnc-ds-shared
     - name: us-west-1
       region: us-west
@@ -87,14 +92,13 @@ platform:
         datacenter: datacenter-2
         computeCluster: /datacenter-2/host/vcs-mdcnc-workload-4
         networks:
-        - ${LEASED_RESOURCE}
+        - ${vsphere_portgroup}
         datastore: mdcnc-ds-shared
 
 networking:
   machineNetwork:
   - cidr: "${machine_cidr}"
 EOF
-
 # TODO: Add this back in once we have an vsphere
 # environment that will support topology storage
 
@@ -132,4 +136,3 @@ EOF
 #        spec:
 #          storageClassName: sc-zone-us-east-1a
 #EOF
-

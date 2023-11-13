@@ -1,4 +1,8 @@
 base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.30.0
   os:
     name: centos
     namespace: origin
@@ -12,7 +16,9 @@ images:
   to: fence-agents-remediation
 operator:
   bundles:
-  - dockerfile_path: bundle.Dockerfile
+  - as: my-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/medik8s/fence-agents-remediation-operator:.*
     with: pipeline:fence-agents-remediation
@@ -28,25 +34,32 @@ resources:
       cpu: 500m
       memory: 1000Mi
 tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: openshift-e2e
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: my-bundle
     env:
-      OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: far-install
-      OO_PACKAGE: fence-agents-remediation
-      OO_TARGET_NAMESPACES: '!all'
     test:
-    - as: e2e
+    - as: e2e-test
       cli: latest
-      commands: export OPERATOR_NS="far-install" && make ocp-aws-credentials test-e2e
+      commands: export OPERATOR_NS="$OO_INSTALL_NAMESPACE" && make ocp-aws-credentials
+        test-e2e
+      env:
+      - name: OO_INSTALL_NAMESPACE
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: medik8s

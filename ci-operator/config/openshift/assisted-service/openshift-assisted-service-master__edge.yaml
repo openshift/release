@@ -43,22 +43,26 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: hypershift-operator
-  openshift_release_golang-1.18:
+  openshift_release_golang-1.20:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.20
   postgresql-12-centos7:
     name: postgresql-12-centos7
     namespace: edge-infrastructure
     tag: latest
+  upi-installer:
+    name: "4.15"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 images:
 - dockerfile_path: ci-images/Dockerfile.base
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service-base
 - dockerfile_path: ci-images/Dockerfile.unit-tests
   from: assisted-service-base
@@ -81,9 +85,9 @@ images:
     edge_infrastructure_swagger_codegen_cli:
       as:
       - quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service-build-base
 - dockerfile_literal: |
     FROM base-build
@@ -99,9 +103,9 @@ images:
   to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service
 - dockerfile_literal: |
     FROM coreos/centos
@@ -148,13 +152,13 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.15"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.15"
   stable-4-10:
     integration:
       name: "4.10"
@@ -221,9 +225,9 @@ tests:
     make lint
   container:
     from: assisted-service-lint
-  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+  skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: verify-generated-code
-  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+  skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
   steps:
     test:
     - ref: assisted-verify-generated-code
@@ -238,7 +242,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-service-codecov-token
-  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+  skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: unit-test-postsubmit
   commands: |
     export REPORTS=/tmp/reports
@@ -440,7 +444,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       DISCONNECTED: "true"
@@ -451,7 +455,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       DISCONNECTED: "true"
@@ -610,6 +614,9 @@ tests:
       HYPERSHIFT_IMAGE: hypershift-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       PROVIDER_IMAGE: cluster-api-provider-agent
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-capi-periodic
   cron: 25 00 */1 * 0-5
@@ -620,6 +627,9 @@ tests:
       HYPERSHIFT_IMAGE: hypershift-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       PROVIDER_IMAGE: cluster-api-provider-agent
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-multiarch-3masters-ocp-411
   optional: true
@@ -647,24 +657,18 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=1
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-hypershift-zero-nodes
+- always_run: false
+  as: e2e-ai-operator-ztp-hypershift-zero-nodes
   optional: true
-  run_if_changed: ^(deploy/operator/hypershift/.*|api/.*|internal/controller/controllers/.*agentserviceconfig.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       HYPERSHIFT_IMAGE: hypershift-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    workflow: assisted-baremetal-operator-hypershift
-- as: e2e-ai-operator-ztp-hypershift-zero-nodes-periodic
-  cron: 00 02 */1 * 1-4
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      HYPERSHIFT_IMAGE: hypershift-operator
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
     workflow: assisted-baremetal-operator-hypershift
 - as: e2e-metal-assisted-tpmv2
   optional: true
@@ -729,6 +733,17 @@ tests:
     env:
       ASSISTED_CONFIG: |
         STATIC_IPS=true
+        TEST_FUNC=test_networking
+      PACKET_PLAN: m3.large.x86
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-bond
+  optional: true
+  run_if_changed: ^(data/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        IS_BONDED=true
         TEST_FUNC=test_networking
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
@@ -810,6 +825,16 @@ tests:
         OPENSHIFT_VERSION=4.14
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-4-15
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.15
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
@@ -817,15 +842,12 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.13
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv-4.14
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv
+        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+        MASTER_MEMORY=17408
+        MASTER_CPU=8
+        WORKER_MEMORY=9216
+        WORKER_CPU=4
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
@@ -845,16 +867,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.13
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-odf-4-14
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=odf
+        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-mce
@@ -914,7 +928,6 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.11
         NUM_MASTERS=1
         NUM_WORKERS=0
         TEST_FUNC=test_deploy_day2_nodes_cloud
@@ -988,7 +1001,7 @@ tests:
   optional: true
   run_if_changed: ^(internal/provider/.*\.go|internal/provider/vsphere/.*|internal/provider/registry/.*)$
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -998,7 +1011,7 @@ tests:
 - as: e2e-vsphere-assisted-4-12
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -1009,7 +1022,7 @@ tests:
 - as: e2e-vsphere-assisted-4-13
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -1020,7 +1033,7 @@ tests:
 - as: e2e-vsphere-assisted-umn
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0

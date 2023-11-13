@@ -1,24 +1,32 @@
 base_images:
+  ci_tests-private-base_4.8:
+    name: tests-private-base
+    namespace: ci
+    tag: "4.8"
+  ci_tests-private-builder_4.8:
+    name: tests-private-builder
+    namespace: ci
+    tag: "4.8"
+  ocp_4.8_tools:
+    name: "4.8"
+    namespace: ocp
+    tag: tools
   ocp_builder_rhel-8-golang-1.16-openshift-4.8:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
-  tools:
-    name: "4.8"
-    namespace: ocp
-    tag: tools
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
 images:
-- dockerfile_path: images/Dockerfile
-  from: tools
+- dockerfile_path: images/Dockerfile.golang
+  from: ci_tests-private-base_4.8
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    ci_tests-private-builder_4.8:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+      - registry.ci.openshift.org/ci/tests-private-builder:4.8
   to: tests-private
 - dockerfile_literal: |
     FROM src
@@ -29,6 +37,30 @@ images:
         yum clean all && rm -rf /var/cache/yum/*
   from: src
   to: tests-private-ui
+- dockerfile_literal: |
+    FROM root
+    RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
+        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
+        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib" && \
+        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
+        yum clean all && rm -rf /var/cache/yum/*
+  from: root
+  optional: true
+  to: tests-private-baseui
+- dockerfile_path: images/Dockerfile.base
+  inputs:
+    ocp_4.8_tools:
+      as:
+      - registry.ci.openshift.org/ocp/4.8:tools
+  optional: true
+  to: tests-private-base
+- dockerfile_path: images/Dockerfile.builder
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+  optional: true
+  to: tests-private-builder
 promotion:
   namespace: ci
   tag: "4.8"

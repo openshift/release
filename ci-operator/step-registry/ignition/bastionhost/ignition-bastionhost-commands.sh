@@ -345,9 +345,9 @@ done
 patch_file=$(mktemp)
 
 # patch proxy for 6001 quay.io
-reg_quay_url=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.url')
-reg_quay_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
-reg_quay_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
+reg_quay_url=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.url')
+reg_quay_user=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.user')
+reg_quay_password=$(cat "/var/run/vault/mirror-registry/registry_quay_proxy.json" | jq -r '.password')
 cat > "${patch_file}" << EOF
 proxy:
   remoteurl: "${reg_quay_url}"

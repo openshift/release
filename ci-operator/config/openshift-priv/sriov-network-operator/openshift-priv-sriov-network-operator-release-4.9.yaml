@@ -11,6 +11,10 @@ base_images:
     name: 4.9-priv
     namespace: ocp-private
     tag: openstack-installer
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.9
   sriov-cni:
     name: 4.9-priv
     namespace: ocp-private
@@ -54,7 +58,10 @@ images:
   to: sriov-network-webhook
 operator:
   bundles:
-  - dockerfile_path: bundleci.Dockerfile
+  - as: sriov-network-operator-bundle
+    base_index: operator-index
+    dockerfile_path: bundleci.Dockerfile
+    update_graph: replaces
   substitutions:
   - pullspec: quay.io/openshift/origin-sriov-dp-admission-controller:4.9
     with: pipeline:sriov-dp-admission-controller
@@ -109,7 +116,7 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: ci-index-sriov-network-operator-bundle
     env:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
@@ -129,7 +136,7 @@ tests:
   steps:
     cluster_profile: openstack-nfv
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: ci-index-sriov-network-operator-bundle
     env:
       OPENSTACK_DPDK_NETWORK: intel-dpdk
     workflow: openshift-e2e-openstack-sriov

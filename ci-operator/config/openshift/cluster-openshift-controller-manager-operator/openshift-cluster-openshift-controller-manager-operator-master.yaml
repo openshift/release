@@ -3,19 +3,19 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: cluster-openshift-controller-manager-operator
 promotion:
   name: "4.15"
@@ -80,6 +80,12 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-builds
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: openshift-controller-manager
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift

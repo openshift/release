@@ -42,4 +42,10 @@ esac
 echo $JOB_ITERATIONS is JOB_ITERATIONS
 export JOB_ITERATIONS
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+
+rm -f ${SHARED_DIR}/index.json
+
 ./run.sh
+
+folder_name=$(ls -t -d /tmp/*/ | head -1)
+jq ".iterations = $JOB_ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json

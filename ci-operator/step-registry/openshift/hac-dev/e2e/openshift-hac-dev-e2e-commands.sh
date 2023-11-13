@@ -5,7 +5,7 @@ HOME=/tmp
 WORKSPACE=$(pwd)
 
 #Vault Secrets
-export HAC_KC_SSO_URL HAC_KC_USERNAME HAC_KC_PASSWORD HAC_KC_REGISTRATION CYPRESS_GH_TOKEN CYPRESS_GH_PASSWORD CYPRESS_QUAY_TOKEN CYPRESS_RP_HAC CYPRESS_VC_KUBECONFIG
+export HAC_KC_SSO_URL HAC_KC_USERNAME HAC_KC_PASSWORD HAC_KC_REGISTRATION CYPRESS_GH_TOKEN CYPRESS_GH_PASSWORD CYPRESS_QUAY_TOKEN CYPRESS_RP_HAC CYPRESS_VC_KUBECONFIG CYPRESS_SNYK_TOKEN
 HAC_KC_SSO_URL=$(cat /usr/local/ci-secrets/devsandbox/sso_hostname)
 HAC_KC_USERNAME=$(cat /usr/local/ci-secrets/devsandbox/username)
 HAC_KC_PASSWORD=$(cat /usr/local/ci-secrets/devsandbox/new-password)
@@ -16,6 +16,7 @@ CYPRESS_GH_PASSWORD=$(cat /usr/local/ci-secrets/github/github-password)
 CYPRESS_QUAY_TOKEN=$(cat /usr/local/ci-secrets/github/quay-token)
 CYPRESS_RP_HAC=$(cat /usr/local/ci-secrets/github/report-portal-token-hac)
 CYPRESS_VC_KUBECONFIG=$(cat /usr/local/ci-secrets/github/vc-kubeconfig)
+CYPRESS_SNYK_TOKEN=$(cat /usr/local/ci-secrets/github/snyk_token)
 
 #QONTRACT
 export QONTRACT_PASSWORD QONTRACT_USERNAME QONTRACT_BASE_URL
@@ -80,7 +81,7 @@ python keycloak.py $HAC_KC_SSO_URL $HAC_KC_USERNAME $HAC_KC_PASSWORD $B64_USER $
 
 export CYPRESS_PERIODIC_RUN CYPRESS_HAC_BASE_URL CYPRESS_USERNAME CYPRESS_PASSWORD CYPRESS_RP_TOKEN
 CYPRESS_PERIODIC_RUN=true
-CYPRESS_HAC_BASE_URL=https://${HOSTNAME}/application-pipeline
+CYPRESS_HAC_BASE_URL=https://${HOSTNAME}/preview/application-pipeline
 CYPRESS_USERNAME=`echo ${B64_USER} | base64 -d`
 CYPRESS_PASSWORD=`echo ${B64_PASS} | base64 -d`
 CYPRESS_RP_TOKEN=${CYPRESS_RP_HAC}

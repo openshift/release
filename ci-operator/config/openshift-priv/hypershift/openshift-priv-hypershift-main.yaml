@@ -11,14 +11,14 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: hypershift-operator
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
-  openshift_release_golang-1.19:
+    tag: rhel-8-golang-1.20-openshift-4.15
+  openshift_release_golang-1.20:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.20
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -26,16 +26,16 @@ canonical_go_repository: github.com/openshift/hypershift
 images:
 - from: base
   inputs:
-    openshift_release_golang-1.19:
+    openshift_release_golang-1.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
+      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: hypershift
 promotion:
   additional_images:
@@ -148,7 +148,7 @@ tests:
   run_if_changed: ^api/
   steps:
     env:
-      BOM_VERSION: 4.10.26_openshift
+      BOM_VERSION: 4.12.0_openshift
       MANAGED_CLUSTER_TYPE: iks
       MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/iks.kubeconfig
       TEST_TYPE: main
@@ -159,7 +159,7 @@ tests:
   run_if_changed: ^api/
   steps:
     env:
-      BOM_VERSION: 4.11.0_openshift
+      BOM_VERSION: 4.13.0_openshift
       MANAGED_CLUSTER_TYPE: openshift
       MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/roks.kubeconfig
       TEST_TYPE: main

@@ -41,6 +41,71 @@ EOF
     fi
 }
 
+function extract_ccoctl(){
+    echo -e "Extracting ccoctl\n"
+    local retry=5 
+    tmp_ccoctl="/tmp/upgtool"
+    mkdir -p ${tmp_ccoctl}
+    export PATH=/tmp:${PATH}
+    cco_image=$(oc adm release info --image-for='cloud-credential-operator' ${TARGET} -a "${CLUSTER_PROFILE_DIR}/pull-secret") || return 1
+    while ! (env "NO_PROXY=*" "no_proxy=*" oc image extract $cco_image --path="/usr/bin/ccoctl:${tmp_ccoctl}" -a "${CLUSTER_PROFILE_DIR}/pull-secret");
+    do
+        echo >&2 "Failed to extract ccoctl binary, retry..."
+        (( retry -= 1 ))
+        if (( retry < 0 )); then return 1; fi
+        sleep 60
+    done
+    mv ${tmp_ccoctl}/ccoctl /tmp -f
+    if [[ ! -e /tmp/ccoctl ]]; then
+        echo "No ccoctl tool found!" && return 1
+    else
+        chmod 775 /tmp/ccoctl
+    fi
+}
+
+function update_cloud_credentials_oidc(){
+    platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
+    preCredsDir="/tmp/pre-include-creds"
+    tobeCredsDir="/tmp/tobe-include-creds"
+    mkdir "${preCredsDir}" "${tobeCredsDir}"
+    # Extract all CRs from live cluster with --included
+    if ! oc adm release extract --to "${preCredsDir}" --included --credentials-requests; then
+        echo "Failed to extract CRs from live cluster!" && exit 1
+    fi
+    if ! oc adm release extract --to "${tobeCredsDir}" --included --credentials-requests "${TARGET}"; then
+        echo "Failed to extract CRs from tobe upgrade release payload!" && exit 1
+    fi
+
+    # TODO: add gcp and azure
+    # Update iam role with ccoctl based on tobeCredsDir
+    if ! diff -r "${preCredsDir}" "${tobeCredsDir}" &> /dev/null; then
+        toManifests="/tmp/to-manifests"
+        mkdir "${toManifests}"
+        case "${platform}" in
+        "AWS")
+            if [[ ! -e ${SHARED_DIR}/aws_oidc_provider_arn ]]; then
+                echo "No aws_oidc_provider_arn file in SHARED_DIR" && exit 1
+            else
+                export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+                infra_name=${NAMESPACE}-${UNIQUE_HASH}
+                oidc_provider=$(head -n1 ${SHARED_DIR}/aws_oidc_provider_arn)
+                extract_ccoctl
+                if ! ccoctl aws create-iam-roles --name="${infra_name}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="${tobeCredsDir}" --identity-provider-arn="${oidc_provider}" --output-dir="${toManifests}"; then
+                    echo "Failed to update iam role!" && exit 1
+                fi
+                if [[ "$(ls -A ${toManifests}/manifests)" ]]; then
+                    echo "Apply the new credential secrets."
+                    oc apply -f "${toManifests}/manifests"
+                fi
+            fi
+            ;;
+        *)
+           echo "to be supported platform: ${platform}" 
+           ;;
+        esac
+    fi
+}
+
 # Add cloudcredential.openshift.io/upgradeable-to: <version_number> to cloudcredential cluster when cco mode is manual
 function cco_annotation(){
     if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )); then
@@ -214,7 +279,7 @@ function run_command_oc() {
 }
 
 function check_clusteroperators() {
-    local tmp_ret=0 tmp_clusteroperator input column last_column_name tmp_clusteroperator_1 rc null_version unavailable_operator degraded_operator skip_operator
+    local tmp_ret=0 tmp_clusteroperator input column last_column_name tmp_clusteroperator_1 rc unavailable_operator degraded_operator skip_operator
 
     skip_operator="aro" # ARO operator versioned but based on RP git commit ID not cluster version
     echo "Make sure every operator do not report empty column"
@@ -241,12 +306,6 @@ function check_clusteroperators() {
     done < "${input}"
     rm -f "${tmp_clusteroperator}"
 
-    echo "Make sure every operator column reports version"
-    if null_version=$(${OC} get clusteroperator -o json | jq '.items[] | select(.status.versions == null) | .metadata.name') && [[ ${null_version} != "" ]]; then
-      echo >&2 "Null Version: ${null_version}"
-      (( tmp_ret += 1 ))
-    fi
-
     echo "Make sure every operator reports correct version"
     if incorrect_version=$(${OC} get clusteroperator --no-headers | grep -v ${skip_operator} | awk -v var="${TARGET_VERSION}" '$2 != var') && [[ ${incorrect_version} != "" ]]; then
         echo >&2 "Incorrect CO Version: ${incorrect_version}"
@@ -260,7 +319,7 @@ function check_clusteroperators() {
         echo >&2 "$unavailable_operator"
         (( tmp_ret += 1 ))
     fi
-    if ${OC} get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Available") | .status' | grep -iv "True"; then
+    if ${OC} get clusteroperator -o jsonpath='{.items[].status.conditions[?(@.type=="Available")].status}'| grep -iv "True"; then
         echo >&2 "Some operators are unavailable, pls run 'oc get clusteroperator -o json' to check"
         (( tmp_ret += 1 ))
     fi
@@ -273,7 +332,7 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
     #co_check=$(${OC} get clusteroperator -o json | jq '.items[] | select(.metadata.name != "openshift-samples") | .status.conditions[] | select(.type == "Degraded") | .status'  | grep -iv 'False')
-    if ${OC} get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Degraded") | .status'  | grep -iv 'False'; then
+    if ${OC} get clusteroperator -o jsonpath='{.items[].status.conditions[?(@.type=="Degraded")].status}'| grep -iv 'False'; then
         echo >&2 "Some operators are Degraded, pls run 'oc get clusteroperator -o json' to check"
         (( tmp_ret += 1 ))
     fi
@@ -306,62 +365,67 @@ function wait_clusteroperators_continous_success() {
     fi
 }
 
-function check_latest_machineconfig_applied() {
-    local role="$1" cmd latest_machineconfig applied_machineconfig_machines ready_machines
+function check_mcp() {
+    local updating_mcp unhealthy_mcp
 
-    cmd="oc get machineconfig"
-    echo "Command: $cmd"
-    eval "$cmd"
-
-    echo "Checking $role machines are applied with latest $role machineconfig..."
-    latest_machineconfig=$(oc get mcp/$role -o json | jq -r '.spec.configuration.name')
-    if [[ ${latest_machineconfig} == "" ]]; then
-        echo >&2 "Did not found ${role} render machineconfig"
-        return 1
-    else
-        echo "latest ${role} machineconfig: ${latest_machineconfig}"
-    fi
-
-    applied_machineconfig_machines=$(oc get node -l "node-role.kubernetes.io/${role}" -o json | jq -r --arg mc_name "${latest_machineconfig}" '.items[] | select(.metadata.annotations."machineconfiguration.openshift.io/state" == "Done" and .metadata.annotations."machineconfiguration.openshift.io/currentConfig" == $mc_name) | .metadata.name' | sort)
-    ready_machines=$(oc get node -l "node-role.kubernetes.io/${role}" -o json | jq -r '.items[].metadata.name' | sort)
-    if [[ ${applied_machineconfig_machines} == "${ready_machines}" ]]; then
-        echo "latest machineconfig - ${latest_machineconfig} is already applied to ${ready_machines}"
-        return 0
-    else
-        echo "latest machineconfig - ${latest_machineconfig} is applied to ${applied_machineconfig_machines}, but expected ready node lists: ${ready_machines}"
+    updating_mcp=$(oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status --no-headers | grep -v "False")
+    if [[ -n "${updating_mcp}" ]]; then
+        echo "Some mcp is updating..."
+        echo "${updating_mcp}"
         return 1
     fi
+
+    # Do not check UPDATED on purpose, beause some paused mcp would not update itself until unpaused
+    unhealthy_mcp=$(oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount --no-headers | grep -v "False.*False.*0")
+    if [[ -n "${unhealthy_mcp}" ]]; then
+        echo "Detected unhealthy mcp:"
+        echo "${unhealthy_mcp}"
+        echo "Real-time detected unhealthy mcp:"
+        oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount | grep -v "False.*False.*0"
+        echo "Real-time full mcp output:"
+        oc get mcp
+        echo ""
+        unhealthy_mcp_names=$(echo "${unhealthy_mcp}" | awk '{print $1}')
+        echo "Using oc describe to check status of unhealthy mcp ..."
+        for mcp_name in ${unhealthy_mcp_names}; do
+          echo "Name: $mcp_name"
+          oc describe mcp $mcp_name || echo "oc describe mcp $mcp_name failed"
+        done
+        return 2
+    fi
+    return 0
 }
 
-function wait_machineconfig_applied() {
-    local role="${1}" try=0 interval=30
-    num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l) 
-    local max_retries; max_retries=$(expr $num \* 20 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
-
-    local mcp_try=0 mcp_status=''
-    local max_try_between_updated_and_updating; max_try_between_updated_and_updating=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
-    while [ $mcp_try -lt $max_try_between_updated_and_updating ] && [ $try -lt $max_retries ]
-    do
-        sleep ${interval}
-        echo "Checking MCP #${try}"
-        mcp_status=$(oc get mcp/$role -o json | jq -r '.status.conditions[] | select(.type == "Updated") | .status')
-        if [[ X"$mcp_status" != X"True" ]]; then
-            mcp_try=0
+function wait_mcp_continous_success() {
+    local try=0 continous_successful_check=0 passed_criteria max_retries ret=0 interval=30
+    num=$(oc get node --no-headers | wc -l)
+    max_retries=$(expr $num \* 20 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
+    passed_criteria=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
+    while (( try < max_retries && continous_successful_check < passed_criteria )); do
+        echo "Checking #${try}"
+        ret=0
+        check_mcp || ret=$?
+        if [[ "$ret" == "0" ]]; then
+            echo "Passed #${continous_successful_check}"
+            (( continous_successful_check += 1 ))
+        elif [[ "$ret" == "1" ]]; then
+            echo "Some machines are updating..."
+            continous_successful_check=0
+        else
+            echo "Some machines are degraded..."
+            break
         fi
-        (( mcp_try += 1 ))
+        echo "wait and retry..."
+        sleep ${interval}
         (( try += 1 ))
     done
-    echo "MCP ${role} status is ${mcp_status}"
-    if [[ X"$mcp_status" != X"True" ]]; then
-        echo "Timeout waiting for mcp updated"
-        return 1
-    fi
-
-    if ! check_latest_machineconfig_applied "${role}"; then
-        echo >&2 "Timeout waiting for all $role machineconfigs are applied"
+    if (( continous_successful_check != passed_criteria )); then
+        echo >&2 "Some mcp does not get ready or not stable"
+        echo "Debug: current mcp output is:"
+        oc get mcp
         return 1
     else
-        echo "All ${role} machineconfigs check PASSED"
+        echo "All mcp status check PASSED"
         return 0
     fi
 }
@@ -390,20 +454,15 @@ function check_pod() {
 }
 
 function health_check() {
-    #1. Make sure all machines are applied with latest machineconfig
-    echo "Step #1: Make sure all machines are applied with latest machineconfig"
-    wait_machineconfig_applied "master"
-    wait_machineconfig_applied "worker"
+    echo "Step #1: Make sure no degrated or updating mcp"
+    wait_mcp_continous_success
 
-    #2. Check all cluster operators get stable and ready
     echo "Step #2: check all cluster operators get stable and ready"
     wait_clusteroperators_continous_success
 
-    #3. Make sure every machine is in 'Ready' status
     echo "Step #3: Make sure every machine is in 'Ready' status"
     check_node
 
-    #4. All pods are in status running or complete
     echo "Step #4: check all pods are in status running or complete"
     check_pod
 }
@@ -430,14 +489,22 @@ function admin_ack() {
 
     local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r ".data")"
     if [[ ${out} != *"ack-4.${SOURCE_MINOR_VERSION}"* ]]; then
-        echo "Admin ack not required" && return
+        echo "Admin ack not required: ${out}" && return
     fi
 
-    echo "Require admin ack"
+    echo "Require admin ack:\n ${out}"
     local wait_time_loop_var=0 ack_data
-    ack_data="$(echo ${out} | awk '{print $2}' | cut -f2 -d\")" && echo "Admin ack patch data is: ${ack_data}"
-    oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack_data}"'": "true"}}' --type=merge
 
+    ack_data="$(echo "${out}" | jq -r "keys[]")"
+    for ack in ${ack_data};
+    do
+        # e.g.: ack-4.12-kube-1.26-api-removals-in-4.13
+        if [[ "${ack}" == *"ack-4.${SOURCE_MINOR_VERSION}"* ]]
+        then
+            echo "Admin ack patch data is: ${ack}"
+            oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
+        fi
+    done
     echo "Admin-acks patch gets started"
 
     echo -e "sleep 5 min wait admin-acks patch to be valid...\n"
@@ -466,31 +533,31 @@ function upgrade() {
 # Monitor the upgrade status
 function check_upgrade_status() {
     local wait_upgrade="${TIMEOUT}" out avail progress
+    echo "Starting the upgrade checking on $(date "+%F %T")"
     while (( wait_upgrade > 0 )); do
         sleep 5m
-        (( wait_upgrade -= 5 ))
-        if ! ( echo "oc get clusterversion" && oc get clusterversion ); then
+        wait_upgrade=$(( wait_upgrade - 5 ))
+        if ! ( run_command "oc get clusterversion" ); then
             continue
         fi
         if ! out="$(oc get clusterversion --no-headers)"; then continue; fi
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${TARGET_VERSION}" ]]; then
-            echo -e "Upgrade succeed\n\n"
+            echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
             return 0
         fi
     done
-    if (( wait_upgrade <= 0 )); then
-        echo -e "Upgrade timeout, exiting\n" && return 1
+    if [[ ${wait_upgrade} -le 0 ]]; then
+        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
     fi
 }
 
 # Check version, state in history
 function check_history() {
-    local cv version state
-    cv=$(oc get clusterversion/version -o json)
-    version=$(echo "${cv}" | jq -r '.status.history[0].version')
-    state=$(echo "${cv}" | jq -r '.status.history[0].state')
+    local version state
+    version=$(oc get clusterversion/version -o jsonpath='{.status.history[0].version}')
+    state=$(oc get clusterversion/version -o jsonpath='{.status.history[0].state}')
     if [[ ${version} == "${TARGET_VERSION}" && ${state} == "Completed" ]]; then
         echo "History check PASSED, cluster is now upgraded to ${TARGET_VERSION}" && return 0
     else
@@ -526,7 +593,6 @@ mkdir -p /tmp/client
 export OC_DIR="/tmp/client"
 export PATH=${OC_DIR}:$PATH
 
-
 for target in "${TARGET_RELEASES[@]}"
 do
     export TARGET="${target}"
@@ -553,7 +619,9 @@ do
         admin_ack
         cco_annotation
     fi
-
+    if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
+        update_cloud_credentials_oidc
+    fi
     upgrade
     check_upgrade_status
     check_history

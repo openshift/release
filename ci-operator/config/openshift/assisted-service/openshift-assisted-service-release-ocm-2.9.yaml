@@ -15,14 +15,6 @@ base_images:
     name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-controller
-  assisted-test-infra:
-    name: ocm-2.9
-    namespace: edge-infrastructure
-    tag: assisted-test-infra
-  assisted-test-infra-internal:
-    name: ocm-2.9
-    namespace: edge-infrastructure
-    tag: assisted-test-infra-internal
   cli:
     name: "4.11"
     namespace: ocp
@@ -43,10 +35,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: hypershift-operator
-  openshift_release_golang-1.18:
+  openshift_release_golang-1.20:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.20
   postgresql-12-centos7:
     name: postgresql-12-centos7
     namespace: edge-infrastructure
@@ -56,9 +48,9 @@ build_root:
 images:
 - dockerfile_path: ci-images/Dockerfile.base
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service-base
 - dockerfile_path: ci-images/Dockerfile.unit-tests
   from: assisted-service-base
@@ -81,9 +73,9 @@ images:
     edge_infrastructure_swagger_codegen_cli:
       as:
       - quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service-build-base
 - dockerfile_literal: |
     FROM base-build
@@ -99,9 +91,9 @@ images:
   to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service
 - dockerfile_literal: |
     FROM coreos/centos
@@ -445,7 +437,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       DISCONNECTED: "true"
@@ -456,7 +448,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       DISCONNECTED: "true"
@@ -654,18 +646,9 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=1
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-hypershift-zero-nodes
+- always_run: false
+  as: e2e-ai-operator-ztp-hypershift-zero-nodes
   optional: true
-  run_if_changed: ^(deploy/operator/hypershift/.*|api/.*|internal/controller/controllers/.*agentserviceconfig.*)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      HYPERSHIFT_IMAGE: hypershift-operator
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    workflow: assisted-baremetal-operator-hypershift
-- as: e2e-ai-operator-ztp-hypershift-zero-nodes-periodic
-  cron: 00 02 */1 * 1-4
   steps:
     cluster_profile: packet-assisted
     dependencies:

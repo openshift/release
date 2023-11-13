@@ -31,29 +31,29 @@ base_images:
     name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
-  coreos-centos-stream8:
-    name: stream8
-    namespace: coreos
-    tag: "8"
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_golang-1.18:
+  openshift_release_golang-1.20:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.20
 build_root:
-  project_image:
-    dockerfile_path: Dockerfile.assisted_installer_agent-build
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile.assisted_installer_agent
-  from: coreos-centos-stream8
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-installer-agent
+- dockerfile_path: Dockerfile.assisted_installer_agent-build
+  inputs:
+    openshift_release_golang-1.20:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.20
+  to: assisted-installer-agent-build
 - dockerfile_literal: |
     FROM base
     COPY . .
@@ -67,7 +67,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -101,18 +101,24 @@ tests:
     - ref: assisted-baremetal-images-publish
 - as: lint
   commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
     make lint
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-agent-build
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test
   commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-agent-build
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-agent-codecov-token
@@ -122,7 +128,8 @@ tests:
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-agent-build
   postsubmit: true
   secret:
     mount_path: /tmp/secret
@@ -166,7 +173,12 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+        MASTER_MEMORY=17408
+        MASTER_CPU=8
+        WORKER_MEMORY=9216
+        WORKER_CPU=4
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
   optional: true
@@ -186,7 +198,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2

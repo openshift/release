@@ -152,26 +152,6 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-usertags
-- as: azure-ipi-baselinecaps-v412-to-multiarch-f14
-  cron: 47 10 8,23 * *
-  steps:
-    cluster_profile: azure-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: v4.12
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @azure-ipi and @heterogeneous
-        and @network-ovnkubernetes and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @azure-ipi and @heterogeneous
-        and @network-ovnkubernetes and not @fips'
-    test:
-    - chain: openshift-upgrade-qe-test-arch-migration
-    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-disconnected-fullyprivate-f14
   cron: 33 5 8,23 * *
   steps:
@@ -198,6 +178,25 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: azure-ipi-to-multiarch-f14
+  cron: 12 9 10,25 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-arch-migration
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: baremetal-upi-to-multiarch-f7
   cluster: build05
   cron: 30 21 2,14 * *

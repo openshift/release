@@ -7,7 +7,7 @@ base_images:
     name: "4.14"
     namespace: origin
     tag: operator-sdk
-binary_build_commands: make build
+binary_build_commands: make build && go mod vendor
 build_root:
   image_stream_tag:
     name: builder
@@ -27,7 +27,7 @@ operator:
     context_dir: ./bundle/openshift
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: ghcr.io/grafana/tempo-operator/tempo-operator:v0.2.0
+  - pullspec: ghcr.io/grafana/tempo-operator/tempo-operator:v0.4.0
     with: pipeline:tempo-operator
 releases:
   latest:
@@ -41,6 +41,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: tempo-operator
+    workflow: openshift-ci-security
 - as: test
   steps:
     test:
@@ -63,6 +69,7 @@ tests:
     env:
       EO_SUB_CHANNEL: stable-5.7
       EO_SUB_SOURCE: redhat-operators
+      SKIP_TESTS: tests/e2e-openshift/red-metrics tests/e2e/custom-ca
     test:
     - as: install
       cli: latest

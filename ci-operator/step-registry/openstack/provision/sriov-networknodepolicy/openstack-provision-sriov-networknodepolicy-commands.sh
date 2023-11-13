@@ -128,6 +128,9 @@ else
     IS_RDMA="false"
 fi
 
+echo "Print SriovNetworkNodeState before creating SriovNetworkNodePolicy"
+oc get SriovNetworkNodeState -n openshift-sriov-network-operator -o yaml
+
 create_sriov_networknodepolicy "sriov1" "${OPENSTACK_SRIOV_NETWORK}" "${SRIOV_DEVICE_TYPE}" "${IS_RDMA}"
 
 if [[ "${OPENSTACK_DPDK_NETWORK}" != "" ]]; then

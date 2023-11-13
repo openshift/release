@@ -56,12 +56,15 @@ fi
 oc registry login
 
 # Install tools
+mkdir /tmp/bin
+export PATH=$PATH:/tmp/bin/
+
 echo "## Install yq"
-curl -L https://github.com/mikefarah/yq/releases/download/v4.13.5/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+curl -L https://github.com/mikefarah/yq/releases/download/v4.13.5/yq_linux_amd64 -o /tmp/bin/yq && chmod +x /tmp/bin/yq
 echo "   yq installed"
 
 echo "## Install jq"
-curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq && chmod +x /tmp/jq
+curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/bin/jq && chmod +x /tmp/bin/jq
 echo "   jq installed"
 
 UNRELEASED_SEMVER="99.0.0-unreleased"
@@ -75,7 +78,6 @@ CO_GIT="https://github.com/${CO_REPO}.git"
 CO_FORK="https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com/${GITHUB_USER}/${CO_PROJECT}.git"
 CO_DIR=$(mktemp -d)
 CO_OPERATOR_DIR="${CO_DIR}/operators/assisted-service-operator"
-CO_OPERATOR_PACKAGE="${CO_OPERATOR_DIR}/assisted-service.package.yaml"
 
 if [ -z "${GITHUB_USER}" ] || [ -z "${GITHUB_TOKEN}" ] || [ -z "${GITHUB_NAME}" ] || [ -z "${GITHUB_EMAIL}" ]; then
     echo "Must set all of GITHUB_USER, GITHUB_TOKEN, GITHUB_NAME, and GITHUB_EMAIL"
@@ -96,35 +98,38 @@ popd
 
 echo
 echo "## Collecting channels to be updated"
-BUNDLE_CHANNELS=$(/tmp/yq eval '.annotations."operators.operatorframework.io.bundle.channels.v1"' "${OPERATOR_METADATA}/annotations.yaml")
+BUNDLE_CHANNELS=$(yq eval '.annotations."operators.operatorframework.io.bundle.channels.v1"' "${OPERATOR_METADATA}/annotations.yaml")
 echo "   channels to be updated are: ${BUNDLE_CHANNELS}"
 
 echo
 echo "## Determing operator version"
-channel="${BUNDLE_CHANNELS%%,*}"
-echo "   using '${channel}' channel to determine previous operator version"
-PREV_OPERATOR_VERSION=$(c=${channel} /tmp/yq eval --exit-status \
-    '.channels[] | select(.name == strenv(c)) | .currentCSV' "${CO_OPERATOR_PACKAGE}" | \
-    sed -e "s/assisted-service-operator.v//")
+readarray -t versions <<< "$(ls ${CO_OPERATOR_DIR} --ignore ci.yaml | sort --version-sort)"
+PREV_OPERATOR_VERSION=${versions[-1]}
 echo "   previous operator version: ${PREV_OPERATOR_VERSION}"
 
-BUMP_MINOR="false"
-for c in ${BUNDLE_CHANNELS//,/ }; do
-    package_exists=$(c=${c} /tmp/yq eval '.channels[] | select(.name == strenv(c))' "${CO_OPERATOR_PACKAGE}")
-    if [ -z "${package_exists}" ]; then
-        BUMP_MINOR="true"
+BUMP_MINOR="true"
+for channel in ${BUNDLE_CHANNELS//,/ }; do
+    if ! [[ $channel =~ ^ocm-[0-9]+\.[0-9]+$ ]]; then
+        echo "    channel ${channel} is not in the form 'ocm-x.y'. Skipping..."
+        continue
     fi
+
+    for version in "${versions[@]}"; do
+        associated_channels=$(yq eval '.annotations."operators.operatorframework.io.bundle.channels.v1"' ${CO_OPERATOR_DIR}/$version/metadata/annotations.yaml)
+        if [[ ${associated_channels[*]} != *"${channel}"* ]]; then
+            BUMP_MINOR="false"
+            break
+        fi
+    done
 done
+
 if [ "${BUMP_MINOR}" == "true" ]; then
     echo "   we will bump the minor version since we are creating a new channel"
 else
     echo "   we will bump the patch version"
 fi
-# First drop any build metadata
-OPERATOR_VERSION=${PREV_OPERATOR_VERSION%+*}
-# Now drop any pre-release info
-OPERATOR_VERSION="${OPERATOR_VERSION%-*}"
-IFS='.' read -r -a version_split <<< "${OPERATOR_VERSION}"
+
+IFS='.' read -r -a version_split <<< "${PREV_OPERATOR_VERSION}"
 if [ "${BUMP_MINOR}" == "true" ]; then
     OPERATOR_VERSION="${version_split[0]}.$((1 + 10#${version_split[1]})).${version_split[2]}"
 else
@@ -143,7 +148,7 @@ if [[ "${BUNDLE_CHANNELS}" == *"alpha"* ]]; then
     done
 else
     echo "   use previous version to determine the versions we skip"
-    OPERATOR_SKIPS=$(/tmp/yq eval ".spec.skips | .[]" "${CO_OPERATOR_DIR}/${PREV_OPERATOR_VERSION}/${CSV}")
+    OPERATOR_SKIPS=$(yq eval ".spec.skips | .[]" "${CO_OPERATOR_DIR}/${PREV_OPERATOR_VERSION}/${CSV}")
     OPERATOR_SKIPS="${OPERATOR_SKIPS} assisted-service-operator.v${PREV_OPERATOR_VERSION}"
 fi
 echo "   skipping these operator versions: "
@@ -152,15 +157,21 @@ for version in ${OPERATOR_SKIPS}; do
 done
 
 echo
-echo "## Update operator manifests"
-cp -r "${OPERATOR_MANIFESTS}" "${CO_OPERATOR_DIR}/${OPERATOR_VERSION}"
+echo "## Update operator manifests and metadata"
+mkdir "${CO_OPERATOR_DIR}/${OPERATOR_VERSION}/"
+cp -rv "${OPERATOR_MANIFESTS}" "${OPERATOR_METADATA}" "${CO_OPERATOR_DIR}/${OPERATOR_VERSION}/"
+
+echo "   removing test-related annotations from metadata"
+yq eval --inplace '.annotations = (.annotations | with_entries(select(.key | test("operators.operatorframework.io.test") | not)))' \
+    "${CO_OPERATOR_DIR}/${OPERATOR_VERSION}/metadata/annotations.yaml"
+
 pushd "${CO_DIR}"
 git checkout -B "${OPERATOR_VERSION}"
-CO_CSV="${CO_OPERATOR_DIR}/${OPERATOR_VERSION}/${CSV}"
+CO_CSV="${CO_OPERATOR_DIR}/${OPERATOR_VERSION}/manifests/${CSV}"
 
 echo "   updating images to use digest"
 # Grab all of the images from the relatedImages and get their digest sha
-for full_image in $(/tmp/yq eval '.spec.relatedImages[] | .image' "${CO_CSV}"); do
+for full_image in $(yq eval '.spec.relatedImages[] | .image' "${CO_CSV}"); do
     image=${full_image%:*}
     image_name=${image#*/}
 
@@ -174,7 +185,7 @@ for full_image in $(/tmp/yq eval '.spec.relatedImages[] | .image' "${CO_CSV}"); 
     }
 
     digest=$(curl -G "https://${REGISTRY_HOST}/api/v1/repository/${mirror_image_name}/tag/?specificTag=${OPERATOR_VERSION}" | \
-        /tmp/jq -e -r '
+        jq -e -r '
             .tags[]
             | select((has("expiration") | not))
             | .manifest_digest')
@@ -193,41 +204,24 @@ sed -i "s/${UNRELEASED_SEMVER}/${OPERATOR_VERSION}/" "${CO_CSV}"
 
 echo "   adding replaces"
 v="assisted-service-operator.v${PREV_OPERATOR_VERSION}" \
-    /tmp/yq eval --exit-status --inplace \
+    yq eval --exit-status --inplace \
     '.spec.replaces |= strenv(v)' "${CO_CSV}"
 
 echo "   adding spec.skips"
 for version in ${OPERATOR_SKIPS}; do
     v="${version}" \
-        /tmp/yq eval --exit-status --inplace \
+        yq eval --exit-status --inplace \
         '.spec.skips |= . + [strenv(v)]' "${CO_CSV}"
-done
-
-echo "   update package versions"
-for c in ${BUNDLE_CHANNELS//,/ }; do
-    package_exists=$(c="${c}" /tmp/yq eval '.channels[] | select(.name == strenv(c))' "${CO_OPERATOR_PACKAGE}")
-    if [[ -z "${package_exists}" ]]; then
-        c="${c}" v="assisted-service-operator.v${OPERATOR_VERSION}" \
-            /tmp/yq eval --exit-status --inplace \
-            '(.channels |= . + [{"currentCSV": strenv(v), "name": strenv(c)}]' \
-            "${CO_OPERATOR_PACKAGE}"
-    else
-        c="${c}" v="assisted-service-operator.v${OPERATOR_VERSION}" \
-            /tmp/yq eval --exit-status --inplace \
-            '(.channels[] | select(.name == strenv(c)).currentCSV) |= strenv(v)' \
-            "${CO_OPERATOR_PACKAGE}"
-    fi
 done
 
 echo
 echo "## Submit PR to community operators"
 echo "   commit changes"
 git add --all
-git commit -s -m "assisted-service-operator.v${OPERATOR_VERSION}"
+git commit -s -m "operator assisted-service-operator (${OPERATOR_VERSION})"
 git push --set-upstream --force origin HEAD
 
 echo "   submit PR"
-# Create PR
 curl "https://api.github.com/repos/${CO_REPO}/pulls" --user "${GITHUB_USER}:${GITHUB_TOKEN}" -X POST \
     --data '{"title": "'"$(git log -1 --format=%s)"'", "base": "main", "body": "An automated PR to update assisted-service-operator to v'"${OPERATOR_VERSION}"'", "head": "'"${GITHUB_USER}:${OPERATOR_VERSION}"'"}'
 popd

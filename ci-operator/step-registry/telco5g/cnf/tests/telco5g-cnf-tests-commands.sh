@@ -34,6 +34,11 @@ function create_tests_temp_skip_list_12 {
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/CNF-10321
+# TESTNAME
+metallb "coexist should have correct statuses"
+
 EOF
 }
 
@@ -250,10 +255,7 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 
-if [[ "$T5CI_VERSION" == "4.14" ]]; then
-    export CNF_BRANCH="master"
-    export CNF_TESTS_IMAGE="cnf-tests:4.14"
-elif [[ "$T5CI_VERSION" == "4.15" ]]; then
+if [[ "$T5CI_VERSION" == "4.15" ]]; then
     export CNF_BRANCH="master"
     export CNF_TESTS_IMAGE="cnf-tests:4.14"
 else
@@ -273,11 +275,19 @@ if [[ ! -d "${CNF_REPO_DIR}" ]]; then
 fi
 
 pushd $CNF_REPO_DIR
-echo "Checking out pull request for repository cnf-features-deploy if exists"
+if [[ "$T5CI_VERSION" == "4.15" ]]; then
+    echo "Updating all submodules for >=4.15 versions"
+    # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
+    sed -i "s@https://github.com/openshift/metallb-operator.git@https://github.com/openshift/metallb-operator.git\n        branch = main@" .gitmodules
+    git submodule update --init --force --recursive --remote
+    git submodule foreach --recursive 'echo $path `git config --get remote.origin.url` `git rev-parse HEAD`' | grep -v Entering > ${ARTIFACT_DIR}/hashes.txt || true
+fi
+echo "******** Checking out pull request for repository cnf-features-deploy if exists"
 check_for_pr "openshift-kni" "cnf-features-deploy"
-
-oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 popd
+
+echo "******** Patching OperatorHub to disable all default sources"
+oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 
 # Skiplist common for all releases
 create_tests_skip_list_file
@@ -297,13 +307,13 @@ if [[ "$CNF_BRANCH" == *"4.13"* ]]; then
     create_tests_temp_skip_list_13
     export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
 fi
-if [[ "$CNF_BRANCH" == *"4.14"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+if [[ "$CNF_BRANCH" == *"4.14"* ]]; then
     create_tests_temp_skip_list_14
     export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
 fi
 if [[ "$CNF_BRANCH" == *"4.15"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
     create_tests_temp_skip_list_15
-    export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
+    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
 
@@ -312,6 +322,7 @@ export TESTS_REPORTS_PATH="${ARTIFACT_DIR}/"
 skip_tests=$(get_skip_tests)
 
 if [[ "$T5CI_JOB_TYPE" != "sno-cnftests" ]]; then
+    echo "******** For non-SNO jobs, get worker nodes"
     worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \
     --selector='!node-role.kubernetes.io/master' -o name)
     if [ -z "${worker_nodes}" ]; then
@@ -333,9 +344,11 @@ if [[ "$T5CI_JOB_TYPE" != "sno-cnftests" ]]; then
 fi
 
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
+    echo "******** For SNO jobs, get master nodes"
     test_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' -o name)
     export ROLE_WORKER_CNF="master"
     # Make local workarounds for SNO
+    echo "******** Running SNO fixes"
     sno_fixes
 fi
 export CNF_NODES="${test_nodes}"
@@ -350,13 +363,15 @@ fi
 # if RUN_VALIDATIONS set, run validations
 if $RUN_VALIDATIONS; then
     echo "************ Running validations ************"
-    FEATURES=$VALIDATIONS_FEATURES FEATURES_ENVIRONMENT="ci" make feature-deploy-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-validations-run.log || val_status=$?
+    FEATURES=$VALIDATIONS_FEATURES FEATURES_ENVIRONMENT="ci" stdbuf -o0 make feature-deploy-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-validations-run.log ${ARTIFACT_DIR}/saved-cnf-validations.log || val_status=$?
 fi
 # set overall status to fail if validations failed
 if [[ ${val_status} -ne 0 ]]; then
+    echo "Validations failed with status code $val_status"
     status=${val_status}
 fi
 
+echo "Wait until number of nodes matches number of machines"
 # Wait until number of nodes matches number of machines
 # Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
 for _ in $(seq 30); do
@@ -366,12 +381,15 @@ for _ in $(seq 30); do
     sleep 30
 done
 
+echo "Check if nodes amount '$nodes' equal to machines '$machines'"
 [ "$machines" -le "$nodes" ]
 
+echo "Wait for nodes to be up and ready"
 # Wait for nodes to be ready
 # Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
 oc wait nodes --all --for=condition=Ready=true --timeout=10m
 
+echo "Wait for cluster operators to be deployed and ready"
 # Waiting for clusteroperators to finish progressing
 # Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
@@ -379,7 +397,7 @@ oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 # if validations passed and RUN_TESTS set, run the tests
 if [[ ${val_status} -eq 0 ]] && $RUN_TESTS; then
     echo "************ Running e2e tests ************"
-    FEATURES=$TEST_RUN_FEATURES FEATURES_ENVIRONMENT="ci" make functests 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log || status=$?
+    FEATURES=$TEST_RUN_FEATURES FEATURES_ENVIRONMENT="ci" stdbuf -o0 make functests 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log ${ARTIFACT_DIR}/saved-cnf-tests-run.log || status=$?
 fi
 popd
 

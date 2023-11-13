@@ -125,7 +125,7 @@ tests:
 - as: e2e-openstack-kuryr
   minimum_interval: 72h
   steps:
-    cluster_profile: openstack-kuryr
+    cluster_profile: openstack-vh-mecha-az0
     env:
       NETWORK_TYPE: Kuryr
       TEST_SKIPS: NodePort \| session affinity \| Services should be able to change
@@ -168,6 +168,8 @@ tests:
   minimum_interval: 96h
   steps:
     cluster_profile: openstack-hwoffload
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-openstack-dualstack
 - as: e2e-openstack-ccpmso
   minimum_interval: 240h
@@ -182,7 +184,7 @@ tests:
         git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch release-4.14 --depth=1 $dir
         export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
         cd $dir
-        make e2e-presubmit e2e-periodic
+        make e2e-periodic
       from: stolostron
       resources:
         requests:
@@ -195,7 +197,7 @@ tests:
 - as: e2e-openstack-ccpmso-zone
   minimum_interval: 240h
   steps:
-    cluster_profile: openstack-kuryr
+    cluster_profile: openstack-vh-mecha-az0
     env:
       TEST_SUITE: experimental/reliability/minimal
     test:
@@ -206,7 +208,7 @@ tests:
         export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
         cd $dir
         test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
-        make e2e-presubmit e2e-periodic
+        make e2e-periodic
       from: stolostron
       resources:
         requests:
@@ -216,6 +218,20 @@ tests:
     - ref: openstack-test-openstack
     workflow: openshift-e2e-openstack-ipi
   timeout: 7h0m0s
+- as: openstack-kuryr-migration
+  minimum_interval: 336h
+  steps:
+    cluster_profile: openstack-vh-mecha-az0
+    env:
+      NETWORK_TYPE: Kuryr
+      OPENSTACK_TEST_SKIPS: Amphora LoadBalancer
+      TEST_SKIPS: NodePort \| session affinity \| Services should be able to change
+        the type from ExternalName to ClusterIP \| Pods should delete a collection
+        of pods \| Kubectl client Guestbook application should create and stop a working
+        application \| Services should serve multiport endpoints from pods \| Services
+        should serve a basic endpoint from pods
+      TEST_SUITE: kubernetes/conformance
+    workflow: openshift-e2e-openstack-kuryr-migration
 zz_generated_metadata:
   branch: main
   org: shiftstack

@@ -3,7 +3,9 @@ workflow:
   steps:
     env:
       STS: "true"
+      PERMISSIONS_BOUNDARY: "arn:aws:iam::aws:policy/AdministratorAccess"
       COMPUTE_MACHINE_TYPE: "m5.xlarge"
+      WORKER_DISK_SIZE: "128GiB"
       ENABLE_AUTOSCALING: "true"
       MIN_REPLICAS: "3"
       MAX_REPLICAS: "6"
@@ -18,13 +20,15 @@ workflow:
       DISABLE_WORKLOAD_MONITORING: "true"
       DISABLE_SCP_CHECKS: "false"
       EC2_METADATA_HTTP_TOKENS: "required"
-      DEFAULT_MACHINE_POOL_LABELS: "prowci=true"
+      DEFAULT_MACHINE_POOL_LABELS: "k8s.ovn.org/egress-assignable="
       MP_MACHINE_TYPE: "g4dn.2xlarge"
       MP_REPLICAS: "1"
       LOCAL_ZONE: "true"
       LOCALZONE_WORKER_ASSIGN_PUBLIC_IP: "no"
+      ADDITIONAL_SECURITY_GROUP: "false"
     pre:
     - ref: aws-provision-vpc-shared
+    - ref: aws-provision-security-group
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
     - chain: aws-provision-bastionhost
     - chain: rosa-sts-oidc-config-create
@@ -40,6 +44,7 @@ workflow:
     - chain: rosa-cluster-deprovision
     - ref: rosa-sts-kms-key-delete
     - chain: rosa-sts-oidc-config-delete
+    - ref: aws-deprovision-security-group
     - ref: aws-deprovision-s3buckets
     - ref: aws-deprovision-stacks
   documentation: |-

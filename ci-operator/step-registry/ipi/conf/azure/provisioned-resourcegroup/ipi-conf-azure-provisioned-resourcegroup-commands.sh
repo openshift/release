@@ -4,7 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-provisioned_rg_file="${SHARED_DIR}/resourcegroup"
+if [[ -s "${SHARED_DIR}/resourcegroup_cluster" ]]; then
+    provisioned_rg_file="${SHARED_DIR}/resourcegroup_cluster"
+else
+    provisioned_rg_file="${SHARED_DIR}/resourcegroup"
+fi
+
 if [ ! -f "${provisioned_rg_file}" ]; then
     echo "${provisioned_rg_file} is not found, exiting..."
     exit 1

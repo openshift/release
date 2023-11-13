@@ -27,7 +27,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-test-0.3.59
+    tag: stackrox-test-0.3.61
 resources:
   '*':
     requests:
@@ -36,19 +36,23 @@ resources:
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
 - as: shell-unit-tests
+  run_if_changed: (\\.sh|\\.bat)$
   steps:
     test:
     - ref: stackrox-initial
 - as: gke-qa-e2e-tests
   optional: true
+  skip_if_only_changed: ^ui/
   steps:
     env:
       COLLECTION_METHOD: core_bpf
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: gke-ebpf-qa-e2e-tests
+- always_run: false
+  as: gke-ebpf-qa-e2e-tests
   optional: true
+  skip_if_only_changed: ^ui/
   steps:
     env:
       COLLECTION_METHOD: ebpf
@@ -57,6 +61,7 @@ tests:
     - ref: stackrox-e2e
 - as: gke-ui-e2e-tests
   optional: true
+  run_if_changed: ^(ui|proto/(storage|api)|central/.+?/service)/
   steps:
     env:
       COLLECTION_METHOD: core_bpf
@@ -65,30 +70,45 @@ tests:
   timeout: 5h0m0s
 - as: gke-nongroovy-e2e-tests
   optional: true
+  skip_if_only_changed: ^ui/
   steps:
     env:
       COLLECTION_METHOD: core_bpf
     test:
     - ref: stackrox-e2e
-- as: gke-sensor-integration-tests
+- always_run: false
+  as: gke-sensor-integration-tests
   optional: true
+  skip_if_only_changed: ^ui/
   steps:
     env:
       COLLECTION_METHOD: core_bpf
     test:
     - ref: stackrox-e2e
-- as: gke-upgrade-tests
+- always_run: false
+  as: gke-operator-e2e-tests
   optional: true
+  run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
   steps:
     test:
     - ref: stackrox-e2e
-- as: gke-version-compatibility-tests
+  timeout: 5h0m0s
+- always_run: false
+  as: gke-upgrade-tests
+  optional: true
+  run_if_changed: ^(COLLECTOR_VERSION|SCANNER_VERSION|tests/upgrade/|qa-tests-backend/src/test/groovy/UpgradesTest.groovy|migrator/|image/)
+  steps:
+    test:
+    - ref: stackrox-e2e
+- always_run: false
+  as: gke-version-compatibility-tests
   optional: true
   steps:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: gke-race-condition-qa-e2e-tests
+- always_run: false
+  as: gke-race-condition-qa-e2e-tests
   optional: true
   steps:
     env:
@@ -96,19 +116,22 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: gke-scale-tests
+- always_run: false
+  as: gke-scale-tests
   optional: true
   steps:
     test:
     - ref: stackrox-e2e
-- as: eks-qa-e2e-tests
+- always_run: false
+  as: eks-qa-e2e-tests
   optional: true
   steps:
     env:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-eks-e2e
   timeout: 5h0m0s
-- as: eks-ebpf-qa-e2e-tests
+- always_run: false
+  as: eks-ebpf-qa-e2e-tests
   optional: true
   steps:
     env:
@@ -116,14 +139,16 @@ tests:
       TEST_SUITE: eks-qa-e2e-tests
     workflow: stackrox-automation-flavors-eks-e2e
   timeout: 5h0m0s
-- as: osd-gcp-qa-e2e-tests
+- always_run: false
+  as: osd-gcp-qa-e2e-tests
   optional: true
   steps:
     env:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-osd-gcp-e2e
   timeout: 5h0m0s
-- as: aro-qa-e2e-tests
+- always_run: false
+  as: aro-qa-e2e-tests
   optional: true
   steps:
     env:
@@ -135,6 +160,12 @@ tests:
   steps:
     test:
     - ref: stackrox-initial
+- as: merge-gke-operator-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
 - as: merge-gke-qa-e2e-tests
   postsubmit: true
   steps:
@@ -227,7 +258,8 @@ tests:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-aro-e2e
   timeout: 5h0m0s
-- as: powervs-qa-e2e-tests
+- always_run: false
+  as: powervs-qa-e2e-tests
   optional: true
   steps:
     env:

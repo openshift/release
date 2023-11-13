@@ -96,12 +96,30 @@ tests:
     --branch=maistra-3.0 \
     --token-path=/creds-github/token \
     '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
-    "--labels=tide/merge-method-merge" \
+    "--labels=tide/merge-method-merge,auto-merge" \
     --modifier=merge_upstream_istio_master \
     --merge-repository=https://github.com/istio/istio \
     --merge-branch=master \
     --merge-failure-notify=@maistra/release-managers-3-0 \
     --merge-strategy=merge
+  container:
+    from: src
+  cron: 00 05 * * 1-5
+  secrets:
+  - mount_path: /creds-github
+    name: github-token
+- as: update-istio-builder-image
+  commands: |
+    export NEW_IMAGE=$(curl -sL https://raw.githubusercontent.com/istio/common-files/master/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
+    ./tools/automator-main.sh \
+    --org=openshift \
+    --repo=release \
+    --branch=master \
+    --token-path=/creds-github/token \
+    '--title=Update maistra/istio builder image' \
+    --modifier=update_istio_builder_image_master \
+    '--cmd=sed -i "s|\(gcr.io/istio-testing/build-tools\):.* \(registry.ci.openshift.org/ci/maistra-builder:upstream-master\)|\1:$NEW_IMAGE \2|" core-services/image-mirroring/supplemental-ci-images/mapping_supplemental_ci_images_ci' \
+    '--body=cc @jwendell'
   container:
     from: src
   cron: 00 05 * * 1-5

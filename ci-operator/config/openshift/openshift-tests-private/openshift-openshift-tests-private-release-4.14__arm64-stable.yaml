@@ -111,6 +111,26 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
+- as: aws-ipi-ovn-ipsec-to-multiarch-f14
+  cron: 44 21 4,19 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-arch-migration
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 - as: aws-ipi-proxy-sts-f14
   cron: 34 13 11,26 * *
   steps:
@@ -126,8 +146,8 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
-- as: aws-ipi-usertags-f14
-  cron: 3 3 4,19 * *
+- as: aws-ipi-usertags-custom-sg-f14
+  cron: 7 12 6,22 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -139,20 +159,7 @@ tests:
       OCP_ARCH: arm64
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-aws-ipi-usertags
-- as: azure-ipi-disconnected-fullyprivate-f14
-  cron: 53 5 3,18 * *
-  steps:
-    cluster_profile: azure-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      OCP_ARCH: arm64
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
+    workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
 - as: azure-ipi-fullyprivate-proxy-f14
   cron: 5 23 9,24 * *
   steps:
@@ -166,6 +173,25 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: azure-ipi-to-multiarch-f14
+  cron: 8 21 8,23 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-arch-migration
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-usertags-f14
   cron: 35 3 1,16 * *
   steps:
@@ -233,6 +259,45 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: baremetal-lab-agent-install-pxe
+- as: gcp-ipi-compact-filestore-csi-f14
+  cron: 43 19 4,24 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.14
+    env:
+      OCP_ARCH: arm64
+      SIZE_VARIANT: compact
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
+- as: gcp-ipi-disconnected-private-workload-identity-f14
+  cron: 31 13 11,29 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
+- as: gcp-ipi-proxy-private-f14
+  cron: 15 14 7,17 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

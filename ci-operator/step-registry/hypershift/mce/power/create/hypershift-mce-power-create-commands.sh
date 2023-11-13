@@ -3,7 +3,7 @@
 set -x
 
 # Agent hosted cluster configs
-CLUSTERS_NAMESPACE="clusters"
+CLUSTERS_NAMESPACE="local-cluster"
 HOSTED_CLUSTER_NAME="$(printf $PROW_JOB_ID|sha256sum|cut -c-20)"
 export HOSTED_CLUSTER_NAME
 export HOSTED_CONTROL_PLANE_NAMESPACE="${CLUSTERS_NAMESPACE}-${HOSTED_CLUSTER_NAME}"
@@ -189,6 +189,7 @@ mkdir /tmp/hc-manifests
 
 ${HYPERSHIFT_CLI_NAME} create cluster agent \
     --name=${HOSTED_CLUSTER_NAME} \
+    --namespace=${CLUSTERS_NAMESPACE} \
     --pull-secret=${PULL_SECRET} \
     --agent-namespace=${HOSTED_CONTROL_PLANE_NAMESPACE} \
     --base-domain=${HYPERSHIFT_BASE_DOMAIN} \
@@ -303,10 +304,7 @@ if [ ${#MAC_ADDRESSES[@]} -ne ${HYPERSHIFT_NODE_COUNT} ] || [ ${#IP_ADDRESSES[@]
 fi
 
 # Creating dns record for ingress
-# Assigning first node's ip to ingress dns record.
-# To-Do: In case of multiple nodes, there is a chance that ingress controller may run in different node, so need to take care of this scenario in future.
-# So currently using single node cluster to avoid this problem.
-# Note: Only one replica of ingress controller's running in agent cluster and we won't be able to scale it since it would reconciled by ingress operator.
+# Assigning first node's ip to ingress dns record
 echo "$(date) Creating dns record for ingress"
 ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "*.apps.${HOSTED_CLUSTER_NAME}" --content "${IP_ADDRESSES[0]}"
 
@@ -389,3 +387,7 @@ oc wait --all=true agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --for=jsonpath='{.
 # Download guest cluster kubeconfig
 echo "$(date) Setup nested_kubeconfig"
 ${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --name=${HOSTED_CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+
+# Setting nodeSelector on ingresscontroller  to first agent to make sure router pod spawns on first agent,
+# since *.apps DNS record is pointing to first agent's IP.
+oc patch ingresscontroller default -n openshift-ingress-operator -p '{"spec": {"nodePlacement": {"nodeSelector": { "matchLabels": { "kubernetes.io/hostname": "'"${INSTANCE_NAMES[0]}"'"}}, "tolerations": [{ "effect": "NoSchedule", "key": "kubernetes.io/hostname", "operator": "Exists"}]}}}' --type=merge --kubeconfig=${SHARED_DIR}/nested_kubeconfig
