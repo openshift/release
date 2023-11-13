@@ -12,6 +12,8 @@ unset NAMESPACE
 # Check org and project from job's spec
 REF_REPO=$(echo ${JOB_SPEC} | jq -r '.refs.repo')
 REF_ORG=$(echo ${JOB_SPEC} | jq -r '.refs.org')
+REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+
 # PR SHA
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
 # Get Pull request info - Pull request
@@ -36,7 +38,7 @@ if [[ "$REF_ORG" != "$DEFAULT_ORG" ]]; then
     echo "Not a ${DEFAULT_ORG} job. Checking if isn't a rehearsal job..."
     EXTRA_REF_REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
     EXTRA_REF_ORG=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].org')
-    #EXTRA_REF_BASE_REF=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
+    REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
     if [[ "$EXTRA_REF_ORG" != "$DEFAULT_ORG" ]]; then
       echo "Failing since this step supports only ${DEFAULT_ORG} changes."
       exit 1
@@ -45,11 +47,13 @@ if [[ "$REF_ORG" != "$DEFAULT_ORG" ]]; then
     BASE_OP=${EXTRA_REF_REPO}
 fi
 SERVICE_NAME=$(echo "${BASE_OP}" | sed 's/\(.*\)-operator/\1/')
+# sets default branch for install_yamls
+export OPENSTACK_K8S_BRANCH=${REF_BRANCH}
 
 function create_openstack_namespace {
   pushd ${BASE_DIR}
   if [ ! -d "./install_yamls" ]; then
-    git clone https://github.com/openstack-k8s-operators/install_yamls.git
+    git clone https://github.com/openstack-k8s-operators/install_yamls.git -b ${REF_BRANCH}
   fi
   cd install_yamls
   make namespace
@@ -94,7 +98,7 @@ function check_build_result {
 # Clone the openstack-operator and checkout
 # the requested PR
 function clone_openstack_operator {
-    git clone https://github.com/openstack-k8s-operators/openstack-operator.git
+    git clone https://github.com/openstack-k8s-operators/openstack-operator.git -b ${REF_BRANCH}
     pushd openstack-operator
     local pr_num=""
     # Depends-On syntax detected in the PR description: get the PR ID
