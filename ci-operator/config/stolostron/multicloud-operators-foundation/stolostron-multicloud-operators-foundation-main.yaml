@@ -73,13 +73,15 @@ tests:
     dependencies:
       COMPONENT_IMAGE_REF: multicloud-manager
     env:
-      CLUSTER_NAMES: none
+      ACM_RELEASE_VERSION: main
       CLUSTERPOOL_GROUP_NAME: Server Foundation
       CLUSTERPOOL_HOST_NAMESPACE: server-foundation
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-sf-clusterpool
-      CLUSTERPOOL_LIFETIME: 6h
-      CLUSTERPOOL_LIST_INCLUSION_FILTER: sf-e2e-aws-ocp410-ha
-      SKIP_COMPONENT_INSTALL: "true"
+      CLUSTERPOOL_LIFETIME: 12h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: sf-e2e-aws-ocp410
+      COMPONENT_NAME: multicloud-manager
+      PRODUCT_PREFIX: backplane
+      SKIP_COMPONENT_INSTALL: "false"
     test:
     - as: test
       cli: latest
@@ -93,9 +95,11 @@ tests:
         WORK_IMAGE=quay.io/stolostron/work:$OCM_VERSION
         PLACEMENT_IMAGE=quay.io/stolostron/placement:$OCM_VERSION
         export KUBECTL IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE PLACEMENT_IMAGE REGISTRATION_OPERATOR_BRANCH
-        export KUBECTL
+        export MANAGED_CLUSTER_NAME=local-cluster
+        export DEPLOY_NAMESPACE=multicluster-engine
         set -o pipefail
-        make test-e2e 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
+        make build-e2e 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
+        ./e2e.test -test.v -ginkgo.vv | tee ${ARTIFACT_DIR}/e2e_tests_out.log
         set +o pipefail
       dependencies:
       - env: FOUNDATION_IMAGE_NAME
