@@ -3,6 +3,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+python3 --version
+export CLOUDSDK_PYTHON=python3
+
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/env"
 chmod +x ${SHARED_DIR}/login_script.sh

@@ -91,6 +91,8 @@ resources:
   properties:
     infra_id: '${CLUSTER_NAME}'
     region: '${REGION}'
+    master_subnet_cidr: '${MASTER_SUBNET_CIDR}'
+    worker_subnet_cidr: '${WORKER_SUBNET_CIDR}'
 EOF
 
 gcloud deployment-manager deployments create "${CLUSTER_NAME}-vpc" --config 01_vpc.yaml
