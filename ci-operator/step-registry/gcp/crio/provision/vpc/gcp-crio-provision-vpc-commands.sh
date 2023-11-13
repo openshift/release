@@ -40,7 +40,7 @@ def GenerateConfig(context):
         'type': 'compute.v1.subnetwork',
         'properties': {
             'region': context.properties['region'],
-            'network': '$(ref.' + context.properties['infra_id'] + '-network.selfLink)',
+            'network': '\$(ref.' + context.properties['infra_id'] + '-network.selfLink)',
             'ipCidrRange': context.properties['master_subnet_cidr']
         }
     }, {
@@ -48,7 +48,7 @@ def GenerateConfig(context):
         'type': 'compute.v1.subnetwork',
         'properties': {
             'region': context.properties['region'],
-            'network': '$(ref.' + context.properties['infra_id'] + '-network.selfLink)',
+            'network': '\$(ref.' + context.properties['infra_id'] + '-network.selfLink)',
             'ipCidrRange': context.properties['worker_subnet_cidr']
         }
     }, {
@@ -56,14 +56,14 @@ def GenerateConfig(context):
         'type': 'compute.v1.router',
         'properties': {
             'region': context.properties['region'],
-            'network': '$(ref.' + context.properties['infra_id'] + '-network.selfLink)',
+            'network': '\$(ref.' + context.properties['infra_id'] + '-network.selfLink)',
             'nats': [{
                 'name': context.properties['infra_id'] + '-nat-master',
                 'natIpAllocateOption': 'AUTO_ONLY',
                 'minPortsPerVm': 7168,
                 'sourceSubnetworkIpRangesToNat': 'LIST_OF_SUBNETWORKS',
                 'subnetworks': [{
-                    'name': '$(ref.' + context.properties['infra_id'] + '-master-subnet.selfLink)',
+                    'name': '\$(ref.' + context.properties['infra_id'] + '-master-subnet.selfLink)',
                     'sourceIpRangesToNat': ['ALL_IP_RANGES']
                 }]
             }, {
@@ -72,7 +72,7 @@ def GenerateConfig(context):
                 'minPortsPerVm': 512,
                 'sourceSubnetworkIpRangesToNat': 'LIST_OF_SUBNETWORKS',
                 'subnetworks': [{
-                    'name': '$(ref.' + context.properties['infra_id'] + '-worker-subnet.selfLink)',
+                    'name': '\$(ref.' + context.properties['infra_id'] + '-worker-subnet.selfLink)',
                     'sourceIpRangesToNat': ['ALL_IP_RANGES']
                 }]
             }]
@@ -91,8 +91,6 @@ resources:
   properties:
     infra_id: '${CLUSTER_NAME}'
     region: '${REGION}'
-    master_subnet_cidr: '${MASTER_SUBNET_CIDR}'
-    worker_subnet_cidr: '${WORKER_SUBNET_CIDR}'
 EOF
 
 gcloud deployment-manager deployments create "${CLUSTER_NAME}-vpc" --config 01_vpc.yaml
@@ -115,5 +113,3 @@ platform:
     controlPlaneSubnet: ${CLUSTER_NAME}-master-subnet
     computeSubnet: ${CLUSTER_NAME}-worker-subnet
 EOF
-
-popd
