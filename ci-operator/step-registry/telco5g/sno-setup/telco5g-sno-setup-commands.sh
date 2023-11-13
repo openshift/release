@@ -143,7 +143,7 @@ cat << EOF > ~/ocp-install.yml
   - name: Run deployment
     shell: >-
         ./scripts/sno_ag.py $SNO_PARAM --host ${CLUSTER_NAME} --debug --wait
-        --host-ip ${HYPERV_IP} --registry
+        --host-ip ${HYPERV_IP} --registry --reset-bmc
         -L /tmp/${CLUSTER_NAME}_sno_ci.log 2>&1 > /tmp/${CLUSTER_NAME}_sno_ag.log
     args:
       chdir: /home/kni/telco5g-lab-deployment
