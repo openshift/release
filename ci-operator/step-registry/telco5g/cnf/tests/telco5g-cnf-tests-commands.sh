@@ -282,11 +282,12 @@ if [[ "$T5CI_VERSION" == "4.15" ]]; then
     git submodule update --init --force --recursive --remote
     git submodule foreach --recursive 'echo $path `git config --get remote.origin.url` `git rev-parse HEAD`' | grep -v Entering > ${ARTIFACT_DIR}/hashes.txt || true
 fi
-echo "Checking out pull request for repository cnf-features-deploy if exists"
+echo "******** Checking out pull request for repository cnf-features-deploy if exists"
 check_for_pr "openshift-kni" "cnf-features-deploy"
-
-oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 popd
+
+echo "******** Patching OperatorHub to disable all default sources"
+oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 
 # Skiplist common for all releases
 create_tests_skip_list_file
@@ -321,6 +322,7 @@ export TESTS_REPORTS_PATH="${ARTIFACT_DIR}/"
 skip_tests=$(get_skip_tests)
 
 if [[ "$T5CI_JOB_TYPE" != "sno-cnftests" ]]; then
+    echo "******** For non-SNO jobs, get worker nodes"
     worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \
     --selector='!node-role.kubernetes.io/master' -o name)
     if [ -z "${worker_nodes}" ]; then
@@ -342,9 +344,11 @@ if [[ "$T5CI_JOB_TYPE" != "sno-cnftests" ]]; then
 fi
 
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
+    echo "******** For SNO jobs, get master nodes"
     test_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' -o name)
     export ROLE_WORKER_CNF="master"
     # Make local workarounds for SNO
+    echo "******** Running SNO fixes"
     sno_fixes
 fi
 export CNF_NODES="${test_nodes}"
