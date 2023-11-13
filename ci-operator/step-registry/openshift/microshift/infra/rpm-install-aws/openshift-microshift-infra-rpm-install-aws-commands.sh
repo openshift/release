@@ -22,6 +22,7 @@ chmod 0600 "${HOME}/.ssh/config"
 
 cat << EOF > /tmp/config.yaml
 apiServer:
+  advertiseAddress: 10.44.0.0/32
   subjectAltNames:
   - ${IP_ADDRESS}
 EOF
@@ -43,7 +44,7 @@ sudo dnf clean all -y
 make rpm
 sudo dnf localinstall -y ./_output/rpmbuild/RPMS/*/*.rpm
 sudo systemctl enable --now crio
-sudo systemctl enable --now microshift
+#sudo systemctl enable --now microshift
 EOF
 chmod +x /tmp/install.sh
 
@@ -57,3 +58,4 @@ scp \
   "${INSTANCE_PREFIX}:/tmp"
 
 ssh "${INSTANCE_PREFIX}" "/tmp/install.sh"
+sleep 3600
