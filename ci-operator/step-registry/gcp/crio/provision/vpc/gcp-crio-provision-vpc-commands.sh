@@ -16,13 +16,6 @@ then
   gcloud config set project "${GOOGLE_PROJECT_ID}"
 fi
 
-echo "$(date -u --rfc-3339=seconds) - Copying resource files from lib dir..."
-dir=/tmp/installer
-mkdir -p "${dir}"
-pushd "${dir}"
-cp -t "${dir}" \
-    "/var/lib/openshift-install/upi/${CLUSTER_TYPE}"/*
-
 ## Create the VPC
 echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 
