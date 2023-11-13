@@ -3,20 +3,26 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export CLOUDSDK_PYTHON=python3
+
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/env"
+
 chmod +x ${SHARED_DIR}/login_script.sh
-${SHARED_DIR}/login_script.sh 
+${SHARED_DIR}/login_script.sh
 
-instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
-
-# Print the git branch 
+# Print the git branch
 branch=$(git rev-parse --abbrev-ref HEAD)
 echo "Printing the current branch of cri-o: $branch"
 
 # Trying to copy the content from /src
-tar -czf - . | gcloud compute ssh --zone="${ZONE}" ${instance_name} -- "cat > \${HOME}/cri-o.tar.gz"
-timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_name} -- bash - << EOF 
+tar -czf - . | ssh "${SSHOPTS[@]}" ${IP} -- "cat > \${HOME}/cri-o.tar.gz"
+
+timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
+    set -o nounset
+    set -o errexit
+    set -o pipefail
+
     export GOROOT=/usr/local/go
     echo GOROOT="/usr/local/go" | sudo tee -a /etc/environment
     mkdir -p \${HOME}/logs/artifacts
@@ -30,6 +36,7 @@ timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     mkdir -p "\${REPO_DIR}"
     # copy the agent sources on the remote machine
     tar -xzf cri-o.tar.gz -C "\${REPO_DIR}"
+    rm -f cri-o.tar.gz
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
     sudo chown -R deadbeef /tmp/*
