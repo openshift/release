@@ -41,29 +41,28 @@ wait_approve_csr() {
   oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' | xargs oc adm certificate approve
 }
 
+wait_for_api
+
 if [[ "$(hostname)" != "another-hostname" ]]
 then
+  echo "Deleting node object before changing the hostname..."
+  oc delete node "$(oc get nodes -ojsonpath='{.items[?(@.metadata.name == "'"$(hostname)"'")].metadata.name}')"
+
   systemctl stop kubelet.service
   # Forcefully remove all pods rather than just stop them, because a different hostname
   # requires new pods to be created by kubelet.
   crictl rmp --force --all
   systemctl stop crio.service
+
   hostnamectl hostname another-hostname
+
   cd /var/lib/kubelet && rm -rfv !\(config.json\)
   reboot
   exit 0
 fi
 
-wait_for_api
-
-if [[ "$(oc get nodes -ojsonpath='{.items[0].metadata.name}')" != "$(hostname)" ]]
-then
-  wait_approve_csr "kube-apiserver-client-kubelet"
-  wait_approve_csr "kubelet-serving"
-
-  echo "Deleting previous node..."
-  oc delete node "$(oc get nodes -ojsonpath='{.items[?(@.metadata.name != "'"$(hostname)"'")].metadata.name}')"
-fi
+wait_approve_csr "kube-apiserver-client-kubelet"
+wait_approve_csr "kubelet-serving"
 
 touch /var/hostname.done
 echo "Hostname changed successfully."
