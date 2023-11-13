@@ -14,6 +14,19 @@ function create_foo_project_and_policies()
 
 function create_foo_configmaps()
 {
+  REGISTRY_REDHAT_IO_AUTH=$(cat /tmp/secrets/foo-qe/registry-redhat-io-auth-secret)
+  QUAY_IO_AUTH=$(cat /tmp/secrets/foo-qe/quay-io-auth-secret)
+  CONSOLE_URL=$(cat $SHARED_DIR/console.url)
+  API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
+  NGINX_DOMAIN="nginx.${CONSOLE_URL#"https://console-openshift-console."}"
+  KUBEADMIN_PWD=$(cat $SHARED_DIR/kubeadmin-password)
+
+
+  export REGISTRY_REDHAT_IO_AUTH
+  export QUAY_IO_AUTH
+  export API_URL
+  export KUBEADMIN_PWD
+
   cat << EOF > /tmp/settings.xml
 <?xml version="1.0" encoding="UTF-8"?>
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -42,6 +55,18 @@ function create_foo_configmaps()
   						<updatePolicy>never</updatePolicy>
   					</snapshots>
   				</repository>
+  				<repository>
+            <id>custom-mvn-repo</id>
+            <url>http://${NGINX_DOMAIN}/</url>
+            <snapshots>
+              <enabled>true</enabled>
+              <updatePolicy>never</updatePolicy>
+            </snapshots>
+            <releases>
+              <enabled>true</enabled>
+              <updatePolicy>never</updatePolicy>
+            </releases>
+          </repository>
   			</repositories>
   			<pluginRepositories>
   				<pluginRepository>
@@ -56,6 +81,18 @@ function create_foo_configmaps()
   						<updatePolicy>never</updatePolicy>
   					</snapshots>
   				</pluginRepository>
+  				<pluginRepository>
+            <id>custom-plugin-repo</id>
+              <url>http://${NGINX_DOMAIN}/</url>
+              <snapshots>
+                <enabled>true</enabled>
+                <updatePolicy>never</updatePolicy>
+              </snapshots>
+              <releases>
+                <enabled>true</enabled>
+                <updatePolicy>never</updatePolicy>
+              </releases>
+            </pluginRepository>
   			</pluginRepositories>
   		</profile>
   		<profile>
@@ -75,6 +112,18 @@ function create_foo_configmaps()
   				</repository>
   			</repositories>
   			<pluginRepositories>
+  			  <pluginRepository>
+          	<id>custom-plugin-repo</id>
+          	<url>http://${NGINX_DOMAIN}/</url>
+          	<snapshots>
+          		<enabled>true</enabled>
+          		<updatePolicy>never</updatePolicy>
+          	</snapshots>
+          	<releases>
+          		<enabled>true</enabled>
+          		<updatePolicy>never</updatePolicy>
+          	</releases>
+          </pluginRepository>
   				<pluginRepository>
   					<id>jboss-ga-plugin-repository</id>
   					<url>https://maven.repository.redhat.com/earlyaccess/all/</url>
@@ -98,19 +147,6 @@ function create_foo_configmaps()
   	</activeProfiles>
 </settings>
 EOF
-
-REGISTRY_REDHAT_IO_AUTH=$(cat /tmp/secrets/foo-qe/registry-redhat-io-auth-secret)
-QUAY_IO_AUTH=$(cat /tmp/secrets/foo-qe/quay-io-auth-secret)
-CONSOLE_URL=$(cat $SHARED_DIR/console.url)
-API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
-NGINX_DOMAIN="nginx.${CONSOLE_URL#"https://console-openshift-console."}"
-KUBEADMIN_PWD=$(cat $SHARED_DIR/kubeadmin-password)
-
-
-export REGISTRY_REDHAT_IO_AUTH
-export QUAY_IO_AUTH
-export API_URL
-export KUBEADMIN_PWD
 
  cat << EOF > /tmp/test.properties
 xtf.config.delete.namespace=true
@@ -233,14 +269,16 @@ data:
 EOF
 
   oc create -f - <<EOF
-kind: DeploymentConfig
-apiVersion: apps.openshift.io/v1
+kind: Deployment
+apiVersion: apps/v1
 metadata:
   name: nginx-server
   namespace: ${1}
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"nginx:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"nginx\")].image"}]'
   labels:
     application: xpaas-qe
-    deploymentConfig: nginx
+    deployment: nginx
 spec:
   strategy:
     type: Recreate
@@ -256,12 +294,13 @@ spec:
     - type: ConfigChange
   replicas: 1
   selector:
-    deploymentConfig: nginx
+    matchLabels:
+      deployment: nginx
   template:
     metadata:
       name: nginx
       labels:
-        deploymentConfig: nginx
+        deployment: nginx
         application: xpaas-qe
     spec:
       securityContext:
@@ -279,6 +318,7 @@ spec:
             claimName: persistent-xpaas-qe
       containers:
         - name: nginx
+          image: nginx:latest
           ports:
             - containerPort: 22
               protocol: TCP
@@ -324,7 +364,7 @@ spec:
     protocol: TCP
     targetPort: 8080
   selector:
-    deploymentConfig: nginx
+    deployment: nginx
   type: NodePort
 EOF
 
