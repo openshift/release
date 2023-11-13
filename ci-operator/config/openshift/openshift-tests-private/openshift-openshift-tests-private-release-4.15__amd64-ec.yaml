@@ -389,6 +389,19 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn
+- as: gcp-ipi-to-multiarch-f14
+  cron: 5 12 5,20 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @gcp-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @gcp-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-arch-migration
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: ibmcloud-ipi-proxy-private-f14
   cron: 32 0 8,23 * *
   steps:

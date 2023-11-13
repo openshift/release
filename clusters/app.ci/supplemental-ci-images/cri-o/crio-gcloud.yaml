@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    namespace: cri-o
+    name: gcloud-base
+- kind: BuildConfig
+  apiVersion: build.openshift.io/v1
+  metadata:
+    namespace: cri-o
+    name: gcloud-base
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: gcloud-base:latest
+    source:
+      dockerfile: |
+        FROM ocp/ubi:9
+        RUN dnf install -y jq git openssl python3.11 gzip jq unzip openssh-clients openssl bind-utils util-linux xz && \
+          alternatives  --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+          dnf clean all
+        RUN curl https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz > /tmp/google-cloud-sdk.tar.gz
+        RUN mkdir -p /usr/local/gcloud \
+          && tar -C /usr/local/gcloud -xvf /tmp/google-cloud-sdk.tar.gz \
+          && rm -f /tmp/google-cloud-sdk.tar.gz
+        ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: ubi:9
+          namespace: ocp
+        imageOptimizationPolicy: SkipLayers
+      type: Docker
+    triggers:
+      - type: ConfigChange
