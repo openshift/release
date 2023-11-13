@@ -19,6 +19,10 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.20
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -164,6 +168,21 @@ tests:
       TEST_TYPE: main
       VERIFY_COMPLIANCE_OPERATOR_SCAN: "true"
     workflow: hypershift-ibmcloud-e2e
+- as: e2e-aws-qe-nested-critical
+  optional: true
+  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and @critical
+        and @hypershift-hosted and not @fips'
+      TAG_VERSION: '@4.15'
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 zz_generated_metadata:
   branch: main
   org: openshift
