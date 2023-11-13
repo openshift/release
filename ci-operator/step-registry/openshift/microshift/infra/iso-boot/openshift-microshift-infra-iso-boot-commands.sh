@@ -4,6 +4,8 @@ export PS4='+ $(date "+%T.%N") \011'
 
 finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
+  scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx_error.log" "${ARTIFACT_DIR}" || true
+  scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx.log" "${ARTIFACT_DIR}" || true
 
   STEP_NAME="${HOSTNAME##${JOB_NAME_SAFE}-}"
   REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
