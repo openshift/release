@@ -13,17 +13,19 @@ workflow:
       - chain: hypershift-conformance
     pre:
       - chain: baremetalds-ofcir-pre
-      - ref: hypershift-mce-install-disconnected
-      - ref: hypershift-mce-agent-disconnected-nfs
+      - ref: enable-qe-catalogsource
+      - chain: hypershift-mce-agent-lvm
+      - ref: hypershift-mce-install
       - chain: hypershift-mce-agent-disconnected-create
     env:
-      DISCONNECTED: "true"
+      MCE_VERSION: "2.4"
       IP_STACK: v4v6
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
-        MIRROR_IMAGES=true
-        INSTALLER_PROXY=true
         WORKER_DISK=300
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=1024G
         NUM_EXTRA_WORKERS=3
         EXTRA_WORKER_VCPU=8
         EXTRA_WORKER_MEMORY=16384
