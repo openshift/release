@@ -215,12 +215,19 @@ tests:
   run_if_changed: vsphere
   steps:
     env:
-      VSPHERE_ADDITIONAL_BASEDOMAINS: ( hive-$(uuidgen | tr '[:upper:]' '[:lower:]') )
+      CLUSTER_NAME: "hive-$(uuidgen | tr '[:upper:]' '[:lower:]')"
+      VSPHERE_ADDITIONAL_BASEDOMAINS: ("${CLUSTER_NAME}")
     cluster_profile: vsphere-2
     test:
     - as: test
+      env:
+        - name: CLUSTER_NAME
+        - name: VSPHERE_ADDITIONAL_BASEDOMAINS
       cli: latest
-      commands: CLOUD=vsphere make test-e2e
+      commands: |
+        host api.$CLUSTER_NAME
+        host foo.apps.$CLUSTER_NAME
+        CLOUD=vsphere make test-e2e
       dependencies:
       - env: HIVE_IMAGE
         name: hive
