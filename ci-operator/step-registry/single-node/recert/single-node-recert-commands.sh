@@ -21,9 +21,27 @@ function wait_for_api {
   echo "API is available"
 }
 
-function start_containers {
-  systemctl start crio
-  systemctl start kubelet
+function fetch_crts_keys {
+  mkdir -p /tmp/certs /tmp/keys
+
+  oc get cm -n openshift-config admin-kubeconfig-client-ca -ojsonpath='{.data.ca-bundle\.crt}' > /tmp/certs/admin-kubeconfig-client-ca.crt
+
+  declare -a secrets=(
+    "loadbalancer-serving-signer"
+    "localhost-serving-signer"
+    "service-network-serving-signer"
+  )
+  for secret in "\${secrets[@]}"; do
+    oc get secrets -n openshift-kube-apiserver-operator "\${secret}" -ojsonpath='{.data.tls\.key}' | base64 -d > "/tmp/keys/\${secret}.key"
+  done
+
+  # CommonName includes a timestamp so we cannot hardcode it, e.g. ingress-operator@1693569847
+  ROUTER_CA_CN=\$(oc get secret -n openshift-ingress-operator router-ca -ojsonpath='{.data.tls\.crt}' | base64 -d | openssl x509 -subject -noout -nameopt multiline | grep commonName | awk '{ print \$3 }')
+  oc get secret -n openshift-ingress-operator router-ca -ojsonpath='{.data.tls\.key}' | base64 -d > "/tmp/keys/router-ca.key"
+}
+
+function fetch_etcd_image {
+  ETCD_IMAGE="\$(oc get pods -l 'app=etcd' -n openshift-etcd -ojsonpath='{.items[0].spec.containers[?(@.name=="etcd")].image}')"
 }
 
 function stop_containers {
@@ -32,9 +50,17 @@ function stop_containers {
   systemctl stop crio
 }
 
+function wait_for_recert_etcd {
+  echo "Waiting for recert etcd to be available..."
+  until curl -s http://localhost:2379/health |jq -e '.health == "true"' &> /dev/null
+  do
+    echo "Waiting for recert etcd to be available..."
+    sleep 2
+  done
+}
+
 function recert {
-  local release_image="${RELEASE_IMAGE:-quay.io/openshift-release-dev/ocp-release:4.14.2-x86_64}"
-  local etcd_image="\$(oc adm release extract --from="\${release_image}" --file=image-references | jq '.spec.tags[] | select(.name == "etcd").from.name' -r)"
+  local etcd_image="\${ETCD_IMAGE}"
   local recert_image="${RECERT_IMAGE:-quay.io/edge-infrastructure/recert:latest}"
 
   podman run --authfile=/var/lib/kubelet/config.json \
@@ -49,7 +75,7 @@ function recert {
       --name editor \
       --data-dir /store \
 
-  sleep 10 # TODO: wait for etcd
+  wait_for_recert_etcd
 
   podman run -it --network=host --privileged \
       -v /tmp/certs:/certs  \
@@ -73,37 +99,20 @@ function recert {
       --use-key "\${ROUTER_CA_CN} /keys/router-ca.key" \
 
   podman kill recert_etcd
-
-  # workaround until https://github.com/omertuc/recert/blob/4d41d451ba57fbc9fd75781684906360696f384a/README.md?plain=1#L24 is resolved
-  rm -rf "/etc/machine-config-daemon/currentconfig"
-  touch "/run/machine-config-daemon-force"
-}
-
-function fetch_crts_keys {
-  mkdir -p /tmp/certs /tmp/keys
-
-  oc get cm -n openshift-config admin-kubeconfig-client-ca -ojsonpath='{.data.ca-bundle\.crt}' > /tmp/certs/admin-kubeconfig-client-ca.crt
-
-  declare -a secrets=(
-    "loadbalancer-serving-signer"
-    "localhost-serving-signer"
-    "service-network-serving-signer"
-  )
-  for secret in "\${secrets[@]}"; do
-    oc get secrets -n openshift-kube-apiserver-operator "\${secret}" -ojsonpath='{.data.tls\.key}' | base64 -d > "/tmp/keys/\${secret}.key"
-  done
-
-  # CommonName includes a timestamp so we cannot hardcode it, e.g. ingress-operator@1693569847
-  ROUTER_CA_CN=\$(oc get secret -n openshift-ingress-operator router-ca -ojsonpath='{.data.tls\.crt}' | base64 -d | openssl x509 -subject -noout -nameopt multiline | grep commonName | awk '{ print \$3 }')
-  oc get secret -n openshift-ingress-operator router-ca -ojsonpath='{.data.tls\.key}' | base64 -d > "/tmp/keys/router-ca.key"
 }
 
 function delete_crts_keys {
   rm -rf /tmp/certs /tmp/keys
 }
 
+function start_containers {
+  systemctl start crio
+  systemctl start kubelet
+}
+
 wait_for_api
 fetch_crts_keys
+fetch_etcd_image
 stop_containers
 
 recert
