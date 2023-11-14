@@ -69,7 +69,7 @@ cp -t "${installer_dir}/auth" \
 if command -v pwsh &> /dev/null
 then
   cp -t "${installer_dir}/secrets" \
-      "${SHARED_DIR}/vcenter-crds.xml"
+      "${SHARED_DIR}/vcenter-creds.xml"
 fi
 
 # Copy sample UPI files
