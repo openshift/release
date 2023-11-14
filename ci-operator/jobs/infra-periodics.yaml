@@ -978,6 +978,66 @@ periodics:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
+  cron: 0 0 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: operator-framework-operator-controller
+  - base_ref: main
+    org: openshift
+    repo: operator-framework-rukpak
+  - base_ref: main
+    org: openshift
+    repo: operator-framework-catalogd
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-auto-olm-v1-downstreaming
+  reporter_config:
+    slack:
+      channel: '#team-operator-fw'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed.
+  spec:
+    containers:
+    - args:
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --github-login=openshift-bot
+      - --git-name=openshift-bot
+      - --git-email=openshift-bot@redhat.com
+      - --operator-controller-dir=/home/prow/go/src/github.com/openshift/operator-framework-operator-controller
+      - --rukpak-dir=/home/prow/go/src/github.com/openshift/operator-framework-rukpak
+      - --catalogd-dir=/home/prow/go/src/github.com/openshift/operator-framework-catalogd
+      - --mode=publish
+      - --fetch-mode=https
+      - --log-level=debug
+      - --self-approve=true
+      - --dry-run=false
+      command:
+      - /usr/bin/bumper
+      env:
+      - name: HOME
+        value: /home/prow/go
+      image: registry.ci.openshift.org/operator-lifecycle-manager/olm-v1-bumper:latest
+      imagePullPolicy: Always
+      name: bumper
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
   cron: 30 7 * * *
   decorate: true
   extra_refs:
