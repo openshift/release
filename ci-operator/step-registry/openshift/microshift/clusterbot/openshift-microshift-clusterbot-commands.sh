@@ -2,3 +2,5 @@
 set -xeuo pipefail
 
 echo TODO
+
+env

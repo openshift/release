@@ -64,19 +64,22 @@ tests:
   container:
     from: test-bin
 - as: e2e
-  cluster_claim:
-    architecture: amd64
-    as: custom
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.10"
   steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: multicloud-manager
+    env:
+      CLUSTER_NAMES: none
+      CLUSTERPOOL_GROUP_NAME: Server Foundation
+      CLUSTERPOOL_HOST_NAMESPACE: server-foundation
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-sf-clusterpool
+      CLUSTERPOOL_LIFETIME: 6h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: sf-e2e-aws-ocp410
+      SKIP_COMPONENT_INSTALL: "true"
     test:
     - as: test
       cli: latest
       commands: |
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
         KUBECTL=oc
         OCM_VERSION=backplane-2.2
         REGISTRATION_OPERATOR_BRANCH=$OCM_VERSION
@@ -85,7 +88,9 @@ tests:
         WORK_IMAGE=quay.io/stolostron/work:$OCM_VERSION
         PLACEMENT_IMAGE=quay.io/stolostron/placement:$OCM_VERSION
         export KUBECTL IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE PLACEMENT_IMAGE REGISTRATION_OPERATOR_BRANCH
-        make test-e2e
+        set -o pipefail
+        make test-e2e 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
+        set +o pipefail
       dependencies:
       - env: FOUNDATION_IMAGE_NAME
         name: multicloud-manager
@@ -93,7 +98,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: generic-claim
+    workflow: ocm-e2e-clusterpool
 - as: sonarcloud
   steps:
     test:
