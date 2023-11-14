@@ -84,6 +84,27 @@ tests:
     test:
     - chain: openshift-qe-node-density-cni
     workflow: rosa-aws-sts
+- as: conc-builds-3nodes
+  cron: 0 0 1,15 * *
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
+      MP_LABELS: concurrent-builds=enabled
+      MP_MACHINE_TYPE: m5.xlarge
+      MP_REPLICAS: "3"
+      MP_TAINTS: test=test:PreferNoSchedule
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.15"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "3"
+    test:
+    - ref: rosa-conf-machine-pool
+    - chain: openshift-qe-conc-builds
+    workflow: rosa-aws-sts
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-qe
