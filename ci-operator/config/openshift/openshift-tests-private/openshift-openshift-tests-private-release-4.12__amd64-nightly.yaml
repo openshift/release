@@ -672,12 +672,13 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-winc
-- as: aws-ipi-private-f14-disasterrecovery
-  cron: 44 15 4,19 * *
+- as: aws-ipi-private-fips-f28-disasterrecovery
+  cron: 44 15 14 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
       TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
       TEST_SCENARIOS: DR_Testing
     test:
@@ -1397,12 +1398,13 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-longduration
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
-- as: azure-ipi-private-f14-disasterrecovery
-  cron: 26 1 2,17 * *
+- as: azure-ipi-private-fips-f28-disasterrecovery
+  cron: 26 1 16 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FIPS_ENABLED: "true"
       TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
       TEST_SCENARIOS: DR_Testing
     test:
@@ -1986,11 +1988,23 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
-- as: gcp-ipi-private-f14-disasterrecovery
-  cron: 55 11 9,24 * *
+- as: gcp-ipi-private-f28-disasterrecovery
+  cron: 55 11 23 * *
   steps:
     cluster_profile: gcp-qe
     env:
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
+      TEST_SCENARIOS: DR_Testing
+    test:
+    - ref: idp-htpasswd
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-gcp-ipi-private
+- as: gcp-ipi-private-fips-f28-disasterrecovery
+  cron: 55 11 30 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      FIPS_ENABLED: "true"
       TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
       TEST_SCENARIOS: DR_Testing
     test:
