@@ -41,6 +41,7 @@ ADDITIONAL_OC_EXTRACT_ARGS=""
 if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
   ADDITIONAL_OC_EXTRACT_ARGS="${ADDITIONAL_OC_EXTRACT_ARGS} --included --install-config=${SHARED_DIR}/install-config.yaml"
 fi
+echo "ADDITIONAL_OC_EXTRACT_ARGS: ${ADDITIONAL_OC_EXTRACT_ARGS}"
 echo "OC Version:"
 which oc
 oc version --client
@@ -51,12 +52,25 @@ dir=$(mktemp -d)
 pushd "${dir}"
 cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
 oc registry login --to pull-secret
-oc adm release extract --registry-config pull-secret --credentials-requests --cloud=alibabacloud --to="${CR_PATH}" ${ADDITIONAL_OC_EXTRACT_ARGS} "${TESTING_RELEASE_IMAGE}"
+oc adm release extract --registry-config pull-secret --credentials-requests --cloud=alibabacloud --to="${CR_PATH}" ${ADDITIONAL_OC_EXTRACT_ARGS} "${TESTING_RELEASE_IMAGE}" -v 3
 rm pull-secret
 popd
 
 echo "CR manifest files:"
 ls "${CR_PATH}"
+pushd "${CR_PATH}"
+found=false
+for FILE in *; 
+do
+    if [[ "${FILE}" =~ "machine-api" ]]; then
+        found=true
+        break
+    fi
+done
+if ! ${found}; then
+    echo "Failed to find the machine-api-operator credentials request, abort." && exit 1
+fi
+popd
 
 ADDITIONAL_CCOCTL_ARGS=""
 if [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
