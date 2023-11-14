@@ -80,7 +80,7 @@ function rosa_upgrade()
   fi
 
   echo "######################################################################"
-  rosa list upgrade -c $CLUSTER_ID
+  rosa list upgrade -c $CLUSTER_ID --region $REGION
   echo "######################################################################"
 
   RECOMMEND_VERSION=`rosa list upgrade -c $CLUSTER_ID | grep recommended | awk '{print $1}'`
