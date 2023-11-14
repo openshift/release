@@ -3,6 +3,10 @@ base_images:
     name: tests-private-base
     namespace: ci
     tag: "4.9"
+  ci_tests-private-baseui_4.9:
+    name: tests-private-baseui
+    namespace: ci
+    tag: "4.9"
   ci_tests-private-builder_4.9:
     name: tests-private-builder
     namespace: ci
@@ -29,13 +33,18 @@ images:
       - registry.ci.openshift.org/ci/tests-private-builder:4.9
   to: tests-private
 - dockerfile_literal: |
-    FROM src
-    RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
-        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib" && \
-        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
-        yum clean all && rm -rf /var/cache/yum/*
-  from: src
+    FROM src AS builder
+    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.9
+    RUN mkdir -p /go/src/github.com/openshift
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+  inputs:
+    ci_tests-private-baseui_4.9:
+      as:
+      - registry.ci.openshift.org/ci/tests-private-baseui:4.9
+    src:
+      as:
+      - src
   to: tests-private-ui
 - dockerfile_literal: |
     FROM root
