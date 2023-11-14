@@ -83,7 +83,7 @@ function rosa_upgrade()
   rosa list upgrade -c $CLUSTER_ID --region $REGION
   echo "######################################################################"
 
-  RECOMMEND_VERSION=`rosa list upgrade -c $CLUSTER_ID | grep recommended | awk '{print $1}'`
+  RECOMMEND_VERSION=`rosa list upgrade -c $CLUSTER_ID --region $REGION | grep recommended | awk '{print $1}'`
 
   #If fail to find TARGET_RELEASES, use RECOMMEND_VERSION
   if [[ -z $TARGET_RELEASES ]];then
