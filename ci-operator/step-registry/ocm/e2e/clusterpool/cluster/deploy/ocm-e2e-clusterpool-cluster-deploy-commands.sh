@@ -162,19 +162,23 @@ if [[ "$release" == "main" || "$release" == "master" ]]; then
         log "ERROR Could not clone release repo $release_url"
         exit 1
     }
-    release=$(cat "${release_dir}/CURRENT_RELEASE")
+    if [[ "${PRODUCT_PREFIX}" == "release" ]]; then
+        release=$(cat "${release_dir}/CURRENT_RELEASE")
+    else
+        release="$(git -C ${release_dir} remote show origin | grep -o "${PRODUCT_PREFIX}-[0-9]\+\.[0-9]\+" | sort -V | tail -1)"
+    fi
     log "INFO Branch from CURRENT_RELEASE is $release"
 fi
 
 # Validate release branch. We can only run on release-x.y branches.
-if [[ ! "$release" =~ ^release-[0-9]+\.[0-9]+$ ]]; then
+if [[ ! "$release" =~ ^${PRODUCT_PREFIX}-[0-9]+\.[0-9]+$ ]]; then
     log "ERROR Branch ($release) is not a release branch."
-    log "Base branch of PR must match release-x.y"
+    log "Base branch of PR must match ${PRODUCT_PREFIX}-x.y"
     exit 1
 fi
 
 # Trim "release-" prefix.
-release=${release#release-}
+release=${release#${PRODUCT_PREFIX}-}
 
 PIPELINE_STAGE=${PIPELINE_STAGE:-"dev"}
 
