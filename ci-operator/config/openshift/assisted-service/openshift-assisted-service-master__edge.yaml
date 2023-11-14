@@ -1030,6 +1030,18 @@ tests:
         OPENSHIFT_VERSION=4.13
       PLATFORM: vsphere
     workflow: assisted-vsphere
+- always_run: false
+  as: e2e-vsphere-assisted-4-14
+  optional: true
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.14
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
 - as: e2e-vsphere-assisted-umn
   optional: true
   steps:
@@ -1053,6 +1065,21 @@ tests:
         MAKEFILE_TARGET=test
         DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
         ISO_IMAGE_TYPE=minimal-iso
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
+- as: e2e-nutanix-assisted-4-14
+  cluster: build01
+  optional: true
+  run_if_changed: ^(internal/provider/.*\.go|internal/provider/nutanix/.*|internal/provider/registry/.*)$
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
+        OPENSHIFT_VERSION=4.14
       PLATFORM: nutanix
     workflow: assisted-nutanix
 - as: e2e-nutanix-assisted-2workers
@@ -1089,6 +1116,16 @@ tests:
   run_if_changed: ^(internal/provider/.*\.go|internal/provider/oci/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: oci-assisted
+    workflow: assisted-oci
+- always_run: false
+  as: e2e-oci-assisted-4-14
+  run_if_changed: ^(internal/provider/.*\.go|internal/provider/oci/.*|internal/provider/registry/.*)$
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.14
+      PLATFORM: assisted-oci
     workflow: assisted-oci
 zz_generated_metadata:
   branch: master
