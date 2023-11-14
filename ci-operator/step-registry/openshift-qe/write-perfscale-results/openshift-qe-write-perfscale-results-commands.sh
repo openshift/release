@@ -7,7 +7,7 @@ cat /etc/os-release
 oc config view
 oc projects
 python --version
-pushd /tmp
+pushd /tmp || exit
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
@@ -41,9 +41,9 @@ jq -r 'to_entries[] | "\(.key)\t\(.value)"' ${SHARED_DIR}/index_data.json |
 source index.sh
 env
 
-pushd ocp-qe-perfscale-ci
+pushd ocp-qe-perfscale-ci || exit
 
 pip install -r requirements.txt
-pushd write_to_sheet
+pushd write_to_sheet || exit
 
 python prow_write.py
