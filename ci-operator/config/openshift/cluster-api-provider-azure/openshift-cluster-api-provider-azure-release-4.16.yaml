@@ -3,6 +3,10 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: base
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.16"
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
@@ -62,6 +66,11 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-serial
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
+  container:
+    from: commitchecker
 zz_generated_metadata:
   branch: release-4.16
   org: openshift
