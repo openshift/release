@@ -46,8 +46,8 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 REGION="${LEASED_RESOURCE}"
 echo "Azure region: ${REGION}"
 
-workers=3
-if [[ "${SIZE_VARIANT}" == "compact" ]]; then
+workers=${COMPUTE_NODE_REPLICAS:-3}
+if [ "${COMPUTE_NODE_REPLICAS}" -le 0 ] || [ "${SIZE_VARIANT}" = "compact" ]; then
   workers=0
 fi
 master_type=null

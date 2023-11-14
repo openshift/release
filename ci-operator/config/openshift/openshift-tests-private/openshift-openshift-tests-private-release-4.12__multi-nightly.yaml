@@ -86,16 +86,22 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
-- as: aws-ipi-ovn-ipsec-amd-mixarch-f14
+- as: aws-ipi-ovn-ipsec-arm-mixarch-f14
   cron: 48 11 8,23 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
+      ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@aws-ipi and @heterogeneous and @network-ovnkubernetes and not
         @fips'
+      OCP_ARCH: arm64
       TAG_VERSION: '@4.12'
       TEST_ADDITIONAL: Network_Observability
     test:
@@ -109,7 +115,9 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
+      ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
       E2E_RUN_TAGS: '@aws-ipi and @heterogeneous and @network-ovnkubernetes and not
         @fips'
       TAG_VERSION: '@4.12'
@@ -151,17 +159,22 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-upi
-- as: azure-ipi-amd-mixarch-f14
+- as: azure-ipi-arm-mixarch-f14
   cron: 53 2 3,18 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
+      ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
       E2E_RUN_TAGS: '@heterogeneous and @azure-ipi and @network-ovnkubernetes and
         not @fips'
+      OCP_ARCH: arm64
       TAG_VERSION: '@4.12'
     test:
     - ref: ipi-install-heterogeneous
