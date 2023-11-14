@@ -208,7 +208,7 @@ tests:
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-12-periodic
-  cron: 00 02 */1 * 0-5
+  cron: 00 02 */1 * 0,3
   steps:
     cluster_profile: packet-assisted
     env:
@@ -669,6 +669,18 @@ tests:
         OPENSHIFT_VERSION=4.13
       PLATFORM: vsphere
     workflow: assisted-vsphere
+- always_run: false
+  as: e2e-vsphere-assisted-4-14
+  optional: true
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.14
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
 - as: e2e-vsphere-assisted-periodic
   cron: 45 02 */1 * 0-5
   steps:
@@ -682,7 +694,7 @@ tests:
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - as: e2e-vsphere-assisted-4-12-periodic
-  cron: 40 02 */1 * 0-5
+  cron: 40 02 */1 * 0,3
   steps:
     cluster_profile: vsphere-2
     env:
@@ -692,6 +704,32 @@ tests:
         WORKER_VCPU=4
         WORKER_MEMORY=16384
         OPENSHIFT_VERSION=4.12
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-4-13-periodic
+  cron: 45 02 */1 * 0-5
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=3
+        MAKEFILE_TARGET=test
+        WORKER_VCPU=4
+        WORKER_MEMORY=16384
+        OPENSHIFT_VERSION=4.13
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-4-14-periodic
+  cron: 50 02 */1 * 0-5
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=3
+        MAKEFILE_TARGET=test
+        WORKER_VCPU=4
+        WORKER_MEMORY=16384
+        OPENSHIFT_VERSION=4.14
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - as: e2e-vsphere-assisted-kube-api
@@ -822,6 +860,21 @@ tests:
         OPENSHIFT_VERSION=4.13
       PLATFORM: nutanix
     workflow: assisted-nutanix
+- always_run: false
+  as: e2e-nutanix-assisted-4-14
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
+        OPENSHIFT_VERSION=4.14
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
 - as: e2e-nutanix-assisted-periodic
   cluster: build01
   interval: 24h
@@ -847,6 +900,20 @@ tests:
         DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
         ISO_IMAGE_TYPE=minimal-iso
         OPENSHIFT_VERSION=4.13
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
+- as: e2e-nutanix-assisted-4-14-periodic
+  cluster: build01
+  interval: 48h
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
+        OPENSHIFT_VERSION=4.14
       PLATFORM: nutanix
     workflow: assisted-nutanix
 - as: e2e-metal-assisted-day2-arm-workers
@@ -877,10 +944,21 @@ tests:
         CONTROLLER_IMAGE=brew.registry.redhat.io/rh-osbs/openshift4-assisted-installer-reporter-rhel8:latest
         INSTALLER_IMAGE=brew.registry.redhat.io/rh-osbs/openshift4-assisted-installer-rhel8:latest
     workflow: assisted-equinix
-- as: e2e-oci-assisted
+- always_run: false
+  as: e2e-oci-assisted
   optional: true
   steps:
     cluster_profile: oci-assisted
+    workflow: assisted-oci
+- always_run: false
+  as: e2e-oci-assisted-4-14
+  optional: true
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.14
+      PLATFORM: assisted-oci
     workflow: assisted-oci
 zz_generated_metadata:
   branch: master
