@@ -31,6 +31,18 @@ images:
       - destination_dir: .
         source_path: /bin/opm
   to: openstack-operator-ci-build-deploy
+- build_args:
+  - name: KUTTL_VERSION
+    value: v0.15.0
+  dockerfile_literal: |
+    FROM openstack-operator-ci-build-deploy
+    ARG KUTTL_VERSION=v0.15.0
+    RUN curl -s -L "https://github.com/kudobuilder/kuttl/releases/download/${KUTTL_VERSION}/kubectl-kuttl_${KUTTL_VERSION#v}_linux_x86_64" -o kubectl-kuttl
+    RUN chmod +x ./kubectl-kuttl
+    RUN mv ./kubectl-kuttl /usr/local/bin
+    RUN yum install -y skopeo
+  from: openstack-operator-ci-build-deploy
+  to: openstack-operator-ci-build-deploy-kuttl
 resources:
   '*':
     limits:
@@ -64,6 +76,18 @@ tests:
     env:
       CEPH_HOSTNETWORK: "false"
     workflow: openstack-k8s-operators-test-build-deploy
+- as: telemetry-operator-build-deploy-kuttl
+  cluster_claim:
+    architecture: amd64
+    cloud: vexxhost
+    owner: openstack-k8s-operators
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  steps:
+    env:
+      CEPH_HOSTNETWORK: "false"
+    workflow: openstack-k8s-operators-test-build-deploy-kuttl
 zz_generated_metadata:
   branch: main
   org: openstack-k8s-operators
