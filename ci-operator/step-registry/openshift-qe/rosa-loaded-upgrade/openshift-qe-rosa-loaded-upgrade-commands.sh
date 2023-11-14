@@ -85,11 +85,11 @@ function rosa_upgrade()
 
   RECOMMEND_VERSION=`rosa list upgrade -c $CLUSTER_ID --region $REGION | grep recommended | awk '{print $1}'`
 
-  #If fail to find TARGET_RELEASES, use RECOMMEND_VERSION
-  if [[ -z $TARGET_RELEASES ]];then
-	  UPGRADE_TO_VERSION=$RECOMMEND_VERSION
-  else
+  #prior to use RECOMMEND_VERSION
+  if [[ -z $RECOMMEND_VERSION ]];then
 	  UPGRADE_TO_VERSION=$TARGET_RELEASES
+  else
+	  UPGRADE_TO_VERSION=$RECOMMEND_VERSION
   fi
   echo  "-------------------------------------------------------------------------------------------"
   echo  Loaded Upgrade from [ $CURRENT_VERSION ] to [ $UPGRADE_TO_VERSION ] for $CLUSTER_ID on $REGION
