@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+# testing permissions, don't merge it
 
 echo "************ telco cluster release command ************"
 # TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
