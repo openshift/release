@@ -75,6 +75,29 @@ tests:
     - ref: servicemesh-kiali-int-tests-execute
     - ref: servicemesh-kiali-cypress-tests-execute
     workflow: firewatch-ipi-aws
+- as: servicemesh-interop-ibm
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: ibmcloud-cspi-qe
+    env:
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
+      OPERATORS: |
+        [
+            {"name": "elasticsearch-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"}
+        ]
+      RESOURCE_GROUP: zstream-ocp-interop
+      SMCP_VERSION: "2.4"
+      TEST_GROUP: interop
+    test:
+    - ref: install-operators
+    - ref: servicemesh-maistra-test-tool-execute
+    - ref: servicemesh-smcp-install
+    - ref: servicemesh-kiali-int-tests-execute
+    - ref: servicemesh-kiali-cypress-tests-execute
+    workflow: ipi-ibmcloud
 zz_generated_metadata:
   branch: main
   org: maistra
