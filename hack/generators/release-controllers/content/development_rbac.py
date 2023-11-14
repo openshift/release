@@ -107,7 +107,13 @@ def _add_cache_monitoring_rbac(gendoc):
                 'apiGroups': [''],
                 'resources': ['pods'],
                 'verbs': ['get', 'list', 'watch']
-            }]
+            },
+            {
+                'apiGroups': [''],
+                'resources': ['namespaces'],
+                'verbs': ['get', 'list', 'watch']
+            }
+        ]
     })
 
     gendoc.append({
