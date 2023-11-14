@@ -32,7 +32,7 @@ function rosa_login()
 
 }
 
-function classic_rosa_upgrade()
+function rosa_upgrade()
 {
 
   RELEASE_IMAGE_INTERMEDIATE=${RELEASE_IMAGE_INTERMEDIATE:=""}
@@ -45,6 +45,7 @@ function classic_rosa_upgrade()
 
   RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST:=""}
   CURRENT_VERSION=$(oc get clusterversion -ojsonpath={..desired.version})
+  ROSA_CLUSTER_TYPE=${ROSA_CLUSTER_TYPE:="classic"}
   #OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:=$RELEASE_IMAGE_LATEST}
 
   SHARED_DIR=${SHARED_DIR:=""}
@@ -95,7 +96,13 @@ function classic_rosa_upgrade()
   echo  "-------------------------------------------------------------------------------------------"
   echo rosa upgrade cluster -c $CLUSTER_ID --mode=auto --region $REGION --version $UPGRADE_TO_VERSION  --schedule-date $SCHEDULE_DATE --schedule-time $SCHEDULE_TIME -y
   echo "###############################`date`#######################################"
-  rosa upgrade cluster -c $CLUSTER_ID --mode=auto --region $REGION --version $UPGRADE_TO_VERSION --schedule-date $SCHEDULE_DATE --schedule-time $SCHEDULE_TIME -y
+  if [[ $ROSA_CLUSTER_TYPE == "classic" ]];then
+     rosa upgrade cluster -c $CLUSTER_ID --mode=auto --region $REGION --version $UPGRADE_TO_VERSION --schedule-date $SCHEDULE_DATE --schedule-time $SCHEDULE_TIME -y
+  elif [[ $ROSA_CLUSTER_TYPE == "hcp" ]];then
+     rosa upgrade cluster -c $CLUSTER_ID --mode=auto --region $REGION --version $UPGRADE_TO_VERSION --yes --control-plane
+  else
+      echo "Un-supported clsuter type $ROSA_CLUSTER_TYPE" 
+  fi
 
 
   echo "Checking ROSA upgrade status ..."
@@ -167,4 +174,5 @@ else
   exit 1
 fi
 rosa_login $CLOUD_PROVIDER_REGION
-classic_rosa_upgrade $CLOUD_PROVIDER_REGION
+rosa_upgrade $CLOUD_PROVIDER_REGION
+sleep 14400
