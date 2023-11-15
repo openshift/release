@@ -207,7 +207,7 @@ resources:
       cpu: 500m
       memory: 4Gi
 tests:
-- as: test-e2e-aws-ocp-414
+- as: perf-tests-aws-ocp-414
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -217,6 +217,7 @@ tests:
     version: "4.14"
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
@@ -224,6 +225,7 @@ tests:
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
       from: knative-serving-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
@@ -233,14 +235,28 @@ tests:
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
       from: knative-serving-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
       timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-serving-source-image
+      grace_period: 1m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-e2e
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make perf-tests
       dependencies:
       - env: KNATIVE_SERVING_ACTIVATOR
         name: knative-serving-activator
@@ -268,6 +284,237 @@ tests:
         name: knative-serving-rollout-probe
       - env: KNATIVE_SERVING_SCALE_FROM_ZERO
         name: knative-serving-scale-from-zero
+      - env: KNATIVE_SERVING_TEST_AUTOSCALE
+        name: knative-serving-test-autoscale
+      - env: KNATIVE_SERVING_TEST_FAILING
+        name: knative-serving-test-failing
+      - env: KNATIVE_SERVING_TEST_GRPC_PING
+        name: knative-serving-test-grpc-ping
+      - env: KNATIVE_SERVING_TEST_HELLOHTTP2
+        name: knative-serving-test-hellohttp2
+      - env: KNATIVE_SERVING_TEST_HELLOVOLUME
+        name: knative-serving-test-hellovolume
+      - env: KNATIVE_SERVING_TEST_HELLOWORLD
+        name: knative-serving-test-helloworld
+      - env: KNATIVE_SERVING_TEST_HTTPPROXY
+        name: knative-serving-test-httpproxy
+      - env: KNATIVE_SERVING_TEST_PIZZAPLANETV1
+        name: knative-serving-test-pizzaplanetv1
+      - env: KNATIVE_SERVING_TEST_PIZZAPLANETV2
+        name: knative-serving-test-pizzaplanetv2
+      - env: KNATIVE_SERVING_TEST_READINESS
+        name: knative-serving-test-readiness
+      - env: KNATIVE_SERVING_TEST_RUNTIME
+        name: knative-serving-test-runtime
+      - env: KNATIVE_SERVING_TEST_SERVINGCONTAINER
+        name: knative-serving-test-servingcontainer
+      - env: KNATIVE_SERVING_TEST_SIDECARCONTAINER
+        name: knative-serving-test-sidecarcontainer
+      - env: KNATIVE_SERVING_TEST_SINGLETHREADED
+        name: knative-serving-test-singlethreaded
+      - env: KNATIVE_SERVING_TEST_SLOWSTART
+        name: knative-serving-test-slowstart
+      - env: KNATIVE_SERVING_TEST_TIMEOUT
+        name: knative-serving-test-timeout
+      - env: KNATIVE_SERVING_TEST_VOLUMES
+        name: knative-serving-test-volumes
+      - env: KNATIVE_SERVING_TEST_WSSERVER
+        name: knative-serving-test-wsserver
+      - env: KNATIVE_SERVING_SOURCE_IMAGE
+        name: knative-serving-source-image
+      from: knative-serving-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: generic-claim
+- as: perf-tests-aws-ocp-414-continuous
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  cron: 0 5 * * 2,6
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    post:
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: knative-serving-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: knative-serving-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-serving-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    test:
+    - as: test
+      cli: latest
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make perf-tests
+      dependencies:
+      - env: KNATIVE_SERVING_ACTIVATOR
+        name: knative-serving-activator
+      - env: KNATIVE_SERVING_AUTOSCALER_HPA
+        name: knative-serving-autoscaler-hpa
+      - env: KNATIVE_SERVING_AUTOSCALER
+        name: knative-serving-autoscaler
+      - env: KNATIVE_SERVING_CONTROLLER
+        name: knative-serving-controller
+      - env: KNATIVE_SERVING_STORAGE_VERSION_MIGRATION
+        name: knative-serving-storage-version-migration
+      - env: KNATIVE_SERVING_QUEUE
+        name: knative-serving-queue
+      - env: KNATIVE_SERVING_WEBHOOK
+        name: knative-serving-webhook
+      - env: KNATIVE_SERVING_DATAPLANE_PROBE
+        name: knative-serving-dataplane-probe
+      - env: KNATIVE_SERVING_LOAD_TEST
+        name: knative-serving-load-test
+      - env: KNATIVE_SERVING_REAL_TRAFFIC_TEST
+        name: knative-serving-real-traffic-test
+      - env: KNATIVE_SERVING_RECONCILIATION_DELAY
+        name: knative-serving-reconciliation-delay
+      - env: KNATIVE_SERVING_ROLLOUT_PROBE
+        name: knative-serving-rollout-probe
+      - env: KNATIVE_SERVING_SCALE_FROM_ZERO
+        name: knative-serving-scale-from-zero
+      - env: KNATIVE_SERVING_TEST_AUTOSCALE
+        name: knative-serving-test-autoscale
+      - env: KNATIVE_SERVING_TEST_FAILING
+        name: knative-serving-test-failing
+      - env: KNATIVE_SERVING_TEST_GRPC_PING
+        name: knative-serving-test-grpc-ping
+      - env: KNATIVE_SERVING_TEST_HELLOHTTP2
+        name: knative-serving-test-hellohttp2
+      - env: KNATIVE_SERVING_TEST_HELLOVOLUME
+        name: knative-serving-test-hellovolume
+      - env: KNATIVE_SERVING_TEST_HELLOWORLD
+        name: knative-serving-test-helloworld
+      - env: KNATIVE_SERVING_TEST_HTTPPROXY
+        name: knative-serving-test-httpproxy
+      - env: KNATIVE_SERVING_TEST_PIZZAPLANETV1
+        name: knative-serving-test-pizzaplanetv1
+      - env: KNATIVE_SERVING_TEST_PIZZAPLANETV2
+        name: knative-serving-test-pizzaplanetv2
+      - env: KNATIVE_SERVING_TEST_READINESS
+        name: knative-serving-test-readiness
+      - env: KNATIVE_SERVING_TEST_RUNTIME
+        name: knative-serving-test-runtime
+      - env: KNATIVE_SERVING_TEST_SERVINGCONTAINER
+        name: knative-serving-test-servingcontainer
+      - env: KNATIVE_SERVING_TEST_SIDECARCONTAINER
+        name: knative-serving-test-sidecarcontainer
+      - env: KNATIVE_SERVING_TEST_SINGLETHREADED
+        name: knative-serving-test-singlethreaded
+      - env: KNATIVE_SERVING_TEST_SLOWSTART
+        name: knative-serving-test-slowstart
+      - env: KNATIVE_SERVING_TEST_TIMEOUT
+        name: knative-serving-test-timeout
+      - env: KNATIVE_SERVING_TEST_VOLUMES
+        name: knative-serving-test-volumes
+      - env: KNATIVE_SERVING_TEST_WSSERVER
+        name: knative-serving-test-wsserver
+      - env: KNATIVE_SERVING_SOURCE_IMAGE
+        name: knative-serving-source-image
+      from: knative-serving-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: generic-claim
+- as: test-e2e-aws-ocp-414
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    post:
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: knative-serving-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: knative-serving-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-serving-source-image
+      grace_period: 1m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    test:
+    - as: test
+      cli: latest
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-e2e
+      dependencies:
+      - env: KNATIVE_SERVING_ACTIVATOR
+        name: knative-serving-activator
+      - env: KNATIVE_SERVING_AUTOSCALER_HPA
+        name: knative-serving-autoscaler-hpa
+      - env: KNATIVE_SERVING_AUTOSCALER
+        name: knative-serving-autoscaler
+      - env: KNATIVE_SERVING_CONTROLLER
+        name: knative-serving-controller
+      - env: KNATIVE_SERVING_STORAGE_VERSION_MIGRATION
+        name: knative-serving-storage-version-migration
+      - env: KNATIVE_SERVING_QUEUE
+        name: knative-serving-queue
+      - env: KNATIVE_SERVING_WEBHOOK
+        name: knative-serving-webhook
       - env: KNATIVE_SERVING_TEST_AUTOSCALE
         name: knative-serving-test-autoscale
       - env: KNATIVE_SERVING_TEST_FAILING
@@ -323,6 +570,7 @@ tests:
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
@@ -330,6 +578,7 @@ tests:
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
       from: knative-serving-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
@@ -339,9 +588,23 @@ tests:
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
       from: knative-serving-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-serving-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
       timeout: 20m0s
     test:
     - as: test
@@ -362,18 +625,6 @@ tests:
         name: knative-serving-queue
       - env: KNATIVE_SERVING_WEBHOOK
         name: knative-serving-webhook
-      - env: KNATIVE_SERVING_DATAPLANE_PROBE
-        name: knative-serving-dataplane-probe
-      - env: KNATIVE_SERVING_LOAD_TEST
-        name: knative-serving-load-test
-      - env: KNATIVE_SERVING_REAL_TRAFFIC_TEST
-        name: knative-serving-real-traffic-test
-      - env: KNATIVE_SERVING_RECONCILIATION_DELAY
-        name: knative-serving-reconciliation-delay
-      - env: KNATIVE_SERVING_ROLLOUT_PROBE
-        name: knative-serving-rollout-probe
-      - env: KNATIVE_SERVING_SCALE_FROM_ZERO
-        name: knative-serving-scale-from-zero
       - env: KNATIVE_SERVING_TEST_AUTOSCALE
         name: knative-serving-test-autoscale
       - env: KNATIVE_SERVING_TEST_FAILING
@@ -428,6 +679,7 @@ tests:
     version: "4.14"
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
@@ -435,6 +687,7 @@ tests:
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
       from: knative-serving-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
@@ -444,9 +697,23 @@ tests:
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
       from: knative-serving-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-serving-source-image
+      grace_period: 1m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
       timeout: 20m0s
     test:
     - as: test
@@ -467,18 +734,6 @@ tests:
         name: knative-serving-queue
       - env: KNATIVE_SERVING_WEBHOOK
         name: knative-serving-webhook
-      - env: KNATIVE_SERVING_DATAPLANE_PROBE
-        name: knative-serving-dataplane-probe
-      - env: KNATIVE_SERVING_LOAD_TEST
-        name: knative-serving-load-test
-      - env: KNATIVE_SERVING_REAL_TRAFFIC_TEST
-        name: knative-serving-real-traffic-test
-      - env: KNATIVE_SERVING_RECONCILIATION_DELAY
-        name: knative-serving-reconciliation-delay
-      - env: KNATIVE_SERVING_ROLLOUT_PROBE
-        name: knative-serving-rollout-probe
-      - env: KNATIVE_SERVING_SCALE_FROM_ZERO
-        name: knative-serving-scale-from-zero
       - env: KNATIVE_SERVING_TEST_AUTOSCALE
         name: knative-serving-test-autoscale
       - env: KNATIVE_SERVING_TEST_FAILING
@@ -534,6 +789,7 @@ tests:
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
@@ -541,6 +797,7 @@ tests:
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
       from: knative-serving-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
@@ -550,9 +807,23 @@ tests:
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
       from: knative-serving-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-serving-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
       timeout: 20m0s
     test:
     - as: test
@@ -573,18 +844,6 @@ tests:
         name: knative-serving-queue
       - env: KNATIVE_SERVING_WEBHOOK
         name: knative-serving-webhook
-      - env: KNATIVE_SERVING_DATAPLANE_PROBE
-        name: knative-serving-dataplane-probe
-      - env: KNATIVE_SERVING_LOAD_TEST
-        name: knative-serving-load-test
-      - env: KNATIVE_SERVING_REAL_TRAFFIC_TEST
-        name: knative-serving-real-traffic-test
-      - env: KNATIVE_SERVING_RECONCILIATION_DELAY
-        name: knative-serving-reconciliation-delay
-      - env: KNATIVE_SERVING_ROLLOUT_PROBE
-        name: knative-serving-rollout-probe
-      - env: KNATIVE_SERVING_SCALE_FROM_ZERO
-        name: knative-serving-scale-from-zero
       - env: KNATIVE_SERVING_TEST_AUTOSCALE
         name: knative-serving-test-autoscale
       - env: KNATIVE_SERVING_TEST_FAILING

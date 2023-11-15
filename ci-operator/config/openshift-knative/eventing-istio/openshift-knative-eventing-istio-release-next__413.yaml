@@ -37,6 +37,7 @@ tests:
     version: "4.13"
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
@@ -44,6 +45,7 @@ tests:
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
       from: knative-eventing-istio-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
@@ -53,9 +55,23 @@ tests:
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
       from: knative-eventing-istio-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-eventing-istio-source-image
+      grace_period: 1m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
       timeout: 20m0s
     test:
     - as: test
@@ -83,6 +99,7 @@ tests:
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
@@ -90,6 +107,7 @@ tests:
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
       from: knative-eventing-istio-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
@@ -99,9 +117,23 @@ tests:
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
       from: knative-eventing-istio-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-eventing-istio-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
       timeout: 20m0s
     test:
     - as: test
