@@ -1,0 +1,66 @@
+base_images:
+  cli:
+    name: "4.8"
+    namespace: ocp
+    tag: cli
+  ocp_4.7_cli:
+    name: "4.7"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.16-linux
+images:
+- dockerfile_path: Dockerfile.prow
+  from: cli
+  inputs:
+    ocp_4.7_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.7:cli
+  to: backplane-must-gather
+promotion:
+  disabled: true
+  name: "2.5"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test-unit
+  commands: make -f Makefile.prow unit-test
+  container:
+    from: src
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: backplane-must-gather
+    env:
+      IMAGE_REPO: backplane-must-gather
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: backplane-2.5
+  org: stolostron
+  repo: backplane-must-gather

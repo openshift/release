@@ -1,0 +1,88 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.19-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.19-linux
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.19-linux
+images:
+- dockerfile_path: ./cmd/pure.Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.19-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.19-linux
+  to: cluster-proxy
+promotion:
+  disabled: true
+  name: "2.5"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build
+  commands: |
+    true
+  container:
+    from: src
+- as: unit-test
+  commands: export XDG_CACHE_HOME="/tmp" && make test
+  container:
+    from: src
+- as: integration
+  commands: export XDG_CACHE_HOME="/tmp" && make test-integration
+  container:
+    from: src
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-proxy
+    env:
+      IMAGE_REPO: cluster-proxy
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-proxy
+    env:
+      IMAGE_REPO: cluster-proxy
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export OSCI_COMPONENT_NAME="cluster-proxy"
+        export OSCI_COMPONENT_VERSION="2.5"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: backplane-2.5
+  org: stolostron
+  repo: cluster-proxy
