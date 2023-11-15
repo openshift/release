@@ -6,11 +6,15 @@ set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-export TEMPLATE_BASE_PATH=https://raw.githubusercontent.com/openshift/installer/master/upi/aws/cloudformation
-export TEMPLATE_STACK_VPC="01_vpc.yaml"
-export TEMPLATE_STACK_LOCAL_ZONE="01.99_net_local-zone.yaml"
+ls -la "${SHARED_DIR}"
 
-function join_by { local IFS="$1"; shift; echo "$*"; }
+declare -x STACK_NAME_VPC
+declare -x STACK_NAME_LOCALZONE
+
+TEMPLATE_SRC_REPO=https://raw.githubusercontent.com/openshift/installer/master/upi/aws/cloudformation
+
+TEMPLATE_STACK_VPC="01_vpc.yaml"
+TEMPLATE_STACK_LOCALZONE="01.99_net_local-zone.yaml"
 
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
@@ -22,84 +26,123 @@ REGION="${LEASED_RESOURCE}"
 
 CLUSTER_NAME="$(yq-go r "${CONFIG}" 'metadata.name')"
 
-# The above cloudformation template's max zones account is 3
-if [[ "${ZONES_COUNT}" -gt 3 ]]
-then
-  ZONES_COUNT=3
-fi
+function join_by { local IFS="$1"; shift; echo "$*"; }
 
-echo "Downloading VPC CloudFormation template"
-curl -L ${TEMPLATE_BASE_PATH}/${TEMPLATE_STACK_VPC} -o /tmp/${TEMPLATE_STACK_VPC}
+function add_param_to_json() {
+    local k="$1"
+    local v="$2"
+    local param_json="$3"
+    if [ ! -e "$param_json" ]; then
+        echo -n '[]' > "$param_json"
+    fi
+    cat <<< "$(jq  --arg k "$k" --arg v "$v" '. += [{"ParameterKey":$k, "ParameterValue":$v}]' "$param_json")" > "$param_json"
+}
 
-echo "Creating VPC CloudFormation stack using template file $TEMPLATE_STACK_VPC"
-STACK_NAME_VPC="${CLUSTER_NAME}-shared-vpc"
-aws --region "${REGION}" cloudformation create-stack \
-  --stack-name "${STACK_NAME_VPC}" \
-  --template-body "$(cat /tmp/${TEMPLATE_STACK_VPC})" \
-  --tags "${TAGS}" \
-  --parameters "ParameterKey=AvailabilityZoneCount,ParameterValue=${ZONES_COUNT}" &
+function get_template() {
+  local template_file=$1; shift
+  local template=${SHARED_DIR}/$template_file
+  if [[ -f ${template} ]]; then
+    echo "Using CloudFormation template from image. Path: ${template}"
+  else
+    echo "Downloading CloudFormation template from installer repo"
+    curl -L ${TEMPLATE_SRC_REPO}/"${template_file}" -o "${template}"
+  fi
+}
 
-wait "$!"
-echo "Created stack"
+function wait_for_stack() {
+  stack_name=$1
 
-aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${STACK_NAME_VPC}" &
-wait "$!"
-echo "Waited for stack"
+  echo "Waiting for stack create stack complete: ${stack_name}"
+  aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}" &
+  wait "$!"
+  echo "Waited for stack ${stack_name} completed"
+
+  stack_status=$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" | jq -r .Stacks[0].StackStatus)
+  if [[ "$stack_status" != "CREATE_COMPLETE" ]]; then
+    echo "Detected Failed Stack deployment with status: [${stack_status}]"
+
+    echo "Collecting stack events before failing:"
+    aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" \
+      | jq -c '.StackEvents[] | select(.ResourceStatus | contains("CREATE_FAILED","ROLLBACK_IN_PROGRESS")) \
+                | [.Timestamp, .StackName, .ResourceType, .ResourceStatus, .ResourceStatusReason]'
+    exit 1
+  fi
+}
+
+function deploy_stack() {
+  local stack_name=$1; shift
+  local template_name=$1;
+  local vars_name="${template_name}.parameters.json"
+
+  get_template "${stack_name}"
+
+  echo "Creating CloudFormation stack ${stack_name} with template $template_name"
+  set +e
+  aws --region "${REGION}" cloudformation create-stack \
+    --stack-name "${stack_name}" \
+    --template-body file://"${SHARED_DIR}"/"${template_name}" \
+    --tags "${TAGS}" \
+    --parameters file://"${SHARED_DIR}"/"${vars_name}"
+
+  echo "Created stack: ${stack_name}"
+  wait_for_stack "${stack_name}"
+  set -e
+
+  # save stack information to ${SHARED_DIR} for deprovision step
+  echo "${stack_name}" >> "${SHARED_DIR}/deprovision_stacks"
+}
+
+create_stack_vpc() {
+  # The above cloudformation template's max zones account is 3
+  if [[ "${ZONES_COUNT}" -gt 3 ]]
+  then
+    ZONES_COUNT=3
+  fi
+
+  STACK_NAME_VPC="${CLUSTER_NAME}-shared-vpc"
+  STACK_PARAMS_VPC="${SHARED_DIR}/${TEMPLATE_STACK_VPC}.parameters.json"
+  add_param_to_json AvailabilityZoneCount "${ZONES_COUNT}" "${STACK_PARAMS_VPC}"
+  deploy_stack "${STACK_NAME_VPC}" "${TEMPLATE_STACK_VPC}"
+}
+
+create_stack_localzones() {
+  # Randomly select the Local Zone in the Region (to increase coverage of tested zones added automatically)
+  localzone_name=$(< "${SHARED_DIR}"/local-zone-name.txt)
+  echo "Local Zone selected: ${localzone_name}"
+
+  vpc_rtb_pub=$(aws --region "$REGION" cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="PublicRouteTableId").OutputValue')
+  echo "VPC info: ${vpc_id} [public route table=${vpc_rtb_pub}]"
+
+  STACK_PARAMS_LOCALZONE="${SHARED_DIR}/${TEMPLATE_STACK_LOCALZONE}.parameters.json"
+  STACK_NAME_LOCALZONE="${CLUSTER_NAME}-${localzone_name}"
+  add_param_to_json VpcId "${vpc_id}" "${STACK_PARAMS_LOCALZONE}"
+  add_param_to_json PublicRouteTableId "${vpc_rtb_pub}" "${STACK_PARAMS_LOCALZONE}"
+  add_param_to_json SubnetName "${CLUSTER_NAME}-public-${localzone_name}" "${STACK_PARAMS_LOCALZONE}"
+  add_param_to_json ZoneName "${localzone_name}" "${STACK_PARAMS_LOCALZONE}"
+  add_param_to_json PublicSubnetCidr "10.0.128.0/20" "${STACK_PARAMS_LOCALZONE}"
+  deploy_stack "${STACK_NAME_LOCALZONE}" "${TEMPLATE_STACK_LOCALZONE}"
+}
+
+#
+# Main
+#
+
+create_stack_vpc
 
 subnets_arr="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -c '[.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetIds")).OutputValue | split(",")[]]')"
 echo "Subnets : ${subnets_arr}"
 
 subnets=[]
 
-# save stack information to ${SHARED_DIR} for deprovision step
-echo "${STACK_NAME_VPC}" >> "${SHARED_DIR}/sharednetworkstackname"
-
 vpc_id=$(aws --region "$REGION" cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="VpcId").OutputValue')
 echo "$vpc_id" > "${SHARED_DIR}/vpc_id"
 
 if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
+  create_stack_localzones
 
-  echo "Downloading Local Zone CloudFormation template"
-  curl -L ${TEMPLATE_BASE_PATH}/${TEMPLATE_STACK_LOCAL_ZONE} -o /tmp/${TEMPLATE_STACK_LOCAL_ZONE}
-
-  # Randomly select the Local Zone in the Region (to increase coverage of tested zones added automatically)
-  localzone_name=$(< "${SHARED_DIR}"/local-zone-name.txt)
-  echo "Local Zone selected: ${localzone_name}"
-
-  vpc_rtb_pub=$(aws --region $REGION cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="PublicRouteTableId").OutputValue')
-  echo "VPC info: ${vpc_id} [public route table=${vpc_rtb_pub}]"
-
-  echo "Creating Local Zone subnet CloudFormation stack using template file $TEMPLATE_STACK_LOCAL_ZONE"
-  stack_name_localzone="${CLUSTER_NAME}-${localzone_name}"
-  aws --region "${REGION}" cloudformation create-stack \
-    --stack-name "${stack_name_localzone}" \
-    --template-body "$(cat /tmp/${TEMPLATE_STACK_LOCAL_ZONE})" \
-    --tags "${TAGS}" \
-    --parameters \
-      ParameterKey=VpcId,ParameterValue="${vpc_id}" \
-      ParameterKey=PublicRouteTableId,ParameterValue="${vpc_rtb_pub}" \
-      ParameterKey=SubnetName,ParameterValue="${CLUSTER_NAME}-public-${localzone_name}" \
-      ParameterKey=ZoneName,ParameterValue="${localzone_name}" \
-      ParameterKey=PublicSubnetCidr,ParameterValue="10.0.128.0/20" &
-  
-  wait "$!"
-  echo "Created stack ${stack_name_localzone}"
-
-  aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name_localzone}" &
-  wait "$!"
-  echo "Waited for stack ${stack_name_localzone}"
-
-  stack_status=$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name_localzone}" | jq -r .Stacks[0].StackStatus)
-  if [[ "$stack_status" != "CREATE_COMPLETE" ]]; then
-    echo "Detected Failed Stack deployment with status: [${stack_status}]"
-    exit 1
-  fi
-
-  subnet_lz=$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name_localzone}" | jq -r .Stacks[0].Outputs[0].OutputValue)
+  subnet_lz=$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${STACK_NAME_LOCALZONE}" | jq -r .Stacks[0].Outputs[0].OutputValue)
   subnets_arr=$(jq -c ". + [\"$subnet_lz\"]" <(echo "$subnets_arr"))
   echo "Subnets (including local zones): ${subnets_arr}"
-
-  echo "${stack_name_localzone}" >> "${SHARED_DIR}/sharednetwork_stackname_localzone"
 fi
 
 # Converting for a valid format to install-config.yaml
