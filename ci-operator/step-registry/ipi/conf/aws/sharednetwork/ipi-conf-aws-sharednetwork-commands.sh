@@ -6,6 +6,10 @@ set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
+export TEMPLATE_BASE_PATH=/var/lib/openshift-install/upi/aws/cloudformation
+export TEMPLATE_STACK_VPC=${TEMPLATE_BASE_PATH}/01_vpc.yaml
+export TEMPLATE_STACK_LOCAL_ZONE=${TEMPLATE_BASE_PATH}/01.99_net_local-zone.yaml
+
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
@@ -18,18 +22,17 @@ REGION="${LEASED_RESOURCE}"
 
 CLUSTER_NAME="$(yq-go r "${CONFIG}" 'metadata.name')"
 
-curl -L https://raw.githubusercontent.com/openshift/installer/master/upi/aws/cloudformation/01_vpc.yaml -o /tmp/01_vpc.yaml
-
 # The above cloudformation template's max zones account is 3
 if [[ "${ZONES_COUNT}" -gt 3 ]]
 then
   ZONES_COUNT=3
 fi
 
+echo "Creating VPC CloudFormation stack using template file $TEMPLATE_STACK_VPC"
 STACK_NAME_VPC="${CLUSTER_NAME}-shared-vpc"
 aws --region "${REGION}" cloudformation create-stack \
   --stack-name "${STACK_NAME_VPC}" \
-  --template-body "$(cat /tmp/01_vpc.yaml)" \
+  --template-body "$(cat ${TEMPLATE_STACK_VPC})" \
   --tags "${TAGS}" \
   --parameters "ParameterKey=AvailabilityZoneCount,ParameterValue=${ZONES_COUNT}" &
 
@@ -53,10 +56,6 @@ echo "$vpc_id" > "${SHARED_DIR}/vpc_id"
 
 if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
 
-  echo "Downloading CloudFormation template for Local Zone subnet"
-  template_path_lz="/tmp/01.99_net_local-zone.yaml"
-  curl -L https://raw.githubusercontent.com/openshift/installer/master/upi/aws/cloudformation/01.99_net_local-zone.yaml -o $template_path_lz
-
   # Randomly select the Local Zone in the Region (to increase coverage of tested zones added automatically)
   localzone_name=$(< "${SHARED_DIR}"/local-zone-name.txt)
   echo "Local Zone selected: ${localzone_name}"
@@ -64,10 +63,11 @@ if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
   vpc_rtb_pub=$(aws --region $REGION cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="PublicRouteTableId").OutputValue')
   echo "VPC info: ${vpc_id} [public route table=${vpc_rtb_pub}]"
 
+  echo "Creating Local Zone subnet CloudFormation stack using template file $TEMPLATE_STACK_LOCAL_ZONE"
   stack_name_localzone="${CLUSTER_NAME}-${localzone_name}"
   aws --region "${REGION}" cloudformation create-stack \
     --stack-name "${stack_name_localzone}" \
-    --template-body file://$template_path_lz \
+    --template-body "$(cat ${TEMPLATE_STACK_LOCAL_ZONE})" \
     --tags "${TAGS}" \
     --parameters \
       ParameterKey=VpcId,ParameterValue="${vpc_id}" \
