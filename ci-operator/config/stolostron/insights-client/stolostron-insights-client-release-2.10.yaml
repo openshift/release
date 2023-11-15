@@ -1,0 +1,120 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.20-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+  to: insights-client
+promotion:
+  disabled: true
+  name: "2.10"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: insights-client
+    env:
+      IMAGE_REPO: insights-client
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: e2e
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-obs-usa-aws-kind
+      AWS_INSTANCE_TYPE: t3.xlarge
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
+    test:
+    - as: e2e
+      commands: |
+        echo "COMPONENT_IMAGE_REF=$COMPONENT_IMAGE_REF"
+        export SELF="make -f Makefile.prow"
+        set -o pipefail
+        make -f Makefile.prow test-e2e
+        set +o pipefail
+      dependencies:
+      - env: COMPONENT_IMAGE_REF
+        name: insights-client
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: insights-client
+    env:
+      IMAGE_REPO: insights-client
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: test-unit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow unit-test
+  container:
+    from: src
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+zz_generated_metadata:
+  branch: release-2.10
+  org: stolostron
+  repo: insights-client

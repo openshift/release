@@ -1,0 +1,120 @@
+base_images:
+  stolostron_builder_go1.20-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.18-linux
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+  to: observatorium-operator
+promotion:
+  disabled: true
+  name: "2.10"
+  namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: "4.8"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.8"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+test_binary_build_commands: "true"
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: observatorium-operator
+    env:
+      IMAGE_REPO: observatorium-operator
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: e2e-kind
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-obs-usa-aws-kind
+      AWS_INSTANCE_TYPE: t3.small
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
+    test:
+    - as: test
+      commands: |
+        echo "OPERATOR_IMAGE_NAME=$OPERATOR_IMAGE_NAME"
+        ./tests/e2e.sh test-kind-prow
+      dependencies:
+      - env: OPERATOR_IMAGE_NAME
+        name: observatorium-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: observatorium-operator
+    env:
+      IMAGE_REPO: observatorium-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_COMPONENT_NAME="observatorium-operator"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.10
+  org: stolostron
+  repo: observatorium-operator

@@ -1,0 +1,108 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.18-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.18-linux
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.18-linux
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: base
+  inputs:
+    stolostron_builder_go1.18-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
+  to: node-exporter
+promotion:
+  name: "2.10"
+  namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test-unit
+  commands: make test
+  container:
+    from: src
+- as: ocm-ci-rbac
+  steps:
+    workflow: ocm-ci-rbac
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: node-exporter
+    env:
+      IMAGE_REPO: node-exporter
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: test-e2e
+  commands: make test
+  container:
+    from: src
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: node-exporter
+    env:
+      IMAGE_REPO: node-exporter
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_COMPONENT_NAME="node-exporter"
+        make osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.10
+  org: stolostron
+  repo: node-exporter

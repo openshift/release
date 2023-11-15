@@ -1,0 +1,327 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.20-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+images:
+- dockerfile_path: operators/multiclusterobservability/Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+  to: multicluster-observability-operator
+- dockerfile_path: proxy/Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+  to: rbac-query-proxy
+- dockerfile_path: operators/endpointmetrics/Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+  to: endpoint-monitoring-operator
+- dockerfile_path: tests/Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+  to: observability-e2e-test
+- dockerfile_path: collectors/metrics/Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+  to: metrics-collector
+- dockerfile_path: loaders/dashboards/Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+  to: grafana-dashboard-loader
+promotion:
+  disabled: true
+  name: "2.10"
+  namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: "4.8"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.8"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+test_binary_build_commands: "true"
+tests:
+- as: test-unit
+  commands: |
+    export SELF="make"
+    VERBOSE="-v" make unit-tests
+  container:
+    from: src
+- as: test-e2e
+  skip_if_only_changed: ^docs/|hack/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO)$
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: multicluster-observability-operator
+    env:
+      CLUSTERPOOL_GROUP_NAME: Core-Services
+      CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
+      CLUSTERPOOL_LIFETIME: 1h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: sno-4xlarge
+      COMPONENT_NAME: multicluster-observability-operator
+      DEPLOY_HUB_ADDITIONAL_YAML: |
+        LS0tCmFwaVZlcnNpb246IHJiYWMuYXV0aG9yaXphdGlvbi5rOHMuaW8vdjEKa2luZDogQ2x1c3Rl
+        clJvbGUKbWV0YWRhdGE6CiAgY3JlYXRpb25UaW1lc3RhbXA6IG51bGwKICBuYW1lOiBtdWx0aWNs
+        dXN0ZXItb2JzZXJ2YWJpbGl0eS1vcGVyYXRvci1lMmUtdGVzdGluZwpydWxlczoKICAtIGFwaUdy
+        b3VwczoKICAgIC0gYWRtaXNzaW9ucmVnaXN0cmF0aW9uLms4cy5pbwogICAgcmVzb3VyY2VzOgog
+        ICAgLSBtdXRhdGluZ3dlYmhvb2tjb25maWd1cmF0aW9ucwogICAgLSB2YWxpZGF0aW5nd2ViaG9v
+        a2NvbmZpZ3VyYXRpb25zCiAgICB2ZXJiczoKICAgIC0gY3JlYXRlCiAgICAtIGRlbGV0ZQogICAg
+        LSBnZXQKICAgIC0gbGlzdAogICAgLSBwYXRjaAogICAgLSB1cGRhdGUKICAgIC0gd2F0Y2gKICAt
+        IHZlcmJzOgogICAgLSAnKicKICAgIGFwaUdyb3VwczoKICAgIC0gJ21vbml0b3JpbmcuY29yZW9z
+        LmNvbScKICAgIHJlc291cmNlczoKICAgIC0gcHJvbWV0aGV1c3J1bGVzCiAgLSB2ZXJiczoKICAg
+        IC0gJyonCiAgICBhcGlHcm91cHM6CiAgICAtICdvYXV0aC5vcGVuc2hpZnQuaW8nCiAgICByZXNv
+        dXJjZXM6CiAgICAtIG9hdXRoY2xpZW50cwogIC0gdmVyYnM6CiAgICAtICcqJwogICAgYXBpR3Jv
+        dXBzOgogICAgLSAnYWRkb24ub3Blbi1jbHVzdGVyLW1hbmFnZW1lbnQuaW8nCiAgICByZXNvdXJj
+        ZXM6CiAgICAtIGFkZG9uZGVwbG95bWVudGNvbmZpZ3MKICAtIGFwaUdyb3VwczoKICAgIC0gYWRk
+        b24ub3Blbi1jbHVzdGVyLW1hbmFnZW1lbnQuaW8KICAgIHJlc291cmNlczoKICAgIC0gbWFuYWdl
+        ZGNsdXN0ZXJhZGRvbnMKICAgIC0gbWFuYWdlZGNsdXN0ZXJhZGRvbnMvc3RhdHVzCiAgICAtIG1h
+        bmFnZWRjbHVzdGVyYWRkb25zL2ZpbmFsaXplcnMKICAgIHZlcmJzOgogICAgLSB3YXRjaAogICAg
+        LSBjcmVhdGUKICAgIC0gdXBkYXRlCiAgICAtIGRlbGV0ZQogICAgLSBnZXQKICAgIC0gbGlzdAog
+        ICAgLSBwYXRjaAotLS0Ka2luZDogQ2x1c3RlclJvbGVCaW5kaW5nCmFwaVZlcnNpb246IHJiYWMu
+        YXV0aG9yaXphdGlvbi5rOHMuaW8vdjEKbWV0YWRhdGE6CiAgbmFtZTogbXVsdGljbHVzdGVyLW9i
+        c2VydmFiaWxpdHktb3BlcmF0b3ItZTJlLXRlc3RpbmcKcm9sZVJlZjoKICBhcGlHcm91cDogcmJh
+        Yy5hdXRob3JpemF0aW9uLms4cy5pbwogIGtpbmQ6IENsdXN0ZXJSb2xlCiAgbmFtZTogbXVsdGlj
+        bHVzdGVyLW9ic2VydmFiaWxpdHktb3BlcmF0b3ItZTJlLXRlc3RpbmcKc3ViamVjdHM6Ci0ga2lu
+        ZDogU2VydmljZUFjY291bnQKICBuYW1lOiBtdWx0aWNsdXN0ZXItb2JzZXJ2YWJpbGl0eS1vcGVy
+        YXRvcgogIG5hbWVzcGFjZTogb3Blbi1jbHVzdGVyLW1hbmFnZW1lbnQKLS0tCg==
+    test:
+    - as: e2e
+      commands: |
+        echo "ENDPOINT_MONITORING_OPERATOR_IMAGE_REF=$ENDPOINT_MONITORING_OPERATOR_IMAGE_REF"
+        echo "GRAFANA_DASHBOARD_LOADER_IMAGE_REF=$GRAFANA_DASHBOARD_LOADER_IMAGE_REF"
+        echo "METRICS_COLLECTOR_IMAGE_REF=$METRICS_COLLECTOR_IMAGE_REF"
+        echo "RBAC_QUERY_PROXY_IMAGE_REF=$RBAC_QUERY_PROXY_IMAGE_REF"
+        export SELF="make"
+        set -o pipefail
+        make e2e-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
+        set +o pipefail
+      dependencies:
+      - env: ENDPOINT_MONITORING_OPERATOR_IMAGE_REF
+        name: endpoint-monitoring-operator
+      - env: GRAFANA_DASHBOARD_LOADER_IMAGE_REF
+        name: grafana-dashboard-loader
+      - env: METRICS_COLLECTOR_IMAGE_REF
+        name: metrics-collector
+      - env: RBAC_QUERY_PROXY_IMAGE_REF
+        name: rbac-query-proxy
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
+- as: publish-multicluster-observability-operator
+  postsubmit: true
+  run_if_changed: ^(operators/multiclusterobservability/.*|operators/pkg/.*|REMEDIATE.md|pkg/.*)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicluster-observability-operator
+    env:
+      IMAGE_REPO: multicluster-observability-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="multicluster-observability-operator"
+        export OSCI_PUBLISH_DELAY="0"
+        make osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-rbac-query-proxy
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: rbac-query-proxy
+    env:
+      IMAGE_REPO: rbac-query-proxy
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="rbac-query-proxy"
+        export OSCI_PUBLISH_DELAY="0"
+        make osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-endpoint-monitoring-operator
+  postsubmit: true
+  run_if_changed: ^(operators/endpointmetrics/.*|operators/pkg/.*|REMEDIATE.md|pkg/.*)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: endpoint-monitoring-operator
+    env:
+      IMAGE_REPO: endpoint-monitoring-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="endpoint-monitoring-operator"
+        export OSCI_PUBLISH_DELAY="0"
+        make osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-observability-e2e-test
+  postsubmit: true
+  run_if_changed: ^(tests/.*|REMEDIATE.md)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: observability-e2e-test
+    env:
+      IMAGE_REPO: observability-e2e-test
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="observability-e2e-test"
+        export OSCI_PUBLISH_DELAY="0"
+        make osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-metrics-collector
+  postsubmit: true
+  run_if_changed: ^(collectors/metrics/.*|REMEDIATE.md|pkg/.*)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: metrics-collector
+    env:
+      IMAGE_REPO: metrics-collector
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="metrics-collector"
+        export OSCI_PUBLISH_DELAY="0"
+        make osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-grafana-dashboard-loader
+  postsubmit: true
+  run_if_changed: ^(loaders/dashboards/.*|REMEDIATE.md|pkg/.*)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grafana-dashboard-loader
+    env:
+      IMAGE_REPO: grafana-dashboard-loader
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="grafana-dashboard-loader"
+        export OSCI_PUBLISH_DELAY="0"
+        make osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: sonarcloud
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonarcloud-post-submit
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+zz_generated_metadata:
+  branch: release-2.10
+  org: stolostron
+  repo: multicluster-observability-operator

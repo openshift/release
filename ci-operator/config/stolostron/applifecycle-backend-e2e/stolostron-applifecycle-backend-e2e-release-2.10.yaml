@@ -1,0 +1,76 @@
+base_images:
+  stolostron_builder_go1.20-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+images:
+- dockerfile_path: Dockerfile.prow
+  from: stolostron_builder_go1.20-linux
+  to: applifecycle-backend-e2e
+promotion:
+  disabled: true
+  name: "2.10"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 80m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow setup-tests
+    set -o pipefail
+    make -f Makefile.prow test 2>&1 | tee ${ARTIFACT_DIR}/test_out.log
+    set +o pipefail
+  container:
+    from: src
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: applifecycle-backend-e2e
+    workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: applifecycle-backend-e2e
+    env:
+      IMAGE_REPO: applifecycle-backend-e2e
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: applifecycle-backend-e2e
+    env:
+      IMAGE_REPO: applifecycle-backend-e2e
+      IMAGE_TAG: 2.10.0
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.10
+  org: stolostron
+  repo: applifecycle-backend-e2e

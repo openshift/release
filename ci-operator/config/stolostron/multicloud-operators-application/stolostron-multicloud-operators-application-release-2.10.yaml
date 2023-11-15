@@ -1,0 +1,107 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.20-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+images:
+- dockerfile_path: build/Dockerfile.prow
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+  to: multicluster-operators-application
+promotion:
+  disabled: true
+  name: "2.10"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test-unit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow lint
+    make -f Makefile.prow test
+  container:
+    from: src
+- as: sonarcloud
+  commands: |
+    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/e2e/ {printf $0" "}')"
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    export HOME="/tmp"
+    export XDG_CACHE_HOME="/tmp/.cache"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/e2e/ {printf $0" "}')"
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    export HOME="/tmp"
+    export XDG_CACHE_HOME="/tmp/.cache"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicluster-operators-application
+    workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicluster-operators-application
+    env:
+      IMAGE_REPO: multicluster-operators-application
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicluster-operators-application
+    env:
+      IMAGE_REPO: multicluster-operators-application
+      IMAGE_TAG: 2.10.0
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.10
+  org: stolostron
+  repo: multicloud-operators-application
