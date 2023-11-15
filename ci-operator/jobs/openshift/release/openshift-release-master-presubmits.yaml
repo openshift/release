@@ -18,7 +18,11 @@ presubmits:
       - args:
         - --bot=openshift-merge-robot
         - --bot=openshift-ci-robot
+        - --app=openshift-ci
+        - --app-check-mode=standard
         - --candidate-path=.
+        - --config-path=./core-services/prow/02_config/_config.yaml
+        - --supplemental-prow-config-dir=./core-services/prow/02_config
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --github-endpoint=http://ghproxy
@@ -57,6 +61,65 @@ presubmits:
         secret:
           secretName: openshift-prow-github-app
     trigger: (?m)^/test( | .* )check-gh-automation,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/check-gh-automation-tide
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-check-gh-automation-tide
+    rerun_command: /test check-gh-automation-tide
+    run_if_changed: ^ci-operator/config/.*
+    spec:
+      containers:
+      - args:
+        - --app=openshift-merge-bot
+        - --app-check-mode=tide
+        - --candidate-path=.
+        - --config-path=./core-services/prow/02_config/_config.yaml
+        - --supplemental-prow-config-dir=./core-services/prow/02_config
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --ignore=openshift/multiarch
+        - --ignore=kata-containers/kata-containers
+        - --ignore=containers/gvisor-tap-vsock
+        - --ignore=containers/podman-py
+        - --ignore=CSPI-QE
+        - --ignore=redhat-openshift-ecosystem/certified-operators-prod
+        - --ignore=redhat-openshift-ecosystem/preflight
+        - --ignore=redhat-openshift-ecosystem/cvp
+        - --ignore=insights-qe/iqe-cost-management-plugin
+        - --ignore=ansible/tower-qa
+        - --ignore=rh-openjdk/jdkContainerOcpTests
+        command:
+        - ./hack/check-gh-automation.sh
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              key: appid
+              name: openshift-merge-bot
+        image: registry.ci.openshift.org/ci/check-gh-automation:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: github-app-credentials
+          readOnly: true
+      volumes:
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-merge-bot
+    trigger: (?m)^/test( | .* )check-gh-automation-tide,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
