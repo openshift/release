@@ -1,4 +1,8 @@
 base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.15"
   ocp_4.15_base:
     name: "4.15"
     namespace: ocp
@@ -54,6 +58,11 @@ tests:
   commands: gofmt -l $(find . -type f -name '*.go'| grep -v "/vendor/")
   container:
     from: src
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-main}
+  container:
+    from: commitchecker
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

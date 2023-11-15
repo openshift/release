@@ -255,14 +255,14 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$control_plane_memory = 16384
 \$control_plane_num_cpus = 4
 \$control_plane_count = 3
-\$control_plane_ip_addresses = ${control_plane_ip_addresses}
+\$control_plane_ip_addresses = $(echo ${control_plane_ip_addresses} | tr -d [])
 \$control_plane_hostnames = "control-plane-0", "control-plane-1", "control-plane-2"
 
 \$compute_memory = 16384
 \$compute_num_cpus = 4
 \$compute_count = 3
-\$compute_ip_addresses = ${compute_ip_addresses}
-\$control_plane_hostnames = "compute-0", "compute-1", "compute-2"
+\$compute_ip_addresses = $(echo ${compute_ip_addresses} | tr -d [])
+\$compute_hostnames = "compute-0", "compute-1", "compute-2"
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Create secrets.auto.tfvars..."
@@ -274,6 +274,7 @@ EOF
 
 if command -v pwsh &> /dev/null
 then
+  echo "Creating powercli credentials file"
   pwsh -command "\$User='${GOVC_USERNAME}';\$Password=ConvertTo-SecureString -String '${GOVC_PASSWORD}' -AsPlainText -Force;\$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList \$User, \$Password;\$Credential | Export-Clixml ${SHARED_DIR}/vcenter-creds.xml"
 fi
 

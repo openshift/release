@@ -11,6 +11,7 @@ HOSTED_CP=${HOSTED_CP:-false}
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
 CHANNEL_GROUP=${CHANNEL_GROUP}
+PERMISSIONS_BOUNDARY=${PERMISSIONS_BOUNDARY:-}
 
 # Configure aws
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -61,6 +62,11 @@ if [[ ! -z "$ARN_PATH" ]]; then
    ARN_PATH_SWITCH="--path ${ARN_PATH}"
 fi
 
+PERMISSIONS_BOUNDARY_SWITCH=""
+if [[ ! -z "$PERMISSIONS_BOUNDARY" ]]; then
+   PERMISSIONS_BOUNDARY_SWITCH="--permissions-boundary ${PERMISSIONS_BOUNDARY}"
+fi
+
 # Whatever the account roles with the prefix exist or not, do creation.
 echo "Create the ${CLUSTER_SWITCH} account roles with the prefix '${ACCOUNT_ROLES_PREFIX}'"
 echo "rosa create account-roles -y --mode auto --prefix ${ACCOUNT_ROLES_PREFIX} ${CLUSTER_SWITCH} ${VERSION_SWITCH} ${ARN_PATH_SWITCH}"
@@ -68,7 +74,8 @@ rosa create account-roles -y --mode auto \
                           --prefix ${ACCOUNT_ROLES_PREFIX} \
                           ${CLUSTER_SWITCH} \
                           ${VERSION_SWITCH} \
-                          ${ARN_PATH_SWITCH}
+                          ${ARN_PATH_SWITCH} \
+                          ${PERMISSIONS_BOUNDARY_SWITCH}
 
 # Store the account-role-prefix for the next pre steps and the account roles deletion
 echo "Store the account-role-prefix and the account-roles-arn ..."
