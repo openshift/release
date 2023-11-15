@@ -27,9 +27,14 @@ SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
 declare vlanid
 declare primaryrouterhostname
 declare vsphere_portgroup
+declare VSPHERE_ADDITIONAL_BASEDOMAINS
+declare vsphere_basedomains_list
 source "${SHARED_DIR}/vsphere_context.sh"
 
-num_vips=$((2 + 2*${#VSPHERE_ADDITIONAL_BASEDOMAINS[@]}))
+export VSPHERE_PORTGROUP="${vsphere_portgroup}"
+
+read -a vsphere_basedomains_list <<< "${VSPHERE_ADDITIONAL_BASEDOMAINS}"
+num_vips=$((2 + 2*${#vsphere_basedomains_list[@]}))
 
 if [[ ${vsphere_portgroup} == *"segment"* ]]; then
   third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))

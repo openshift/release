@@ -108,9 +108,11 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
 }
 EOF
 
+read -a vsphere_basedomains_list <<< "${VSPHERE_ADDITIONAL_BASEDOMAINS}"
+
 HOSTNAMES=("api.'$cluster_domain'." "*.apps.'$cluster_domain'.")
-for cluster in "${VSPHERE_ADDITIONAL_BASEDOMAINS[@]}"; do
-  HOSTNAMES+=("api.${cluster}.${basedomain}." "*.apps.${cluster}.${basedomain}.")
+for cluster in "${vsphere_basedomains_list[@]}"; do
+  HOSTNAMES+=("api.${cluster}.${base_domain}." "*.apps.${cluster}.${base_domain}.")
 done
 
 for ((i = 0; i < ${#HOSTNAMES[@]}; i++)); do
