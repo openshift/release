@@ -17,6 +17,7 @@ oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
   --pull-secret=/tmp/.dockerconfigjson \
   --agent-namespace="clusters-${CLUSTER_NAME}" \
   --base-domain=${BASEDOMAIN} \
+  --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
   --release-image ${RELEASE_IMAGE}
 
 echo "Waiting for cluster to become available"

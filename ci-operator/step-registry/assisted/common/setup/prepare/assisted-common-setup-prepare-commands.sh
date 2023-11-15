@@ -6,13 +6,12 @@ set -o pipefail
 
 echo "************ assisted common setup prepare command ************"
 
-# Get packet | vsphere configuration
+# source common configuration, if missing, fallback on packet configuration
 # shellcheck source=/dev/null
-if source "${SHARED_DIR}/packet-conf.sh"; then
+if ! source "${SHARED_DIR}/ci-machine-config.sh"; then
+  source "${SHARED_DIR}/packet-conf.sh"
   export IP
   export SSH_KEY_FILE="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
-else
-  source "${SHARED_DIR}/ci-machine-config.sh"
 fi
 
 mkdir -p build/ansible
@@ -59,6 +58,7 @@ cat > packing-test-infra.yaml <<-EOF
             ServerAliveInterval 90
             LogLevel ERROR
             IdentityFile {{ lookup('env', 'SSH_KEY_FILE') }}
+            ConnectionAttempts 10
     - name: Create ansible configuration
       ansible.builtin.copy:
         dest: "{{ SHARED_DIR }}/ansible.cfg"
@@ -70,6 +70,9 @@ cat > packing-test-infra.yaml <<-EOF
           verbosity = 2
           stdout_callback = yaml
           bin_ansible_callbacks = True
+
+          [ssh_connection]
+          retries = 10
 EOF
 
 ansible-playbook packing-test-infra.yaml
@@ -103,6 +106,7 @@ export TEST_FUNC=test_install
 export ASSISTED_SERVICE_HOST={{ IP }}
 export PUBLIC_CONTAINER_REGISTRIES="{{ CI_REGISTRIES | join(',') }}"
 export OPENSHIFT_INSTALL_RELEASE_IMAGE={{ OPENSHIFT_INSTALL_RELEASE_IMAGE }}
+export TF_APPLY_ATTEMPTS=3
 
 {% if ENVIRONMENT == "production" %}
 # Testing against the production AI parameters
@@ -174,6 +178,8 @@ cat > run_test_playbook.yaml <<-"EOF"
     ASSISTED_TEST_INFRA_IMAGE: "{{ lookup('env', 'ASSISTED_TEST_INFRA_IMAGE')}}"
     CLUSTER_TYPE: "{{ lookup('env', 'CLUSTER_TYPE')}}"
     OPENSHIFT_INSTALL_RELEASE_IMAGE: "{{ lookup('env', 'OPENSHIFT_INSTALL_RELEASE_IMAGE')}}"
+    CLUSTER_PROFILE_PULL_SECRET: "{{ lookup('file', '{{ CLUSTER_PROFILE_DIR }}/pull-secret') }}"
+    BREW_REGISTRY_REDHAT_IO_PULL_SECRET: "{{ lookup('file', '/var/run/vault/brew-registry-redhat-io-pull-secret/pull-secret') }}"
   tasks:
     - name: Fail on unsupported environment
       fail:
@@ -186,11 +192,16 @@ cat > run_test_playbook.yaml <<-"EOF"
       ansible.builtin.file:
         path: /usr/config
         state: absent
-    - name: Copy pull-secret to remote
+    - name: Update pull secrets with brew.registry.redhat.io auth
+      ansible.builtin.set_fact:
+        pull_secret: "{{ CLUSTER_PROFILE_PULL_SECRET | combine(BREW_REGISTRY_REDHAT_IO_PULL_SECRET, recursive=true) }}"
+      no_log: true
+    - name: Setup pull-secret on remote
       become: true
       ansible.builtin.copy:
-        src: "{{ CLUSTER_PROFILE_DIR }}/pull-secret"
+        content: "{{ pull_secret | to_nice_json }}"
         dest: /root/pull-secret
+      no_log: true
     - name: Create prod directory
       ansible.builtin.file:
         path: /root/prod

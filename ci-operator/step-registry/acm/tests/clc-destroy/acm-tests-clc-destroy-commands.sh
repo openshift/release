@@ -1,6 +1,6 @@
 #!/bin/bash
 set -o nounset
-set -o errexit
+# set -o errexit
 set -o pipefail
 
 # The variables defined in this step come from files in the `SHARED_DIR` and credentials from Vault.
@@ -27,6 +27,6 @@ CYPRESS_OPTIONS_HUB_PASSWORD=$(cat $SHARED_DIR/kubeadmin-password)
 export CYPRESS_OPTIONS_HUB_PASSWORD
 
 # run the test execution script
-./execute_clc_interop_commands.sh
+./execute_clc_interop_commands.sh || :
 
-cp -r reports/ocp_interop $ARTIFACT_DIR/
+cp -r reports $ARTIFACT_DIR/

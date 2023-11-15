@@ -24,7 +24,7 @@ function check_signed() {
     digest="$(echo "${TARGET}" | cut -f2 -d@)"
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror2.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -53,7 +53,9 @@ function mirror_image(){
 function apply_signature(){
     if [[ "${APPLY_SIG}" == "true" ]]; then
         echo "Apply signature against cluster..."
-        run_command "oc apply -f ${SAVE_SIG_TO_DIR}/signature-*.json --overwrite=true"
+        #when mirroring images using oc 4.11+, a signature file with 'json' suffix would be created,
+        #but the older verison of oc would create a signature file with 'yaml' suffix.
+        run_command "oc apply -f ${SAVE_SIG_TO_DIR}/signature-*.* --overwrite=true"
     fi
 }
 
@@ -70,6 +72,24 @@ function update_icsp(){
         run_command "cat ${ICSP_FILE}"
         run_command "oc create -f ${ICSP_FILE}"
     fi
+}
+
+# Extract oc binary which is supposed to be identical with target release
+function extract_oc(){
+    echo -e "Extracting oc\n"
+    local retry=5 tmp_oc="/tmp/client-2"
+    mkdir -p ${tmp_oc}
+    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
+    do
+        echo >&2 "Failed to extract oc binary, retry..."
+        (( retry -= 1 ))
+        if (( retry < 0 )); then return 1; fi
+        sleep 60
+    done
+    mv ${tmp_oc}/oc ${OC_DIR} -f
+    which oc
+    oc version --client
+    return 0
 }
 
 if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
@@ -110,6 +130,11 @@ trap 'rm -f "${PULL_SECRET}"' ERR EXIT TERM
 export MIRROR_OUT_FILE="${SHARED_DIR}/mirror"
 export ICSP_FILE="${SHARED_DIR}/icsp.yaml"
 
+# Target version oc will be extract in the /tmp/client directory, use it first
+mkdir -p /tmp/client
+export OC_DIR="/tmp/client"
+export PATH=${OC_DIR}:$PATH
+
 for target in "${TARGET_RELEASES[@]}"
 do
     export TARGET="${target}"
@@ -123,6 +148,9 @@ do
     fi
     export APPLY_SIG
     export SAVE_SIG_TO_DIR
+
+    extract_oc
+
     mirror_image
     set_proxy_env
     apply_signature

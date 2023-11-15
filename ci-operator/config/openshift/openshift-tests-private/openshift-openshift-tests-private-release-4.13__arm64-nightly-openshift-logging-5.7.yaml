@@ -1,0 +1,96 @@
+base_images:
+  ansible:
+    name: "4.13"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: "4.13"
+    namespace: ocp
+    tag: hypershift-operator
+  openstack-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.13"
+  tools:
+    name: "4.13"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.13"
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: azure-upi-f28-disruptive
+  cron: 13 16 6 * *
+  steps:
+    cluster_profile: azure-arm64-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      BOOTSTRAP_NODE_TYPE: Standard_D4ps_v5
+      CLO_SUB_CHANNEL: stable-5.7
+      COMPUTE_NODE_TYPE: Standard_D8ps_v5
+      CONTROL_PLANE_NODE_TYPE: Standard_D8ps_v5
+      EO_SUB_CHANNEL: stable-5.7
+      FORCE_SUCCESS_EXIT: "true"
+      LO_SUB_CHANNEL: stable-5.7
+      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log5.7
+      OCP_ARCH: arm64
+      TEST_FILTERS: Disruptive;Longduration
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: enable-qe-catalogsource-logging
+    - ref: operatorhub-subscribe-elasticsearch-operator
+    - ref: operatorhub-subscribe-cluster-logging-operator
+    - ref: operatorhub-subscribe-loki-operator
+    - chain: openshift-e2e-test-logging-qe-disruptive
+    workflow: cucushift-installer-rehearse-azure-upi
+zz_generated_metadata:
+  branch: release-4.13
+  org: openshift
+  repo: openshift-tests-private
+  variant: arm64-nightly-openshift-logging-5.7

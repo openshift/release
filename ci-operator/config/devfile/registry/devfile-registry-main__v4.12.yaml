@@ -3,6 +3,10 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: cli
+  e2e-test-runner:
+    name: redhat-appstudio
+    namespace: ci
+    tag: e2e-test-runner
 build_root:
   image_stream_tag:
     name: release
@@ -49,6 +53,22 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- as: rhtap-nightly-devfile-compatibility
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  cron: 0 */12 * * *
+  steps:
+    test:
+    - ref: redhat-appstudio-install-rhtap
+    - ref: devfile-rhtap-nightly
+    workflow: redhat-appstudio-claim
 zz_generated_metadata:
   branch: main
   org: devfile

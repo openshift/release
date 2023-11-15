@@ -5,7 +5,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 GOOGLE_PROJECT_ID="$(<${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
-INSTANCE_PREFIX="${NAMESPACE}-${JOB_NAME_HASH}"
+INSTANCE_PREFIX="${NAMESPACE}-${UNIQUE_HASH}"
 
 echo "$(date -u --rfc-3339=seconds) - Configuring VM on GCP..."
 mkdir -p "${HOME}"/.ssh
@@ -59,3 +59,9 @@ gcloud compute instances create "$INSTANCE_PREFIX" \
     --subnet "$INSTANCE_PREFIX" \
     --network "$INSTANCE_PREFIX" \
     --hostname "release-ci-${INSTANCE_PREFIX}.openshift-ci.com"
+
+IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
+HOST_USER="rhel8user"
+
+echo "${HOST_USER}" > "${SHARED_DIR}/ssh_user"
+echo "${IP_ADDRESS}" > "${SHARED_DIR}/public_address"

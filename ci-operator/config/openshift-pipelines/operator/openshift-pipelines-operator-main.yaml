@@ -1,0 +1,76 @@
+binary_build_commands: go build ./cmd/...
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- dockerfile_path: hack/images/e2e/Dockerfile
+  to: base-tests
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: go test ./...
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: e2e-hypershift
+  steps:
+    cluster_profile: aws-2
+    env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
+    test:
+    - as: my-e2e
+      cli: latest
+      commands: |-
+        printenv KUBECONFIG
+        oc get node
+        make test-e2e
+      from: base-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 300Mi
+    workflow: hypershift-hostedcluster-workflow
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    as: latest
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  steps:
+    test:
+    - as: openshift-pipelines-e2e
+      cli: latest
+      commands: |-
+        printenv KUBECONFIG
+        oc get node
+        make test-e2e
+      from: base-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: openshift-pipelines
+  repo: operator

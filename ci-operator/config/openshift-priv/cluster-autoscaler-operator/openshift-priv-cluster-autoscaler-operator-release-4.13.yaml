@@ -81,6 +81,21 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
+- always_run: false
+  as: e2e-nutanix-operator
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: nutanix
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-nutanix
 zz_generated_metadata:
   branch: release-4.13
   org: openshift-priv

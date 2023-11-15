@@ -85,6 +85,20 @@ tests:
           memory: 200Mi
       timeout: 4h30m0s
     workflow: ipi-gcp
+- as: e2e-gcp-pao-updating-profile
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: CLUSTER=mcp-only make cluster-deploy-pao && make pao-functests-updating-profile
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 5h0m0s
+    workflow: ipi-gcp
 - as: e2e-upgrade
   steps:
     cluster_profile: aws
@@ -94,7 +108,7 @@ tests:
   container:
     from: src
 - as: e2e-nightly
-  cron: 0 23 * * *
+  cron: 3 15 */11,24 * *
   steps:
     cluster_profile: aws
     test:

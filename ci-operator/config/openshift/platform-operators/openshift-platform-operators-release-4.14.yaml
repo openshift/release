@@ -8,10 +8,7 @@ base_images:
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: base
@@ -21,7 +18,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: cluster-platform-operators-manager
 promotion:
-  disabled: true
   name: "4.14"
   namespace: ocp
 releases:
@@ -54,25 +50,7 @@ tests:
   commands: make unit
   container:
     from: src
-- as: e2e-aws-techpreview-operator
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: aws
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    test:
-    - as: test
-      cli: latest
-      commands: make test-e2e
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: openshift-e2e-aws
-- as: e2e-aws-techpreview
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: openshift-e2e-aws
   steps:
     cluster_profile: aws
     env:

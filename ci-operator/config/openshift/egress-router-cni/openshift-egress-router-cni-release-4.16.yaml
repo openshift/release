@@ -1,0 +1,71 @@
+base_images:
+  base:
+    name: "4.16"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.15
+binary_build_commands: hack/build-go.sh
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+  to: egress-router-cni
+promotion:
+  name: "4.16"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: src
+- as: verify-deps
+  commands: |
+    HOME=$( mktemp -d )
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: unit
+  commands: hack/test-go.sh
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: egress-router-cni

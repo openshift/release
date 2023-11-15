@@ -1,0 +1,47 @@
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+promotion:
+  name: "4.16"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-test
+  commands: go test ./... -v -tags unit -mod=readonly -coverprofile unit-cover.out
+  container:
+    from: src
+- as: integration-test
+  steps:
+    cluster_profile: aws
+    test:
+    - as: integration-test-aws
+      commands: USE_EXISTING_CLUSTER=true make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.16
+  org: red-hat-storage
+  repo: odf-multicluster-orchestrator

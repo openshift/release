@@ -1,0 +1,36 @@
+ref:
+  as: ipi-conf-azure-osimage
+  from_image:
+    namespace: ocp
+    name: "4.12"
+    tag: upi-installer
+  commands: ipi-conf-azure-osimage-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: OS_IMAGE_URN
+      default: ""
+      documentation: |-
+        Specify the image urn from Azure marketplace to proision nodes
+        If not define, will use image from marketplace with publisher: RedHat, offer: rh-ocp-worker, verson: OS_IMAGE_VERSION
+    - name: OS_IMAGE_PLAN
+      default: ""
+      documentation: |-
+        Plan is the purchase plan of the image. If omitted, it defaults to "WithPurchasePlan".
+        Valid Values: "WithPurchasePlan","NoPurchasePlan"
+        This field is applicable on 4.14+.
+    - name: OS_IMAGE_VERSION
+      default: "4.8.2021122100"
+      documentation: |-
+        marketplace image version to be tested
+        * 4.13 and previouse version: 4.8.2021122100
+        * 4.14+: 413.92.2023101700
+  dependencies:
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST_FROM_BUILD_FARM
+  documentation: |-
+    The IPI Azure configure step generates the Azure-specific install-config.yaml contents based on the cluster profile and the market-image. 
+    On 4.11+, support marketplace image for worker nodes on installer
+    On 4.14+, support marketplace image for all nodes on installer

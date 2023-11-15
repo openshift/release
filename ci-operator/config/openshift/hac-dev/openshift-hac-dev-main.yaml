@@ -1,9 +1,9 @@
 binary_build_commands: ./build.sh
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: tectonic-console-builder-v23
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/rh-cloud-services/releaser:latest
+      RUN dnf install g++ jq wget libxcrypt-compat -y
 images:
 - context_dir: integration-tests
   dockerfile_path: Dockerfile
@@ -15,11 +15,11 @@ releases:
   latest:
     release:
       channel: fast
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 5Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -33,6 +33,11 @@ tests:
     name: hac-dev-codecov-token
 - as: pact
   optional: true
+  steps:
+    test:
+    - ref: openshift-hac-dev-pact
+- as: pact-main
+  postsubmit: true
   steps:
     test:
     - ref: openshift-hac-dev-pact

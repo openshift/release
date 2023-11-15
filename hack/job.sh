@@ -10,10 +10,12 @@ if [[ -n "${GITHUB_TOKEN_PATH:-}" ]]; then
 fi
 
 CONTAINER_ENGINE=${CONTAINER_ENGINE:-docker}
+if [ -z ${VOLUME_MOUNT_FLAGS+x} ]; then VOLUME_MOUNT_FLAGS=':z'; else echo "VOLUME_MOUNT_FLAGS is set to '$VOLUME_MOUNT_FLAGS'"; fi
+
 
 $CONTAINER_ENGINE run \
     --rm \
-    --volume "$PWD:/tmp/release:z" \
+    --volume "$PWD:/tmp/release${VOLUME_MOUNT_FLAGS}" \
     ${volume:-} \
     --workdir /tmp/release \
     "$MKPJ_IMG" \

@@ -25,4 +25,3 @@ echo "Collect minimal required cluster information"
 
 mkdir -p $ARTIFACT_DIR/hypershift-snapshot
 oc -n clusters get hostedcluster $CLUSTER_NAME -o yaml > $ARTIFACT_DIR/hypershift-snapshot/hostedcluster.yaml
-oc -n clusters get nodepool $CLUSTER_NAME -o yaml > $ARTIFACT_DIR/hypershift-snapshot/nodepool.yaml

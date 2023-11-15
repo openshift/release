@@ -257,6 +257,22 @@ Resources:
         - !Ref 'AWS::Region'
         - .ec2
       VpcId: !Ref VPC
+  efsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      VpcEndpointType: Interface
+      SecurityGroupIds:
+      - !Ref EndpointSecurityGroup
+      SubnetIds:
+      - !Ref PrivateSubnet
+      - !If [DoAz2, !Ref PrivateSubnet2, !Ref "AWS::NoValue"]
+      ServiceName: !Join
+      - ''
+      - - com.amazonaws.
+        - !Ref 'AWS::Region'
+        - .elasticfilesystem
+      VpcId: !Ref VPC
   elbEndpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -333,7 +349,7 @@ then
   ZONES_COUNT=3
 fi
 
-STACK_NAME="${NAMESPACE}-${JOB_NAME_HASH}-vpc"
+STACK_NAME="${NAMESPACE}-${UNIQUE_HASH}-vpc"
 echo ${STACK_NAME} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
 aws --region "${REGION}" cloudformation create-stack \
   --stack-name "${STACK_NAME}" \

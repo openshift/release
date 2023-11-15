@@ -3,23 +3,23 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.19-linux:
+  stolostron_builder_go1.20-linux:
     name: builder
     namespace: stolostron
-    tag: go1.19-linux
+    tag: go1.20-linux
 binary_build_commands: go build ./cmd/manager
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.19-linux
+    tag: go1.20-linux
 images:
 - dockerfile_path: build/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.19-linux:
+    stolostron_builder_go1.20-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.19-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
   to: managedcluster-import-controller
 promotion:
   disabled: true
@@ -73,6 +73,38 @@ tests:
   commands: make test
   container:
     from: src
+- as: e2e
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: managedcluster-import-controller
+    env:
+      CLUSTER_NAMES: none
+      CLUSTERPOOL_GROUP_NAME: Server Foundation
+      CLUSTERPOOL_HOST_NAMESPACE: server-foundation
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-sf-clusterpool
+      CLUSTERPOOL_LIFETIME: 2h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      SKIP_COMPONENT_INSTALL: "true"
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+        KUBECTL=oc
+        OCM_VERSION=main
+        export KUBECTL OCM_VERSION
+        set -o pipefail
+        make e2e-test-prow 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
+        set +o pipefail
+      dependencies:
+      - env: IMPORT_CONTROLLER_IMAGE_NAME
+        name: managedcluster-import-controller
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
 - as: pr-image-mirror
   steps:
     dependencies:

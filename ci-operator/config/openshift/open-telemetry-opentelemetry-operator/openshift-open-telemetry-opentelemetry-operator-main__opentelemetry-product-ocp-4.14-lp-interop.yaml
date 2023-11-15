@@ -1,0 +1,71 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
+images:
+- context_dir: .
+  dockerfile_path: ./tests/e2e-openshift/Dockerfile
+  to: opentelemetry-tests-runner
+- dockerfile_path: ./cmd/otel-allocator/Dockerfile
+  to: opentelemetry-target-allocator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: opentelemetry-interop-aws
+  cron: 0 6 25 12 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      DOWNSTREAM_TESTS_COMMIT: c5e438ba41bec98e3ef54e41417ab01789ef156b
+      EO_SUB_CHANNEL: stable-5.7
+      EO_SUB_SOURCE: redhat-operators
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "build-logs", "failure_type": "pod_failure", "classification": "OpenTelemetry operator images", "jira_project": "LPTOCPCI"},
+          {"step": "build-logs", "failure_type": "test_failure", "classification": "OpenTelemetry operator images", "jira_project": "TRACING"},
+          {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure provisioning", "jira_project": "LPTOCPCI"},
+          {"step": "install", "failure_type": "pod_failure", "classification": "OpenTelemetry operator install", "jira_project": "LPTOCPCI"},
+          {"step": "install", "failure_type": "test_failure", "classification": "OpenTelemetry operator install", "jira_project": "TRACING"},
+          {"step": "distributed-tracing-install-*", "failure_type": "pod_failure", "classification": "Distributed tracing operators", "jira_project": "LPTOCPCI"},
+          {"step": "distributed-tracing-install-*", "failure_type": "test_failure", "classification": "Distributed tracing operators", "jira_project": "TRACING"},
+          {"step": "operatorhub-subscribe-*", "failure_type": "pod_failure", "classification": "Distributed tracing dependency operators", "jira_project": "LPTOCPCI"},
+          {"step": "operatorhub-subscribe-*", "failure_type": "test_failure", "classification": "Distributed tracing dependency operators", "jira_project": "TRACING"},
+          {"step": "gather-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI"},
+          {"step": "distributed-tracing-tests-*", "failure_type": "pod_failure", "classification": "OpenTelemetry e2e tests", "jira_project": "LPTOCPCI"},
+          {"step": "distributed-tracing-tests-*", "failure_type": "test_failure", "classification": "OpenTelemetry e2e tests", "jira_project": "TRACING"}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      SKIP_TESTS: tests/e2e/instrumentation-go tests/e2e/instrumentation-apache-httpd
+        tests/e2e/targetallocator-features tests/e2e/smoke-targetallocator tests/e2e/prometheus-config-validation
+        tests/e2e/instrumentation-sdk
+    test:
+    - ref: operatorhub-subscribe-elasticsearch-operator
+    - ref: operatorhub-subscribe-amq-streams
+    - ref: distributed-tracing-install-opentelemetry-product
+    - ref: distributed-tracing-install-jaeger-product
+    - ref: distributed-tracing-install-tempo-product
+    - ref: distributed-tracing-tests-opentelemetry
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: open-telemetry-opentelemetry-operator
+  variant: opentelemetry-product-ocp-4.14-lp-interop

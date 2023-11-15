@@ -20,7 +20,6 @@ images:
 promotion:
   additional_images:
     jenkins-sync-plugin-e2e: src
-  disabled: true
   excluded_images:
   - jenkins
   - jenkins-maven-builder
@@ -63,6 +62,25 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-aws-jenkins-sync-plugin-continuous
+  cron: 0 */12 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: ocptools-jenkins-sync-plugin
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

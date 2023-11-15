@@ -27,7 +27,8 @@ sleep 60
 RETRIES=30
 for try in $(seq "${RETRIES}"); do
   if [[ $(oc get mch -n ${MCH_NAMESPACE} -o=jsonpath='{.items[0].status.phase}') == "Running" ]]; then
-    echo "Success MCH is Running"
+    acm_version=$(oc -n ${MCH_NAMESPACE} get mch multiclusterhub -o jsonpath='{.status.currentVersion}{"\n"}')
+    echo "Success! ACM ${acm_version} is Running"
     break
   else
     if [ $try == $RETRIES ]; then

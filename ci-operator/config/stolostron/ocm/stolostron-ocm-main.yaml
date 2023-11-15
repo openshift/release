@@ -1,0 +1,134 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.20-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+images:
+- dockerfile_path: build/Dockerfile.registration-operator
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - golang:1.20-bullseye
+  to: registration-operator
+- dockerfile_path: build/Dockerfile.registration
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - golang:1.20-bullseye
+  to: registration
+- dockerfile_path: build/Dockerfile.work
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - golang:1.20-bullseye
+  to: work
+- dockerfile_path: build/Dockerfile.placement
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - golang:1.20-bullseye
+  to: placement
+- dockerfile_path: build/Dockerfile.addon
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - golang:1.20-bullseye
+  to: addon-manager
+promotion:
+  disabled: true
+  name: "2.5"
+  namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: pr-merge-image-mirror-registration-operator
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: registration-operator
+    env:
+      IMAGE_REPO: registration-operator
+      IMAGE_TAG: main
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror-registration
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: registration
+    env:
+      IMAGE_REPO: registration
+      IMAGE_TAG: main
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror-work
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: work
+    env:
+      IMAGE_REPO: work
+      IMAGE_TAG: main
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror-placement
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: placement
+    env:
+      IMAGE_REPO: placement
+      IMAGE_TAG: main
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror-addon-manager
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: addon-manager
+    env:
+      IMAGE_REPO: addon-manager
+      IMAGE_TAG: main
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: backplane-2.5
+    workflow: ocm-ci-fastforward
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: ocm

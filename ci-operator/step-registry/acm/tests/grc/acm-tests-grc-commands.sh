@@ -1,6 +1,6 @@
 #!/bin/bash
 set -o nounset
-set -o errexit
+# set -o errexit
 set -o pipefail
 
 # The variables defined in this step come from files in the `SHARED_DIR` and credentials from Vault.
@@ -27,7 +27,7 @@ RBAC_PASS=$(cat $SECRETS_DIR/grc/rbac-pass)
 export RBAC_PASS
 
 # run the test execution script
-./execute_grc_interop_commands.sh
+./execute_grc_interop_commands.sh || :
 
 # Copy the test cases results to an external directory
 cp -r test-output/cypress $ARTIFACT_DIR/

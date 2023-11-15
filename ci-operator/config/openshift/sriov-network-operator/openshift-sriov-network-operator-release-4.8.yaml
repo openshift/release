@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.8
   sriov-cni:
     name: "4.8"
     namespace: ocp
@@ -52,7 +56,10 @@ images:
   to: sriov-network-webhook
 operator:
   bundles:
-  - dockerfile_path: bundleci.Dockerfile
+  - as: sriov-network-operator-bundle
+    base_index: operator-index
+    dockerfile_path: bundleci.Dockerfile
+    update_graph: replaces
   substitutions:
   - pullspec: quay.io/openshift/origin-sriov-dp-admission-controller:4.8
     with: pipeline:sriov-dp-admission-controller
@@ -107,7 +114,7 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      OO_INDEX: ci-index
+      OO_INDEX: ci-index-sriov-network-operator-bundle
     env:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-sriov-network-operator

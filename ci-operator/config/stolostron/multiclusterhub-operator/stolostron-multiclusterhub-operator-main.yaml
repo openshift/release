@@ -28,7 +28,7 @@ images:
       - registry.ci.openshift.org/stolostron/builder:go1.20-linux
   to: multiclusterhub-operator-tests
 promotion:
-  name: "2.8"
+  name: "2.9"
   namespace: stolostron
 resources:
   '*':
@@ -36,6 +36,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multiclusterhub-operator
+    env:
+      IMAGE_REPO: multiclusterhub-operator
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: test-unit
   commands: |
     export ocm_dir=$(mktemp -d -t ocm-XXXXX)
@@ -85,7 +93,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.8
+      DESTINATION_BRANCH: release-2.9
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

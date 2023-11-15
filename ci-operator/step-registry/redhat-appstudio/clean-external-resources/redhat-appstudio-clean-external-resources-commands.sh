@@ -12,6 +12,7 @@ CLEAN_REPOS_STATUS=0
 CLEAN_WEBHOOK_STATUS=0
 CLEAN_QUAY_REPOS_AND_ROBOTS_STATUS=0
 CLEAN_QUAY_TAGS_STATUS=0
+CLEAN_PRIVATE_REPO_STATUS=0
 PREVIOUS_RATE_REMAINING=0
 DEFAULT_QUAY_ORG=redhat-appstudio-qe
 DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/default-quay-org-token)
@@ -45,7 +46,8 @@ make clean-gitops-repositories || CLEAN_REPOS_STATUS=$?
 make clean-github-webhooks || CLEAN_WEBHOOK_STATUS=$?
 make clean-quay-repos-and-robots || CLEAN_QUAY_REPOS_AND_ROBOTS_STATUS=$?
 make clean-quay-tags || CLEAN_QUAY_TAGS_STATUS=$?
+make clean-private-repos || CLEAN_PRIVATE_REPO_STATUS=$?
 
-if [[ "${CLEAN_REPOS_STATUS}" -ne 0 || "${CLEAN_WEBHOOK_STATUS}" -ne 0 || "${CLEAN_QUAY_REPOS_AND_ROBOTS_STATUS}" -ne 0 || "${CLEAN_QUAY_TAGS_STATUS}" -ne 0 ]]; then
+if [[ "${CLEAN_REPOS_STATUS}" -ne 0 || "${CLEAN_WEBHOOK_STATUS}" -ne 0 || "${CLEAN_QUAY_REPOS_AND_ROBOTS_STATUS}" -ne 0 || "${CLEAN_QUAY_TAGS_STATUS}" -ne 0 || "${CLEAN_PRIVATE_REPO_STATUS}" -ne 0 ]]; then
 	exit 1
 fi

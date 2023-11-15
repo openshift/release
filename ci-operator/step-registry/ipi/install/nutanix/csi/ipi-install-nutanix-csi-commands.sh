@@ -8,11 +8,11 @@ source ${SHARED_DIR}/nutanix_context.sh
 
 echo "$(date -u --rfc-3339=seconds) - Creating CSI manifests..."
 
-cat > "${SHARED_DIR}/manifest_0000-nutanix-csi-ntnx-system-namespace.yaml" << EOF
+cat > "${SHARED_DIR}/manifest_0000-nutanix-csi-openshift-cluster-csi-drivers-namespace.yaml" << EOF
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: ntnx-system
+  name: openshift-cluster-csi-drivers
 EOF
 
 cat > "${SHARED_DIR}/manifest_0001-nutanix-csi-operator-beta-catalog-source.yaml" << EOF
@@ -36,7 +36,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: ntnx-secret
-  namespace: ntnx-system
+  namespace: openshift-cluster-csi-drivers
 stringData:
   key: ${PE_HOST}:${PE_PORT}:${PE_USERNAME}:${PE_PASSWORD}
 EOF
@@ -45,11 +45,11 @@ cat > "${SHARED_DIR}/manifest_0003-nutanix-csi-operator-group.yaml" << EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  name: ntnx-system-r8czl
-  namespace: ntnx-system
+  name: openshift-cluster-csi-drivers-r8czl
+  namespace: openshift-cluster-csi-drivers
 spec:
   targetNamespaces:
-    - ntnx-system
+    - openshift-cluster-csi-drivers
 EOF
 
 cat > "${SHARED_DIR}/manifest_0004-nutanix-csi-subscription.yaml" << EOF
@@ -57,7 +57,7 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   name: nutanixcsioperator
-  namespace: ntnx-system
+  namespace: openshift-cluster-csi-drivers
 spec:
   channel: stable
   name: nutanixcsioperator
@@ -71,9 +71,9 @@ apiVersion: crd.nutanix.com/v1alpha1
 kind: NutanixCsiStorage
 metadata:
   name: nutanixcsistorage
-  namespace: ntnx-system
+  namespace: openshift-cluster-csi-drivers
 spec:
-  namespace: ntnx-system
+  namespace: openshift-cluster-csi-drivers
   tolerations:
     - key: "node-role.kubernetes.io/infra"
       operator: "Exists"
@@ -91,11 +91,11 @@ metadata:
 provisioner: csi.nutanix.com
 parameters:
   csi.storage.k8s.io/provisioner-secret-name: ntnx-secret
-  csi.storage.k8s.io/provisioner-secret-namespace: ntnx-system
+  csi.storage.k8s.io/provisioner-secret-namespace: openshift-cluster-csi-drivers
   csi.storage.k8s.io/node-publish-secret-name: ntnx-secret
-  csi.storage.k8s.io/node-publish-secret-namespace: ntnx-system
+  csi.storage.k8s.io/node-publish-secret-namespace: openshift-cluster-csi-drivers
   csi.storage.k8s.io/controller-expand-secret-name: ntnx-secret
-  csi.storage.k8s.io/controller-expand-secret-namespace: ntnx-system
+  csi.storage.k8s.io/controller-expand-secret-namespace: openshift-cluster-csi-drivers
   csi.storage.k8s.io/fstype: ext4
   storageContainer: ${PE_STORAGE_CONTAINER}
   storageType: NutanixVolumes
@@ -103,7 +103,7 @@ allowVolumeExpansion: true
 reclaimPolicy: Delete
 EOF
 
-oc apply -f "${SHARED_DIR}/manifest_0000-nutanix-csi-ntnx-system-namespace.yaml"
+oc apply -f "${SHARED_DIR}/manifest_0000-nutanix-csi-openshift-cluster-csi-drivers-namespace.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0001-nutanix-csi-operator-beta-catalog-source.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0002-nutanix-csi-ntnx-secret.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0003-nutanix-csi-operator-group.yaml"
@@ -130,13 +130,13 @@ wait_for_resource() {
   if [ "$(date +%s)" -ge $end_time ]; then
     echo "Timed out waiting for $resource_type $resource_name to be created in namespace $namespace."
     echo "$(date -u --rfc-3339=seconds) - Checking CSI manifests..."
-    oc -n ntnx-system get all
-    oc -n ntnx-system describe all
-    oc -n ntnx-system get events
-    oc -n ntnx-system get csv
-    oc -n ntnx-system describe csv -l operators.coreos.com/nutanixcsioperator.ntnx-system=
-    oc -n ntnx-system get subscription
-    oc -n ntnx-system describe subscription
+    oc -n openshift-cluster-csi-drivers get all
+    oc -n openshift-cluster-csi-drivers describe all
+    oc -n openshift-cluster-csi-drivers get events
+    oc -n openshift-cluster-csi-drivers get csv
+    oc -n openshift-cluster-csi-drivers describe csv -l operators.coreos.com/nutanixcsioperator.openshift-cluster-csi-drivers=
+    oc -n openshift-cluster-csi-drivers get subscription
+    oc -n openshift-cluster-csi-drivers describe subscription
     oc get sc
     exit 1
   fi
@@ -152,7 +152,7 @@ wait_for_resource() {
 # Customize these variables as needed
 crd_name="nutanixcsistorages.crd.nutanix.com"
 deployment_name="nutanix-csi-controller"
-namespace="ntnx-system"
+namespace="openshift-cluster-csi-drivers"
 timeout=300  # 5 minutes in seconds
 interval=10  # Check every 10 seconds
 

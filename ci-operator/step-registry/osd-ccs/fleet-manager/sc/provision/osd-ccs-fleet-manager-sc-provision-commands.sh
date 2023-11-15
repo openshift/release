@@ -65,15 +65,25 @@ fi
 # Create SC
 sc_cluster_id=$(echo '{"region": "'${OSDFM_REGION}'", "cloud_provider": "aws"}' | ocm post /api/osd_fleet_mgmt/v1/service_clusters | jq -r '.id')
 # Save Service Cluster info
-echo "Service Cluster:${sc_cluster_id}"
-echo "${sc_cluster_id}" >> "${SHARED_DIR}/osd-fm-sc-id"
+echo "Service Cluster fm id:${sc_cluster_id}"
+echo "${sc_cluster_id}" > "${SHARED_DIR}/osd-fm-sc-id"
 
 # Check if Service Cluster is ready
 echo "Waiting for Service Cluster ready..."
 wait_for_cluster
 
-#Save MC kubeconfig
-mc_ocm_cluster_id=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters -p search="parent.id='${sc_cluster_id}' and status is 'ready'" -p size=1 | jq -r '.items[0].cluster_management_reference.cluster_id')
+# Save kubeconfig of sc
+sc_ocm_cluster_id=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters/$sc_cluster_id | jq -r .cluster_management_reference.cluster_id)
+echo "Save kubeconfig for Service Cluster:${sc_ocm_cluster_id}"
+ocm get /api/clusters_mgmt/v1/clusters/${sc_ocm_cluster_id}/credentials | jq -r .kubeconfig > "${SHARED_DIR}/hs-sc.kubeconfig"
+
+# Save MC kubeconfig and cluster info
+mc_ocm_cluster=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters -p search="parent.id='${sc_cluster_id}' and status is 'ready'" -p size=1)
+mc_ocm_cluster_id=$(echo $mc_ocm_cluster | jq -r '.items[0].cluster_management_reference.cluster_id')
+mc_cluster_id=$(echo $mc_ocm_cluster | jq -r '.items[0].id')
+echo "Management Cluster fm id:${mc_cluster_id}"
+echo "${mc_cluster_id}" > "${ARTIFACT_DIR}/osd-fm-mc-id"
+
 echo "Save kubeconfig for Management Cluster:${mc_ocm_cluster_id}"
 if [[ -z "${mc_ocm_cluster_id}" ]]; then
   echo "No ready MC, Exit..."

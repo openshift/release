@@ -10,14 +10,14 @@ function wait_for_cluster()
 {
   local cluster_type=$1
   local cluster_id=$2
-  local expect_state=$3
+  local expected_statuses=$3
 
   while true; do
     sleep 30
     cluster_state=$(ocm get /api/osd_fleet_mgmt/v1/${cluster_type}/${cluster_id} | jq -r '.status')
-    echo "${cluster_type} state: ${cluster_state}"
-    if [[ "${cluster_state}" == "${expect_state}" ]]; then
-      echo "${cluster_type} state matched with ${expect_state}"
+    echo "${cluster_type} status: ${cluster_state}"
+    if printf '%s\0' "${expected_statuses[@]}" | grep -qwz $cluster_state; then
+      printf "%s status found within the list of expected statuses: %s" "${cluster_type}" "${expected_statuses[@]}"
       break
     fi
   done
@@ -72,12 +72,13 @@ do
   echo "Delete MC ${mc_cluster_id}"
   ocm delete /api/osd_fleet_mgmt/v1/management_clusters/${mc_cluster_id}
   #Ack MC delete
-  wait_for_cluster management_clusters ${mc_cluster_id} cleanup_ack_pending
+  wait_for_cluster management_clusters ${mc_cluster_id} "(cleanup_ack_pending)"
   ocm delete /api/osd_fleet_mgmt/v1/management_clusters/${mc_cluster_id}/ack
+  wait_for_cluster management_clusters ${mc_cluster_id} "(cleanup_network, cleanup_account)"
 done
 
 #Ack SC delete
-wait_for_cluster service_clusters ${sc_cluster_id} cleanup_ack_pending
+wait_for_cluster service_clusters ${sc_cluster_id} "(cleanup_ack_pending)"
 ocm delete /api/osd_fleet_mgmt/v1/service_clusters/${sc_cluster_id}/ack
 
 echo "Waiting for SC deletion..."

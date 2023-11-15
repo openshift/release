@@ -61,6 +61,22 @@
         ],
       },
       {
+        name: 'quay-io-image-mirroring',
+        rules: [
+          {
+            alert: 'quay-io-image-mirroring-failures',
+            expr: 'sum(rate(quay_io_ci_images_distributor_image_mirroring_duration_seconds_bucket{state="failure"}[10m])) > 0.5',
+            'for': '1m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'Many mirroring tasks to quay.io have been failed in the last minute. Please check errors in the pod logs to figure out the cause.',
+            },
+          },
+        ],
+      },
+      {
         name: 'cluster-client-creation-failure',
         rules: [
           {
@@ -168,11 +184,11 @@
             expr: |||
              (
                sum(
-                 rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~".*-images",org="openshift-priv",state="success"}[12h])
+                 rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-.*-images",org="openshift-priv",state="success"}[12h])
                )
                /
                sum(
-                 rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~".*-images",org="openshift-priv",state=~"success|failure|aborted"}[12h])
+                 rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~"branch-ci-.*-images",org="openshift-priv",state=~"success|failure|aborted"}[12h])
                )
              )
              < 0.90
@@ -182,7 +198,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'openshift-priv image-building jobs are failing at a high rate. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=*-images|deck-internal>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/openshift-priv-image-building-jobs.md|SOP>.',
+              message: 'openshift-priv image-building jobs are failing at a high rate. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=branch-ci-*-images|deck-internal>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/openshift-priv-image-building-jobs.md|SOP>.',
             },
           }
         ],

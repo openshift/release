@@ -1,9 +1,19 @@
+base_images:
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
     name: maistra-builder
     namespace: ci
     tag: "2.2"
   use_build_cache: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -53,14 +63,10 @@ tests:
   container:
     from: src
 - as: integ-helm-2-2
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.2
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -94,19 +100,15 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-security-2-2
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.2
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -140,19 +142,15 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-pilot-2-2
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.2
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -186,19 +184,15 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-servicemesh-2-2
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.2
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -232,19 +226,15 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-telemetry-2-2
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.2
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -278,32 +268,28 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-servicemesh-multicluster-2-2
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.2
-      MAISTRA_MC_POD: maistra-e2e-test-mc-pod
       MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
     test:
     - as: copy-src
       cli: latest
       commands: |
         # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_MC_POD}":/work/
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
       env:
       - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_MC_POD
+      - name: MAISTRA_SC_POD
       from: src
       resources:
         requests:
@@ -314,7 +300,7 @@ tests:
       cli: latest
       commands: |
         # temporary workaround: unset ARTIFACTS env for integ-servicemesh-multicluster
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_MC_POD}" \
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           bash -c \
           "unset ARTIFACTS; \
           entrypoint \
@@ -322,26 +308,22 @@ tests:
           --topology \
           MULTICLUSTER \
           test.integration.servicemesh.kube"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_MC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_MC_POD
+      - name: MAISTRA_SC_POD
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
-- as: maistra-istio-push-image-2-2
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: push-images
   steps:
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       BUILD_WITH_CONTAINER: "0"
       GOBIN: /gobin
@@ -366,7 +348,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 20m0s
-    - as: maistra-istio-push-image-2-2
+    - as: push-images
       cli: latest
       commands: |
         export QUAY_PASS=$(cat /maistra-secrets/password)
@@ -392,10 +374,10 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 40m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: istio-update-operator-2-2
   commands: |
     # load test-infra automator.sh script

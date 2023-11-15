@@ -131,7 +131,7 @@ ibmcloud_login
 ## Create the VPC
 echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 resource_group="${CLUSTER_NAME}-rg"
 

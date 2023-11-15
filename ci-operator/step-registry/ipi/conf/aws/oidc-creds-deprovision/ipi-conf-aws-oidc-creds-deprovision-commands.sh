@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-infra_name=${NAMESPACE}-${JOB_NAME_HASH}
+infra_name=${NAMESPACE}-${UNIQUE_HASH}
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 REGION="${LEASED_RESOURCE}"
 

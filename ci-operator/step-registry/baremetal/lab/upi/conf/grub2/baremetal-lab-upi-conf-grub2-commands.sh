@@ -46,6 +46,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   mac_postfix=${mac//:/-}
   kargs="$(join_by_semicolon "$ipi_disabled_ifaces" "ip=" ":off")"
   kargs="$kargs$(join_by_semicolon "$console_kargs" "console=" "")"
+  [ "$USE_CONSOLE_HOOK" == "true" ] && kargs="${kargs} ignition.config.url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/$mac_postfix-console-hook.ign"
   cat > "${GRUB_DIR}/grub.cfg-01-${mac_postfix}" <<EOF
 set timeout=5
 set default=0
@@ -55,7 +56,7 @@ load_video
 menuentry 'Install ($flavor)' {
     set gfx_payload=keep
     insmod gzio
-    linux  /${CLUSTER_NAME}/vmlinuz_${arch} debug nosplash ip=${baremetal_iface}:dhcp $kargs coreos.live.rootfs_url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/rootfs-${arch}.img ignition.config.url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/$mac_postfix-console-hook.ign ignition.firstboot ignition.platform.id=metal
+    linux  /${CLUSTER_NAME}/vmlinuz_${arch} debug nosplash ip=${baremetal_iface}:dhcp $kargs coreos.live.rootfs_url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/rootfs-${arch}.img ignition.firstboot ignition.platform.id=metal
     initrd /${CLUSTER_NAME}/initramfs_${arch}.img
 }
 EOF

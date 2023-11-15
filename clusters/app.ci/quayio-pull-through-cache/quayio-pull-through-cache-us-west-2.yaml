@@ -48,15 +48,18 @@ items:
         nodeSelector:
           node-role.kubernetes.io: infra
         containers:
-        - name: quayio-cache
-          image: registry.ci.openshift.org/ci/quayio-pull-through-cache:latest
+        - command:
+          - /tp-entrypoint.sh
+          name: quayio-cache
+          image: registry.ci.openshift.org/ci/docker-registry:tp-2.8.1
           ports:
             - name: http
               containerPort: 5000
           volumeMounts:
-          - mountPath: /etc/pull-secret
-            name: pull-secret
-            readOnly: true
+          - mountPath: /etc/quay-io-pull-credentials
+            name: quay-io-pull-credentials
+          - mountPath: /etc/docker-registry
+            name: config
           env:
           - name: REGISTRY_STORAGE_S3_ACCESSKEY
             valueFrom:
@@ -73,6 +76,9 @@ items:
           - name: REGISTRY_STORAGE_S3_REGION
             value: us-west-2
         volumes:
-        - name: pull-secret
+        - name: config
+          configMap:
+            name: quayio-pull-through-cache-aws
+        - name: quay-io-pull-credentials
           secret:
-            secretName: registry-pull-credentials
+            secretName: quay-io-pull-credentials

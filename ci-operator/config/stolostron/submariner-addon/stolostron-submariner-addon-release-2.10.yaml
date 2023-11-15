@@ -1,0 +1,109 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.20-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+  to: submariner-addon
+promotion:
+  disabled: true
+  name: "2.10"
+  namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: "4.6"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.6"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 300Mi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build
+  commands: |
+    true
+  container:
+    from: bin
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: unit
+  commands: |
+    make test --warn-undefined-variables
+  container:
+    from: test-bin
+- as: integration
+  commands: make test-integration
+  container:
+    from: test-bin
+- as: sonarcloud
+  steps:
+    test:
+    - as: test
+      commands: |
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow sonar/go/prow
+      credentials:
+      - mount_path: /etc/sonarcloud/
+        name: acm-sonarcloud-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: submariner-addon
+    env:
+      IMAGE_REPO: submariner-addon
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_COMPONENT_NAME="submariner-addon"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.10
+  org: stolostron
+  repo: submariner-addon

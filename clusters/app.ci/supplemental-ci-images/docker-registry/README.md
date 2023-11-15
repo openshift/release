@@ -1,4 +1,4 @@
-# Validation images
+# docker-registry
 
 This folder contains the files to build the [docker-registry](https://github.com/docker/distribution-library-image/tree/master) image.
 We rebuild the image instead of reusing or importing the existing one because

@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.10"
+    name: "4.12"
     namespace: ocp
     tag: cli
 build_root:
@@ -12,8 +12,8 @@ build_root:
 releases:
   latest:
     release:
-      channel: fast
-      version: "4.10"
+      channel: stable
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -51,15 +51,11 @@ tests:
     XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
-- as: istio-operator-push-image-2-3
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
+- as: push-images
   steps:
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       GOBIN: /gobin
       GOCACHE: /tmp/cache
@@ -83,7 +79,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 10m0s
-    - as: istio-operator-push-image-2-3
+    - as: push-images
       cli: latest
       commands: |
         export QUAY_PASS=$(cat /maistra-secrets/password)
@@ -94,6 +90,7 @@ tests:
           -p=${QUAY_PASS} quay.io; \
           make push \
           IMAGE=quay.io/maistra-dev/istio-ubi8-operator:PR-${PULL_NUMBER}"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
       - mount_path: /maistra-secrets
         name: maistra-dev-prow
@@ -108,10 +105,10 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 20m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: update-charts-in-2-4
   commands: |
     # load test-infra automator.sh script
@@ -127,9 +124,9 @@ tests:
       -r istio-operator \
       -b maistra-2.4 \
       -f /creds-github/token \
-      '-c make clean update-charts-2.1 update-charts-2.2 update-charts-2.3' \
+      '-c make clean update-charts-2.2 update-charts-2.3' \
       '-t [maistra-2.4] Automator: Update charts from previous versions' \
-      -m update_charts_from_previous_versions_2.1_2.2_2.3
+      -m update_charts_from_previous_versions_2.2_2.3
   container:
     from: src
   postsubmit: true

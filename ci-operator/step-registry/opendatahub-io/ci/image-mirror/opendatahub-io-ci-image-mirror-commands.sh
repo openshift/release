@@ -1,7 +1,9 @@
 #!/bin/bash
 
 export HOME=/tmp/home
-mkdir -p "$HOME/.docker"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}/containers"
 cd "$HOME" || exit 1
 
 # log function
@@ -75,21 +77,6 @@ if [[ "$IMAGE_TAG" == "YearIndex" ]]; then
     esac
 fi
 
-# Get IMAGE_TAG if it's equal to weekly
-if [[ "$IMAGE_TAG" == "weekly" ]]; then
-    case "$JOB_TYPE" in
-        periodic)
-            log "INFO Building weekly image tag for a $JOB_TYPE job"
-            if [[ -n "${RELEASE_VERSION-}" ]]; then
-                IMAGE_TAG="${RELEASE_VERSION}-${IMAGE_TAG}"
-            fi
-            ;;
-        *)
-            IMAGE_TAG=${IMAGE_TAG}
-            ;;
-    esac
-fi
-
 log "INFO Image tag is $IMAGE_TAG"
 
 # Setup registry credentials
@@ -100,7 +87,7 @@ if [[ ! -r "$REGISTRY_TOKEN_FILE" ]]; then
     exit 1
 fi
 
-config_file="$HOME/.docker/config.json"
+config_file="${XDG_RUNTIME_DIR}/containers/auth.json"
 cp $REGISTRY_TOKEN_FILE $config_file || {
     log "ERROR Could not create registry secret file"
     log "    From: $REGISTRY_TOKEN_FILE"

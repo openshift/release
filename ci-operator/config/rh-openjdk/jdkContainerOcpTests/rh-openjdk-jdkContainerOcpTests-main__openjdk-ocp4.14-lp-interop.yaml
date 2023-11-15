@@ -1,0 +1,55 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  rh-openjdk-runner:
+    name: rh_jdk_ocp_testsuite
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: openjdk-interop-aws
+  cron: 0 6 25 12 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "ipi-conf*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 1}},
+          {"step": "ipi-install*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 1}},
+          {"step": "ipi-deprovision*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 2}},
+          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 2}},
+          {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 1}},
+          {"step": "rh-openjdk-test", "failure_type": "pod_failure", "classification": "Test Execution", "jira_project": "LPTOCPCI"},
+          {"step": "rh-openjdk-test", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "OPENJDK", "jira_component": ["container_qe"]}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OPENJDK_VERSION: 8 11 17
+    test:
+    - ref: rh-openjdk-test
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: rh-openjdk
+  repo: jdkContainerOcpTests
+  variant: openjdk-ocp4.14-lp-interop

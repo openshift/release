@@ -23,6 +23,23 @@ ${OPCT_EXEC} results "${ARTIFACT_DIR}"/certification-results/*.tar.gz
 show_msg "running: ${OPCT_EXEC} report --verbose"
 ${OPCT_EXEC} report --verbose "${ARTIFACT_DIR}"/certification-results/*.tar.gz
 
+
+# Check if job is running in OPCT repo
+INVALID_OPCT_REPO=true
+VALID_REPOS=("redhat-openshift-ecosystem-provider-certification-tool")
+VALID_REPOS+=("redhat-openshift-ecosystem-opct")
+for VR in "${VALID_REPOS[@]}"; do
+  if [[ $JOB_NAME == *"$VR"* ]]; then
+    INVALID_OPCT_REPO=false
+  fi
+done
+
+# Ignore persisting data in non OPCT/repo jobs
+if [[ "${INVALID_OPCT_REPO}" == true ]]; then
+  echo -e "\n# INFO: Job $JOB_NAME is not allowed to persist baseline results, ignoring it."
+  exit 0
+fi
+
 #
 # Gather some cluster information and upload certification results
 #

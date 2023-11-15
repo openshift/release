@@ -32,7 +32,7 @@ base_images:
     namespace: logging
     tag: logging-eventrouter
   logging-fluentd:
-    name: v1.14.x
+    name: v1.16.x
     namespace: logging
     tag: logging-fluentd
   logging-kibana6:
@@ -40,7 +40,7 @@ base_images:
     namespace: logging
     tag: logging-kibana6
   logging-vector:
-    name: v0.21-rh
+    name: "5.9"
     namespace: logging
     tag: vector
   logging-view-plugin:
@@ -48,31 +48,24 @@ base_images:
     namespace: logging
     tag: logging-view-plugin
   oauth-proxy:
-    name: "4.11"
-    namespace: ocp
-    tag: oauth-proxy
-  ocp_cli:
     name: "4.14"
     namespace: ocp
-    tag: cli
-  ocp_golang_builder:
-    name: builder
+    tag: oauth-proxy
+  ubi9-minimal:
+    name: ubi-minimal
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
+    tag: "9"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: rhel-9-release-golang-1.20-openshift-4.14
 images:
-- from: base
+- from: ubi9-minimal
   inputs:
-    ocp_cli:
+    base:
       as:
-      - quay.io/openshift/origin-cli:4.12
-    ocp_golang_builder:
-      as:
-      - registry.redhat.io/ubi8/go-toolset:1.18.9
+      - registry.redhat.io/ubi9/go-toolset:latest
   to: cluster-logging-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: base
@@ -96,7 +89,7 @@ operator:
   - pullspec: quay.io/openshift-logging/logging-view-plugin:latest
     with: pipeline:logging-view-plugin
 promotion:
-  name: "5.8"
+  name: "5.9"
   namespace: logging
 releases:
   initial:
@@ -123,9 +116,15 @@ tests:
     from: src
   timeout: 15m0s
 - as: e2e-target
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: cvp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
   skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -143,6 +142,8 @@ tests:
       - env: IMAGE_OAUTH_PROXY
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_CONSOLE_PLUGIN
+        name: pipeline:logging-view-plugin
+      - env: RELATED_IMAGE_LOGGING_CONSOLE_PLUGIN
         name: pipeline:logging-view-plugin
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
@@ -163,13 +164,13 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
   timeout: 5h0m0s
 - as: e2e-ocp-target-minus-one
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: cvp
+    owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
     version: "4.13"
@@ -193,6 +194,8 @@ tests:
       - env: IMAGE_OAUTH_PROXY
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_CONSOLE_PLUGIN
+        name: pipeline:logging-view-plugin
+      - env: RELATED_IMAGE_LOGGING_CONSOLE_PLUGIN
         name: pipeline:logging-view-plugin
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
@@ -244,6 +247,8 @@ tests:
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_CONSOLE_PLUGIN
         name: pipeline:logging-view-plugin
+      - env: RELATED_IMAGE_LOGGING_CONSOLE_PLUGIN
+        name: pipeline:logging-view-plugin
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
       - env: IMAGE_LOGGING_VECTOR
@@ -272,7 +277,8 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.13"
+  optional: true
   skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
@@ -291,6 +297,8 @@ tests:
         name: pipeline:logging-view-plugin
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
+      - env: IMAGE_LOGGING_VECTOR
+        name: pipeline:logging-vector
       - env: IMAGE_ELASTICSEARCH_PROXY
         name: pipeline:elasticsearch-proxy
       - env: IMAGE_ELASTICSEARCH6
@@ -307,10 +315,15 @@ tests:
           cpu: 100m
     workflow: generic-claim
 - as: functional-target
-  optional: true
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: cvp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
   skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -327,6 +340,8 @@ tests:
         name: pipeline:logging-view-plugin
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
+      - env: IMAGE_LOGGING_VECTOR
+        name: pipeline:logging-vector
       - env: IMAGE_ELASTICSEARCH_PROXY
         name: pipeline:elasticsearch-proxy
       - env: IMAGE_ELASTICSEARCH6
@@ -341,7 +356,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift

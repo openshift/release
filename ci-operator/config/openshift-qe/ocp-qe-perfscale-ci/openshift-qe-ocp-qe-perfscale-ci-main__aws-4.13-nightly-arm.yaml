@@ -1,0 +1,51 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: prow/Dockerfile
+  to: ocp-qe-perfscale-ci-aws-413-arm
+promotion:
+  namespace: ci
+  tag: latest
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.13"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: data-path-9nodes
+  cron: 0 9 * * 4
+  steps:
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "9"
+      LOKI_USE_SERVICEMONITOR: "false"
+      OCP_ARCH: arm64
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: aws-4.13-nightly-arm

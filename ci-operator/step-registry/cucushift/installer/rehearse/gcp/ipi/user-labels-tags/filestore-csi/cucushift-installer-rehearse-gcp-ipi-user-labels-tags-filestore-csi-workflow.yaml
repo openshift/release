@@ -1,0 +1,21 @@
+workflow:
+  as: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-filestore-csi
+  steps: 
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-provision
+    - chain: storage-conf-csi-optional-gcp-filestore
+    post:
+    - ref: storage-destroy-csi-gcp-filestore
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    env:
+      CREDENTIALS_MODE: Passthrough
+  documentation: |-
+    The IPI workflow provides provision- and deprovision- steps that provision and
+    deprovision an OpenShift cluster with userLabels and userTags on GCP, allowing 
+    job authors to inject their own end-to-end test logic.
+
+    All modifications to this workflow should be done by modifying the
+    `cucushift-installer-rehearse-gcp-ipi-user-labels-tags-provision` 
+    and `cucushift-installer-rehearse-gcp-ipi-deprovision` 
+    chains to allow other workflows to mimic and extend this base workflow without 
+    a need to backport changes.

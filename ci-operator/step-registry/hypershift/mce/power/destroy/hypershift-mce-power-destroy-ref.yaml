@@ -1,0 +1,36 @@
+ref:
+  as: hypershift-mce-power-destroy
+  cli: latest
+  env:
+    - name: HYPERSHIFT_NODE_COUNT
+      documentation: "The number of power nodes to join the agent cluster"
+    - name: HYPERSHIFT_BASE_DOMAIN
+      documentation: "The cluster's FQDN will be a subdomain of the base domain."
+    - name: AGENT_POWER_CREDENTIALS
+      default: /etc/hypershift-agent-power-credentials
+    - name: POWERVS_INSTANCE_CRN
+      documentation: "Custom Resource Number of IBM Cloud PowerVS service instance where agents will get hosted"
+    - name: POWERVS_IMAGE
+      documentation: "Image name of empty boot volume to boot the agents initially"
+    - name: POWERVS_NETWORK
+      documentation: "Name of the private network where agents will get hosted"
+    - name: CIS_INSTANCE
+      documentation: "Name of IBM Cloud CIS instance where DNS records will be created"
+    - name: CIS_DOMAIN_ID
+      documentation: "ID of domain created under CIS_INSTANCE"
+    - name: BASTION
+      documentation: "Hostname of the bastion node hosted in POWERVS_INSTANCE_CRN where services configured for PXE boot"
+    - name: BASTION_CI_SCRIPTS_DIR
+      documentation: "Directory in BASTION where scripts related this CI are hosted"
+  commands: hypershift-mce-power-destroy-commands.sh
+  from: dev-scripts
+  grace_period: 15m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 45m0s
+  credentials:
+    - mount_path: /etc/hypershift-agent-power-credentials
+      name: hypershift-agent-power-credentials
+      namespace: test-credentials

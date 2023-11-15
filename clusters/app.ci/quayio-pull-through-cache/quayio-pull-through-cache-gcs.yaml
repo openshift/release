@@ -1,6 +1,37 @@
 apiVersion: v1
 kind: List
 items:
+- kind: ConfigMap
+  apiVersion: v1
+  metadata:
+    name: quayio-pull-through-cache-gcp
+    namespace: ci
+  data:
+    config.yml: |-
+      version: 0.1
+      log:
+        fields:
+          service: registry
+      storage:
+        gcs:
+          bucket: quayio-pull-through-cache
+          keyfile: /etc/gcs-secret/credentials.json
+          rootdirectory: /quay.io
+      http:
+        addr: :5000
+        headers:
+          X-Content-Type-Options: [nosniff]
+      health:
+        storagedriver:
+          enabled: true
+          interval: 10s
+          threshold: 3
+      auth:
+        htpasswd:
+          realm: quay-realm
+          path: /tmp/htpasswd
+      proxy:
+        remoteurl: https://quay.io
 - apiVersion: route.openshift.io/v1
   kind: Route
   metadata:
@@ -48,31 +79,28 @@ items:
         nodeSelector:
           node-role.kubernetes.io: infra
         containers:
-        - name: quayio-cache
-          image: registry.ci.openshift.org/ci/quayio-pull-through-cache:latest
+        - command:
+          - /tp-entrypoint.sh
+          name: quayio-cache
+          image: registry.ci.openshift.org/ci/docker-registry:tp-2.8.2-gcs
           ports:
             - name: http
               containerPort: 5000
           volumeMounts:
-          - mountPath: /etc/pull-secret
-            name: pull-secret
-            readOnly: true
           - mountPath: /etc/gcs-secret
             name: gcs-secret
             readOnly: true
-          env:
-          - name: REGISTRY_STORAGE_GCS_BUCKET
-            value: quayio-pull-through-cache
-          - name: REGISTRY_STORAGE
-            value: gcs
-          - name: REGISTRY_STORAGE_GCS_ROOTDIRECTORY
-            value: /quay.io
-          - name: REGISTRY_STORAGE_GCS_KEYFILE
-            value: /etc/gcs-secret/credentials.json
+          - mountPath: /etc/quay-io-pull-credentials
+            name: quay-io-pull-credentials
+          - mountPath: /etc/docker-registry
+            name: config
         volumes:
-        - name: pull-secret
-          secret:
-            secretName: registry-pull-credentials
+        - name: config
+          configMap:
+            name: quayio-pull-through-cache-gcp
         - name: gcs-secret
           secret:
             secretName: gcs-sa-quayio-pull-through-cache
+        - name: quay-io-pull-credentials
+          secret:
+            secretName: quay-io-pull-credentials

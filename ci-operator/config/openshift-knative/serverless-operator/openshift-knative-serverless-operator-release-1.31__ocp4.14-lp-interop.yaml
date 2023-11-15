@@ -1,0 +1,106 @@
+base_images:
+  base:
+    name: "4.14"
+    namespace: ocp
+    tag: base
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  openshift_eventing-istio-src_knative-v1.10:
+    name: eventing-istio-src
+    namespace: openshift
+    tag: knative-v1.10
+  openshift_eventing-kafka-broker-src_knative-v1.10:
+    name: eventing-kafka-broker-src
+    namespace: openshift
+    tag: knative-v1.10
+  openshift_knative-eventing-src_knative-v1.10:
+    name: knative-eventing-src
+    namespace: openshift
+    tag: knative-v1.10
+  openshift_knative-serving-src_knative-v1.10:
+    name: knative-serving-src
+    namespace: openshift
+    tag: knative-v1.10
+  openshift_release_golang-1.19:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+images:
+- context_dir: openshift/ci-operator/source-image
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    openshift_eventing-istio-src_knative-v1.10:
+      as:
+      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.10
+    openshift_eventing-kafka-broker-src_knative-v1.10:
+      as:
+      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.10
+    openshift_knative-eventing-src_knative-v1.10:
+      as:
+      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.10
+    openshift_knative-serving-src_knative-v1.10:
+      as:
+      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.10
+  to: serverless-operator-src
+- context_dir: .
+  dockerfile_path: serving/ingress/Dockerfile
+  from: base
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-openshift-ingress
+- context_dir: .
+  dockerfile_path: knative-operator/Dockerfile
+  from: base
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-operator
+- context_dir: .
+  dockerfile_path: openshift-knative-operator/Dockerfile
+  from: base
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: openshift-knative-operator
+- context_dir: .
+  dockerfile_path: serving/metadata-webhook/Dockerfile
+  from: base
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: metadata-webhook
+- context_dir: olm-catalog/serverless-operator
+  from: base
+  to: serverless-bundle
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-1.31
+  org: openshift-knative
+  repo: serverless-operator
+  variant: ocp4.14-lp-interop

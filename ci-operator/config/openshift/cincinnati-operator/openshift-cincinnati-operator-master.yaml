@@ -1,28 +1,47 @@
 base_images:
-  base:
-    name: "4.12"
-    namespace: ocp
-    tag: base
-  cincinnati_operand_latest:
+  cincinnati-operand:
     name: cincinnati-build-root
     namespace: cincinnati-ci
     tag: deploy
-  graphdata:
+  operator-sdk:
+    name: "4.14"
+    namespace: origin
+    tag: operator-sdk
+  published-cincinnati-graph-data:
     name: cincinnati-graph-data
     namespace: cincinnati-ci-public
     tag: stable
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "9"
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.14
 images:
 - dockerfile_path: build/Dockerfile
-  from: base
+  from: ubi
   to: cincinnati-operator
 - dockerfile_path: dev/Dockerfile
-  from: base
-  to: cincinnati-graph-data-container
+  from: ubi
+  to: local-cincinnati-graph-data
+operator:
+  bundles:
+  - as: cincinnati-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/cincinnati/cincinnati:latest
+    with: pipeline:cincinnati-operand
+  - pullspec: controller:latest
+    with: pipeline:cincinnati-operator
+releases:
+  latest:
+    release:
+      channel: candidate
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -40,63 +59,115 @@ tests:
   commands: make unit-test
   container:
     from: src
-- as: operator-e2e
+- as: install-bundle
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.14"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace install-osus-here
+        operator-sdk run bundle -n install-osus-here "$OO_BUNDLE"
+        oc wait --for condition=Available -n install-osus-here deployment updateservice-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: cincinnati-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1000Mi
+    workflow: generic-claim
+- as: operator-e2e-old-ocp-published-graph-data
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.11"
   steps:
     test:
     - as: e2e-test
       cli: latest
       commands: |
         make func-test \
-        RELATED_IMAGE_OPERAND=quay.io/app-sre/cincinnati@sha256:921b7a2e579d4cfe0e58ecf3abcc2262b321b6d0f8be7f6ebcb700acfca5ba55 \
         OPENSHIFT_BUILD_NAMESPACE=
       dependencies:
-      - env: OPERATOR_IMAGE
-        name: pipeline:cincinnati-operator
       - env: RELATED_IMAGE_OPERATOR
         name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERAND
+        name: pipeline:cincinnati-operand
       - env: GRAPH_DATA_IMAGE
-        name: pipeline:cincinnati-graph-data-container
+        name: pipeline:published-cincinnati-graph-data
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: operator-e2e-latest-osus
+- as: operator-e2e-new-ocp-published-graph-data
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.14"
   steps:
     test:
     - as: e2e-test
       cli: latest
-      commands: make func-test OPENSHIFT_BUILD_NAMESPACE=
+      commands: |
+        make func-test \
+        OPENSHIFT_BUILD_NAMESPACE=
       dependencies:
-      - env: OPERATOR_IMAGE
-        name: pipeline:cincinnati-operator
       - env: RELATED_IMAGE_OPERATOR
         name: pipeline:cincinnati-operator
-      - env: GRAPH_DATA_IMAGE
-        name: graphdata
       - env: RELATED_IMAGE_OPERAND
-        name: cincinnati_operand_latest
+        name: pipeline:cincinnati-operand
+      - env: GRAPH_DATA_IMAGE
+        name: pipeline:published-cincinnati-graph-data
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
+- as: operator-e2e-hypershift-local-graph-data
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-2
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: |
+        make func-test \
+        OPENSHIFT_BUILD_NAMESPACE= \
+      dependencies:
+      - env: RELATED_IMAGE_OPERATOR
+        name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERAND
+        name: pipeline:cincinnati-operand
+      - env: GRAPH_DATA_IMAGE
+        name: pipeline:local-cincinnati-graph-data
+      env:
+      - default: local
+        documentation: Let the test suite know it has a locally-built graph-data image,
+          so it can enable custom testing.
+        name: GRAPH_DATA
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -1,0 +1,36 @@
+base_images:
+  openshift-cli-installer:
+    name: openshift-cli-installer
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: multi-cluster-observability-4-14-rosa-acm-gcp-mngd-rosa-mngd
+  steps:
+    cluster_profile: aws-managed-cspi-qe
+    env:
+      CLUSTER1_CONFIG: name=acm-hub;platform=rosa;region=us-west-2;version=4.14;channel-group=stable;compute-machine-type=m5.xlarge;replicas=2;expiration-time=10h;timeout=8h;acm=True;acm-clusters=rosa-mngd,gcp-mngd;acm-observability=True;ocm-env=stage
+      CLUSTER2_CONFIG: name=rosa-mngd;platform=rosa;region=us-west-2;version=4.14;channel-group=stable;compute-machine-type=m5.xlarge;replicas=2;expiration-time=10h;timeout=2h;ocm-env=stage
+      CLUSTER3_CONFIG: name=gcp-mngd;platform=gcp-osd;region=us-west1;version=4.14;channel-group=stable;compute-machine-type=custom-4-16384;replicas=2;expiration-time=10h;timeout=2h;ocm-env=stage
+      GCP_SERVICE_ACCOUNT_NAME: gcp_service_account.json
+      PULL_SECRET_NAME: pull-secret
+      S3_BUCKET_NAME: openshift-cli-installer
+      S3_BUCKET_PATH: openshift-ci
+    workflow: cluster
+zz_generated_metadata:
+  branch: acm-observability
+  org: CSPI-QE
+  repo: MSI
+  variant: v4.14-stage

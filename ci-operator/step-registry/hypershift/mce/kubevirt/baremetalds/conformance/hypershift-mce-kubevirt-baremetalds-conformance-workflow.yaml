@@ -1,0 +1,50 @@
+workflow:
+  as: hypershift-mce-kubevirt-baremetalds-conformance
+  documentation: |-
+    The HyperShift KubeVirt conformance workflow executes tests against a new ephemeral
+    HyperShift cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    Note that tests will execute once the control plane is ready, regardless of
+    whether nodes have been requested, have joined, or are available.
+
+    The control plane is hosted on a dedicated standalone OCP cluster running
+    HyperShift in Azure account and is destroyed after tests complete.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team.
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    post:
+    - ref: hypershift-mce-dump
+    - chain: gather-core-dump
+    - chain: hypershift-mce-kubevirt-destroy
+    - chain: baremetalds-ipi-post
+    test:
+    - chain: hypershift-conformance
+    pre:
+    - chain: baremetalds-ipi-pre
+    - ref: enable-qe-catalogsource
+    - chain: hypershift-kubevirt-baremetalds-metallb
+    - chain: hypershift-kubevirt-baremetalds-odf
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-mce-install
+    - chain: hypershift-mce-kubevirt-create
+    - chain: hypershift-mce-kubevirt-baremetalds-proxy
+    env:
+      TEST_SKIPS: etcd leader changes are not excessive
+      METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: qe-app-registry
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=0
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=81920
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=100G

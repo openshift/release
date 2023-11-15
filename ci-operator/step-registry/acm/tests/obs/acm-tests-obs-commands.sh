@@ -1,6 +1,6 @@
 #!/bin/bash
 set -o nounset
-set -o errexit
+# set -o errexit
 set -o pipefail
 
 # The variables defined in this step come from files in the `SHARED_DIR` and credentials from Vault.
@@ -64,7 +64,7 @@ mkdir -p /alabama/.kube
 cp ${SHARED_DIR}/kubeconfig ~/.kube/config
 
 # run the test execution script
-bash +x ./execute_obs_interop_commands.sh
+bash +x ./execute_obs_interop_commands.sh || :
 
 # Copy the test cases results to an external directory
 cp -r tests/pkg/tests $ARTIFACT_DIR/

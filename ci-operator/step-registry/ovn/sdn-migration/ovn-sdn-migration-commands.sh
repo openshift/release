@@ -5,8 +5,13 @@ set -o nounset
 set -o pipefail
 
 TARGET=${TARGET:-OVNKubernetes}
+# Check if the OVN_SDN_MIGRATION_TIMEOUT environment variable is set and is equal to "0s"
+if [ -n "$OVN_SDN_MIGRATION_TIMEOUT" ] && [ "$OVN_SDN_MIGRATION_TIMEOUT" = "0s" ]; then
+  unset OVN_SDN_MIGRATION_TIMEOUT
+fi
 
-timeout 1200s bash <<EOT
+co_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-1200s}
+timeout "$co_timeout" bash <<EOT
 until
   oc wait co --all --for='condition=AVAILABLE=True' --timeout=10s && \
   oc wait co --all --for='condition=PROGRESSING=False' --timeout=10s && \
@@ -18,7 +23,8 @@ done
 EOT
 
 oc patch Network.operator.openshift.io cluster --type='merge'   --patch '{"spec":{"migration":null}}'
-timeout 60s bash <<EOT
+cno_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-60s}
+timeout "$cno_timeout" bash <<EOT
 until 
   ! oc get network -o yaml | grep migration > /dev/null
 do
@@ -30,10 +36,12 @@ EOT
 # Change network to target network in Network.operator.openshift.io the CR to trigger machine config update by MCO.
 oc patch Network.operator.openshift.io cluster --type='merge' --patch "{\"spec\":{\"migration\":{\"networkType\":\"${TARGET}\"}}}"
 # Wait until MCO starts applying new machine config to nodes
-oc wait mcp --all --for='condition=UPDATING=True' --timeout=300s
+mco_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-300s}
+oc wait mcp --all --for='condition=UPDATING=True' --timeout="$mco_timeout"
 
 # Wait until MCO finishes its work or it reachs the 20mins timeout
-timeout 2700s bash <<EOT
+mcp_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-2700s}
+timeout "$mcp_timeout" bash <<EOT
 until
   oc wait mcp --all --for='condition=UPDATED=True' --timeout=10s && \
   oc wait mcp --all --for='condition=UPDATING=False' --timeout=10s && \
@@ -47,10 +55,11 @@ EOT
 
 # Trigger ovn-kubenetes deployment
 oc patch Network.config.openshift.io cluster --type='merge' --patch "{\"spec\":{\"networkType\":\"${TARGET}\"}}"
-
-oc wait co network --for='condition=PROGRESSING=True' --timeout=60s
+ovn_co_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-60s}
+oc wait co network --for='condition=PROGRESSING=True' --timeout="$ovn_co_timeout"
 # Wait until the multus pods are restarted
-timeout 300s oc rollout status ds/multus -n openshift-multus
+ovn_multus_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-300s}
+timeout "$ovn_multus_timeout" oc rollout status ds/multus -n openshift-multus
 
 # Reboot all the nodes
 readarray -t POD_NODES <<< "$(oc get pod -n openshift-machine-config-operator -o wide| grep daemon|awk '{print $1" "$7}')"
@@ -65,7 +74,8 @@ done
 sleep 65
 
 # Wait for nodes come back
-timeout 1800s bash <<EOT
+ovn_node_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-1800s}
+timeout "$ovn_node_timeout" bash <<EOT
 until
   oc wait node --all --for condition=ready --timeout=10s;
 do
@@ -75,7 +85,8 @@ done
 EOT
 
 # Check all cluster operators back to normal
-timeout 2700s bash <<EOT
+all_co_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-2700s}
+timeout "$all_co_timeout" bash <<EOT
 until
   oc wait co --all --for='condition=Available=True' --timeout=10s && \
   oc wait co --all --for='condition=Progressing=False' --timeout=10s && \

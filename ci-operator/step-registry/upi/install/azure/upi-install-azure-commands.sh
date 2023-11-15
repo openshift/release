@@ -190,7 +190,7 @@ if [[ "$status" != "success" ]]; then
 fi
 
 echo "Uploading bootstrap.ign"
-az storage container create --name files --account-name $ACCOUNT_NAME --public-access blob
+az storage container create --name files --account-name $ACCOUNT_NAME
 az storage blob upload --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -f "${ARTIFACT_DIR}/installer/bootstrap.ign" -n "bootstrap.ign"
 
 echo "Creating private DNS zone"
@@ -253,7 +253,9 @@ echo "Creating 'api' record in public zone for IP ${PUBLIC_IP}"
 az network dns record-set a add-record -g $BASE_DOMAIN_RESOURCE_GROUP -z ${BASE_DOMAIN} -n api.${CLUSTER_NAME} -a $PUBLIC_IP --ttl 60
 
 echo "Deploying 04_bootstrap"
-BOOTSTRAP_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv)
+BOOTSTRAP_URL_EXPIRY=$(date -u -d "10 hours" '+%Y-%m-%dT%H:%MZ')
+BOOTSTRAP_URL=$(az storage blob generate-sas -c 'files' -n 'bootstrap.ign' --https-only --full-uri --permissions r --expiry ${BOOTSTRAP_URL_EXPIRY} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY} -o tsv)
+#BOOTSTRAP_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv)
 IGNITION_VERSION=$(jq -r .ignition.version ${ARTIFACT_DIR}/installer/bootstrap.ign)
 BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "${IGNITION_VERSION}" --arg url $BOOTSTRAP_URL '{ignition:{version:$v,config:{replace:{source:$url}}}}' | base64 -w0)
 # shellcheck disable=SC2046
@@ -276,9 +278,12 @@ az deployment group create -g $RESOURCE_GROUP \
   --parameters privateDNSZoneName="${CLUSTER_NAME}.${BASE_DOMAIN}" \
   --parameters baseName="$INFRA_ID" ${az_deployment_optional_parameters}
 
-MASTER0_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-0-nic --name pipConfig --query "privateIpAddress" -o tsv)
-MASTER1_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-1-nic --name pipConfig --query "privateIpAddress" -o tsv)
-MASTER2_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-2-nic --name pipConfig --query "privateIpAddress" -o tsv)
+#on az version previouse to 2.45.0, property name is privateIpAddress
+#on 2.45.0+, it changes to privateIPAddress
+ip_keys='"privateIpAddress","privateIPAddress"'
+MASTER0_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-0-nic --name pipConfig | jq -r "with_entries(select(.key | IN($ip_keys))) | .[]")
+MASTER1_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-1-nic --name pipConfig | jq -r "with_entries(select(.key | IN($ip_keys))) | .[]")
+MASTER2_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-2-nic --name pipConfig | jq -r "with_entries(select(.key | IN($ip_keys))) | .[]")
 GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${MASTER0_IP} --master ${MASTER1_IP} --master ${MASTER2_IP}"
 
 echo "Deploying 06_workers"

@@ -1,0 +1,145 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.20-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+images:
+- dockerfile_path: build/Dockerfile.prow
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+  to: multiclusterhub-operator
+- dockerfile_path: build/Dockerfile.test.prow
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+  to: multiclusterhub-operator-tests
+promotion:
+  disabled: true
+  name: "2.10"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multiclusterhub-operator
+    env:
+      IMAGE_REPO: multiclusterhub-operator
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: test-unit
+  commands: |
+    export ocm_dir=$(mktemp -d -t ocm-XXXXX)
+    export HOME="$ocm_dir"
+    export SELF="make -f Makefile"
+    make -f Makefile test
+  container:
+    from: src
+- as: sonar-pre-submit
+  commands: |
+    export ocm_dir=$(mktemp -d -t ocm-XXXXX)
+    export HOME="$ocm_dir"
+    make test-prep
+    export OPERATOR_VERSION=9.9.9
+    export ENVTEST_K8S_VERSION=1.20
+    export KUBEBUILDER_ASSETS=$(./bin/setup-envtest use $ENVTEST_K8S_VERSION -p path)
+    echo "KUBEBUILDER_ASSETS=$KUBEBUILDER_ASSETS"
+    export SONAR_GO_TEST_ARGS=$(go list ./... | grep -E -v test | tr "\n" " ")
+    echo "SONAR_GO_TEST_ARGS=$SONAR_GO_TEST_ARGS"
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export ocm_dir=$(mktemp -d -t ocm-XXXXX)
+    export HOME="$ocm_dir"
+    make test-prep
+    export OPERATOR_VERSION=9.9.9
+    export ENVTEST_K8S_VERSION=1.20
+    export KUBEBUILDER_ASSETS=$(./bin/setup-envtest use $ENVTEST_K8S_VERSION -p path)
+    echo "KUBEBUILDER_ASSETS=$KUBEBUILDER_ASSETS"
+    export SONAR_GO_TEST_ARGS=$(go list ./... | grep -E -v test | tr "\n" " ")
+    echo "SONAR_GO_TEST_ARGS=$SONAR_GO_TEST_ARGS"
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multiclusterhub-operator
+    env:
+      IMAGE_REPO: multiclusterhub-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-tests
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multiclusterhub-operator-tests
+    env:
+      IMAGE_REPO: multiclusterhub-operator-tests
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME="multiclusterhub-operator-tests"
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.10
+  org: stolostron
+  repo: multiclusterhub-operator

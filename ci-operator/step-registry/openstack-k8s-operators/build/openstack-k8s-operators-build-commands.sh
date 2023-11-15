@@ -12,6 +12,8 @@ unset NAMESPACE
 # Check org and project from job's spec
 REF_REPO=$(echo ${JOB_SPEC} | jq -r '.refs.repo')
 REF_ORG=$(echo ${JOB_SPEC} | jq -r '.refs.org')
+REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+
 # PR SHA
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
 # Get Pull request info - Pull request
@@ -22,6 +24,12 @@ PR_REPO_NAME=$(curl -s  -X GET -H \
     https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} | \
     jq -r  '.head.repo.full_name')
 
+DEPENDS_ON=$(curl -s  -X GET -H \
+    -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} | \
+    jq -r  '.body' | grep -iE "(depends-on).*(openstack-operator)" || true)
+
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name
 BASE_OP=${REF_REPO}
@@ -30,7 +38,7 @@ if [[ "$REF_ORG" != "$DEFAULT_ORG" ]]; then
     echo "Not a ${DEFAULT_ORG} job. Checking if isn't a rehearsal job..."
     EXTRA_REF_REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
     EXTRA_REF_ORG=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].org')
-    #EXTRA_REF_BASE_REF=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
+    REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
     if [[ "$EXTRA_REF_ORG" != "$DEFAULT_ORG" ]]; then
       echo "Failing since this step supports only ${DEFAULT_ORG} changes."
       exit 1
@@ -39,15 +47,71 @@ if [[ "$REF_ORG" != "$DEFAULT_ORG" ]]; then
     BASE_OP=${EXTRA_REF_REPO}
 fi
 SERVICE_NAME=$(echo "${BASE_OP}" | sed 's/\(.*\)-operator/\1/')
+# sets default branch for install_yamls
+export OPENSTACK_K8S_BRANCH=${REF_BRANCH}
 
 function create_openstack_namespace {
   pushd ${BASE_DIR}
   if [ ! -d "./install_yamls" ]; then
-    git clone https://github.com/openstack-k8s-operators/install_yamls.git
+    git clone https://github.com/openstack-k8s-operators/install_yamls.git -b ${REF_BRANCH}
   fi
   cd install_yamls
   make namespace
   popd
+}
+
+# Get build status
+function get_build_status() {
+    le_status=$(oc get builds -l buildconfig="$1" -o json | jq -r '.items[0].status.phase')
+    echo $le_status
+}
+
+# Check if build didn't fail
+function check_build_result {
+  local build_name
+  local build_status
+  local n
+  local nb_retries
+
+  build_name="$1"
+  # At this moment, we don't expect more than one build per build-config
+  build_status=$(get_build_status "${build_name}")
+  if [[ "$build_status" == "Failed" ]]; then
+    echo "Build ${build_name} failed to complete. Aborting build step..."
+    exit 1
+  fi
+
+  n=0
+  # sleep time hardcoded to 30s. Adding + 29 to round up the result
+  nb_retries=$(((BUILD_COMPLETE_TIMEOUT + 29) / 30))
+  while [[ "$build_status" != "Complete" ]]; do
+    n=$((n+1))
+    if (( n > nb_retries )); then
+      echo "Build ${build_name} failed to complete. Current status is ${build_status}. Aborting..."
+      exit 1
+    fi
+    sleep 30
+    build_status=$(get_build_status "${build_name}")
+  done
+}
+
+# Clone the openstack-operator and checkout
+# the requested PR
+function clone_openstack_operator {
+    git clone https://github.com/openstack-k8s-operators/openstack-operator.git -b ${REF_BRANCH}
+    pushd openstack-operator
+    local pr_num=""
+    # Depends-On syntax detected in the PR description: get the PR ID
+    if [[ -n $DEPENDS_ON ]]; then
+        pr_num=$(echo "$DEPENDS_ON" | rev | cut -d"/" -f1 | rev)
+    fi
+    # make sure the PR ID we parse is a number
+    if [[ "$pr_num" == ?(-)+([0-9]) ]]; then
+        # checkout pr $pr_num
+        git fetch origin pull/"$pr_num"/head:PR"$pr_num"
+        git checkout PR"$pr_num"
+    fi
+    popd
 }
 
 # Builds and push operator image
@@ -59,28 +123,24 @@ function build_push_operator_images {
 
   export VERSION=0.0.1
   export IMG=${IMAGE_TAG_BASE}:${IMAGE_TAG}
-  export BUNDLE_STORAGE_IMG=${IMAGE_TAG_BASE}-storage-bundle:${IMAGE_TAG}
 
   unset GOFLAGS
   pushd ${OP_DIR}
-  GOWORK='' make build bundle
+
+  # custom per project ENV variables
+  if [ -f .prow_ci.env ]; then
+    source .prow_ci.env
+  fi
+
+  GOWORK='' make build
 
   # Build and push operator image
   oc new-build --binary --strategy=docker --name ${OPERATOR} --to=${IMAGE_TAG_BASE}:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
   oc set build-secret --pull bc/${OPERATOR} ${DOCKER_REGISTRY_SECRET}
   oc start-build ${OPERATOR} --from-dir . -F
+  check_build_result ${OPERATOR}
 
-  # if it is the metaoperator and any extra dependant bundles exist build and push them here
-  local STORAGE_BUNDLE_EXISTS=0
-  if [[ -f storage-bundle.Dockerfile ]]; then
-    DOCKERFILE=storage-bundle.Dockerfile /bin/bash hack/pin-custom-bundle-dockerfile.sh
-    oc new-build --binary --strategy=docker --name ${OPERATOR}-storage-bundle --to=${IMAGE_TAG_BASE}-storage-bundle:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
-    DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\"storage-bundle.Dockerfile.pinned\"\}\}\}\})
-    oc patch bc ${OPERATOR}-storage-bundle -p "${DOCKERFILE_PATH_PATCH[@]}"
-    oc set build-secret --pull bc/${OPERATOR}-storage-bundle ${DOCKER_REGISTRY_SECRET}
-    oc start-build ${OPERATOR}-storage-bundle --from-dir . -F
-    STORAGE_BUNDLE_EXISTS=1
-  fi
+  GOWORK='' make bundle
 
   # Build and push bundle image
   oc new-build --binary --strategy=docker --name ${OPERATOR}-bundle --to=${IMAGE_TAG_BASE}-bundle:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
@@ -95,6 +155,7 @@ function build_push_operator_images {
   oc patch bc ${OPERATOR}-bundle -p "${DOCKERFILE_PATH_PATCH[@]}"
   oc set build-secret --pull bc/${OPERATOR}-bundle ${DOCKER_REGISTRY_SECRET}
   oc start-build ${OPERATOR}-bundle --from-dir . -F
+  check_build_result ${OPERATOR}-bundle
 
   BASE_BUNDLE=${IMAGE_TAG_BASE}-bundle:${IMAGE_TAG}
   DOCKERFILE="index.Dockerfile"
@@ -102,12 +163,9 @@ function build_push_operator_images {
 
 # todo: Improve include manila bundle workflow. For meta operaor only we need to add manila bundle in index and not for individual operators like keystone.
   if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
-    if [[ "$STORAGE_BUNDLE_EXISTS" == "1" ]]; then
-      opm index add --bundles "${BASE_BUNDLE}",${IMAGE_TAG_BASE}-storage-bundle:${IMAGE_TAG} --out-dockerfile "${DOCKERFILE}" --generate
-    else
-      # FIXME: we can drop manila here once ${IMAGE_TAG_BASE}-storage-bundle:${IMAGE_TAG} lands
-      opm index add --bundles "${BASE_BUNDLE}",quay.io/openstack-k8s-operators/manila-operator-bundle:latest --out-dockerfile "${DOCKERFILE}" --generate
-    fi
+    local OPENSTACK_BUNDLES
+    OPENSTACK_BUNDLES=$(/bin/bash hack/pin-bundle-images.sh)
+    opm index add --bundles "${BASE_BUNDLE}${OPENSTACK_BUNDLES}" --out-dockerfile "${DOCKERFILE}" --generate
   else
     opm index add --bundles "${BASE_BUNDLE}" --out-dockerfile "${DOCKERFILE}" --generate
   fi
@@ -115,6 +173,7 @@ function build_push_operator_images {
   oc new-build --binary --strategy=docker --name ${OPERATOR}-index --to=${IMAGE_TAG_BASE}-index:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
   oc patch bc ${OPERATOR}-index -p "${DOCKERFILE_PATH_PATCH[@]}"
   oc start-build ${OPERATOR}-index --from-dir . -F
+  check_build_result ${OPERATOR}-index
 
   popd
 }
@@ -130,6 +189,11 @@ create_openstack_namespace
 DOCKER_REGISTRY_SECRET=pull-docker-secret
 oc create secret generic ${DOCKER_REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/docker/config.json --type=kubernetes.io/dockerconfigjson
 
+# Auth needed by operator-sdk to pull images from internal
+export XDG_RUNTIME_DIR=${BASE_DIR}
+mkdir -p ${BASE_DIR}/containers
+ln -ns /secrets/internal/config.json ${BASE_DIR}/containers/auth.json
+
 # Secret for pushing containers - openstack namespace
 PUSH_REGISTRY_SECRET=push-quay-secret
 oc create secret generic ${PUSH_REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/rdoquay/config.json --type=kubernetes.io/dockerconfigjson
@@ -142,7 +206,7 @@ build_push_operator_images "${BASE_OP}" "${BASE_DIR}/${BASE_OP}" "${IMAGE_TAG_BA
 if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
   pushd ${BASE_DIR}
   if [ ! -d "./openstack-operator" ]; then
-    git clone https://github.com/openstack-k8s-operators/openstack-operator.git
+    clone_openstack_operator
   fi
   pushd openstack-operator
 
@@ -165,7 +229,11 @@ if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
 
   # mod can be either /api or /apis
   MOD=$(grep github.com/${DEFAULT_ORG}/${BASE_OP}/api go.mod || true)
-  if [ -n "$MOD" ]; then
+  # check if a replace directive is already present in go.mod
+  REPLACE=$(grep -E "(^replace).*(${DEFAULT_ORG}/${BASE_OP}/api)" go.mod || true)
+  # exec the following only if mod is present AND no replace directive has already
+  # been added to go.mod
+  if [[ -n "$MOD" && -z "$REPLACE" ]]; then
     API_MOD=$(basename $MOD)
     go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/${API_MOD}=github.com/${REPO_NAME}/${API_MOD}@${API_SHA}
     go mod tidy

@@ -22,7 +22,7 @@ function cleanup() {
 
   exit 0
 }
-trap cleanup EXIT
+trap cleanup INT TERM
 
 # $KUBECONFIG could not be available when the observer first starts
 echo "waiting for $KUBECONFIG or $KUBECONFIGMINIMAL to exist"
@@ -45,8 +45,22 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
   # shellcheck disable=SC1090
   source "${SHARED_DIR}/proxy-conf.sh"
+  echo "using proxy from ${SHARED_DIR}/proxy-conf.sh"
 fi
 
-openshift-tests run-resourcewatch --kubeconfig $KUBECONFIG --namespace default > "${ARTIFACT_DIR}/run-resourcewatch.log" 2>&1 &
-openshift-tests run-monitor --artifact-dir $STORE_PATH > "${ARTIFACT_DIR}/run-monitor.log" 2>&1 &
+# Due to entrypoint-wrapper replacing the SHARED_DIR with a different value,
+# use KUBECONFIGMINIMAL which is part of that SHARED_DIR and is not replaced.
+DS_VARS=$(dirname ${KUBECONFIGMINIMAL})/ds-vars.conf
+if test -f "${DS_VARS}"
+then
+  # shellcheck disable=SC1090
+  source "${DS_VARS}"
+  DEVSCRIPTS_TEST_IMAGE_REPO=${DS_REGISTRY}/localimages/local-test-image
+  MONITOR_ARGS="--from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO}"
+  echo "using additional run-monitor args ${MONITOR_ARGS}"
+fi
+
+openshift-tests run-resourcewatch > "${ARTIFACT_DIR}/run-resourcewatch.log" 2>&1 &
+DISABLED_MONITOR_TESTS="apiserver-availability,apiserver-new-disruption-invariant,disruption-summary-serializer,external-service-availability,incluster-disruption-serializer,image-registry-availability,ingress-availability,pod-network-avalibility,service-type-load-balancer-availability"
+openshift-tests run-monitor ${MONITOR_ARGS:-} --artifact-dir $STORE_PATH --disable-monitor=${DISABLED_MONITOR_TESTS} > "${ARTIFACT_DIR}/run-monitor.log" 2>&1 &
 wait

@@ -1,0 +1,54 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- build_args:
+  - name: DOCKER_BUILDKIT
+    value: "1"
+  - name: BUILDKIT_PROGRESS
+    value: plain
+  context_dir: .
+  dockerfile_path: Dockerfile
+  to: text-generation-inference
+promotion:
+  namespace: opendatahub-io
+  tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      cpu: "20"
+      memory: 24Gi
+    requests:
+      cpu: "10"
+      memory: 16Gi
+tests:
+- as: pr-image-mirror
+  run_if_changed: ^(deployment/.*|integration_tests/.*|launcher/.*|proto/.*|router/.*|server/.*|Makefile|Dockerfile)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: text-generation-inference
+    env:
+      IMAGE_REPO: text-generation-inference
+    workflow: opendatahub-io-ci-image-mirror
+- as: fast-image-mirror
+  postsubmit: true
+  run_if_changed: ^(deployment/.*|integration_tests/.*|launcher/.*|proto/.*|router/.*|server/.*|Makefile|Dockerfile)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: text-generation-inference
+    env:
+      IMAGE_REPO: text-generation-inference
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: text-generation-inference

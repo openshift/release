@@ -84,8 +84,38 @@ case "$CONFIG_TYPE" in
 		if [[ -f "${SHARED_DIR}/LB_HOST" ]]; then
     			yq --yaml-output --in-place ".
     			    | .platform.openstack.loadBalancer.type = \"UserManaged\"
-    			    | .featureSet = \"TechPreviewNoUpgrade\"
     			" "$INSTALL_CONFIG"
+		fi
+		;;
+	dualstack*)
+		source "${SHARED_DIR}/VIPS"
+		API_VIPS=$(echo -n "${API_VIPS[@]}" | jq -cRs '(. / " ")')
+		INGRESS_VIPS=$(echo -n "${INGRESS_VIPS[@]}" | jq -cRs '(. / " ")')
+		yq --yaml-output --in-place ".
+			| .networking.machineNetwork[0].cidr = \"${MACHINES_SUBNET_v4_RANGE:?}\"
+			| .networking.machineNetwork[1].cidr = \"${MACHINES_SUBNET_v6_RANGE:?}\"
+			| .networking.clusterNetwork[0].cidr = \"10.128.0.0/14\"
+			| .networking.clusterNetwork[0].hostPrefix = 23
+			| .networking.clusterNetwork[1].cidr = \"fd01::/48\"
+			| .networking.clusterNetwork[1].hostPrefix = 64
+			| .networking.serviceNetwork = [\"172.30.0.0/16\", \"fd02::/112\"]
+			| .platform.openstack.apiVIPs = $API_VIPS
+			| .platform.openstack.ingressVIPs = $INGRESS_VIPS
+			| .platform.openstack.controlPlanePort.fixedIPs[0].subnet.name = \"${CONTROL_PLANE_SUBNET_V4}\"
+			| .platform.openstack.controlPlanePort.fixedIPs[1].subnet.name = \"${CONTROL_PLANE_SUBNET_V6}\"
+			| .platform.openstack.controlPlanePort.network.name = \"${CONTROL_PLANE_NETWORK}\"
+			| .platform.openstack.controlPlanePort.network.name = \"${CONTROL_PLANE_NETWORK}\"
+			| .platform.openstack.controlPlanePort.network.name = \"${CONTROL_PLANE_NETWORK}\"
+		" "$INSTALL_CONFIG"
+
+		if [[ "${CONFIG_TYPE}" == "dualstack-v6primary" ]]; then
+			yq --yaml-output --in-place ".
+				| .platform.openstack.apiVIPs = (.platform.openstack.apiVIPs | reverse)
+				| .platform.openstack.ingressVIPs = (.platform.openstack.ingressVIPs | reverse)
+				| .networking.machineNetwork = (.networking.machineNetwork | reverse)
+				| .networking.clusterNetwork = (.networking.clusterNetwork | reverse)
+				| .networking.serviceNetwork = (.networking.serviceNetwork | reverse)
+			" "$INSTALL_CONFIG"
 		fi
 		;;
 	*)
@@ -96,18 +126,14 @@ esac
 
 if [[ "${ZONES_COUNT}" -gt '0' ]]; then
 	yq --yaml-output --in-place ".
-		| .compute[0].platform.openstack.zones = ${ZONES_JSON}
 		| .controlPlane.platform.openstack.zones = ${ZONES_JSON}
+		| .controlPlane.platform.openstack.rootVolume.type = \"tripleo\"
+		| .controlPlane.platform.openstack.rootVolume.size = 30
+		| .controlPlane.platform.openstack.rootVolume.zones = ${ZONES_JSON}
+		| .compute[0].platform.openstack.zones = ${ZONES_JSON}
 		| .compute[0].platform.openstack.rootVolume.type = \"tripleo\"
 		| .compute[0].platform.openstack.rootVolume.size = 30
 		| .compute[0].platform.openstack.rootVolume.zones = ${ZONES_JSON}
-	" "$INSTALL_CONFIG"
-fi
-
-if [[ -f "${SHARED_DIR}/failure_domain.json" ]]; then
-	yq --yaml-output --in-place ".
-		| .controlPlane.platform.openstack += $(<"${SHARED_DIR}/failure_domain.json")
-		| .featureSet = \"TechPreviewNoUpgrade\"
 	" "$INSTALL_CONFIG"
 fi
 
@@ -128,6 +154,13 @@ if [ "${FIPS_ENABLED:-}" = "true" ]; then
 	echo "Adding 'fips: true' to install-config.yaml"
 	yq --yaml-output --in-place ".
 		| .fips = true
+	" "$INSTALL_CONFIG"
+fi
+
+if [ -n "${FEATURE_SET}" ]; then
+        echo "Adding 'featureSet: ...' to install-config.yaml"
+	yq --yaml-output --in-place ".
+		| .featureSet = \"${FEATURE_SET}\"
 	" "$INSTALL_CONFIG"
 fi
 

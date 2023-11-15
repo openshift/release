@@ -176,8 +176,8 @@ periodics:
           if [ ! -s "${mapping}" ]; then continue; fi
           attempts=3
           for attempt in $( seq $attempts ); do
-            echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes --continue-on-error"
-            if oc image mirror --keep-manifest-list -a /tmp/config.json -f="$mapping" --skip-multiple-scopes --continue-on-error; then
+            echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes --continue-on-error --max-per-registry=3"
+            if oc image mirror --keep-manifest-list -a /tmp/config.json -f="$mapping" --skip-multiple-scopes --continue-on-error --max-per-registry=3; then
               break
             fi
             if [[ $attempt -eq $attempts ]]; then
@@ -1386,22 +1386,19 @@ periodics:
   cron: '@hourly'
   decorate: true
   labels:
-    ci.openshift.io/area: openshift-cnv
+    ci.openshift.io/area: lvms
     ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-openshift-cnv-tests
+  name: periodic-image-mirroring-lvms
   spec:
-    automountServiceAccountToken: true
     containers:
     - args:
       - -c
       - |
         set -o errexit
-        cp ~/.docker/config.json "${REGISTRY_AUTH_FILE_COMBINED}"
-        oc registry login --to "${REGISTRY_AUTH_FILE_COMBINED}"
         failures=0
-        for mapping in /etc/imagemirror/mapping_openshift-cnv*; do
+        for mapping in /etc/imagemirror/mapping_lvms*; do
           echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror -a "${REGISTRY_AUTH_FILE_COMBINED}" --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
             echo "ERROR: Failed to mirror images from $mapping"
             failures=$((failures+1))
           fi
@@ -1412,8 +1409,6 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      - name: REGISTRY_AUTH_FILE_COMBINED
-        value: /tmp/config.json
       image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
@@ -1430,7 +1425,65 @@ periodics:
     volumes:
     - name: push
       secret:
-        secretName: cluster-secrets-aws-interop-qe
+        secretName: registry-push-credentials-quay-io-lvms-dev
+    - configMap:
+        name: image-mirror-mappings
+      name: config
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@hourly'
+  decorate: true
+  decoration_config:
+    timeout: 2h0m0s
+  labels:
+    ci.openshift.io/area: osa
+    ci.openshift.io/role: image-mirroring
+  name: periodic-image-mirroring-osa
+  reporter_config:
+    slack:
+      channel: '#forum-osa-infra-alerts'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs>
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        failures=0
+        for mapping in /etc/imagemirror/mapping_osa*; do
+          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+            echo "ERROR: Failed to mirror images from $mapping"
+            failures=$((failures+1))
+          fi
+        done
+        exit $failures
+      command:
+      - /bin/bash
+      env:
+      - name: HOME
+        value: /home/mirror
+      image: registry.ci.openshift.org/ocp/4.12:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /home/mirror/.docker/config.json
+        name: push
+        readOnly: true
+        subPath: config.json
+      - mountPath: /etc/imagemirror
+        name: config
+    volumes:
+    - name: push
+      secret:
+        secretName: registry-push-credentials-quay-io-osa
     - configMap:
         name: image-mirror-mappings
       name: config

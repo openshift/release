@@ -2,7 +2,7 @@ from content.utils import get_rc_volumes, get_rc_volume_mounts, get_rcapi_volume
 
 
 def _add_origin_rbac(gendoc):
-    gendoc.append({
+    gendoc.append_all([{
         'apiVersion': 'authorization.openshift.io/v1',
         'kind': 'Role',
         'metadata': {
@@ -33,14 +33,35 @@ def _add_origin_rbac(gendoc):
                 'verbs': ['get',
                           'list',
                           'watch',
-                          'create']
+                          'create',
+                          'delete',
+                          'update',
+                          'patch']
             },
             {
                 'apiGroups': [''],
                 'resources': ['events'],
                 'verbs': ['create', 'patch', 'update']
             }]
-    })
+    }, {
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'release-controller-binding',
+            'namespace': 'origin',
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'Role',
+            'name': 'release-controller-modify',
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'release-controller',
+            'namespace': 'ci'
+        }
+        ]
+    }])
 
 
 def _add_origin_resources(gendoc):
@@ -125,20 +146,77 @@ def _add_origin_resources(gendoc):
                         }
                     },
                     "spec": {
+                        "initContainers": [
+                            {
+                                "name": "git-sync-init",
+                                "command": ["/git-sync"],
+                                "args": [
+                                    "--repo=https://github.com/openshift/release.git",
+                                    "--branch=master",
+                                    "--root=/tmp/git-sync",
+                                    "--one-time=true",
+                                    "--depth=1"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "GIT_SYNC_DEST",
+                                        "value": "release"
+                                    }
+                                ],
+                                "image": "registry.k8s.io/git-sync/git-sync:v3.6.2",
+                                "volumeMounts": [
+                                    {
+                                        "name": "release",
+                                        "mountPath": "/tmp/git-sync"
+                                    }
+                                ]
+                            }
+                        ],
                         "containers": [
+                            {
+                                "name": "git-sync",
+                                "command": ["/git-sync"],
+                                "args": [
+                                    "--repo=https://github.com/openshift/release.git",
+                                    "--branch=master",
+                                    "--wait=30",
+                                    "--root=/tmp/git-sync",
+                                    "--max-sync-failures=3"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "GIT_SYNC_DEST",
+                                        "value": "release"
+                                    }
+                                ],
+                                "image": "registry.k8s.io/git-sync/git-sync:v3.6.2",
+                                "volumeMounts": [
+                                    {
+                                        "name": "release",
+                                        "mountPath": "/tmp/git-sync"
+                                    }
+                                ],
+                                "resources": {
+                                    "requests": {
+                                        "memory": "1Gi",
+                                        "cpu": "0.5",
+                                    }
+                                }
+                            },
                             {
                                 "command": [
                                     "/usr/bin/release-controller",
                                     "--release-namespace=origin",
                                     "--prow-config=/etc/config/config.yaml",
                                     "--supplemental-prow-config-dir=/etc/config",
-                                    "--job-config=/etc/job-config",
+                                    "--job-config=/var/repo/release/ci-operator/jobs",
                                     "--prow-namespace=ci",
                                     "--job-namespace=ci-release",
-                                    "--tools-image-stream-tag=4.6:tests",
+                                    "--tools-image-stream-tag=release-controller-bootstrap:tests",
                                     "--release-architecture=amd64",
                                     "-v=4",
-                                    "--process-legacy-results"
+                                    "--process-legacy-results",
+                                    "--manifest-list-mode"
                                 ],
                                 "image": "release-controller:latest",
                                 "name": "controller",
@@ -198,7 +276,7 @@ def _add_origin_resources(gendoc):
                                     "--release-namespace=origin",
                                     "--prow-namespace=ci",
                                     "--job-namespace=ci-release",
-                                    "--tools-image-stream-tag=4.6:tests",
+                                    "--tools-image-stream-tag=release-controller-bootstrap:tests",
                                     "--release-architecture=amd64",
                                     "--enable-jira",
                                     "--jira-endpoint=https://issues.redhat.com",

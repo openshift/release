@@ -31,18 +31,12 @@ def get_rc_volume_mounts():
             'readOnly': True
         },
         {
-            'mountPath': '/etc/job-config',
-            'name': 'job-config',
-            'readOnly': True
+            'mountPath': '/var/repo',
+            'name': 'release'
         },
         {
             'mountPath': '/etc/github',
             'name': 'oauth',
-            'readOnly': True
-        },
-        {
-            'mountPath': '/etc/bugzilla',
-            'name': 'bugzilla',
             'readOnly': True
         },
         {
@@ -104,65 +98,14 @@ def get_rc_volumes(context):
             'name': 'config'
         },
         {
-            'name': 'job-config',
-            'projected': {
-                'sources': [
-                    {
-                        'configMap': {
-                            'name': 'job-config-misc'
-                        }
-                    },
-                    {
-                        'configMap': {
-                            'name': 'job-config-master-periodics'
-                        }
-                    },
-                    {
-                        'configMap': {
-                            'name': 'job-config-master-postsubmits'
-                        }
-                    },
-                    {
-                        'configMap': {
-                            'name': 'job-config-master-presubmits'
-                        }
-                    },
-                    {
-                        'configMap': {
-                            'name': 'job-config-1.x'
-                        }
-                    },
-                    {
-                        'configMap': {
-                            'name': 'job-config-2.x'
-                        }
-                    },
-                    {
-                        'configMap': {
-                            'name': 'job-config-3.x'
-                        }
-                    },
-                    {
-                        'configMap': {
-                            'name': 'job-config-4.0'
-                        }
-                    },
-                    *_get_dynamic_projected_deployment_volumes(context),
-                ]
-            }
+            'name': 'release',
+            'emptyDir': {}
         },
         {
             'name': 'oauth',
             'secret': {
                 'defaultMode': 420,
                 'secretName': 'github-credentials-openshift-merge-robot'
-            }
-        },
-        {
-            'name': 'bugzilla',
-            'secret': {
-                'defaultMode': 420,
-                'secretName': 'bugzilla-credentials-openshift-bugzilla-robot'
             }
         },
         {

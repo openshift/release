@@ -6,7 +6,7 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})

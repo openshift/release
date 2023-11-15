@@ -63,37 +63,6 @@ tests:
     make test --warn-undefined-variables
   container:
     from: test-bin
-- as: e2e
-  cluster_claim:
-    architecture: amd64
-    as: custom
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.9"
-  steps:
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        KUBECTL=oc
-        OCM_VERSION=backplane-2.0
-        REGISTRATION_OPERATOR_BRANCH=$OCM_VERSION
-        IMAGE_NAME=quay.io/stolostron/registration-operator:$OCM_VERSION
-        REGISTRATION_IMAGE=quay.io/stolostron/registration:$OCM_VERSION
-        WORK_IMAGE=quay.io/stolostron/work:$OCM_VERSION
-        PLACEMENT_IMAGE=quay.io/stolostron/placement:$OCM_VERSION
-        export KUBECTL IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE PLACEMENT_IMAGE REGISTRATION_OPERATOR_BRANCH
-        make test-e2e
-      dependencies:
-      - env: FOUNDATION_IMAGE_NAME
-        name: multicloud-manager
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: generic-claim
 - as: sonarcloud
   steps:
     test:

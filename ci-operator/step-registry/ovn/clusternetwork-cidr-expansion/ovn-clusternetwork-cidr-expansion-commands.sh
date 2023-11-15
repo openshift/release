@@ -77,7 +77,10 @@ oc scale --replicas=$(($READY_COUNT + 3)) machineset "$NODE_TO_SCALE" -n openshi
 
 # wait for the two extra nodes to become ready, then validate that only 2 of the new nodes were allocated a subnet.
 # the 3rd extra node should be notReady and have no subnet because they are exhausted
-oc wait machinesets -n openshift-machine-api "$NODE_TO_SCALE" --for=jsonpath='{.status.readyReplicas}'=$(($READY_COUNT + 2)) --timeout=1200s
+if ! oc wait machinesets -n openshift-machine-api "$NODE_TO_SCALE" --for=jsonpath='{.status.readyReplicas}'=$(($READY_COUNT + 2)) --timeout=1200s; then
+    dump_cluster_state
+    exit 1
+fi
 # machinesets are Ready, but there is a chance the final node that we expect to be notReady is not even deployed
 # from the cloud provider, so let's make sure (10m) we have 9 nodes in total before we move on
 timeout 600 bash <<EOT

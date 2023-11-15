@@ -24,7 +24,7 @@ function extract_oc(){
     echo -e "Extracting oc\n"
     local retry=5 tmp_oc="/tmp/client-2"
     mkdir -p ${tmp_oc}
-    while ! (oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
+    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
     do
         echo >&2 "Failed to extract oc binary, retry..."
         (( retry -= 1 ))
@@ -43,7 +43,7 @@ function check_signed() {
     digest="$(echo "${TARGET}" | cut -f2 -d@)"
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror2.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -60,8 +60,16 @@ function admin_ack() {
 
     echo "Require admin ack"
     local wait_time_loop_var=0 ack_data
-    ack_data="$(echo ${out} | awk '{print $2}' | cut -f2 -d\")" && echo "Admin ack patch data is: ${ack_data}"
-    oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack_data}"'": "true"}}' --type=merge
+    ack_data="$(echo "${out}" | jq -r "keys[]")"
+    for ack in ${ack_data};
+    do
+        # e.g.: ack-4.12-kube-1.26-api-removals-in-4.13
+        if [[ "${ack}" == *"ack-4.${SOURCE_MINOR_VERSION}"* ]]
+        then
+            echo "Admin ack patch data is: ${ack}"
+            oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
+        fi
+    done
 
     echo "Admin-acks patch gets started"
 
@@ -100,22 +108,30 @@ function upgrade() {
 # Monitor the upgrade status
 function check_upgrade_status() {
     local wait_upgrade="${TIMEOUT}" out avail progress
+    echo "Starting the upgrade checking on $(date "+%F %T")"
     while (( wait_upgrade > 0 )); do
-        echo "oc get clusterversion" && oc get clusterversion
-        out="$(oc get clusterversion --no-headers)"
+        sleep 5m
+        wait_upgrade=$(( wait_upgrade - 5 ))
+        if ! ( run_command "oc get clusterversion" ); then
+            continue
+        fi
+        if ! out="$(oc get clusterversion --no-headers)"; then continue; fi
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${TARGET_VERSION}" ]]; then
-            echo -e "Upgrade succeed\n\n"
+            echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
             return 0
-        else
-            sleep 5m
-            (( wait_upgrade -= 5 ))
-        fi        
+        fi
     done
-    if (( wait_upgrade <= 0 )); then
-        echo >&2 "Upgrade timeout, exiting" && return 1
+    if [[ ${wait_upgrade} -le 0 ]]; then
+        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
     fi
+}
+
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
 }
 
 function run_command_oc_retries() {
@@ -270,13 +286,13 @@ function check_mcp() {
             else
                 echo >&2 "Worker pool status check failed" && return 1
             fi 
-        fi   
-    done      
+        fi
+    done
 }
 
 function health_check() {
-    check_mcp
     wait_clusteroperators_continous_success
+    check_mcp
     check_node
 }
 
@@ -293,8 +309,12 @@ export PATH=${OC_DIR}:$PATH
 
 export OC="run_command_oc_retries"
 
+SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
+SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
+export SOURCE_MINOR_VERSION
+
 export TARGET="${RELEASE_IMAGE_TARGET}"
-TARGET_VERSION="$(oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
+TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
 export TARGET_VERSION
 echo -e "Target release version is: ${TARGET_VERSION}"
 

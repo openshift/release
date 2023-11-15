@@ -8,6 +8,11 @@ set -o pipefail
 oc version
 openshift-install version
 
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
+
 mirror_output="${SHARED_DIR}/mirror_output"
 new_pull_secret="${SHARED_DIR}/new_pull_secret"
 install_config_icsp_patch="${SHARED_DIR}/install-config-icsp.yaml.patch"

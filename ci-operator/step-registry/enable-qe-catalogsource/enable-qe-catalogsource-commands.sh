@@ -54,17 +54,21 @@ function update_global_auth () {
   # replace all global auth with the QE's
   # new_dockerconfig="/var/run/vault/image-registry/qe_dockerconfigjson"
 
-  # only add quay.io/openshift-qe-optional-operators auth to the global auth
+  # add quay.io/openshift-qe-optional-operators and quay.io/openshifttest auth to the global auth
   new_dockerconfig="/tmp/new-dockerconfigjson"
   # qe_registry_auth=$(cat "/var/run/vault/mirror-registry/qe_optional.json" | jq -r '.auths."quay.io/openshift-qe-optional-operators".auth')
   optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
   optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
   qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
 
+  openshifttest_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.user')
+  openshifttest_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.password')
+  openshifttest_registry_auth=`echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0`
+
   reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
   reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
   brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
-  jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${new_dockerconfig}
+  jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${new_dockerconfig}
 
  # run_command "cat ${new_dockerconfig} | jq"
 
@@ -204,9 +208,25 @@ EOF
 
 }
 
+# from OCP 4.15, the OLM is optional, details: https://issues.redhat.com/browse/OCPVE-634
+function check_olm_capability(){
+    # check if OLM capability is added 
+    knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+    if [[ ${knownCaps} =~ "OperatorLifecycleManager" ]]; then
+        echo "knownCapabilities contains OperatorLifecycleManager"
+        # check if OLM capability enabled
+        enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+          if [[ ! ${enabledCaps} =~ "OperatorLifecycleManager" ]]; then
+              echo "OperatorLifecycleManager capability is not enabled, skip the following tests..."
+              exit 0
+          fi
+    fi
+}
+
 set_proxy
 run_command "oc whoami"
 run_command "oc version -o yaml"
+check_olm_capability
 update_global_auth
 sleep 5
 create_icsp_connected

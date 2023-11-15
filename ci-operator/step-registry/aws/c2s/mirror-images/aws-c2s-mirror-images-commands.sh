@@ -18,6 +18,10 @@ fi
 MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
 
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
 
 oc registry login
 

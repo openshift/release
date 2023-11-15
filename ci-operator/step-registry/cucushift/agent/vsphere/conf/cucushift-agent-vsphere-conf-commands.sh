@@ -16,17 +16,50 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-[ -z "${WORKERS}" ] && { echo "\$WORKERS is not filled. Failing."; exit 1; }
-[ -z "${MASTERS}" ] && { echo "\$MASTERS is not filled. Failing."; exit 1; }
-
-third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+[ -z "${WORKERS}" ] && {
+  echo "\$WORKERS is not filled. Failing."
+  exit 1
+}
+[ -z "${MASTERS}" ] && {
+  echo "\$MASTERS is not filled. Failing."
+  exit 1
+}
 
 export HOME=/tmp
+SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+
+declare vlanid
+declare primaryrouterhostname
+declare vsphere_portgroup
+source "${SHARED_DIR}/vsphere_context.sh"
+
+machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
+if [[ ${vsphere_portgroup} == *"segment"* ]]; then
+  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${vsphere_portgroup}"))
+  gateway="192.168.${third_octet}.1"
+  rendezvous_ip_address="192.168.${third_octet}.4"
+else
+  if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
+    echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+    exit 1
+  fi
+
+  dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
+  gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
+  cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].cidr' "${SUBNETS_CONFIG}")
+  machine_cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
+
+  # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
+  rendezvous_ip_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[4]' "${SUBNETS_CONFIG}")
+
+fi
+
+echo "${rendezvous_ip_address}" >"${SHARED_DIR}"/node-zero-ip.txt
 
 pull_secret_path=${CLUSTER_PROFILE_DIR}/pull-secret
-build01_secrets="/var/run/vault/secrets/.dockerconfigjson"
-extract_build01_auth=$(jq -c '.auths."registry.apps.build01-us-west-2.vmc.ci.openshift.org"' ${build01_secrets})
-final_pull_secret=$(jq -c --argjson auth "$extract_build01_auth" '.auths["registry.apps.build01-us-west-2.vmc.ci.openshift.org"] += $auth' "${pull_secret_path}")
+build02_secrets="/var/run/vault/secrets/.dockerconfigjson"
+extract_build02_auth=$(jq -c '.auths."registry.apps.build02.vmc.ci.openshift.org"' ${build02_secrets})
+final_pull_secret=$(jq -c --argjson auth "$extract_build02_auth" '.auths["registry.apps.build02.vmc.ci.openshift.org"] += $auth' "${pull_secret_path}")
 
 echo "${final_pull_secret}" >>"${SHARED_DIR}"/pull-secrets
 echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
@@ -34,15 +67,13 @@ echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
 echo "vmc-ci.devcluster.openshift.com" >"${SHARED_DIR}"/base-domain.txt
 base_domain=$(<"${SHARED_DIR}"/base-domain.txt)
 
-machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
-
 pull_secret=$(<"${SHARED_DIR}/pull-secrets")
 
 # Create cluster-name.txt
-echo "${NAMESPACE}-${JOB_NAME_HASH}" >"${SHARED_DIR}"/cluster-name.txt
+echo "${NAMESPACE}-${UNIQUE_HASH}" >"${SHARED_DIR}"/cluster-name.txt
 cluster_name=$(<"${SHARED_DIR}"/cluster-name.txt)
 
-# Add build01 secrets if the mirror registry secrets are not available.
+# Add build02 secrets if the mirror registry secrets are not available.
 if [ ! -f "${SHARED_DIR}/pull_secret_ca.yaml.patch" ]; then
   yq -i 'del(.pullSecret)' "${SHARED_DIR}/install-config.yaml"
   cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
@@ -104,7 +135,7 @@ declare GOVC_PASSWORD
 declare vsphere_datacenter
 declare vsphere_datastore
 declare dns_server
-source "${SHARED_DIR}/vsphere_context.sh"
+declare vsphere_cluster
 
 total_host="$((MASTERS + WORKERS))"
 declare -a mac_addresses=()
@@ -127,8 +158,16 @@ for ((i = 0; i < total_host; i++)); do
 done >"${SHARED_DIR}"/hostnames.txt
 
 for ((i = 0; i < total_host; i++)); do
+  ipaddress=""
+  if [[ ${vsphere_portgroup} == *"segment"* ]]; then
+    ipaddress=192.168.${third_octet}.$((i + 4))
+    cidr=25
+  else
+    ipaddress=$(jq -r --argjson N $((i + 4)) --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
+  fi
+
   echo " - hostname: ${hostnames[$i]}
-   role: $(echo "${hostnames[$i]}"|rev|cut -d'-' -f2|rev|cut -f1)
+   role: $(echo "${hostnames[$i]}" | rev | cut -d'-' -f2 | rev | cut -f1)
    interfaces:
     - name: ens32
       macAddress: ${mac_addresses[$i]}
@@ -141,8 +180,8 @@ for ((i = 0; i < total_host; i++)); do
         ipv4:
           enabled: true
           address:
-            - ip: 192.168.${third_octet}.$((i + 4))
-              prefix-length: 25
+            - ip: ${ipaddress}
+              prefix-length: ${cidr}
           dhcp: false
     dns-resolver:
      config:
@@ -151,7 +190,7 @@ for ((i = 0; i < total_host; i++)); do
     routes:
      config:
        - destination: 0.0.0.0/0
-         next-hop-address: 192.168.${third_octet}.1
+         next-hop-address: ${gateway}
          next-hop-interface: ens32
          table-id: 254"
 done >>"${SHARED_DIR}/agent-config.yaml.patch"
@@ -161,7 +200,7 @@ agent_config_patch="${SHARED_DIR}/agent-config.yaml.patch"
 cat >"${SHARED_DIR}/agent-config.yaml" <<EOF
 apiVersion: v1alpha1
 kind: AgentConfig
-rendezvousIP: 192.168.${third_octet}.4
+rendezvousIP: ${rendezvous_ip_address}
 hosts: []
 EOF
 
@@ -197,28 +236,31 @@ agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
 echo "uploading ${agent_iso} to iso-datastore.."
 
 for ((i = 0; i < 3; i++)); do
-  /tmp/govc datastore.upload -ds "${vsphere_datastore}" agent.x86_64.iso agent-installer-isos/"${agent_iso}" || true
-  result=$?
-  if [[ $result -eq 0 ]]; then
+  if /tmp/govc datastore.upload -ds "${vsphere_datastore}" agent.x86_64.iso agent-installer-isos/"${agent_iso}"; then
     echo "$(date -u --rfc-3339=seconds) - Agent ISO has been uploaded successfully!!"
+    status=0
     break
   else
     echo "$(date -u --rfc-3339=seconds) - Failed to upload agent iso. Retrying..."
-    sleep 1
+    status=1
+    sleep 2
   fi
 done
-if [[ $result -ne 0 ]]; then
+if [ $status -ne 0 ]; then
   echo "Agent ISO upload failed after 3 attempts!!!"
   exit 1
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Creating platform-conf.sh file for post installation..."
-cat >> "${SHARED_DIR}/platform-conf.sh" << EOF
+cat >>"${SHARED_DIR}/platform-conf.sh" <<EOF
 export VSPHERE_USERNAME="${GOVC_USERNAME}"
 export VSPHERE_VCENTER="${vsphere_url}"
 export VSPHERE_DATACENTER="${vsphere_datacenter}"
+export VSPHERE_CLUSTER="${vsphere_cluster}"
 export VSPHERE_DATASTORE="${vsphere_datastore}"
 export VSPHERE_PASSWORD='${GOVC_PASSWORD}'
+export VSPHERE_NETWORK='${vsphere_portgroup}'
+export VSPHERE_FOLDER="${cluster_name}"
 EOF
 
 echo "Copying kubeconfig to the shared directory..."

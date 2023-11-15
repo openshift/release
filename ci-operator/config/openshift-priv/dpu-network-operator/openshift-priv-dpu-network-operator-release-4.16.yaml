@@ -1,0 +1,46 @@
+base_images:
+  base:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base
+binary_build_commands: make
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/dpu-network-operator
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: dpu-network-operator
+promotion:
+  name: 4.16-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.16-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.16-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: fmt
+  commands: make fmt vet
+  container:
+    from: src
+- as: unit
+  commands: HOME=/tmp make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift-priv
+  repo: dpu-network-operator

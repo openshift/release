@@ -1,0 +1,92 @@
+base_images:
+  acmqe-grc-test:
+    name: "2.8"
+    namespace: acm-qe
+    tag: acmqe-grc-test
+  application-ui-test:
+    name: "2.8"
+    namespace: acm-qe
+    tag: application-ui-test
+  clc-ui-e2e:
+    name: "2.8"
+    namespace: acm-qe
+    tag: clc-ui-e2e
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  fetch-managed-clusters:
+    name: autotest
+    namespace: acm-qe
+    tag: fetch-managed-clusters
+  observability-core-automation:
+    name: "2.8"
+    namespace: acm-qe
+    tag: observability-core-automation
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: acm-interop-aws
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "ipi-conf*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["4.15-lp","self-managed-lp","acm-lp"]},
+          {"step": "ipi-install*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["4.15-lp","self-managed-lp","acm-lp"]},
+          {"step": "ipi-deprovision*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.15-lp","self-managed-lp","acm-lp"]},
+          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.15-lp","self-managed-lp","acm-lp"]},
+          {"step": "*gather*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+          {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_project": "LPINTEROP", "jira_additional_labels": ["4.15-lp","self-managed-lp","acm-lp"]},
+          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["4.15-lp","self-managed-lp","acm-lp"]},
+          {"step": "acm-mch", "failure_type": "all", "classification": "MCH install", "jira_project": "LPINTEROP", "jira_additional_labels": ["4.15-lp","self-managed-lp","acm-lp","interop-tests"]},
+          {"step": "acm-tests-clc-create", "failure_type": "all", "classification": "CLC testcase failure", "jira_project": "ACM", "jira_component": "QE", "jira_additional_labels": ["4.15-lp","self-managed-lp","acm-lp","CI","ClusterLifecycle","QE-ACM","interop-tests"], "jira_assignee": "vboulos@redhat.com", "group": {"name": "clc", "priority": 1}},
+          {"step": "acm-tests-clc-destroy", "failure_type": "all", "classification": "CLC testcase failure", "jira_project": "ACM", "jira_component": "QE", "jira_additional_labels": ["4.15-lp","self-managed-lp","acm-lp","CI","ClusterLifecycle","QE-ACM","interop-tests"], "jira_assignee": "vboulos@redhat.com", "group": {"name": "clc", "priority": 3}},
+          {"step": "acm-fetch-*", "failure_type": "all", "classification": "Fetch managed cluster failure", "jira_project": "ACM", "jira_component": "QE", "jira_additional_labels": ["4.15-lp","self-managed-lp","acm-lp","CI","QE-ACM","interop-tests"], "jira_assignee": "vboulos@redhat.com", "group": {"name": "clc", "priority": 2}},
+          {"step": "acm-tests-obs", "failure_type": "all", "classification": "OBS testcase failure", "jira_project": "ACM", "jira_component": "QE", "jira_additional_labels": ["4.15-lp","self-managed-lp","acm-lp","CI","Observability","QE-ACM","interop-tests"], "jira_assignee": "vboulos@redhat.com"},
+          {"step": "acm-tests-grc", "failure_type": "all", "classification": "GRC testcase failure", "jira_project": "ACM", "jira_component": "QE", "jira_additional_labels": ["4.15-lp","self-managed-lp","acm-lp","CI","GRC","QE-ACM","interop-tests"], "jira_assignee": "vboulos@redhat.com"},
+          {"step": "acm-tests-alc", "failure_type": "all", "classification": "CLC testcase failure", "jira_project": "ACM", "jira_component": "QE", "jira_additional_labels": ["4.15-lp","self-managed-lp","acm-lp","CI","ApplicationLifecycle","QE-ACM","interop-tests"], "jira_assignee": "vboulos@redhat.com"},
+          {"step": "acm-must-gather", "failure_type": "pod_failure", "classification": "ACM must-gather failure", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.15-lp","self-managed-lp","acm-lp","interop-tests"]},
+          {"step": "mce-must-gather", "failure_type": "pod_failure", "classification": "MCE must-gather failure", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.15-lp","self-managed-lp","acm-lp","interop-tests"]}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "!default", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
+          {"name": "compliance-operator", "source": "redhat-operators", "channel": "release-0.1", "install_namespace": "openshift-compliance", "target_namespaces": "openshift-compliance", "operator_group": "compliance-operator-group"},
+          {"name": "gatekeeper-operator-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+          {"name": "openshift-gitops-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators"},
+          {"name": "oadp-operator", "source": "community-operators", "channel": "stable", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp", "operator_group": "adp-operator-group"},
+          {"name": "container-security-operator", "source": "redhat-operators", "channel": "stable-3.6", "install_namespace": "openshift-operators"}
+        ]
+      USER_TAGS: |
+        scenario acm
+      ZONES_COUNT: "3"
+    test:
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: acm-tests-clc-create
+    - ref: acm-fetch-managed-clusters
+    - ref: acm-tests-obs
+    - ref: acm-tests-grc
+    - ref: acm-tests-alc
+    workflow: acm-ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: acmqe-autotest
+  variant: acm-ocp4.15-lp-interop

@@ -14,6 +14,7 @@
       'configresolver.json': '703f0ccf02cc4339a374b52eb10f653b',
       'clusterpool.json': '22491886c1e19dde8d2984bca82154c1',
       'ci-chat-bot.json': '63182a3ee8939d9b5c54b5c5ce97134c',
+      'osp-hive-dashboard.json': '114c4a96cb93b35ef74ccf94c23b63f4',
     },
     alertManagerReceivers: {
       'build-cop': {

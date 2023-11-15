@@ -7,6 +7,10 @@ ref:
       cpu: 10m
       memory: 100Mi
   env:
+  - name: PULL_THROUGH_CACHE
+    default: "enabled"
+    documentation: |-
+      Cluster images are pulled through a cache located in the CI environment when enabled.
   - name: SIZE_VARIANT
     default: ""
     documentation: |-
@@ -23,8 +27,14 @@ ref:
     name: vsphere-vmc
     mount_path: /var/run/vault/vsphere
   - namespace: test-credentials
+    name: vsphere-config
+    mount_path: /var/run/vault/vsphere-config
+  - namespace: test-credentials
     name: ci-ibmcloud
     mount_path: /var/run/vault/ibmcloud
+  dependencies:
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST_FROM_BUILD_FARM
   documentation: >-
     The IPI vSphere configure step generates the vSphere-specific
     install-config.yaml contents based on the cluster profile,

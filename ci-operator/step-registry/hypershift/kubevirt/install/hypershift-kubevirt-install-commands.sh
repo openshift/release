@@ -2,7 +2,12 @@
 
 set -ex
 
-CNV_PRERELEASE_VERSION=${CNV_PRERELEASE_VERSION:-}
+function ocp_version() {
+    oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}'
+}
+
+CNV_PRERELEASE_VERSION=${CNV_PRERELEASE_VERSION:-$(ocp_version)}
+CNV_PRERELEASE_CATALOG_IMAGE=${CNV_PRERELEASE_CATALOG_IMAGE:-quay.io/openshift-cnv/nightly-catalog:${CNV_PRERELEASE_VERSION}}
 
 if [ -z "${CNV_PRERELEASE_VERSION}" ]
 then
@@ -44,7 +49,7 @@ metadata:
   namespace: openshift-marketplace
 spec:
   sourceType: grpc
-  image: quay.io/openshift-cnv/nightly-catalog:${CNV_PRERELEASE_VERSION}
+  image: ${CNV_PRERELEASE_CATALOG_IMAGE}
   displayName: OpenShift Virtualization Nightly Index
   publisher: Red Hat
   updateStrategy:

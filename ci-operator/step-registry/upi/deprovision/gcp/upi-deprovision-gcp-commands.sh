@@ -8,6 +8,18 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 export HOME=/tmp
 
+echo "$(date -u --rfc-3339=seconds) - Configuring gcloud..."
+if ! gcloud --version; then
+  GCLOUD_TAR="google-cloud-sdk-447.0.0-linux-x86_64.tar.gz"
+  GCLOUD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$GCLOUD_TAR"
+  echo "$(date -u --rfc-3339=seconds) - gcloud not installed: installing from $GCLOUD_URL"
+  pushd ${HOME}
+  curl -O "$GCLOUD_URL"
+  tar -xzf "$GCLOUD_TAR"
+  export PATH=${HOME}/google-cloud-sdk/bin:${PATH}
+  popd
+fi
+
 if [[ -s "${SHARED_DIR}/xpn.json" ]] && [[ -f "${CLUSTER_PROFILE_DIR}/xpn_creds.json" ]]; then
   echo "Activating XPN service-account..."
   GOOGLE_CLOUD_XPN_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/xpn_creds.json"

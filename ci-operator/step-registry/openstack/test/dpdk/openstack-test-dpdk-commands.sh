@@ -2,6 +2,8 @@
 
 set -Eeuo pipefail
 
+export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
+
 function wait_for_network() {
     # Wait up to 2 minutes for the network to be ready
     for _ in $(seq 1 12); do
@@ -75,6 +77,9 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+OPENSTACK_DPDK_NETWORK_ID=$(openstack network show "${OPENSTACK_DPDK_NETWORK}" -f value -c id)
+DPDK_PCI_DEVICE=$(oc get sriovnetworknodestates -n openshift-sriov-network-operator -o jsonpath='{.items[0].status.interfaces[?(@.netFilter=="'"openstack/NetworkID:${OPENSTACK_DPDK_NETWORK_ID}"'")].pciAddress}')
+
 CNF_NAMESPACE=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: v1
@@ -104,7 +109,7 @@ spec:
   additionalNetworks:
   - name: ${OPENSTACK_DPDK_NETWORK}
     namespace: ${CNF_NAMESPACE}
-    rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_DPDK_NETWORK}", "type": "host-device","pciBusId": "0000:00:04.0", "ipam": {}}'
+    rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_DPDK_NETWORK}", "type": "host-device","pciBusId": "${DPDK_PCI_DEVICE}", "ipam": {}}'
     type: Raw
 EOF
     oc patch network.operator cluster --patch "$(cat "${SHARED_DIR}/additionalnetwork-dpdk.yaml")" --type=merge
@@ -168,7 +173,7 @@ else
     exit 1
 fi
 
-TESTPMD_OUTPUT=$(oc -n "${CNF_NAMESPACE}" rsh "${CNF_POD}" bash -c "yes | testpmd -l 2-3 --in-memory --allow 00:04.0 --socket-mem 1024 -n 4 --proc-type auto --file-prefix pg  -- --disable-rss  --nb-cores=1 --rxq=1 --txq=1 --auto-start --forward-mode=mac")
+TESTPMD_OUTPUT=$(oc -n "${CNF_NAMESPACE}" rsh "${CNF_POD}" bash -c "yes | testpmd -l 2-3 --in-memory --allow ${DPDK_PCI_DEVICE} --socket-mem 1024 -n 4 --proc-type auto --file-prefix pg  -- --disable-rss  --nb-cores=1 --rxq=1 --txq=1 --auto-start --forward-mode=mac")
 echo "${TESTPMD_OUTPUT}"
 if [[ "${TESTPMD_OUTPUT}" == *"forwards packets on 1 streams"* ]]; then
     echo "Testpmd could run successfully"

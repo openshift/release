@@ -6,26 +6,26 @@ set -o pipefail
 
 config_sdn_egressip_crs() {
   # Get egressCIDR value from node's egress-ipconfig field.
-  # egress_ipconfig=$(oc get node $HOSTSUBNET_NAME -o json | jq .metadata.annotations.'"cloud.network.openshift.io/egress-ipconfig"')
-  # egress_ipconfig_parsed=${egress_ipconfig##*ipv4\":\"}
-  # egress_cidrs=${egress_ipconfig_parsed%%\"*}
+  egress_cidrs=$(oc get no  "$HOSTSUBNET_NAME" -o jsonpath="{.metadata.annotations.cloud\.network\.openshift\.io/egress-ipconfig}" | jq -r '.[].ifaddr.ipv4')
+  ip_part=$(echo "$egress_cidrs" | cut -d'/' -f1)
+  ip_address="${ip_part%.*}.5"
+
 
   # Define patch value
-  # hsn_patch='{"egressCIDRs": ["'
-  # hsn_patch+=$egress_cidrs
-  # hsn_patch+='"]}'
-
-  # In future we may refine above query to dynamically get egressCIDRs.
-  # egress-ipconfig field for nodes is hardcoded in cluster config so using hardcoded value is acceptable.
-  hsn_patch='{"egressCIDRs": ["10.0.128.0/18"]}'
+  hsn_patch='{"egressCIDRs": ["'
+  hsn_patch+=$egress_cidrs
+  hsn_patch+='"]}'
 
   # Patch the resources to contain egress config.
   oc patch hostsubnet "$HOSTSUBNET_NAME" --type=merge -p   "$hsn_patch"
-  oc patch netnamespace $NETNAMESPACE_NAME --type=merge -p   '{"egressIPs": ["10.0.128.5"]}'
+  oc patch netnamespace $NETNAMESPACE_NAME --type=merge -p   "{\"egressIPs\": [\"$ip_address\"]}"
 }
 
 config_egressip_cr() {
   oc label node --overwrite $HOSTSUBNET_NAME k8s.ovn.org/egress-assignable=
+  egress_cidrs=$(oc get no  "$HOSTSUBNET_NAME" -o jsonpath="{.metadata.annotations.cloud\.network\.openshift\.io/egress-ipconfig}" | jq -r '.[].ifaddr.ipv4')
+  ip_part=$(echo "$egress_cidrs" | cut -d'/' -f1)
+  ip_address="${ip_part%.*}.5"
   cat <<EOF | oc apply -f -
 apiVersion: k8s.ovn.org/v1
 kind: EgressIP
@@ -33,7 +33,7 @@ metadata:
   name: egressip-test-migration
 spec:
   egressIPs:
-  - "10.0.128.5"
+  - "${ip_address}"
   namespaceSelector:
     matchLabels:
       kubernetes.io/metadata.name: "test-migration"

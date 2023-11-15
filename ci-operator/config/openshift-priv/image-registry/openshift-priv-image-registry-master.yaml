@@ -1,12 +1,24 @@
 base_images:
   base:
-    name: 4.14-priv
+    name: 4.15-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: hypershift-operator
+  hypershift-tests:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: hypershift-tests
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/image-registry
@@ -14,22 +26,22 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: docker-registry
 promotion:
-  name: 4.14-priv
+  name: 4.15-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.14-priv
+      name: 4.15-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
+      name: 4.15-priv
       namespace: ocp-private
 resources:
   '*':
@@ -82,6 +94,19 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: e2e-hypershift
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
+- as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
 zz_generated_metadata:
   branch: master
   org: openshift-priv

@@ -6,7 +6,7 @@ BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 API_VIP="$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")"
 INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
 
-# Patching the cluster_name again as the one set in the ipi-conf ref is using the ${JOB_NAME_HASH} variable, and
+# Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
 # (e.g., hostname, NFV-related interface names, etc...)
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")

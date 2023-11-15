@@ -4,61 +4,76 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ -z "${CO_SUB_INSTALL_NAMESPACE}" ]]; then
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+if [[ -z "${CLO_SUB_INSTALL_NAMESPACE}" ]]; then
   echo "ERROR: INSTALL_NAMESPACE is not defined"
   exit 1
 fi
 
-if [[ -z "${CO_SUB_PACKAGE}" ]]; then
+if [[ -z "${CLO_PACKAGE}" ]]; then
   echo "ERROR: PACKAGE is not defined"
   exit 1
 fi
 
-if [[ -z "${CO_SUB_CHANNEL}" ]]; then
-  echo "ERROR: CHANNEL is not defined"
+if [[ -z "${CLO_SUB_CHANNEL}" ]]; then
+  echo "ERROR: CLO_SUB_CHANNEL is not defined"
   exit 1
 fi
 
-if [[ "${CO_SUB_TARGET_NAMESPACES}" == "!install" ]]; then
-  CO_SUB_TARGET_NAMESPACES="${CO_SUB_INSTALL_NAMESPACE}"
+if [[ "${CLO_TARGET_NAMESPACES}" == "!install" ]]; then
+  CLO_TARGET_NAMESPACES="${CLO_SUB_INSTALL_NAMESPACE}"
 fi
 
-echo "Installing ${CO_SUB_PACKAGE} from ${CO_SUB_CHANNEL} into ${CO_SUB_INSTALL_NAMESPACE}, targeting ${CO_SUB_TARGET_NAMESPACES}"
+echo "Installing ${CLO_PACKAGE} from ${CLO_SUB_CHANNEL} into ${CLO_SUB_INSTALL_NAMESPACE}, targeting ${CLO_TARGET_NAMESPACES}"
 
 # create the install namespace
 oc apply -f - <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: "${CO_SUB_INSTALL_NAMESPACE}"
+  name: "${CLO_SUB_INSTALL_NAMESPACE}"
   labels:
     openshift.io/cluster-monitoring: "true"
 EOF
 
 # deploy new operator group
-oc apply -f - <<EOF
+if [[ "${CLO_TARGET_NAMESPACES}" == "" ]]; then
+  oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  name: "${CO_SUB_INSTALL_NAMESPACE}"
-  namespace: "${CO_SUB_INSTALL_NAMESPACE}"
+  name: "${CLO_SUB_INSTALL_NAMESPACE}"
+  namespace: "${CLO_SUB_INSTALL_NAMESPACE}"
+spec: {}
+EOF
+else
+  oc apply -f - <<EOF
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: "${CLO_SUB_INSTALL_NAMESPACE}"
+  namespace: "${CLO_SUB_INSTALL_NAMESPACE}"
 spec:
   targetNamespaces:
-  - $(echo \"${CO_SUB_TARGET_NAMESPACES}\" | sed "s|,|\"\n  - \"|g")
+  - $(echo \"${CLO_TARGET_NAMESPACES}\" | sed "s|,|\"\n  - \"|g")
 EOF
+fi
 
 # subscribe to the operator
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  name: "${CO_SUB_PACKAGE}"
-  namespace: "${CO_SUB_INSTALL_NAMESPACE}"
+  name: "${CLO_PACKAGE}"
+  namespace: "${CLO_SUB_INSTALL_NAMESPACE}"
 spec:
-  channel: "${CO_SUB_CHANNEL}"
+  channel: "${CLO_SUB_CHANNEL}"
   installPlanApproval: Automatic
-  name: "${CO_SUB_PACKAGE}"
-  source: "${CO_SUB_SOURCE}"
+  name: "${CLO_PACKAGE}"
+  source: "${CLO_SUB_SOURCE}"
   sourceNamespace: openshift-marketplace
 EOF
 
@@ -69,31 +84,37 @@ RETRIES=30
 CSV=
 for i in $(seq "${RETRIES}"); do
   if [[ -z "${CSV}" ]]; then
-    CSV=$(oc get subscription -n "${CO_SUB_INSTALL_NAMESPACE}" "${CO_SUB_PACKAGE}" -o jsonpath='{.status.installedCSV}')
+    CSV=$(oc get subscription -n "${CLO_SUB_INSTALL_NAMESPACE}" "${CLO_PACKAGE}" -o jsonpath='{.status.installedCSV}')
   fi
 
   if [[ -z "${CSV}" ]]; then
-    echo "Try ${i}/${RETRIES}: can't get the ${CO_SUB_PACKAGE} yet. Checking again in 30 seconds"
+    echo "Try ${i}/${RETRIES}: can't get the ${CLO_PACKAGE} yet. Checking again in 30 seconds"
     sleep 30
   fi
 
-  if [[ $(oc get csv -n ${CO_SUB_INSTALL_NAMESPACE} ${CSV} -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
-    echo "${CO_SUB_PACKAGE} is deployed"
+  if [[ $(oc get csv -n ${CLO_SUB_INSTALL_NAMESPACE} ${CSV} -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
+    echo "${CLO_PACKAGE} is deployed"
     break
   else
-    echo "Try ${i}/${RETRIES}: ${CO_SUB_PACKAGE} is not deployed yet. Checking again in 30 seconds"
+    echo "Try ${i}/${RETRIES}: ${CLO_PACKAGE} is not deployed yet. Checking again in 30 seconds"
     sleep 30
   fi
 done
 
-if [[ $(oc get csv -n "${CO_SUB_INSTALL_NAMESPACE}" "${CSV}" -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
-  echo "Error: Failed to deploy ${CO_SUB_PACKAGE}"
+if [[ $(oc get csv -n "${CLO_SUB_INSTALL_NAMESPACE}" "${CSV}" -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
+  echo "Error: Failed to deploy ${CLO_PACKAGE}"
+  echo "oc get catsrc -n openshift-marketplace"
+  oc get catsrc -n openshift-marketplace
+  echo "oc get pod -n openshift-marketplace"
+  oc get pod -n openshift-marketplace
+  echo "oc describe sub -n ${CLO_SUB_INSTALL_NAMESPACE} ${CLO_PACKAGE}"
+  oc describe sub -n ${CLO_SUB_INSTALL_NAMESPACE} ${CLO_PACKAGE}
   echo "csv ${CSV} YAML"
-  oc get csv "${CSV}" -n "${CO_SUB_INSTALL_NAMESPACE}" -o yaml
+  oc get csv "${CSV}" -n "${CLO_SUB_INSTALL_NAMESPACE}" -o yaml
   echo
   echo "csv ${CSV} Describe"
-  oc describe csv "${CSV}" -n "${CO_SUB_INSTALL_NAMESPACE}"
+  oc describe csv "${CSV}" -n "${CLO_SUB_INSTALL_NAMESPACE}"
   exit 1
 fi
 
-echo "successfully installed ${CO_SUB_PACKAGE}"
+echo "successfully installed ${CLO_PACKAGE}"

@@ -1,24 +1,24 @@
 periodics:
 - agent: kubernetes
-  cluster: build02
+  cluster: build09
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: ci-tools
-  interval: 5m
+  interval: 10m
   labels:
-    ci-operator.openshift.io/cluster: build02
+    ci-operator.openshift.io/cluster: build09
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-ci-tools-master-continuouslint
+  name: periodic-ci-openshift-ci-tools-master-canary-build09
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
-      - --target=continuouslint
+      - --target=canary-build09
       command:
       - ci-operator
       image: ci-operator:latest
@@ -31,6 +31,9 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -39,6 +42,9 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

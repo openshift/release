@@ -139,6 +139,10 @@ function mirror_optional_images () {
     optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
     qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
 
+    openshifttest_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.user')
+    openshifttest_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.password')
+    openshifttest_registry_auth=`echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0`
+
     brew_auth_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
     brew_auth_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
     brew_registry_auth=`echo -n "${brew_auth_user}:${brew_auth_password}" | base64 -w 0`
@@ -156,7 +160,7 @@ function mirror_optional_images () {
     # {"auths":{"ec2-3-92-162-185.compute-1.amazonaws.com:5000":{"auth":"XXXXXXXXXXXXXXXX"}}}
     run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
     if [[ $ret -eq 0 ]]; then 
-        jq --argjson a "{\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}, \"brew.registry.redhat.io\": {\"auth\": \"$brew_registry_auth\"}, \"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
+        jq --argjson a "{\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}, \"brew.registry.redhat.io\": {\"auth\": \"$brew_registry_auth\"}, \"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
     else
         echo "!!! fail to extract the auth of the cluster"
         return 1
@@ -365,9 +369,25 @@ EOF
     marketplace=1
 }
 
+# from OCP 4.15, the OLM is optional, details: https://issues.redhat.com/browse/OCPVE-634
+function check_olm_capability(){
+    # check if OLM capability is added 
+    knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+    if [[ ${knownCaps} =~ "OperatorLifecycleManager" ]]; then
+        echo "knownCapabilities contains OperatorLifecycleManager"
+        # check if OLM capability enabled
+        enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+          if [[ ! ${enabledCaps} =~ "OperatorLifecycleManager" ]]; then
+              echo "OperatorLifecycleManager capability is not enabled, skip the following tests..."
+              exit 0
+          fi
+    fi
+}
+
 set_proxy
 run_command "oc whoami"
 run_command "oc version -o yaml"
+check_olm_capability
 
 # private mirror registry host
 # <public_dns>:<port>

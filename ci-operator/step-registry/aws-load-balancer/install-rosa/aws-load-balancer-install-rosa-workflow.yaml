@@ -9,17 +9,13 @@ workflow:
       DISABLE_WORKLOAD_MONITORING: "false"
       OO_APPLY_RESOURCES: "false"
     pre:
-    - ref: rosa-sts-account-roles-create
-    - ref: rosa-sts-cluster-provision
-    - ref: rosa-conf-idp-htpasswd
-    - ref: rosa-operators-wait-ready
+    - chain: rosa-aws-sts-provision
     - ref: aws-load-balancer-pre-install
     - ref: aws-load-balancer-pre-install-rosa
     - ref: optional-operators-subscribe
     post:
     - ref: aws-load-balancer-must-gather-rosa
     - ref: aws-load-balancer-post-install-rosa
-    - ref: rosa-sts-cluster-deprovision
-    - ref: rosa-sts-account-roles-delete
+    - chain: rosa-aws-sts-deprovision
   documentation: |-
     Installs a ROSA STS cluster on AWS and runs through the pre-requistes of the aws-load-balancer-operator to complete installation.

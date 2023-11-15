@@ -15,6 +15,7 @@ trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
 [ -z "${workers}" ] && { echo "\$workers is not filled. Failing."; exit 1; }
 [ -z "${masters}" ] && { echo "\$masters is not filled. Failing."; exit 1; }
 
+
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
@@ -40,7 +41,38 @@ bmc_password = sys.argv[3]
 iso_path = sys.argv[4]
 transfer_protocol_type = sys.argv[5]
 
-context = redfish.redfish_client(bmc_address, username=bmc_username, password=bmc_password)
+def redfish_mount_remote(context):
+    response = context.post(f"/redfish/v1/Managers/{manager}/VirtualMedia/{removable_disk}/Actions/VirtualMedia.InsertMedia",
+                        body={"Image": iso_path, "TransferProtocolType": transfer_protocol_type,
+                              "Inserted": True, **other_options})
+    print(f"/redfish/v1/Managers/{manager}/VirtualMedia/{removable_disk}/Actions/VirtualMedia.InsertMedia")
+    print({"Image": iso_path, "TransferProtocolType": transfer_protocol_type})
+    imageIsMounted = False
+    print(response.status)
+    print(response.text)
+    if response.status > 299:
+        sys.exit(1)
+    d = {}
+    task = None
+    if response.is_processing:
+        while task is None or (task is not None and
+                            (task.is_processing or not task.dict.get("TaskState") in ("Completed", "Exception"))):
+            task = response.monitor(context)
+            print("Task target: %s" % bmc_address)
+            print("Task is_processing: %s" % task.is_processing)
+            print("Task state: %s " % task.dict.get("TaskState"))
+            print("Task status: %s" % task.status)
+            retry_time = task.retry_after
+            time.sleep(retry_time if retry_time else 5)
+            if (task.dict.get("TaskState") in ("Completed")):
+              imageIsMounted = True
+        if task.status > 299:
+            print()
+            sys.exit(1)
+        print()
+    return imageIsMounted
+
+context = redfish.redfish_client(bmc_address, username=bmc_username, password=bmc_password, max_retry=20)
 context.login(auth=redfish.AuthMethod.BASIC)
 response = context.get("/redfish/v1/Managers/")
 manager = response.dict.get("Members")[0]["@odata.id"].split("/")[-1]
@@ -51,7 +83,7 @@ removable_disk = list(filter((lambda x: x["@odata.id"].find("CD") != -1),
 ### This is for AMI BMCs (currently only the arm64 servers) as they are affected by a bug that prevents the ISOs to be mounted/umounted
 ### correctly. The workaround is to reset the redfish internal redis database and make it populate again from the BMC.
 if manager == "Self":
-  print("Reset BMC's redfish database...")
+  print(f"Reset {bmc_address} BMC's redfish database...")
   try:
     response = context.post(f"/redfish/v1/Managers/{manager}/Actions/Oem/AMIManager.RedfishDBReset/",
                             body={"RedfishDBResetType": "ResetAll"})
@@ -71,8 +103,6 @@ if manager == "Self":
 print("Eject virtual media, if any...")
 response = context.post(
     f"/redfish/v1/Managers/{manager}/VirtualMedia/{removable_disk}/Actions/VirtualMedia.EjectMedia", body={})
-print(response.__dict__)
-print(response.status)
 print(response.text)
 time.sleep(30)
 print("Insert new virtual media...")
@@ -81,35 +111,21 @@ other_options = {}
 if transfer_protocol_type == "CIFS":
   other_options = {"UserName": "root", "Password": bmc_password}
 
-response = context.post(f"/redfish/v1/Managers/{manager}/VirtualMedia/{removable_disk}/Actions/VirtualMedia.InsertMedia",
-                        body={"Image": iso_path, "TransferProtocolType": transfer_protocol_type,
-                              "Inserted": True, **other_options})
+retry_counter = 0
+max_retries = 6
+imageIsMounted = False
 
-print(f"/redfish/v1/Managers/{manager}/VirtualMedia/{removable_disk}/Actions/VirtualMedia.InsertMedia")
-print({"Image": iso_path, "TransferProtocolType": transfer_protocol_type})
+while retry_counter < max_retries and not imageIsMounted:
+  imageIsMounted = redfish_mount_remote(context)
+  retry_counter=retry_counter+1
 
-print(response.__dict__)
-print(response.status)
-print(response.text)
-if response.status > 299:
-    sys.exit(1)
-d = {}
-task = None
-if response.is_processing:
-    while task is None or (task is not None and
-                           (task.is_processing or not task.dict.get("TaskState") in ("Completed", "Exception"))):
-        task = response.monitor(context)
-        print("Task is_processing: %s" % task.is_processing)
-        print("Task state: %s %s" % (
-            task.dict.get("TaskState"), task.dict.get("TaskState") in ("Completed", "Exception")))
-        print("Task status: %s" % task.status)
-        print("Task dict: %s" % task.dict)
-        retry_time = task.retry_after
-        time.sleep(retry_time if retry_time else 5)
-    if task.status > 299:
-        print()
-        sys.exit(1)
-    print()
+print(f"Logging out of {bmc_address}")
+context.logout()
+
+if not imageIsMounted:
+  print("Max retries, failing")
+  sys.exit(1)
+
 
 EOF
   local ret=$?
@@ -137,12 +153,14 @@ function reset_host() {
   local bmc_user="${2}"
   local bmc_pass="${3}"
   local vendor="${4:-ampere}"
+  ipmi_boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && echo force_pxe || echo force_cdrom)
+  sushy_boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && echo PXE || echo VCD-DVD)
   echo "Resetting the host ${bmc_address}..."
   case "${vendor}" in
     ampere)
       ipmitool -I lanplus -H "$bmc_address" \
         -U "$bmc_user" -P "$bmc_pass" \
-        chassis bootparam set bootflag "force_cdrom" options=PEF,watchdog,reset,power
+        chassis bootparam set bootflag "$ipmi_boot_selection" options=PEF,watchdog,reset,power
     ;;
     dell)
       # this is how sushy does it
@@ -152,7 +170,7 @@ function reset_host() {
          '{"ShareParameters":{"Target":"ALL"},"ImportBuffer":
             "<SystemConfiguration><Component FQDD=\"iDRAC.Embedded.1\">
             <Attribute Name=\"ServerBoot.1#BootOnce\">Enabled</Attribute>
-            <Attribute Name=\"ServerBoot.1#FirstBootDevice\">VCD-DVD</Attribute>
+            <Attribute Name=\"ServerBoot.1#FirstBootDevice\">'"$sushy_boot_selection"'</Attribute>
             </Component></SystemConfiguration>"}'
     ;;
     *)
@@ -203,11 +221,14 @@ echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
 oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
    --command=openshift-install --to=/tmp
 
-if [ "${DISCONNECTED}" == "true" ]; then
+# We change the payload image to the one in the mirror registry only when the mirroring happens.
+# For example, in the case of clusters using cluster-wide proxy, the mirroring is not required.
+# To avoid additional params in the workflows definition, we check the existence of the ICSP patch file.
+if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-icsp.yaml.patch" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 fi
 
-# Patching the cluster_name again as the one set in the ipi-conf ref is using the ${JOB_NAME_HASH} variable, and
+# Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
 # (e.g., hostname, NFV-related interface names, etc...)
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
@@ -240,6 +261,17 @@ compute:
 fi
 
 if [ "${masters}" -gt 1 ]; then
+  if [ "${AGENT_PLATFORM_TYPE}" = "none" ]; then
+  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
+compute:
+- architecture: ${architecture}
+  hyperthreading: Enabled
+  name: worker
+  replicas: ${workers}
+platform:
+  none: {}
+"
+  else
   yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
 compute:
 - architecture: ${architecture}
@@ -253,6 +285,7 @@ platform:
     ingressVIPs:
     - ${INGRESS_VIP}
 "
+  fi
 fi
 
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
@@ -286,19 +319,39 @@ case "${BOOT_MODE}" in
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the ISO image into the bastion host..."
   scp "${SSHOPTS[@]}" "${INSTALL_DIR}/agent.$gnu_arch.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.${gnu_arch}.iso"
+  echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
+  # shellcheck disable=SC2154
+  for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+    # shellcheck disable=SC1090
+    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+    if [ "${transfer_protocol_type}" == "cifs" ]; then
+      IP_ADDRESS="$(dig +short "${AUX_HOST}")"
+      iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.${arch}.iso"
+    else
+      # Assuming HTTP or HTTPS
+      iso_path="${transfer_protocol_type}://${AUX_HOST}/${CLUSTER_NAME}.${arch}.iso"
+    fi
+    mount_virtual_media "${bmc_address}" "${redfish_user}" "${redfish_password}" \
+      "${iso_path}" "${transfer_protocol_type}" &
+  done
+
+  wait
+  if [ -f /tmp/virtual_media_mount_failed ]; then
+    echo "Failed to mount the ISO image in one or more hosts"
+    exit 1
+  fi
 ;;
 "pxe")
-  ### TODO: dropped support but keeping here as it might be useful soon
   ### Create pxe files
   echo -e "\nCreating PXE files..."
   oinst agent create pxe-files
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the PXE files into the bastion host..."
-  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/pxe/agent-vmlinuz* \
-    "root@${AUX_HOST}:/opt/tftpboot/${CLUSTER_NAME}/vmlinux_${gnu_arch}"
-  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/pxe/agent-initrd* \
+  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/boot-artifacts/agent.*-vmlinuz* \
+    "root@${AUX_HOST}:/opt/tftpboot/${CLUSTER_NAME}/vmlinuz_${gnu_arch}"
+  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/boot-artifacts/agent.*-initrd* \
     "root@${AUX_HOST}:/opt/tftpboot/${CLUSTER_NAME}/initramfs_${gnu_arch}.img"
-  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/pxe/agent-rootfs* \
+  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/boot-artifacts/agent.*-rootfs* \
     "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/rootfs-${gnu_arch}.img"
 ;;
 *)
@@ -311,31 +364,6 @@ export KUBECONFIG="$INSTALL_DIR/auth/kubeconfig"
 echo -e "\nPreparing files for next steps in SHARED_DIR..."
 cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
-
-### Mount the image in the hosts via virtual media
-### We cannot mount the ISO image before it gets created. Therefore, despite the increased complexity of this step,
-### we need to do it here
-echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
-# shellcheck disable=SC2154
-for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
-  # shellcheck disable=SC1090
-  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  if [ "${transfer_protocol_type}" == "cifs" ]; then
-    IP_ADDRESS="$(dig +short "${AUX_HOST}")"
-    iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.${arch}.iso"
-  else
-    # Assuming HTTP or HTTPS
-    iso_path="${transfer_protocol_type}://${AUX_HOST}/${CLUSTER_NAME}.${arch}.iso"
-  fi
-  mount_virtual_media "${bmc_address}" "${redfish_user}" "${redfish_password}" \
-   "${iso_path}" "${transfer_protocol_type}" &
-done
-
-wait
-if [ -f /tmp/virtual_media_mount_failed ]; then
-  echo "Failed to mount the ISO image in one or more hosts"
-  exit 1
-fi
 
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do

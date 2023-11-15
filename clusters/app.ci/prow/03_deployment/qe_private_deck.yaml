@@ -72,7 +72,44 @@ objects:
             component: qe-private-deck
         spec:
           serviceAccountName: qe-private-deck
+          initContainers:
+          - name: git-sync-init
+            command:
+            - /git-sync
+            args:
+            - --repo=https://github.com/openshift/release.git
+            - --branch=master
+            - --root=/tmp/git-sync
+            - --one-time=true
+            - --depth=1
+            env:
+            - name: GIT_SYNC_DEST
+              value: release
+            image: registry.k8s.io/git-sync/git-sync:v3.6.2
+            volumeMounts:
+            - name: release
+              mountPath: /tmp/git-sync
           containers:
+            - name: git-sync
+              command:
+              - /git-sync
+              args:
+              - --repo=https://github.com/openshift/release.git
+              - --branch=master
+              - --wait=30
+              - --root=/tmp/git-sync
+              - --max-sync-failures=3
+              env:
+              - name: GIT_SYNC_DEST
+                value: release
+              image: registry.k8s.io/git-sync/git-sync:v3.6.2
+              volumeMounts:
+              - name: release
+                mountPath: /tmp/git-sync
+              resources:
+                requests:
+                  memory: "1Gi"
+                  cpu: "0.5"
             - name: oauth-proxy
               image: quay.io/openshift/origin-oauth-proxy:4.9
               imagePullPolicy: IfNotPresent
@@ -101,7 +138,7 @@ objects:
                 - mountPath: /etc/proxy/secrets
                   name: session-secret
             - name: deck
-              image: gcr.io/k8s-prow/deck:v20230510-91962c0408
+              image: gcr.io/k8s-prow/deck:v20231107-c87e01249e
               args:
                 - --github-oauth-config-file=/etc/oauth/config.json
                 - --github-app-id=$(GITHUB_APP_ID)
@@ -112,7 +149,7 @@ objects:
                 - --oauth-url=/github-login
                 - --config-path=/etc/config/config.yaml
                 - --supplemental-prow-config-dir=/etc/config
-                - --job-config-path=/etc/job-config
+                - --job-config-path=/var/repo/release/ci-operator/jobs
                 - --tide-url=http://tide/
                 - --hook-url=http://hook:8888/plugin-help
                 - --spyglass=true
@@ -125,6 +162,7 @@ objects:
                 - --kubeconfig-dir=/etc/build-farm-credentials
                 - --kubeconfig-suffix=config
                 - --tenant-id=qe-private
+                - --tenant-id=gangway-api
               env:
               - name: GITHUB_APP_ID
                 valueFrom:
@@ -172,72 +210,8 @@ objects:
                 - name: oauth-config
                   mountPath: /etc/oauth
                   readOnly: true
-                - name: job-config-misc
-                  mountPath: /etc/job-config/misc
-                  readOnly: true
-                - name: job-config-master-periodics
-                  mountPath: /etc/job-config/master-periodics
-                  readOnly: true
-                - name: job-config-master-postsubmits
-                  mountPath: /etc/job-config/master-postsubmits
-                  readOnly: true
-                - name: job-config-master-presubmits
-                  mountPath: /etc/job-config/master-presubmits
-                  readOnly: true
-                - name: job-config-1x
-                  mountPath: /etc/job-config/1.x
-                  readOnly: true
-                - name: job-config-2x
-                  mountPath: /etc/job-config/2.x
-                  readOnly: true
-                - name: job-config-3x
-                  mountPath: /etc/job-config/3.x
-                  readOnly: true
-                - name: job-config-40
-                  mountPath: /etc/job-config/4.0
-                  readOnly: true
-                - name: job-config-41
-                  mountPath: /etc/job-config/4.1
-                  readOnly: true
-                - name: job-config-42
-                  mountPath: /etc/job-config/4.2
-                  readOnly: true
-                - name: job-config-43
-                  mountPath: /etc/job-config/4.3
-                  readOnly: true
-                - name: job-config-44
-                  mountPath: /etc/job-config/4.4
-                  readOnly: true
-                - name: job-config-45
-                  mountPath: /etc/job-config/4.5
-                  readOnly: true
-                - name: job-config-46
-                  mountPath: /etc/job-config/4.6
-                  readOnly: true
-                - name: job-config-47
-                  mountPath: /etc/job-config/4.7
-                  readOnly: true
-                - name: job-config-48
-                  mountPath: /etc/job-config/4.8
-                  readOnly: true
-                - name: job-config-49
-                  mountPath: /etc/job-config/4.9
-                  readOnly: true
-                - name: job-config-410
-                  mountPath: /etc/job-config/4.10
-                  readOnly: true
-                - name: job-config-411
-                  mountPath: /etc/job-config/4.11
-                  readOnly: true
-                - name: job-config-412
-                  mountPath: /etc/job-config/4.12
-                  readOnly: true
-                - name: job-config-413
-                  mountPath: /etc/job-config/4.13
-                  readOnly: true
-                - name: job-config-414
-                  mountPath: /etc/job-config/4.14
-                  readOnly: true
+                - name: release
+                  mountPath: /var/repo
                 - mountPath: /etc/build-farm-credentials
                   name: build-farm-credentials
                   readOnly: true
@@ -275,75 +249,8 @@ objects:
             - name: qe-private-deck-tls
               secret:
                 secretName: qe-private-deck-tls
-            - name: job-config-misc
-              configMap:
-                name: job-config-misc
-            - name: job-config-master-periodics
-              configMap:
-                name: job-config-master-periodics
-            - name: job-config-master-postsubmits
-              configMap:
-                name: job-config-master-postsubmits
-            - name: job-config-master-presubmits
-              configMap:
-                name: job-config-master-presubmits
-            - name: job-config-1x
-              configMap:
-                name: job-config-1.x
-            - name: job-config-2x
-              configMap:
-                name: job-config-2.x
-            - name: job-config-3x
-              configMap:
-                name: job-config-3.x
-            - name: job-config-40
-              configMap:
-                name: job-config-4.0
-            - name: job-config-41
-              configMap:
-                name: job-config-4.1
-            - name: job-config-42
-              configMap:
-                name: job-config-4.2
-            - name: job-config-43
-              configMap:
-                name: job-config-4.3
-            - name: job-config-44
-              configMap:
-                name: job-config-4.4
-            - name: job-config-45
-              configMap:
-                name: job-config-4.5
-            - name: job-config-46
-              configMap:
-                name: job-config-4.6
-            - name: job-config-47
-              configMap:
-                name: job-config-4.7
-            - name: job-config-48
-              configMap:
-                name: job-config-4.8
-            - name: job-config-49
-              configMap:
-                name: job-config-4.9
-            - name: job-config-410
-              configMap:
-                name: job-config-4.10
-            - name: job-config-411
-              configMap:
-                name: job-config-4.11
-            - name: job-config-412
-              configMap:
-                name: job-config-4.12
-            - name: job-config-413
-              configMap:
-                name: job-config-4.13
-            - name: job-config-414
-              configMap:
-                name: job-config-4.14
-            - name: job-config-415
-              configMap:
-                name: job-config-4.15
+            - name: release
+              emptyDir: {}
             - name: build-farm-credentials
               secret:
                 secretName: deck
