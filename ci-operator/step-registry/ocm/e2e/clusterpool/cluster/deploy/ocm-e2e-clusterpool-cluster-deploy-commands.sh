@@ -144,6 +144,7 @@ git config --global credential.helper 'store --file=ghcreds'
 
 # Set up repo URLs.
 pipeline_url="https://${PIPELINE_REPO}.git"
+backplane_pipeline_url="https://${BACKPLANE_PIPELINE_REPO}.git"
 release_url="https://${RELEASE_REPO}.git"
 deploy_url="https://${DEPLOY_REPO}.git"
 component_url="https://${COMPONENT_REPO}.git"
@@ -181,6 +182,37 @@ fi
 release=${release#${PRODUCT_PREFIX}-}
 
 PIPELINE_STAGE=${PIPELINE_STAGE:-"dev"}
+
+if [[ -n "$BACKPLANE_PIPELINE_REPO" ]]; then
+    log "BACKPLANE_PIPELINE_REPO is set to $BACKPLANE_PIPELINE_REPO"
+    # Get backplane pipeline branch.
+    mce_release=$(awk -v num="$release" 'BEGIN {print num - 0.5}')
+    # hardcode the integration branch here since the x.y-dev branch snapshot is empty
+    backplane_pipeline_branch="${mce_release}-integration"
+
+    # Clone backplane pipeline repo.
+    log "Cloning backplane pipeline repo at branch $backplane_pipeline_branch"
+    backplane_pipeline_dir="${ocm_dir}/backplane-pipeline"
+    git clone -b "$backplane_pipeline_branch" "$backplane_pipeline_url" "$backplane_pipeline_dir" || {
+        log "ERROR Could not clone branch $backplane_pipeline_branch from pipeline repo $backplane_pipeline_url"
+        exit 1
+    }
+
+    # Get latest snapshot.
+    log "Getting latest backplane snapshot for $backplane_pipeline_branch"
+    backplane_snapshot_dir="$backplane_pipeline_dir/snapshots"
+    cd "$backplane_snapshot_dir" || exit 1
+    backplane_manifest_file=$(find . -maxdepth 1 -name 'manifest-*' | sort | tail -n 1)
+    backplane_manifest_file="${backplane_manifest_file#./}"
+    if [[ -z "$backplane_manifest_file" ]]; then
+        log "ERROR no manifest file found in backplane-pipeline/snapshots"
+        log "Contents of backplane-pipeline/snapshots"
+        ls "$backplane_snapshot_dir" > >(tee -a "$log_file")
+        exit 1
+    fi
+
+    log "Using backplane manifest file name: $backplane_manifest_file"
+fi
 
 # Get pipeline branch.
 pipeline_branch="${release}-${PIPELINE_STAGE}"
@@ -262,10 +294,21 @@ if [[ "$SKIP_COMPONENT_INSTALL" == "false" ]]; then
     image_name_query=".[] | select(.[\"image-name\"]==\"${COMPONENT_NAME}\")"
     IMAGE_NAME=$(jq -r "$image_name_query" "$snapshot_dir/$manifest_file" 2> >(tee -a "$log_file"))
     if [[ -z "$IMAGE_NAME" ]]; then
-        log "ERROR Could not find image $COMPONENT_NAME in manifest $manifest_file"
-        log "Contents of manifest $manifest_file"
-        cat "$manifest_file" > >(tee -a "$log_file")
-        exit 1
+        if [[ -z "$BACKPLANE_PIPELINE_REPO" ]]; then
+          log "ERROR Could not find image $COMPONENT_NAME in manifest $manifest_file"
+          log "Contents of manifest $manifest_file"
+          cat "$manifest_file" > >(tee -a "$log_file")
+          exit 1
+        fi
+
+        log "BACKPLANE_PIPELINE_REPO is set, try to get image from backplane manifest"
+        IMAGE_NAME=$(jq -r "$image_name_query" "$backplane_snapshot_dir/$backplane_manifest_file" 2> >(tee -a "$log_file"))
+        if [[ -z "$IMAGE_NAME" ]]; then
+            log "ERROR Could not find image $COMPONENT_NAME in manifest $backplane_manifest_file"
+            log "Contents of manifest $backplane_manifest_file"
+            cat "$backplane_manifest_file" > >(tee -a "$log_file")
+            exit 1
+        fi
     fi
     IMAGE_NAME="$COMPONENT_NAME"
     log ">>> Using IMAGE_NAME: $IMAGE_NAME"
@@ -284,6 +327,7 @@ fi
 QUAY_TOKEN=$(cat "$QUAY_TOKEN_FILE")
 
 # Set up additional deploy variables
+MCE_NAMESPACE=multicluster-engine
 NAMESPACE=open-cluster-management
 CATALOG_NAMESPACE=openshift-marketplace
 OPERATOR_DIR=acm-operator
@@ -673,7 +717,7 @@ deploy() {
             echo "ERROR_UPDATE_CSV" > "$_status"
             return 1
         }
-    
+
         # Wait for ClusterServiceVersion
         logf "$_log" "Deploy $_cluster: Waiting up to 10 minutes for CSV"
         echo "WAIT_CSV_2" > "${_status}"
@@ -683,34 +727,34 @@ deploy() {
             # Wait for _step seconds, including first iteration
             sleep $_step
             _elapsed=$(( _elapsed + _step ))
-    
+
             # Check timeout
             if (( _elapsed > _timeout )); then
                     logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for CSV"
                     echo "ERROR WAIT_CSV_2" > "${_status}"
                     return 1
             fi
-    
+
             # Get CSV name
             KUBECONFIG="$_kc" oc -n $NAMESPACE get csv -o name > csv_name 2> >(tee -a "$_log") || {
                 logf "$_log" "WARN Deploy $_cluster: Error getting CSV name. Will retry (${_elapsed}/${_timeout}s)"
                 continue
             }
-    
+
             # Check that CSV name isn't empty
             _csv_name=$(cat csv_name)
             if [[ -z "$_csv_name" ]]; then
                 logf "$_log" "WARN Deploy $_cluster: CSV not created yet. Will retry (${_elapsed}/${_timeout}s)"
                 continue
             fi
-    
+
             # Get CSV status
             KUBECONFIG="$_kc" oc -n $NAMESPACE get "$_csv_name" \
                 -o json > csv.json 2> >(tee -a "$_log") || {
                 logf "$_log" "WARN Deploy $_cluster: Error getting CSV status. Will retry (${_elapsed}/${_timeout}s)"
                 continue
             }
-    
+
             # Check CSV status
             _csv_status=$(jq -r .status.phase csv.json 2> >(tee -a "$_log"))
             case "$_csv_status" in
@@ -729,9 +773,10 @@ deploy() {
                     break
                     ;;
             esac
-    
+
             logf "$_log" "WARN Deploy $_cluster: Current CSV status is $_csv_status. Will retry (${_elapsed}/${_timeout}s)"
         done
+
     else
         logf "$_log" "Deploy $_cluster: Skipping updating CSV as we're not installing a dev component"
     fi
@@ -765,6 +810,149 @@ deploy() {
 
         logf "$_log" "WARN Deploy $_cluster: Unable to apply YAML files from MCH directory. Will retry (${_elapsed}/${_timeout}s)"
     done
+
+    # Wait for MCE ClusterServiceVersion
+    logf "$_log" "Deploy $_cluster: Waiting up to 10 minutes for MCE CSV"
+    echo "WAIT_MCE_CSV_1" > "${_status}"
+    local _timeout=600 _elapsed='' _step=15
+    local _mce_csv_name='' _mce_csv_status=''
+    # Wait for MCE csv after the MCH CR is applied
+    while true; do
+        # Wait for _step seconds, except for first iteration.
+        if [[ -z "$_elapsed" ]]; then
+            _elapsed=0
+        else
+            sleep $_step
+            _elapsed=$(( _elapsed + _step ))
+        fi
+
+        # Check timeout
+        if (( _elapsed > _timeout )); then
+                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for MCE CSV"
+                echo "ERROR WAIT_MCE_CSV_1" > "${_status}"
+                return 1
+        fi
+
+        # Get MCE CSV name
+        KUBECONFIG="$_kc" oc -n $MCE_NAMESPACE get csv -o name > csv_name 2> >(tee -a "$_log") || {
+            logf "$_log" "WARN Deploy $_cluster: Error getting MCE CSV name. Will retry (${_elapsed}/${_timeout}s)"
+            continue
+        }
+
+        # Check that MCE CSV name isn't empty
+        _mce_csv_name=$(cat csv_name)
+        if [[ -z "$_mce_csv_name" ]]; then
+            logf "$_log" "WARN Deploy $_cluster: MCE CSV not created yet. Will retry (${_elapsed}/${_timeout}s)"
+            continue
+        fi
+
+        # Get MCE CSV status
+        KUBECONFIG="$_kc" oc -n $MCE_NAMESPACE get "$_mce_csv_name" \
+            -o json > mce_csv.json 2> >(tee -a "$_log") || {
+            logf "$_log" "WARN Deploy $_cluster: Error getting MCE CSV status. Will retry (${_elapsed}/${_timeout}s)"
+            continue
+        }
+
+        # Check MCE CSV status
+        _mce_csv_status=$(jq -r .status.phase mce_csv.json 2> >(tee -a "$_log"))
+        case "$_mce_csv_status" in
+            Failed)
+                logf "$_log" "ERROR Deploy $_cluster: Error MCE CSV install failed after ${_elapsed}s"
+                local _msg
+                _msg=$(jq -r .status.message mce_csv.json 2> >(tee -a "$_log"))
+                logf "$_log" "ERROR Deploy $_cluster: Error message: $_msg"
+                logf "$_log" "ERROR Deploy $_cluster: Full MCE CSV"
+                jq . mce_csv.json > >(tee -a "$_log") 2>&1
+                echo "ERROR WAIT_MCE_CSV_1" > "$_status"
+                return 1
+                ;;
+            Succeeded)
+                logf "$_log" "Deploy $_cluster: MCE CSV is ready after ${_elapsed}s"
+                break
+                ;;
+        esac
+
+        logf "$_log" "WARN Deploy $_cluster: Current MCE CSV status is $_mce_csv_status. Will retry (${_elapsed}/${_timeout}s)"
+    done
+
+    # Check if we're installing a mce dev component
+    if [[ "$SKIP_COMPONENT_INSTALL" == "false" ]]; then
+        # Update MCE CSV
+        logf "$_log" "Deploy $_cluster: Updating MCE CSV"
+        echo "UPDATE_MCE_CSV" > "${_status}"
+        # Rewrite MCE CSV. CSV contents are in mce_csv.json
+        sed -E "s,$IMAGE_QUERY,$COMPONENT_IMAGE_REF," mce_csv.json > mce_csv_update.json 2> >(tee -a "$_log")
+        jq 'del(.metadata.uid) | del(.metadata.resourceVersion)' mce_csv_update.json > mce_csv_clean.json 2> >(tee -a "$_log")
+        # Replace MCE CSV on cluster
+        KUBECONFIG="$_kc" oc -n $MCE_NAMESPACE replace -f mce_csv_clean.json > >(tee -a "$_log") 2>&1 || {
+            logf "$_log" "ERROR Deploy $_cluster: Failed to update MCE CSV."
+            logf "$_log" "ERROR Deploy $_cluster: New MCE CSV contents"
+            jq . mce_csv_clean.json > >(tee -a "$_log") 2>&1
+            echo "ERROR_UPDATE_MCE_CSV" > "$_status"
+            return 1
+        }
+
+        # Wait for MCE ClusterServiceVersion
+        logf "$_log" "Deploy $_cluster: Waiting up to 10 minutes for MCE CSV"
+        echo "WAIT_MCE_CSV_2" > "${_status}"
+        local _timeout=600 _elapsed=0 _step=15
+        local _mce_csv_name='' _mce_csv_status=''
+        while true; do
+            # Wait for _step seconds, including first iteration
+            sleep $_step
+            _elapsed=$(( _elapsed + _step ))
+    
+            # Check timeout
+            if (( _elapsed > _timeout )); then
+                    logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for MCE CSV"
+                    echo "ERROR WAIT_MCE_CSV_2" > "${_status}"
+                    return 1
+            fi
+    
+            # Get CSV name
+            KUBECONFIG="$_kc" oc -n $MCE_NAMESPACE get csv -o name > mce_csv_name 2> >(tee -a "$_log") || {
+                logf "$_log" "WARN Deploy $_cluster: Error getting MCE CSV name. Will retry (${_elapsed}/${_timeout}s)"
+                continue
+            }
+    
+            # Check that CSV name isn't empty
+            _mce_csv_name=$(cat mce_csv_name)
+            if [[ -z "$_mce_csv_name" ]]; then
+                logf "$_log" "WARN Deploy $_cluster: MCE CSV not created yet. Will retry (${_elapsed}/${_timeout}s)"
+                continue
+            fi
+    
+            # Get MCE CSV status
+            KUBECONFIG="$_kc" oc -n $MCE_NAMESPACE get "$_mce_csv_name" \
+                -o json > mce_csv.json 2> >(tee -a "$_log") || {
+                logf "$_log" "WARN Deploy $_cluster: Error getting MCE CSV status. Will retry (${_elapsed}/${_timeout}s)"
+                continue
+            }
+    
+            # Check MCE CSV status
+            _mce_csv_status=$(jq -r .status.phase mce_csv.json 2> >(tee -a "$_log"))
+            case "$_mce_csv_status" in
+                Failed)
+                    logf "$_log" "ERROR Deploy $_cluster: Error MCE CSV install failed after ${_elapsed}s"
+                    local _msg
+                    _msg=$(jq -r .status.message mce_csv.json 2> >(tee -a "$_log"))
+                    logf "$_log" "ERROR Deploy $_cluster: Error message: $_msg"
+                    logf "$_log" "ERROR Deploy $_cluster: Full MCE CSV"
+                    jq . mce_csv.json > >(tee -a "$_log") 2>&1
+                    echo "ERROR WAIT_MCE_CSV_2" > "$_status"
+                    return 1
+                    ;;
+                Succeeded)
+                    logf "$_log" "Deploy $_cluster: MCE CSV is ready after ${_elapsed}s"
+                    break
+                    ;;
+            esac
+    
+            logf "$_log" "WARN Deploy $_cluster: Current CSV status is $_mce_csv_status. Will retry (${_elapsed}/${_timeout}s)"
+        done
+    else
+        logf "$_log" "Deploy $_cluster: Skipping updating MCE CSV as we're not installing a dev component"
+    fi
 
     # Wait for MultiClusterHub CR to be ready
     logf "$_log" "Deploy $_cluster: Waiting up to 15 minutes for MCH CR"
