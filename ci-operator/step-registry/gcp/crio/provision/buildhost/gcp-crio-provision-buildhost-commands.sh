@@ -97,7 +97,7 @@ server_name="${CLUSTER_NAME}-buildhost"
 MACHINE_TYPE="n2-standard-8"
 gcloud compute instances create "${server_name}" \
   ${IMAGE_ARGS} \
-  --image-project=openshift-gce-devel-ci \
+  --image-project=openshift-gce-devel-ci-3 \
   --boot-disk-type pd-ssd \
   --boot-disk-size=200GB \
   --machine-type=${MACHINE_TYPE} \
