@@ -4,12 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+#
+# Multi-layer step used in presubmits to copy artifacts from build image
+# to be used in the later steps.
+#
+
 TEMPLATE_SRC_LOCAL=/var/lib/openshift-install/upi/aws/cloudformation
+TEMPLATES=()
+TEMPLATES+=( "01_vpc.yaml" )
+TEMPLATES+=( "01.99_net_local-zone.yaml" )
 
-TEMPLATE_STACK_VPC="01_vpc.yaml"
-TEMPLATE_STACK_LOCAL_ZONE="01.99_net_local-zone.yaml"
-
-cp -v ${TEMPLATE_SRC_LOCAL}/${TEMPLATE_STACK_VPC} "${SHARED_DIR}"/${TEMPLATE_STACK_VPC} || true
-cp -v ${TEMPLATE_SRC_LOCAL}/${TEMPLATE_STACK_LOCAL_ZONE} "${SHARED_DIR}"/${TEMPLATE_STACK_LOCAL_ZONE} || true
-
-ls -la "${SHARED_DIR}"
+for TEMPLATE in "${TEMPLATES[@]}"; do
+    cp -v "${TEMPLATE_SRC_LOCAL}/${TEMPLATE}" "${SHARED_DIR}/${TEMPLATE}" || true
+done

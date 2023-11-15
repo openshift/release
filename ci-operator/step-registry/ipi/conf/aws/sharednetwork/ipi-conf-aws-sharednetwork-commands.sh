@@ -6,13 +6,10 @@ set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-ls -la "${SHARED_DIR}"
-
 declare -x STACK_NAME_VPC
 declare -x STACK_NAME_LOCALZONE
 
 TEMPLATE_SRC_REPO=https://raw.githubusercontent.com/openshift/installer/master/upi/aws/cloudformation
-
 TEMPLATE_STACK_VPC="01_vpc.yaml"
 TEMPLATE_STACK_LOCALZONE="01.99_net_local-zone.yaml"
 
@@ -28,6 +25,7 @@ CLUSTER_NAME="$(yq-go r "${CONFIG}" 'metadata.name')"
 
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
+# add_param_to_json Insert a parameter (Key/Value) in the CloudFormation Template parameter file.
 function add_param_to_json() {
     local k="$1"
     local v="$2"
@@ -38,9 +36,14 @@ function add_param_to_json() {
     cat <<< "$(jq  --arg k "$k" --arg v "$v" '. += [{"ParameterKey":$k, "ParameterValue":$v}]' "$param_json")" > "$param_json"
 }
 
+# get_template check if template file is present in the multi-layer step*, otherwise
+# download it directly from installer repository.
+# *multi-layer step is added in presubmit jobs, the templates are copyed in the step
+# ipi-conf-aws-sharednetwork-pull.
 function get_template() {
-  local template_file=$1; shift
+  local template_file=$1
   local template=${SHARED_DIR}/$template_file
+
   if [[ -f ${template} ]]; then
     echo "Using CloudFormation template from image. Path: ${template}"
   else
@@ -49,6 +52,7 @@ function get_template() {
   fi
 }
 
+# wait_for_stack waits for the CloudFormation stack to be created.
 function wait_for_stack() {
   stack_name=$1
 
@@ -64,17 +68,18 @@ function wait_for_stack() {
     echo "Collecting stack events before failing:"
     aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" \
       | jq -c '.StackEvents[] | select(.ResourceStatus | contains("CREATE_FAILED","ROLLBACK_IN_PROGRESS")) \
-                | [.Timestamp, .StackName, .ResourceType, .ResourceStatus, .ResourceStatusReason]'
+                | [.Timestamp, .StackName, .ResourceType, .ResourceStatus, .ResourceStatusReason]' || true
     exit 1
   fi
 }
 
+# deploy_stack deploys the CloudFormation stack, waiting the creation.
 function deploy_stack() {
   local stack_name=$1; shift
   local template_name=$1;
   local vars_name="${template_name}.parameters.json"
 
-  get_template "${stack_name}"
+  get_template "${template_name}"
 
   echo "Creating CloudFormation stack ${stack_name} with template $template_name"
   set +e
@@ -92,6 +97,7 @@ function deploy_stack() {
   echo "${stack_name}" >> "${SHARED_DIR}/deprovision_stacks"
 }
 
+# create_stack_vpc trigger the CloudFormation Stack creaion for VPC resources.
 create_stack_vpc() {
   # The above cloudformation template's max zones account is 3
   if [[ "${ZONES_COUNT}" -gt 3 ]]
@@ -105,6 +111,7 @@ create_stack_vpc() {
   deploy_stack "${STACK_NAME_VPC}" "${TEMPLATE_STACK_VPC}"
 }
 
+# create_stack_vpc trigger the CloudFormation Stack creaion for LOcal Zone subnets.
 create_stack_localzones() {
   # Randomly select the Local Zone in the Region (to increase coverage of tested zones added automatically)
   localzone_name=$(< "${SHARED_DIR}"/local-zone-name.txt)
