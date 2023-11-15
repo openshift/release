@@ -18,25 +18,26 @@ dns_reserve_and_defer_cleanup() {
     "ResourceRecords": [{"Value": "'${vips[$idx]}'"}]'
   fi 
 
-  json_create='{
-    "Action": "UPSERT",
-    "ResourceRecordSet": {
-      "Name": '${hostname}',
-      "Type": "A",
-      '$dns_target'
-      }
-    }'
-    jq --argjson json_create "$json_create" '.Changes += [$json_create]' "${SHARED_DIR}"/dns-create.json > "${SHARED_DIR}"/tmp.json && mv "${SHARED_DIR}"/tmp.json "${SHARED_DIR}"/dns-create.json
 
-  json_delete='{
-    "Action": "DELETE",
-    "ResourceRecordSet": {
-      "Name": '${hostname}',
-      "Type": "A",
-      '$dns_target'
-      }
-    }'
-    jq --argjson json_delete "$json_delete" '.Changes += [$json_delete]' "${SHARED_DIR}"/dns-delete.json > "${SHARED_DIR}"/tmp.json && mv "${SHARED_DIR}"/tmp.json "${SHARED_DIR}"/dns-delete.json
+  json_create="{
+    \"Action\": \"UPSERT\",
+    \"ResourceRecordSet\": {
+      \"Name\": \"$hostname\",
+      \"Type\": \"A\",
+      \"$dns_target\"
+    }
+  }"
+  jq --argjson jc "$json_create" '.Changes += [$jc]' "${SHARED_DIR}"/dns-create.json > "${SHARED_DIR}"/tmp.json && mv "${SHARED_DIR}"/tmp.json "${SHARED_DIR}"/dns-create.json
+
+  json_delete="{
+    \"Action\": \"DELETE\",
+    \"ResourceRecordSet\": {
+      \"Name\": \"$hostname\",
+      \"Type\": \"A\",
+      \"dns_target\": \"$dns_target\"
+    }
+  }"
+  jq --argjson jd "$json_delete" '.Changes += [$jd]' "${SHARED_DIR}"/dns-delete.json > "${SHARED_DIR}"/tmp.json && mv "${SHARED_DIR}"/tmp.json "${SHARED_DIR}"/dns-delete.json
 
 }
 
@@ -116,11 +117,11 @@ for cluster in "${vsphere_basedomains_list[@]}"; do
 done
 
 for ((i = 0; i < ${#HOSTNAMES[@]}; i++)); do
+  echo "Adding ${HOSTNAMES[$i]} to batch files"
   dns_reserve_and_defer_cleanup $i ${HOSTNAMES[$i]}  # $i is the index in vips.txt
 done
 # Snowflake for the default api-int, which shares a vip with the default api.
 dns_reserve_and_defer_cleanup 0 "api-int.$cluster_domain"
-
 
 id=$(aws route53 change-resource-record-sets --hosted-zone-id "$hosted_zone_id" --change-batch file:///"${SHARED_DIR}"/dns-create.json --query '"ChangeInfo"."Id"' --output text)
 
