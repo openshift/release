@@ -61,7 +61,13 @@ scp \
     /tmp/microshift.tgz \
     "${INSTANCE_PREFIX}:/tmp"
 
-trap 'scp -r ${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/build-logs ${ARTIFACT_DIR}' EXIT
+finalize() {
+  scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/build-logs" ${ARTIFACT_DIR}
+  scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx_error.log" "${ARTIFACT_DIR}" || true
+  scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx.log" "${ARTIFACT_DIR}" || true
+}
+trap 'finalize' EXIT
+
 # Call wait regardless of the outcome of the kill command, in case some of the children are finished
 # by the time we try to kill them. There is only 1 child now, but this is generic enough to allow N.
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} || true; wait; fi' TERM
