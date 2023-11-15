@@ -3,6 +3,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: base
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.15"
   hypershift-operator:
     name: "4.15"
     namespace: ocp
@@ -92,6 +96,11 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
+  container:
+    from: commitchecker
 zz_generated_metadata:
   branch: release-4.15
   org: openshift
