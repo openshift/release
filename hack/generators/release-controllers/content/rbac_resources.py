@@ -114,7 +114,7 @@ def _release_controller_developers_cluster_role(gendoc):
 def _add_release_controller_developers_cluster_role_bindings(gendoc, namespace):
     gendoc.append({
         'apiVersion': 'rbac.authorization.k8s.io/v1',
-        'kind': 'RoleBinding',
+        'kind': 'ClusterRoleBinding',
         'metadata': {
             'name': 'openshift-release-controller-developers-binding',
             'namespace': namespace,
