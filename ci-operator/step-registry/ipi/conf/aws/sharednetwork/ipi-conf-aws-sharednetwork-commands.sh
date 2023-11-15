@@ -6,9 +6,9 @@ set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-export TEMPLATE_BASE_PATH=/var/lib/openshift-install/upi/aws/cloudformation
-export TEMPLATE_STACK_VPC=${TEMPLATE_BASE_PATH}/01_vpc.yaml
-export TEMPLATE_STACK_LOCAL_ZONE=${TEMPLATE_BASE_PATH}/01.99_net_local-zone.yaml
+export TEMPLATE_BASE_PATH=https://raw.githubusercontent.com/openshift/installer/master/upi/aws/cloudformation
+export TEMPLATE_STACK_VPC="01_vpc.yaml"
+export TEMPLATE_STACK_LOCAL_ZONE="01.99_net_local-zone.yaml"
 
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
@@ -28,11 +28,14 @@ then
   ZONES_COUNT=3
 fi
 
+echo "Downloading VPC CloudFormation template"
+curl -L ${TEMPLATE_BASE_PATH}/${TEMPLATE_STACK_VPC} -o /tmp/${TEMPLATE_STACK_VPC}
+
 echo "Creating VPC CloudFormation stack using template file $TEMPLATE_STACK_VPC"
 STACK_NAME_VPC="${CLUSTER_NAME}-shared-vpc"
 aws --region "${REGION}" cloudformation create-stack \
   --stack-name "${STACK_NAME_VPC}" \
-  --template-body "$(cat ${TEMPLATE_STACK_VPC})" \
+  --template-body "$(cat /tmp/${TEMPLATE_STACK_VPC})" \
   --tags "${TAGS}" \
   --parameters "ParameterKey=AvailabilityZoneCount,ParameterValue=${ZONES_COUNT}" &
 
@@ -51,10 +54,13 @@ subnets=[]
 # save stack information to ${SHARED_DIR} for deprovision step
 echo "${STACK_NAME_VPC}" >> "${SHARED_DIR}/sharednetworkstackname"
 
-vpc_id=$(aws --region $REGION cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="VpcId").OutputValue')
+vpc_id=$(aws --region "$REGION" cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="VpcId").OutputValue')
 echo "$vpc_id" > "${SHARED_DIR}/vpc_id"
 
 if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
+
+  echo "Downloading Local Zone CloudFormation template"
+  curl -L ${TEMPLATE_BASE_PATH}/${TEMPLATE_STACK_LOCAL_ZONE} -o /tmp/${TEMPLATE_STACK_LOCAL_ZONE}
 
   # Randomly select the Local Zone in the Region (to increase coverage of tested zones added automatically)
   localzone_name=$(< "${SHARED_DIR}"/local-zone-name.txt)
@@ -67,7 +73,7 @@ if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
   stack_name_localzone="${CLUSTER_NAME}-${localzone_name}"
   aws --region "${REGION}" cloudformation create-stack \
     --stack-name "${stack_name_localzone}" \
-    --template-body "$(cat ${TEMPLATE_STACK_LOCAL_ZONE})" \
+    --template-body "$(cat /tmp/${TEMPLATE_STACK_LOCAL_ZONE})" \
     --tags "${TAGS}" \
     --parameters \
       ParameterKey=VpcId,ParameterValue="${vpc_id}" \
