@@ -11,35 +11,34 @@ binary_build_commands: make
 build_root:
   from_repository: true
 images:
-- dockerfile_path: config/docker/addon-operator-manager.Dockerfile
+- dockerfile_path: deploy-extras/docker/addon-operator-manager.Dockerfile
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/addon-operator/bin/linux_amd64/addon-operator-manager
   to: addon-operator-manager
-- dockerfile_path: config/docker/addon-operator-webhook.Dockerfile
+- dockerfile_path: deploy-extras/docker/addon-operator-webhook.Dockerfile
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/addon-operator/bin/linux_amd64/addon-operator-webhook
   to: addon-operator-webhook
-- dockerfile_path: config/docker/api-mock.Dockerfile
+- dockerfile_path: deploy-extras/docker/api-mock.Dockerfile
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/addon-operator/bin/linux_amd64/api-mock
   to: api-mock
-- dockerfile_path: config/docker/Dockerfile.src.ci
+- dockerfile_path: deploy-extras/docker/Dockerfile.src.ci
   from: src
   to: addon-operator-tooling
 operator:
   bundles:
   - as: addon-operator-bundle
-    context_dir: config/openshift
-    dockerfile_path: addon-operator-bundle.Dockerfile
+    dockerfile_path: deploy-extras/docker/addon-operator-bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/openshift/addon-operator:latest
     with: addon-operator-manager
@@ -101,7 +100,6 @@ tests:
     dependencies:
       OO_BUNDLE: addon-operator-bundle
     pre:
-    - ref: ipi-install-rbac
     - as: label-infra-nodes
       commands: ./mage test:integrationciprepare
       from: src
@@ -130,6 +128,7 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
+    - ref: ipi-install-rbac
     test:
     - as: test
       cli: latest
