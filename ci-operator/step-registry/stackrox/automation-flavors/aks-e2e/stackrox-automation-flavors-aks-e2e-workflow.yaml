@@ -5,6 +5,10 @@ workflow:
     - ref: stackrox-stackrox-begin
     - as: aks-create
       commands: |
+        if [[ -f "${SHARED_DIR:-}/shared_env" ]]; then
+            # shellcheck disable=SC1091
+            source "${SHARED_DIR:-}/shared_env"
+        fi
         /usr/bin/openshift-ci.sh create aks
       credentials:
       - mount_path: /tmp/vault/stackrox-automation-flavors
@@ -20,6 +24,10 @@ workflow:
     post:
     - as: aks-destroy
       commands: |
+        if [[ -f "${SHARED_DIR:-}/shared_env" ]]; then
+            # shellcheck disable=SC1091
+            source "${SHARED_DIR:-}/shared_env"
+        fi
         /usr/bin/openshift-ci.sh destroy aks
       credentials:
       - mount_path: /tmp/vault/stackrox-automation-flavors
