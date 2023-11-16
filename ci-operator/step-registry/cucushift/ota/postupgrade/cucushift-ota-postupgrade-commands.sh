@@ -21,7 +21,7 @@ function extract_oc(){
 }
 
 # Define the checkpoints/steps needed for the specific case
-function post-ocp-66839(){
+function post-OCP-66839(){
     if [[ "${BASELINE_CAPABILITY_SET}" != "None" ]]; then
         echo "Test Skipped: ${FUNCNAME[0]}"
         return 0
@@ -45,7 +45,30 @@ function post-ocp-66839(){
     return 0
 }
 
-# This func run all test cases with with checkpoints which will not break other cases, 
+function post-OCP-24358(){
+    local pre_proxy_spec="${SHARED_DIR}/OCP-24358_spec_pre.out"
+    local post_proxy_spec="${SHARED_DIR}/OCP-24358_spec_post.out"
+    local ret=0 verified
+
+    oc get proxy -ojson | jq -r '.items[].spec' > "${post_proxy_spec}"
+    if [[ ! -s "${post_proxy_spec}" ]]; then
+        echo "Fail to get proxy spec!"
+        ret=1
+    fi
+    sdiff "${pre_proxy_spec}" "${post_proxy_spec}" || ret=$?
+    if [[ ${ret} != 0 ]]; then
+        echo "cluster proxy spec get changed afer upgrade!"
+    fi
+    verified=$(oc get clusterversion -o json | jq -r '.items[0].status.history[0].verified')
+    if [[ "${verified}" != "true" ]]; then
+        echo "cv.items[0].status.history.verified is ${verified}"
+        ret=1
+    fi
+
+    return $ret
+}
+
+# This func run all test cases with with checkpoints which will not break other cases,
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be ran or not
 function run_ota_multi_test(){
@@ -54,15 +77,23 @@ function run_ota_multi_test(){
 
 # Run single case through case ID
 function run_ota_single_case(){
-    if ! type post-ocp-"${1}" &>/dev/null; then
-        echo "Test Failed: post-ocp-${1} due to no case id found!" >> "${report_file}"
+    if ! type post-"${1}" &>/dev/null; then
+        echo "WARN: no post-${1} function found" >> "${report_file}"
     else
-        post-ocp-"${1}"
-        if [[ $? == 1 ]]; then
-            echo "Test Failed: post-ocp-${1}" >> "${report_file}"
+        echo "------> ${1}"
+        post-"${1}"
+        if [[ $? == 0 ]]; then
+            echo "PASS: post-${1}" >> "${report_file}"
+        else
+            echo "FAIL: post-${1}" >> "${report_file}"
         fi
-    fi 
+    fi
 }
+
+if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
+  exit 0
+fi
+
 report_file="${ARTIFACT_DIR}/ota-test-result.txt"
 export PATH=/tmp:${PATH}
 extract_oc
@@ -75,12 +106,8 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 set +e
-if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
-  exit 0
-elif [[ "${ENABLE_OTA_TEST}" == "true" ]]; then
+if [[ "${ENABLE_OTA_TEST}" == "true" ]]; then
   run_ota_multi_test
 else
   run_ota_single_case ${ENABLE_OTA_TEST}
 fi
-
-
