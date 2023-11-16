@@ -28,9 +28,6 @@ images:
 - dockerfile_path: openshift-kuryr-controller-rhel8.Dockerfile
   from: rpm-os
   to: kuryr-controller
-promotion:
-  name: "4.15"
-  namespace: ocp
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -41,12 +38,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.14"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.14"
       namespace: ocp
 resources:
   '*':
@@ -55,29 +52,6 @@ resources:
       memory: 200Mi
 rpm_build_commands: tools/build-rpm-rhel8.sh 4.14.0
 rpm_build_location: _output/RPMS/noarch
-tests:
-- as: unit
-  commands: HOME=`dirname .` tox -e py3
-  container:
-    from: kuryr-tester
-- as: verify
-  commands: HOME=`dirname .` tox -e pep8
-  container:
-    from: kuryr-tester
-- as: e2e-openstack-kuryr
-  steps:
-    cluster_profile: openstack-vh-mecha-az0
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: Kuryr
-      TEST_SKIPS: NodePort \| session affinity \| Services should be able to change
-        the type from ExternalName to ClusterIP \| Pods should delete a collection
-        of pods \| Kubectl client Guestbook application should create and stop a working
-        application \| Services should serve multiport endpoints from pods \| Services
-        should serve a basic endpoint from pods
-      TEST_SUITE: kubernetes/conformance
-    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: master
   org: openshift
