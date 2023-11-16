@@ -30,7 +30,7 @@ gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 gpgcheck = 1
 EOE
     sudo dnf update -y
-    dnf install -y python3.11
+    sudo dnf install -y python3.11
 
     export GOROOT=/usr/local/go
     echo "GOROOT=\"/usr/local/go\"" | sudo tee -a /etc/environment
