@@ -17,12 +17,10 @@ echo "Printing the current branch of cri-o: $branch"
 
 # Trying to copy the content from /src
 tar -czf - . | ssh "${SSHOPTS[@]}" ${IP} -- "cat > \${HOME}/cri-o.tar.gz"
+echo "Transferring source done"
 
+echo "Running remote setup command"
 timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
-    set -o nounset
-    set -o errexit
-    set -o pipefail
-
     sudo tee /etc/yum.repos.d/redhat-codeready.repo &> /dev/null <<EOE
 [ubi-9-codeready-builder]
 name = Red Hat Universal Base Image 9 (RPMs) - CodeReady Builder
