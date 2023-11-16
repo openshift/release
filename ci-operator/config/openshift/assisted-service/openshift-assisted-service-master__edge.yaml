@@ -152,13 +152,13 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.15"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.15"
   stable-4-10:
     integration:
       name: "4.10"
@@ -825,6 +825,16 @@ tests:
         OPENSHIFT_VERSION=4.14
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-4-15
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.15
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
@@ -832,20 +842,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.13
-        MASTER_MEMORY=17408
-        MASTER_CPU=8
-        WORKER_MEMORY=9216
-        WORKER_CPU=4
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv-4.14
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.13
+        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
         MASTER_MEMORY=17408
         MASTER_CPU=8
         WORKER_MEMORY=9216
@@ -869,16 +867,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.13
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-odf-4-14
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=odf
+        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-mce
@@ -1040,6 +1030,18 @@ tests:
         OPENSHIFT_VERSION=4.13
       PLATFORM: vsphere
     workflow: assisted-vsphere
+- always_run: false
+  as: e2e-vsphere-assisted-4-14
+  optional: true
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.14
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
 - as: e2e-vsphere-assisted-umn
   optional: true
   steps:
@@ -1063,6 +1065,21 @@ tests:
         MAKEFILE_TARGET=test
         DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
         ISO_IMAGE_TYPE=minimal-iso
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
+- as: e2e-nutanix-assisted-4-14
+  cluster: build01
+  optional: true
+  run_if_changed: ^(internal/provider/.*\.go|internal/provider/nutanix/.*|internal/provider/registry/.*)$
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
+        OPENSHIFT_VERSION=4.14
       PLATFORM: nutanix
     workflow: assisted-nutanix
 - as: e2e-nutanix-assisted-2workers
@@ -1099,6 +1116,16 @@ tests:
   run_if_changed: ^(internal/provider/.*\.go|internal/provider/oci/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: oci-assisted
+    workflow: assisted-oci
+- always_run: false
+  as: e2e-oci-assisted-4-14
+  optional: true
+  steps:
+    cluster_profile: oci-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.14
+      PLATFORM: assisted-oci
     workflow: assisted-oci
 zz_generated_metadata:
   branch: master

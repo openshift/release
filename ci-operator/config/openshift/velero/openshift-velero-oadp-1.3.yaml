@@ -1,0 +1,44 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+images:
+- dockerfile_path: Dockerfile.ubi
+  to: velero-oadp-1.3
+- dockerfile_path: Dockerfile-velero-restore-helper.ubi
+  to: velero-restore-helper-oadp-1.3
+promotion:
+  additional_images:
+    velero-oadp-1.3: velero-oadp-1.3
+    velero-restore-helper-oadp-1.3: velero-restore-helper-oadp-1.3
+  name: velero
+  namespace: konveyor
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-test
+  optional: true
+  steps:
+    test:
+    - as: unit
+      commands: make -f Makefile.prow ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: oadp-1.3
+  org: openshift
+  repo: velero

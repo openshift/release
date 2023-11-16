@@ -4,6 +4,7 @@ set -x
 set -o nounset
 set -o errexit
 set -o pipefail
+export PS4='+ $(date "+%T.%N") \011'
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 #Save stacks events
@@ -15,6 +16,13 @@ REGION="${EC2_REGION:-$LEASED_RESOURCE}"
 JOB_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 stack_name="${JOB_NAME}"
 cf_tpl_file="${SHARED_DIR}/${JOB_NAME}-cf-tpl.yaml"
+
+MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
+if [ -f "${MICROSHIFT_CLUSTERBOT_SETTINGS}" ]; then
+  : Overriding step defaults by sourcing clusterbot settings
+  # shellcheck disable=SC1090
+  source "${MICROSHIFT_CLUSTERBOT_SETTINGS}"
+fi
 
 if [[ "${EC2_AMI}" == "" ]]; then
   echo "must supply an AMI to use for EC2 Instance"
@@ -56,9 +64,11 @@ Mappings:
    MetalMachine:
      PrimaryVolumeSize: "300"
      SecondaryVolumeSize: "0"
+     Throughput: 500
    VirtualMachine:
      PrimaryVolumeSize: "200"
      SecondaryVolumeSize: "10"
+     Throughput: 125
 Parameters:
   EC2Type:
     Default: 'VirtualMachine'
@@ -248,10 +258,32 @@ Resources:
         CidrIp: 0.0.0.0/0
       VpcId: !Ref RHELVPC
 
+  rhelLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: ${stack_name}-launch-template
+      LaunchTemplateData:
+        BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, PrimaryVolumeSize]
+            VolumeType: gp3
+            Throughput: !FindInMap [VolumeSize, !Ref EC2Type, Throughput]
+        - !If
+          - AddSecondaryVolume
+          - DeviceName: /dev/sdc
+            Ebs:
+              VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, SecondaryVolumeSize]
+              VolumeType: gp3
+          - !Ref AWS::NoValue
+
   RHELInstance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Ref AmiId
+      LaunchTemplate:
+        LaunchTemplateName: ${stack_name}-launch-template
+        Version: !GetAtt rhelLaunchTemplate.LatestVersionNumber
       IamInstanceProfile: !Ref RHELInstanceProfile
       InstanceType: !Ref HostInstanceType
       NetworkInterfaces:
@@ -263,18 +295,6 @@ Resources:
       Tags:
       - Key: Name
         Value: !Join ["", [!Ref Machinename]]
-      BlockDeviceMappings:
-      - DeviceName: /dev/sda1
-        Ebs:
-          VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, PrimaryVolumeSize]
-          VolumeType: gp3
-      - !If
-        - AddSecondaryVolume
-        - DeviceName: /dev/sdc
-          Ebs:
-            VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, SecondaryVolumeSize]
-            VolumeType: gp3
-        - !Ref AWS::NoValue
       PrivateDnsNameOptions:
         EnableResourceNameDnsARecord: true
         HostnameType: resource-name

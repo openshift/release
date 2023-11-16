@@ -1,0 +1,37 @@
+ref:
+  as: openshift-microshift-clusterbot
+  from_image:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  grace_period: 30m
+  commands: openshift-microshift-clusterbot-commands.sh
+  resources:
+    requests:
+      cpu: 800m
+      memory: 1800Mi
+  credentials:
+    - name: pull-secret
+      namespace: test-credentials
+      mount_path: /secrets/ci-pull-secret
+  env:
+    - name: MICROSHIFT_ARCH
+      default: "x86_64"
+      documentation: MicroShift host's architecture
+    - name: MICROSHIFT_OS
+      default: "rhel-9.2"
+      documentation: MicroShift host's operating system
+    - name: MICROSHIFT_GIT
+      default: ""
+      documentation: Ref to build from openshift/microshift. If empty, MicroShift will be installed from RHSM repositories.
+    - name: BASE_DOMAIN
+      default: ""
+    - name: EC2_AMI
+      default: ""
+    - name: EC2_INSTANCE_TYPE
+      default: ""
+  dependencies:
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST
+  documentation: |-
+    This is an entrypoint for cluster-bot workflow: parses and verifies arguments, and kicks off the provisioning and deployment.

@@ -1,0 +1,114 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.18-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.18-linux
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.18-linux
+images:
+- dockerfile_path: Dockerfile.prow
+  from: base
+  inputs:
+    stolostron_builder_go1.18-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
+  to: prometheus
+promotion:
+  name: "2.10"
+  namespace: stolostron
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+test_binary_build_commands: "true"
+tests:
+- as: vendor
+  commands: make unused && git diff --exit-code
+  container:
+    from: src
+- as: common-test
+  commands: GOOPTS="-tags=builtinassets -p=1" make common-test
+  container:
+    from: src
+- as: react-app-test
+  commands: |
+    nodejs_version=v14.16.1
+    nodejs_platform=linux-x64
+    nodejs="node-${nodejs_version}-${nodejs_platform}"
+    cd /tmp
+    curl -LO "https://nodejs.org/download/release/${nodejs_version}/${nodejs}.tar.gz"
+    tar xf "${nodejs}.tar.gz"
+    export NODEJS_HOME="/tmp/${nodejs}"
+    export PATH=$PATH:$NODEJS_HOME/bin
+    HOME=/tmp npm install yarn
+    export PATH=$PATH:/tmp/node_modules/.bin
+    cd -
+    make react-app-test
+  container:
+    from: src
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: prometheus
+    env:
+      IMAGE_REPO: prometheus
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: prometheus
+    env:
+      IMAGE_REPO: prometheus
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_COMPONENT_NAME="prometheus"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.10
+  org: stolostron
+  repo: prometheus

@@ -88,7 +88,7 @@ CONFIG = {
         'us-west-2': 10
     },
     'aws-rhtap-performance-quota-slice': {
-        'us-west-2': 10
+        'eu-west-1': 10
     },
     'aws-opendatahub-quota-slice': {
         # Wild guesses. We can re-configure later
@@ -162,6 +162,9 @@ CONFIG = {
         'us-central1': 80,
     },
     'gcp-arm64-quota-slice': {
+        'us-central1': 30,
+    },
+    'gcp-opendatahub-quota-slice': {
         'us-central1': 30,
     },
     'libvirt-s390x-quota-slice': {},
@@ -317,6 +320,10 @@ CONFIG = {
     },
     'hypershift-powervs-cb-quota-slice': {
         'default': 5,
+    },
+    'ossm-quota-slice': {
+        # Wild guesses.  We'll see when we hit quota issues
+        'default': 1000,
     },
 }
 

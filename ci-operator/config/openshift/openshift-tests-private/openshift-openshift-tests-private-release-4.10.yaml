@@ -3,6 +3,10 @@ base_images:
     name: tests-private-base
     namespace: ci
     tag: "4.10"
+  ci_tests-private-baseui_4.10:
+    name: tests-private-baseui
+    namespace: ci
+    tag: "4.10"
   ci_tests-private-builder_4.10:
     name: tests-private-builder
     namespace: ci
@@ -22,7 +26,7 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.10
 images:
-- dockerfile_path: images/Dockerfile.go
+- dockerfile_path: images/Dockerfile.golang
   from: ci_tests-private-base_4.10
   inputs:
     ci_tests-private-builder_4.10:
@@ -30,13 +34,18 @@ images:
       - registry.ci.openshift.org/ci/tests-private-builder:4.10
   to: tests-private
 - dockerfile_literal: |
-    FROM src
-    RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
-        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib" && \
-        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
-        yum clean all && rm -rf /var/cache/yum/*
-  from: src
+    FROM src AS builder
+    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.10
+    RUN mkdir -p /go/src/github.com/openshift
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+  inputs:
+    ci_tests-private-baseui_4.10:
+      as:
+      - registry.ci.openshift.org/ci/tests-private-baseui:4.10
+    src:
+      as:
+      - src
   to: tests-private-ui
 promotion:
   excluded_images:
@@ -104,7 +113,7 @@ tests:
   optional: true
   run_if_changed: frontend/
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     test:
     - ref: enable-qe-catalogsource
     - as: console-test
