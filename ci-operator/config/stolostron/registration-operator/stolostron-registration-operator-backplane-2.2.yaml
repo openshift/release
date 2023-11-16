@@ -20,6 +20,7 @@ images:
     stolostron_builder_go1.19-linux:
       as:
       - golang:1.19
+      - golang:1.19-bullseye
   to: registration-operator
 promotion:
   additional_images:
@@ -71,29 +72,6 @@ tests:
   commands: HOME=/tmp make test-integration
   container:
     from: test-bin
-- as: e2e
-  steps:
-    cluster_profile: aws
-    test:
-    - as: operator-e2e-test
-      commands: |
-        KUBECTL=oc
-        IMAGE_REGISTRY=quay.io/stolostron
-        REGISTRATION_TAG=backplane-2.2
-        WORK_TAG=backplane-2.2
-        PLACEMENT_TAG=backplane-2.2
-        PATH=.:$PATH
-        export KUBECTL PATH IMAGE_REGISTRY REGISTRATION_TAG WORK_TAG PLACEMENT_TAG
-        make test-e2e
-      dependencies:
-      - env: IMAGE_NAME
-        name: registration-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: openshift-e2e-aws
 - as: publish
   postsubmit: true
   steps:

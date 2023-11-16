@@ -66,57 +66,6 @@ tests:
   commands: HOME=/tmp make test-integration
   container:
     from: test-bin
-- as: e2e
-  steps:
-    cluster_profile: aws
-    test:
-    - as: operator-e2e-test
-      commands: |
-        KUBECTL=oc
-        IMAGE_REGISTRY=quay.io/stolostron
-        REGISTRATION_TAG=backplane-2.4
-        WORK_TAG=backplane-2.4
-        PLACEMENT_TAG=backplane-2.4
-        PATH=.:$PATH
-        export KUBECTL PATH IMAGE_REGISTRY REGISTRATION_TAG WORK_TAG PLACEMENT_TAG
-        make test-e2e
-      dependencies:
-      - env: IMAGE_NAME
-        name: registration-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: openshift-e2e-aws
-- as: publish
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: registration-operator
-    env:
-      IMAGE_REPO: registration-operator
-      REGISTRY_ORG: stolostron
-    test:
-    - as: publish
-      commands: |-
-        export OSCI_COMPONENT_NAME=registration-operator
-        export OSCI_COMPONENT_VERSION=2.4.0
-        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
-        export OSCI_PIPELINE_REPO=backplane-pipeline
-        export OSCI_PUBLISH_DELAY="0"
-        export SELF="make -f /opt/build-harness/Makefile.prow"
-        make -f /opt/build-harness/Makefile.prow osci/publish
-      credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ocm-ci-image-mirror
 - as: pr-merge-image-mirror
   postsubmit: true
   steps:
