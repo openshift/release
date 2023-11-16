@@ -6,6 +6,6 @@ else
     echo "An end.sh script was not found in the target repo. Which is expected for release branches and migration."
     set -x
     pwd
-    ls -l .openshift || true
+    ls -l .openshift-ci || true
     set +x
 fi
