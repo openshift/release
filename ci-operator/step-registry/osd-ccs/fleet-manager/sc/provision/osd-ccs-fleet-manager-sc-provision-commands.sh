@@ -21,12 +21,12 @@ function wait_for_cluster()
 }
 
 #Set up region
-OSDFM_REGION=${LEASED_RESOURCE}
-echo "region: ${LEASED_RESOURCE}"
-if [[ "${OSDFM_REGION}" != "ap-northeast-1" ]]; then
-  echo "${OSDFM_REGION} is not ap-northeast-1, exit"
-  exit 1
-fi
+OSDFM_REGION="us-west-2"
+# echo "region: ${LEASED_RESOURCE}"
+# if [[ "${OSDFM_REGION}" != "ap-northeast-1" ]]; then
+#   echo "${OSDFM_REGION} is not ap-northeast-1, exit"
+#   exit 1
+# fi
 
 ## Configure aws
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -55,12 +55,12 @@ else
 fi
 
 # Check if SC already exists
-sc_cluster_num=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters -p search="region='${OSDFM_REGION}'" | jq -r '.total')
-if ((${sc_cluster_num} > 0)); then
-  sc_cluster_id=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters -p search="region='${OSDFM_REGION}'" | jq -r '.items[0].id')
-  echo "Service Cluster '${sc_cluster_id}' already exists in region '${OSDFM_REGION}', exit"
-  exit 1
-fi
+# sc_cluster_num=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters -p search="region='${OSDFM_REGION}'" | jq -r '.total')
+# if ((${sc_cluster_num} > 0)); then
+#   sc_cluster_id=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters -p search="region='${OSDFM_REGION}'" | jq -r '.items[0].id')
+#   echo "Service Cluster '${sc_cluster_id}' already exists in region '${OSDFM_REGION}', exit"
+#   exit 1
+# fi
 
 # Create SC
 sc_cluster_id=$(echo '{"region": "'${OSDFM_REGION}'", "cloud_provider": "aws"}' | ocm post /api/osd_fleet_mgmt/v1/service_clusters | jq -r '.id')

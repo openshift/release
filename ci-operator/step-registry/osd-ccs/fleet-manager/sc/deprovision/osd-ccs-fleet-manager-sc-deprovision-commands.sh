@@ -25,12 +25,12 @@ function wait_for_cluster()
 }
 
 #Set up region
-OSDFM_REGION=${LEASED_RESOURCE}
-echo "region: ${LEASED_RESOURCE}"
-if [[ "${OSDFM_REGION}" != "ap-northeast-1" ]]; then
-  echo "${OSDFM_REGION} is not ap-northeast-1, exit"
-  exit 1
-fi
+OSDFM_REGION="us-west-2"
+# echo "region: ${LEASED_RESOURCE}"
+# if [[ "${OSDFM_REGION}" != "ap-northeast-1" ]]; then
+#   echo "${OSDFM_REGION} is not ap-northeast-1, exit"
+#   exit 1
+# fi
 
 ## Configure aws
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
