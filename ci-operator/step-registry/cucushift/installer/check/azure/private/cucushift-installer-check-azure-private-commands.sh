@@ -47,8 +47,6 @@ if [[ -z "${RESOURCE_GROUP}" ]]; then
 fi
 
 critical_check_result=0
-no_critical_check_result=0
-
 #lb check
 lb_list=$(az network lb list -g ${RESOURCE_GROUP} -ojson |jq -r '.[].name')
 echo "INFO: lb list is ${lb_list}"
@@ -94,8 +92,4 @@ if [[ ${critical_check_result} -eq 1 ]]; then
     exit 1
 fi
 
-if [[ ${no_critical_check_result} -eq 1 ]]; then
-    echo "ERROR: Load Balancer check failed! Found some issues."
-    [[ "${EXIT_ON_INSTALLER_CHECK_FAIL}" == "yes" ]] && exit 1
-fi 
 exit 0

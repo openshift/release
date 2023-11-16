@@ -1,0 +1,37 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  name: qci-appci
+spec:
+  selector:
+    app: qci-appci
+  ports:
+  - name: http
+    port: 8400
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    route.openshift.io/termination: passthrough
+  name: qci-appci
+  namespace: ci
+spec:
+  ingressClassName: openshift-default
+  tls:
+    - secretName: qci-appci-tls
+      hosts:
+        - quay-proxy.ci.openshift.org
+  rules:
+  - host: quay-proxy.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: qci-appci
+            port:
+              number: 8400
+        pathType: ImplementationSpecific

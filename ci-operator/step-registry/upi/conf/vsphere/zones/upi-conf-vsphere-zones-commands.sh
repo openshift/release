@@ -339,12 +339,14 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$control_plane_memory = 16384
 \$control_plane_num_cpus = 4
 \$control_plane_count = ${MASTER_REPLICAS}
-\$control_plane_ip_addresses = ${control_plane_ip_addresses}
+\$control_plane_ip_addresses = $(echo ${control_plane_ip_addresses} | tr -d [])
+\$control_plane_hostnames = "control-plane-0", "control-plane-1", "control-plane-2"
 
 \$compute_memory = 16384
 \$compute_num_cpus = 4
 \$compute_count = ${WORKER_REPLICAS}
-\$compute_ip_addresses = ${compute_ip_addresses}
+\$compute_ip_addresses = $(echo ${compute_ip_addresses} | tr -d [])
+\$compute_hostnames = "compute-0", "compute-1", "compute-2"
 
 \$failure_domains = @"
 [

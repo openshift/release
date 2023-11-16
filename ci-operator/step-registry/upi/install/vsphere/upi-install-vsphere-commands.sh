@@ -44,7 +44,7 @@ cp -t "${installer_dir}/auth" \
 if command -v pwsh &> /dev/null
 then
     cp -t "${installer_dir}/secrets" \
-        "${SHARED_DIR}/vcenter-crds.xml"
+        "${SHARED_DIR}/vcenter-creds.xml"
 fi
 
 # Copy sample UPI files
@@ -195,7 +195,7 @@ then
   wait "$!"
 else
   echo "$(date -u --rfc-3339=seconds) - pwsh upi.ps1..."
-  pswh -f upi.ps1 &
+  pwsh -f upi.ps1 &
   wait "$!"
 fi
 
