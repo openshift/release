@@ -56,7 +56,7 @@ resources:
       memory: 200Mi
 tests:
 - as: security
-  optional: true
+  cron: 0 3 * * 0
   steps:
     env:
       PROJECT_NAME: jaeger-operator
@@ -71,14 +71,14 @@ tests:
     version: "4.13"
   steps:
     env:
-      EO_SUB_CHANNEL: stable-5.7
+      EO_SUB_CHANNEL: stable-5.8
       EO_SUB_SOURCE: redhat-operators
     test:
     - as: install
       cli: latest
       commands: |
         oc create namespace jaeger-operator
-        operator-sdk run bundle -n jaeger-operator "$OO_BUNDLE"
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n jaeger-operator "$OO_BUNDLE"
         oc wait --for condition=Available -n jaeger-operator deployment jaeger-operator
       dependencies:
       - env: OO_BUNDLE
@@ -91,7 +91,6 @@ tests:
     - ref: operatorhub-subscribe-elasticsearch-operator
     - ref: operatorhub-subscribe-amq-streams
     - ref: distributed-tracing-install-opentelemetry-product
-    - ref: distributed-tracing-install-tempo-product
     - ref: distributed-tracing-tests-jaeger
     workflow: generic-claim
 zz_generated_metadata:

@@ -61,18 +61,18 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      EO_SUB_CHANNEL: stable-5.7
+      EO_SUB_CHANNEL: stable-5.8
       EO_SUB_SOURCE: redhat-operators
     test:
     - ref: operatorhub-subscribe-elasticsearch-operator
     - ref: operatorhub-subscribe-amq-streams
     - ref: distributed-tracing-install-opentelemetry-product
-    - ref: distributed-tracing-install-tempo-product
     - as: install
       cli: latest
       commands: |
-        operator-sdk run bundle --timeout=5m --security-context-config restricted -n openshift-operators "$OO_BUNDLE"
-        oc wait --for condition=Available -n openshift-operators deployment jaeger-operator
+        oc create namespace jaeger-operator
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n jaeger-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n jaeger-operator deployment jaeger-operator
       dependencies:
       - env: OO_BUNDLE
         name: jaeger-bundle
