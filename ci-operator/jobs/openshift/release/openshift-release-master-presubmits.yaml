@@ -21,8 +21,8 @@ presubmits:
         - --app=openshift-ci
         - --app-check-mode=standard
         - --candidate-path=.
-        - --config-path=./core-services/prow/02_config/_config.yaml
-        - --supplemental-prow-config-dir=./core-services/prow/02_config
+        - --config-path=/data/config/config.yaml
+        - --supplemental-prow-config-dir=/data/config
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --github-endpoint=http://ghproxy
@@ -56,10 +56,22 @@ presubmits:
         - mountPath: /etc/github
           name: github-app-credentials
           readOnly: true
+        - mountPath: /data/config
+          name: prow-config
+          readOnly: true
+        - mountPath: /data/plugins
+          name: plugin-config
+          readOnly: true
       volumes:
+      - name: prow-config
+        configMap:
+          name: config
       - name: github-app-credentials
         secret:
           secretName: openshift-prow-github-app
+      - name: plugin-config
+        configMap:
+          name: plugins
     trigger: (?m)^/test( | .* )check-gh-automation,?($|\s.*)
   - agent: kubernetes
     always_run: false
