@@ -2410,8 +2410,8 @@ periodics:
   spec:
     containers:
     - args:
-      - --config-path=./core-services/prow/02_config/_config.yaml
-      - --supplemental-prow-config-dir=./core-services/prow/02_config
+      - --config-path=/data/config/config.yaml
+      - --supplemental-prow-config-dir=/data/config
       - --job-config-path=./ci-operator/jobs
       - --github-app-id=$(GITHUB_APP_ID)
       - --github-app-private-key-path=/etc/github/cert
@@ -2451,10 +2451,22 @@ periodics:
       - mountPath: /etc/github
         name: github-app-credentials
         readOnly: true
+      - mountPath: /data/config
+        name: prow-config
+        readOnly: true
+      - mountPath: /data/plugins
+        name: plugin-config
+        readOnly: true
     volumes:
+    - name: prow-config
+      configMap:
+        name: config
     - name: github-app-credentials
       secret:
         secretName: openshift-prow-github-app
+    - name: plugin-config
+      configMap:
+        name: plugins
 - agent: kubernetes
   cluster: app.ci
   cron: 0 10,22 * * *
