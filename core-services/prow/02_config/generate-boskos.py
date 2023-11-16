@@ -88,7 +88,7 @@ CONFIG = {
         'us-west-2': 10
     },
     'aws-rhtap-performance-quota-slice': {
-        'us-west-2': 10
+        'eu-west-1': 10
     },
     'aws-opendatahub-quota-slice': {
         # Wild guesses. We can re-configure later
