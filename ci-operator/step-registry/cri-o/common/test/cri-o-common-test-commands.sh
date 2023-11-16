@@ -35,6 +35,13 @@ baseurl = https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/appst
 enabled = 1
 gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 gpgcheck = 1
+
+[ubi-9-baseos-rpms]
+name = Red Hat Universal Base Image 9 (RPMs) - BaseOS
+baseurl = https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os
+enabled = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+gpgcheck = 1
 EOE
     sudo dnf update -y
     sudo dnf install -y python3.11
