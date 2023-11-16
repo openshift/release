@@ -469,11 +469,27 @@ function health_check() {
 
 # Check if a build is signed
 function check_signed() {
-    local digest algorithm hash_value response
-    digest="$(echo "${TARGET}" | cut -f2 -d@)"
+    local digest algorithm hash_value response try max_retries
+    if [[ "${TARGET}" =~ "@sha256:" ]]; then
+        digest="$(echo "${TARGET}" | cut -f2 -d@)"
+        echo "The target image is using digest pullspec, its digest is ${digest}"
+    else
+        digest="$(oc image info "${TARGET}" -o json | jq -r ".digest")"
+        echo "The target image is using tagname pullspec, its digest is ${digest}"
+    fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+    set -x
+    try=0
+    max_retries=2
+    response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+    while (( try < max_retries && response != 200 )); do
+        echo "Trying #${try}"
+        response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+        (( try += 1 ))
+        sleep 60
+    done
+    set +x
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -526,7 +542,7 @@ function admin_ack() {
 
 # Upgrade the cluster to target release
 function upgrade() {
-    oc adm upgrade --to-image="${TARGET}" --allow-explicit-upgrade --force="${FORCE_UPDATE}"
+    run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
@@ -614,6 +630,12 @@ do
     if ! check_signed; then
         echo "You're updating to an unsigned images, you must override the verification using --force flag"
         FORCE_UPDATE="true"
+        if [[ "${ENABLE_OTA_TEST}" =~ "OCP-30832" ]] || [[ "${ENABLE_OTA_TEST}" =~ "OCP-27986" ]]; then
+            echo "ENABLE_OTA_TEST is enabled on this job, these cases need to run against a signed target image!"
+            exit 1
+        fi
+    else
+        echo "You're updating to a signed images, so run the upgrade command without --force flag"
     fi
     if [[ "${FORCE_UPDATE}" == "false" ]]; then
         admin_ack
