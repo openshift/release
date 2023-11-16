@@ -23,6 +23,16 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     set -o errexit
     set -o pipefail
 
+    sudo tee /etc/yum.repos.d/redhat-codeready.repo &> /dev/null <<EOF
+    [ubi-9-codeready-builder]
+    name = Red Hat Universal Base Image 9 (RPMs) - CodeReady Builder
+    baseurl = https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/\$basearch/codeready-builder/os
+    enabled = 1
+    gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+    gpgcheck = 1
+    EOF
+    sudo dnf update
+
     export GOROOT=/usr/local/go
     echo GOROOT="/usr/local/go" | sudo tee -a /etc/environment
     mkdir -p \${HOME}/logs/artifacts
