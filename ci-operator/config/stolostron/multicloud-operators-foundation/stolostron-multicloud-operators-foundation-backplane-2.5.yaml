@@ -1,0 +1,155 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.20-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+  to: multicloud-manager
+promotion:
+  name: "2.5"
+  namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build
+  commands: |
+    true
+  container:
+    from: bin
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: bin
+- as: unit
+  commands: |
+    make test --warn-undefined-variables
+  container:
+    from: test-bin
+- as: integration
+  commands: make test-integration
+  container:
+    from: test-bin
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    as: custom
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.10"
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        KUBECTL=oc
+        OCM_VERSION=backplane-2.5
+        REGISTRATION_OPERATOR_BRANCH=$OCM_VERSION
+        IMAGE_NAME=quay.io/stolostron/registration-operator:$OCM_VERSION
+        REGISTRATION_IMAGE=quay.io/stolostron/registration:$OCM_VERSION
+        WORK_IMAGE=quay.io/stolostron/work:$OCM_VERSION
+        PLACEMENT_IMAGE=quay.io/stolostron/placement:$OCM_VERSION
+        export KUBECTL IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE PLACEMENT_IMAGE REGISTRATION_OPERATOR_BRANCH
+        make test-e2e
+      dependencies:
+      - env: FOUNDATION_IMAGE_NAME
+        name: multicloud-manager
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: sonarcloud
+  steps:
+    test:
+    - as: test
+      commands: |
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow sonar/go/prow
+      credentials:
+      - mount_path: /etc/sonarcloud/
+        name: acm-sonarcloud-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicloud-manager
+    env:
+      IMAGE_REPO: multicloud-manager
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicloud-manager
+    env:
+      IMAGE_REPO: multicloud-manager
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=multicloud-manager
+        export OSCI_COMPONENT_VERSION=2.5.0
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: backplane-2.5
+  org: stolostron
+  repo: multicloud-operators-foundation

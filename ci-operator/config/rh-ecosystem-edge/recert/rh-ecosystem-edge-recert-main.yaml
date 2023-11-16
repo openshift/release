@@ -1,8 +1,16 @@
 base_images:
+  assisted-test-infra:
+    name: ocm-2.9
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
   builder:
     name: ubi
     namespace: ocp
     tag: "9"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   tests-private:
     name: tests-private
     namespace: ci
@@ -118,6 +126,15 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: openshift-e2e-aws-single-node-recert
   timeout: 8h0m0s
+- always_run: false
+  as: baremetalds-sno-recert-cluster-rename
+  steps:
+    cluster_profile: packet-sno
+    test:
+    - ref: baremetalds-sno-conf
+    - ref: baremetalds-sno-rename
+    - ref: baremetalds-sno-test
+    workflow: baremetalds-sno
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
