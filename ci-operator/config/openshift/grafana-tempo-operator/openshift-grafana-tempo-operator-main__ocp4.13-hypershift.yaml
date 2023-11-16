@@ -55,21 +55,16 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      EO_SUB_CHANNEL: stable-5.7
-      EO_SUB_SOURCE: redhat-operators
       SKIP_TESTS: tests/e2e-openshift/red-metrics tests/e2e/custom-ca
     test:
     - ref: cucushift-hypershift-extended-health-check
     - ref: cucushift-pre
-    - ref: operatorhub-subscribe-elasticsearch-operator
-    - ref: operatorhub-subscribe-amq-streams
-    - ref: distributed-tracing-install-jaeger-product
-    - ref: distributed-tracing-install-opentelemetry-product
     - as: install
       cli: latest
       commands: |
-        operator-sdk run bundle --timeout=5m --security-context-config restricted -n openshift-operators "$OO_BUNDLE"
-        oc wait --for condition=Available -n openshift-operators deployment tempo-operator-controller
+        oc create namespace tempo-operator
+        operator-sdk run bundle --timeout=10m --security-context-config restricted -n tempo-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n tempo-operator deployment tempo-operator-controller
       dependencies:
       - env: OO_BUNDLE
         name: tempo-bundle
@@ -78,6 +73,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 400Mi
+    - ref: distributed-tracing-install-opentelemetry-product
     - ref: distributed-tracing-tests-tempo
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 zz_generated_metadata:
