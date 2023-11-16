@@ -22,11 +22,6 @@ def _add_namespace_read_only_rbac(gendoc, namespace):
                 'resources': ['imagestreams', 'imagestreamtags'],
                 'verbs': ['get', 'list', 'watch']
             },
-            {
-                'apiGroups': ['release.openshift.io'],
-                'resources': ['releasepayloads'],
-                'verbs': ['get', 'list', 'watch']
-            }
         ]
     })
 
