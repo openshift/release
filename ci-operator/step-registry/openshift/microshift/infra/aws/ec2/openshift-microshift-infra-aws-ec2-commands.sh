@@ -17,6 +17,13 @@ JOB_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 stack_name="${JOB_NAME}"
 cf_tpl_file="${SHARED_DIR}/${JOB_NAME}-cf-tpl.yaml"
 
+MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
+if [ -f "${MICROSHIFT_CLUSTERBOT_SETTINGS}" ]; then
+  : Overriding step defaults by sourcing clusterbot settings
+  # shellcheck disable=SC1090
+  source "${MICROSHIFT_CLUSTERBOT_SETTINGS}"
+fi
+
 if [[ "${EC2_AMI}" == "" ]]; then
   echo "must supply an AMI to use for EC2 Instance"
   exit 1
