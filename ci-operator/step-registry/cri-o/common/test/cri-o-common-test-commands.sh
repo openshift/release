@@ -29,7 +29,7 @@ enabled = 1
 gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 gpgcheck = 1
 EOE
-    sudo dnf update
+    sudo dnf update -y
 
     export GOROOT=/usr/local/go
     echo "GOROOT=\"/usr/local/go\"" | sudo tee -a /etc/environment
