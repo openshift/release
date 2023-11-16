@@ -116,6 +116,46 @@ tests:
     - chain: openshift-qe-data-path-tests
     workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
+- as: sdn-to-ovn-24nodes
+  cron: 0 12 * * 6
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m6i.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.xlarge
+      OVN_SDN_MIGRATION_TIMEOUT: 3600s
+      ZONES_COUNT: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: sdn-conf
+    - chain: ipi-install
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - ref: ovn-sdn-migration
+- as: sdn-to-ovn-120nodes
+  cron: 0 14 * * 0
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m6i.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.4xlarge
+      OVN_SDN_MIGRATION_TIMEOUT: 7200s
+      ZONES_COUNT: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: sdn-conf
+    - chain: ipi-install
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - ref: ovn-sdn-migration
 zz_generated_metadata:
   branch: main
   org: openshift-qe
