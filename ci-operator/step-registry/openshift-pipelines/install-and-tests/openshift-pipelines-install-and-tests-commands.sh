@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
-API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
+# API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 export gauge_reports_dir=${ARTIFACT_DIR}
 export overwrite_reports=false
 export KUBECONFIG=$SHARED_DIR/kubeconfig
@@ -14,7 +14,8 @@ export KUBECONFIG=$SHARED_DIR/kubeconfig
 gauge config runner_connection_timeout 600000 && gauge config runner_request_timeout 300000
 
 echo "Login to the cluster as kubeadmin"
-oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
+oc whoami --show-server
+# oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
 
 echo "Running olm.spec to install operator"
 CATALOG_SOURCE=redhat-operators CHANNEL=${OLM_CHANNEL} gauge run --log-level=debug --verbose --tags install specs/olm.spec || true
