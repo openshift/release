@@ -1,0 +1,81 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.14
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+images:
+- dockerfile_literal: |-
+    FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+    COPY . .
+    RUN chgrp -R 0 /go && \
+    chmod -R g=u /go
+    RUN mkdir -p /.cache
+    RUN chgrp -R 0 /.cache && \
+    chmod -R g=u /.cache
+  inputs:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+  to: jenkins-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: aws-jenkins-lp-rosa-hypershift
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "aws-provision*", "failure_type": "all", "classification": "Infrastructure Provisioning - AWS", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","jenkins-lp"]},
+          {"step": "aws-deprovision*", "failure_type": "all", "classification": "Infrastructure Deprovisioning - AWS", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","jenkins-lp"]},
+          {"step": "cucushift-hypershift-*", "failure_type": "all", "classification": "Health Check - Cluster", "jira_project": "LPINTEROP", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","jenkins-lp"]},
+          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Must Gather - Cluster", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","jenkins-lp"]},
+          {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+          {"step": "jenkins-smoke-tests", "failure_type": "pod_failure", "classification": "Test Execution", "jira_project": "LPINTEROP", "group": {"name": "lp-tests", "priority": 1}},
+          {"step": "jenkins-smoke-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "OCPBUGS", "group": {"name": "lp-tests", "priority": 1}, "jira_component": "Jenkins", "jira_affects_version": "4.14"},
+          {"step": "osd-*", "failure_type": "all", "classification": "Other", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","jenkins-lp"]},
+          {"step": "rosa-cluster-deprovision", "failure_type": "all", "classification": "Infrastructure Deprovisioning - Cluster", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","jenkins-lp"]},
+          {"step": "rosa-cluster-provision", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","jenkins-lp"]},
+          {"step": "rosa-cluster-wait*", "failure_type": "all", "classification": "Infrastructure Provisioning - Rosa Cluster Operators", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","jenkins-lp"]},
+          {"step": "rosa-sts-account-roles-create", "failure_type": "all", "classification": "Account Roles Creation - AWS", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","jenkins-lp"]},
+          {"step": "rosa-sts-account-roles-delete", "failure_type": "all", "classification": "Account Roles Deletion - AWS", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","jenkins-lp"]},
+          {"step": "rosa-conf-idp-htpasswd", "failure_type": "all", "classification": "Admin Access - Cluster", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","jenkins-lp"]}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.14"
+      REGION: us-west-2
+      ROSA_LOGIN_ENV: staging
+    test:
+    - ref: jenkins-smoke-tests
+    - ref: cucushift-hypershift-extended-health-check
+    workflow: firewatch-rosa-aws-sts-hypershift
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift
+  repo: jenkins
+  variant: jenkins-hypershift4.14

@@ -1,0 +1,64 @@
+base_images:
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: web-terminal-aws-rosa-hypershift
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "aws-provision*", "failure_type": "all", "classification": "Infrastructure Provisioning - AWS", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","web-terminal-lp"]},
+          {"step": "aws-deprovision*", "failure_type": "all", "classification": "Infrastructure Deprovisioning - AWS", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","web-terminal-lp"]},
+          {"step": "cucushift-hypershift-*", "failure_type": "all", "classification": "Health Check - Cluster", "jira_project": "LPINTEROP", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","web-terminal-lp"]},
+          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Must Gather - Cluster", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","web-terminal-lp"]},
+          {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+          {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_project": "LPINTEROP", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","web-terminal-lp"]},
+          {"step": "osd-*", "failure_type": "all", "classification": "Other", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","web-terminal-lp"]},
+          {"step": "rosa-cluster-deprovision", "failure_type": "all", "classification": "Infrastructure Deprovisioning - Cluster", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","web-terminal-lp"]},
+          {"step": "rosa-cluster-provision", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","web-terminal-lp"]},
+          {"step": "rosa-cluster-wait*", "failure_type": "all", "classification": "Infrastructure Provisioning - Rosa Cluster Operators", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","web-terminal-lp"]},
+          {"step": "rosa-sts-account-roles-create", "failure_type": "all", "classification": "Account Roles Creation - AWS", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","web-terminal-lp"]},
+          {"step": "rosa-sts-account-roles-delete", "failure_type": "all", "classification": "Account Roles Deletion - AWS", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","web-terminal-lp"]},
+          {"step": "rosa-conf-idp-htpasswd", "failure_type": "all", "classification": "Admin Access - Cluster", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp","rosa-hypershift-lp","web-terminal-lp"]}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.14"
+      OPERATORS: |
+        [
+            {"name": "web-terminal", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators"}
+        ]
+      REGION: us-west-2
+      ROSA_LOGIN_ENV: staging
+    test:
+    - ref: install-operators
+    - ref: cucushift-hypershift-extended-health-check
+    workflow: firewatch-rosa-aws-sts-hypershift
+zz_generated_metadata:
+  branch: main
+  org: rhpit
+  repo: interop-tests
+  variant: web-terminal-hypershift-4.14-lp-rosa-hypershift
