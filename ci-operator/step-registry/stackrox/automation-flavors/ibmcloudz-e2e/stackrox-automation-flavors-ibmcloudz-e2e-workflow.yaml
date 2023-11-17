@@ -2,10 +2,38 @@ workflow:
   as: stackrox-automation-flavors-ibmcloudz-e2e
   steps:
     pre:
-    - ref: stackrox-automation-flavors-ibmcloudz-e2e-cluster-create
+    - as: ibmcloudz-create
+      commands: |
+        /usr/bin/openshift-ci.sh create ibmcloudz
+      credentials:
+      - mount_path: /tmp/vault/ibmcloudz-rhr-creds
+        name: ibmcloudz-rhr-creds
+        namespace: test-credentials
+      env:
+      - name: IBM_CLOUD_OPENSHIFT_CHANNEL
+        default: ''
+      from: ibmcloudz
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
     test:
     - ref: stackrox-e2e
     post:
-    - ref: stackrox-automation-flavors-ibmcloudz-e2e-cluster-destroy
+    - as: ibmcloudz-destroy
+      commands: |
+        /usr/bin/openshift-ci.sh destroy ibmcloudz
+      credentials:
+      - mount_path: /tmp/vault/ibmcloudz-rhr-creds
+        name: ibmcloudz-rhr-creds
+        namespace: test-credentials
+      env:
+      - name: IBM_CLOUD_OPENSHIFT_CHANNEL
+        default: ''
+      from: ibmcloudz
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
   documentation: |-
-    A stackrox workflow to execute e2e QA tests in a IBM Cloud Z k8s cluster.
+    A stackrox workflow to execute e2e QA tests in an IBM Z cluster.
