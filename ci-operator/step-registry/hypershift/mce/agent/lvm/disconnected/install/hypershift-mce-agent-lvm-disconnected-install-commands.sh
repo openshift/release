@@ -42,6 +42,7 @@ index_image="registry.redhat.io/redhat/redhat-operator-index:v\${ocp_version}"
 catalog_source_name="mirror-catalog-for-lvms-operator"
 LOCAL_REGISTRY="\${LOCAL_REGISTRY_DNS_NAME}:\${LOCAL_REGISTRY_PORT}"
 
+
 mirror_package "lvms-operator" \
   "\${index_image}" "\${LOCAL_REGISTRY}" "\$PULL_SECRET_FILE" "\${catalog_source_name}"
 
