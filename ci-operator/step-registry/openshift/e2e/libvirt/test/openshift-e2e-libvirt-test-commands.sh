@@ -300,9 +300,9 @@ test_suite = all_tests - excluded_tests
 for t in test_suite:
     print(t)
 EOSCRIPT
-      chmod +x ${SHARED_DIR}/invert_excluded.py
-      openshift-tests run "${TEST_SUITE}" --dry-run | ${SHARED_DIR}/invert_excluded.py ${SHARED_DIR}/excluded_tests > ${SHARED_DIR}/tests
-      TEST_ARGS="${TEST_ARGS:-} --file ${SHARED_DIR}/tests"
+        chmod +x ${SHARED_DIR}/invert_excluded.py
+        openshift-tests run "${TEST_SUITE}" --dry-run | ${SHARED_DIR}/invert_excluded.py ${SHARED_DIR}/excluded_tests > ${SHARED_DIR}/tests
+        TEST_ARGS="${TEST_ARGS:-} --file ${SHARED_DIR}/tests"
     fi
 
     case ${BRANCH} in
@@ -328,6 +328,20 @@ export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
     esac
 
     VERBOSITY="" # "--v 9"
+    set -x
+    openshift-tests run \
+        ${VERBOSITY} \
+        "${TEST_SUITE}" \
+        ${TEST_ARGS:-} \
+        -o "${ARTIFACT_DIR}/e2e.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit" &
+    wait "$!"
+}
+
+function heavy_build() {
+    TEST_ARGS="${TEST_ARGS:-} --file ${SHARED_DIR}/tests"
+    VERBOSITY="" # "--v 9"
+
     set -x
     openshift-tests run \
         ${VERBOSITY} \
@@ -374,6 +388,9 @@ jenkins-e2e-rhel-only)
     ;;
 image-ecosystem)
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/image-ecosystem suite
+    ;;
+heavy-build)
+    TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel heavy_build
     ;;
 upgrade)
     upgrade
