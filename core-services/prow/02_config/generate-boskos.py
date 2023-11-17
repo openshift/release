@@ -323,8 +323,7 @@ CONFIG = {
     },
     'ossm-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
-        'us-east-2': 80,
-        'eu-west-1': 80,
+        'default': 1000,
     },
 }
 
