@@ -28,3 +28,4 @@ rm -f ${SHARED_DIR}/index.json
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 cp $folder_name/index_data.json ${SHARED_DIR}/index_data.json
+# 17 Nov 2023: Results analysis for OCPQE-16058
