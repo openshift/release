@@ -3,6 +3,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: cli
+  golang-builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.15
   upi-installer:
     name: "4.15"
     namespace: ocp
@@ -12,6 +16,22 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.18
+images:
+- dockerfile_literal: |-
+    FROM golang-builder
+    WORKDIR /go/src/red-hat-storage/odf-operator
+    ENV GOFLAGS ""
+    COPY --from=cli /usr/bin/oc /usr/bin/oc
+    RUN git clone https://github.com/red-hat-storage/odf-operator.git --branch release-4.15 . && \
+    chmod g+xw -R $GOPATH && \
+    chmod g+xw -R $(go env GOROOT) && \
+    ln -s /usr/bin/oc /usr/bin/kubectl
+  from: golang-builder
+  inputs:
+    cli:
+      as:
+      - cli
+  to: deploy-odf-operator-4.15
 releases:
   latest:
     candidate:
@@ -47,12 +67,21 @@ tests:
         ]
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_JIRA_SERVER: https://issues.redhat.com
-      ODF_OPERATOR_CHANNEL: stable-4.13
+      ODF_OPERATOR_CHANNEL: alpha
       QBO_CHANNEL: stable-3.9
       QUAY_OPERATOR_CHANNEL: stable-3.9
       USER_TAGS: |
         scenario quay
     test:
+    - as: deploy-odf-operator-for-ocp-4.15
+      commands: make deploy-with-olm
+      from: deploy-odf-operator-4.15
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - chain: quay-tests-quay-e2e-test
     - ref: quay-tests-qbo-qe-test
     - ref: quay-tests-cso-qe-test
