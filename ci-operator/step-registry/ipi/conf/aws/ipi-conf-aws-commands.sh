@@ -322,8 +322,8 @@ EOF
 fi
 
 if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
-  local_zone=$(< "${SHARED_DIR}"/local-zone-name.txt)
-  local_zones_str="[ $local_zone ]"
+  edge_zone=$(< "${SHARED_DIR}"/edge-zone-name.txt)
+  edge_zones_str="[ $edge_zone ]"
   patch_edge="${SHARED_DIR}/install-config-edge.yaml.patch"
   cat > "${patch_edge}" << EOF
 compute:
@@ -331,7 +331,7 @@ compute:
   name: edge
   platform:
     aws:
-      zones: ${local_zones_str}
+      zones: ${edge_zones_str}
 EOF
   yq-go m -a -x -i "${CONFIG}" "${patch_edge}"
 fi

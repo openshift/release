@@ -138,7 +138,7 @@ fi
 
 az_name=$(aws --region $REGION ec2 describe-subnets --subnet-ids $localzone_parent_subnet | jq -r '.Subnets[0].AvailabilityZone')
 local_az_name=$(aws --region $REGION ec2 describe-availability-zones --filters Name=opt-in-status,Values=opted-in Name=zone-type,Values=local-zone | jq -r --arg z $az_name '[.AvailabilityZones[] | select (.ParentZoneName==$z)] | .[0].ZoneName')
-echo $local_az_name > "${SHARED_DIR}"/local-zone-name.txt
+echo $local_az_name > "${SHARED_DIR}"/edge-zone-name.txt
 
 route_table_id=$(aws --region $REGION ec2 describe-route-tables --filter Name=association.subnet-id,Values=$localzone_parent_subnet | jq -r .RouteTables[].RouteTableId)
 
