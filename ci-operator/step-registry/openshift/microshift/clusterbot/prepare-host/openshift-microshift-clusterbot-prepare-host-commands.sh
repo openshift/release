@@ -122,4 +122,5 @@ oc create namespace openshift-apiserver
 
 : Web Console not set up - kubeconfig and oc debug must be used to SSH into the instance
 node_name=$(oc get node -o=jsonpath='{.items[0].metadata.name}')
-echo "oc debug node/${node_name}" >"${SHARED_DIR}/console.url"
+echo "Use following command to SSH: oc debug node/${node_name}" >"${SHARED_DIR}/console.url"
+echo "- Use command provided above to SSH into the host -" >"${SHARED_DIR}/kubeadmin-password"

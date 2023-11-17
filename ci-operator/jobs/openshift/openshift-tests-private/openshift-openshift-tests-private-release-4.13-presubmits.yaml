@@ -6,6 +6,70 @@ presubmits:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build01
+    context: ci/prow/bindata-check
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      job-release: "4.13"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-openshift-tests-private-release-4.13-bindata-check
+    optional: true
+    rerun_command: /test bindata-check
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=bindata-check
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )bindata-check,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.13$
+    - ^release-4\.13-
+    cluster: build01
     context: ci/prow/code-check
     decorate: true
     decoration_config:
