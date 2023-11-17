@@ -370,8 +370,9 @@ $(crds):
 update_dp_crd: download_dp_crd $(crds)
 update_crt_crd: download_crt_crd $(crds)
 
+export APP_CHECK_MODE ?= standard
 check-repo:
-	./hack/check-repo.sh "$(REPO)"
+	./hack/check-repo.sh "$(REPO)" "$(APP_CHECK_MODE)"
 .PHONY: check-repo
 
 token_version ?= $(shell yq -r '.nonExpiringToken.currentVersion' ./hack/_token.yaml)
