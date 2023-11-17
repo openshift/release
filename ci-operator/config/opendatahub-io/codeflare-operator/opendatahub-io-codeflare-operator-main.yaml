@@ -36,11 +36,10 @@ tests:
         export CODEFLARE_TEST_TIMEOUT_SHORT=1m
         export CODEFLARE_TEST_TIMEOUT_MEDIUM=5m
         export CODEFLARE_TEST_TIMEOUT_LONG=10m
+        export NOTEBOOK_IMAGE_STREAM_NAME=quay.io/project-codeflare/notebook:v0.12.1
         IMAGE_PATH="image-registry.openshift-image-registry.svc:5000/${NAMESPACE}/pipeline:codeflare-operator-amd64"
         echo "Using image ${IMAGE_PATH}"
         sed -i "s|odh-codeflare-operator-controller-image=.*|odh-codeflare-operator-controller-image=$IMAGE_PATH|" ./config/manifests/bases/params.env
-        # Temporary to test imagestream version
-        sed -i 's|v0.12.0|v0.10.1|g' ./config/manifests/bases/codeflare-notebook-imagestream.yaml
         # Temporary solution until https://github.com/opendatahub-io/distributed-workloads/ repo is closed and content migrated
         git clone https://github.com/opendatahub-io/distributed-workloads.git
         cd distributed-workloads
@@ -60,7 +59,8 @@ tests:
         oc apply -f ./contrib/configuration/basic-dsc.yaml -n opendatahub
         cat ./contrib/configuration/basic-dsc.yaml
         sleep 60
-        cd tests && go test -timeout 60m -v ./integration
+        cd ..
+        cd test && go test -timeout 60m -v ./odh
       dependencies:
       - env: ODH-CODEFLARE-OPERATOR-CONTROLLER-IMAGE
         name: codeflare-operator
