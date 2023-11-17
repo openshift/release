@@ -6,14 +6,14 @@ set -o pipefail
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
-PATCH="${ARTIFACT_DIR}/install-config-local-zone.yaml.patch"
+PATCH="${ARTIFACT_DIR}/install-config-edge-zone.yaml.patch"
 
-local_zone=$(< "${SHARED_DIR}"/local-zone-name.txt)
-local_zones_str="[ $local_zone ]"
+edge_zone=$(< "${SHARED_DIR}"/edge-zone-name.txt)
+edge_zones_str="[ $edge_zone ]"
 
-echo "Selected Local Zone: ${local_zone}"
+echo "Selected Local Zone: ${edge_zone}"
 
-cat <<EOF > ${PATCH}
+cat <<EOF > "${PATCH}"
 compute:
 - name: edge
   architecture: amd64
@@ -21,7 +21,7 @@ compute:
   replicas: ${LOCALZONE_WORKER_NUMBER}
   platform:
     aws:
-      zones: ${local_zones_str}
+      zones: ${edge_zones_str}
 EOF
 
 if [[ ${LOCALZONE_INSTANCE_TYPE} != "" ]]; then

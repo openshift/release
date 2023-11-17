@@ -1,0 +1,71 @@
+binary_build_commands: make -f Makefile.prow install && make -f Makefile.prow build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: nodejs14-linux
+images:
+- dockerfile_path: Dockerfile
+  to: search-e2e
+promotion:
+  disabled: true
+  name: "2.10"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow lint
+  container:
+    from: bin
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-e2e
+    env:
+      IMAGE_REPO: search-e2e
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-e2e
+    env:
+      IMAGE_REPO: search-e2e
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-e2e
+    env:
+      IMAGE_REPO: search-e2e
+      IMAGE_TAG: latest-2.10
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.10
+  org: stolostron
+  repo: search-e2e-test
