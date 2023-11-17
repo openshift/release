@@ -373,6 +373,32 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${vendor}"
 done
 
+function agent_gather_logs(){
+  SSH_PORT=2222
+# shellcheck disable=SC2154
+for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  collect_agent_gather_logs "$SSH_PORT" "$ip" "$name" &
+  ((SSH_PORT=SSH_PORT+1))
+done
+  # Wait 60s and kill background ssh tunnels
+  sleep 60
+  pkill ssh
+}
+
+function collect_agent_gather_logs(){
+  echo "Creating SSH tunnel to host $2 on port $1 via bastion"
+  ssh "${SSHOPTS[@]}" -N -L "$1":"$2":22 "root@${AUX_HOST}" &
+  sleep 10
+  echo "Generating agent gather logs on remote host $2"
+  ssh "${SSHOPTS[@]}" -t -p "$1" "core@127.0.0.1" << 'EOF'
+    agent-gather -O >/tmp/agent-gather.tar.xz
+EOF
+  echo "Copying agent logs from remote host $2 to artifact dir"
+  scp "${SSHOPTS[@]}" -r -P "$1" "core@127.0.0.1:/tmp/agent-gather.tar.xz" "${ARTIFACT_DIR}/agent-gather-$3.tar.xz"
+}
+
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 echo -e "\nForcing 15min delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
 sleep 900
@@ -384,8 +410,8 @@ proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
   oinst agent wait-for bootstrap-complete 2>&1 &
 if ! wait $!; then
-  # TODO: gather logs??
-  echo "ERROR: Bootstrap failed. Aborting execution."
+  echo "ERROR: Bootstrap failed. Aborting execution and gathering agent logs"
+  agent_gather_logs
   exit 1
 fi
 
@@ -394,7 +420,7 @@ echo -e "\nLaunching 'wait-for install-complete' installation step....."
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
   oinst agent wait-for install-complete &
 if ! wait "$!"; then
-  echo "ERROR: Installation failed. Aborting execution."
-  # TODO: gather logs??
+  echo "ERROR: Installation failed. Aborting execution and gathering agent logs"
+  agent_gather_logs
   exit 1
 fi
