@@ -46,6 +46,20 @@ tests:
     test:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws
+- as: payload-control-plane-6nodes
+  cron: 0 10 * * 3
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=13s
+      ITERATION_MULTIPLIER_ENV: "15"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+  timeout: 2h30m0s
 - as: conc-builds-3nodes
   cron: 0 0 8,22 * *
   steps:
@@ -83,6 +97,35 @@ tests:
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
+- as: payload-node-density-heavy-6nodes
+  cron: 0 15 * * 4
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      EXTRA_FLAGS: --pod-ready-threshold=43s
+      ITERATIONS_PER_NAMESPACE: "100"
+      PODS_PER_NODE: "200"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-aws
+  timeout: 2h0m0s
+- as: payload-node-density-cni-6nodes
+  cron: 0 15 * * 3
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      POD_READY_THRESHOLD: 4s
+      PODS_PER_NODE: "200"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-aws
+  timeout: 2h0m0s
 - as: data-path-9nodes
   cron: 0 9 * * 4
   steps:
