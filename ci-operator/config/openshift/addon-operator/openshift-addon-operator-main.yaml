@@ -1,48 +1,50 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  operator-sdk:
+    name: "4.14"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make
 build_root:
   from_repository: true
 images:
-- dockerfile_path: config/docker/addon-operator-manager.Dockerfile
+- dockerfile_path: deploy-extras/docker/addon-operator-manager.Dockerfile
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/addon-operator/bin/linux_amd64/addon-operator-manager
   to: addon-operator-manager
-- dockerfile_path: config/docker/addon-operator-webhook.Dockerfile
+- dockerfile_path: deploy-extras/docker/addon-operator-webhook.Dockerfile
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/addon-operator/bin/linux_amd64/addon-operator-webhook
   to: addon-operator-webhook
-- dockerfile_path: config/docker/api-mock.Dockerfile
+- dockerfile_path: deploy-extras/docker/api-mock.Dockerfile
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/addon-operator/bin/linux_amd64/api-mock
   to: api-mock
-- dockerfile_path: config/docker/Dockerfile.src.ci
+- dockerfile_path: deploy-extras/docker/Dockerfile.src.ci
   from: src
   to: addon-operator-tooling
 operator:
   bundles:
-  - context_dir: config/openshift
-    dockerfile_path: addon-operator-bundle.Dockerfile
+  - as: addon-operator-bundle
+    dockerfile_path: deploy-extras/docker/addon-operator-bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/openshift/addon-operator:latest
     with: addon-operator-manager
   - pullspec: quay.io/openshift/addon-operator-webhook:latest
     with: addon-operator-webhook
-promotion:
-  name: addon-operator-manager
-  namespace: addon-operator
 releases:
-  initial:
-    integration:
-      name: "4.11"
-      namespace: ocp
   latest:
     integration:
       include_built_images: true
@@ -85,18 +87,19 @@ tests:
   container:
     from: addon-operator-tooling
 - as: operator-e2e
+  cluster_claim:
+    architecture: amd64
+    as: latest
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.11"
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws
     dependencies:
-      OO_INDEX: ci-index
-    env:
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: addon-operator-test
-      OO_PACKAGE: addon-operator
-      OO_TARGET_NAMESPACES: '!all'
+      OO_BUNDLE: addon-operator-bundle
     pre:
-    - chain: ipi-aws-pre
     - as: label-infra-nodes
       commands: ./mage test:integrationciprepare
       from: src
@@ -104,7 +107,20 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    - ref: optional-operators-subscribe
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace addon-operator-test
+        operator-sdk run bundle -n addon-operator-test "$OO_BUNDLE" --install-mode AllNamespaces
+        oc wait --for condition=Available -n addon-operator-test deployment addon-operator-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: addon-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
     - as: enable-status-reporting
       commands: OO_INSTALL_NAMESPACE=addon-operator-test ./mage test:IntegrationCIInjectEnvVariable
       from: src
@@ -112,8 +128,10 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
+    - ref: ipi-install-rbac
     test:
     - as: test
+      cli: latest
       commands: ENABLE_WEBHOOK=true make test-e2e
       dependencies:
       - env: ADDON_OPERATOR_MANAGER_IMAGE
@@ -122,14 +140,12 @@ tests:
         name: addon-operator-webhook
       - env: API_MOCK_IMAGE
         name: api-mock
-      - env: OO_INDEX
-        name: replaced-by-ci-operator
       from: src
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
