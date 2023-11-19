@@ -49,4 +49,6 @@ fi
 
 echo "$RUN_COMMAND" | sed -r "s/token [=A-Za-z0-9\.\-]+/token hashed-token /g"
 
+sleep 5000000000000
+
 ${RUN_COMMAND}
