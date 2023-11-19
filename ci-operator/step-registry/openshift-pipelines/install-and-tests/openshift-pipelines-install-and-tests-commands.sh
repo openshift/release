@@ -17,6 +17,9 @@ echo "Login to the cluster as kubeadmin"
 oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
 
 echo "Running olm.spec to install operator"
+sleep 1h
+echo "DEBUG: "
+echo $GOPROXY
 CATALOG_SOURCE=redhat-operators CHANNEL=${OLM_CHANNEL} gauge run --log-level=debug --verbose --tags install specs/olm.spec || true
 
 echo "Running gauge specs"
