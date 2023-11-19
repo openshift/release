@@ -40,7 +40,7 @@ base_images:
     namespace: ci
     tag: 2.4.18
   hypershift-operator:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: hypershift-operator
   openshift_release_golang-1.20:
@@ -879,6 +879,8 @@ tests:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=mce
         NUM_WORKERS=3
+        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-metallb
@@ -911,6 +913,8 @@ tests:
         OLM_OPERATORS=mce
         NUM_MASTERS=1
         NUM_WORKERS=0
+        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
   optional: true
@@ -1119,9 +1123,9 @@ tests:
     workflow: assisted-oci
 - always_run: false
   as: e2e-oci-assisted-4-14
-  run_if_changed: ^(internal/provider/.*\.go|internal/provider/oci/.*|internal/provider/registry/.*)$
+  optional: true
   steps:
-    cluster_profile: nutanix
+    cluster_profile: oci-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.14

@@ -126,10 +126,13 @@ vhd_name=$(basename "${bastion_source_vhd_uri}")
 status="unknown"
 run_command "az storage container create --name ${storage_contnainer} --account-name ${sa_name} --account-key ${account_key}" &&
 run_command "az storage blob copy start --account-name ${sa_name} --account-key ${account_key} --destination-blob ${vhd_name} --destination-container ${storage_contnainer} --source-uri '${bastion_source_vhd_uri}'" || exit 2
+bastion_url_expiry=$(date -u -d "10 hours" '+%Y-%m-%dT%H:%MZ')
+bastion_url=$(az storage blob generate-sas -c ${storage_contnainer} -n ${vhd_name} --https-only --full-uri --permissions r --expiry ${bastion_url_expiry} --account-name ${sa_name} --account-key ${account_key} -o tsv)
 try=0 retries=30 interval=60
 while [ X"${status}" != X"success" ] && [ $try -lt $retries ]; do
     echo "check copy complete, ${try} try..."
-    cmd="az storage blob show --container-name ${storage_contnainer} --name '${vhd_name}' --account-name ${sa_name} --account-key ${account_key} -o tsv --query properties.copy.status"
+    #cmd="az storage blob show --container-name ${storage_contnainer} --name '${vhd_name}' --account-name ${sa_name} --account-key ${account_key} -o tsv --query properties.copy.status"
+    cmd="az storage blob show --blob-url '${bastion_url}' -o tsv --query properties.copy.status"
     echo "Command: $cmd"
     status=$(eval "$cmd" || echo "pending")
     echo "Status: $status"
