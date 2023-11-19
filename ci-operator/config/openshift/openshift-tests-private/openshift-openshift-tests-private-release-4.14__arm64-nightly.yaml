@@ -516,7 +516,9 @@ tests:
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
+      ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
@@ -527,8 +529,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-private-f14-disasterrecovery
-  cron: 39 2 1,16 * *
+- as: aws-ipi-private-f28-disasterrecovery
+  cron: 15 18 9 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -904,22 +906,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec-azurefile-csi
-- as: azure-ipi-private-f14-disasterrecovery
-  cron: 21 0 8,23 * *
-  steps:
-    cluster_profile: azure-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      OCP_ARCH: arm64
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
-      TEST_SCENARIOS: DR_Testing
-    test:
-    - ref: idp-htpasswd
-    - ref: openshift-extended-test-longduration
-    workflow: cucushift-installer-rehearse-azure-ipi-private
 - as: azure-ipi-proxy-tp-f28
   cron: 17 3 15 * *
   steps:
@@ -1027,7 +1013,9 @@ tests:
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
+      ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @azure-ipi and @heterogeneous
@@ -1314,8 +1302,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi
-- as: gcp-ipi-private-f14-disasterrecovery
-  cron: 34 1 8,23 * *
+- as: gcp-ipi-private-f28-disasterrecovery
+  cron: 21 22 5 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
@@ -1354,6 +1342,8 @@ tests:
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @gcp-ipi and @heterogeneous

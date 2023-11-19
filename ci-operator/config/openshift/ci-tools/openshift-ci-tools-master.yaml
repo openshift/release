@@ -616,6 +616,17 @@ images:
   to: github-ldap-user-group-creator
 - dockerfile_literal: |-
     FROM quay.io/centos/centos:stream8
+    ADD qci-appci /usr/bin/qci-appci
+    ENTRYPOINT ["qci-appci"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/qci-appci
+  to: qci-appci
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
     ADD payload-testing-prow-plugin /usr/bin/payload-testing-prow-plugin
     ENTRYPOINT ["/usr/bin/payload-testing-prow-plugin"]
   from: os
@@ -765,7 +776,7 @@ tests:
     test:
     - as: e2e
       commands: |
-        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig HIVE_KUBECONFIG=/tmp/hive/kubeconfig make e2e
+        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig HIVE_KUBECONFIG=/tmp/hive/kubeconfig MANIFEST_TOOL_SECRET=/secrets/manifest-tool/.dockerconfigjson LOCAL_REGISTRY_DNS=image-registry.openshift-image-registry.svc:5000 make e2e
       credentials:
       - mount_path: /auth
         name: ci-operator
@@ -799,7 +810,7 @@ tests:
     test:
     - as: e2e-oo
       commands: |
-        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig make e2e TAGS=e2e_framework,optional_operators
+        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig MANIFEST_TOOL_SECRET=/secrets/manifest-tool/.dockerconfigjson LOCAL_REGISTRY_DNS=image-registry.openshift-image-registry.svc:5000 make e2e TAGS=e2e_framework,optional_operators
       credentials:
       - mount_path: /auth
         name: ci-operator
@@ -815,6 +826,9 @@ tests:
         namespace: test-credentials
       - mount_path: /tmp/gcs
         name: gce-sa-credentials-gcs-publisher
+        namespace: test-credentials
+      - mount_path: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
         namespace: test-credentials
       from: test-bin
       resources:

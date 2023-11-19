@@ -1,4 +1,8 @@
 base_images:
+  ocp-4:
+    name: automation-flavors
+    namespace: stackrox
+    tag: openshift-4-0.8.7
   ubi-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -8,12 +12,6 @@ build_root:
     name: apollo-ci
     namespace: stackrox
     tag: stackrox-test-0.3.61
-releases:
-  latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.14"
 resources:
   '*':
     requests:
@@ -24,82 +22,65 @@ tests:
 - as: qa-e2e-tests
   postsubmit: true
   steps:
-    cluster_profile: aws
     env:
       COLLECTION_METHOD: core_bpf
+      OCP_VERSION: ocp/stable-4.14
       TEST_SUITE: ocp-qa-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
+    workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: qa-ebpf-e2e-tests
   postsubmit: true
   steps:
-    cluster_profile: aws
     env:
       COLLECTION_METHOD: ebpf
+      OCP_VERSION: ocp/stable-4.14
       TEST_SUITE: ocp-qa-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
+    workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: fips-qa-e2e-tests
   postsubmit: true
   steps:
-    cluster_profile: gcp
     env:
       COLLECTION_METHOD: core_bpf
       FIPS_ENABLED: "true"
+      OCP_VERSION: ocp/stable-4.14
       TEST_SUITE: ocp-qa-e2e-tests
-    pre:
-    - chain: ipi-gcp-pre
-    - ref: fips-check
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-gcp
+    workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: operator-e2e-tests
   postsubmit: true
   steps:
-    cluster_profile: aws
     env:
+      OCP_VERSION: ocp/stable-4.14
       TEST_SUITE: ocp-operator-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
+    workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: sensor-integration-tests
   postsubmit: true
   steps:
-    cluster_profile: aws
     env:
       COLLECTION_METHOD: core_bpf
+      OCP_VERSION: ocp/stable-4.14
       TEST_SUITE: ocp-sensor-integration-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
+    workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: ui-e2e-tests
   postsubmit: true
   steps:
-    cluster_profile: aws
     env:
       COLLECTION_METHOD: core_bpf
+      OCP_VERSION: ocp/stable-4.14
       TEST_SUITE: ocp-ui-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
+    workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: compliance-e2e-tests
   postsubmit: true
   steps:
-    cluster_profile: aws
     env:
       COLLECTION_METHOD: core_bpf
+      OCP_VERSION: ocp/stable-4.14
       TEST_SUITE: ocp-compliance-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
+    workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: nightlies

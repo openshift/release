@@ -1,0 +1,62 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.16-linux
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: bailer
+promotion:
+  disabled: true
+  name: "2.10"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: bailer
+    env:
+      IMAGE_REPO: bailer
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.10
+  org: stolostron
+  repo: bailer
