@@ -1,0 +1,56 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+  test-image:
+    name: strimzi-tests
+    namespace: ci
+    tag: release-0.36.x
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: amq-streams-2-5-rosa-aws
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "rosa-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["4.14-lp","rosa-lp","amq-streams-lp"]},
+          {"step": "aws-*", "failure_type": "all", "classification": "Infrastructure AWS", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["4.14-lp","rosa-lp","amq-streams-lp"]},
+          {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_project": "LPTOCPCI", "jira_additional_labels": ["4.14-lp","rosa-lp","amq-streams-lp"]},
+          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp","rosa-lp","amq-streams-lp"]},
+          {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp","rosa-lp","amq-streams-lp"]},
+          {"step": "strimzi-run-tests", "failure_type": "pod_failure", "classification": "Test Execution", "jira_project": "LPTOCPCI", "jira_additional_labels": ["4.14-lp","rosa-lp","amq-streams-lp","interop-tests"]},
+          {"step": "strimzi-run-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "ENTMQST", "jira_additional_labels": ["4.14-lp","rosa-lp","amq-streams-lp","interop-tests"]}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      GROUPS: sanity
+      OCM_LOGIN_ENV: staging
+      OLM_OPERATOR_VERSION: 2.5.1-1
+      OPENSHIFT_VERSION: "4.14"
+      ROSA_LOGIN_ENV: staging
+    test:
+    - ref: strimzi-run-tests
+    workflow: firewatch-rosa-aws-sts
+zz_generated_metadata:
+  branch: main
+  org: amq-streams-qe
+  repo: strimzi-kafka-operator
+  variant: amq-streams-ocp4.14-lp-rosa
