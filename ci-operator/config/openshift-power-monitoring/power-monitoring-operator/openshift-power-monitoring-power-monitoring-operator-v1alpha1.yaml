@@ -35,8 +35,9 @@ operator:
     with: pipeline:kepler-operator
 releases:
   latest:
-    release:
-      channel: stable
+    candidate:
+      product: ocp
+      stream: nightly
       version: "4.13"
 resources:
   '*':
@@ -44,10 +45,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: kepler-operator-e2e-aws
-  cron: 0 6 * * 1,3,5
+- as: kepler-operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
   steps:
-    cluster_profile: aws
     test:
     - as: install
       cli: latest
@@ -62,28 +68,8 @@ tests:
           cpu: 100m
           memory: 400Mi
     - ref: openshift-power-monitoring-tests-kepler
-    workflow: openshift-e2e-aws
-- as: kepler-operator-e2e-gcp
-  cron: 0 6 * * 1,3,5
-  steps:
-    cluster_profile: gcp
-    test:
-    - as: install
-      cli: latest
-      commands: |
-        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
-      dependencies:
-      - env: OO_BUNDLE
-        name: kepler-bundle
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 100m
-          memory: 400Mi
-    - ref: openshift-power-monitoring-tests-kepler
-    workflow: openshift-e2e-gcp
+    workflow: generic-claim
 zz_generated_metadata:
   branch: v1alpha1
   org: openshift-power-monitoring
-  repo: kepler-operator
-  variant: periodic
+  repo: power-monitoring-operator
