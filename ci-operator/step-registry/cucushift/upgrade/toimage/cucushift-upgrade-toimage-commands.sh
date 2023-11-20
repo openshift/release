@@ -565,6 +565,54 @@ function check_history() {
     fi
 }
 
+# if this is a management cluster upgrade for hosted cluster, check hosted cluster status
+function check_hostedcluster() {
+  ho=$(oc get pod --ignore-not-found -n hypershift)
+  if [[ -z "$ho" ]] ; then
+    echo "no hypershift operator found, this is not a management cluster for hosted cluster, skip hostedcluster check"
+    return 0
+  fi
+
+  hc=$(oc get hostedcluster --ignore-not-found -A)
+  if [[ -z "$hc" ]] ; then
+      echo "no hostedcluster found, treat it as a normal ocp upgrade, skip hostedcluster check"
+      return 0
+  fi
+
+  # check hostedcluster
+  check_ho_connection &
+}
+
+# query hypershift operator logs to check ho connection
+function check_ho_connection() {
+
+  hc_name=$(oc get hc -n clusters -ojsonpath='{.items[].metadata.name}')
+  counter=0
+  while true ; do
+    echo "-------------->"
+    oc get pod -n hypershift
+    oc logs -n hypershift -lapp=operator --tail=-1 | head -1
+    echo "-------------->"
+    oc get pod -n clusters-${hc_name} -owide
+
+    if [[ -f "${SHARED_DIR}/nested_kubeconfig" ]] ; then
+    echo "--------------> check hostedcluster apiserver connection"
+    oc --kubeconfig=${SHARED_DIR}/nested_kubeconfig get clusterversion
+    oc --kubeconfig=${SHARED_DIR}/nested_kubeconfig get co
+    fi
+    echo "--------------> $count"
+    date
+    sleep 5
+    counter=$(($counter+1))
+    # 20min
+    if [[ $counter -gt 240 ]] ; then
+      break
+    fi
+  done
+}
+
+
+
 if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
@@ -623,6 +671,7 @@ do
         update_cloud_credentials_oidc
     fi
     upgrade
+    check_hostedcluster
     check_upgrade_status
     check_history
 
