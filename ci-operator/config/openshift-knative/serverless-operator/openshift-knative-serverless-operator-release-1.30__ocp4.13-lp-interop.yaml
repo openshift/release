@@ -1,32 +1,28 @@
 base_images:
   base:
-    name: "4.14"
+    name: "4.13"
     namespace: ocp
     tag: base
   cli:
-    name: "4.14"
+    name: "4.13"
     namespace: ocp
     tag: cli
-  ocp_4.14_cli:
-    name: "4.14"
-    namespace: ocp
-    tag: cli
-  openshift_eventing-istio-src_knative-v1.11:
+  openshift_eventing-istio-src_knative-v1.9:
     name: eventing-istio-src
     namespace: openshift
-    tag: knative-v1.11
-  openshift_eventing-kafka-broker-src_knative-v1.11:
+    tag: knative-v1.9
+  openshift_eventing-kafka-broker-src_knative-v1.9:
     name: eventing-kafka-broker-src
     namespace: openshift
-    tag: knative-v1.11
-  openshift_knative-eventing-src_knative-v1.11:
+    tag: knative-v1.9
+  openshift_knative-eventing-src_knative-v1.9:
     name: knative-eventing-src
     namespace: openshift
-    tag: knative-v1.11
-  openshift_knative-serving-src_knative-v1.11:
+    tag: knative-v1.9
+  openshift_knative-serving-src_knative-v1.9:
     name: knative-serving-src
     namespace: openshift
-    tag: knative-v1.11
+    tag: knative-v1.9
   openshift_release_golang-1.19:
     name: release
     namespace: openshift
@@ -42,21 +38,18 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    ocp_4.14_cli:
+    openshift_eventing-istio-src_knative-v1.9:
       as:
-      - registry.ci.openshift.org/ocp/4.14:cli
-    openshift_eventing-istio-src_knative-v1.11:
+      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.9
+    openshift_eventing-kafka-broker-src_knative-v1.9:
       as:
-      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.11
-    openshift_eventing-kafka-broker-src_knative-v1.11:
+      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.9
+    openshift_knative-eventing-src_knative-v1.9:
       as:
-      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.11
-    openshift_knative-eventing-src_knative-v1.11:
+      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.9
+    openshift_knative-serving-src_knative-v1.9:
       as:
-      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.11
-    openshift_knative-serving-src_knative-v1.11:
-      as:
-      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.11
+      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.9
   to: serverless-operator-src
 - context_dir: .
   dockerfile_path: serving/ingress/Dockerfile
@@ -90,7 +83,7 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: metadata-webhook
-- dockerfile_path: olm-catalog/serverless-operator/Dockerfile
+- context_dir: olm-catalog/serverless-operator
   from: base
   to: serverless-bundle
 releases:
@@ -98,7 +91,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -107,8 +100,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: operator-e2e-interop-aws-ocp414
-  cron: 0 6 25 12 *
+- as: operator-e2e-interop
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -144,42 +136,10 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: knative-serving-eventing-e2e
-      commands: make test-upstream-e2e-no-upgrade
-      dependencies:
-      - env: KNATIVE_OPENSHIFT_INGRESS
-        name: knative-openshift-ingress
-      - env: KNATIVE_OPERATOR
-        name: knative-operator
-      - env: OPENSHIFT_KNATIVE_OPERATOR
-        name: openshift-knative-operator
-      from: serverless-operator-src
-      resources:
-        limits:
-          memory: 6Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: knative-eventing-kafka-broker-e2e
-      commands: make test-upstream-e2e-kafka-no-upgrade
-      dependencies:
-      - env: KNATIVE_OPENSHIFT_INGRESS
-        name: knative-openshift-ingress
-      - env: KNATIVE_OPERATOR
-        name: knative-operator
-      - env: OPENSHIFT_KNATIVE_OPERATOR
-        name: openshift-knative-operator
-      from: serverless-operator-src
-      resources:
-        limits:
-          memory: 6Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
     workflow: firewatch-ipi-aws
   timeout: 8h0m0s
 zz_generated_metadata:
-  branch: main
+  branch: release-1.30
   org: openshift-knative
   repo: serverless-operator
-  variant: ocp4.14-lp-interop
+  variant: ocp4.13-lp-interop
