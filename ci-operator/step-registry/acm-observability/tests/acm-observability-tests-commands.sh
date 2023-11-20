@@ -5,13 +5,8 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-sleep 2h
-
-KUBECONFIG=""
-KUBEADMIN_PASSWORD=""
-
-# Login to the hub cluster as kube:admin
-export KUBECONFIG
+# Login to the ACM hub cluster as kube:admin
+KUBEADMIN_PASSWORD=$(cat ${SHARED_DIR}/${HUB_CLUSTER_NAME}/kubeadmin-password)
 oc login --username=kubeadmin --password=${KUBEADMIN_PASSWORD}
 
 # Run ACM Observability tests
