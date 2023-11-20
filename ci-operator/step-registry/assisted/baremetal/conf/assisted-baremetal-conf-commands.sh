@@ -13,7 +13,11 @@ case "${CLUSTER_TYPE}" in
         export TEST_PROVIDER=vsphere
         ;;
 
-    packet-edge|nutanix|oci-edge)
+    packet-edge|nutanix)
+        export TEST_PROVIDER=baremetal
+        ;;
+
+    oci-edge)
         export TEST_PROVIDER=baremetal
         ;;
 
