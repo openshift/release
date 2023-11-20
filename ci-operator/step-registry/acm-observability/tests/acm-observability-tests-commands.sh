@@ -15,5 +15,6 @@ export KUBECONFIG
 oc login --username=kubeadmin --password=${KUBEADMIN_PASSWORD}
 
 # Run ACM Observability tests
-export KUBEADMIN_TOKEN=$(oc whoami -t)
+KUBEADMIN_TOKEN=$(oc whoami -t)
+export KUBEADMIN_TOKEN
 poetry run pytest -m acm_observability --cluster-name=${HUB_CLUSTER_NAME}
