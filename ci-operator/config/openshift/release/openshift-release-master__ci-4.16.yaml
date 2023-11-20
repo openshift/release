@@ -1,0 +1,517 @@
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.16"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-sdn
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn
+- as: e2e-aws-sdn-techpreview
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn
+- as: e2e-aws-ovn-no-capabilities
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      BASELINE_CAPABILITY_SET: None
+      PERSISTENT_MONITORING: "false"
+      TEST_SKIPS: check registry.redhat.io is available and samples operator can import
+        sample imagestreams
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-ovn
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-ovn-proxy
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-proxy
+- as: e2e-aws-sdn-serial
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn-serial
+- as: e2e-aws-ovn-serial
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn-serial
+- as: e2e-aws-sdn-techpreview-serial
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn-serial
+- as: e2e-aws-sdn-multitenant
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn-multi
+- as: e2e-aws-sdn-upgrade
+  cluster: build01
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-sdn
+- as: e2e-aws-sdn-upgrade-out-of-change
+  cluster: build01
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-sdn
+- as: e2e-aws-ovn-upgrade
+  cluster: build01
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-ovn
+- as: e2e-aws-ovn-upgrade-out-of-change
+  cluster: build01
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-ovn
+- as: e2e-aws-cilium
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-cilium
+- as: e2e-aws-sdn-imdsv2
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      AWS_METADATA_SERVICE_AUTH: Required
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn
+- as: e2e-azure-sdn
+  interval: 168h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-sdn
+- as: e2e-azure-sdn-techpreview
+  interval: 168h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-sdn
+- as: e2e-azure-sdn-serial
+  interval: 168h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-sdn-serial
+- as: e2e-azure-sdn-techpreview-serial
+  interval: 168h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-sdn-serial
+- as: e2e-azure-sdn-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-azure-sdn
+- as: e2e-azure-sdn-upgrade-out-of-change
+  interval: 168h
+  steps:
+    cluster_profile: azure-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-azure-sdn
+- as: e2e-azure-ovn-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-azure-ovn
+- as: e2e-azure-ovn-upgrade-out-of-change
+  interval: 168h
+  steps:
+    cluster_profile: azure-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-azure-ovn
+- as: e2e-azure-cilium
+  interval: 168h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-cilium
+- as: e2e-azure-ovn
+  interval: 168h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      FAIL_ON_CORE_DUMP: "true"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-ovn
+- as: e2e-gcp-sdn
+  interval: 168h
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-sdn
+- as: e2e-gcp-sdn-techpreview
+  interval: 168h
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-sdn
+- as: e2e-gcp-ovn
+  interval: 168h
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-ovn
+- as: e2e-gcp-ovn-mount-ns-hiding
+  interval: 168h
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      MOUNT_NS_HIDING_ENABLED: "true"
+      MOUNT_NS_HIDING_LOG: "2"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-mount-ns-hiding
+- as: e2e-gcp-sdn-techpreview-serial
+  interval: 168h
+  steps:
+    cluster_profile: gcp-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-sdn-serial
+- as: e2e-gcp-sdn-upgrade
+  cluster: build02
+  interval: 168h
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-gcp-sdn
+- as: e2e-gcp-sdn-upgrade-out-of-change
+  cluster: build02
+  interval: 168h
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-gcp-sdn
+- as: e2e-gcp-ovn-upgrade
+  cluster: build02
+  interval: 168h
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-gcp-ovn
+- as: e2e-gcp-ovn-upgrade-out-of-change
+  cluster: build02
+  interval: 168h
+  steps:
+    cluster_profile: gcp-3
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-gcp-ovn
+- as: e2e-gcp-cilium
+  interval: 168h
+  steps:
+    cluster_profile: gcp-3
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-cilium
+- as: e2e-gcp-secureboot
+  interval: 168h
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-secureboot
+  timeout: 6h0m0s
+- as: e2e-aws-sdn-upgrade-rollback
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=random
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-sdn
+- as: e2e-aws-upgrade-ovn-single-node
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-single-node
+- as: e2e-aws-ovn-network-migration
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
+        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
+        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-config-multicast
+    - ref: ovn-sdn-migration
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-validate-multicast
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-sdn
+- as: e2e-network-migration-rollback
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
+        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
+        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-config-multicast
+    - ref: ovn-sdn-migration
+    - ref: ovn-sdn-migration-rollback
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-validate-multicast
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-sdn
+- as: e2e-aws-sdn-cgroupsv2
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn-cgroupsv2
+- as: e2e-aws-sdn-crun
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn-crun
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: ci-4.16
