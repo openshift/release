@@ -1,0 +1,58 @@
+base_images:
+  base:
+    name: "4.15"
+    namespace: ocp
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  driver-toolkit-tests:
+    name: "4.15"
+    namespace: ocp
+    tag: driver-toolkit-tests
+  upi-installer:
+    name: "4.15"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.15"
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.15"
+  oldest-supported-z-rollback:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.15"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-external-aws
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-external-aws
+  timeout: 6h0m0s
+- as: e2e-external-aws-ccm
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
+    workflow: openshift-e2e-external-aws
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: ec-4.15
