@@ -7,10 +7,11 @@ set -o verbose
 
 sleep 2h
 
-export KUBECONFIG=""
-export KUBEADMIN_PASSWORD=""
+KUBECONFIG=""
+KUBEADMIN_PASSWORD=""
 
 # Login to the hub cluster as kube:admin
+export KUBECONFIG
 oc login --username=kubeadmin --password=${KUBEADMIN_PASSWORD}
 
 # Run ACM Observability tests
