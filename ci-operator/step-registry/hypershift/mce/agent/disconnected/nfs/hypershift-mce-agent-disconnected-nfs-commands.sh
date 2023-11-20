@@ -29,8 +29,8 @@ metadata:
 spec:
   repositoryDigestMirrors:
   - mirrors:
-    - \${mirror_registry}/openshifttest
-    source: quay.io/openshifttest
+    - \${mirror_registry}
+    source: quay.io
 END
 
 echo "3. deploy nfs provisioner"

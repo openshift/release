@@ -42,10 +42,15 @@ PLAYLOADIMAGE=\$(oc get clusterversion version -ojsonpath='{.status.desired.imag
 
 EXTRA_ARGS=""
 if [[ "\$DISCONNECTED" == "true" ]]; then
-  PLAYLOADIMAGE=\$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
-  HO_OPERATOR_IMAGE="\${PLAYLOADIMAGE//@sha256:[^ ]*/@\$(oc adm release info "\$PLAYLOADIMAGE" | grep hypershift | awk '{print \$2}')}"
-  podman pull "\$HO_OPERATOR_IMAGE"
-  EXTRA_ARGS+=\$(echo "--annotations=hypershift.openshift.io/control-plane-operator-image=\$HO_OPERATOR_IMAGE ")
+  mirror_registry=\$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]')
+  mirror_registry=\${mirror_registry%%/*}
+  if [[ \$mirror_registry == "" ]] ; then
+      echo "Warning: Can not find the mirror registry, abort !!!"
+      exit 0
+  fi
+  oc image mirror quay.io/jparrill/hypershift@sha256:36e82b8f80077794870bf1e68ecf0fc142cf2ee7ce85deebced54b95f0cbe3e2 \${mirror_registry}/jparrill/hypershift:OCPBUGS-22295v1
+
+  EXTRA_ARGS+=\$(echo "--annotations=hypershift.openshift.io/control-plane-operator-image=quay.io/jparrill/hypershift@sha256:36e82b8f80077794870bf1e68ecf0fc142cf2ee7ce85deebced54b95f0cbe3e2 ")
   EXTRA_ARGS+=\$(echo "--additional-trust-bundle /etc/pki/ca-trust/source/anchors/registry.2.crt ")
 fi
 
@@ -59,7 +64,6 @@ fi
   --agent-namespace="\${CLUSTER_NAMESPACE}" \
   --namespace local-cluster \
   --base-domain=\${BASEDOMAIN} \
-  --api-server-address=api.\${CLUSTER_NAME}.\${BASEDOMAIN} \
   --image-content-sources "/home/mgmt_iscp.yaml" \
   --release-image \${PLAYLOADIMAGE}
 
