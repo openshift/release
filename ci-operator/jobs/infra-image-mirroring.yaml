@@ -1487,3 +1487,51 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@hourly'
+  decorate: true
+  labels:
+    ci.openshift.io/area: lightspeed-service
+    ci.openshift.io/role: image-mirroring
+  name: periodic-image-mirroring-lightspeed-service
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        failures=0
+        for mapping in /etc/imagemirror/mapping_lightspeed_service*; do
+          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+            echo "ERROR: Failed to mirror images from $mapping"
+            failures=$((failures+1))
+          fi
+        done
+        exit $failures
+      command:
+      - /bin/bash
+      env:
+      - name: HOME
+        value: /home/mirror
+      image: registry.ci.openshift.org/ocp/4.12:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /home/mirror/.docker/config.json
+        name: push
+        readOnly: true
+        subPath: config.json
+      - mountPath: /etc/imagemirror
+        name: config
+    volumes:
+    - name: push
+      secret:
+        secretName: registry-push-credentials-openshift
+    - configMap:
+        name: image-mirror-mappings
+      name: config
