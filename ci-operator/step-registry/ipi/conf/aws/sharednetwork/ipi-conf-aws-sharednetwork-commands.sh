@@ -22,7 +22,7 @@ job_ref_version=master
 
 ## rehearse jobs must use the target branch defined in the job.
 if [[ "${JOB_NAME}" == rehearse* ]]; then
-  echo "> Discovering custom template URL for reheare job with JOB_TYPE=${JOB_TYPE}"
+  echo "> Discovering custom template URL for rehearse job with JOB_TYPE=${JOB_TYPE}"
   job_ref_version=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[0].base_ref // null' || true)
 
 ## presubmit and periodic must use the ref commit hash.
@@ -109,33 +109,93 @@ function wait_for_stack() {
   echo_date "Waiting to create stack complete: ${stack_name}"
   aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}"
 
-  template_url="${TEMPLATE_SRC_REPO}/${TEMPLATE_STACK_LOCALZONE}"
-  template_path="${TEMPLATE_DEST}/${TEMPLATE_STACK_LOCALZONE}"
-  echo "Downloading Local Zone CloudFormation template from [${template_url}] to [${template_path}]"
-  curl -L "${template_url}" -o "${template_path}"
+  echo_date "Stack ${stack_name} completed"
+
+  stack_status=$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" | jq -r '.Stacks[0].StackStatus // null')
+  if [[ "$stack_status" != "CREATE_COMPLETE" ]]; then
+    echo_date "Detected Failed Stack deployment with status: [${stack_status}]"
+
+    echo_date "Collecting stack events before failing:"
+    aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json \
+      | tee "${ARTIFACT_DIR}/events_cfn_stack_${stack_name}.json"
+    exit 1
+  fi
+}
+
+# deploy_stack deploys the CloudFormation stack, waiting the creation.
+function deploy_stack() {
+  local stack_name=$1; shift
+  local template_name=$1;
+  local template_path="${TEMPLATE_DEST}/${template_name}"
+  local parameters_path="${TEMPLATE_DEST}/${template_name}.parameters.json"
+
+  echo_date "Initializing CloudFormation Stack creation"
+  cat <<EOF
+stack_name=$stack_name
+template_path=$template_path
+parameters_path=$parameters_path
+EOF
+
+  get_template "${template_name}"
+
+  echo_date "Creating CloudFormation stack ${stack_name} with template $template_name"
+  set +e
+  if aws --region "${REGION}" cloudformation create-stack \
+    --stack-name "${stack_name}" \
+    --template-body file://"${template_path}" \
+    --tags ${TAGS[*]} \
+    --parameters file://"${parameters_path}"; then
+
+    echo_date "Created stack: ${stack_name}"
+    echo "${stack_name}" >> "${SHARED_DIR}/deprovision_stacks"
+
+  else
+    echo_date "ERROR when creating CloudFormation stack. Items to check:"
+    echo "- Build log"
+    echo "- CloudFormation Template: ARTIFACT_DIR/${template_name}"
+    echo "- CloudFormation Template parameters: ARTIFACT_DIR/${template_name}.parameters.json"
+  fi
+
+  wait_for_stack "${stack_name}"
+  set -e
+}
+
+# create_stack_vpc trigger the CloudFormation Stack creaion for VPC resources.
+function create_stack_vpc() {
+  echo_date "Initializing CloudFormation Stack creation for VPC"
+
+  # The above cloudformation template's max zones account is 3
+  if [[ "${ZONES_COUNT}" -gt 3 ]]
+  then
+    ZONES_COUNT=3
+  fi
+
+  STACK_NAME_VPC="${CLUSTER_NAME}-shared-vpc"
+  STACK_PARAMS_VPC="${TEMPLATE_DEST}/${TEMPLATE_STACK_VPC}.parameters.json"
+
+  add_param_to_json AvailabilityZoneCount "${ZONES_COUNT}" "${STACK_PARAMS_VPC}"
+  deploy_stack "${STACK_NAME_VPC}" "${TEMPLATE_STACK_VPC}"
+
+  SUBNETS_STR="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -c '[.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetIds")).OutputValue | split(",")[]]')"
+  echo "Subnets : ${SUBNETS_STR}"
+
+  VPC_ID=$(aws --region "$REGION" cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -r '.Stacks[].Outputs[] | select(.OutputKey=="VpcId").OutputValue')
+}
+
+# create_stack_vpc trigger the CloudFormation Stack creaion for LOcal Zone subnets.
+function create_stack_localzone() {
+  echo_date "Initializing CloudFormation Stack creation for Local Zone"
 
   # Randomly select the Local Zone in the Region (to increase coverage of tested zones added automatically)
   localzone_name=$(< "${SHARED_DIR}"/edge-zone-name.txt)
   echo_date "Local Zone selected: ${localzone_name}"
 
-  vpc_rtb_pub=$(aws --region "$REGION" cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="PublicRouteTableId").OutputValue')
-  echo "VPC info: ${vpc_id} [public route table=${vpc_rtb_pub}]"
+  vpc_rtb_pub=$(aws --region "$REGION" cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" \
+    | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="PublicRouteTableId").OutputValue')
+  echo_date "VPC info: ${VPC_ID} [public route table=${vpc_rtb_pub}]"
 
-  echo "Creating Local Zone subnet CloudFormation stack using template file $TEMPLATE_STACK_LOCALZONE"
-  stack_name_localzone="${CLUSTER_NAME}-${localzone_name}"
-  aws --region "${REGION}" cloudformation create-stack \
-    --stack-name "${stack_name_localzone}" \
-    --template-body "$(cat ${TEMPLATE_DEST}/${TEMPLATE_STACK_LOCALZONE})" \
-    --tags "${TAGS}" \
-    --parameters \
-      ParameterKey=VpcId,ParameterValue="${vpc_id}" \
-      ParameterKey=PublicRouteTableId,ParameterValue="${vpc_rtb_pub}" \
-      ParameterKey=SubnetName,ParameterValue="${CLUSTER_NAME}-public-${localzone_name}" \
-      ParameterKey=ZoneName,ParameterValue="${localzone_name}" \
-      ParameterKey=PublicSubnetCidr,ParameterValue="10.0.128.0/20" &
-  
-  wait "$!"
-  echo "Created stack ${stack_name_localzone}"
+  STACK_PARAMS_LOCALZONE="${TEMPLATE_DEST}/${TEMPLATE_STACK_LOCALZONE}.parameters.json"
+  STACK_NAME_LOCALZONE="${CLUSTER_NAME}-${localzone_name}"
 
   add_param_to_json VpcId "${VPC_ID}" "${STACK_PARAMS_LOCALZONE}"
   add_param_to_json PublicRouteTableId "${vpc_rtb_pub}" "${STACK_PARAMS_LOCALZONE}"
