@@ -32,7 +32,7 @@ function rosa_login()
 
 }
 
-function classic_rosa_upgrade()
+function rosa_upgrade()
 {
 
   RELEASE_IMAGE_INTERMEDIATE=${RELEASE_IMAGE_INTERMEDIATE:=""}
@@ -45,6 +45,7 @@ function classic_rosa_upgrade()
 
   RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST:=""}
   CURRENT_VERSION=$(oc get clusterversion -ojsonpath={..desired.version})
+  ROSA_CLUSTER_TYPE=${ROSA_CLUSTER_TYPE:="classic"}
   #OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:=$RELEASE_IMAGE_LATEST}
 
   SHARED_DIR=${SHARED_DIR:=""}
@@ -79,26 +80,44 @@ function classic_rosa_upgrade()
   fi
 
   echo "######################################################################"
-  rosa list upgrade -c $CLUSTER_ID
+  rosa describe cluster -c $CLUSTER_ID --region $REGION
+  echo "######################################################################"
+  rosa list upgrade -c $CLUSTER_ID --region $REGION
   echo "######################################################################"
 
-  RECOMMEND_VERSION=`rosa list upgrade -c $CLUSTER_ID | grep recommended | awk '{print $1}'`
+  RECOMMEND_VERSION=`rosa list upgrade -c $CLUSTER_ID --region $REGION | grep recommended | awk '{print $1}'`
 
-  #If fail to find TARGET_RELEASES, use RECOMMEND_VERSION
-  if [[ -z $TARGET_RELEASES ]];then
-	  UPGRADE_TO_VERSION=$RECOMMEND_VERSION
+  #prior to use RECOMMEND_VERSION
+  if [[ -z $RECOMMEND_VERSION ]];then
+	 export UPGRADE_TO_VERSION=$TARGET_RELEASES
   else
-	  UPGRADE_TO_VERSION=$TARGET_RELEASES
+	 export UPGRADE_TO_VERSION=$RECOMMEND_VERSION
   fi
+
+  #Save target version to shared dir
+  echo  $UPGRADE_TO_VERSION >${SHARED_DIR}/perfscale-upgrade-target-version
+
   echo  "-------------------------------------------------------------------------------------------"
   echo  Loaded Upgrade from [ $CURRENT_VERSION ] to [ $UPGRADE_TO_VERSION ] for $CLUSTER_ID on $REGION
   echo  "-------------------------------------------------------------------------------------------"
-  echo rosa upgrade cluster -c $CLUSTER_ID --mode=auto --region $REGION --version $UPGRADE_TO_VERSION  --schedule-date $SCHEDULE_DATE --schedule-time $SCHEDULE_TIME -y
   echo "###############################`date`#######################################"
-  rosa upgrade cluster -c $CLUSTER_ID --mode=auto --region $REGION --version $UPGRADE_TO_VERSION --schedule-date $SCHEDULE_DATE --schedule-time $SCHEDULE_TIME -y
+  if [[ $ROSA_CLUSTER_TYPE == "classic" ]];then
+     echo upgrade rosa classic cluster
+     echo rosa upgrade cluster -c $CLUSTER_ID --mode=auto --region $REGION --version $UPGRADE_TO_VERSION  --schedule-date $SCHEDULE_DATE --schedule-time $SCHEDULE_TIME -y
+     rosa upgrade cluster -c $CLUSTER_ID --mode=auto --region $REGION --version $UPGRADE_TO_VERSION --schedule-date $SCHEDULE_DATE --schedule-time $SCHEDULE_TIME -y
+  elif [[ $ROSA_CLUSTER_TYPE == "hcp" ]];then
+     echo upgrade rosa hosted control plance
+     echo rosa upgrade cluster -c $CLUSTER_ID --mode=auto --region $REGION --version $UPGRADE_TO_VERSION --yes --control-plane
+     rosa upgrade cluster -c $CLUSTER_ID --mode=auto --region $REGION --version $UPGRADE_TO_VERSION --yes --control-plane
+  else
+      echo "Un-supported clsuter type $ROSA_CLUSTER_TYPE" 
+  fi
 
+  echo "######################################################################"
+  rosa describe cluster -c $CLUSTER_ID --region $REGION
+  echo "######################################################################"
 
-  echo "Checking ROSA upgrade status ..."
+  echo "Checking if ROSA cluster upgrade scheduled ..."
   INIT=1
   MAXRETRY=120
   while true
@@ -106,7 +125,7 @@ function classic_rosa_upgrade()
 	  UPGRADE_STATE=$(rosa describe upgrade --region $REGION -c $CLUSTER_ID | grep 'Upgrade State:' | awk -F':' '{print $2}' | tr -d ' ')
 	  if [[ $UPGRADE_STATE == "scheduled" ]];then
                   echo "######################################################################"
-		  echo "ROSA Upgrade has been sucessfully scheduled"
+		  echo "ROSA cluster Upgrade has been sucessfully scheduled"
                   echo "######################################################################"
 		  break
 	  fi
@@ -119,16 +138,15 @@ function classic_rosa_upgrade()
 	  sleep 10
   done
 
-  echo
-  echo "Check ROSA if upgrade started"
+  echo "Check ROSA cluster if upgrade started"
   INIT=1
-  MAXRETRY=210
+  MAXRETRY=180
   UPGRADE_STATE=""
   echo "######################################################################"
   while true
   do
-	  UPGRADE_STATE=$(rosa describe upgrade --region $REGION -c $CLUSTER_ID | grep 'Upgrade State:' | awk -F':' '{print $2}' | tr -d ' ')
-	  if [[ $UPGRADE_STATE == "started" ]];then
+	  CLUSTER_UPGRADE_STATE=$(rosa describe upgrade --region $REGION -c $CLUSTER_ID | grep 'Upgrade State:' | awk -F':' '{print $2}' | tr -d ' ')
+	  if [[ $CLUSTER_UPGRADE_STATE == "started" ]];then
                   echo
                   echo "######################################################################"
 		  echo "ROSA Upgrade has been sucessfully started"
@@ -149,11 +167,43 @@ function classic_rosa_upgrade()
 	  INIT=$(( $INIT + 1 ))
   done
 
+  echo "Check if cluster version and confirm if the rosa hcp control plane/classic rosa has been upgrade successfully"
+  INIT=1
+  MAXRETRY=240
+  while true
+  do
+          ACTUAL_VERSION=`rosa describe cluster -c $CLUSTER_ID --region $REGION |grep 'OpenShift Version' | awk -F':' '{print $2}'| tr -d ' '`
+	  if [[ ${UPGRADE_TO_VERSION} == "${ACTUAL_VERSION}" ]];then
+                  echo
+                  echo "######################################################################"
+		  echo "ROSA HCP Control Plane/classic rosa Upgrade has been sucessfully done"
+                  echo "######################################################################"
+		  UPGRADE_DURATION=$(( $INIT * 30 ))
+		  echo "The rosa upgrade take about $UPGRADE_DURATION second to complete"
+		  break
+	  fi
+
+	  if [[ $INIT -gt $MAXRETRY ]];then
+                  echo
+                  echo "######################################################################"
+		  echo "Fail to upgrade rosa control plane/classic rosa in limited time, please check rosa cluster"
+		  rosa describe upgrade --region $REGION -c $CLUSTER_ID
+                  echo "----------------------------------------------------------------------"
+                  oc get co
+                  echo "----------------------------------------------------------------------"
+                  oc get nodes
+                  echo "----------------------------------------------------------------------"
+                  oc describe nodes
+                  echo "######################################################################"
+		  echo "End Date Tiime: `date`"
+		  exit 1
+	  fi
+	  echo -n "."&&sleep 30
+	  INIT=$(( $INIT + 1 ))
+  done
 }
 
 
-#main
-#set -x
 CLUSTER_ID=${CLUSTER_ID:=""}
 LEASED_RESOURCE=${LEASED_RESOURCE:=""}
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
@@ -167,4 +217,7 @@ else
   exit 1
 fi
 rosa_login $CLOUD_PROVIDER_REGION
-classic_rosa_upgrade $CLOUD_PROVIDER_REGION
+rosa_upgrade $CLOUD_PROVIDER_REGION
+echo "######################################################################"
+rosa describe cluster -c $CLUSTER_ID --region $REGION
+echo "######################################################################"
