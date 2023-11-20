@@ -321,7 +321,7 @@ CONFIG = {
     'hypershift-powervs-cb-quota-slice': {
         'default': 5,
     },
-    'ossm-quota-slice': {
+    'aws-ossm-dev-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'default': 1000,
     },
