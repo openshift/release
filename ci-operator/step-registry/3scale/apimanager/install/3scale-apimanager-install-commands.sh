@@ -12,5 +12,8 @@ AWS_SECRET_ACCESS_KEY=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_acces
 export AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY
 
+# Add the required permissions to the service account used for test runs
+oc policy add-role-to-user apimanagers.apps.3scale.net-v1alpha1-admin -z zync-que-sa -n threescale
+
 echo "Deploying APIManager"
 deploy install
