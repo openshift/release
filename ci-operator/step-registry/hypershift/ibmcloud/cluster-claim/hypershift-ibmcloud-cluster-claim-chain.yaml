@@ -5,7 +5,10 @@ chain:
     commands: |-
       oc --kubeconfig="${MANAGEMENT_CLUSTER_KUBECONFIG}" get deploy -n hypershift operator || exit 0
       BUILD_ID=$(oc --kubeconfig="${MANAGEMENT_CLUSTER_KUBECONFIG}" get deploy -n hypershift operator -o jsonpath='{.metadata.labels.build-id}')
-      echo "HyperShift operator deployment found on the PR test cluster. There may be another PR test in progress. Build ${BUILD_ID} installed the current HO deployment."
+      echo "HyperShift operator deployment found on the PR test cluster. There may be another PR test in progress."
+      if [[ "${BUILD_ID}" != "" ]]; then
+        echo "Build ${BUILD_ID} installed the current HO deployment."
+      fi
       exit 1
     credentials:
     - mount_path: /etc/ibmcloud/secrets
