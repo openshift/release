@@ -71,8 +71,8 @@ tests:
     - as: test-unit
       cli: latest
       commands: |
-        export IMAGE_HOST=quay.io IMAGE_NAMESPACE=pipeline-integrations \
-          TEST_IMAGE_REPO=quay.io/pipeline-integrations/openshift-ci-e2e GO_ARCH=amd64
+        export IMAGE_HOST=quay.io IMAGE_NAMESPACE=piteam_openshiftci \
+          TEST_IMAGE_REPO=quay.io/piteam_openshiftci/build-unit GO_ARCH=amd64
         mkdir -p ${HOME}/.docker
         cp /tmp/secret/.dockerconfigjson ${HOME}/.docker/config.json
         echo "------------------------------install-tekton------------------------------"
@@ -105,7 +105,7 @@ tests:
         make test
       credentials:
       - mount_path: /tmp/secret/
-        name: dockerconfigjson
+        name: dockerconfigjsonnew
         namespace: test-credentials
       from: src-kubectl
       resources:
@@ -125,13 +125,8 @@ tests:
     - as: test-e2e
       cli: latest
       commands: |
-        export IMAGE_HOST=quay.io IMAGE_NAMESPACE=pipeline-integrations \
-          TEST_IMAGE_REPO=quay.io/pipeline-integrations/openshift-ci-e2e GO_ARCH=amd64
-        oc projects
-        echo "checking for route in registry"
-        oc project openshift-image-registry
-        oc get all
-        oc get svc
+        export IMAGE_HOST=quay.io IMAGE_NAMESPACE=piteam_openshiftci \
+          TEST_IMAGE_REPO=quay.io/piteam_openshiftci/build-e2e GO_ARCH=amd64
         mkdir -p ${HOME}/.docker
         cp /tmp/secret/.dockerconfigjson ${HOME}/.docker/config.json
         echo "------------------------------install-tekton------------------------------"
@@ -160,13 +155,13 @@ tests:
         echo "------------------------------install-strategies------------------------------"
         oc project default
         oc adm policy add-scc-to-user privileged -z pipeline
-        oc create secret docker-registry registry-credential --docker-server=image-registry.openshift-image-registry.svc:5000 --docker-username=kubeadmin --docker-password=`oc whoami -t`
+        oc create secret docker-registry registry-credential --docker-server=quay.io --docker-username=piteam_openshiftci+openshift_ci --docker-password=`cat /tmp/secret/password.secrets.sh`
         make install-strategies
         echo "------------------------------run-e2e-tests------------------------------"
-        make IMAGE_HOST=image-registry.openshift-image-registry.svc:5000 IMAGE_NAMESPACE=default TEST_IMAGE_REPO=image-registry.openshift-image-registry.svc:5000/default TEST_IMAGE_REPO_SECRET=registry-credential test-e2e
+        make TEST_IMAGE_REPO_SECRET=registry-credential test-e2e
       credentials:
       - mount_path: /tmp/secret
-        name: dockerconfigjson
+        name: dockerconfigjsonnew
         namespace: test-credentials
       from: src-kubectl
       resources:
@@ -186,8 +181,8 @@ tests:
     - as: test-integration
       cli: latest
       commands: |
-        export IMAGE_HOST=quay.io IMAGE_NAMESPACE=pipeline-integrations\
-          TEST_IMAGE_REPO=quay.io/pipeline-integrations GO_ARCH=amd64
+        export IMAGE_HOST=quay.io IMAGE_NAMESPACE=piteam_openshiftci\
+          TEST_IMAGE_REPO=quay.io/piteam_openshiftci/build-integration GO_ARCH=amd64
         echo "------------------------------setup-creds------------------------------"
         mkdir -p ${HOME}/.docker
         cat /tmp/secret/.dockerconfigjson
@@ -195,12 +190,12 @@ tests:
         # oc new-project test-shipwright
         oc project default
         oc adm policy add-scc-to-user privileged -z pipeline
-        oc create secret docker-registry registry-credential --docker-server=quay.io --docker-username=pipeline-integrations+openshift_ci --docker-password=`cat /tmp/secret/password.secrets.sh`
+        oc create secret docker-registry registry-credential --docker-server=quay.io --docker-username=piteam_openshiftci+openshift_ci --docker-password=`cat /tmp/secret/password.secrets.sh`
         echo "------------------------------run-integration-tests------------------------------"
         make TEST_IMAGE_REPO_SECRET=registry-credential test-integration
       credentials:
       - mount_path: /tmp/secret
-        name: dockerconfigjson
+        name: dockerconfigjsonnew
         namespace: test-credentials
       from: src-kubectl
       resources:
