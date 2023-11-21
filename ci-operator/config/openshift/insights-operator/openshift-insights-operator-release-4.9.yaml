@@ -1,41 +1,37 @@
 base_images:
   base:
-    name: "4.14"
+    name: "4.9"
     namespace: ocp
     tag: base
-  dev-scripts:
-    name: test
-    namespace: ocp-kni
-    tag: dev-scripts
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
-    tag: latest
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    tag: "4.9"
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.16-openshift-4.9
 build_root:
   from_repository: true
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: insights-operator
 promotion:
-  name: "4.14"
+  name: "4.9"
   namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.9"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.9"
       namespace: ocp
 resources:
   '*':
@@ -49,36 +45,18 @@ tests:
   container:
     from: src
 - as: unit
-  commands: |
-    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
-    make unit
+  commands: make test
   container:
     from: src
-  secret:
-    mount_path: /tmp/secret
-    name: insights-operator-codecov-token
-- as: publish-coverage
-  commands: |
-    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
-    make coverage
-  container:
-    from: src
-  postsubmit: true
-  secret:
-    mount_path: /tmp/secret
-    name: insights-operator-codecov-token
 - as: e2e
-  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: e2e-agnostic-upgrade
-  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - as: insights-operator-e2e-tests
-  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: gcp
     pre:
@@ -87,7 +65,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -m "not ui and not tp_only"
+      commands: pytest.sh -m "not ui"
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -98,7 +76,7 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: insights-operator-e2e-tests-periodic
-  cron: 0 0 * * *
+  cron: 49 0 10,23 * *
   steps:
     cluster_profile: gcp
     pre:
@@ -107,7 +85,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -k "not tp_only" --junitxml=${ARTIFACT_DIR}/test-report.xml
+      commands: pytest.sh --junitxml=${ARTIFACT_DIR}/test-report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -118,7 +96,7 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: insights-operator-test-time-periodic
-  cron: 0 0 * * *
+  cron: 41 19 13,24 * *
   steps:
     cluster_profile: gcp
     pre:
@@ -133,36 +111,7 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-gcp-ovn-techpreview
-  steps:
-    cluster_profile: gcp
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    pre:
-    - chain: ipi-gcp-pre
-    - ref: insights-live
-    test:
-    - as: test
-      cli: latest
-      commands: pytest.sh -m "not ui and techpreview"
-      credentials:
-      - mount_path: /secrets
-        name: insights-qa
-        namespace: test-credentials
-      from: insights-operator-tests
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-gcp
-- always_run: false
-  as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
-  optional: true
-  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
-  steps:
-    cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-ovn-ipv6
 zz_generated_metadata:
-  branch: release-4.14
+  branch: release-4.9
   org: openshift
   repo: insights-operator
