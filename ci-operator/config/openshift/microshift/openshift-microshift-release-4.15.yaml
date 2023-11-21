@@ -73,18 +73,18 @@ tests:
   commands: RPM_INFO=true make rpm srpm
   container:
     from: microshift-test-rpm
-  run_if_changed: ^(rpm/*|packaging/.*|Makefile)
+  run_if_changed: ^(rpm/.*|packaging/.*|Makefile)$
 - as: test-rebase
   cluster: build02
   optional: true
-  run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod)
+  run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod)$
   steps:
     env:
       DRY_RUN: "y"
     workflow: openshift-microshift-rebase
 - as: microshift-metal-tests
   cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh|.*\.ks\.template)
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: aws
     env:
@@ -110,7 +110,7 @@ tests:
     workflow: openshift-microshift-e2e-metal-cache
 - as: metal-periodic-test
   cluster: build02
-  run_if_changed: (.*periodic.*|^test/bin/.*)
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: aws
     env:
@@ -119,6 +119,7 @@ tests:
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-conformance
   cluster: build02
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|origin/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: aws
     env:
