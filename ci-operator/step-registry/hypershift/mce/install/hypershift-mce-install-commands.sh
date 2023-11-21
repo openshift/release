@@ -21,7 +21,7 @@ spec:
     source: registry.redhat.io/multicluster-engine
   - mirrors:
     - registry.redhat.io/openshift4/ose-oauth-proxy
-    source: registry.access.redhat.com/openshift4/ose-oauth-proxy"
+    source: registry.access.redhat.com/openshift4/ose-oauth-proxy
 EOF
 
 QUAY_USERNAME=$(cat /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_username)

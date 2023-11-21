@@ -1,0 +1,52 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/build-root/Dockerfile
+images:
+- context_dir: openshift-ci/build-root/source-image
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: oc-bin-image
+releases:
+  initial:
+    integration:
+      name: "4.13"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.13"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 800m
+      memory: 6Gi
+tests:
+- as: showcase-e2e-periodic
+  cron: 0 1 * * 1
+  steps:
+    cluster_profile: aws
+    test:
+    - as: showcase-e2e-test-steps
+      commands: scripts/openshiftci-showcase-e2e-test.sh
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+      timeout: 4h0m0s
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: janus-idp
+  repo: showcase-e2e
+  variant: v4.13

@@ -34,9 +34,11 @@ function run_command_with_retries() {
       interval=30
   fi
 
+  set +o errexit
+  
   output=$(eval "$cmd"); ret=$?
   try=1
-  set +o errexit
+
   # avoid exit with "del Resource groups with active or pending reclamation instances can't be deleted"
   while [ X"$ret" != X"0" ] && [ $try -lt $retries ]; do
       sleep $interval

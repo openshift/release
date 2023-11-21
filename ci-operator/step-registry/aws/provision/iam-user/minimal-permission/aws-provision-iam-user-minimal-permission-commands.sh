@@ -252,6 +252,14 @@ if (( ocp_minor_version >= 11 && ocp_major_version == 4 )); then
   echo "s3:GetBucketPolicy" >> "${PERMISION_LIST}"
 fi
 
+# additional permisions for 4.14+
+if (( ocp_minor_version >= 14 && ocp_major_version == 4 )); then
+  echo "ec2:DescribeSecurityGroupRules" >> "${PERMISION_LIST}"
+
+  # sts:AssumeRole is required for Shared-VPC install https://issues.redhat.com/browse/OCPBUGS-17751
+  echo "sts:AssumeRole" >> "${PERMISION_LIST}"
+fi
+
 # generte policy file
 
 PERMISION_JSON="${ARTIFACT_DIR}/permision_list.json"

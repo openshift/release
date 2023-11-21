@@ -54,11 +54,13 @@ mkdir -p /tmp/artifacts
 
 function run-tests() {
   pushd crc
+  cp -r test/testdata ${HOME}/testdata
   set +e
-  export PULL_SECRET_FILE=--pull-secret-file="${HOME}"/pull-secret
-  export BUNDLE_LOCATION=--bundle-location="${HOME}"/$(cat "${HOME}"/bundle)
-  export CRC_BINARY=--crc-binary=/tmp/
-  make e2e GODOG_OPTS="--godog.tags='~@story_registry && @linux && ~@minimal'"
+  /tmp/e2e.test --pull-secret-file="${HOME}"/pull-secret \
+                --bundle-location="${HOME}"/$(cat "${HOME}"/bundle) \
+                --crc-binary=/tmp \
+                --godog.tags='~@story_registry && @linux && ~@minimal && ~@microshift' \
+                --godog.paths test/e2e/features/
   if [[ $? -ne 0 ]]; then
     exit 1
     popd
@@ -72,7 +74,7 @@ EOF
 chmod +x "${HOME}"/run-tests.sh
 
 # Get the bundle
-curl -L "https://storage.googleapis.com/crc-bundle-github-ci/${BUNDLE}" -o /tmp/${BUNDLE}
+curl -L "https://mirror.openshift.com/pub/openshift-v4/clients/crc/bundles/openshift/${BUNDLE_VERSION}/${BUNDLE}" -o /tmp/${BUNDLE}
 
 echo "${BUNDLE}" > "${HOME}"/bundle
 
@@ -93,6 +95,12 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse /bin/crc packer@"${INSTANCE_PREFIX}":/tmp/crc
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse /bin/e2e.test packer@"${INSTANCE_PREFIX}":/tmp/e2e.test
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \

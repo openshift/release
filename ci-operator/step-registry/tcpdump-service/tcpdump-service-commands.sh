@@ -16,7 +16,7 @@ set -e
 echo "Running tcpdump:"
 
 # Grab all 443 traffic, all attempts to filter have caused us to miss what we need.
-/usr/sbin/tcpdump -nn -U -i any -s 256 -w "/var/log/tcpdump/tcpdump-\$(date +'%FT%H%M%S').pcap" 'tcp and (port 443 or 6443)'
+/usr/sbin/tcpdump -nn -U -i any -s 256 -w "/var/log/tcpdump/tcpdump-\$(date +'%FT%H%M%S').pcap" 'tcp and (port 443 or 6443 or 1337)'
 EOF
 )
 
@@ -25,13 +25,14 @@ b64_script=$(echo "$sysd_script" | base64 -w 0)
 
 # Create the MachineConfig manifest with embedded b64 encoded systemd script, and the two
 # systemd units to (a) install tcpdump, and (b) run the script.
-cat > "${SHARED_DIR}/manifest_tcpdump_service_machineconfig.yaml" << EOF
+for role in master worker; do
+cat > "${SHARED_DIR}/manifest_tcpdump_service_machineconfig_${role}.yaml" << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
   labels:
-    machineconfiguration.openshift.io/role: worker
-  name: tcpdump-service
+    machineconfiguration.openshift.io/role: $role
+  name: tcpdump-service-$role
 spec:
   config:
     ignition:
@@ -57,7 +58,7 @@ spec:
           [Service]
           Type=oneshot
           ExecStart=rpm-ostree usroverlay
-          ExecStart=rpm -ihv http://mirror.centos.org/centos/8-stream/AppStream/x86_64/os/Packages/tcpdump-4.9.3-3.el8.x86_64.rpm
+          ExecStart=rpm -ihv https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/tcpdump-4.99.0-6.el9.x86_64.rpm
           RemainAfterExit=yes
 
           [Install]
@@ -82,6 +83,7 @@ spec:
         name: tcpdump.service
 EOF
 
-echo "manifest_tcpdump_service_machineconfig.yaml"
+echo "manifest_tcpdump_service_machineconfig_${role}.yaml"
 echo "---------------------------------------------"
-cat ${SHARED_DIR}/manifest_tcpdump_service_machineconfig.yaml
+cat ${SHARED_DIR}/manifest_tcpdump_service_machineconfig_${role}.yaml
+done

@@ -2,13 +2,13 @@ base_images:
   go-builder:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.19-openshift-4.13
+    tag: rhel-9-golang-1.20-openshift-4.14
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.48.0
+    tag: v1.53.1
   operator-sdk:
-    name: "4.13"
+    name: "4.14"
     namespace: origin
     tag: operator-sdk
 binary_build_commands: make manager
@@ -16,7 +16,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.20
 images:
 - build_args:
   - name: TARGET
@@ -32,14 +32,16 @@ images:
   inputs:
     ubi9-minimal-entitled:
       as:
-      - registry.access.redhat.com/ubi9/ubi-minimal:9.2
+      - registry.access.redhat.com/ubi9/ubi-minimal:9.3
   to: kernel-module-management-signimage
 - dockerfile_path: Dockerfile.must-gather
   to: kernel-module-management-must-gather
+- dockerfile_path: Dockerfile.worker
+  to: kernel-module-management-worker
 - dockerfile_literal: |
     FROM ubi9-minimal
     RUN rm -rf /etc/yum.repos.d/*
-    RUN curl http://base-4-13-rhel9.ocp.svc > /etc/yum.repos.d/base-4-13-rhel9.repo
+    RUN curl http://base-4-14-rhel9.ocp.svc > /etc/yum.repos.d/base-4-14-rhel9.repo
   to: ubi9-minimal-entitled
 - dockerfile_literal: |
     FROM src
@@ -62,6 +64,8 @@ operator:
     with: pipeline:kernel-module-management-operator-hub
   - pullspec: quay.io/edge-infrastructure/kernel-module-management-signimage:latest
     with: pipeline:kernel-module-management-signimage
+  - pullspec: quay.io/edge-infrastructure/kernel-module-management-worker:latest
+    with: pipeline:kernel-module-management-worker
 promotion:
   excluded_images:
   - ubi9-minimal-entitled
@@ -73,7 +77,7 @@ releases:
   latest:
     release:
       channel: fast
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -153,7 +157,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.13"
   steps:
     test:
     - as: install
@@ -161,7 +165,7 @@ tests:
       commands: |
         oc create namespace openshift-kmm
         operator-sdk run bundle -n openshift-kmm "$OO_BUNDLE"
-        oc wait --for=condition=Available -n openshift-kmm --timeout=1m deployment/kmm-operator-controller-manager
+        oc wait --for=condition=Available -n openshift-kmm --timeout=1m deployment/kmm-operator-controller
       dependencies:
       - env: OO_BUNDLE
         name: operator-bundle
@@ -188,7 +192,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.13"
   steps:
     test:
     - as: run-test
@@ -208,6 +212,12 @@ tests:
           cpu: 1000m
           memory: 500Mi
     workflow: generic-claim
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: kmm
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge

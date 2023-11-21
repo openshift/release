@@ -163,6 +163,9 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-serving-test-wsserver
+- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+  from: src
+  to: knative-serving-source-image
 promotion:
   additional_images:
     knative-serving-src: src
@@ -184,13 +187,15 @@ tests:
     version: "4.10"
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-serving-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
@@ -199,15 +204,29 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-serving-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
       timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-serving-source-image
+      grace_period: 1m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
     test:
     - as: test
       cli: latest
-      commands: make test-e2e
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-e2e
       dependencies:
       - env: KNATIVE_SERVING_ACTIVATOR
         name: knative-serving-activator
@@ -261,7 +280,9 @@ tests:
         name: knative-serving-test-volumes
       - env: KNATIVE_SERVING_TEST_WSSERVER
         name: knative-serving-test-wsserver
-      from: src
+      - env: KNATIVE_SERVING_SOURCE_IMAGE
+        name: knative-serving-source-image
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -275,16 +296,18 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.10"
-  cron: 0 21 * * 1-5
+  cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-serving-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
@@ -293,15 +316,29 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-serving-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
       timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-serving-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
     test:
     - as: test
       cli: latest
-      commands: make test-e2e
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-e2e
       dependencies:
       - env: KNATIVE_SERVING_ACTIVATOR
         name: knative-serving-activator
@@ -355,7 +392,9 @@ tests:
         name: knative-serving-test-volumes
       - env: KNATIVE_SERVING_TEST_WSSERVER
         name: knative-serving-test-wsserver
-      from: src
+      - env: KNATIVE_SERVING_SOURCE_IMAGE
+        name: knative-serving-source-image
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -371,13 +410,15 @@ tests:
     version: "4.10"
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-serving-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
@@ -386,15 +427,29 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-serving-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
       timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-serving-source-image
+      grace_period: 1m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
     test:
     - as: test
       cli: latest
-      commands: make test-e2e-tls
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-e2e-tls
       dependencies:
       - env: KNATIVE_SERVING_ACTIVATOR
         name: knative-serving-activator
@@ -448,7 +503,9 @@ tests:
         name: knative-serving-test-volumes
       - env: KNATIVE_SERVING_TEST_WSSERVER
         name: knative-serving-test-wsserver
-      from: src
+      - env: KNATIVE_SERVING_SOURCE_IMAGE
+        name: knative-serving-source-image
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m
@@ -462,16 +519,18 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.10"
-  cron: 0 21 * * 1-5
+  cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-serving-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
@@ -480,15 +539,29 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-serving-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
       timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-serving-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
     test:
     - as: test
       cli: latest
-      commands: make test-e2e-tls
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-e2e-tls
       dependencies:
       - env: KNATIVE_SERVING_ACTIVATOR
         name: knative-serving-activator
@@ -542,7 +615,9 @@ tests:
         name: knative-serving-test-volumes
       - env: KNATIVE_SERVING_TEST_WSSERVER
         name: knative-serving-test-wsserver
-      from: src
+      - env: KNATIVE_SERVING_SOURCE_IMAGE
+        name: knative-serving-source-image
+      from: knative-serving-source-image
       resources:
         requests:
           cpu: 100m

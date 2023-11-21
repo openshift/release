@@ -27,6 +27,10 @@ base_images:
     name: govc
     namespace: ci
     tag: v0.29.0
+  upi-installer:
+    name: "4.15"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -104,22 +108,6 @@ tests:
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-net-suite-periodic
-  cron: 43 22 */1 * 1-5
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.7
-        KUBE_API=true
-        ENABLE_KUBE_API=true
-        NUM_MASTERS=1
-        ISO_IMAGE_TYPE=minimal-iso
-        STATIC_IPS=true
-        TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="test_kube_api_parallel"
-      TEST_SUITE: full
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-ha-kube-api
   optional: true
   steps:
@@ -165,7 +153,7 @@ tests:
 - as: e2e-vsphere-assisted-kube-api
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.7
@@ -181,7 +169,7 @@ tests:
 - as: e2e-vsphere-assisted-kube-api-periodic
   cron: 00 00 */1 * 0-5
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.7

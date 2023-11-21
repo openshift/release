@@ -57,8 +57,10 @@ function run-tests() {
   pushd crc
   set +e
   export PULL_SECRET_PATH="${HOME}"/pull-secret
+  set -e
   export BUNDLE_PATH="${HOME}"/$(cat "${HOME}"/bundle)
-  make integration
+   
+  /tmp/integration.test
   if [[ $? -ne 0 ]]; then
     exit 1
     popd
@@ -72,7 +74,7 @@ EOF
 chmod +x "${HOME}"/run-tests.sh
 
 # Get the bundle
-curl -L "https://storage.googleapis.com/crc-bundle-github-ci/${BUNDLE}" -o /tmp/${BUNDLE}
+curl -L "https://mirror.openshift.com/pub/openshift-v4/clients/crc/bundles/openshift/${BUNDLE_VERSION}/${BUNDLE}" -o /tmp/${BUNDLE}
 
 echo "${BUNDLE}" > "${HOME}"/bundle
 
@@ -93,6 +95,12 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse /bin/crc packer@"${INSTANCE_PREFIX}":/tmp/crc
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse /bin/integration.test packer@"${INSTANCE_PREFIX}":/tmp/integration.test
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \

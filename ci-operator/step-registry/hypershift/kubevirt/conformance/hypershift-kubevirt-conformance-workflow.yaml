@@ -19,8 +19,16 @@ workflow:
     Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
   steps:
     env:
+      HYPERSHIFT_NODE_COUNT: "2"
+      COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: c5n.metal
       CONTROL_PLANE_INSTANCE_TYPE: "m6i.2xlarge"
+      ZONES_COUNT: "3"
+      ETCD_STORAGE_CLASS: gp3-csi
+      SKIP_MONITOR_TEST: "true"
+    leases:
+      - env: LEASED_RESOURCE
+        resource_type: aws-3-quota-slice
     pre:
     - chain: ipi-aws-ovn-pre
     - chain: ipi-install
@@ -30,7 +38,6 @@ workflow:
     - chain: hypershift-kubevirt-create
     test:
     - chain: hypershift-conformance
-    - chain: hypershift-kubevirt-run-csi-e2e
     post:
     - chain: hypershift-dump
     - chain: gather-core-dump

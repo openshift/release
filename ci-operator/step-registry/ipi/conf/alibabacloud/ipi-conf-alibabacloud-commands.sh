@@ -25,6 +25,8 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 echo "Alibaba base domain: ${BASE_DOMAIN}"
 REGION="${LEASED_RESOURCE}"
 echo "Alibaba region: ${REGION}"
+INSTANCE_TYPE=ecs.g6.2xlarge
+echo "Alibaba instance type: ${INSTANCE_TYPE}"
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${BASE_DOMAIN}
@@ -32,4 +34,14 @@ platform:
   alibabacloud:
     region: ${REGION}
     resourceGroupID: ${CI_RESOURCE_GROUP_ID}
+controlPlane:  
+  name: master
+  platform:
+    alibabacloud:
+      instanceType: ${INSTANCE_TYPE}
+compute:
+- name: worker  
+  platform:
+    alibabacloud:
+      instanceType: ${INSTANCE_TYPE}    
 EOF

@@ -4,23 +4,6 @@ set -xeuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
-HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
-INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
-
-echo "Using Host $IP_ADDRESS"
-
-mkdir -p "${HOME}/.ssh"
-cat <<EOF >"${HOME}/.ssh/config"
-Host ${IP_ADDRESS}
-  User ${HOST_USER}
-  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
-  StrictHostKeyChecking accept-new
-  ServerAliveInterval 30
-  ServerAliveCountMax 1200
-EOF
-chmod 0600 "${HOME}/.ssh/config"
-
 cat <<'EOF' > "${HOME}"/suite.txt
 "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] listing mutating webhooks should work [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] listing validating webhooks should work [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
@@ -548,6 +531,4 @@ cat <<'EOF' > "${HOME}"/suite.txt
 EOF
 chmod +r "${HOME}/suite.txt"
 
-ssh "${INSTANCE_PREFIX}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
-
-KUBECONFIG=/tmp/kubeconfig openshift-tests run -v 2 --provider=none -f "${HOME}/suite.txt" -o "${ARTIFACT_DIR}/e2e.log" --junit-dir "${ARTIFACT_DIR}/junit"
+KUBECONFIG="${SHARED_DIR}/kubeconfig" openshift-tests run -v 2 --provider=none -f "${HOME}/suite.txt" -o "${ARTIFACT_DIR}/e2e.log" --junit-dir "${ARTIFACT_DIR}/junit"

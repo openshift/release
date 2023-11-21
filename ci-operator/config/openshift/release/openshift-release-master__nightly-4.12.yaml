@@ -8,27 +8,27 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-image-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -111,11 +111,7 @@ releases:
   oldest-supported-credentials-request:
     release:
       channel: candidate
-      version: 4.12.0-rc.0
-  oldest-supported-z-rollback:
-    release:
-      channel: candidate
-      version: 4.12.0
+      version: 4.12.29
 resources:
   '*':
     requests:
@@ -328,7 +324,7 @@ tests:
 - as: e2e-vsphere-sdn
   cron: 48 6 */5,18 * *
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     observers:
       enable:
       - observers-resource-watch
@@ -336,7 +332,7 @@ tests:
 - as: e2e-vsphere-ovn-techpreview
   cron: 35 19 */4,14 * *
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
@@ -359,7 +355,7 @@ tests:
 - as: e2e-vsphere-ovn
   cron: 22 21 */14,28 * *
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     observers:
       enable:
       - observers-resource-watch
@@ -367,7 +363,7 @@ tests:
 - as: e2e-vsphere-ovn-serial
   cron: 37 14 */13,26 * *
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     observers:
       enable:
       - observers-resource-watch
@@ -375,7 +371,7 @@ tests:
 - as: e2e-vsphere-ovn-techpreview-serial
   cron: 46 20 */1,10 * *
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -385,7 +381,7 @@ tests:
 - as: e2e-vsphere-ovn-upi
   cron: 48 8 */5,18 * *
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     observers:
       enable:
       - observers-resource-watch
@@ -393,7 +389,7 @@ tests:
 - as: e2e-vsphere-ovn-upi-serial
   cron: 5 18 */8,19 * *
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     observers:
       enable:
       - observers-resource-watch
@@ -401,7 +397,7 @@ tests:
 - as: e2e-vsphere-ovn-csi
   cron: 7 5 */12,21 * *
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -412,12 +408,12 @@ tests:
 - as: e2e-vsphere-zones
   cron: 2 16 */1,14 * *
   steps:
-    cluster_profile: vsphere-multizone
+    cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-ovn-etcd-scaling
   cron: 58 5 */6,16 * *
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     observers:
       enable:
       - observers-resource-watch
@@ -518,7 +514,7 @@ tests:
 - as: e2e-gcp-ovn-csi
   cron: 26 19 */8,19 * *
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     observers:
       enable:
       - observers-resource-watch
@@ -591,7 +587,7 @@ tests:
 - as: e2e-gcp-ovn-rt
   cron: 42 6 */3,13 * *
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       COMPUTE_NODE_TYPE: n2-standard-8
       RT_ENABLED: "true"
@@ -599,23 +595,8 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-realtime
-- as: e2e-aws-ovn-upgrade-rollback-oldest-supported
-  cron: 47 8 */2,14 * *
-  steps:
-    cluster_profile: aws-2
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      TEST_TYPE: upgrade-conformance
-      TEST_UPGRADE_OPTIONS: abort-at=random
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-aws
 - as: credentials-request-freeze
-  cron: 0 6 */6,19 * *
+  interval: 48h
   steps:
     dependencies:
       OPENSHIFT_FROZEN_RELEASE_IMAGE: release:oldest-supported-credentials-request
@@ -869,6 +850,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-cnf
+  timeout: 6h0m0s
 - as: e2e-telco5g-sno-cnftests
   cluster: build05
   cron: 30 08 */1 * 1-5
@@ -979,7 +961,7 @@ tests:
 - as: e2e-gcp-ovn-etcd-scaling
   cron: 6 15 */1,14 * *
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     observers:
       enable:
       - observers-resource-watch

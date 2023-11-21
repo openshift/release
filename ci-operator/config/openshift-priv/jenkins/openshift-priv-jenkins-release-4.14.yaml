@@ -3,10 +3,10 @@ base_images:
     name: 4.14-priv
     namespace: ocp-private
     tag: cli
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
+    tag: rhel-8-golang-1.20-openshift-4.14
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/jenkins
@@ -15,9 +15,9 @@ images:
   dockerfile_path: Dockerfile.rhel8
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
     src:
       paths:
       - destination_dir: .
@@ -27,16 +27,15 @@ images:
   dockerfile_path: Dockerfile.rhel8
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
     src:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/slave-base/.
   to: jenkins-agent-base
 promotion:
-  disabled: true
   name: 4.14-priv
   namespace: ocp-private
 releases:
@@ -59,13 +58,13 @@ tests:
   commands: hack/check-plugins-supply-chain-change.sh
   container:
     clone: true
-    from: ocp_builder_rhel-8-golang-1.19-openshift-4.13
+    from: ocp_builder_rhel-8-golang-1.20-openshift-4.14
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e-jenkins-image-tests
   commands: IMAGE_NAME=stable:jenkins make smoke
   container:
     clone: true
-    from: ocp_builder_rhel-8-golang-1.19-openshift-4.13
+    from: ocp_builder_rhel-8-golang-1.20-openshift-4.14
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -86,6 +85,12 @@ tests:
     test:
     - ref: jenkins-client-plugin-tests
     workflow: ipi-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: ocptools-jenkins
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.14
   org: openshift-priv

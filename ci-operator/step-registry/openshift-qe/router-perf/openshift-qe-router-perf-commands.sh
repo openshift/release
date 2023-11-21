@@ -13,6 +13,8 @@ source ./venv_qe/bin/activate
 
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
+GSHEET_KEY_LOCATION="/ga-gsheet/gcp-sa-account"
+export GSHEET_KEY_LOCATION
 
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking --depth=1
 pushd e2e-benchmarking/workloads/router-perf-v2
@@ -38,6 +40,12 @@ export SMALL_SCALE_CLIENTS='1 400'
 export SMALL_SCALE_CLIENTS_MIX='1 125'
 
 export GEN_CSV='true'
-export GSHEET_KEY_LOCATION="${CLUSTER_PROFILE_DIR}/gce.json"
+
 export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
-./ingress-performance.sh
+
+rm -f ${SHARED_DIR}/index.json
+
+./ingress-performance.sh 
+
+folder_name=$(ls -t -d /tmp/*/ | head -1)
+cp $folder_name/index_data.json ${SHARED_DIR}/index_data.json

@@ -7,34 +7,34 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.14_base:
+  ocp_4.15_base-rhel9:
     name: "4.15"
     namespace: ocp
-    tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-9-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 images:
 - dockerfile_path: build/Dockerfile.openshift
   inputs:
-    ocp_4.14_base:
+    ocp_4.15_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.14:base
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: kubernetes-nmstate-handler
 - dockerfile_path: build/Dockerfile.operator.openshift
   inputs:
-    ocp_4.14_base:
+    ocp_4.15_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.14:base
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: kubernetes-nmstate-operator
 - dockerfile_literal: |
     FROM src
@@ -48,6 +48,7 @@ images:
         source_path: /usr/bin/oc
   to: src-with-oc-and-kubectl
 promotion:
+  disabled: true
   excluded_images:
   - kubernetes-nmstate-handler
   - kubernetes-nmstate-operator
@@ -98,6 +99,8 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE="OpenShiftSDN"
         MIRROR_IMAGES=false
+      HANDLER_NAMESPACE: openshift-nmstate
+      OPERATOR_NAMESPACE: openshift-nmstate
     workflow: kubernetes-nmstate-e2e-handler
 - as: e2e-handler-ovn-ipv4
   cluster: build05
@@ -108,17 +111,9 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE="OVNKubernetes"
         MIRROR_IMAGES=false
+      HANDLER_NAMESPACE: openshift-nmstate
+      OPERATOR_NAMESPACE: openshift-nmstate
     workflow: kubernetes-nmstate-e2e-handler
-- as: e2e-operator-sdn-ipv4
-  cluster: build05
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE="OpenShiftSDN"
-        MIRROR_IMAGES=false
-    workflow: kubernetes-nmstate-e2e-operator
 - as: e2e-operator-ovn-ipv4
   cluster: build05
   steps:
@@ -128,6 +123,8 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE="OVNKubernetes"
         MIRROR_IMAGES=false
+      HANDLER_NAMESPACE: openshift-nmstate
+      OPERATOR_NAMESPACE: openshift-nmstate
     workflow: kubernetes-nmstate-e2e-operator
 zz_generated_metadata:
   branch: release-4.15

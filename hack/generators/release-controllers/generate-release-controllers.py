@@ -9,20 +9,21 @@
 # All non-static methods in contexts
 # pylint: disable=R0201
 
+import argparse
 # Allow TOOD
 # pylint: disable=W0511
 import json
 import logging
-import sys
-import pathlib
 import os
-import argparse
+import pathlib
+import sys
 
 from config import Context, Config
 
 # Change python path so we can import genlib
 sys.path.append(str(pathlib.Path(__file__).absolute().parent.parent.joinpath('lib')))
 import genlib
+
 sys.path.append(str(pathlib.Path(__file__).absolute().parents[0]))
 import content
 
@@ -31,9 +32,11 @@ logger = logging.getLogger()
 
 
 def generate_app_ci_content(config, git_clone_dir):
+    namespaces = []
     for private in (False, True):
         for arch in config.arches:
             context = Context(config, arch, private)
+            namespaces.append(context.is_namespace)
 
             with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'admin_deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
                 content.add_imagestream_namespace_rbac(gendoc)
@@ -103,7 +106,10 @@ def generate_app_ci_content(config, git_clone_dir):
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('deploy-ci-signer.yaml'), context) as gendoc:
         content.generate_signer_resources(gendoc)
 
-    # Development RBAC
+    # Release Admins RBAC
+    content.generate_release_admin_rbac(config)
+
+    # Release-controller Development RBAC
     content.generate_development_rbac(config)
 
     # TRT RBAC
@@ -112,9 +118,11 @@ def generate_app_ci_content(config, git_clone_dir):
     # Release Payload Controller
     content.add_release_payload_controller_resources(config, context)
 
+    # Release Reimport Controller
+    content.add_release_reimport_controller_resources(config, context, namespaces)
+
 
 def run(git_clone_dir, bump=False):
-
     config = Config(git_clone_dir)
 
     # Generate version specific files (if necessary)

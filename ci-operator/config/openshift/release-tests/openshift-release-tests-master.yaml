@@ -1,12 +1,31 @@
-build_root:
-  image_stream_tag:
+base_images:
+  tools:
     name: "4.14"
     namespace: ocp
     tag: tools
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.20-openshift-4.14
 images:
-- dockerfile_path: prow/Dockerfile
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install -y python3-devel && \
+      dnf install -y python3-pip && \
+      pip3 install --upgrade pip && \
+      pip3 install setuptools-rust cryptography pyyaml pygithub gitpython
   from: root
+  to: oar-python3
+- dockerfile_path: prow/Dockerfile
+  from: tools
   to: job-python3
+- dockerfile_path: Dockerfile
+  from: oar-python3
+  to: oar
+- dockerfile_path: prow/Dockerfile.k8sgpt
+  from: root
+  to: k8sgpt
 promotion:
   namespace: ci
   tag: master
@@ -19,6 +38,11 @@ resources:
       memory: 4Gi
 test_binary_build_commands: job --help
 tests:
+- as: oar-check
+  commands: oar --help
+  container:
+    from: oar
+  optional: true
 - as: stable-build-test
   cron: 0 * * * *
   steps:

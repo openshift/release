@@ -73,8 +73,10 @@ branch="${PULL_BASE_REF}"
 echo "INFO The base branch is $branch"
 
 if [[ -n "$RELEASE_REF" ]]; then
-    echo "INFO RELEASE_REF variable is set. Using $RELEASE_REF for OSCI_COMPONENT_BRANCH."
-    export OSCI_COMPONENT_BRANCH=${RELEASE_REF}
+    if [ -z "$OSCI_RELEASE_BRANCH" ]; then
+        echo "INFO OSCI_RELEASE_BRANCH variable is not set. Using $RELEASE_REF for OSCI_COMPONENT_BRANCH."
+        export OSCI_COMPONENT_BRANCH=${RELEASE_REF}
+    fi
     echo "INFO RELEASE_REF variable is set. Using $RELEASE_REF as branch."
     branch="${RELEASE_REF}"
 fi

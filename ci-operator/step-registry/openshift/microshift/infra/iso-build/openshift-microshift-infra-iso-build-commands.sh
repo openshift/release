@@ -1,10 +1,9 @@
 #!/bin/bash
 set -xeuo pipefail
+export PS4='+ $(date "+%T.%N") \011'
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
-IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
-HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
+IP_ADDRESS="$(cat "${SHARED_DIR}/public_address")"
+HOST_USER="$(cat "${SHARED_DIR}/ssh_user")"
 INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
 
 echo "Using Host $IP_ADDRESS"
@@ -30,10 +29,10 @@ if ! sudo subscription-manager status >&/dev/null; then
         --activationkey="\$(cat /tmp/subscription-manager-act-key)"
 fi
 
+sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
+
 chmod 0755 ~
-mkdir ~/rpms
-tar -xf /tmp/rpms.tar -C ~/rpms
-tar -xf /tmp/microshift.tgz -C ~
+tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 
 cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
 cp /tmp/ssh-privatekey ~/.ssh/id_rsa
@@ -43,18 +42,48 @@ chmod 0400 ~/.ssh/id_rsa*
 export PULL_SECRET="\${HOME}/.pull-secret.json"
 cp /tmp/pull-secret "\${PULL_SECRET}"
 
+# Set up the AWS CLI keys at the expected location for accessing the cached data.
+# Also, set the environment variables for using the profile and bucket.
+if [ -e /tmp/aws_access_key_id ] && [ -e /tmp/aws_secret_access_key ] ; then
+    echo "Setting up AWS CLI configuration for the 'microshift-ci' profile"
+    mkdir -p -m 0700 \${HOME}/.aws/
+
+    # Profile configuration
+    cat <<EOF2 >>\${HOME}/.aws/config
+
+[microshift-ci]
+region = ${EC2_REGION}
+output = json
+EOF2
+
+    # Profile credentials
+    cat <<EOF2 >>\${HOME}/.aws/credentials
+
+[microshift-ci]
+aws_access_key_id = \$(cat /tmp/aws_access_key_id)
+aws_secret_access_key = \$(cat /tmp/aws_secret_access_key)
+EOF2
+
+    # Permissions and environment settings
+    chmod -R go-rwx \${HOME}/.aws/
+    export AWS_PROFILE=microshift-ci
+    export AWS_BUCKET_NAME="microshift-build-cache-${EC2_REGION}"
+fi
+
 cd ~/microshift
 
-./test/bin/ci_phase_iso_build.sh
-
-./scripts/image-builder/build.sh -pull_secret_file "\${PULL_SECRET}" -microshift_rpms ~/rpms -authorized_keys_file ~/.ssh/id_rsa.pub -open_firewall_ports 6443:tcp
+export CI_JOB_NAME="${JOB_NAME}"
+if [[ "${JOB_NAME}" =~ .*metal-cache.* ]] ; then
+    ./test/bin/ci_phase_iso_build.sh -update_cache
+else
+    ./test/bin/ci_phase_iso_build.sh
+fi
 EOF
 chmod +x /tmp/iso.sh
 
-tar czf /tmp/microshift.tgz /microshift
+tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 
 scp \
-    /rpms.tar \
     /tmp/iso.sh \
     /var/run/rhsm/subscription-manager-org \
     /var/run/rhsm/subscription-manager-act-key \
@@ -64,4 +93,29 @@ scp \
     /tmp/microshift.tgz \
     "${INSTANCE_PREFIX}:/tmp"
 
-ssh "${INSTANCE_PREFIX}" "/tmp/iso.sh"
+if [ -e /var/run/microshift-dev-access-keys/aws_access_key_id ] && \
+   [ -e /var/run/microshift-dev-access-keys/aws_secret_access_key ] ; then
+    scp \
+        /var/run/microshift-dev-access-keys/aws_access_key_id \
+        /var/run/microshift-dev-access-keys/aws_secret_access_key \
+        "${INSTANCE_PREFIX}:/tmp"
+fi
+
+finalize() {
+  scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/build-logs" "${ARTIFACT_DIR}" || true
+  scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx_error.log" "${ARTIFACT_DIR}" || true
+  scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx.log" "${ARTIFACT_DIR}" || true
+}
+trap 'finalize' EXIT
+
+# Call wait regardless of the outcome of the kill command, in case some of the children are finished
+# by the time we try to kill them. There is only 1 child now, but this is generic enough to allow N.
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} || true; wait; fi' TERM
+
+# Run in background to allow trapping signals before the command ends. If running in foreground
+# then TERM is queued until the ssh completes. This might be too long to fit in the grace period
+# and get abruptly killed, which prevents gathering logs.
+ssh "${INSTANCE_PREFIX}" "/tmp/iso.sh" &
+# Run wait -n since we only have one background command. Should this change, please update the exit
+# status handling.
+wait -n

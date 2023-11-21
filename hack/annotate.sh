@@ -10,7 +10,21 @@ base="$( dirname "${BASH_SOURCE[0]}" )/.."
 # [4.11, 4.10, 4.9, 4.8, ...]
 releases=( $(ls "${base}/core-services/release-controller/_releases/" | grep "ocp-" | grep -Eo "4\.[0-9]+" | sort -Vr | uniq) )
 
-# Stolen from https://github.com/kubermatic/kubermatic/blob/00c0da788d618a4fbf3ddf1e9655c8a3a06d0a28/hack/lib.sh#L41 https://github.com/kubermatic/kubermatic/blob/00c0da788d618a4fbf3ddf1e9655c8a3a06d0a28/hack/lib.sh#L41
+# Stolen (and then revised) from https://github.com/kubermatic/kubermatic/blob/00c0da788d618a4fbf3ddf1e9655c8a3a06d0a28/hack/lib.sh#L41 https://github.com/kubermatic/kubermatic/blob/00c0da788d618a4fbf3ddf1e9655c8a3a06d0a28/hack/lib.sh#L41
+# Keep going and execute the next statement even if the nth attempt has failed
+keep_going=1
+# Whether retry has ever failed executing at least one command, after n attempts
+global_failure=0
+# When keep_going=1 the following script executes every retry but it fails overall (it exits non-zero):
+# ```sh
+# 	retry 1 false
+# 	retry 1 true
+# ```
+# When keep_going=0 the following script executes only the first retry and then fails immediately:
+# ```sh
+# 	retry 1 false
+# 	retry 1 true
+# ```
 retry() {
   retries=$1
   shift
@@ -25,6 +39,10 @@ retry() {
       sleep $delay
     else
       echo "Retry $count/$retries exited $rc, no more retries left." > /dev/stderr
+	  if [ $keep_going -eq 1 ]; then
+	  	global_failure=1
+	  	return 0
+	  fi
       return $rc
     fi
     delay=$((delay * 2))
@@ -92,3 +110,5 @@ annotate "ocp-s390x" "4-dev-preview-s390x" "ocp-4-dev-preview-s390x.json"
 annotate "ocp-ppc64le" "4-dev-preview-ppc64le" "ocp-4-dev-preview-ppc64le.json"
 annotate "ocp-arm64" "4-dev-preview-arm64" "ocp-4-dev-preview-arm64.json"
 annotate "ocp-multi" "4-dev-preview-multi" "ocp-4-dev-preview-multi.json"
+
+exit $global_failure

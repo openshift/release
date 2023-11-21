@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-test-infra:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -31,10 +31,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  driver-toolkit-tests:
-    name: "4.9"
-    namespace: ocp
-    tag: driver-toolkit-tests
   gcp-pd-csi-driver-operator-test:
     name: "4.9"
     namespace: ocp
@@ -168,22 +164,22 @@ tests:
 - as: e2e-vsphere
   cron: '@yearly'
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-serial
   cron: '@yearly'
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-upi
   cron: '@yearly'
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-upi-serial
   cron: '@yearly'
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-upi-serial
 - as: e2e-aws-ovn-local-gateway
   cron: 51 17 11,20 * *
@@ -196,12 +192,12 @@ tests:
 - as: e2e-vsphere-ovn
   cron: '@yearly'
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-csi
   cron: '@yearly'
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-csi-techpreview
 - as: e2e-aws-workers-rhel7
   cron: 31 9 8,21 * *
@@ -269,7 +265,7 @@ tests:
 - as: e2e-gcp-fips
   cron: 1 16 3,16 * *
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       FIPS_ENABLED: "true"
     pre:
@@ -279,7 +275,7 @@ tests:
 - as: e2e-gcp-csi
   cron: 20 22 4,14 * *
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     workflow: openshift-e2e-gcp-csi
 - as: e2e-gcp-csi-migration
   cron: 58 19 7,22 * *
@@ -365,10 +361,10 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
-      TEST_UPGRADE_OPTIONS: abort-at=random
+      TEST_UPGRADE_OPTIONS: abort-at=100
     workflow: openshift-upgrade-aws
 - as: credentials-request-freeze
-  cron: 27 3 8,20 * *
+  interval: 48h
   steps:
     dependencies:
       OPENSHIFT_FROZEN_RELEASE_IMAGE: release:oldest-supported-credentials-request
@@ -522,19 +518,6 @@ tests:
           cpu: 100m
           memory: 600Mi
     workflow: ipi-azure
-- as: e2e-aws-driver-toolkit
-  cron: 56 0 2,19 * *
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: make test-e2e
-      from: driver-toolkit-tests
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 - as: e2e-aws-upi
   cron: 32 1 8,25 * *
   steps:

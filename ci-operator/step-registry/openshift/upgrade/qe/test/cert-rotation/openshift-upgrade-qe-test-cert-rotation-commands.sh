@@ -1,6 +1,16 @@
 #!/bin/bash
 set -xeuo pipefail
 
+function download_oc(){
+    local tmp_bin_path='/tmp/oc-bin/'
+
+    mkdir -p "$tmp_bin_path"
+    curl -sSL --retry 3 --retry-delay 5 https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest-4.10/openshift-client-linux.tar.gz | tar xvzf - -C "${tmp_bin_path}" oc
+    export PATH=${tmp_bin_path}:$PATH
+    which oc
+    oc version --client
+}
+
 function extract_oc(){
     mkdir -p /tmp/client
     export OC_DIR="/tmp/client"
@@ -23,7 +33,15 @@ function extract_oc(){
 }
 
 # This step is executed after upgrade to target, oc client of target release should use as many new versions as possible, make sure new feature cert-rotation of oc amd is supported
-extract_oc
+ocp_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version)
+major_version=$(echo ${ocp_version} | cut -d '.' -f1)
+minor_version=$(echo ${ocp_version} | cut -d '.' -f2)
+if [[ -n "$minor_version" && "$minor_version" -lt 10 ]] ; then
+    echo "Y version is less than 10, using oc 4.10 directly"
+    download_oc
+else
+    extract_oc
+fi
 
 start_date=$(date +"%Y-%m-%dT%H:%M:%S%:z")
 
@@ -148,8 +166,11 @@ oc config new-admin-kubeconfig > "${SHARED_DIR}/admin.kubeconfig"
 # Detail see https://issues.redhat.com/browse/OCPBUGS-15793
 if oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami ;then
     :
-else
-    sleep 2
+elif sleep 10;oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami ;then
+    :
+else 
+    # 4.6 - 4.9 need to wait for more time
+    [[ ${major_version} -eq 4 && ${minor_version} -lt 10 ]] && sleep 60 || sleep 10
     oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami
 fi
 

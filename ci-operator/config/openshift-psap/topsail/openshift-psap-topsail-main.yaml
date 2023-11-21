@@ -1,0 +1,71 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: build/Dockerfile
+  from: os
+  to: topsail
+promotion:
+  name: master
+  namespace: psap
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- as: test-pr-no-cluster
+  steps:
+    test:
+    - as: test-pr
+      commands: run test-pr
+      credentials:
+      - mount_path: /var/run/psap-entitlement-secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+- as: test-pr
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.10"
+  steps:
+    test:
+    - as: test-pr
+      commands: run test-pr
+      credentials:
+      - mount_path: /var/run/psap-entitlement-secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: openshift-psap
+  repo: topsail

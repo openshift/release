@@ -107,14 +107,14 @@ set +x
 oc patch hostedcluster "$cluster_name" -n "$HYPERSHIFT_NAMESPACE" --type=merge -p '{"spec":{"release":{"image":"'"${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"'"}}}'
 
 _upgradeReady=1
-for ((i=1; i<=60; i++)); do
+for ((i=1; i<=120; i++)); do
     count=$(oc get hostedcluster -n "$HYPERSHIFT_NAMESPACE" "$cluster_name" -ojsonpath='{.status.version.history[?(@.image=="'"${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"'")].state}' | grep -c Completed || true)
     if [ "$count" -eq 1 ] ; then
         echo "HyperShift HostedCluster(CP) upgrade successful"
         _upgradeReady=0
         break
     fi
-    echo "Try ${i}/60: HyperShift HostedCluster(CP) is not updated yet. Checking again in 30 seconds"
+    echo "Try ${i}/120: HyperShift HostedCluster(CP) is not updated yet. Checking again in 30 seconds"
     sleep 30
 done
 

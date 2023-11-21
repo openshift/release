@@ -1,0 +1,141 @@
+base_images:
+  assisted-test-infra:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  builder:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.14"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- dockerfile_literal: |
+    FROM registry.redhat.io/ubi9/ubi:latest as builder
+    RUN INSTALL_PKGS=" \
+          gcc-c++ \
+          cmake \
+          make \
+          git \
+          unzip \
+          llvm-toolset \
+          " && \
+        dnf install -y $INSTALL_PKGS && \
+        rpm -V $INSTALL_PKGS && \
+        dnf clean all
+
+    ENV HOME=/root
+    RUN PB_REL="https://github.com/protocolbuffers/protobuf/releases" && \
+        curl -LO $PB_REL/download/v3.15.8/protoc-3.15.8-linux-x86_64.zip && \
+        unzip protoc-3.15.8-linux-x86_64.zip -d $HOME/.local
+    ENV PATH="$PATH:$HOME/.local/bin"
+
+    RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+    ENV CARGO_HOME=$HOME/.cargo
+    ENV PATH=$CARGO_HOME/bin:$PATH
+
+    RUN mkdir -p /src
+    WORKDIR /src
+    COPY . /src
+
+    RUN chmod -R 777 /src $CARGO_HOME
+  from: builder
+  to: recert-check
+- dockerfile_path: Dockerfile
+  to: recert
+promotion:
+  namespace: edge-infrastructure
+  tag: latest
+  tag_by_commit: true
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: true
+  as: cargo-check
+  commands: cargo check
+  container:
+    from: recert-check
+- always_run: true
+  as: cargo-clippy
+  commands: cargo clippy
+  container:
+    from: recert-check
+- always_run: false
+  as: e2e-aws-ovn-single-node-recert-serial
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SKIPS: Managed cluster should grow and decrease when scaling different
+        machineSets simultaneously
+      TEST_SUITE: openshift/conformance/serial
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node-recert
+- always_run: false
+  as: e2e-aws-ovn-single-node-recert-parallel
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SUITE: openshift/conformance/parallel
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node-recert
+- always_run: false
+  as: e2e-aws-ovn-single-node-recert-openshift-e2e-test-qe
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and @singlenode
+        and not @fips'
+      FILTERS_ADDITIONAL: ~LSO&
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: enable-qe-catalogsource
+    - chain: openshift-e2e-test-qe
+    workflow: openshift-e2e-aws-single-node-recert
+  timeout: 8h0m0s
+- always_run: false
+  as: baremetalds-sno-recert-cluster-rename
+  steps:
+    cluster_profile: packet-sno
+    test:
+    - ref: baremetalds-sno-conf
+    - ref: baremetalds-sno-rename
+    - ref: baremetalds-sno-test
+    workflow: baremetalds-sno
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: recert

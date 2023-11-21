@@ -5,15 +5,15 @@ metadata:
   name: admin
   namespace: hypershift-toolkit
 subjects:
-- kind: Group
-  apiGroup: rbac.authorization.k8s.io
-  name: hypershift-pool-admins
-- kind: Group
-  name: ci-admins
-  apiGroup: rbac.authorization.k8s.io
-- kind: ServiceAccount
-  name: hypershift-toolkit-admin
-  namespace: hypershift-toolkit
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: hypershift-pool-admins
+  - kind: Group
+    name: ci-admins
+    apiGroup: rbac.authorization.k8s.io
+  - kind: ServiceAccount
+    name: hypershift-toolkit-admin
+    namespace: hypershift-toolkit
 roleRef:
   kind: ClusterRole
   apiGroup: rbac.authorization.k8s.io
@@ -25,13 +25,40 @@ metadata:
   name: image-puller
   namespace: hypershift-toolkit
 subjects:
-- kind: Group
-  apiGroup: rbac.authorization.k8s.io
-  name: system:unauthenticated
-- kind: Group
-  apiGroup: rbac.authorization.k8s.io
-  name: system:authenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:unauthenticated
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:authenticated
 roleRef:
   kind: ClusterRole
   apiGroup: rbac.authorization.k8s.io
   name: system:image-puller
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: image-viewer
+rules:
+  - apiGroups:
+      - image.openshift.io
+    resources:
+      - images
+    verbs:
+      - list
+      - get
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: image-viewer
+  namespace: hypershift-toolkit
+subjects:
+  - kind: ServiceAccount
+    name: hypershift-toolkit-admin
+    namespace: hypershift-toolkit
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: image-viewer

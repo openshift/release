@@ -19,26 +19,26 @@ if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
   CONTROL_PLANE_SUBNET="$(jq -r '.controlSubnet' "${SHARED_DIR}/xpn.json")"
 fi
 
-if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]] && [[ ! -s "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
-  echo "Lack of VPC info, abort." && exit 1
+if [[ -s "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
+  NETWORK=$(yq-go r "${SHARED_DIR}/customer_vpc_subnets.yaml" 'platform.gcp.network')
+  CONTROL_PLANE_SUBNET=$(yq-go r "${SHARED_DIR}/customer_vpc_subnets.yaml" 'platform.gcp.controlPlaneSubnet')
 fi
 
+if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
+  echo "Could not find VPC network and control-plane subnet" && exit 1
+fi
 
 #####################################
 ##############Initialize#############
 #####################################
 workdir=`mktemp -d`
 
-curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-bastion-host/fedora-coreos-stable.json -o /tmp/fedora-coreos-stable.json
-IMAGE_NAME=$(jq -r .architectures.x86_64.images.gcp.name < /tmp/fedora-coreos-stable.json)
-if [ -z "${IMAGE_NAME}" ]; then
-  echo "Missing IMAGE in region: ${REGION}" 1>&2
-  exit 1
-fi
-IMAGE_PROJECT=$(jq -r .architectures.x86_64.images.gcp.project < /tmp/fedora-coreos-stable.json)
-IMAGE_RELEASE=$(jq -r .architectures.x86_64.images.gcp.release < /tmp/fedora-coreos-stable.json)
-echo "Using FCOS ${IMAGE_RELEASE} IMAGE: ${IMAGE_NAME}"
-
+# Generally we do not update boot image for bastion host very often, we just use it as a jump
+# host, mirror registry, and proxy server, these services do not have frequent update.
+# So hard-code them here.
+IMAGE_NAME="fedora-coreos-34-20210821-3-0-gcp-x86-64"
+IMAGE_PROJECT="fedora-coreos-cloud"
+echo "Using ${IMAGE_NAME} image from ${IMAGE_PROJECT} project"
 
 #####################################
 ###############Log In################
@@ -62,14 +62,6 @@ fi
 REGION="${LEASED_RESOURCE}"
 echo "Using region: ${REGION}"
 
-VPC_CONFIG="${SHARED_DIR}/customer_vpc_subnets.yaml"
-if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
-  NETWORK=$(yq-go r "${VPC_CONFIG}" 'platform.gcp.network')
-  CONTROL_PLANE_SUBNET=$(yq-go r "${VPC_CONFIG}" 'platform.gcp.controlPlaneSubnet')
-fi
-if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
-  echo "Could not find VPC network and control-plane subnet" && exit 1
-fi
 ZONE_0=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[0] | cut -d "/" -f9)
 MACHINE_TYPE="n2-standard-2"
 

@@ -1,0 +1,39 @@
+base_images:
+  base:
+    name: text-generation-inference
+    namespace: red-hat-data-services
+    tag: rhods-1.32-final
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  from: base
+  to: caikit-tgis-serving
+promotion:
+  namespace: red-hat-data-services
+  tag: rhods-1.32
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: stable-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: caikit-tgis-serving
+    env:
+      IMAGE_REPO: caikit-tgis-serving
+      RELEASE_VERSION: rhods-1.32
+    workflow: red-hat-data-services-ci-image-mirror
+zz_generated_metadata:
+  branch: rhods-1.32
+  org: red-hat-data-services
+  repo: caikit-tgis-serving

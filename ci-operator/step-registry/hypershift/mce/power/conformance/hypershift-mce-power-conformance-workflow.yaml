@@ -1,0 +1,27 @@
+workflow:
+  as: hypershift-mce-power-conformance
+  documentation: |-
+    The HyperShift mce power conformance workflow executes tests against a new ephemeral Hypershift Agent cluster
+    created on Power Nodes to validate the cluster creation reaches completed state.
+  steps:
+    pre:
+      - ref: ingress-aws-nlb-manifest
+      - chain: ipi-aws-pre
+      - ref: hypershift-mce-install
+      - ref: hypershift-mce-power-create
+    test:
+      - chain: hypershift-mce-power-test
+    post:
+      - ref: hypershift-mce-dump
+      - ref: hypershift-mce-power-destroy
+      - chain: ipi-aws-post
+    env:
+      HYPERSHIFT_BASE_DOMAIN: "hypershift.cis.ibm.net"
+      HYPERSHIFT_NODE_COUNT: 1
+      POWERVS_INSTANCE_CRN: "crn:v1:bluemix:public:power-iaas:tok04:a/c265c8cefda241ca9c107adcbbacaa84:d04e2b0c-58aa-4e64-85c1-ecb5ab00d03d::"
+      POWERVS_IMAGE: "rhcos-none"
+      POWERVS_NETWORK: "private-net"
+      CIS_INSTANCE: "hypershift.cis.ibm.net"
+      CIS_DOMAIN_ID: "2efc206d822e60cd3586d1f482ffac97"
+      BASTION: "rh-agent-ci-bastion.hypershift.cis.ibm.net"
+      BASTION_CI_SCRIPTS_DIR: "/root/agent-ci/scripts"

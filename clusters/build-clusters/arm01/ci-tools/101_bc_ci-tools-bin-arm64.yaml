@@ -1,0 +1,37 @@
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: ci-tools-bin-arm64
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: ci-tools-bin-arm64:latest
+  source:
+    git:
+      uri: https://github.com/openshift/ci-tools
+    dockerfile: |
+      FROM ci/ci-tools-build-root-arm64:1.19
+      LABEL maintainer="dgemoli@redhat.com"
+      COPY . /src/ci-tools/
+      WORKDIR /src/ci-tools
+      RUN make production-install
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: ci-tools-build-root-arm64:1.19
+        namespace: ci
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+  triggers:
+  - imageChange:
+      from:
+        kind: ImageStreamTag
+        name: ci-tools-build-root-arm64:1.19
+        namespace: ci
+    type: ImageChange

@@ -11,8 +11,13 @@ source "${SHARED_DIR}/govc.sh"
 
 bastion_path=$(< ${SHARED_DIR}/bastion_host_path)
 echo "$(date -u --rfc-3339=seconds) - Deprovisioning bastion host ${bastion_path}"
-govc vm.power -off=true ${bastion_path}
-govc vm.destroy ${bastion_path}
+destroy_ret=0
+govc vm.power -off=true ${bastion_path} || true
+govc vm.destroy ${bastion_path} || destroy_ret=1
+
+if [[ ${destroy_ret} -eq 1 ]]; then
+    echo "ERROR: fail to destroy bastion vm: ${bastion_path}, please check!"
+fi
 
 ## Destroying DNS resources of mirror registry
 if [[ -f "${SHARED_DIR}/bastion-host-dns-delete.json" ]]; then

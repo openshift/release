@@ -10,7 +10,9 @@ OCP_VERSION="${OCP_MAJOR_MINOR}"
 
 OCS_VERSION=$(oc get csv -n openshift-storage -o json | jq -r '.items[] | select(.metadata.name | startswith("ocs-operator")).spec.version' | cut -d. -f1,2)
 
-CLUSTER_NAME=$(cat "${SHARED_DIR}/CLUSTER_NAME")
+# CLUSTER_NAME=$(cat "${SHARED_DIR}/CLUSTER_NAME")
+# CLUSTER_NAME="cluster-name"
+CLUSTER_NAME=$([[ -f "${SHARED_DIR}/CLUSTER_NAME" ]] && cat "${SHARED_DIR}/CLUSTER_NAME" || echo "cluster-name")
 CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-release-ci.cnv-qe.rhood.us}"
 LOGS_FOLDER="${ARTIFACT_DIR}/ocs-tests"
 LOGS_CONFIG="${LOGS_FOLDER}/ocs-tests-config.yaml"
@@ -31,6 +33,9 @@ cat > "${LOGS_CONFIG}" << __EOF__
 ---
 RUN:
   log_dir: "${LOGS_FOLDER}"
+REPORTING:
+  default_ocs_must_gather_image: "quay.io/rhceph-dev/ocs-must-gather"
+  default_ocs_must_gather_latest_tag: "latest-${ODF_VERSION_MAJOR_MINOR}"
 __EOF__
 
 
@@ -39,6 +44,7 @@ START_TIME=$(date "+%s")
 
 run-ci --color=yes tests/ -m acceptance -k '' \
   --ocsci-conf "${LOGS_CONFIG}" \
+  --collect-logs \
   --ocs-version "${OCS_VERSION}" \
   --ocp-version "${OCP_VERSION}" \
   --cluster-path "${CLUSTER_PATH}" \

@@ -41,8 +41,7 @@ ERROR: $ make release-controllers
 ERROR: The following differences were found:
 
 EOF
-    diff <(echo "$PRE_RC_GEN") <(echo "$POST_RC_GEN") || true
-    git diff --exit-code &&
+    diff <(echo "$PRE_RC_GEN") <(echo "$POST_RC_GEN")
     exit 1
 fi
 

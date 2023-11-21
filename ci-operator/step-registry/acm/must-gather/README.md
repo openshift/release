@@ -1,4 +1,4 @@
-# acm-fetch-managed-clusters-ref<!-- omit from toc -->
+# acm-must-gather-ref<!-- omit from toc -->
 
 ## Table of Contents<!-- omit from toc -->
 - [Purpose](#purpose)
@@ -9,13 +9,12 @@
 
 ## Purpose
 
-To gather information for further debugging using the acm must-gather images.
+To gather information for further debugging using the acm must-gather image.
 
 ## Process
 
 - Run ACM must-gather
-- Run MCE must-gather
-- Saves both outputs to the $ARTIFACT_DIR
+- Saves output to the $ARTIFACT_DIR
 
 ## Requirements
 - Advanced-cluster-management operator and Multi-cluster-engine are installed on the OCP cluster.

@@ -1,0 +1,40 @@
+ref:
+  as: ipi-conf-debug-kdump-configure-logs
+  from: cli
+  commands: ipi-conf-debug-kdump-configure-logs-commands.sh
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+  env:
+  - name: APPLY_NODE_ROLE
+    default: "worker"
+    documentation: |-
+      The node role to configure kdump logs on.
+  - name: KDUMP_COMMANDLINE_REMOVE
+    default: "hugepages hugepagesz slub_debug quiet log_buf_len swiotlb"
+    documentation: |-
+      List of kargs to remove in crashkernel.
+  - name: KDUMP_COMMANDLINE_APPEND
+    default: "irqpoll nr_cpus=1 reset_devices cgroup_disable=memory mce=off numa=off udev.children-max=2 panic=10 rootflags=nofail acpi_no_memhotplug transparent_hugepage=never nokaslr novmcoredd hest_disable"
+    documentation: |-
+      List of kargs to append in crashkernel.
+  - name: KDUMP_KEXEC_ARGS
+    default: "-s"
+    documentation: |-
+      Args used when kdump kexecs into the crash kernel.
+  - name: KDUMP_IMG
+    default: "vmlinuz"
+    documentation: |-
+      Kdump image.
+  - name: LOG_PATH
+    default: "/var/crash"
+    documentation: |-
+      The directory where the kdump logs should be output to.
+  - name: CRASH_KERNEL_MEMORY
+    default: "256M"
+    documentation: |-
+      The amount of memory to reserve for the crash kernel. Requirements differ per arch.
+      Try `$ kdumpctl estimate` to get a breakdown for your node.
+  documentation: |-
+    The kdump-configure-logs step applies the kdump machine configuration to cluster nodes.

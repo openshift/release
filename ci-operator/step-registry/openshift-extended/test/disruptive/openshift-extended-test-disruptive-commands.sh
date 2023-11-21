@@ -12,6 +12,12 @@ export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:$PATH
 export REPORT_HANDLE_PATH="/usr/bin"
 export ENABLE_PRINT_EVENT_STDOUT=true
 
+# add for hosted kubeconfig in the hosted cluster env
+if test -f "${SHARED_DIR}/nested_kubeconfig"
+then
+    export GUEST_KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+fi
+
 # although we set this env var, but it does not exist if the CLUSTER_TYPE is not gcp.
 # so, currently some cases need to access gcp service whether the cluster_type is gcp or not
 # and they will fail, like some cvo cases, because /var/run/secrets/ci.openshift.io/cluster-profile/gce.json does not exist.
@@ -138,10 +144,13 @@ vsphere)
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/govc.sh"
     export VSPHERE_CONF_FILE="${SHARED_DIR}/vsphere.conf"
-    oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE"
-    # The test suite requires a vSphere config file with explicit user and password fields.
-    sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
-    sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+    error_code=0
+    oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE" || error_code=$?
+    if [ "W${error_code}W" == "W0W" ]; then
+        # The test suite requires a vSphere config file with explicit user and password fields.
+        sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
+        sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+    fi
     export TEST_PROVIDER=vsphere;;
 openstack*)
     # shellcheck disable=SC1090
@@ -154,7 +163,7 @@ ibmcloud)
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 equinix-ocp-metal|equinix-ocp-metal-qe|powervs-1)
     export TEST_PROVIDER='{"type":"skeleton"}';;
-nutanix|nutanix-qe)
+nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
 *)
     echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
@@ -195,7 +204,7 @@ oc get clusterversion version -o yaml || true
 # execute the cases
 function run {
     test_scenarios=""
-    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
+    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
     echo "TEST_SCENARIOS: \"${TEST_SCENARIOS:-}\""
     echo "TEST_ADDITIONAL: \"${TEST_ADDITIONAL:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
@@ -232,8 +241,13 @@ function run {
     fi
 
     if [ "W${test_additional}W" != "WW" ]; then
-        echo "test additional: ${test_additional:1:-1}"
-        test_scenarios="${test_scenarios}|${test_additional:1:-1}"
+        if [ "W${test_additional: -1}W" != "W|W" ]; then
+            echo "test additional: ${test_additional:1}"
+            test_scenarios="${test_scenarios}|${test_additional:1}"
+        else
+            echo "test additional: ${test_additional:1:-1}"
+            test_scenarios="${test_scenarios}|${test_additional:1:-1}"
+        fi
     fi
 
     echo "final scenarios: ${test_scenarios}"
@@ -262,6 +276,8 @@ function run {
     cat ./case_selected
     echo "-----------------------------------------------------"
 
+    # failures happening after this point should not be caught by the Overall CI test suite in RP
+    touch "${ARTIFACT_DIR}/skip_overall_if_fail"
     ret_value=0
     set -x
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
@@ -281,17 +297,33 @@ function run {
     echo "done to handle result"
     if [ "W${ret_value}W" == "W0W" ]; then
         echo "success"
-        exit 0
+    else
+        echo "fail"
     fi
-    echo "fail"
+
+    # summarize test results
+    echo "Summarizing test result..."
+    failures=0 errors=0 skipped=0 tests=0
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
+    while read -a row ; do
+        # if the last ARG of command `let` evaluates to 0, `let` returns 1
+        let errors+=${row[0]} failures+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
+    done < /tmp/zzz-tmp.log
+
+    TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results"
+    echo -e "\nfailures: $failures, errors: $errors, skipped: $skipped, tests: $tests in openshift-extended-test-disruptive" | tee -a "${TEST_RESULT_FILE}"
+    if [ $((failures)) != 0 ] ; then
+        echo "Failing Scenarios:" | tee -a "${TEST_RESULT_FILE}"
+        grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | grep -v grep | cut -d'"' -f2 | sort -t':' -k2 | uniq | sed -E 's/^( +)?/  /' | tee -a "${TEST_RESULT_FILE}" || true
+    fi
+    cat "${TEST_RESULT_FILE}" >> "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
+
     # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
     # please refer to the junit result for case result, not depends on step result.
     if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
         echo "force success exit"
-        exit 1
+        exit $ret_value
     fi
-    echo "normal exit"
-    exit 0
 }
 
 # select the cases per FILTERS
@@ -340,19 +372,19 @@ function handle_filters {
 
 function valid_filter {
     filter="$1"
-    if ! echo ${filter} | grep -E '^[~]?[a-zA-Z0-9]{1,}[&]?$'; then
-        echo "the filter ${filter} is not correct format. it should be ^[~]?[a-zA-Z0-9]{1,}[&]?$"
+    if ! echo ${filter} | grep -E '^[~]?[a-zA-Z0-9_]{1,}[&]?$'; then
+        echo "the filter ${filter} is not correct format. it should be ^[~]?[a-zA-Z0-9_]{1,}[&]?$"
         exit 1
     fi
     action="$(echo $filter | grep -Eo '^[~]?')"
-    value="$(echo $filter | grep -Eo '[a-zA-Z0-9]{1,}')"
+    value="$(echo $filter | grep -Eo '[a-zA-Z0-9_]{1,}')"
     logical="$(echo $filter | grep -Eo '[&]?$')"
     echo "$action--$value--$logical"
 }
 
 function handle_and_filter {
     action="$(echo $1 | grep -Eo '^[~]?')"
-    value="$(echo $1 | grep -Eo '[a-zA-Z0-9]{1,}')"
+    value="$(echo $1 | grep -Eo '[a-zA-Z0-9_]{1,}')"
 
     ret=0
     if [ "W${action}W" == "WW" ]; then
@@ -369,7 +401,7 @@ function handle_and_filter {
 
 function handle_or_filter {
     action="$(echo $1 | grep -Eo '^[~]?')"
-    value="$(echo $1 | grep -Eo '[a-zA-Z0-9]{1,}')"
+    value="$(echo $1 | grep -Eo '[a-zA-Z0-9_]{1,}')"
 
     ret=0
     if [ "W${action}W" == "WW" ]; then

@@ -40,67 +40,66 @@ tests:
 - as: installer-rehearse-debug
   cron: '@yearly'
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: gcp-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      SLEEP_DURATION: 2h
+      SLEEP_DURATION: 1h
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-aws-ipi-provision
-- as: installer-rehearse-aws-shared-vpc-phz
+    - chain: cucushift-installer-rehearse-gcp-ipi-private-provision
+- as: installer-rehearse-aws
   cron: '@yearly'
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-1-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      FEATURE_SET: TechPreviewNoUpgrade
-    workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz
-- as: installer-rehearse-aws-shared-vpc-phz-sts
-  cron: '@yearly'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FEATURE_SET: TechPreviewNoUpgrade
-    workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
-- as: installer-rehearse-aws-private-shared-vpc-phz
-  cron: '@yearly'
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FEATURE_SET: TechPreviewNoUpgrade
-    workflow: cucushift-installer-rehearse-aws-ipi-private-shared-vpc-phz-sts
+    workflow: cucushift-installer-rehearse-aws-ipi-localzone-byo-subnet-ovn-day2
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-    workflow: cucushift-installer-rehearse-azure-ipi-usertags
+    workflow: cucushift-installer-rehearse-azure-ipi-private
 - as: installer-rehearse-azure-stack
   cluster: build01
   cron: '@yearly'
   steps:
     cluster_profile: azurestack-qe
-    workflow: cucushift-installer-rehearse-azure-stack-upi
+    workflow: cucushift-installer-rehearse-azure-stack-ipi
 - as: installer-rehearse-gcp
   cron: '@yearly'
   steps:
     cluster_profile: gcp-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-sno
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.14
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-filestore-csi
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-static
+- as: installer-rehearse-ibmcloud-dynamic
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-dynamic
 - as: installer-rehearse-vsphere-dis
   cron: '@yearly'
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnected
+- as: installer-rehearse-vsphere-ipi-template
+  cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-connected-2
+    workflow: cucushift-installer-rehearse-vsphere-ipi-template
 zz_generated_metadata:
   branch: master
   org: openshift

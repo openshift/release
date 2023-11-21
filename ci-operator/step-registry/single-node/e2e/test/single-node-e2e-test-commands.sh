@@ -11,6 +11,11 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
+LOKI_SSO_CLIENT_ID="$(cat /var/run/loki-secret/client-id)"
+export LOKI_SSO_CLIENT_ID
+LOKI_SSO_CLIENT_SECRET="$(cat /var/run/loki-secret/client-secret)"
+export LOKI_SSO_CLIENT_SECRET
+
 # HACK: HyperShift clusters use their own profile type, but the cluster type
 # underneath is actually AWS and the type identifier is derived from the profile
 # type. For now, just treat the `hypershift` type the same as `aws` until
@@ -40,16 +45,15 @@ fi
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-mkdir -p "${HOME}"
+function cleanup() {
+    echo "Requesting risk analysis for test failures in this job run from sippy:"
+    openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
 
-# Override the upstream docker.io registry due to issues with rate limiting
-# https://bugzilla.redhat.com/show_bug.cgi?id=1895107
-# sjenning: TODO: use of personal repo is temporary; should find long term location for these mirrored images
-export KUBE_TEST_REPO_LIST=${HOME}/repo_list.yaml
-cat <<EOF > ${KUBE_TEST_REPO_LIST}
-dockerLibraryRegistry: quay.io/sjenning
-dockerGluster: quay.io/sjenning
-EOF
+    echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"
+}
+trap cleanup EXIT
+
+mkdir -p "${HOME}"
 
 # if the cluster profile included an insights secret, install it to the cluster to
 # report support data from the support-operator
@@ -123,7 +127,7 @@ aws|aws-arm64)
     export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
     export KUBE_SSH_USER=core
     ;;
-azure4) export TEST_PROVIDER=azure;;
+azure4|azure-arm64) export TEST_PROVIDER=azure;;
 azurestack)
     export TEST_PROVIDER="none"
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
@@ -156,10 +160,18 @@ openstack*)
     fi
     ;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-ibmcloud)
+ibmcloud*)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
+    ;;
+powervs*)
+    #export TEST_PROVIDER='{"type":"powervs"}' # TODO In the future, powervs will be a supprted test type
+    export TEST_PROVIDER='{"type":"ibmcloud"}'
+    IC_API_KEY=$(sed -e 's,^.*"apikey":",,' -e 's,".*$,,' ${SHARED_DIR}/powervs-config.json)
+    IBMCLOUD_API_KEY=${IC_API_KEY}
+    export IC_API_KEY
+    export IBMCLOUD_API_KEY
     ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
@@ -203,12 +215,25 @@ function upgrade_conformance() {
     local exit_code=0 &&
     upgrade || exit_code=$? &&
     PROGRESSING="$(oc get -o jsonpath='{.status.conditions[?(@.type == "Progressing")].status}' clusterversion version)" &&
-    if test False = "${PROGRESSING}"
+    HISTORY_LENGTH="$(oc get -o jsonpath='{range .status.history[*]}{.version}{"\n"}{end}' clusterversion version | wc -l)" &&
+    if test 2 -gt "${HISTORY_LENGTH}"
     then
-        TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite || exit_code=$?
-    else
+        echo "Skipping conformance suite because ClusterVersion only has ${HISTORY_LENGTH} entries, so an update was not run"
+    elif test False != "${PROGRESSING}"
+    then
         echo "Skipping conformance suite because post-update ClusterVersion Progressing=${PROGRESSING}"
+    else
+        TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite || exit_code=$?
     fi &&
+    return $exit_code
+}
+
+# upgrade_rt runs the rt test suite, the upgrade, and the rt test suite again, and exits with an error if any calls fail
+function upgrade_rt() {
+    local exit_code=0 &&
+    TEST_SUITE=openshift/nodes/realtime suite || exit_code=$? &&
+    upgrade || exit_code=$? &&
+    TEST_SUITE=openshift/nodes/realtime suite || exit_code=$? &&
     return $exit_code
 }
 
@@ -281,7 +306,6 @@ function suite() {
 }
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
-trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
 oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-api-removals-in-4.9":"true"}}' --type=merge || echo 'failed to ack the 4.9 Kube v1beta1 removals; possibly API-server issue, or a pre-4.8 release image'
 
@@ -290,6 +314,10 @@ oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 
 # wait up to 10m for the number of nodes to match the number of machines
 i=0
+node_check_interval=30
+node_check_limit=20
+# AWS Local Zone nodes usually take much more to be ready.
+test -n "${AWS_EDGE_POOL_ENABLED-}" && node_check_limit=60
 while true
 do
     MACHINECOUNT="$(kubectl get machines -A --no-headers | wc -l)"
@@ -304,10 +332,10 @@ EOF
         echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
         break
     fi
-    echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
-    sleep 30
+    echo "$(date) [$i/$node_check_limit] - $MACHINECOUNT Machines - $NODECOUNT Nodes"
+    sleep $node_check_interval
     i=$((i+1))
-    if [ $i -gt 20 ]; then
+    if [ $i -gt $node_check_limit ]; then
       MACHINELIST="$(kubectl get machines -A)"
       NODELIST="$(kubectl get nodes)"
       cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF
@@ -389,27 +417,48 @@ oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 echo "$(date) - all clusteroperators are done progressing."
 
 # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
-echo "$(date) - waiting for non-samples imagesteams to import..."
-count=0
+count=1
 while :
 do
-  non_imported_imagestreams=$(oc -n openshift get imagestreams -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
-  if [ -z "${non_imported_imagestreams}" ]
-  then
-    break
-  fi
-  echo "The following image streams are yet to be imported (attempt #${count}):"
-  echo "${non_imported_imagestreams}"
+  echo "[$(date)] waiting for non-samples imagesteams to import..."
+  wait_count=1
+  while :
+  do
+    non_imported_imagestreams=$(oc -n openshift get imagestreams -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
+    if [ -z "${non_imported_imagestreams}" ]
+    then
+      break 2 # break from outer loop
+    fi
+    echo "[$(date)] The following image streams are yet to be imported (attempt #${wait_count}):"
+    echo "${non_imported_imagestreams}"
 
+    wait_count=$((wait_count+1))
+    if (( wait_count > 10 )); then
+        break
+    fi
+
+    sleep 60
+  done
+
+  # Given up after 3 rounds of waiting 10 minutes
   count=$((count+1))
-  if (( count > 40 )); then
-    echo "Failed while waiting on imagestream import"
-    exit 1
+  if (( count > 3 )); then
+      echo "[$(date)] Failed to import all image streams after 30 minutes"
+      echo $non_imported_imagestreams
+      exit 1
   fi
 
-  sleep 60
+  # image streams won't retry by themselves https://issues.redhat.com/browse/RFE-3660
+  set +e
+  for imagestream in $non_imported_imagestreams
+  do
+      echo "[$(date)] Retrying image import $imagestream"
+      oc import-image -n "$(echo "$imagestream" | cut -d/ -f1)" "$(echo "$imagestream" | cut -d/ -f2)"
+  done
+  set -e
 done
-echo "$(date) - all imagestreams are imported."
+
+echo "[$(date)] All imagestreams are imported."
 
 case "${TEST_TYPE}" in
 upgrade-conformance)
@@ -420,6 +469,9 @@ upgrade)
     ;;
 upgrade-paused)
     upgrade_paused
+    ;;
+upgrade-rt)
+    upgrade_rt
     ;;
 suite-conformance)
     suite

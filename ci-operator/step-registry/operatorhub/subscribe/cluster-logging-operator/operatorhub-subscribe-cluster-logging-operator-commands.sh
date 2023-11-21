@@ -40,7 +40,17 @@ metadata:
 EOF
 
 # deploy new operator group
-oc apply -f - <<EOF
+if [[ "${CLO_TARGET_NAMESPACES}" == "" ]]; then
+  oc apply -f - <<EOF
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: "${CLO_SUB_INSTALL_NAMESPACE}"
+  namespace: "${CLO_SUB_INSTALL_NAMESPACE}"
+spec: {}
+EOF
+else
+  oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -50,6 +60,7 @@ spec:
   targetNamespaces:
   - $(echo \"${CLO_TARGET_NAMESPACES}\" | sed "s|,|\"\n  - \"|g")
 EOF
+fi
 
 # subscribe to the operator
 cat <<EOF | oc apply -f -

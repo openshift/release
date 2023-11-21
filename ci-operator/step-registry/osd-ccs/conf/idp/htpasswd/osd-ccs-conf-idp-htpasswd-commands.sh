@@ -6,17 +6,36 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
+
 # Log in
 OCM_VERSION=$(ocm version)
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
 ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 
+# The API_URL is not registered ASAP, we need to wait for a while. 
+API_URL=$(ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}" | jq -r ".api.url")
+start_time=$(date +"%s")
+while true; do
+  if [[ "${API_URL}" != "null" ]]; then
+    echo "API URL: ${API_URL}"
+    break
+  fi
+  echo "API URL is not registered back. Wait for 60 seconds..."
+  sleep 60
+  API_URL=$(ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}" | jq -r ".api.url")
+
+  if (( $(date +"%s") - $start_time >= $IDP_TIMEOUT )); then
+    echo "error: Timed out while waiting for the API URL to be ready"
+    exit 1
+  fi
+done
+
 # Config htpasswd idp
 # The expected time for the htpasswd idp configuaration is in 1 minute. But actually, we met the waiting time
 # is over 10 minutes, so we give a loop to wait for the configuration to be active before timeout. 
 echo "Config htpasswd idp ..."
-CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 IDP_NAME="osd-htpasswd"
 IDP_USER="osd-admin"
 IDP_PASSWD="HTPasswd_$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 6)"
@@ -36,10 +55,7 @@ IDP_PAYLOAD=$(echo -e '{
   "type": "HTPasswdIdentityProvider"  
 }')
 echo "${IDP_PAYLOAD}" | jq -c | ocm post "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/identity_providers"  > "${SHARED_DIR}/htpasswd.txt"
-
-API_URL=$(ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}" | jq -r ".api.url")
 echo "oc login ${API_URL} -u ${IDP_USER} -p ${IDP_PASSWD} --insecure-skip-tls-verify=true" > "${SHARED_DIR}/api.login"
-cat "${SHARED_DIR}/api.login" > "${ARTIFACT_DIR}/api.login"
 
 # Grant cluster-admin access to the cluster
 echo "Add the user ${IDP_USER} to the cluster-admins group..."

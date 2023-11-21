@@ -14,12 +14,15 @@ die_modlist() {
 echo "Checking that all modules can be resolved offline"
 go list -mod=readonly -m all || die_modlist
 
+# Allow setting explicit -compat argument for go mod tidy
+COMPAT=${COMPAT:-""}
+
 echo "Checking that vendor/ is correct"
-go mod tidy
+go mod tidy $COMPAT
 go mod vendor
 CHANGES=$(git status --porcelain)
 if [ -n "$CHANGES" ] ; then
-    echo "ERROR: detected vendor inconsistency after 'go mod tidy; go mod vendor':"
+    echo "ERROR: detected vendor inconsistency after 'go mod tidy $COMPAT; go mod vendor':"
     echo "$CHANGES"
     exit 1
 fi

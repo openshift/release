@@ -7,10 +7,10 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: must-gather
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -18,9 +18,9 @@ canonical_go_repository: github.com/openshift/csi-driver-shared-resource
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: csi-driver-shared-resource
 - dockerfile_path: Dockerfile.mustgather
   from: must_gather
@@ -28,13 +28,14 @@ images:
 - dockerfile_path: Dockerfile.webhook
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: csi-driver-shared-resource-webhook
 promotion:
   additional_images:
     csi-driver-shared-resource-scripts: src
+  disabled: true
   name: 4.15-priv
   namespace: ocp-private
 releases:
@@ -124,6 +125,12 @@ tests:
         requests:
           cpu: 100m
     workflow: csi-driver-shared-resource-e2e-test
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: openshift-csi-driver-shared-resource
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

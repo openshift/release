@@ -113,3 +113,80 @@ subjects:
   - kind: ServiceAccount
     namespace: ci
     name: hypershift-workload
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  name: hypershift-rj7rg-worker-us-east-1a
+  namespace: openshift-machine-api
+spec:
+  selector:
+    matchLabels:
+      machineset-role: hypershift
+  template:
+    metadata:
+      labels:
+        machineset-role: hypershift
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+    spec:
+      metadata:
+        labels:
+          hypershift.openshift.io/control-plane: 'true'
+      providerSpec:
+        value:
+          ami:
+            id: ami-03d1c2cba04df838c
+          apiVersion: awsproviderconfig.openshift.io/v1beta1
+          blockDevices:
+            - ebs:
+                encrypted: true
+                iops: 100
+                kmsKey:
+                  arn: ''
+                volumeSize: 300
+                volumeType: gp2
+          securityGroups:
+            - filters:
+                - name: 'tag:Name'
+                  values:
+                    - hive-rj7rg-worker-sg
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: hive-rj7rg-worker-profile
+          instanceType: m5.4xlarge
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          placement:
+            availabilityZone: us-east-1a
+            region: us-east-1
+          subnet:
+            filters:
+            - name: tag:Name
+              values:
+              - hive-rj7rg-private-us-east-1a
+          tags:
+          - name: kubernetes.io/cluster/hive-rj7rg
+            value: owned
+          userDataSecret:
+            name: worker-user-data
+      taints:
+          - effect: NoSchedule
+            key: hypershift.openshift.io/control-plane
+            value: "true"
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: hypershift-rj7rg-worker-us-east-1a
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 100
+  minReplicas: 0
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: hypershift-rj7rg-worker-us-east-1a

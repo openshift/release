@@ -1,6 +1,26 @@
 base_images:
+  assisted-image-service:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
@@ -11,10 +31,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -22,11 +42,12 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: cluster-kube-apiserver-operator
 promotion:
+  disabled: true
   name: "4.15"
   namespace: ocp
 releases:
@@ -76,7 +97,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-gcp-operator
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     test:
     - as: test
       cli: latest
@@ -256,7 +277,7 @@ tests:
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     test:
     - as: test
       cli: latest
@@ -288,6 +309,102 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-suspend-90d
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      SKEW: +90d
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-suspend-180d
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      SKEW: +180d
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-suspend-360d
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      SKEW: +360d
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- always_run: false
+  as: e2e-metal-ovn-ha-cert-rotation-suspend-90d
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      SKEW: +90d
+    workflow: openshift-e2e-cert-rotation-suspend
+- always_run: false
+  as: e2e-metal-ovn-ha-cert-rotation-suspend-180d
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      SKEW: +180d
+    workflow: openshift-e2e-cert-rotation-suspend
+- always_run: false
+  as: e2e-metal-ovn-ha-cert-rotation-suspend-360d
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      SKEW: +360d
+    workflow: openshift-e2e-cert-rotation-suspend
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-shutdown-90d
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      SKEW: +90d
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-shutdown-180d
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      SKEW: +180d
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-shutdown-360d
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    env:
+      SKEW: +360d
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- always_run: false
+  as: e2e-metal-ovn-ha-cert-rotation-shutdown-90d
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      SKEW: +90d
+    workflow: openshift-e2e-cert-rotation-shutdown
+- always_run: false
+  as: e2e-metal-ovn-ha-cert-rotation-shutdown-180d
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      SKEW: +180d
+    workflow: openshift-e2e-cert-rotation-shutdown
+- always_run: false
+  as: e2e-metal-ovn-ha-cert-rotation-shutdown-360d
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      SKEW: +360d
+    workflow: openshift-e2e-cert-rotation-shutdown
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

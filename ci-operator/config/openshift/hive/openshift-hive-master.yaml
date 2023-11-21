@@ -7,7 +7,7 @@ base_images:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.20-openshift-4.14
-binary_build_commands: make build
+binary_build_commands: GO_COMPLIANCE_INFO=0 make build
 build_root:
   project_image:
     dockerfile_path: build/build-image/Dockerfile
@@ -27,12 +27,12 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.14"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     requests:
@@ -44,19 +44,19 @@ resources:
       memory: 4Gi
 tests:
 - as: unit
-  commands: make test
+  commands: GO_COMPLIANCE_INFO=0 make test
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: verify
-  commands: make verify
+  commands: GO_COMPLIANCE_INFO=0 make verify
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
-    make coverage
+    GO_COMPLIANCE_INFO=0 make coverage
   container:
     from: src
   run_if_changed: \.go$
@@ -66,13 +66,19 @@ tests:
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
-    make coverage
+    GO_COMPLIANCE_INFO=0 make coverage
   container:
     from: src
   postsubmit: true
   secret:
     mount_path: /tmp/secret
     name: hive-codecov-token
+- as: security
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+    workflow: openshift-ci-security
 - as: e2e
   cluster_claim:
     architecture: amd64
@@ -90,25 +96,19 @@ tests:
     - as: test
       cli: latest
       commands: |
-        # Creds for the `ci` user in the hive-team cluster
-        # TODO: Get a CI-owned account: DPTP-2348
-        export AWS_ACCESS_KEY_ID=$(cat /tmp/secret/hive-aws-creds/AWS_ACCESS_KEY_ID)
-        export AWS_SECRET_ACCESS_KEY=$(cat /tmp/secret/hive-aws-creds/AWS_SECRET_ACCESS_KEY)
+        # Creds for the `ci` user in the cluster-control-plane cluster
+        export AWS_ACCESS_KEY_ID=$(cat /tmp/secret/hiveci-aws-creds/AWS_ACCESS_KEY_ID)
+        export AWS_SECRET_ACCESS_KEY=$(cat /tmp/secret/hiveci-aws-creds/AWS_SECRET_ACCESS_KEY)
         # Override default location for pull secret
         export PULL_SECRET_FILE=/tmp/secret/pull-secret/.dockerconfigjson
-        # Our AWS account is set up with this domain:
-        export BASE_DOMAIN=new-installer.openshift.com
-        # Configure a cluster name that our monitor/reaper can use to
-        # - discover clusters created by this test (prefix `hiveci-`)
-        # - know when they were created (embedded date stamp)
-        # Add the PR number for extra uniqueness.
+        # Configure a unique cluster name based on timestamp and the PR number.
         # We'll exceed the 21c cluster name cutoff at PR 1Mi or some
         # time in July of 4147, whichever comes first.
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
-        CLOUD=aws make test-e2e
+        GO_COMPLIANCE_INFO=0 CLOUD=aws make test-e2e
       credentials:
-      - mount_path: /tmp/secret/hive-aws-creds
-        name: hive-aws-creds
+      - mount_path: /tmp/secret/hiveci-aws-creds
+        name: hiveci-aws-creds
         namespace: test-credentials
       - mount_path: /tmp/secret/pull-secret
         name: ci-pull-credentials
@@ -141,27 +141,21 @@ tests:
     - as: test
       cli: latest
       commands: |
-        # Creds for the `ci` user in the hive-team cluster
-        # TODO: Get a CI-owned account: DPTP-2348
-        export AWS_ACCESS_KEY_ID=$(cat /tmp/secret/hive-aws-creds/AWS_ACCESS_KEY_ID)
-        export AWS_SECRET_ACCESS_KEY=$(cat /tmp/secret/hive-aws-creds/AWS_SECRET_ACCESS_KEY)
+        # Creds for the `ci` user in the cluster-control-plane cluster
+        export AWS_ACCESS_KEY_ID=$(cat /tmp/secret/hiveci-aws-creds/AWS_ACCESS_KEY_ID)
+        export AWS_SECRET_ACCESS_KEY=$(cat /tmp/secret/hiveci-aws-creds/AWS_SECRET_ACCESS_KEY)
         # Override default location for pull secret
         export PULL_SECRET_FILE=/tmp/secret/pull-secret/.dockerconfigjson
-        # Our AWS account is set up with this domain:
-        export BASE_DOMAIN=new-installer.openshift.com
-        # Configure a cluster name that our monitor/reaper can use to
-        # - discover clusters created by this test (prefix `hiveci-`)
-        # - know when they were created (embedded date stamp)
-        # Add the PR number for extra uniqueness.
+        # Configure a unique cluster name based on timestamp and the PR number.
         # We'll exceed the 21c cluster name cutoff at PR 1Mi or some
         # time in July of 4147, whichever comes first.
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
         # Disable managed DNS (on by default, and left on for the e2e test)
-        USE_MANAGED_DNS=false
-        CLOUD=aws make test-e2e-pool
+        export USE_MANAGED_DNS=false
+        GO_COMPLIANCE_INFO=0 CLOUD=aws make test-e2e-pool
       credentials:
-      - mount_path: /tmp/secret/hive-aws-creds
-        name: hive-aws-creds
+      - mount_path: /tmp/secret/hiveci-aws-creds
+        name: hiveci-aws-creds
         namespace: test-credentials
       - mount_path: /tmp/secret/pull-secret
         name: ci-pull-credentials
@@ -178,14 +172,13 @@ tests:
           cpu: 100m
     workflow: generic-claim
 - as: e2e-gcp
-  optional: true
   run_if_changed: gcp
   steps:
     cluster_profile: gcp
     test:
     - as: test
       cli: latest
-      commands: CLOUD=gcp make test-e2e
+      commands: GO_COMPLIANCE_INFO=0 CLOUD=gcp make test-e2e
       dependencies:
       - env: HIVE_IMAGE
         name: hive
@@ -197,14 +190,13 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-azure
-  optional: true
   run_if_changed: azure
   steps:
     cluster_profile: azure4
     test:
     - as: test
       cli: latest
-      commands: CLOUD=azure make test-e2e
+      commands: GO_COMPLIANCE_INFO=0 CLOUD=azure make test-e2e
       dependencies:
       - env: HIVE_IMAGE
         name: hive

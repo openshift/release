@@ -1,0 +1,39 @@
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/build-root/Dockerfile
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: intersmash-e2e-prod
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  steps:
+    test:
+    - as: intersmash-prod-build
+      commands: |
+        ls -la .ci/openshift-ci/build-root/
+        /bin/bash .ci/openshift-ci/build-root/e2e-test-prod.sh
+      credentials:
+      - mount_path: /var/run/registry-redhat-io-pull-secret
+        name: registry-redhat-io-pull-secret
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: Intersmash
+  repo: intersmash
+  variant: prod

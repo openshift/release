@@ -24,6 +24,7 @@ function aws_delete_role()
 {
     local aws_region=$1
     local role_name=$2
+    local policy_arn attached_policies inline_policies policy_name
 
     echo -e "deleteing role: $role_name"
     # detach policy
@@ -68,12 +69,13 @@ if [[ ${ENABLE_SHARED_PHZ} == "yes" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
 
   role_name=$(head -n 1 ${SHARED_DIR}/shared_install_role_name)
-  policy_arn=$(head -n 1 ${SHARED_DIR}/shared_install_policy_arn)
+  shared_policy_arn=$(head -n 1 ${SHARED_DIR}/shared_install_policy_arn)
 
   aws_delete_role $REGION ${role_name}
   echo "Deleted role: ${role_name}"
 
-  aws --region $REGION iam delete-policy --policy-arn ${policy_arn}
-  echo "Deleted policy: ${policy_arn}"
+  echo "Deleting policy: ${shared_policy_arn}"
+  aws --region "$REGION" iam delete-policy --policy-arn "${shared_policy_arn}"
+  echo "Deleted policy: ${shared_policy_arn}"
 
 fi

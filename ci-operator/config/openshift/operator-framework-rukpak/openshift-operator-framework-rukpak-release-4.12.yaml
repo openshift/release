@@ -53,22 +53,13 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: e2e
-  optional: true
+- as: openshift-e2e-aws
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
-    cluster_profile: gcp
-    test:
-    - as: test
-      cli: latest
-      commands: make e2e
-      dependencies:
-      - env: OLM_RUKPAK_IMAGE
-        name: olm-rukpak
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-gcp
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.12
   org: openshift

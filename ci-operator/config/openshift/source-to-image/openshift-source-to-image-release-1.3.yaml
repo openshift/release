@@ -1,0 +1,41 @@
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 1Gi
+tests:
+- as: verify
+  commands: |
+    make verify > ${ARTIFACT_DIR}/verify.log
+  container:
+    from: bin
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: unit
+  commands: |
+    mkdir -p ${ARTIFACT_DIR}/coverage
+    make test-unit OUTPUT_COVERAGE=${ARTIFACT_DIR}/coverage > ${ARTIFACT_DIR}/test-unit.log
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: integration
+  commands: |
+    make test-dockerfile > ${ARTIFACT_DIR}/test-dockerfile.log
+  container:
+    from: bin
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: source-to-image
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-1.3
+  org: openshift
+  repo: source-to-image

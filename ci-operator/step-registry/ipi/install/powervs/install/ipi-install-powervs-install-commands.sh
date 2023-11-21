@@ -223,7 +223,7 @@ function install_required_tools() {
   export HOME=/tmp
 
   if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.16.1/IBM_Cloud_CLI_2.16.1_amd64.tar.gz
+    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.20.0/IBM_Cloud_CLI_2.20.0_amd64.tar.gz
     tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
 
     if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]; then
@@ -334,14 +334,31 @@ function init_ibmcloud() {
   fi
 
   CIS_INSTANCE_CRN=$(ibmcloud cis instances --output json | jq -r '.[].id');
+  if [ -z "${CIS_INSTANCE_CRN}" ]; then
+    echo "Error: CIS_INSTANCE_CRN is empty!"
+    exit 1
+  fi
   export CIS_INSTANCE_CRN
 
+  if [ -z "${POWERVS_SERVICE_INSTANCE_ID}" ]; then
+    echo "Error: POWERVS_SERVICE_INSTANCE_ID is empty!"
+    exit 1
+  fi
+
   SERVICE_INSTANCE_CRN="$(ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .crn')"
+  if [ -z "${SERVICE_INSTANCE_CRN}" ]; then
+    echo "Error: SERVICE_INSTANCE_CRN is empty!"
+    exit 1
+  fi
   export SERVICE_INSTANCE_CRN
 
   ibmcloud pi service-target ${SERVICE_INSTANCE_CRN}
 
   CLOUD_INSTANCE_ID="$(echo ${SERVICE_INSTANCE_CRN} | cut -d: -f8)"
+  if [ -z "${CLOUD_INSTANCE_ID}" ]; then
+    echo "Error: CLOUD_INSTANCE_ID is empty!"
+    exit 1
+  fi
   export CLOUD_INSTANCE_ID
 }
 

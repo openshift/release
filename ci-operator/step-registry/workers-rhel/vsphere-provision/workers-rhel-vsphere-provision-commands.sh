@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+declare vsphere_portgroup
+source "${SHARED_DIR}/vsphere_context.sh"
+
+echo "$(date -u --rfc-3339=seconds) vsphere_portgroup: ${vsphere_portgroup}"
+
 KUBECONFIG=${SHARED_DIR}/kubeconfig
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
@@ -29,7 +34,7 @@ fi
 #Start to provision rhel instances from template
 for count in $(seq 1 ${RHEL_WORKER_COUNT}); do
   echo "$(date -u --rfc-3339=seconds) - Provision ${infra_id}-rhel-${count} ..."
-  govc vm.clone -vm /${vcenter_datacenter}/vm/Templates/${RHEL_IMAGE} -on=false -net=${LEASED_RESOURCE} ${infra_id}-rhel-${count}
+  govc vm.clone -vm /${vcenter_datacenter}/vm/${RHEL_IMAGE} -on=false -net=${vsphere_portgroup} ${infra_id}-rhel-${count}
   govc vm.customize -vm ${vcenter_folder}/${infra_id}-rhel-${count} -name=${infra_id}-rhel-${count} -ip=dhcp
   govc vm.change -vm ${vcenter_folder}/${infra_id}-rhel-${count} -c ${RHEL_VM_CPUS_NUM} -m ${RHEL_VM_MEMORY_SIZE} -e disk.enableUUID=TRUE
   disk_name=$(govc device.info -json -vm ${vcenter_folder}/${infra_id}-rhel-${count} | jq -r '.Devices[]|select(.Type == "VirtualDisk")|.Name')
@@ -41,7 +46,7 @@ for count in $(seq 1 ${RHEL_WORKER_COUNT}); do
   while [ ${loop} -gt 0 ]; do
     rhel_node_ip=$(govc vm.info -json ${vcenter_folder}/${infra_id}-rhel-${count} | jq -r .VirtualMachines[].Summary.Guest.IpAddress)
     if [ "x${rhel_node_ip}" == "x" ]; then
-      loop=$(( loop - 1 ))
+      loop=$((loop - 1))
       sleep 30
     else
       break
@@ -49,11 +54,11 @@ for count in $(seq 1 ${RHEL_WORKER_COUNT}); do
   done
 
   if [ "x${rhel_node_ip}" == "x" ]; then
-    echo "Unabel to get ip of rhel instance ${infra_id}-rhel-${count}!"
+    echo "Unable to get ip of rhel instance ${infra_id}-rhel-${count}!"
     exit 1
   fi
 
-  echo "${infra_id}-rhel-${count} ${rhel_node_ip}" >> "${SHARED_DIR}"/rhel_nodes_info
+  echo "${infra_id}-rhel-${count} ${rhel_node_ip}" >>"${SHARED_DIR}"/rhel_nodes_info
 done
 cp "${SHARED_DIR}"/rhel_nodes_info "${ARTIFACT_DIR}"/rhel_nodes_info
 
@@ -65,8 +70,10 @@ if test -n "$(govc ls ${vcenter_folder} | grep "lb-0")"; then
   lb_vars="[lb:vars]\nansible_user=core\nansible_become=True"
 fi
 
+echo "$(date -u --rfc-3339=seconds) rhel_node_ip: ${rhel_node_ip}"
+
 #Generate ansible-hosts file
-cat > "${SHARED_DIR}/ansible-hosts" << EOF
+cat >"${SHARED_DIR}/ansible-hosts" <<EOF
 [all:vars]
 openshift_kubeconfig_path=${KUBECONFIG}
 openshift_pull_secret_path=${PULL_SECRET_PATH}
@@ -79,7 +86,7 @@ ansible_become=True
 $(echo -e ${lb_vars})
 
 [new_workers]
-# hostnames must be listed by what `hostname -f` returns on the host
+# hostnames must be listed by what $(hostname -f) returns on the host
 # this is the name the cluster will use
 $(awk '{print $2}' "${SHARED_DIR}"/rhel_nodes_info)
 

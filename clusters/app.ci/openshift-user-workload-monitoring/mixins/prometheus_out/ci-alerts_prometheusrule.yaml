@@ -191,6 +191,15 @@ spec:
       for: 1m
       labels:
         severity: critical
+  - name: quay-io-image-mirroring
+    rules:
+    - alert: quay-io-image-mirroring-failures
+      annotations:
+        message: Many mirroring tasks to quay.io have been failed in the last minute. Please check errors in the pod logs to figure out the cause.
+      expr: sum(rate(quay_io_ci_images_distributor_image_mirroring_duration_seconds_bucket{state="failure"}[10m])) > 0.5
+      for: 1m
+      labels:
+        severity: critical
   - name: cluster-client-creation-failure
     rules:
     - alert: component-failed-to-construct-a-client
@@ -428,6 +437,13 @@ spec:
       annotations:
         message: Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container}}) is restarting {{ printf "%.2f" $value }} times over the last 1 hour.
       expr: increase(kube_pod_container_status_restarts_total{job="kube-state-metrics",namespace="ci"}[1h]) > 20
+      for: 10m
+      labels:
+        severity: critical
+    - alert: ImagePullBackOff
+      annotations:
+        message: Many pods have been failing on pulling images. Please check the relevant events on the cluster.
+      expr: sum(sum_over_time(kube_pod_container_status_waiting_reason{reason="ImagePullBackOff"}[5m])) > 30
       for: 10m
       labels:
         severity: critical

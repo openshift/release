@@ -11,7 +11,7 @@ postsubmits:
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-maistra-istio-maistra-3.0-istio-update-operator-3-0
+    name: branch-ci-maistra-istio-maistra-3.0-update-proxy
     spec:
       containers:
       - args:
@@ -19,7 +19,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/github-token
-        - --target=istio-update-operator-3-0
+        - --target=update-proxy
         command:
         - ci-operator
         image: ci-operator:latest
@@ -35,6 +35,9 @@ postsubmits:
         - mountPath: /secrets/github-token
           name: github-token
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -46,6 +49,9 @@ postsubmits:
       - name: github-token
         secret:
           secretName: github-token
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

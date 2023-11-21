@@ -40,6 +40,9 @@ chain:
     - name: HYPERSHIFT_INSTANCE_TYPE
       default: "m5.xlarge"
       documentation: "Instance type for the cluster nodes"
+    - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
+      default: ""
+      documentation: "Sets hostname to opinionated values in the specificed domain for services with publishing type LoadBalancer or Route"
     commands: |-
       set -exuo pipefail
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -66,6 +69,7 @@ chain:
       /usr/bin/hypershift create cluster aws \
         ${EXTRA_ARGS} ${ICSP_COMMAND} \
         --name ${CLUSTER_NAME} \
+        --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
         --instance-type ${HYPERSHIFT_INSTANCE_TYPE} \
         --base-domain ${DOMAIN} \
@@ -77,6 +81,7 @@ chain:
         --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
         --release-image ${RELEASE_IMAGE} \
         --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
+        --annotations=hypershift.openshift.io/skip-release-image-validation=true \
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
 
       # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091

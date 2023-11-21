@@ -1,0 +1,48 @@
+chain:
+  as: hypershift-mce-agent-destroy
+  steps:
+    - as: destroy
+      cli: latest
+      commands: |-
+        set -exuo pipefail
+        
+        if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+
+        MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
+        HYPERSHIFT_NAME=hcp
+        if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
+          echo "MCE version is less than 2.4"
+          HYPERSHIFT_NAME=hypershift
+        fi
+        
+        arch=$(arch)
+        if [ "$arch" == "x86_64" ]; then
+          downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
+          cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
+          chmod +x /tmp/${HYPERSHIFT_NAME}
+          cd -
+        fi
+
+        CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        
+        echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
+        /tmp/${HYPERSHIFT_NAME} destroy cluster agent \
+          --name ${CLUSTER_NAME} \
+          --namespace local-cluster
+
+        echo "$(date) Finished deleting cluster"
+        
+        oc delete managedcluster ${CLUSTER_NAME} --ignore-not-found
+        echo "$(date) Finished destroying hypershift managed cluster"
+      from_image:
+        namespace: ocp
+        name: "4.12"
+        tag: upi-installer
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 30m0s

@@ -4,6 +4,7 @@ set -x
 set -o nounset
 set -o errexit
 set -o pipefail
+export PS4='+ $(date "+%T.%N") \011'
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 #Save stacks events
@@ -16,16 +17,28 @@ JOB_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 stack_name="${JOB_NAME}"
 cf_tpl_file="${SHARED_DIR}/${JOB_NAME}-cf-tpl.yaml"
 
+MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
+if [ -f "${MICROSHIFT_CLUSTERBOT_SETTINGS}" ]; then
+  : Overriding step defaults by sourcing clusterbot settings
+  # shellcheck disable=SC1090
+  source "${MICROSHIFT_CLUSTERBOT_SETTINGS}"
+fi
+
 if [[ "${EC2_AMI}" == "" ]]; then
   echo "must supply an AMI to use for EC2 Instance"
   exit 1
+fi
+
+ec2Type="VirtualMachine"
+if [[ "$EC2_INSTANCE_TYPE" =~ c[0-9]+[gn].metal ]]; then
+  ec2Type="MetalMachine"
 fi
 
 ami_id=${EC2_AMI}
 instance_type=${EC2_INSTANCE_TYPE}
 host_device_name="/dev/xvdc"
 
-if [[ "$EC2_INSTANCE_TYPE" =~ a1.* ]] || [[ "$EC2_INSTANCE_TYPE" =~ c[0-9]+g.* ]]; then
+if [[ "$EC2_INSTANCE_TYPE" =~ a1.* ]] || [[ "$EC2_INSTANCE_TYPE" =~ c[0-9]+[gn].* ]]; then
   host_device_name="/dev/nvme1n1"
 fi
 
@@ -44,8 +57,22 @@ echo -e "AMI ID: $ami_id"
 cat > "${cf_tpl_file}" << EOF
 AWSTemplateFormatVersion: 2010-09-09
 Description: Template for RHEL machine Launch
-
+Conditions:
+  AddSecondaryVolume: !Not [!Equals [!Ref EC2Type, 'MetalMachine']]
+Mappings:
+ VolumeSize:
+   MetalMachine:
+     PrimaryVolumeSize: "300"
+     SecondaryVolumeSize: "0"
+     Throughput: 500
+   VirtualMachine:
+     PrimaryVolumeSize: "200"
+     SecondaryVolumeSize: "10"
+     Throughput: 125
 Parameters:
+  EC2Type:
+    Default: 'VirtualMachine'
+    Type: String
   VpcCidr:
     AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-4]))$
     ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-24.
@@ -219,12 +246,7 @@ Resources:
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
         FromPort: 6443
-        ToPort: 6453
-        CidrIp: 0.0.0.0/0
-      # Range for all dynamic port-forwarding for scenario tests, see boot phase for use
-      - IpProtocol: tcp
-        FromPort: 7000
-        ToPort: 8000
+        ToPort: 6443
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
         FromPort: 30000
@@ -236,10 +258,32 @@ Resources:
         CidrIp: 0.0.0.0/0
       VpcId: !Ref RHELVPC
 
+  rhelLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: ${stack_name}-launch-template
+      LaunchTemplateData:
+        BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, PrimaryVolumeSize]
+            VolumeType: gp3
+            Throughput: !FindInMap [VolumeSize, !Ref EC2Type, Throughput]
+        - !If
+          - AddSecondaryVolume
+          - DeviceName: /dev/sdc
+            Ebs:
+              VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, SecondaryVolumeSize]
+              VolumeType: gp3
+          - !Ref AWS::NoValue
+
   RHELInstance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Ref AmiId
+      LaunchTemplate:
+        LaunchTemplateName: ${stack_name}-launch-template
+        Version: !GetAtt rhelLaunchTemplate.LatestVersionNumber
       IamInstanceProfile: !Ref RHELInstanceProfile
       InstanceType: !Ref HostInstanceType
       NetworkInterfaces:
@@ -251,17 +295,6 @@ Resources:
       Tags:
       - Key: Name
         Value: !Join ["", [!Ref Machinename]]
-      BlockDeviceMappings:
-      - DeviceName: /dev/sda1
-        Ebs:
-          VolumeSize: "120"
-          VolumeType: gp3
-          Iops: 16000
-      - DeviceName: /dev/sdc
-        Ebs:
-          VolumeSize: "120"
-          VolumeType: gp3
-          Iops: 16000
       PrivateDnsNameOptions:
         EnableResourceNameDnsARecord: true
         HostnameType: resource-name
@@ -270,17 +303,26 @@ Resources:
           #!/bin/bash -xe
           echo "====== Authorizing public key ======" | tee -a /tmp/init_output.txt
           echo "\${PublicKeyString}" >> /home/ec2-user/.ssh/authorized_keys
+          # Use the same defaults as OCP to avoid failing requests to apiserver, such as
+          # requesting logs.
+          echo "====== Updating inotify =====" | tee -a /tmp/init_output.txt
+          echo "fs.inotify.max_user_watches = 65536" >> /etc/sysctl.conf
+          echo "fs.inotify.max_user_instances = 8192" >> /etc/sysctl.conf
+          sysctl --system |& tee -a /tmp/init_output.txt
+          sysctl -a |& tee -a /tmp/init_output.txt
           echo "====== Running DNF Install ======" | tee -a /tmp/init_output.txt
+          if ! ( sudo lsblk | grep 'xvdc' ); then
+              echo "/dev/xvdc device not found, assuming this is metal host, skipping LVM configuration" |& tee -a /tmp/init_output
+              exit 0
+          fi
           sudo dnf install -y lvm2 |& tee -a /tmp/init_output.txt
 
-          # NOTE: wrappig script vars with {} since the cloudformation will see
+          # NOTE: wrapping script vars with {} since the cloudformation will see
           # them as cloudformation vars instead.
           echo "====== Creating PV ======" | tee -a /tmp/init_output.txt
           sudo pvcreate "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
           echo "====== Creating VG ======" | tee -a /tmp/init_output.txt
           sudo vgcreate rhel "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
-          echo "====== Creating Thin Pool ======" | tee -a /tmp/init_output.txt
-          sudo lvcreate -L 10G --thinpool thin rhel |& tee -a /tmp/init_output.txt
 
 Outputs:
   InstanceId:
@@ -315,13 +357,12 @@ aws --region "$REGION" cloudformation create-stack --stack-name "${stack_name}" 
         ParameterKey=Machinename,ParameterValue="${stack_name}"  \
         ParameterKey=AmiId,ParameterValue="${ami_id}" \
         ParameterKey=HostDeviceName,ParameterValue="${host_device_name}" \
-        ParameterKey=PublicKeyString,ParameterValue="$(cat ${CLUSTER_PROFILE_DIR}/ssh-publickey)" &
+        ParameterKey=EC2Type,ParameterValue="${ec2Type}" \
+        ParameterKey=PublicKeyString,ParameterValue="$(cat ${CLUSTER_PROFILE_DIR}/ssh-publickey)"
 
-wait "$!"
 echo "Created stack"
 
-aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}" &
-wait "$!"
+aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}"
 echo "Waited for stack"
 
 echo "$stack_name" > "${SHARED_DIR}/rhel_host_stack_name"

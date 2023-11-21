@@ -40,10 +40,18 @@ function extract_oc(){
 # Check if a build is signed
 function check_signed() {
     local digest algorithm hash_value response
-    digest="$(echo "${TARGET}" | cut -f2 -d@)"
+    if [[ "${TARGET}" =~ "@sha256:" ]]; then
+        digest="$(echo "${TARGET}" | cut -f2 -d@)"
+        echo "The target image is using digest pullspec, its digest is ${digest}"
+    else
+        digest="$(oc image info "${TARGET}" -o json | jq -r ".digest")"
+        echo "The target image is using tagname pullspec, its digest is ${digest}"
+    fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+    set -x
+    response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+    set +x
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -60,8 +68,16 @@ function admin_ack() {
 
     echo "Require admin ack"
     local wait_time_loop_var=0 ack_data
-    ack_data="$(echo ${out} | awk '{print $2}' | cut -f2 -d\")" && echo "Admin ack patch data is: ${ack_data}"
-    oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack_data}"'": "true"}}' --type=merge
+    ack_data="$(echo "${out}" | jq -r "keys[]")"
+    for ack in ${ack_data};
+    do
+        # e.g.: ack-4.12-kube-1.26-api-removals-in-4.13
+        if [[ "${ack}" == *"ack-4.${SOURCE_MINOR_VERSION}"* ]]
+        then
+            echo "Admin ack patch data is: ${ack}"
+            oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
+        fi
+    done
 
     echo "Admin-acks patch gets started"
 
@@ -93,28 +109,30 @@ function pause_worker_mcp() {
 
 # Upgrade the cluster to target release
 function upgrade() {
-    oc adm upgrade --to-image="${TARGET}" --allow-explicit-upgrade --force="${FORCE_UPDATE}"
+    run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
 # Monitor the upgrade status
 function check_upgrade_status() {
     local wait_upgrade="${TIMEOUT}" out avail progress
+    echo "Starting the upgrade checking on $(date "+%F %T")"
     while (( wait_upgrade > 0 )); do
-        echo "oc get clusterversion" && oc get clusterversion
-        out="$(oc get clusterversion --no-headers)"
+        sleep 5m
+        wait_upgrade=$(( wait_upgrade - 5 ))
+        if ! ( run_command "oc get clusterversion" ); then
+            continue
+        fi
+        if ! out="$(oc get clusterversion --no-headers)"; then continue; fi
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${TARGET_VERSION}" ]]; then
-            echo -e "Upgrade succeed\n\n"
+            echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
             return 0
-        else
-            sleep 5m
-            (( wait_upgrade -= 5 ))
-        fi        
+        fi
     done
-    if (( wait_upgrade <= 0 )); then
-        echo >&2 "Upgrade timeout, exiting" && return 1
+    if [[ ${wait_upgrade} -le 0 ]]; then
+        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
     fi
 }
 
@@ -276,13 +294,13 @@ function check_mcp() {
             else
                 echo >&2 "Worker pool status check failed" && return 1
             fi 
-        fi   
-    done      
+        fi
+    done
 }
 
 function health_check() {
-    check_mcp
     wait_clusteroperators_continous_success
+    check_mcp
     check_node
 }
 
@@ -314,6 +332,7 @@ if ! check_signed; then
     echo "You're updating to an unsigned images, you must override the verification using --force flag"
     FORCE_UPDATE="true"
 else
+    echo "You're updating to a signed images, so run the upgrade command without --force flag"
     admin_ack
 fi
 upgrade
