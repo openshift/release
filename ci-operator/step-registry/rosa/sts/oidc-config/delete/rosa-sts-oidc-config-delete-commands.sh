@@ -35,7 +35,7 @@ fi
 OIDC_CONFIG_FILE="${SHARED_DIR}/oidc-config"
 if [[ -e "${OIDC_CONFIG_FILE}" ]]; then
   oidc_config_id=$(cat "${OIDC_CONFIG_FILE}" | jq -r '.id')
-
+  sleep 86400
   echo "Start deleting the oidc config ${oidc_config_id}..."
   rosa delete oidc-provider -y --mode auto --oidc-config-id ${oidc_config_id} || true
   rosa delete oidc-config -y --mode auto --oidc-config-id ${oidc_config_id}
