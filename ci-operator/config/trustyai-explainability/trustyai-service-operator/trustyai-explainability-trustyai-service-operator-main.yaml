@@ -4,30 +4,22 @@ base_images:
     namespace: origin
     tag: stream8
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi8/ubi
+      RUN yum install -y --nodocs make git golang
+      RUN ln -s /cli/oc /usr/bin/kubectl
 images:
 - context_dir: tests/
   dockerfile_path: Dockerfile
   from: os
-  to: trustyai-service-operator-ci-tests
-promotion:
-  additional_images:
-    latest: trustyai-service-operator-ci-tests
-  name: trustyai-service-operator-ci-tests
-  namespace: ocp
+  to: trustyai-explainability-ci-tests
 releases:
-  initial:
-    integration:
-      name: "4.13"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.13"
-      namespace: ocp
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.13"
 resources:
   '*':
     requests:
@@ -40,7 +32,6 @@ tests:
     cluster_profile: aws-opendatahub
     env:
       BASE_DOMAIN: openshift-ci.odhdev.com
-      COMPUTE_NODE_TYPE: n2-standard-8
       HYPERSHIFT_AWS_REGION: us-west-2
     test:
     - as: e2e
