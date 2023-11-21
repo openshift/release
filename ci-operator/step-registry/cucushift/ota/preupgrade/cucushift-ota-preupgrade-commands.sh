@@ -21,13 +21,14 @@ function extract_oc(){
 }
 
 # Define the checkpoints/steps needed for the specific case
-function pre-ocp-66839(){
+function pre-OCP-66839(){
     if [[ "${BASELINE_CAPABILITY_SET}" != "None" ]]; then
         echo "Test Skipped: ${FUNCNAME[0]}"
         return 0
     fi
 
-    echo "Test Start: ${FUNCNAME[0]}"    
+    echo "Test Start: ${FUNCNAME[0]}"
+    extract_oc || return 1
     # Extract all manifests from live cluster with --included
     manifestsDir="/tmp/pre-include-manifest"
     mkdir "${manifestsDir}"
@@ -96,6 +97,17 @@ function pre-ocp-66839(){
     return 0
 }
 
+function pre-OCP-24358(){
+    local pre_proxy_spec="${SHARED_DIR}/OCP-24358_spec_pre.out"
+    
+    oc get proxy -ojson | jq -r '.items[].spec' > "${pre_proxy_spec}"
+    if [[ ! -s "${pre_proxy_spec}" ]]; then
+        echo "Fail to get proxy spec!"
+        return 1
+    fi
+    return 0
+}
+
 # This func run all test cases with checkpoints which will not break other cases, 
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be run or not
@@ -105,17 +117,27 @@ function run_ota_multi_test(){
 
 # Run single case through case ID
 function run_ota_single_case(){
-    if ! type pre-ocp-"${1}" &>/dev/null; then
-        echo "Test Failed: pre-ocp-${1} due to no case id found!" >> "${report_file}"
+    if ! type pre-"${1}" &>/dev/null; then
+        echo "WARN: no pre-${1} function found" >> "${report_file}"
     else
-        pre-ocp-"${1}"
-        if [[ $? == 1 ]]; then
-            echo "Test Failed: pre-ocp-${1}" >> "${report_file}"
+        echo "------> ${1}"
+        pre-"${1}"
+        if [[ $? == 0 ]]; then
+            echo "PASS: pre-${1}" >> "${report_file}"
+        else
+            echo "FAIL: pre-${1}" >> "${report_file}"
         fi
-    fi 
+    fi
 }
+
+if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
+  exit 0
+fi
+
 report_file="${ARTIFACT_DIR}/ota-test-result.txt"
 export PATH=/tmp:${PATH}
+which oc
+oc version --client
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
@@ -124,13 +146,8 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 set +e
-if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
-  exit 0
-elif [[ "${ENABLE_OTA_TEST}" == "true" ]]; then
-  extract_oc
+if [[ "${ENABLE_OTA_TEST}" == "true" ]]; then
   run_ota_multi_test
 else
-  extract_oc
   run_ota_single_case ${ENABLE_OTA_TEST}
 fi
-
