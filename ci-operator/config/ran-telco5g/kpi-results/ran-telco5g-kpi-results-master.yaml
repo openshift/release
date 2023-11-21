@@ -4,12 +4,17 @@ build_root:
     namespace: openshift
     tag: golang-1.13
 releases:
-  custom:
-    prerelease:
+  initial:
+    release:
+      channel: stable
+      version: "4.14"
+  latest:
+    candidate:
+      architecture: amd64
       product: ocp
-      version_bounds:
-        lower: 4.13.0
-        upper: 4.15.0-0
+      relative: 1
+      stream: nightly
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -18,12 +23,19 @@ resources:
       cpu: 100m
       memory: 100Mi
 tests:
-- as: kpi-results
+- as: kpi-results-stable
   cluster: build01
   cron: 0 14 * * *
   steps:
     env:
-      OCP_RELEASE_VERSION: release:custom
+      OCP_RELEASE_VERSION: release:initial
+    workflow: telco5g-kpi-results
+- as: kpi-results-nightly
+  cluster: build01
+  cron: 0 14 * * *
+  steps:
+    env:
+      OCP_RELEASE_VERSION: release:latest
     workflow: telco5g-kpi-results
 zz_generated_metadata:
   branch: master
