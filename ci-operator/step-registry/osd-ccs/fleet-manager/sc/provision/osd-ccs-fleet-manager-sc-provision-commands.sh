@@ -74,15 +74,18 @@ wait_for_cluster
 
 # Save kubeconfig of sc
 sc_ocm_cluster_id=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters/$sc_cluster_id | jq -r .cluster_management_reference.cluster_id)
-echo "Save kubeconfig for Service Cluster:${sc_ocm_cluster_id}"
+echo "Save kubeconfig and ocm cluster ID for Service Cluster:${sc_ocm_cluster_id}"
 ocm get /api/clusters_mgmt/v1/clusters/${sc_ocm_cluster_id}/credentials | jq -r .kubeconfig > "${SHARED_DIR}/hs-sc.kubeconfig"
+echo "${sc_ocm_cluster_id}" > "${ARTIFACT_DIR}/ocm-sc-id"
 
 # Save MC kubeconfig and cluster info
 mc_ocm_cluster=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters -p search="parent.id='${sc_cluster_id}' and status is 'ready'" -p size=1)
 mc_ocm_cluster_id=$(echo $mc_ocm_cluster | jq -r '.items[0].cluster_management_reference.cluster_id')
 mc_cluster_id=$(echo $mc_ocm_cluster | jq -r '.items[0].id')
 echo "Management Cluster fm id:${mc_cluster_id}"
+echo "Save ocm and osdfm cluster ID for MC with fm id:${mc_cluster_id}"
 echo "${mc_cluster_id}" > "${ARTIFACT_DIR}/osd-fm-mc-id"
+echo "${mc_ocm_cluster_id}" > "${ARTIFACT_DIR}/ocm-mc-id"
 
 echo "Save kubeconfig for Management Cluster:${mc_ocm_cluster_id}"
 if [[ -z "${mc_ocm_cluster_id}" ]]; then

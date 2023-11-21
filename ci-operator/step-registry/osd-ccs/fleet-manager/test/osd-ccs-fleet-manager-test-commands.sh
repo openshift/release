@@ -855,8 +855,8 @@ function test_hypershift_crds_not_installed_on_sc () {
 
 function test_add_labels_to_sc_after_installing () {
   TEST_PASSED=true
-  sc_cluster_id=$(cat "${SHARED_DIR}"/osd-fm-sc-id)
-  mc_cluster_id=$(cat "${ARTIFACT_DIR}"/osd-fm-mc-id)
+  sc_cluster_id=$(cat "${ARTIFACT_DIR}/ocm-sc-id")
+  mc_cluster_id=$(cat "${ARTIFACT_DIR}/ocm-mc-id")
   
   echo "Confirming that 'ext-hypershift.openshift.io/cluster-type' label is set to 'service-cluster' for SC with ID: $sc_cluster_id"
   EXPECTED_SC_LABEL="service-cluster"
@@ -1037,6 +1037,148 @@ function test_fetching_cluster_details_from_api () {
 
 ###### end of Fix: Unable to fetch cluster details via the API tests (OCPQE-17819) ######
 
+##################################################################
+
+###### Create machine pools for request serving HCP components tests (OCPQE-17866) ######
+
+function test_machineset_tains_and_labels () {
+  TEST_PASSED=true
+  export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+
+  echo "Getting a name of serving machineset"
+  SERVING_MACHINE_SET_NAME=""
+  SERVING_MACHINE_SET_NAME=$(oc get machineset -A | grep -e "serving" | grep -v "non-serving" | awk '{print $2}' | head -1) || true
+  if [ "$SERVING_MACHINE_SET_NAME" == "" ]; then
+    echo "ERROR. Failed to get a name of a serving machineset"
+    TEST_PASSED=false
+  else
+    echo "Getting labels of of serving machineset: $SERVING_MACHINE_SET_NAME and confirming that 'hypershift.openshift.io/request-serving-component' is set to true"
+    SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE=""
+    SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE=$(oc get machineset "$SERVING_MACHINE_SET_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.metadata.labels | jq  '."hypershift.openshift.io/request-serving-component"')
+    if [ "$SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE" == "" ] || [ "$SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE" = false ]; then
+      echo "ERROR. 'hypershift.openshift.io/request-serving-component' should be present in machineset labels and set to true. Unable to get the key value pair from labels"
+      TEST_PASSED=false
+    fi
+    echo "Getting tains of of serving machineset: $SERVING_MACHINE_SET_NAME and confirming that 'hypershift.openshift.io/request-serving-component' is set to true"
+    SERVING_MACHINE_SET_REQUEST_SERVING_TAINT_VALUE=false
+    SERVING_MACHINE_SET_REQUEST_SERVING_TAINT_VALUE=$(oc get machineset "$SERVING_MACHINE_SET_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.taints[] | jq 'select(.key == "hypershift.openshift.io/request-serving-component")' | jq -r .value)
+    if [ "$SERVING_MACHINE_SET_REQUEST_SERVING_TAINT_VALUE" = false ]; then
+      echo "ERROR. 'hypershift.openshift.io/request-serving-component' should be present in machineset taints and set to true. Unable to get the key value pair from taints"
+      TEST_PASSED=false
+    fi
+  fi
+
+  update_results "OCPQE-17866" $TEST_PASSED
+}
+
+###### end of Create machine pools for request serving HCP components tests (OCPQE-17866) ######
+
+##################################################################
+
+###### MCs/SCs are created as OSD or ROSA STS clusters tests (OCPQE-17867) ######
+
+function test_sts_mc_sc () {
+  TEST_PASSED=true
+  mc_cluster_id=$(cat "${ARTIFACT_DIR}/ocm-mc-id")
+  sc_cluster_id=$(cat "${ARTIFACT_DIR}/ocm-sc-id")
+
+  function check_sts_enabled () {
+    cluster_type=$1
+    ocm_cluster_id=$2
+    echo "Getting clusters_mgmt API output for $cluster_type: $ocm_cluster_id"
+    CLUSTERS_MGMT_API_CLUSTER_OUTPUT=""
+    CLUSTERS_MGMT_API_CLUSTER_OUTPUT=$(ocm get /api/clusters_mgmt/v1/clusters/"$ocm_cluster_id") || true
+
+    if [ "$CLUSTERS_MGMT_API_CLUSTER_OUTPUT" == "" ]; then
+      echo "ERROR. Failed to get cluster with mgmt cluster ID: $ocm_cluster_id"
+      TEST_PASSED=false
+    else
+      EXPECTED_VALUE="required"
+      echo "Confirming that '.aws.ec2_metadata_http_tokens' value for $cluster_type: $ocm_cluster_id is: $EXPECTED_VALUE"
+      EC2_METADATA_HTTP_TOKENS_VALUE=$(jq -n "$CLUSTERS_MGMT_API_CLUSTER_OUTPUT" | jq -r .aws.ec2_metadata_http_tokens)
+      if [ "$EC2_METADATA_HTTP_TOKENS_VALUE" != "$EXPECTED_VALUE" ]; then
+        echo "ERROR. Expected value of '.aws.ec2_metadata_http_tokens' for the MC to be $EXPECTED_VALUE. Got: $EC2_METADATA_HTTP_TOKENS_VALUE"
+        TEST_PASSED=false
+      fi
+      echo "Confirming that '.aws.sts.enabled' value for $cluster_type: $ocm_cluster_id is: set to true"
+      STS_ENABLED=false
+      STS_ENABLED=$(jq -n "$CLUSTERS_MGMT_API_CLUSTER_OUTPUT" | jq -r .aws.sts.enabled) || true
+      if [ "$STS_ENABLED" = false ]; then
+        echo "ERROR. Expected '.aws.sts.enabled' for the MC to be set to 'true'"
+        TEST_PASSED=false
+      fi
+    fi
+  }
+
+  check_sts_enabled "MC" "$mc_cluster_id"
+
+  check_sts_enabled "SC" "$sc_cluster_id"
+
+  update_results "OCPQE-17867" $TEST_PASSED
+}
+
+###### end of MCs/SCs are created as OSD or ROSA STS clusters tests (OCPQE-17867) ######
+
+##################################################################
+
+###### fix: Backups created only once tests (OCPQE-17901) ######
+
+function test_backups_created_only_once () {
+  TEST_PASSED=true
+  export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+
+  echo "Getting schedule configuration"
+  SCHEDULE_OUTPUT=$(oc get schedule -n openshift-adp-operator | tail -3)
+  echo "Confirming that hourly, daily and weekly backups are available, enabled and with correct cron expression"
+  echo "$SCHEDULE_OUTPUT" | while read -r line; do
+    SCHEDULE_NAME=$(echo "$line" | awk '{print $1}')
+    SCHEDULE_ENABLED=$(echo "$line" | awk '{print $2}')
+    SCHEDULE_CRON=$(echo "$line" | awk '{print $3 " " $4 " " $5 " " $6 " " $7}')
+    if ! [[ "$SCHEDULE_NAME" =~ ^("daily-full-backup"|"hourly-full-backup"|"weekly-full-backup") ]]; then
+      echo "Found unexpected name: '$SCHEDULE_NAME'. Expected one of: ['daily-full-backup'|'hourly-full-backup'|'weekly-full-backup']"
+      TEST_PASSED=false
+      break
+    fi
+    if [ "$SCHEDULE_ENABLED" != "Enabled" ]; then
+      echo "Schedule '$SCHEDULE_NAME' should be set to 'Enabled'. Found: $SCHEDULE_ENABLED"
+      TEST_PASSED=false
+      break
+    fi
+    case $SCHEDULE_NAME in
+
+      daily-full-backup)
+        if [ "$SCHEDULE_CRON" != "0 1 * * *" ]; then
+          echo "Schedule '$SCHEDULE_NAME' should be set to '0 1 * * *'. Found: $SCHEDULE_CRON"
+          TEST_PASSED=false
+          break
+        fi
+        ;;
+
+      hourly-full-backup)
+        if [ "$SCHEDULE_CRON" != "17 * * * *" ]; then
+          echo "Schedule '$SCHEDULE_NAME' should be set to '17 * * * *'. Found: $SCHEDULE_CRON"
+          TEST_PASSED=false
+          break
+        fi
+        ;;
+
+      weekly-full-backup)
+        if [ "$SCHEDULE_CRON" != "0 2 * * 1" ]; then
+          echo "Schedule '$SCHEDULE_NAME' should be set to '0 2 * * 1'. Found: $SCHEDULE_CRON"
+          TEST_PASSED=false
+          break
+        fi
+        ;;
+    esac
+  done
+
+  update_results "OCPQE-17901" $TEST_PASSED
+}
+
+###### end of fix: Backups created only once tests (OCPQE-17901) ######
+
+##################################################################
+
 # Test all cases and print results
 
 test_monitoring_disabled
@@ -1066,6 +1208,12 @@ test_add_labels_to_sc_after_installing
 test_ready_mc_acm_placement_decision
 
 test_fetching_cluster_details_from_api
+
+test_machineset_tains_and_labels
+
+test_sts_mc_sc
+
+test_backups_created_only_once
 
 printf "\nPassed tests:\n"
 for p in "${PASSED[@]}"; do
