@@ -161,14 +161,14 @@ function main(){
     # make sure file doesn't already exist
     cleanup
 
-    # check if $RELEASE_IMAGE_LATEST is defined
-    if [[ -z "${RELEASE_IMAGE_LATEST}" ]]; then
-        print_error "Environment variable \$RELEASE_IMAGE_LATEST was not defined"
+    # check if $OCP_RELEASE_VERSION is defined
+    if [[ -z "${OCP_RELEASE_VERSION}" ]]; then
+        print_error "Environment variable \$OCP_RELEASE_VERSION was not defined"
         exit 32
     fi
 
     # download the report
-    download_kpi_results_report "${RELEASE_IMAGE_LATEST}"
+    download_kpi_results_report "${OCP_RELEASE_VERSION}"
 
     # Check the test data
     local test_data
