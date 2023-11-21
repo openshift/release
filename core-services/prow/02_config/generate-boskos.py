@@ -88,7 +88,7 @@ CONFIG = {
         'us-west-2': 10
     },
     'aws-rhtap-performance-quota-slice': {
-        'us-west-2': 10
+        'eu-west-1': 10
     },
     'aws-opendatahub-quota-slice': {
         # Wild guesses. We can re-configure later
@@ -321,9 +321,12 @@ CONFIG = {
     'hypershift-powervs-cb-quota-slice': {
         'default': 5,
     },
-    'ossm-quota-slice': {
+    'ossm-aws-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
-        'default': 1000,
+        'us-east-2': 50,
+        'us-west-2': 50,
+        'eu-west-1': 50,
+        'eu-central-1': 50,
     },
 }
 
@@ -379,7 +382,7 @@ for i in [871,991,1165,1154,1148,1140]:
 for i in [1287,1289,1296,1298,1300,1302]:
     CONFIG['vsphere-multizone-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
 
-for i in [1153,1179,1211,1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274,1283,1285,1305,1309,758,902]:
+for i in [1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274,1283,1285,1305,1309]:
     CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
 
 for i in range(200,213):

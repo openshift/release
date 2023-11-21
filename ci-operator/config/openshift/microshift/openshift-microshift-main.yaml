@@ -1,12 +1,4 @@
 base_images:
-  cli:
-    name: "4.15"
-    namespace: ocp
-    tag: cli
-  test-bin:
-    name: "4.15"
-    namespace: ocp
-    tag: tests
   test-runtime:
     name: test-runtime
     namespace: microshift
@@ -16,7 +8,21 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.20-openshift-4.14
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
+  inputs:
+    src:
+      as:
+      - src
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift
+  to: microshift-test-rpm
 promotion:
+  excluded_images:
+  - microshift-test-rpm
   name: "4.15"
   namespace: ocp
 releases:
@@ -61,36 +67,70 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: test-srpm
+- as: test-rpm
   cluster: build02
-  commands: make srpm
+  commands: RPM_INFO=true make rpm srpm
   container:
-    from: src
-  run_if_changed: ^(rpm/*|packaging/.*|Makefile)
+    from: microshift-test-rpm
+  run_if_changed: ^(rpm/.*|packaging/.*|Makefile)$
 - as: test-rebase
   cluster: build02
   optional: true
-  run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod)
+  run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod)$
   steps:
     env:
       DRY_RUN: "y"
     workflow: openshift-microshift-rebase
 - as: microshift-metal-tests
   cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh|.*\.ks\.template)
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: aws
     env:
       EC2_AMI: ami-02b8534ff4b424939
       EC2_INSTANCE_TYPE: c5n.metal
     workflow: openshift-microshift-e2e-metal-tests
+- as: microshift-metal-cache
+  cluster: build02
+  run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_AMI: ami-02b8534ff4b424939
+    workflow: openshift-microshift-e2e-metal-cache
+- as: microshift-metal-cache-nightly
+  cluster: build02
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_AMI: ami-02b8534ff4b424939
+    workflow: openshift-microshift-e2e-metal-cache
+- as: microshift-metal-cache-arm
+  cluster: build02
+  run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_AMI: ami-08c7e766098f8cb4f
+      EC2_INSTANCE_TYPE: t4g.2xlarge
+    workflow: openshift-microshift-e2e-metal-cache
+- as: microshift-metal-cache-nightly-arm
+  cluster: build02
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_AMI: ami-08c7e766098f8cb4f
+      EC2_INSTANCE_TYPE: t4g.2xlarge
+    workflow: openshift-microshift-e2e-metal-cache
 - as: rebase-on-nightlies
   cron: 0 5 * * 1-5
   steps:
     workflow: openshift-microshift-rebase
 - as: metal-periodic-test
   cluster: build02
-  run_if_changed: (.*periodic.*|^test/bin/.*)
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: aws
     env:
@@ -99,7 +139,7 @@ tests:
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly
   cluster: build02
-  cron: 0 1 * * *
+  cron: 0 1,13 * * *
   steps:
     cluster_profile: aws
     env:
@@ -108,7 +148,7 @@ tests:
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly-arm
   cluster: build02
-  cron: 0 1 * * *
+  cron: 0 1,13 * * *
   steps:
     cluster_profile: aws
     env:
@@ -117,7 +157,7 @@ tests:
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly-presubmit-arm
   cluster: build02
-  cron: 0 1 * * *
+  cron: 0 1,13 * * *
   steps:
     cluster_profile: aws
     env:
@@ -126,7 +166,7 @@ tests:
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-conformance-nightly
   cluster: build02
-  cron: 0 1 * * *
+  cron: 0 1,13 * * *
   steps:
     cluster_profile: aws
     env:
@@ -134,6 +174,7 @@ tests:
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-conformance
   cluster: build02
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|origin/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: aws
     env:

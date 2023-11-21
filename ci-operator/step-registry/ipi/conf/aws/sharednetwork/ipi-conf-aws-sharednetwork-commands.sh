@@ -63,7 +63,7 @@ if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
   curl -L ${TEMPLATE_BASE_PATH}/${TEMPLATE_STACK_LOCAL_ZONE} -o /tmp/${TEMPLATE_STACK_LOCAL_ZONE}
 
   # Randomly select the Local Zone in the Region (to increase coverage of tested zones added automatically)
-  localzone_name=$(< "${SHARED_DIR}"/local-zone-name.txt)
+  localzone_name=$(< "${SHARED_DIR}"/edge-zone-name.txt)
   echo "Local Zone selected: ${localzone_name}"
 
   vpc_rtb_pub=$(aws --region $REGION cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="PublicRouteTableId").OutputValue')
