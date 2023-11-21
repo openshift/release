@@ -1263,8 +1263,89 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
+  cluster: build04
+  cron: 0 3 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.14
+    org: openshift
+    repo: hypershift
+  labels:
+    ci-operator.openshift.io/cloud: hypershift-powervs-cb
+    ci-operator.openshift.io/cloud-cluster-profile: hypershift-powervs-cb
+    ci-operator.openshift.io/variant: periodics
+    ci.openshift.io/generator: prowgen
+    job-release: "4.14"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-hypershift-release-4.14-periodics-e2e-powervs-cno-test
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-powervs-cno-test-cluster-profile
+      - --target=e2e-powervs-cno-test
+      - --variant=periodics
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-powervs-cno-test-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-hypershift-powervs-cb
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build04
+  cron: 0 3 * * *
   decorate: true
   labels:
     config-type: modern
@@ -1278,26 +1359,26 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --namespace=$(NAMESPACE)
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/launch-cluster-profile
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --namespace=$(NAMESPACE)
       - --target=e2e-powervs-cno-test
       command:
       - ci-operator
       env:
-      - name: RELEASE_IMAGE_INITIAL
-      - name: RELEASE_IMAGE_LATEST
-      - name: CLUSTER_VARIANT
-      - name: CLUSTER_DURATION
-        value: "9000"
       - name: BRANCH
         value: "4.14"
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: CLUSTER_VARIANT
       - name: JOB_NAME_SAFE
         value: launch
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
       - name: UNRESOLVED_CONFIG
         value: |
           resources:
@@ -1324,14 +1405,14 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
       - mountPath: /etc/report
         name: result-aggregator
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -1347,12 +1428,12 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-hypershift-powervs-cb
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
