@@ -86,6 +86,8 @@ echo "Management Cluster fm id:${mc_cluster_id}"
 echo "Save ocm and osdfm cluster ID for MC with fm id:${mc_cluster_id}"
 echo "${mc_cluster_id}" > "${ARTIFACT_DIR}/osd-fm-mc-id"
 echo "${mc_ocm_cluster_id}" > "${ARTIFACT_DIR}/ocm-mc-id"
+echo "${mc_cluster_id}" > "${SHARED_DIR}/osd-fm-mc-id"
+
 
 echo "Save kubeconfig for Management Cluster:${mc_ocm_cluster_id}"
 if [[ -z "${mc_ocm_cluster_id}" ]]; then
