@@ -38,9 +38,8 @@ tests:
         # TODO: return CODEFLARE_TEST_TIMEOUT_LONG to 10m once the SDK test "https://github.com/project-codeflare/codeflare-sdk/pull/306" is merged, and test removed from odh/cfo.
         export CODEFLARE_TEST_TIMEOUT_LONG=15m
         export NOTEBOOK_IMAGE_STREAM_NAME=jupyter-datascience-notebook
-        IMAGE_PATH="image-registry.openshift-image-registry.svc:5000/${NAMESPACE}/pipeline:codeflare-operator-amd64"
-        echo "Using image ${IMAGE_PATH}"
-        sed -i "s|odh-codeflare-operator-controller-image=.*|odh-codeflare-operator-controller-image=$IMAGE_PATH|" ./config/manifests/bases/params.env
+        echo "Using image ${ODH_CODEFLARE_OPERATOR_CONTROLLER_IMAGE}"
+        sed -i "s|odh-codeflare-operator-controller-image=.*|odh-codeflare-operator-controller-image=$ODH_CODEFLARE_OPERATOR_CONTROLLER_IMAGE|" ./config/manifests/bases/params.env
         # Temporary solution until https://github.com/opendatahub-io/distributed-workloads/ repo is closed and content migrated
         git clone https://github.com/opendatahub-io/distributed-workloads.git
         cd distributed-workloads
@@ -63,7 +62,7 @@ tests:
         cd ..
         cd test && go test -timeout 60m -v ./odh ./e2e
       dependencies:
-      - env: ODH-CODEFLARE-OPERATOR-CONTROLLER-IMAGE
+      - env: ODH_CODEFLARE_OPERATOR_CONTROLLER_IMAGE
         name: codeflare-operator
       from: src
       resources:
