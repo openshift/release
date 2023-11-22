@@ -62,7 +62,7 @@ rhc4tp-prod-z8cxf-image-registry-us-east-1-evenkyleffocxqvofrk.s3.dualstack.us-e
 rhcos.mirror.openshift.com
 route53.amazonaws.com
 s3.${REGION}.amazonaws.com
-s3.amazonaws.com
+*.s3.amazonaws.com
 s3.dualstack.${REGION}.amazonaws.com
 servicequotas.${REGION}.amazonaws.com
 sso.redhat.com
