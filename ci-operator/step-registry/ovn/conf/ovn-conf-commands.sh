@@ -8,10 +8,6 @@ curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -
 touch "${SHARED_DIR}/install-config.yaml"
 /tmp/yq w -i "${SHARED_DIR}/install-config.yaml" 'networking.networkType' OVNKubernetes
 
-echo "install-config.yaml"
-echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret"
-
 if [[ ! -z "${GATEWAY_MODE}" ]]; then
   echo "Overriding OVN gateway mode with \"${GATEWAY_MODE}\""
   cat >> "${SHARED_DIR}/manifest_cluster-network-00-gateway-mode.yaml" << EOF
