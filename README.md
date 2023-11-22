@@ -1,4 +1,4 @@
-# OpenShift Release Tooling
+## OpenShift Release Tooling
 
 This repository holds OpenShift cluster manifests, component build manifests and
 CI workflow configuration for OpenShift component repositories for both OKD and
