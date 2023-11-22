@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-KUBECONFIG=$HUB_CLUSER_KUCECONFIG_PATH
+KUBECONFIG=$HUB_CLUSTER_KUBECONFIG_PATH
 KUBEADMIN_TOKEN=$(cat $SHARED_DIR/kubeadmin-token)
 
 export KUBECONFIG
