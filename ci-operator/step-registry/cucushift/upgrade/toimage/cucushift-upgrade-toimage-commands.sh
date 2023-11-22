@@ -332,7 +332,6 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
 
-    # In disconnected install, marketplace often get into False state, so it is better to remove it from cluster from flexy post-action
     echo "Make sure every operator's AVAILABLE column is True"
     if unavailable_operator=$(${OC} get clusteroperator | awk '$3 == "False"' | grep "False"); then
         echo >&2 "Some operator's AVAILABLE is False"
@@ -344,6 +343,18 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
 
+    echo "Make sure every operator's PROGRESSING column is False"
+    if progressing_operator=$(${OC} get clusteroperator | awk '$4 == "True"' | grep "True"); then
+        echo >&2 "Some operator's PROGRESSING is True"
+        echo >&2 "$progressing_operator"
+        (( tmp_ret += 1 ))
+    fi
+    if ${OC} get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Progressing") | .status' | grep -iv "False"; then
+        echo >&2 "Some operators are Progressing, pls run 'oc get clusteroperator -o json' to check"
+        (( tmp_ret += 1 ))
+    fi
+
+    echo "Make sure every operator's DEGRADED column is False"
     # In disconnected install, openshift-sample often get into Degrade state, so it is better to remove them from cluster from flexy post-action
     #degraded_operator=$(${OC} get clusteroperator | grep -v "openshift-sample" | awk '$5 == "True"')
     if degraded_operator=$(${OC} get clusteroperator | awk '$5 == "True"' | grep "True"); then

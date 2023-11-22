@@ -60,18 +60,12 @@ function check_clusteroperators() {
     done < "${input}"
     rm -f "${tmp_clusteroperator}"
 
-    # oc get clusteroperator
-    # NAME                                  VERSION                             AVAILABLE   PROGRESSING   FAILING   SINCE
-    # operator-lifecycle-manager            4.0.0-0.nightly-2019-03-19-004004   True        False         False     4h26m
-    # service-ca                                                                True        False         False     4h26m
-    # "versions": null
     echo "Make sure every operator column reports version"
     if null_version=$(${OC} get clusteroperator -o json | jq '.items[] | select(.status.versions == null) | .metadata.name') && [[ ${null_version} != "" ]]; then
         echo >&2 "Null Version: ${null_version}"
         (( tmp_ret += 1 ))
     fi
 
-    # In disconnected install, marketplace often get into False state, so it is better to remove it from cluster from flexy post-action
     echo "Make sure every operator's AVAILABLE column is True"
     if unavailable_operator=$(${OC} get clusteroperator | awk '$3 == "False"' | grep "False"); then
         echo >&2 "Some operator's AVAILABLE is False"
@@ -83,6 +77,18 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
 
+    echo "Make sure every operator's PROGRESSING column is False"
+    if progressing_operator=$(${OC} get clusteroperator | awk '$4 == "True"' | grep "True"); then
+        echo >&2 "Some operator's PROGRESSING is True"
+        echo >&2 "$progressing_operator"
+        (( tmp_ret += 1 ))
+    fi
+    if ${OC} get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Progressing") | .status' | grep -iv "False"; then
+        echo >&2 "Some operators are Progressing, pls run 'oc get clusteroperator -o json' to check"
+        (( tmp_ret += 1 ))
+    fi
+
+    echo "Make sure every operator's DEGRADED column is False"
     # In disconnected install, openshift-sample often get into Degrade state, so it is better to remove them from cluster from flexy post-action
     #degraded_operator=$(${OC} get clusteroperator | grep -v "openshift-sample" | awk '$5 == "True"')
     if degraded_operator=$(${OC} get clusteroperator | awk '$5 == "True"' | grep "True"); then
