@@ -20,7 +20,7 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-curl https://github.com/bmanzari/release/blob/templating_test/ci-operator/step-registry/baremetal/lab/agent/misc/scripts/agent-baremetal.sh > "${SHARED_DIR}/agent-baremetal.sh"
+curl https://github.com/openshift-qe/agent-qe/blob/master/prow-utils/scripts/agent-scripts.sh > "${SHARED_DIR}/agent-scripts.sh"
 
 source "${SHARED_DIR}/agent-baremetal.sh"
 
