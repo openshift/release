@@ -5,10 +5,11 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-sleep 2h
+# Extract clusters archive from SHARED_DIR
+tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=/tmp/clusters-data
 
-KUBECONFIG="${HUB_CLUSTER_DATA_DIR}/kubeconfig"
-KUBEADMIN_TOKEN=$(cat ${HUB_CLUSTER_DATA_DIR}/kubeadmin-token)
+KUBECONFIG=$(cat "${SHARED_DIR}/hub-kubeconfig-path")
+KUBEADMIN_TOKEN=$(cat "${SHARED_DIR}/hub-kubeadmin-token")
 
 export KUBECONFIG
 export KUBEADMIN_TOKEN
