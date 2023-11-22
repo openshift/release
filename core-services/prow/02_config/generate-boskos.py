@@ -98,6 +98,9 @@ CONFIG = {
         'us-west-1': 40,
         'us-west-2': 40,
     },
+    'aws-devfile-quota-slice': {
+        'us-west-2': 10
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
