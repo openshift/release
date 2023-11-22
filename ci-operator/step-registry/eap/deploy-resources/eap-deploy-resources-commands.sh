@@ -33,3 +33,4 @@ EOF
 
 oc delete configmap test-properties -n "${1}" || true
 oc create configmap test-properties -n "${1}" --from-file=/tmp/test.properties
+}
