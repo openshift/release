@@ -272,6 +272,7 @@ platform:
   none: {}
 "
   else
+  if [ "${AGENT_BM_HOSTS_IN_INSTALL_CONFIG}" = "false" ]; then
   yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
 compute:
 - architecture: ${architecture}
@@ -285,6 +286,57 @@ platform:
     ingressVIPs:
     - ${INGRESS_VIP}
 "
+  else
+  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
+compute:
+- architecture: ${architecture}
+  hyperthreading: Enabled
+  name: worker
+  replicas: ${workers}
+platform:
+  baremetal:
+    apiVIPs:
+    - ${API_VIP}
+    ingressVIPs:
+    - ${INGRESS_VIP}
+    provisioningNetwork: Managed
+    provisioningNetworkInterface: eno1
+    ClusterProvisioningIP: 172.22.0.3
+    hosts: []
+"
+
+# shellcheck disable=SC2154
+for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  AGENT_BMC_INSTALL_CONFIG="
+  name: ${name}
+  bootMACAddress: ${provisioning_mac}
+  bmc:
+        address:  ${bmc_scheme}://${bmc_address}${bmc_base_uri}
+        username: ${bmc_user}
+        password: ${bmc_pass}
+        disableCertificateVerification: true
+  networkConfig:
+    interfaces:
+    - name: ${baremetal_iface}
+      type: ethernet
+      state: up
+      ipv4:
+        enabled: true
+        dhcp: false
+        address:
+            - ip: ${ip}
+              prefix-length: 192.168.90.0/24
+      ipv6:
+        enabled: false
+"
+
+# Patch the install-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
+  yq --inplace eval-all 'select(fileIndex == 0).platform.baremetal.hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
+    "$SHARED_DIR/install-config.yaml" - <<< "$AGENT_BMC_INSTALL_CONFIG"
+done
+  fi
   fi
 fi
 
@@ -294,8 +346,11 @@ cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
 # From now on, we assume no more patches to the install-config.yaml are needed.
 # Also, we assume that the agent-config.yaml is already in place in the SHARED_DIR.
 # We can create the installation dir with the install-config.yaml and agent-config.yaml.
-grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
-grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
+#grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
+#grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
+
+grep -v "pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
+grep -v "pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
 
 ### TODO check if we can support the following
 ### Create manifests
@@ -397,4 +452,8 @@ if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   # TODO: gather logs??
   exit 1
+fi
+
+if [ "${AGENT_BM_HOSTS_IN_INSTALL_CONFIG}" = "true" ]; then
+  oc get bmh -n openshift-machine-api
 fi
