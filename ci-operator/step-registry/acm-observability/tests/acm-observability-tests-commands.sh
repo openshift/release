@@ -5,8 +5,8 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-KUBECONFIG=$(cat $HUB_CLUSTER_DATA_PATH | yq .kubeconfig_path)
-KUBEADMIN_TOKEN=$(cat $HUB_CLUSTER_DATA_PATH | yq .kubeadmin_token)
+KUBECONFIG=$HUB_CLUSER_KUCECONFIG_PATH
+KUBEADMIN_TOKEN=$(cat $SHARED_DIR/kubeadmin-token)
 
 export KUBECONFIG
 export KUBEADMIN_TOKEN

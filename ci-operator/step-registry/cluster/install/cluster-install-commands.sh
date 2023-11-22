@@ -87,6 +87,7 @@ if [ $NUM_CLUSTERS -eq 1 ]; then
   grep 'api-url' "$CLUSTER_DATA_DIR/cluster_data.yaml" |  awk -F': ' '{print $2}' > "${SHARED_DIR}/api.url"
   grep 'console-url' "$CLUSTER_DATA_DIR/cluster_data.yaml" |  awk -F': ' '{print $2}' > "${SHARED_DIR}/console.url"
   grep 'cluster-id' "$CLUSTER_DATA_DIR/cluster_data.yaml" |  awk -F': ' '{print $2}' > "${SHARED_DIR}/cluster-id"
+  grep 'kubeadmin-token' "$CLUSTER_DATA_DIR/cluster_data.yaml" |  awk -F': ' '{print $2}' > "${SHARED_DIR}/kubeadmin-token"
 fi
 
 # Save cluster_data.yaml and kubeconfig files to be used during cluster deletion
