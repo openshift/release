@@ -32,6 +32,8 @@ else
   exit 1
 fi
 
+sleep 86400
+
 # If the account roles exist, do deletion.
 ACCOUNT_ROLES_PREFIX_FILE="${SHARED_DIR}/account-roles-prefix"
 if [[ -e "${ACCOUNT_ROLES_PREFIX_FILE}" ]]; then
