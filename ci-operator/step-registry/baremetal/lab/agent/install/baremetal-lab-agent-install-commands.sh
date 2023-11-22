@@ -20,7 +20,9 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-curl -O 
+curl https://github.com/bmanzari/release/blob/templating_test/ci-operator/step-registry/baremetal/lab/agent/misc/scripts/agent-baremetal.sh > "${SHARED_DIR}/agent-baremetal.sh"
+
+source "${SHARED_DIR}/agent-baremetal.sh"
 
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
