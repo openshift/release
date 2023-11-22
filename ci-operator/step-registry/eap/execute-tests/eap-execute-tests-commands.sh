@@ -6,5 +6,5 @@ set -o pipefail
 
 shopt -s nullglob
 
-#Debug
+#Debug test execution
 sleep 2h
