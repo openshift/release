@@ -16,6 +16,8 @@ ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 echo "Deleting cluster: ${CLUSTER_ID}"
 
+sleep 86400
+
 ocm delete "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}"
 echo "Waiting for cluster deletion..."
 while ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}" ; do
