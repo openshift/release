@@ -3,29 +3,21 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: base
-  ci-artifacts:
-    name: master
-    namespace: psap
-    tag: ci-artifacts
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
-canonical_go_repository: github.com/openshift/cluster-nfd-operator
+canonical_go_repository: github.com/openshift/installer
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: images/infrastructure-providers/Dockerfile
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
-  to: cluster-nfd-operator
-operator:
-  bundles:
-  - context_dir: manifests/stable
-    dockerfile_path: bundle.Dockerfile
+  to: installer-terraform-providers
 promotion:
   name: 4.15-priv
   namespace: ocp-private
@@ -44,27 +36,21 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  terraform-artifacts:
+    requests:
+      cpu: "5"
+      memory: 5Gi
 tests:
-- as: unit
-  commands: make test
+- always_run: false
+  as: verify-vendor
+  commands: |
+    make -C terraform go-mod-tidy-vendor
+    git diff --exit-code
   container:
     from: src
-- as: verify
-  commands: make verify
-  container:
-    from: src
-- as: e2e-aws
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index
-    env:
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: '!create'
-      OO_PACKAGE: nfd
-      OO_TARGET_NAMESPACES: '!install'
-    workflow: optional-operators-ci-aws
+  run_if_changed: ^terraform/.*
 zz_generated_metadata:
   branch: master
   org: openshift-priv
-  repo: cluster-nfd-operator
+  repo: installer
+  variant: terraform
