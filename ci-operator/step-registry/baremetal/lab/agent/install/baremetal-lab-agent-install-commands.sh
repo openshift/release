@@ -22,7 +22,7 @@ fi
 
 curl https://github.com/openshift-qe/agent-qe/blob/master/prow-utils/scripts/agent-scripts.sh > "${SHARED_DIR}/agent-scripts.sh"
 
-source "${SHARED_DIR}/agent-baremetal.sh"
+source "${SHARED_DIR}/agent-scripts.sh"
 
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
