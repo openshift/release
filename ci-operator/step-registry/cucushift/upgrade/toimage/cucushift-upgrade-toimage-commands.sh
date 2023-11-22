@@ -42,12 +42,28 @@ EOF
 }
 
 function extract_ccoctl(){
-    echo -e "Extracting ccoctl\n"
-    local retry=5 
-    tmp_ccoctl="/tmp/upgtool"
+    local payload_image image_arch cco_image
+    local retry=5
+    local tmp_ccoctl="/tmp/upgtool"
     mkdir -p ${tmp_ccoctl}
     export PATH=/tmp:${PATH}
-    cco_image=$(oc adm release info --image-for='cloud-credential-operator' ${TARGET} -a "${CLUSTER_PROFILE_DIR}/pull-secret") || return 1
+
+    echo -e "Extracting ccoctl\n"
+    payload_image="${TARGET}"
+    set -x
+    image_arch=$(oc adm release info ${payload_image} -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o jsonpath='{.config.architecture}')
+    if [[ "${image_arch}" == "arm64" ]]; then
+        echo "The target payload is arm64 arch, trying to find out a matched version of payload image on amd64"
+        if [[ -n ${RELEASE_IMAGE_TARGET:-} ]]; then
+            payload_image=${RELEASE_IMAGE_TARGET}
+            echo "Getting target release image from RELEASE_IMAGE_TARGET: ${payload_image}"
+        elif env "NO_PROXY=*" "no_proxy=*" "KUBECONFIG=" oc get istag "release:target" -n ${NAMESPACE} &>/dev/null; then
+            payload_image=$(env "NO_PROXY=*" "no_proxy=*" "KUBECONFIG=" oc -n ${NAMESPACE} get istag "release:target" -o jsonpath='{.tag.from.name}')
+            echo "Getting target release image from build farm imagestream: ${payload_image}"
+        fi
+    fi
+    set +x
+    cco_image=$(oc adm release info --image-for='cloud-credential-operator' ${payload_image} -a "${CLUSTER_PROFILE_DIR}/pull-secret") || return 1
     while ! (env "NO_PROXY=*" "no_proxy=*" oc image extract $cco_image --path="/usr/bin/ccoctl:${tmp_ccoctl}" -a "${CLUSTER_PROFILE_DIR}/pull-secret");
     do
         echo >&2 "Failed to extract ccoctl binary, retry..."
@@ -64,6 +80,8 @@ function extract_ccoctl(){
 }
 
 function update_cloud_credentials_oidc(){
+    local platform preCredsDir tobeCredsDir tmp_ret
+
     platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
     preCredsDir="/tmp/pre-include-creds"
     tobeCredsDir="/tmp/tobe-include-creds"
@@ -78,7 +96,9 @@ function update_cloud_credentials_oidc(){
 
     # TODO: add gcp and azure
     # Update iam role with ccoctl based on tobeCredsDir
-    if ! diff -r "${preCredsDir}" "${tobeCredsDir}" &> /dev/null; then
+    tmp_ret=0
+    diff -r "${preCredsDir}" "${tobeCredsDir}" || tmp_ret=1
+    if [[ ${tmp_ret} != 0 ]]; then
         toManifests="/tmp/to-manifests"
         mkdir "${toManifests}"
         case "${platform}" in
@@ -469,11 +489,27 @@ function health_check() {
 
 # Check if a build is signed
 function check_signed() {
-    local digest algorithm hash_value response
-    digest="$(echo "${TARGET}" | cut -f2 -d@)"
+    local digest algorithm hash_value response try max_retries
+    if [[ "${TARGET}" =~ "@sha256:" ]]; then
+        digest="$(echo "${TARGET}" | cut -f2 -d@)"
+        echo "The target image is using digest pullspec, its digest is ${digest}"
+    else
+        digest="$(oc image info "${TARGET}" -o json | jq -r ".digest")"
+        echo "The target image is using tagname pullspec, its digest is ${digest}"
+    fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+    set -x
+    try=0
+    max_retries=2
+    response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+    while (( try < max_retries && response != 200 )); do
+        echo "Trying #${try}"
+        response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+        (( try += 1 ))
+        sleep 60
+    done
+    set +x
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -526,7 +562,7 @@ function admin_ack() {
 
 # Upgrade the cluster to target release
 function upgrade() {
-    oc adm upgrade --to-image="${TARGET}" --allow-explicit-upgrade --force="${FORCE_UPDATE}"
+    run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
@@ -563,6 +599,20 @@ function check_history() {
     else
         echo >&2 "History check FAILED, cluster upgrade to ${TARGET_VERSION} failed, current version is ${version}, exiting" && return 1
     fi
+}
+
+# check if any of cases is enabled via ENABLE_OTA_TEST
+function check_ota_case_enabled() {
+    local case_id
+    local cases_array=("$@")
+    for case_id in "${cases_array[@]}"; do
+        # shellcheck disable=SC2076
+        if [[ " ${ENABLE_OTA_TEST} " =~ " ${case_id} " ]]; then
+            echo "${case_id} is enabled via ENABLE_OTA_TEST on this job."
+            return 0
+        fi
+    done
+    return 1
 }
 
 if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
@@ -614,6 +664,12 @@ do
     if ! check_signed; then
         echo "You're updating to an unsigned images, you must override the verification using --force flag"
         FORCE_UPDATE="true"
+        if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358"; then
+            echo "The case need to run against a signed target image!"
+            exit 1
+        fi
+    else
+        echo "You're updating to a signed images, so run the upgrade command without --force flag"
     fi
     if [[ "${FORCE_UPDATE}" == "false" ]]; then
         admin_ack
