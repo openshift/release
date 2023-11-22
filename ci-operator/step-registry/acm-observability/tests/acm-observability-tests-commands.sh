@@ -5,8 +5,10 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-KUBECONFIG=$HUB_CLUSTER_KUBECONFIG_PATH
-KUBEADMIN_TOKEN=$(cat $SHARED_DIR/kubeadmin-token)
+sleep 2h
+
+KUBECONFIG="${HUB_CLUSTER_DATA_DIR}/kubeconfig"
+KUBEADMIN_TOKEN=$(cat ${HUB_CLUSTER_DATA_DIR}/kubeadmin-token)
 
 export KUBECONFIG
 export KUBEADMIN_TOKEN
