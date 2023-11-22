@@ -1,0 +1,72 @@
+base_images:
+  base:
+    name: "4.3"
+    namespace: ocp
+    tag: base
+  ocp_builder_golang-1.12:
+    name: builder
+    namespace: ocp
+    tag: golang-1.12
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_golang-1.12:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+  to: insights-operator
+promotion:
+  name: "4.3"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.3"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.3"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-upgrade
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- as: insights-operator-e2e-tests
+  steps:
+    cluster_profile: aws
+    pre:
+    - chain: ipi-aws-pre
+    - ref: insights-live
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.3
+  org: openshift
+  repo: insights-operator
