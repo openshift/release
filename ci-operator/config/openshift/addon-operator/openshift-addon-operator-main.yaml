@@ -7,7 +7,7 @@ base_images:
     name: "4.14"
     namespace: origin
     tag: operator-sdk
-binary_build_commands: make
+binary_build_commands: make all
 build_root:
   from_repository: true
 images:
@@ -77,13 +77,16 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: addon-operator-codecov-token
-- as: unit
-  commands: make test-unit
+- as: lint
+  commands: make lint
   container:
     from: src
-- as: lint-and-precommit-check
-  commands: make lint && PRE_COMMIT_HOME=/tmp GOLANGCI_LINT_CACHE=/tmp pre-commit
-    run --all-files --show-diff-on-failure
+- as: unit
+  commands: make go-test
+  container:
+    from: src
+- as: precommit-check
+  commands: PRE_COMMIT_HOME=/tmp pre-commit run --all-files --show-diff-on-failure
   container:
     from: addon-operator-tooling
 - as: operator-e2e
