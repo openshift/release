@@ -5,13 +5,11 @@ set -o errexit
 set -o pipefail
 
 
-CREDENTIALS=$(cat /tmp/secrets/eap/credentials)
 CONSOLE_URL=$(cat "$SHARED_DIR"/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 KUBEADMIN_PWD=$(cat "$SHARED_DIR"/kubeadmin-password)
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
 
-export CREDENTIALS
 export API_URL
 export KUBEADMIN_PWD
 export OCM_TOKEN
