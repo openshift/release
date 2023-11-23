@@ -3,6 +3,8 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: cli
+binary_build_commands: unset GOFLAGS && sed -i '/toolchain/d' /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/otel-allocator/go.mod
+  && make manager && make targetallocator
 build_root:
   image_stream_tag:
     name: builder
@@ -13,7 +15,14 @@ images:
 - context_dir: .
   dockerfile_path: ./tests/e2e-openshift/Dockerfile
   to: opentelemetry-tests-runner
-- dockerfile_path: ./cmd/otel-allocator/Dockerfile
+- context_dir: ./cmd/otel-allocator/
+  dockerfile_path: Dockerfile
+  from: src
+  inputs:
+    bin:
+      paths:
+      - destination_dir: ./bin
+        source_path: /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/otel-allocator/bin/targetallocator_amd64
   to: opentelemetry-target-allocator
 releases:
   latest:
@@ -34,12 +43,9 @@ tests:
     env:
       AMQ_SOURCE: dt-catalogsource
       BASE_DOMAIN: qe.devcluster.openshift.com
-      DOWNSTREAM_TESTS_COMMIT: c5e438ba41bec98e3ef54e41417ab01789ef156b
       JAEGER_SOURCE: dt-catalogsource
       OTEL_SOURCE: dt-catalogsource
-      SKIP_TESTS: tests/e2e/instrumentation-go tests/e2e/instrumentation-apache-httpd
-        tests/e2e/targetallocator-features tests/e2e/smoke-targetallocator tests/e2e/prometheus-config-validation
-        tests/e2e/instrumentation-sdk
+      SKIP_TESTS: tests/e2e-openshift/multi-cluster tests/e2e/smoke-daemonset
       TEMPO_SOURCE: dt-catalogsource
     test:
     - ref: distributed-tracing-install-catalogsource

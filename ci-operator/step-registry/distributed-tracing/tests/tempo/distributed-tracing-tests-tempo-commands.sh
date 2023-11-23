@@ -47,6 +47,9 @@ if [[ -n "$SKIP_TESTS_TO_REMOVE" ]]; then
   rm -rf $SKIP_TESTS_TO_REMOVE
 fi
 
+# Unset environment variables which conflict with kuttl
+unset NAMESPACE
+
 # Execute Tempo e2e tests
 KUBECONFIG=$KUBECONFIG kuttl test \
   --report=xml \
