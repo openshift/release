@@ -1,12 +1,4 @@
 base_images:
-  cli:
-    name: 4.14-priv
-    namespace: ocp-private
-    tag: cli
-  test-bin:
-    name: 4.14-priv
-    namespace: ocp-private
-    tag: tests
   test-runtime:
     name: test-runtime
     namespace: microshift
@@ -17,7 +9,21 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.20-openshift-4.14
 canonical_go_repository: github.com/openshift/microshift
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
+  inputs:
+    src:
+      as:
+      - src
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift
+  to: microshift-test-rpm
 promotion:
+  excluded_images:
+  - microshift-test-rpm
   name: 4.14-priv
   namespace: ocp-private
 releases:
@@ -62,11 +68,12 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: test-srpm
+- as: test-rpm
   cluster: build02
-  commands: make srpm
+  commands: make rpm srpm && find _output/rpmbuild/{RPMS,SRPMS} -type f -exec sh -c
+    'i=$1; echo "${i}" && rpm -qip --dump "${i}" && echo' shell {} \;
   container:
-    from: src
+    from: microshift-test-rpm
   run_if_changed: ^(rpm/*|packaging/.*|Makefile)
 - as: test-rebase
   cluster: build02

@@ -1,0 +1,42 @@
+base_images:
+  ubi-min9:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make binary
+build_root:
+  project_image:
+    dockerfile_path: Containerfile.tools
+images:
+- dockerfile_path: Containerfile
+  from: ubi-min9
+  to: oran-o2ims
+promotion:
+  name: "4.15"
+  namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "4.15"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.15"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ci-job
+  commands: make ci-job
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: oran-o2ims

@@ -387,7 +387,6 @@ function check_olm_capability(){
 set_proxy
 run_command "oc whoami"
 run_command "oc version -o yaml"
-check_olm_capability
 
 # private mirror registry host
 # <public_dns>:<port>
@@ -430,6 +429,7 @@ else
 fi 
 
 create_settled_icsp
+check_olm_capability
 check_marketplace
 # No need to disable the default OperatorHub when marketplace disabled as default.
 if [ $marketplace -eq 0 ]; then
