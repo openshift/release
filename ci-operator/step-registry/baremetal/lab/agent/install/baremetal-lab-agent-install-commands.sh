@@ -309,6 +309,12 @@ platform:
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  # See: https://docs.openshift.com/container-platform/4.14/installing/installing_bare_metal_ipi/ipi-install-installation-workflow.html#bmc-addressing-for-dell-idrac_ipi-install-installation-workflow
+  # and baremetal-lab-agent-install-commands.sh for IPI bmc configuration
+  # disableCertificateVerification not needed when using IPMI protocol
+  # Example bmc fields contained in hosts.yaml file
+  # bmc_scheme: ipmi
+  # bmc_base_uri: /
   AGENT_BMC_INSTALL_CONFIG="
   name: ${name}
   bootMACAddress: ${provisioning_mac}
@@ -327,7 +333,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         dhcp: false
         address:
             - ip: ${ip}
-              prefix-length: 192.168.90.0/24
+              prefix-length: ${INTERNAL_NET_CIDR##*/}
       ipv6:
         enabled: false
 "
