@@ -153,12 +153,21 @@ tests:
         echo "------------------------------setup-webhook------------------------------"
         sh hack/setup-webhook-cert.sh
         echo "------------------------------install-strategies------------------------------"
-        oc project default
+        oc login -u kubeadmin -p `cat ${KUBEADMIN_PASSWORD_FILE}` --insecure-skip-tls-verify
+        # oc project default
+        oc new-project test-e2e
         oc adm policy add-scc-to-user privileged -z pipeline
-        oc create secret docker-registry registry-credential --docker-server=quay.io --docker-username=piteam_openshiftci+openshift_ci --docker-password=`cat /tmp/secret/password.secrets.sh`
+        # oc create secret docker-registry registry-credential --docker-server=quay.io --docker-username=piteam_openshiftci+openshift_ci --docker-password=`cat /tmp/secret/password.secrets.sh`
+        oc create secret docker-registry registry-credential --docker-server=image-registry.openshift-image-registry.svc:5000 --docker-username=kubeadmin --docker-password=`oc whoami -t`
+        echo "checking secret: to be removed"
+        oc get secret registry-credential -oyaml
         make install-strategies
         echo "------------------------------run-e2e-tests------------------------------"
-        make TEST_IMAGE_REPO_SECRET=registry-credential test-e2e
+        # make TEST_IMAGE_REPO_SECRET=registry-credential test-e2e
+        oc create imagestream e2e-repo
+        echo "list is"
+        oc get is
+        make TEST_NAMESPACE=test-e2e TEST_IMAGE_REPO=image-registry.openshift-image-registry.svc:5000/test-e2e/e2e-repo test-e2e
       credentials:
       - mount_path: /tmp/secret
         name: dockerconfigjsonnew
