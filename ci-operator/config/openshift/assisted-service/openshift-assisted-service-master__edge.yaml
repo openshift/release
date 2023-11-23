@@ -137,17 +137,6 @@ promotion:
   name: ocm-2.10
   namespace: edge-infrastructure
 releases:
-  candidate-4-11:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.11"
-  candidate-4-11-multi:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
-      version: "4.11"
   latest:
     candidate:
       product: ocp
@@ -159,14 +148,6 @@ releases:
       product: ocp
       stream: nightly
       version: "4.15"
-  stable-4-10:
-    integration:
-      name: "4.10"
-      namespace: ocp
-  stable-4-11:
-    integration:
-      name: "4.11"
-      namespace: ocp
 resources:
   '*':
     requests:
@@ -631,29 +612,29 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
     workflow: assisted-baremetal-operator-capi
-- as: e2e-ai-operator-ztp-multiarch-3masters-ocp-411
+- always_run: false
+  as: e2e-ai-operator-ztp-multiarch-3masters-ocp
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate-4-11-multi
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-multi
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
-        ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.11.0-rc.6-multi"
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-multiarch-sno-ocp-411
+- always_run: false
+  as: e2e-ai-operator-ztp-multiarch-sno-ocp
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate-4-11-multi
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-multi
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
-        ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.11.0-rc.6-multi"
         SPOKE_CONTROLPLANE_AGENTS=1
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
@@ -775,22 +756,6 @@ tests:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-9
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.9
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-10
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.10
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-11
   steps:
     cluster_profile: packet-assisted
@@ -892,17 +857,6 @@ tests:
         OLM_OPERATORS=metallb
         METALLB_API_IP=10.0.0.1
         METALLB_INGRESS_IP=10.0.0.2
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-mce-4-10
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=mce
-        OPENSHIFT_VERSION=4.10
-        NUM_WORKERS=3
-      PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-mce-sno
   optional: true
