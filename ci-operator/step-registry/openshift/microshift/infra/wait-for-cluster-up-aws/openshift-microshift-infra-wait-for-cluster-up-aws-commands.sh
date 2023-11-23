@@ -45,6 +45,7 @@ else
   done
   sudo ls -la /var/lib/microshift
   sudo ls -la /var/lib/microshift/resources/kubeadmin/kubeconfig
+  sudo systemctl start greenboot-healthcheck
 fi
 EOF
 
