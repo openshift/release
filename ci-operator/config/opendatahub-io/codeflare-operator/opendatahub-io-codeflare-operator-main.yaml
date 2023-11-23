@@ -21,61 +21,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-odh-cfo
-  steps:
-    cluster_profile: aws-2
-    env:
-      HYPERSHIFT_NODE_COUNT: "3"
-    test:
-    - as: e2e-odh-cfo
-      cli: latest
-      commands: |
-        git --version
-        unset GOFLAGS
-        export CODEFLARE_TEST_OUTPUT_DIR=${ARTIFACT_DIR}
-        export CODEFLARE_TEST_TIMEOUT_SHORT=1m
-        export CODEFLARE_TEST_TIMEOUT_MEDIUM=5m
-        # TODO: return CODEFLARE_TEST_TIMEOUT_LONG to 10m once the SDK test "https://github.com/project-codeflare/codeflare-sdk/pull/306" is merged, and test removed from odh/cfo.
-        export CODEFLARE_TEST_TIMEOUT_LONG=15m
-        export NOTEBOOK_IMAGE_STREAM_NAME=jupyter-datascience-notebook
-        echo "Using image ${ODH_CODEFLARE_OPERATOR_CONTROLLER_IMAGE}"
-        sed -i "s|odh-codeflare-operator-controller-image=.*|odh-codeflare-operator-controller-image=$ODH_CODEFLARE_OPERATOR_CONTROLLER_IMAGE|" ./config/manifests/bases/params.env
-        # Temporary solution until https://github.com/opendatahub-io/distributed-workloads/ repo is closed and content migrated
-        git clone https://github.com/opendatahub-io/distributed-workloads.git
-        cd distributed-workloads
-        make install-opendatahub-operator
-        sed -i '0,/<DW PR tarball URI>/! {1,/<DW PR tarball URI>/ s|<DW PR tarball URI>|https://api.github.com/repos/opendatahub-io/kuberay/tarball/master|}' ./contrib/configuration/basic-dsc.yaml
-        sed -i "/codeflare/,/contextDir/ {/contextDir/ s|contextDir: .*|contextDir: 'config'|}" ./contrib/configuration/basic-dsc.yaml
-        sed -i "/codeflare/,/sourcePath/ {/sourcePath/ s|sourcePath: .*|sourcePath: 'manifests'|}" ./contrib/configuration/basic-dsc.yaml
-        sed -i "/ray/,/contextDir/ {/contextDir/ s|contextDir: .*|contextDir: 'ray-operator/config'|}" ./contrib/configuration/basic-dsc.yaml
-        sed -i "/ray/,/sourcePath/ {/sourcePath/ s|sourcePath: .*|sourcePath: 'openshift'|}" ./contrib/configuration/basic-dsc.yaml
-        if [[ "${REPO_OWNER}" == "openshift" ]]; then
-          echo -e "Running in openshift repo, it means that this is PJ rehearsal, using latest main for CodeFlare manifest \n"
-          sed -i "0,/\<DW PR tarball URI\>/s|<DW PR tarball URI>|https://api.github.com/repos/opendatahub-io/codeflare-operator/tarball/main|" ./contrib/configuration/basic-dsc.yaml
-        else
-          echo -e "Running PR ${PULL_NUMBER} \n"
-          sed -i "0,/\<DW PR tarball URI\>/s|<DW PR tarball URI>|https://api.github.com/repos/opendatahub-io/codeflare-operator/tarball/pull/${PULL_NUMBER}/head|" ./contrib/configuration/basic-dsc.yaml
-        fi
-        oc apply -f ./contrib/configuration/basic-dsc.yaml -n opendatahub
-        cat ./contrib/configuration/basic-dsc.yaml
-        sleep 60
-        cd ..
-        cd test && go test -timeout 60m -v ./odh ./e2e
-      dependencies:
-      - env: ODH_CODEFLARE_OPERATOR_CONTROLLER_IMAGE
-        name: codeflare-operator
-      from: src
-      resources:
-        requests:
-          cpu: 8000m
-          memory: 16Gi
-    workflow: hypershift-hostedcluster-workflow
-- as: security
-  optional: true
-  steps:
-    env:
-      PROJECT_NAME: opendatahub-io/codeflare-operator
-    workflow: openshift-ci-security
+- as: testx
+  commands: |
+    git --version
+    git remote -v
+    ls
+  container:
+    from: src
 zz_generated_metadata:
   branch: main
   org: opendatahub-io
