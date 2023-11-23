@@ -60,25 +60,13 @@ set +e
 set -x
 PS4='+ $(date "+%T.%N")\011'
 
-retries=3
+retries=10
 while [ ${retries} -gt 0 ] ; do
   ((retries-=1))
-
-  KUBECONFIG="${SHARED_DIR}/kubeconfig" oc wait \
-    pod \
-    --for=condition=ready \
-    -l='app.kubernetes.io/name=topolvm-csi-driver' \
-    -n openshift-storage \
-    --timeout=5m
-  [ $? -eq 0 ] && exit 0
-
-  # Image pull operation sometimes get stuck for topolvm images
-  # Delete topolvm pods to retry image pull operation
-  KUBECONFIG="${SHARED_DIR}/kubeconfig" oc delete \
-    pod \
-    -l='app.kubernetes.io/name=topolvm-csi-driver' \
-    -n openshift-storage \
-    --timeout=30s
+  if ssh "${INSTANCE_PREFIX}" "sudo systemctl status greenboot-healthcheck | grep 'active (exited)'"; then
+    exit 0
+  fi
+  sleep 30
 done
 
 # All retries waiting for the cluster failed
