@@ -4,22 +4,30 @@ base_images:
     namespace: origin
     tag: stream8
 build_root:
-  project_image:
-    dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi8/ubi
-      RUN yum install -y --nodocs make git golang
-      RUN ln -s /cli/oc /usr/bin/kubectl
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
 images:
 - context_dir: tests/
   dockerfile_path: Dockerfile
   from: os
   to: trustyai-explainability-ci-tests
+promotion:
+  additional_images:
+    latest: trustyai-explainability-ci-tests
+  name: trustyai-explainability-ci-tests
+  namespace: ocp
 releases:
+  initial:
+    integration:
+      name: "4.13"
+      namespace: ocp
   latest:
-    release:
-      architecture: amd64
-      channel: stable
-      version: "4.13"
+    integration:
+      include_built_images: true
+      name: "4.13"
+      namespace: ocp
 resources:
   '*':
     requests:
