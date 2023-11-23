@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build03
-  cron: 45 01 */1 * 1,4
+  cron: 00 02 */1 * 0,3
   decorate: true
   extra_refs:
   - base_ref: master
@@ -13,7 +13,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-4-10-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-4-11-periodic
   spec:
     containers:
     - args:
@@ -22,8 +22,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-4-10-periodic-cluster-profile
-      - --target=e2e-metal-assisted-4-10-periodic
+      - --secret-dir=/usr/local/e2e-metal-assisted-4-11-periodic-cluster-profile
+      - --target=e2e-metal-assisted-4-11-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -39,7 +39,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-4-10-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-metal-assisted-4-11-periodic-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -348,83 +348,6 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-metal-assisted-4-15-periodic-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 30 01 */1 * 0-5
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: assisted-test-infra
-  labels:
-    ci-operator.openshift.io/cloud: packet-edge
-    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-    ci.openshift.io/generator: prowgen
-    job-release: "4.15"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-4-9-periodic
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-4-9-periodic-cluster-profile
-      - --target=e2e-metal-assisted-4-9-periodic
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-4-9-periodic-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
