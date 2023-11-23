@@ -21,28 +21,39 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: aws-rosa-sts-e2e-f3
-  cron: 38 16 3,6,9,12,15,18,21,23,27,30 * *
+- as: aws-rosa-non-sts-e2e-f7
+  cron: 25 21 1,8,15,23 * *
   steps:
     cluster_profile: aws-qe
     env:
-      CHANNEL_GROUP: stable
+      CHANNEL_GROUP: candidate
       ROSA_LOGIN_ENV: staging
     test:
     - ref: openshift-extended-rosacli-tests
     - ref: openshift-e2e-test-qe-report
-    workflow: rosa-aws-sts-rosacli-e2e
+    workflow: rosa-aws-non-sts
 - as: aws-rosa-non-sts-advanced-e2e-f3
   cron: 23 5 1,4,7,10,13,16,19,22,24,28 * *
   steps:
     cluster_profile: aws-qe
     env:
-      CHANNEL_GROUP: stable
+      CHANNEL_GROUP: candidate
       ROSA_LOGIN_ENV: staging
     test:
     - ref: openshift-extended-rosacli-tests
     - ref: openshift-e2e-test-qe-report
     workflow: rosa-aws-non-sts-advanced
+- as: aws-rosa-sts-e2e-f3
+  cron: 38 16 3,6,9,12,15,18,21,23,27,30 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: candidate
+      ROSA_LOGIN_ENV: staging
+    test:
+    - ref: openshift-extended-rosacli-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: rosa-aws-sts
 - as: aws-rosa-sts-advanced-e2e-f3
   cron: 41 2 2,5,7,11,14,17,20,23,26,29 * *
   steps:
@@ -50,29 +61,40 @@ tests:
     env:
       ADDITIONAL_SECURITY_GROUP: "true"
       ARN_PATH: /rosa/e2e/
-      CHANNEL_GROUP: stable
+      CHANNEL_GROUP: candidate
       ROSA_LOGIN_ENV: staging
     test:
     - ref: openshift-extended-rosacli-tests
     - ref: openshift-e2e-test-qe-report
     workflow: rosa-aws-sts-advanced
-- as: aws-rosa-private-link-e2e-f7
+- as: aws-rosa-sts-private-link-e2e-f7
   cron: 24 2 4,11,18,26 * *
   steps:
     cluster_profile: aws-qe
     env:
-      CHANNEL_GROUP: stable
+      CHANNEL_GROUP: candidate
       ROSA_LOGIN_ENV: staging
     test:
     - ref: openshift-extended-rosacli-tests
     - ref: openshift-e2e-test-qe-report
     workflow: rosa-aws-sts-private-link
+- as: aws-rosa-hcp-e2e-f3
+  cron: 32 0 3,6,9,12,14,18,21,24,27,30 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      ROSA_LOGIN_ENV: staging
+    test:
+    - ref: openshift-extended-rosacli-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: rosa-aws-sts-hypershift
 - as: aws-rosa-hypershift-advanced-e2e-f3
   cron: 32 0 3,6,9,12,14,18,21,24,27,30 * *
   steps:
     cluster_profile: aws-sd-qe
     env:
-      CHANNEL_GROUP: stable
+      CHANNEL_GROUP: candidate
       ROSA_LOGIN_ENV: staging
     test:
     - ref: openshift-extended-rosacli-tests
@@ -84,7 +106,7 @@ tests:
     cluster_profile: aws-sd-qe
     env:
       ARN_PATH: /rosa/e2e/
-      CHANNEL_GROUP: stable
+      CHANNEL_GROUP: candidate
       ROSA_LOGIN_ENV: staging
     test:
     - ref: openshift-extended-rosacli-tests
@@ -95,7 +117,7 @@ tests:
   steps:
     cluster_profile: aws-sd-qe
     env:
-      CHANNEL_GROUP: stable
+      CHANNEL_GROUP: candidate
       ROSA_LOGIN_ENV: staging
     test:
     - ref: openshift-extended-rosacli-tests
