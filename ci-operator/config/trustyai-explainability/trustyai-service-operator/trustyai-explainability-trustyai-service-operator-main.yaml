@@ -13,7 +13,7 @@ images:
 - context_dir: tests/
   dockerfile_path: Dockerfile
   from: os
-  to: trustyai-explainability-ci-tests
+  to: trustyai-service-operator-ci-tests
 releases:
   latest:
     release:
@@ -29,10 +29,9 @@ tests:
 - as: trustyai-service-operator-e2e
   run_if_changed: ^(tests/*|config/*|controllers/*|hack/*|Dockerfile|main.go|go.mod|go.sum|api/*|.github/*)
   steps:
-    cluster_profile: aws-opendatahub
+    cluster_profile: gcp
     env:
-      BASE_DOMAIN: openshift-ci.odhdev.com
-      HYPERSHIFT_AWS_REGION: us-west-2
+      COMPUTE_NODE_TYPE: n2-standard-8
     test:
     - as: e2e
       commands: $HOME/peak/installandtest.sh
@@ -41,7 +40,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
-    workflow: hypershift-hostedcluster-workflow
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
   org: trustyai-explainability
