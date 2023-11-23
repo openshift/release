@@ -40,27 +40,18 @@ tests:
         export NOTEBOOK_IMAGE_STREAM_NAME=jupyter-datascience-notebook
         echo "Using image ${ODH_CODEFLARE_OPERATOR_CONTROLLER_IMAGE}"
         sed -i "s|odh-codeflare-operator-controller-image=.*|odh-codeflare-operator-controller-image=$ODH_CODEFLARE_OPERATOR_CONTROLLER_IMAGE|" ./config/manifests/bases/params.env
-        # Temporary solution until https://github.com/opendatahub-io/distributed-workloads/ repo is closed and content migrated
-        git clone https://github.com/opendatahub-io/distributed-workloads.git
-        cd distributed-workloads
-        make install-opendatahub-operator
-        sed -i '0,/<DW PR tarball URI>/! {1,/<DW PR tarball URI>/ s|<DW PR tarball URI>|https://api.github.com/repos/opendatahub-io/kuberay/tarball/master|}' ./contrib/configuration/basic-dsc.yaml
-        sed -i "/codeflare/,/contextDir/ {/contextDir/ s|contextDir: .*|contextDir: 'config'|}" ./contrib/configuration/basic-dsc.yaml
-        sed -i "/codeflare/,/sourcePath/ {/sourcePath/ s|sourcePath: .*|sourcePath: 'manifests'|}" ./contrib/configuration/basic-dsc.yaml
-        sed -i "/ray/,/contextDir/ {/contextDir/ s|contextDir: .*|contextDir: 'ray-operator/config'|}" ./contrib/configuration/basic-dsc.yaml
-        sed -i "/ray/,/sourcePath/ {/sourcePath/ s|sourcePath: .*|sourcePath: 'openshift'|}" ./contrib/configuration/basic-dsc.yaml
+        make install-odh-operator
         if [[ "${REPO_OWNER}" == "openshift" ]]; then
           echo -e "Running in openshift repo, it means that this is PJ rehearsal, using latest main for CodeFlare manifest \n"
-          sed -i "0,/\<DW PR tarball URI\>/s|<DW PR tarball URI>|https://api.github.com/repos/opendatahub-io/codeflare-operator/tarball/main|" ./contrib/configuration/basic-dsc.yaml
+          sed -i "s|<CFO PR tarball URI>|https://api.github.com/repos/opendatahub-io/codeflare-operator/tarball/main|" ./contrib/configuration/basic-dsc.yaml
         else
           echo -e "Running PR ${PULL_NUMBER} \n"
-          sed -i "0,/\<DW PR tarball URI\>/s|<DW PR tarball URI>|https://api.github.com/repos/opendatahub-io/codeflare-operator/tarball/pull/${PULL_NUMBER}/head|" ./contrib/configuration/basic-dsc.yaml
+          sed -i "s|<CFO PR tarball URI>|https://api.github.com/repos/opendatahub-io/codeflare-operator/tarball/pull/${PULL_NUMBER}/head|" ./contrib/configuration/basic-dsc.yaml
         fi
         oc apply -f ./contrib/configuration/basic-dsc.yaml -n opendatahub
         cat ./contrib/configuration/basic-dsc.yaml
         sleep 60
-        cd ..
-        cd test && go test -timeout 60m -v ./odh ./e2e
+        make test-e2e test-odh store-odh-logs --keep-going
       dependencies:
       - env: ODH_CODEFLARE_OPERATOR_CONTROLLER_IMAGE
         name: codeflare-operator
