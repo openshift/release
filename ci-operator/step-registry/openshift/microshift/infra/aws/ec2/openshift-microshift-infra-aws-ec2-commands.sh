@@ -39,8 +39,7 @@ if [ -f "${MICROSHIFT_CLUSTERBOT_SETTINGS}" ]; then
 fi
 
 if [[ "${EC2_AMI}" == "" ]]; then
-  echo "must supply an AMI to use for EC2 Instance"
-  exit 1
+  EC2_AMI="${ami_map[$REGION,$ARCH,$RHEL_VERSION]}"
 fi
 
 ec2Type="VirtualMachine"
