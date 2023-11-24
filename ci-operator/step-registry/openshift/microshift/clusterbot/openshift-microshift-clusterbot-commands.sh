@@ -9,13 +9,13 @@ CURRENT_RELEASE=4.15
 
 # | Instance Type | Arch   | vCPUs | GiB |
 # |---------------|--------|-------|-----|
-# | t2.large      | x86_64 | 2     | 8   |
-# | t2.xlarge     | x86_64 | 4     | 16  |
-# | m6g.large     | arm64  | 2     | 8   |
-# | m6g.xlarge    | arm64  | 4     | 16  |
+# | t3.large      | x86_64 | 2     | 8   |
+# | t3.xlarge     | x86_64 | 4     | 16  |
+# | t4g.large     | arm64  | 2     | 8   |
+# | t4g.xlarge    | arm64  | 4     | 16  |
 declare -A instance_types=(
-	[x86_64]=t2.large
-	[arm64]=m6g.large
+	[x86_64]=t3.large
+	[arm64]=t4g.large
 )
 
 # ami-0931978297f275f71   RHEL-9.2.0_HVM-20230905-x86_64-38-Hourly2-GP2
