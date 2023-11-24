@@ -3,19 +3,6 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.13
-releases:
-  initial:
-    release:
-      architecture: amd64
-      channel: stable
-      version: "4.14"
-  latest:
-    candidate:
-      architecture: amd64
-      product: ocp
-      relative: 1
-      stream: nightly
-      version: "4.15"
 resources:
   '*':
     limits:
@@ -24,19 +11,37 @@ resources:
       cpu: 100m
       memory: 100Mi
 tests:
-- as: kpi-results-stable
+- as: kpi-results-415
   cluster: build01
   cron: 0 14 * * *
   steps:
     env:
-      OCP_RELEASE_VERSION: ${RELEASE_IMAGE_INITIAL}
+      KPI_DESCRIPTION: Dev Telco VRAN KPI
+      OCP_RELEASE_VERSION: "4.15"
     workflow: telco5g-kpi-results
-- as: kpi-results-nightly
+- as: kpi-results-414
   cluster: build01
   cron: 0 14 * * *
   steps:
     env:
-      OCP_RELEASE_VERSION: ${RELEASE_IMAGE_LATEST}
+      KPI_DESCRIPTION: QE Telco VRAN KPI
+      OCP_RELEASE_VERSION: "4.14"
+    workflow: telco5g-kpi-results
+- as: kpi-results-413
+  cluster: build01
+  cron: 0 14 * * *
+  steps:
+    env:
+      KPI_DESCRIPTION: QE Telco VRAN KPI
+      OCP_RELEASE_VERSION: "4.13"
+    workflow: telco5g-kpi-results
+- as: kpi-results-412
+  cluster: build01
+  cron: 0 14 * * *
+  steps:
+    env:
+      KPI_DESCRIPTION: QE Telco VRAN KPI
+      OCP_RELEASE_VERSION: "4.12"
     workflow: telco5g-kpi-results
 zz_generated_metadata:
   branch: master

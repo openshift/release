@@ -45,9 +45,16 @@ function download_kpi_results_report() {
     local ocp_version
     ocp_version=$1
 
+    local kpi_description
+    if [[ -n $2 ]]; then
+        kpi_description=$2
+    elif
+        kpi_description="KPI"
+    fi
+
     # url filters will be generated using the provided version
     local api_filters
-    api_filters="?max_results=1&start_version=${ocp_version}&end_version=${ocp_version}&description=KPI"
+    api_filters="?max_results=1&start_version=${ocp_version}&end_version=${ocp_version}&description=${kpi_description}"
 
     # Build the url
     local url
@@ -183,6 +190,4 @@ function main(){
     exit "${test_data}"
 }
 
-echo $RELEASE_IMAGE_INITIAL
-echo $RELEASE_IMAGE_LATEST
 main
