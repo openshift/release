@@ -183,4 +183,6 @@ function main(){
     exit "${test_data}"
 }
 
+echo $RELEASE_IMAGE_INITIAL
+echo $RELEASE_IMAGE_LATEST
 main
