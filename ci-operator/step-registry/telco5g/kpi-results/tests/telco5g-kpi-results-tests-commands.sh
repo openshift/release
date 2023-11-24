@@ -2,6 +2,7 @@
 
 set -o nounset
 set -o pipefail
+set -x
 
 # Constants for the server used to save reports
 KPI_RESULTS_SERVER="http://ocp-far-edge-vran-deployment-kpi.hosts.prod.psi.rdu2.redhat.com"
@@ -9,6 +10,9 @@ KPI_RESULTS_BASE_API="/backend/api/v1/reports/"
 
 # Temporary file used to save the report data
 KPI_RESULTS_FILE_PATH="/tmp/kpi-results.json"
+
+# Default value for description
+KPI_DESCRIPTION="${KPI_DESCRIPTION:-KPI}"
 
 function get_date_stamp() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')]"
@@ -45,13 +49,9 @@ function download_kpi_results_report() {
     local ocp_version
     ocp_version=$1
 
-    # kpi description should be provided but if not we will use a reasonable default
+    # kpi description will be used in the url
     local kpi_description
-    if [[ -n $2 ]]; then
-        kpi_description=$2
-    else
-        kpi_description="KPI"
-    fi
+    kpi_description=$2
 
     # replace any spaces in the description with url encoded %20 characters for the api call
     kpi_description=$(echo ${kpi_description} | sed 's/ /%20/g')
