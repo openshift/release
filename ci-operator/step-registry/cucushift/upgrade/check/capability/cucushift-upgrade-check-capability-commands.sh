@@ -15,14 +15,14 @@ function create_postupgrade_junit() {
     if (( FRC == 0 )); then
         cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1">
+<testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="$SECONDS">
   <testcase name="${subteam}:Post upgrade check on capability should succeed or skip"/>
 </testsuite>
 EOF
     else
         cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1">
+<testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="$SECONDS">
   <testcase name="${subteam}:Post upgrade check on capability should succeed">
     <failure message="">Post upgrade check on capability failed</failure>
   </testcase>

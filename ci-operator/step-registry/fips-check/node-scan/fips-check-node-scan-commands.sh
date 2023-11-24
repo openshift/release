@@ -90,14 +90,14 @@ subteam="Security_and_Compliance"
 if $pass; then
     cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1">
+<testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="$SECONDS">
 <testcase name="${subteam}:Node scan of fips check should succeedded or skipped"/>
 </testsuite>
 EOF
 else
     cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1">
+<testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="$SECONDS">
 <testcase name="${subteam}:Node scan of fips check should succeedded or skipped">
 <failure message="">Fips node scan check failed</failure>
 </testcase>
