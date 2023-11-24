@@ -45,10 +45,11 @@ function download_kpi_results_report() {
     local ocp_version
     ocp_version=$1
 
+    # kpi description should be provided but if not we will use a reasonable default
     local kpi_description
     if [[ -n $2 ]]; then
         kpi_description=$2
-    elif
+    else
         kpi_description="KPI"
     fi
 
@@ -175,7 +176,7 @@ function main(){
     fi
 
     # download the report
-    download_kpi_results_report "${OCP_RELEASE_VERSION}"
+    download_kpi_results_report "${OCP_RELEASE_VERSION}" "${KPI_DESCRIPTION}"
 
     # Check the test data
     local test_data
