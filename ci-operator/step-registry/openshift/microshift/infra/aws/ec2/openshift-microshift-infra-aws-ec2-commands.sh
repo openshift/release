@@ -10,14 +10,16 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 #Save stacks events
 trap 'save_stack_events_to_shared' EXIT TERM INT
 
+# This map should be extended everytime AMIs from different regions/architectures/os versions
+# are added.
 declare -A ami_map=(
-  [us-west-2,x86_64,9.2]=ami-0d5b3039c1132e1b2
-  [us-west-2,x86_64,9.3]=ami-04b4d3355a2e2a403
-  [us-west-2,arm64,9.2]=ami-0addfb94c944af1cc
-  [us-west-2,arm64,9.3]=ami-0086e25ab5453b65e
+  [us-west-2,x86_64,rhel-9.2]=ami-0d5b3039c1132e1b2
+  [us-west-2,x86_64,rhel-9.3]=ami-04b4d3355a2e2a403
+  [us-west-2,arm64,rhel-9.2]=ami-0addfb94c944af1cc
+  [us-west-2,arm64,rhel-9.3]=ami-0086e25ab5453b65e
 )
 
-# All graviton instances have a lower case g before the dot. Using
+# All graviton instances have a lower case g in the family part. Using
 # this we avoid adding the full map here.
 ARCH="x86_64"
 if [[ "${EC2_INSTANCE_TYPE%.*}" =~ .*"g".* ]]; then
@@ -39,7 +41,7 @@ if [ -f "${MICROSHIFT_CLUSTERBOT_SETTINGS}" ]; then
 fi
 
 if [[ "${EC2_AMI}" == "" ]]; then
-  EC2_AMI="${ami_map[$REGION,$ARCH,$RHEL_VERSION]}"
+  EC2_AMI="${ami_map[$REGION,$ARCH,$MICROSHIFT_OS]}"
 fi
 
 ec2Type="VirtualMachine"
