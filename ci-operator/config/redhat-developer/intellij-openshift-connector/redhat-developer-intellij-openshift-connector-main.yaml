@@ -1,14 +1,18 @@
 build_root:
-  image_stream_tag:
-    name: ubi8-openjdk-11
-    namespace: openshift
-    tag: "1.12"
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi8/ubi
+      RUN yum install -y java-17-openjdk-devel git
+      RUN mkdir /tmp/work
+      RUN chmod +777 /tmp/work
+      RUN chmod ugo+rwx /tmp/work
+      RUN export GRADLE_USER_HOME=/tmp/work
 releases:
   latest:
     release:
       architecture: amd64
-      channel: fast
-      version: "4.11"
+      channel: stable
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -17,12 +21,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-4.11
+- as: e2e-openshift
   steps:
     cluster_profile: aws
     test:
-    - as: e2e-4.11
-      commands: ./gradlew integrationTest
+    - as: e2e
+      commands: |
+        chmod ugo+rwx ./gradlew
+        echo $GRADLE_USER_HOME
+        ./gradlew integrationTest -Dgradle.user.home=/tmp/work --no-daemon
       from: src
       resources:
         requests:
