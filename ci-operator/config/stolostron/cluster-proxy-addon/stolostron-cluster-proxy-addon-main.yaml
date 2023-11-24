@@ -60,19 +60,25 @@ tests:
   container:
     from: test-bin
 - as: e2e
-  cluster_claim:
-    architecture: amd64
-    as: custom
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.10"
   steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: cluster-proxy-addon
+    env:
+      CLUSTER_NAMES: none
+      CLUSTERPOOL_GROUP_NAME: Server Foundation
+      CLUSTERPOOL_HOST_NAMESPACE: server-foundation
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-sf-clusterpool
+      CLUSTERPOOL_LIFETIME: 2h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      SKIP_COMPONENT_INSTALL: "true"
     test:
     - as: test
       cli: latest
-      commands: "KUBECTL=oc\nexport KUBECTL \nmake test-e2e\n"
+      commands: |
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+        KUBECTL=oc
+        export KUBECTL
+        make test-e2e
       dependencies:
       - env: CLUSTER_PROXY_ADDON_IMAGE
         name: cluster-proxy-addon
@@ -80,7 +86,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: generic-claim
+    workflow: ocm-e2e-clusterpool
 - as: sonar
   commands: |
     export HOME="/tmp"
@@ -120,7 +126,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: backplane-2.4
+      DESTINATION_BRANCH: backplane-2.5
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main
