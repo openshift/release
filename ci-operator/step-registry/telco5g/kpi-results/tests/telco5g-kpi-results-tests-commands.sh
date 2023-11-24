@@ -53,6 +53,9 @@ function download_kpi_results_report() {
         kpi_description="KPI"
     fi
 
+    # replace any spaces in the description with url encoded %20 characters for the api call
+    kpi_description=$(echo ${kpi_description} | sed 's/ /%20/g')
+
     # url filters will be generated using the provided version
     local api_filters
     api_filters="?max_results=1&start_version=${ocp_version}&end_version=${ocp_version}&description=${kpi_description}"
