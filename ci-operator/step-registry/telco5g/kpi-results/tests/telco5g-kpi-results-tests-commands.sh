@@ -68,7 +68,7 @@ function download_kpi_results_report() {
     print_message "Downloading data report from url: '${url}'"
 
     # fetch the report from the server using curl
-    curl -s "${url}" 2>/dev/null 1>${KPI_RESULTS_FILE_PATH}
+    curl -s "${url}" -o ${KPI_RESULTS_FILE_PATH}
 }
 
 function did_specified_test_pass() {
