@@ -9,27 +9,29 @@ CURRENT_RELEASE=4.15
 
 # | Instance Type | Arch   | vCPUs | GiB |
 # |---------------|--------|-------|-----|
-# | t2.large      | x86_64 | 2     | 8   |
-# | t2.xlarge     | x86_64 | 4     | 16  |
-# | m6g.large     | arm64  | 2     | 8   |
-# | m6g.xlarge    | arm64  | 4     | 16  |
+# | t3.large      | x86_64 | 2     | 8   |
+# | t3.xlarge     | x86_64 | 4     | 16  |
+# | t4g.large     | arm64  | 2     | 8   |
+# | t4g.xlarge    | arm64  | 4     | 16  |
 declare -A instance_types=(
-	[x86_64]=t2.large
-	[arm64]=m6g.large
+	[x86_64]=t3.large
+	[arm64]=t4g.large
 )
 
-# ami-0931978297f275f71   RHEL-9.2.0_HVM-20230905-x86_64-38-Hourly2-GP2
-# ami-0ef50c2b2eb330511   RHEL-9.3.0_HVM-20231101-x86_64-5-Hourly2-GP2
+## These ami's are for us-west-2 region.
+
+# ami-0d5b3039c1132e1b2   RHEL-9.2.0_HVM-20231115-x86_64-23-Hourly2-GP3
+# ami-04b4d3355a2e2a403   RHEL-9.3.0_HVM-20231101-x86_64-5-Hourly2-GP2
 declare -A x86_64_ami=(
-	["rhel-9.2"]=ami-0931978297f275f71
-	["rhel-9.3"]=ami-0ef50c2b2eb330511
+	["rhel-9.2"]=ami-0d5b3039c1132e1b2
+	["rhel-9.3"]=ami-04b4d3355a2e2a403
 )
 
-# ami-08c7e766098f8cb4f   RHEL-9.2.0_HVM-20230905-arm64-38-Hourly2-GP2
-# ami-0d863285841e3f97c   RHEL-9.3.0_HVM-20231101-arm64-5-Hourly2-GP2
+# ami-0addfb94c944af1cc   RHEL-9.2.0_HVM-20231115-arm64-23-Hourly2-GP3 
+# ami-0086e25ab5453b65e   RHEL-9.3.0_HVM-20231101-arm64-5-Hourly2-GP2
 declare -A arm64_ami=(
-	["rhel-9.2"]=ami-08c7e766098f8cb4f
-	["rhel-9.3"]=ami-0d863285841e3f97c
+	["rhel-9.2"]=ami-0addfb94c944af1cc
+	["rhel-9.3"]=ami-0086e25ab5453b65e
 )
 
 if [[ "${MICROSHIFT_OS}" != "rhel-9.2" ]] && [[ "${MICROSHIFT_OS}" != "rhel-9.3" ]]; then
