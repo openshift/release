@@ -3,10 +3,6 @@ base_images:
     name: managed-services-integration-tests
     namespace: ci
     tag: latest
-  openshift-cli-installer:
-    name: openshift-cli-installer
-    namespace: ci
-    tag: latest
 releases:
   latest:
     candidate:
@@ -25,14 +21,18 @@ tests:
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
-      CLUSTER_NAME_PREFIX: ci-smoke
-      CLUSTER1_CONFIG: name=ci-rosa;platform=rosa;region=us-west-2;version=4.14;channel-group=candidate;compute-machine-type=m5.4xlarge;replicas=2;expiration-time=8h;timeout=2h
-      PULL_SECRET_NAME: pull-secret
-      S3_BUCKET_NAME: openshift-cli-installer
-      S3_BUCKET_PATH: openshift-ci
+      CHANNEL_GROUP: candidate
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      HOSTED_CP: "false"
+      MULTI_AZ: "false"
+      OPENSHIFT_VERSION: "4.14"
+      READY_WAIT_TIMEOUT: 60m
+      REGION: us-west-2
+      REPLICAS: "2"
+      ROSA_LOGIN_ENV: staging
     test:
     - ref: cluster-msi-cluster-sanity
-    workflow: cluster
+    workflow: rosa-aws-sts
 zz_generated_metadata:
   branch: single-cluster-smoke
   org: CSPI-QE
