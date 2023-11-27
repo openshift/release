@@ -19,6 +19,7 @@ echo "Transferring source done"
 
 echo "Running remote setup command"
 timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
+    set -xeuo pipefail
     sudo dnf install -y python3.11
 
     export GOROOT=/usr/local/go
