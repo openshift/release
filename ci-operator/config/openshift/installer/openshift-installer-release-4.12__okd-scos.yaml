@@ -95,40 +95,6 @@ resources:
     requests:
       cpu: "3"
       memory: 5Gi
-tests:
-- as: unit
-  commands: go test ./pkg/...
-  container:
-    from: src
-  optional: true
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
-- as: verify-codegen
-  commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
-  container:
-    from: src
-  optional: true
-- as: e2e-aws-ovn
-  optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws
-- as: e2e-gcp
-  optional: true
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-e2e-gcp
-- as: e2e-aws-upgrade
-  optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
-  steps:
-    cluster_profile: aws
-    workflow: openshift-upgrade-aws
-- as: e2e-gcp-ovn-upgrade
-  optional: true
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-upgrade-gcp
 zz_generated_metadata:
   branch: release-4.12
   org: openshift
