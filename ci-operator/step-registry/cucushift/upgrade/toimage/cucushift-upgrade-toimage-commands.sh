@@ -573,6 +573,23 @@ function admin_ack() {
 
 # Upgrade the cluster to target release
 function upgrade() {
+    local log_file history_len
+    if check_ota_case_enabled "OCP-21588"; then
+        log_file=$(mktemp)
+        echo "Testing --allow-explicit-upgrade option"
+        run_command "oc adm upgrade --to-image=${TARGET} --force=${FORCE_UPDATE} 2>&1 | tee ${log_file}" || true
+        if grep -q 'specify --allow-explicit-upgrade to continue' "${log_file}"; then
+            echo "--allow-explicit-upgrade prompt message is shown"
+        else
+            echo "--allow-explicit-upgrade prompt message is NOT shown!"
+            exit 1
+        fi
+        history_len=$(oc get clusterversion -o json | jq '.items[0].status.history | length')
+        if [[ "${history_len}" != 1 ]]; then
+            echo "seem like there are more than 1 hisotry in CVO, sounds some unexpected update happened!"
+            exit 1
+        fi
+    fi
     run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
 }

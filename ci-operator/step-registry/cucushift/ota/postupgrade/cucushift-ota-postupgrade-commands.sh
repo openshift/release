@@ -68,6 +68,18 @@ function post-OCP-24358(){
     return $ret
 }
 
+function post-OCP-21588(){
+    local ret=0 verified
+
+    verified=$(oc get clusterversion -o json | jq -r '.items[0].status.history[0].verified')
+    if [[ "${verified}" != "false" ]]; then
+        echo "cv.items[0].status.history.verified is ${verified}"
+        ret=1
+    fi
+
+    return $ret
+}
+
 # This func run all test cases with with checkpoints which will not break other cases,
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be ran or not
