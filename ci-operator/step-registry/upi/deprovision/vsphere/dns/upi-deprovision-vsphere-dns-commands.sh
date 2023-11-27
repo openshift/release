@@ -39,6 +39,13 @@ then
 
   aws route53 wait resource-record-sets-changed --id "$id"
 
+  if [ -f "${SHARED_DIR}/dns-nodes-delete.json" ]
+  then
+    id=$(aws route53 change-resource-record-sets --hosted-zone-id "${HOSTED_ZONE_ID}" --change-batch file:///"${SHARED_DIR}"/dns-nodes-delete.json --query '"ChangeInfo"."Id"' --output text)
+    echo "Waiting for Route53 DNS records for nodes to be deleted..."
+    aws route53 wait resource-record-sets-changed --id "$id"
+  fi
+
   echo "Delete successful."
 else
   echo "Skipping DNS deprovision due to falling back to Terraform."

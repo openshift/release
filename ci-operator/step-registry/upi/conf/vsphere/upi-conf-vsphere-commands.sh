@@ -68,24 +68,30 @@ else
 
   printf "***** DEBUG %s %s %s %s ******\n" "$dns_server" "$lb_ip_address" "$bootstrap_ip_address" "$machine_cidr"
 
-  tempaddrs=()
+  control_plane_idx=0
+  control_plane_addrs=()
+  control_plane_hostnames=()
   for n in {4..6}; do
-    tempaddrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+    control_plane_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+    control_plane_hostnames+=("control-plane-$((control_plane_idx++))")
   done
 
-  printf "**** DEBUG %s ******\n" "${tempaddrs[@]}"
+  printf "**** DEBUG %s ******\n" "${control_plane_addrs[@]}"
 
-  printf -v control_plane_ip_addresses "\"%s\"," "${tempaddrs[@]}"
+  printf -v control_plane_ip_addresses "\"%s\"," "${control_plane_addrs[@]}"
   control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
 
-  tempaddrs=()
+  compute_idx=0
+  compute_addrs=()
+  compute_hostnames=()
   for n in {7..9}; do
-    tempaddrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+    compute_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+    compute_hostnames+=("compute-$((compute_idx++))")
   done
 
-  printf "**** DEBUG %s ******\n" "${tempaddrs[@]}"
+  printf "**** DEBUG %s ******\n" "${compute_addrs[@]}"
 
-  printf -v compute_ip_addresses "\"%s\"," "${tempaddrs[@]}"
+  printf -v compute_ip_addresses "\"%s\"," "${compute_addrs[@]}"
   compute_ip_addresses="[${compute_ip_addresses%,}]"
 
 fi
@@ -169,6 +175,61 @@ platform_required=true
 if grep -F "${platform_none}" "${install_config}"; then
   echo "platform none present, install-config will not be extended"
   platform_required=false
+fi
+
+# Create DNS files for nodes
+if command -v pwsh &> /dev/null
+then
+  ROUTE53_CREATE_JSON='{"Comment": "Create public OpenShift DNS records for Nodes of VSphere UPI CI install", "Changes": []}'
+  ROUTE53_DELETE_JSON='{"Comment": "Delete public OpenShift DNS records for Nodes of VSphere UPI CI install", "Changes": []}'
+  DNS_RECORD='{
+  "Action": "${ACTION}",
+  "ResourceRecordSet": {
+    "Name": "${CLUSTER_NAME}-${VM_NAME}.${CLUSTER_DOMAIN}.",
+    "Type": "A",
+    "TTL": 60,
+    "ResourceRecords": [{"Value": "${IP_ADDRESS}"}]
+    }
+  }'
+
+  for (( node=0; node < 3; node++)); do
+    echo "Creating DNS entry for ${compute_hostnames[$node]}"
+    node_record=$(echo "${DNS_RECORD}" |
+      jq -r --arg ACTION "CREATE" \
+            --arg CLUSTER_NAME "$cluster_name" \
+            --arg VM_NAME "${control_plane_hostnames[$node]}" \
+            --arg CLUSTER_DOMAIN "${cluster_domain}" \
+            --arg IP_ADDRESS "${control_plane_ip_addresses[$node]}" \
+            '.Action = $ACTION |
+             .ResourceRecordSet.Name = $CLUSTER_NAME+"-"+$VM_NAME+"."+$CLUSTER_DOMAIN+"." |
+             .ResourceRecordSet.ResourceRecords[0].Value = $IP_ADDRESS')
+    ROUTE53_CREATE_JSON=$(echo "${ROUTE53_CREATE_JSON}" | jq --argjson DNS_RECORD "$node_record" -r '.Changes[.Changes|length] |= .+ $DNS_RECORD')
+    node_record=$(echo "${node_record}" |
+      jq -r --arg ACTION "DELETE" '.Action = $ACTION')
+    ROUTE53_DELETE_JSON=$(echo "${ROUTE53_DELETE_JSON}" | jq --argjson DNS_RECORD "$node_record" -r '.Changes[.Changes|length] |= .+ $DNS_RECORD')
+  done
+  for (( node=0; node < 3; node++)); do
+    echo "Creating DNS entry for ${compute_hostnames[$node]}"
+    node_record=$(echo "${DNS_RECORD}" |
+      jq -r --arg ACTION "CREATE" \
+            --arg CLUSTER_NAME "$cluster_name" \
+            --arg VM_NAME "${compute_hostnames[$node]}" \
+            --arg CLUSTER_DOMAIN "${cluster_domain}" \
+            --arg IP_ADDRESS "${compute_ip_addresses[$node]}" \
+            '.Action = $ACTION |
+             .ResourceRecordSet.Name = $CLUSTER_NAME+"-"+$VM_NAME+"."+$CLUSTER_DOMAIN+"." |
+             .ResourceRecordSet.ResourceRecords[0].Value = $IP_ADDRESS')
+    ROUTE53_CREATE_JSON=$(echo "${ROUTE53_CREATE_JSON}" | jq --argjson DNS_RECORD "$node_record" -r '.Changes[.Changes|length] |= .+ $DNS_RECORD')
+    node_record=$(echo "${node_record}" |
+      jq -r --arg ACTION "DELETE" '.Action = $ACTION')
+    ROUTE53_DELETE_JSON=$(echo "${ROUTE53_DELETE_JSON}" | jq --argjson DNS_RECORD "$node_record" -r '.Changes[.Changes|length] |= .+ $DNS_RECORD')
+  done
+
+  echo "Creating json to create Node DNS records..."
+  echo ${ROUTE53_CREATE_JSON} > "${SHARED_DIR}"/dns-nodes-create.json
+
+  echo "Creating json file to delete Node DNS records..."
+  echo ${ROUTE53_DELETE_JSON} > "${SHARED_DIR}"/dns-nodes-delete.json
 fi
 
 ${platform_required} && cat >>"${install_config}" <<EOF
@@ -256,13 +317,13 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$control_plane_num_cpus = 4
 \$control_plane_count = 3
 \$control_plane_ip_addresses = $(echo ${control_plane_ip_addresses} | tr -d [])
-\$control_plane_hostnames = "control-plane-0", "control-plane-1", "control-plane-2"
+\$control_plane_hostnames = $(printf "\"%s\"," "${control_plane_hostnames[@]}" | sed 's/,$//')
 
 \$compute_memory = 16384
 \$compute_num_cpus = 4
 \$compute_count = 3
 \$compute_ip_addresses = $(echo ${compute_ip_addresses} | tr -d [])
-\$compute_hostnames = "compute-0", "compute-1", "compute-2"
+\$compute_hostnames = $(printf "\"%s\"," "${compute_hostnames[@]}" | sed 's/,$//')
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Create secrets.auto.tfvars..."
