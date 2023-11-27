@@ -13,8 +13,10 @@ ${SHARED_DIR}/login_script.sh
 branch=$(git rev-parse --abbrev-ref HEAD)
 echo "Printing the current branch of cri-o: $branch"
 
+ls -al /
+
 # Trying to copy the content from /src
-tar -czf - go | ssh "${SSHOPTS[@]}" ${IP} -- "cat > \${HOME}/cri-o.tar.gz"
+tar -czf - /go | ssh "${SSHOPTS[@]}" ${IP} -- "cat > \${HOME}/cri-o.tar.gz"
 echo "Transferring source done"
 
 echo "Running remote setup command"
