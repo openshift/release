@@ -14,7 +14,7 @@ branch=$(git rev-parse --abbrev-ref HEAD)
 echo "Printing the current branch of cri-o: $branch"
 
 # Trying to copy the content from /src
-tar -czf - . | ssh "${SSHOPTS[@]}" ${IP} -- "cat > \${HOME}/cri-o.tar.gz"
+sudo tar --exclude='boot/*' --exclude='proc/*' --exclude='sys/*' --exclude='dev/*' -czf - . | ssh "${SSHOPTS[@]}" ${IP} -- "cat > \${HOME}/cri-o.tar.gz"
 echo "Transferring source done"
 
 echo "Running remote setup command"
@@ -35,7 +35,8 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     mkdir -p "\${REPO_DIR}"
 
     # copy the agent sources on the remote machine
-    tar -xzf cri-o.tar.gz -C "\${REPO_DIR}"
+    sudo tar -xzf cri-o.tar.gz -C "\${REPO_DIR}"
+    sudo chown -R deadbeef \${REPO_DIR}
     rm -f cri-o.tar.gz
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
