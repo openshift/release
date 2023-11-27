@@ -143,4 +143,11 @@ EOF
   aws route53 wait resource-record-sets-changed --id "$id"
 
   echo "DNS records created."
+
+  if [ -f "${SHARED_DIR}/dns-nodes-create.json" ]
+  then
+    id=$(aws route53 change-resource-record-sets --hosted-zone-id "$hosted_zone_id" --change-batch file:///"${SHARED_DIR}"/dns-nodes-create.json --query '"ChangeInfo"."Id"' --output text)
+    echo "Waiting for DNS records for nodes to sync..."
+    aws route53 wait resource-record-sets-changed --id "$id"
+  fi
 fi
