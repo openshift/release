@@ -192,14 +192,15 @@ then
     }
   }'
 
+  # Generate control plane DNS entries
   for (( node=0; node < 3; node++)); do
-    echo "Creating DNS entry for ${compute_hostnames[$node]}"
+    echo "Creating DNS entry for ${control_plane_hostnames[$node]}"
     node_record=$(echo "${DNS_RECORD}" |
       jq -r --arg ACTION "CREATE" \
             --arg CLUSTER_NAME "$cluster_name" \
             --arg VM_NAME "${control_plane_hostnames[$node]}" \
             --arg CLUSTER_DOMAIN "${cluster_domain}" \
-            --arg IP_ADDRESS "${control_plane_ip_addresses[$node]}" \
+            --arg IP_ADDRESS "${control_plane_addrs[$node]}" \
             '.Action = $ACTION |
              .ResourceRecordSet.Name = $CLUSTER_NAME+"-"+$VM_NAME+"."+$CLUSTER_DOMAIN+"." |
              .ResourceRecordSet.ResourceRecords[0].Value = $IP_ADDRESS')
@@ -208,6 +209,7 @@ then
       jq -r --arg ACTION "DELETE" '.Action = $ACTION')
     ROUTE53_DELETE_JSON=$(echo "${ROUTE53_DELETE_JSON}" | jq --argjson DNS_RECORD "$node_record" -r '.Changes[.Changes|length] |= .+ $DNS_RECORD')
   done
+  # Generate compute DNS entries
   for (( node=0; node < 3; node++)); do
     echo "Creating DNS entry for ${compute_hostnames[$node]}"
     node_record=$(echo "${DNS_RECORD}" |
@@ -215,7 +217,7 @@ then
             --arg CLUSTER_NAME "$cluster_name" \
             --arg VM_NAME "${compute_hostnames[$node]}" \
             --arg CLUSTER_DOMAIN "${cluster_domain}" \
-            --arg IP_ADDRESS "${compute_ip_addresses[$node]}" \
+            --arg IP_ADDRESS "${compute_addrs[$node]}" \
             '.Action = $ACTION |
              .ResourceRecordSet.Name = $CLUSTER_NAME+"-"+$VM_NAME+"."+$CLUSTER_DOMAIN+"." |
              .ResourceRecordSet.ResourceRecords[0].Value = $IP_ADDRESS')
