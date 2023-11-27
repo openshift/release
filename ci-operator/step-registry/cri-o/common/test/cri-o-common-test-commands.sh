@@ -14,7 +14,7 @@ branch=$(git rev-parse --abbrev-ref HEAD)
 echo "Printing the current branch of cri-o: $branch"
 
 # Trying to copy the content from /src
-tar --exclude='boot/*' --exclude='proc/*' --exclude='sys/*' --exclude='dev/*' -czf - . | ssh "${SSHOPTS[@]}" ${IP} -- "cat > \${HOME}/cri-o.tar.gz"
+tar -czf - go | ssh "${SSHOPTS[@]}" ${IP} -- "cat > \${HOME}/cri-o.tar.gz"
 echo "Transferring source done"
 
 echo "Running remote setup command"
