@@ -102,13 +102,13 @@ prow-config:
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --sharded-plugin-config-base-dir /config
 
 acknowledge-critical-fixes-only:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/${GO_ARCH} registry.ci.openshift.org/ci/tide-config-manager:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(REPOS):/repos" registry.ci.openshift.org/ci/tide-config-manager:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase acknowledge-critical-fixes-only --repos-guarded-by-ack-critical-fixes /repos
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/tide-config-manager:latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(REPOS):/repos" registry.ci.openshift.org/ci/tide-config-manager:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase acknowledge-critical-fixes-only --repos-guarded-by-ack-critical-fixes /repos
 	$(MAKE) prow-config
 
 revert-acknowledge-critical-fixes-only:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/${GO_ARCH} registry.ci.openshift.org/ci/tide-config-manager:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/tide-config-manager:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase revert-critical-fixes-only
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/tide-config-manager:latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/tide-config-manager:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase revert-critical-fixes-only
 	$(MAKE) prow-config
 
 branch-cut:
