@@ -292,6 +292,30 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-sdn-mtu-migrate
+- as: aws-ipi-arm-mixarch-f28-day2-64k-pagesize
+  cron: 14 4 13 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      E2E_RUN_TAGS: '@heterogeneous and @aws-ipi and @network-ovnkubernetes and not
+        @fips'
+      MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL: node-role.kubernetes.io/worker=,kubernetes.io/arch=arm64
+      MCO_CONF_DAY2_CUSTOM_MCP_NAME: 64k-pages
+      MCO_CONF_DAY2_INSTALL_KERNEL_MCPS: 64k-pages
+      MCO_CONF_DAY2_INSTALL_KERNEL_TYPE: 64k-pages
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: ipi-install-heterogeneous-day2-kerneltype
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-upi-baselinecaps-none-amd-f14
   cron: 7 9 6,20 * *
   steps:
@@ -601,6 +625,30 @@ tests:
     test:
     - chain: cucushift-sdn-migration-ovn
     workflow: cucushift-installer-rehearse-azure-ipi-sdn
+- as: azure-ipi-arm-mixarch-disc-fullypriv-f28-day2-64k-pagesize
+  cron: 14 4 23 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@heterogeneous and @azure-ipi and @network-ovnkubernetes and
+        @disconnected and not @fips'
+      MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL: node-role.kubernetes.io/worker=,kubernetes.io/arch=arm64
+      MCO_CONF_DAY2_CUSTOM_MCP_NAME: 64k-pages
+      MCO_CONF_DAY2_INSTALL_KERNEL_MCPS: 64k-pages
+      MCO_CONF_DAY2_INSTALL_KERNEL_TYPE: 64k-pages
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: ipi-install-heterogeneous-day2-kerneltype
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
 - as: gcp-ipi-baselinecaps-none-amd-f28-destructive
   cron: 31 22 5 * *
   steps:

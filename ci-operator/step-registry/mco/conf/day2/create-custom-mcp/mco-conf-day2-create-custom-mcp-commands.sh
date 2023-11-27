@@ -21,7 +21,8 @@ function set_proxy () {
 }
 
 function validate_params() {
-  NUM_WORKERS=$(oc get nodes -l "$MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL" -oname | wc -l)
+  # shellcheck disable=SC2086
+  NUM_WORKERS=$(oc get nodes -l $MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL -oname | wc -l)
 
   if [ "$MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES" != "" ] && (( MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES > NUM_WORKERS  )) ; then
     echo "ERROR: We are trying to add $MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES to our custom pool, but there are only $NUM_WORKERS nodes available with label $MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL"
@@ -57,15 +58,13 @@ EOF
 
   if [ "$MCP_NUM_NODES" == "0" ]; then
     echo "It has been requested to add 0 nodes to the pool. No node will be added to the custom MachineConfigPool."
-  else
-    if [ "$MCP_NUM_NODES" == "" ]; then
-	echo "MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES variable is empty. All nodes matching the '$MCP_LABEL' label will be added to the custom pool"
-    fi
-
-    echo "Labeling $MCP_NUM_NODES worker nodes in order to add them to the new custom MCP"
-    # shellcheck disable=SC2046
-    oc label node $(oc get nodes -l "$MCP_LABEL" -ojsonpath="{.items[:$MCP_NUM_NODES].metadata.name}") node-role.kubernetes.io/"$MCO_CONF_DAY2_CUSTOM_MCP_NAME"=
+    return
   fi
+  [ -z "$MCP_NUM_NODES" ] \
+    && echo "MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES variable is empty. All nodes matching the '$MCP_LABEL' label will be added to the custom pool" \
+    || echo "Labeling $MCP_NUM_NODES worker nodes in order to add them to the new custom MCP"
+  # shellcheck disable=SC2046
+  oc label node $(oc get nodes -l "$MCP_LABEL" -ojsonpath="{.items[:$MCP_NUM_NODES].metadata.name}") node-role.kubernetes.io/"$MCO_CONF_DAY2_CUSTOM_MCP_NAME"=
 }
 
 function wait_for_config_to_be_applied() {
@@ -84,8 +83,8 @@ function wait_for_config_to_be_applied() {
 }
 
 
-validate_params
 set_proxy
+validate_params
 create_custom_mcp "$MCO_CONF_DAY2_CUSTOM_MCP_NAME" "$MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES" "$MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL"
 wait_for_config_to_be_applied "$MCO_CONF_DAY2_CUSTOM_MCP_NAME" "$MCO_CONF_DAY2_CUSTOM_MCP_NUM_NODES" "$MCO_CONF_DAY2_CUSTOM_MCP_TIMEOUT"
 
