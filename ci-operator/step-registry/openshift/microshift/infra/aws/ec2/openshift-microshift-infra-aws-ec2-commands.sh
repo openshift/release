@@ -327,7 +327,7 @@ Resources:
           sysctl -a |& tee -a /tmp/init_output.txt
           echo "====== Running DNF Install ======" | tee -a /tmp/init_output.txt
           if ! ( sudo lsblk | grep 'xvdc' ); then
-              echo "/dev/xvdc device not found, assuming this is metal host, skipping LVM configuration" |& tee -a /tmp/init_output
+              echo "/dev/xvdc device not found, assuming this is metal host, skipping LVM configuration" |& tee -a /tmp/init_output.txt
               exit 0
           fi
           sudo dnf install -y lvm2 |& tee -a /tmp/init_output.txt
