@@ -9,7 +9,6 @@ source "${SHARED_DIR}/env"
 chmod +x "${SHARED_DIR}/login_script.sh"
 ${SHARED_DIR}/login_script.sh
 
-ls -al /
 cd /workdir
 
 # Print the git branch
@@ -35,11 +34,18 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
 
     # setup the directory where the tests will run
     REPO_DIR="/home/deadbeef/cri-o"
+    SOURCE_DIR="/usr/go/src/github.com/cri-o/cri-o"
+
     mkdir -p "\${REPO_DIR}"
+    mkdir -p "\${SOURCE_DIR}"
 
     # copy the agent sources on the remote machine
     sudo tar -xzf cri-o.tar.gz -C "\${REPO_DIR}"
+    sudo tar -xzf cri-o.tar.gz -C "\${SOURCE_DIR}"
+
     sudo chown -R deadbeef \${REPO_DIR}
+    sudo chown -R deadbeef \${SOURCE_DIR}
+
     rm -f cri-o.tar.gz
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
