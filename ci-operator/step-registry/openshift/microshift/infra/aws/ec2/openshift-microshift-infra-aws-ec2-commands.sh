@@ -60,7 +60,7 @@ fi
 function save_stack_events_to_shared()
 {
   set +o errexit
-  aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json > "${SHARED_DIR}/stack-events-${stack_name}.json"
+  aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json > "${ARTIFACT_DIR}/stack-events-${stack_name}.json"
   set -o errexit
 }
 
