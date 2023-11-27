@@ -37,7 +37,7 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     SOURCE_DIR="/usr/go/src/github.com/cri-o/cri-o"
 
     mkdir -p "\${REPO_DIR}"
-    mkdir -p "\${SOURCE_DIR}"
+    sudo mkdir -p "\${SOURCE_DIR}"
 
     # copy the agent sources on the remote machine
     sudo tar -xzf cri-o.tar.gz -C "\${REPO_DIR}"
