@@ -9,10 +9,7 @@ set -o verbose
 tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=/tmp/clusters-data
 
 KUBECONFIG=$(cat "${SHARED_DIR}/hub-kubeconfig-path")
-KUBEADMIN_TOKEN=$(cat "${SHARED_DIR}/hub-kubeadmin-token")
-
 export KUBECONFIG
-export KUBEADMIN_TOKEN
 
 RUN_COMMAND="poetry run pytest tests \
             -o log_cli=true \
