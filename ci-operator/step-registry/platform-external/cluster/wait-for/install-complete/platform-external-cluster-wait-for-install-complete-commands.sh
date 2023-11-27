@@ -40,7 +40,7 @@ function wait_for_masters() {
 function wait_for_workers() {
   # TODO improve this check
   all_approved_offset=0
-  all_approved_limit=5
+  all_approved_limit=10
   all_approved_check_delay=10
   echo_date "wait_for_workers()"
   while true; do
@@ -64,6 +64,7 @@ function wait_for_workers() {
   done
   echo_date "Starting workers ready waiter..."
   until oc wait node --selector='node-role.kubernetes.io/worker' --for condition=Ready --timeout=30s; do
+    oc get csr -ojson | jq -r '.items[] | select(.status == {} ) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve || true
     echo_date "Waiting for workers join..."
     sleep 10
   done

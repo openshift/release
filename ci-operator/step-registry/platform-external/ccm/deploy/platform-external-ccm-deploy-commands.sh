@@ -33,9 +33,11 @@ if [[ "${PLATFORM_EXTERNAL_CCM_ENABLED-}" != "yes" ]]; then
   exit 0
 fi
 
-export CCM_RESOURCE=$(<${SHARED_DIR}/CCM_RESOURCE)
-export CCM_NAMESPACE=$(<${SHARED_DIR}/CCM_NAMESPACE)
-export CCM_REPLICAS_COUNT=$(<${SHARED_DIR}/CCM_REPLICAS_COUNT)
+source ${SHARED_DIR}/ccm.env
+
+# export CCM_RESOURCE=$(<${SHARED_DIR}/CCM_RESOURCE)
+# export CCM_NAMESPACE=$(<${SHARED_DIR}/CCM_NAMESPACE)
+# export CCM_REPLICAS_COUNT=$(<${SHARED_DIR}/CCM_REPLICAS_COUNT)
 
 function stream_logs() {
   echo_date "[log-stream] Starting log streamer"
@@ -68,11 +70,13 @@ echo_date "Deploying Cloud Controller Manager"
 
 while read -r manifest
 do
-  echo "Processing manifest $manifest";
-  oc create -f $manifest
+  echo "Processing manifest ${SHARED_DIR}/$manifest";
+  oc create -f ${SHARED_DIR}/$manifest || true
 done <<< "$(cat "${SHARED_DIR}/ccm-manifests.txt")"
 
-until  oc wait --for=jsonpath='{.status.availableReplicas}'=${CCM_REPLICAS_COUNT} ${CCM_RESOURCE} -n ${CCM_NAMESPACE} --timeout=10m &> /dev/null
+#CCM_STATUS_KEY=.status.availableReplicas
+CCM_STATUS_KEY=.status.numberAvailable
+until  oc wait --for=jsonpath="{${CCM_STATUS_KEY}}"=${CCM_REPLICAS_COUNT} ${CCM_RESOURCE} -n ${CCM_NAMESPACE} --timeout=10m &> /dev/null
 do
   echo_date "Waiting for minimum replicas avaialble..."
   sleep 10
