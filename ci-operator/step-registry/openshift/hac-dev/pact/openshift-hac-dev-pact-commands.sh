@@ -21,7 +21,7 @@ if [[ $JOB_TYPE == "presubmit" ]]; then
     SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
 
     pact-broker publish \
-    "$(pwd)/pact/pacts/HACdev-HAS.json" \
+    "$(pwd)/pact/pacts" \
     -a ${SHA:0:7} \
     -t PR${PR_NUMBER} \
     -b $PACT_BROKER_BASE_URL \
@@ -32,7 +32,7 @@ else
     SHA=$(echo ${JOB_SPEC} | jq -r '.refs.base_sha')
 
     pact-broker publish \
-    "$(pwd)/pact/pacts/HACdev-HAS.json" \
+    "$(pwd)/pact/pacts" \
     -a ${SHA:0:7} \
     -b $PACT_BROKER_BASE_URL \
     -u $PACT_BROKER_USERNAME \

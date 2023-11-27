@@ -73,6 +73,7 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
 
+    echo "Make sure every operator's DEGRADED column is False"
     if degraded_operator=$(oc get clusteroperator | awk '$5 == "True"' | grep "True"); then
         echo >&2 "Some operator's DEGRADED is True"
         echo >&2 "$degraded_operator"
