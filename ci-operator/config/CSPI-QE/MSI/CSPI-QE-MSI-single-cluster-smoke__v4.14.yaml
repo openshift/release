@@ -1,0 +1,41 @@
+base_images:
+  managed-services-integration-tests:
+    name: managed-services-integration-tests
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: singlecluster-rosa-4-14-candidate-smoke
+  steps:
+    cluster_profile: aws-managed-cspi-qe
+    env:
+      CHANNEL_GROUP: candidate
+      CLUSTER_NAME: msi-ci-sanity
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      HOSTED_CP: "false"
+      MULTI_AZ: "false"
+      OPENSHIFT_VERSION: "4.14"
+      READY_WAIT_TIMEOUT: 60m
+      REGION: us-west-2
+      REPLICAS: "2"
+      ROSA_LOGIN_ENV: staging
+    test:
+    - ref: cluster-msi-cluster-sanity
+    workflow: rosa-aws-sts
+zz_generated_metadata:
+  branch: single-cluster-smoke
+  org: CSPI-QE
+  repo: MSI
+  variant: v4.14
