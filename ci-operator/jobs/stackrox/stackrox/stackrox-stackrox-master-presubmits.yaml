@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/aks-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -69,7 +69,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/aro-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -133,7 +133,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/eks-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -197,7 +197,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-nongroovy-e2e-tests
     decorate: true
     decoration_config:
@@ -261,7 +261,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-operator-e2e-tests
     decorate: true
     decoration_config:
@@ -326,7 +326,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -391,7 +391,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-race-condition-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -455,7 +455,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-scale-tests
     decorate: true
     decoration_config:
@@ -518,7 +518,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-sensor-integration-tests
     decorate: true
     decoration_config:
@@ -582,7 +582,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-ui-e2e-tests
     decorate: true
     decoration_config:
@@ -647,7 +647,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-upgrade-tests
     decorate: true
     decoration_config:
@@ -711,7 +711,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/gke-version-compatibility-tests
     decorate: true
     decoration_config:
@@ -775,12 +775,76 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
+    context: ci/prow/ibmcloudz-4-13-qa-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 6h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-master-ibmcloudz-4-13-qa-e2e-tests
+    optional: true
+    rerun_command: /test ibmcloudz-4-13-qa-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=ibmcloudz-4-13-qa-e2e-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ibmcloudz-4-13-qa-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/ibmcloudz-4-14-qa-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 5h0m0s
+      timeout: 6h0m0s
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -839,71 +903,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/ibmcloudz-qa-e2e-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-ibmcloudz-qa-e2e-tests
-    optional: true
-    rerun_command: /test ibmcloudz-qa-e2e-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=ibmcloudz-qa-e2e-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ibmcloudz-qa-e2e-tests,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-11-compliance-e2e-tests
     decorate: true
     decoration_config:
@@ -963,7 +963,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-11-ebpf-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1023,7 +1023,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-11-operator-e2e-tests
     decorate: true
     decoration_config:
@@ -1083,7 +1083,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-11-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1143,7 +1143,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-11-sensor-integration-tests
     decorate: true
     decoration_config:
@@ -1202,7 +1202,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-11-sensor-profiling
     decorate: true
     decoration_config:
@@ -1261,7 +1261,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-11-ui-e2e-tests
     decorate: true
     decoration_config:
@@ -1321,7 +1321,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-13-compliance-e2e-tests
     decorate: true
     decoration_config:
@@ -1334,7 +1334,6 @@ presubmits:
     name: pull-ci-stackrox-stackrox-master-ocp-4-13-compliance-e2e-tests
     optional: true
     rerun_command: /test ocp-4-13-compliance-e2e-tests
-    run_if_changed: ^(compliance|central\/compliance.*)
     spec:
       containers:
       - args:
@@ -1381,7 +1380,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-13-ebpf-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1394,7 +1393,6 @@ presubmits:
     name: pull-ci-stackrox-stackrox-master-ocp-4-13-ebpf-qa-e2e-tests
     optional: true
     rerun_command: /test ocp-4-13-ebpf-qa-e2e-tests
-    run_if_changed: ^COLLECTOR_VERSION
     spec:
       containers:
       - args:
@@ -1441,7 +1439,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-13-fips-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1500,7 +1498,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-13-operator-e2e-tests
     decorate: true
     decoration_config:
@@ -1513,7 +1511,6 @@ presubmits:
     name: pull-ci-stackrox-stackrox-master-ocp-4-13-operator-e2e-tests
     optional: true
     rerun_command: /test ocp-4-13-operator-e2e-tests
-    run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
     spec:
       containers:
       - args:
@@ -1560,7 +1557,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-13-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1573,7 +1570,6 @@ presubmits:
     name: pull-ci-stackrox-stackrox-master-ocp-4-13-qa-e2e-tests
     optional: true
     rerun_command: /test ocp-4-13-qa-e2e-tests
-    run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
     spec:
       containers:
       - args:
@@ -1620,7 +1616,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-13-sensor-integration-tests
     decorate: true
     decoration_config:
@@ -1679,7 +1675,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-13-sensor-profiling
     decorate: true
     decoration_config:
@@ -1738,7 +1734,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-13-ui-e2e-tests
     decorate: true
     decoration_config:
@@ -1751,7 +1747,6 @@ presubmits:
     name: pull-ci-stackrox-stackrox-master-ocp-4-13-ui-e2e-tests
     optional: true
     rerun_command: /test ocp-4-13-ui-e2e-tests
-    run_if_changed: ^ui/
     spec:
       containers:
       - args:
@@ -1798,31 +1793,26 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-14-compliance-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci-operator.openshift.io/variant: ocp-4-14
       ci.openshift.io/generator: prowgen
-      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-stackrox-stackrox-master-ocp-4-14-compliance-e2e-tests
     optional: true
     rerun_command: /test ocp-4-14-compliance-e2e-tests
+    run_if_changed: ^(compliance|central\/compliance.*)
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/compliance-e2e-tests-cluster-profile
         - --target=compliance-e2e-tests
         - --variant=ocp-4-14
         command:
@@ -1834,14 +1824,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/compliance-e2e-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1856,18 +1838,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1883,31 +1853,26 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-14-ebpf-qa-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci-operator.openshift.io/variant: ocp-4-14
       ci.openshift.io/generator: prowgen
-      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-stackrox-stackrox-master-ocp-4-14-ebpf-qa-e2e-tests
     optional: true
     rerun_command: /test ocp-4-14-ebpf-qa-e2e-tests
+    run_if_changed: ^COLLECTOR_VERSION
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/ebpf-qa-e2e-tests-cluster-profile
         - --target=ebpf-qa-e2e-tests
         - --variant=ocp-4-14
         command:
@@ -1919,14 +1884,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/ebpf-qa-e2e-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1941,18 +1898,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1968,32 +1913,26 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/ocp-4-14-operator-e2e-tests
+    cluster: build01
+    context: ci/prow/ocp-4-14-fips-qa-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci-operator.openshift.io/variant: ocp-4-14
       ci.openshift.io/generator: prowgen
-      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-ocp-4-14-operator-e2e-tests
+    name: pull-ci-stackrox-stackrox-master-ocp-4-14-fips-qa-e2e-tests
     optional: true
-    rerun_command: /test ocp-4-14-operator-e2e-tests
+    rerun_command: /test ocp-4-14-fips-qa-e2e-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/operator-e2e-tests-cluster-profile
-        - --target=operator-e2e-tests
+        - --target=fips-qa-e2e-tests
         - --variant=ocp-4-14
         command:
         - ci-operator
@@ -2004,14 +1943,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/operator-e2e-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2026,18 +1957,66 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
+      - name: manifest-tool-local-pusher
         secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
         secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
+          secretName: registry-pull-credentials
+      - name: result-aggregator
         secret:
-          secretName: cluster-secrets-aws
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ocp-4-14-fips-qa-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/ocp-4-14-operator-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci-operator.openshift.io/variant: ocp-4-14
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-master-ocp-4-14-operator-e2e-tests
+    optional: true
+    rerun_command: /test ocp-4-14-operator-e2e-tests
+    run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=operator-e2e-tests
+        - --variant=ocp-4-14
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2053,31 +2032,26 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-14-qa-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci-operator.openshift.io/variant: ocp-4-14
       ci.openshift.io/generator: prowgen
-      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-stackrox-stackrox-master-ocp-4-14-qa-e2e-tests
     optional: true
     rerun_command: /test ocp-4-14-qa-e2e-tests
+    run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|[A-Z_]+_VERSION)
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/qa-e2e-tests-cluster-profile
         - --target=qa-e2e-tests
         - --variant=ocp-4-14
         command:
@@ -2089,14 +2063,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/qa-e2e-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2111,18 +2077,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2138,18 +2092,15 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-14-sensor-integration-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci-operator.openshift.io/variant: ocp-4-14
       ci.openshift.io/generator: prowgen
-      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-stackrox-stackrox-master-ocp-4-14-sensor-integration-tests
     optional: true
@@ -2159,10 +2110,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/sensor-integration-tests-cluster-profile
         - --target=sensor-integration-tests
         - --variant=ocp-4-14
         command:
@@ -2174,14 +2122,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/sensor-integration-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2196,18 +2136,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2223,18 +2151,15 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-14-sensor-profiling
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 2h0m0s
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci-operator.openshift.io/variant: ocp-4-14
       ci.openshift.io/generator: prowgen
-      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-stackrox-stackrox-master-ocp-4-14-sensor-profiling
     optional: true
@@ -2244,10 +2169,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/sensor-profiling-cluster-profile
         - --target=sensor-profiling
         - --variant=ocp-4-14
         command:
@@ -2259,14 +2181,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/sensor-profiling-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2281,18 +2195,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2308,31 +2210,26 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/ocp-4-14-ui-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci-operator.openshift.io/variant: ocp-4-14
       ci.openshift.io/generator: prowgen
-      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-stackrox-stackrox-master-ocp-4-14-ui-e2e-tests
     optional: true
     rerun_command: /test ocp-4-14-ui-e2e-tests
+    run_if_changed: ^ui/
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/ui-e2e-tests-cluster-profile
         - --target=ui-e2e-tests
         - --variant=ocp-4-14
         command:
@@ -2344,14 +2241,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/ui-e2e-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -2366,18 +2255,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2393,7 +2270,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/osd-aws-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -2457,7 +2334,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/osd-gcp-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -2521,7 +2398,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/powervs-4-12-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -2585,7 +2462,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/powervs-4-14-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -2649,7 +2526,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/powervs-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -2713,7 +2590,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/rosa-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -2777,7 +2654,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build01
     context: ci/prow/shell-unit-tests
     decorate: true
     decoration_config:

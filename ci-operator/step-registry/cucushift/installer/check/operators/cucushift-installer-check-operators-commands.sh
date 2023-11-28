@@ -82,10 +82,11 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
     if oc get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Progressing") | .status' | grep -iv "False"; then
-        echo >&2 "Some operators are unavailable, pls run 'oc get clusteroperator -o json' to check"
+        echo >&2 "Some operators are Progressing, pls run 'oc get clusteroperator -o json' to check"
         (( tmp_ret += 1 ))
     fi
 
+    echo "Make sure every operator's DEGRADED column is False"
     if degraded_operator=$(oc get clusteroperator | awk '$5 == "True"' | grep "True"); then
         echo >&2 "Some operator's DEGRADED is True"
         echo >&2 "$degraded_operator"

@@ -813,7 +813,7 @@ def check_entry(entry, config, data):
   {job.run_if_changed}""")
         entry_ok = False
     elif job.has_run_if_changed and not entry.has_run_if_changed:
-        check_error(f"""The value of run_if_changed should be copied to config/
+        check_error(f"""The value of run_if_changed should be reconciled with config/
   {job.run_if_changed}""")
         entry_ok = False
 
@@ -825,7 +825,7 @@ def check_entry(entry, config, data):
   {job.skip_if_only_changed}""")
         entry_ok = False
     elif job.has_skip_if_only_changed and not entry.has_skip_if_only_changed:
-        check_error(f"""The value of skip_if_only_changed should be copied to config/
+        check_error(f"""The value of skip_if_only_changed should be reconciled with config/
   {job.skip_if_only_changed}""")
         entry_ok = False
 
