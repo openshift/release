@@ -1,8 +1,16 @@
 base_images:
-  nginx-120:
-    name: nginx
+  go-builder-base:
+    name: release
     namespace: openshift
-    tag: 1.20-ubi9
+    tag: rhel-9-release-golang-1.20-openshift-4.14
+  ubi9-minimal-base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+  web-builder-base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
 build_root:
   image_stream_tag:
     name: release
@@ -12,7 +20,14 @@ images:
 - dockerfile_path: Dockerfile.cypress
   to: plugin-test
 - dockerfile_path: Dockerfile.ci
-  from: nginx-120
+  from: ubi9-minimal-base
+  inputs:
+    go-builder-base:
+      as:
+      - registry.redhat.io/ubi9/go-toolset:1.19
+    web-builder-base:
+      as:
+      - registry.redhat.io/ubi9/ubi-minimal
   to: logging-view-plugin
 promotion:
   name: "5.8"
