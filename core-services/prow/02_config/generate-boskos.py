@@ -304,10 +304,9 @@ CONFIG = {
     },
     'ossm-aws-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
+        'us-east-1': 50,
         'us-east-2': 50,
         'us-west-2': 50,
-        'eu-west-1': 50,
-        'eu-central-1': 50,
     },
 }
 
