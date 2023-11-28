@@ -1,0 +1,21 @@
+workflow:
+  as: openshift-e2e-aws-network-mtu
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-conf-aws
+    - ref: network-conf-aws-cluster-mtu
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    env:
+      FAIL_ON_CORE_DUMP: "false"
+      NETWORK_TYPE: "OVNKubernetes"
+      CLUSTER_NETWORK_MTU: 0
+  documentation: |-
+    The Openshift E2E workflow executes the installation with a custom MTU in overlay network,
+    running regular end-to-end test suite.
