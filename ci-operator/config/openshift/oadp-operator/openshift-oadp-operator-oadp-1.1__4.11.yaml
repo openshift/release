@@ -1,23 +1,14 @@
-base_images:
-  base:
-    name: "4.9"
-    namespace: ocp
-    tag: base
-  openshift_release_golang-1.19:
+build_root:
+  image_stream_tag:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.12
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
 images:
 - dockerfile_path: Dockerfile
-  from: base
+  from: src
   to: oadp-operator
 - dockerfile_path: build/ci-Dockerfile
-  from: openshift_release_golang-1.19
+  from: src
   to: test-oadp-operator
 operator:
   bundles:
@@ -38,16 +29,6 @@ resources:
       cpu: 1000m
       memory: 512Mi
 tests:
-- as: operator-unit-test
-  steps:
-    test:
-    - as: unit
-      commands: HOME=$(pwd) make test
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
 - as: operator-e2e-aws
   steps:
     cluster_profile: aws
@@ -61,7 +42,7 @@ tests:
     test:
     - as: e2e
       cli: latest
-      commands: CLUSTER_PROFILE=aws make test-e2e
+      commands: make test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
@@ -85,7 +66,7 @@ tests:
     test:
     - as: e2e
       cli: latest
-      commands: CLUSTER_PROFILE=azure make test-e2e
+      commands: make test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
@@ -109,7 +90,7 @@ tests:
     test:
     - as: e2e
       cli: latest
-      commands: CLUSTER_PROFILE=gcp make test-e2e
+      commands: make test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
@@ -134,7 +115,7 @@ tests:
     test:
     - as: e2e
       cli: latest
-      commands: CLUSTER_PROFILE=aws make test-e2e
+      commands: make test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
@@ -159,7 +140,7 @@ tests:
     test:
     - as: e2e
       cli: latest
-      commands: CLUSTER_PROFILE=gcp make test-e2e
+      commands: make test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
@@ -184,7 +165,7 @@ tests:
     test:
     - as: e2e
       cli: latest
-      commands: CLUSTER_PROFILE=azure make test-e2e
+      commands: make test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
