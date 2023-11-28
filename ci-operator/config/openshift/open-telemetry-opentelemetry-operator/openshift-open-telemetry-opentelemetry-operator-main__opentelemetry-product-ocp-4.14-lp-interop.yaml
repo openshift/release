@@ -3,6 +3,8 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
+binary_build_commands: unset GOFLAGS && sed -i '/toolchain/d' /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/otel-allocator/go.mod
+  && make manager && make targetallocator
 build_root:
   image_stream_tag:
     name: builder
@@ -13,7 +15,14 @@ images:
 - context_dir: .
   dockerfile_path: ./tests/e2e-openshift/Dockerfile
   to: opentelemetry-tests-runner
-- dockerfile_path: ./cmd/otel-allocator/Dockerfile
+- context_dir: ./cmd/otel-allocator/
+  dockerfile_path: Dockerfile
+  from: src
+  inputs:
+    bin:
+      paths:
+      - destination_dir: ./bin
+        source_path: /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/otel-allocator/bin/targetallocator_amd64
   to: opentelemetry-target-allocator
 releases:
   latest:
