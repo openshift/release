@@ -217,6 +217,10 @@ API_VIP="$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")"
 INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
 mkdir -p "${INSTALL_DIR}"
 
+
+# Replace release image
+OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/aleskandrox/okd-release-argo:4.15.0-20231128-amd64-agent"
+
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
    --command=openshift-install --to=/tmp
@@ -364,6 +368,8 @@ export KUBECONFIG="$INSTALL_DIR/auth/kubeconfig"
 echo -e "\nPreparing files for next steps in SHARED_DIR..."
 cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
+
+sleep 86400
 
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
