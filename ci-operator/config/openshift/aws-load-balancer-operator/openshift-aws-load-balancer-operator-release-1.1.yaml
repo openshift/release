@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: "4.12"
-    namespace: ocp
-    tag: base
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -11,7 +7,6 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: base
   to: aws-load-balancer-operator
 operator:
   bundles:
@@ -24,12 +19,12 @@ operator:
 releases:
   initial:
     integration:
-      name: "4.12"
+      name: "4.14"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.14"
       namespace: ocp
 resources:
   '*':
@@ -56,7 +51,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-aws-load-balancer-operator-bundle
     env:
-      OO_CHANNEL: stable-v1.0
+      OO_CHANNEL: stable-v1.1
       OO_INSTALL_NAMESPACE: aws-load-balancer-operator
       OO_PACKAGE: aws-load-balancer-operator
       OO_TARGET_NAMESPACES: '!all'
@@ -75,7 +70,9 @@ tests:
     dependencies:
       OO_INDEX: ci-index-aws-load-balancer-operator-bundle
     env:
-      OO_CHANNEL: stable-v1.0
+      EVAL_CONFIG_ENVVARS: "yes"
+      OO_CHANNEL: stable-v1.1
+      OO_CONFIG_ENVVARS: ROLEARN=$(cat ${SHARED_DIR}/operator-role-arn)
       OO_INSTALL_NAMESPACE: aws-load-balancer-operator
       OO_PACKAGE: aws-load-balancer-operator
       OO_TARGET_NAMESPACES: '!all'
@@ -86,13 +83,33 @@ tests:
         export ALBO_E2E_PLATFORM=ROSA
         export ALBO_E2E_WAFV2_WEBACL_ARN=$(cat ${SHARED_DIR}/wafv2-webacl)
         export ALBO_E2E_WAF_WEBACL_ID=$(cat ${SHARED_DIR}/waf-webacl | head -1)
+        export ALBO_E2E_CONTROLLER_ROLE_ARN=$(cat ${SHARED_DIR}/controller-role-arn)
         make test-e2e
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: aws-load-balancer-install-rosa
+- as: e2e-aws-proxy-operator
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-aws-load-balancer-operator-bundle
+    env:
+      OO_CHANNEL: stable-v1.1
+      OO_INSTALL_NAMESPACE: aws-load-balancer-operator
+      OO_PACKAGE: aws-load-balancer-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: aws-load-balancer-install-proxy
 zz_generated_metadata:
-  branch: release-1.0
+  branch: release-1.1
   org: openshift
   repo: aws-load-balancer-operator
