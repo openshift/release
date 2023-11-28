@@ -27,6 +27,9 @@ chain:
       default: ""
       documentation: |-
         The storage class that will be used for etcd on the hosted control plane.
+    - name: USE_SECONDARY_NETWORK
+      default: "false"
+      documentation: "Use non default networks"
     commands: |-
       set -exuo pipefail
 
@@ -63,6 +66,87 @@ chain:
 
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       CLUSTER_NAMESPACE=clusters-${CLUSTER_NAME}
+ 
+      if [ "${USE_SECONDARY_NETWORK}" == "true" ]; then
+        oc apply -f - <<EOF
+      apiVersion: nmstate.io/v1
+      kind: NodeNetworkConfigurationPolicy
+      metadata:
+        name: multi-net
+      spec:
+        desiredState:
+          interfaces:
+          - name: net1
+            type:  linux-bridge
+            state: up
+            ipv4:
+              enabled: false
+            ipv6:
+              enabled: false
+            bridge:
+              options:
+                stp:
+                  enabled: true
+              port:
+                - name: enp3s0
+          - name: net2
+            type:  linux-bridge
+            state: up
+            ipv4:
+              enabled: false
+            ipv6:
+              enabled: false
+            bridge:
+              options:
+                stp:
+                  enabled: true
+              port:
+                - name: enp4s0
+      EOF
+        oc wait nncp multi-net --for condition=Available --timeout 5m
+        oc apply -f - <<EOF
+      ---
+      apiVersion: k8s.cni.cncf.io/v1
+      kind: NetworkAttachmentDefinition
+      metadata:
+        namespace: default
+        name: net1
+        annotations:
+          k8s.v1.cni.cncf.io/resourceName: bridge.network.kubevirt.io/net1
+      spec:
+        config: >
+          {
+              "cniVersion": "0.3.1",
+              "name": "net1",
+              "plugins": [{
+                  "type": "cnv-bridge",
+                  "bridge": "net1",
+                  "ipam": {}
+              }]
+          }
+      ---
+      apiVersion: k8s.cni.cncf.io/v1
+      kind: NetworkAttachmentDefinition
+      metadata:
+        namespace: default
+        name: net2
+        annotations:
+          k8s.v1.cni.cncf.io/resourceName: bridge.network.kubevirt.io/net2
+      spec:
+        config: >
+          {
+              "cniVersion": "0.3.1",
+              "name": "net2",
+              "plugins": [{
+                  "type": "cnv-bridge",
+                  "bridge": "net2",
+                  "ipam": {}
+              }]
+          }
+      ---
+      EOF
+        EXTRA_ARGS="${EXTRA_ARGS} --additional-network=name:default/net1 --additional-network=name:default/net2 --attach-default-network=false"
+      fi
 
       echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
       $HCP_CLI create cluster kubevirt \

@@ -10,6 +10,10 @@ chain:
         - name: ENABLE_ICSP
           default: "false"
           documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_iscp.yaml)"
+        - name: USE_SECONDARY_NETWORK
+          default: "false"
+          documentation: "Use non default networks"
+
       commands: |-
         set -exuo pipefail
         
@@ -55,7 +59,82 @@ chain:
           echo "AWS infra detected. Setting --etcd-storage-class"
           ETCD_STORAGE_CLASS="--etcd-storage-class gp3-csi"
         fi
-
+      
+        if [ "${USE_SECONDARY_NETWORK}" == "true" ]; then
+          oc apply -f - <<EOF
+        ---
+        apiVersion: k8s.cni.cncf.io/v1
+        kind: NetworkAttachmentDefinition
+        metadata:
+          name: net1
+          annotations:
+            k8s.v1.cni.cncf.io/resourceName: bridge.network.kubevirt.io/net1
+        spec:
+          config: >
+            {
+                "cniVersion": "0.3.1",
+                "name": "net1",
+                "plugins": [{
+                    "type": "cnv-bridge",
+                    "bridge": "net1",
+                    "ipam": {}
+                }]
+            }
+        ---
+        apiVersion: k8s.cni.cncf.io/v1
+        kind: NetworkAttachmentDefinition
+        metadata:
+          name: net2
+          annotations:
+            k8s.v1.cni.cncf.io/resourceName: bridge.network.kubevirt.io/net2
+        spec:
+          config: >
+            {
+                "cniVersion": "0.3.1",
+                "name": "net2",
+                "plugins": [{
+                    "type": "cnv-bridge",
+                    "bridge": "net2",
+                    "ipam": {}
+                }]
+            }
+        ---
+        apiVersion: nmstate.io/v1
+        kind: NodeNetworkConfigurationPolicy
+        metadata:
+          name: multi-net
+        spec:
+          desiredState:
+            interfaces:
+            - name: net1
+              type:  linux-bridge
+              state: up
+              ipv4:
+                enabled: false
+              ipv6:
+                enabled: false
+              bridge:
+                options:
+                  stp:
+                    enabled: true
+                port:
+                  - name: enp3s0
+            - name: net2
+              type:  linux-bridge
+              state: up
+              ipv4:
+                enabled: false
+              ipv6:
+                enabled: false
+              bridge:
+                options:
+                  stp:
+                    enabled: true
+                port:
+                  - name: enp3s0
+        EOF
+          additional_networks_arg="--additional-network='name:net1' --additional-network='name:net2' --attach-default-network=false"
+        fi
         echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
         /tmp/${HYPERSHIFT_NAME} create cluster kubevirt ${ETCD_STORAGE_CLASS} ${ICSP_COMMAND} \
           --name ${CLUSTER_NAME} \
@@ -65,7 +144,7 @@ chain:
           --root-volume-size 64 \
           --namespace local-cluster \
           --release-image ${RELEASE_IMAGE_LATEST} \
-          --pull-secret ${PULL_SECRET_PATH} \
+          --pull-secret ${PULL_SECRET_PATH} ${additional_networks_arg} \
           --generate-ssh
 
         oc annotate hostedclusters -n local-cluster ${CLUSTER_NAME} "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
