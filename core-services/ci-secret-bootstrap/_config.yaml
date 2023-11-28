@@ -914,6 +914,10 @@ secret_configs:
     - non_app_ci
     name: cluster-secrets-aws-rhtap-performance
     namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aws-devfile
+    namespace: ci
 - from:
     pull-secret:
       dockerconfigJSON:
@@ -5366,6 +5370,21 @@ secret_configs:
 - from:
     .dockerconfigjson:
       dockerconfigJSON:
+      - auth_field: token_image-pusher_build09_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc:5000
+  to:
+  - cluster: build09
+    name: manifest-tool-local-pusher
+    namespace: ci
+    type: kubernetes.io/dockerconfigjson
+  - cluster: build09
+    name: manifest-tool-local-pusher
+    namespace: test-credentials
+    type: kubernetes.io/dockerconfigjson
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
       - auth_field: token_image-pusher_multi01_reg_auth_value.txt
         item: build_farm
         registry_url: image-registry.openshift-image-registry.svc:5000
@@ -5489,6 +5508,17 @@ secret_configs:
   - cluster: build09
     name: ci-operator
     namespace: test-credentials
+- from:
+    password:
+      field: password
+      item: quayio-ci-read-only-robot
+    username:
+      field: username
+      item: quayio-ci-read-only-robot
+  to:
+  - cluster: app.ci
+    name: qci-robot-credentials
+    namespace: ci
 user_secrets_target_clusters:
 - app.ci
 - arm01

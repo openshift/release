@@ -318,7 +318,7 @@ function run {
     echo -e "\nfailures: $failures, errors: $errors, skipped: $skipped, tests: $tests in openshift-extended-test-supplementary" | tee -a "${TEST_RESULT_FILE}"
     if [ $((failures)) != 0 ] ; then
         echo "Failing Scenarios:" | tee -a "${TEST_RESULT_FILE}"
-        grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | grep -v grep | cut -d'"' -f2 | sort -t':' -k2 | uniq | tee -a "${TEST_RESULT_FILE}" || true
+        grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | grep -v grep | cut -d'"' -f2 | sort -t':' -k2 | uniq | sed -E 's/^( +)?/  /' | tee -a "${TEST_RESULT_FILE}" || true
     fi
     cat "${TEST_RESULT_FILE}" >> "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
 

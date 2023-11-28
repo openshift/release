@@ -1,16 +1,20 @@
 base_images:
+  ci_tests-private-base_4.15:
+    name: tests-private-base
+    namespace: ci
+    tag: "4.15"
+  ci_tests-private-baseui_4.15:
+    name: tests-private-baseui
+    namespace: ci
+    tag: "4.15"
+  ci_tests-private-builder_4.15:
+    name: tests-private-builder
+    namespace: ci
+    tag: "4.15"
   cli:
     name: 4.16-priv
     namespace: ocp-private
     tag: cli
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
-  tools:
-    name: 4.16-priv
-    namespace: ocp-private
-    tag: tools
   upi-installer:
     name: 4.16-priv
     namespace: ocp-private
@@ -23,29 +27,43 @@ build_root:
     tag: rhel-8-golang-1.20-openshift-4.15
 canonical_go_repository: github.com/openshift/openshift-tests-private
 images:
-- dockerfile_path: images/Dockerfile
-  from: tools
+- dockerfile_path: images/Dockerfile.golang
+  from: ci_tests-private-base_4.15
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ci_tests-private-builder_4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ci/tests-private-builder:4.15
   to: tests-private
 - dockerfile_literal: |
-    FROM src
-    RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
-        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib" && \
-        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
-        yum clean all && rm -rf /var/cache/yum/*
-  from: src
+    FROM src AS builder
+    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.15
+    RUN mkdir -p /go/src/github.com/openshift
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+  inputs:
+    ci_tests-private-baseui_4.15:
+      as:
+      - registry.ci.openshift.org/ci/tests-private-baseui:4.15
+    src:
+      as:
+      - src
   to: tests-private-ui
 - dockerfile_literal: |
-    FROM src
-    RUN unset GOFLAGS && \
-        go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1 && \
-        which golangci-lint
-  from: src
-  to: tests-private-cck
+    FROM bin AS builder
+    FROM registry.ci.openshift.org/ci/tests-private-base:4.15
+    RUN mkdir -p /go/src/github.com/openshift
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+    RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
+        rm -rf /usr/bin/oc /usr/bin/kubectl
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+  inputs:
+    bin:
+      as:
+      - bin
+    ci_tests-private-base_4.15:
+      as:
+      - registry.ci.openshift.org/ci/tests-private-base:4.15
+  to: tests-private-newpr
 - dockerfile_literal: |
     FROM bin
     RUN sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" >/etc/yum.repos.d/azure-cli.repo' && \
@@ -56,13 +74,14 @@ images:
     RUN pip3 install --upgrade setuptools pip && pip3 install dotmap minio pyyaml==5.4.1 requests python-openstackclient
     RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && unzip -q awscliv2.zip && ./aws/install -b /bin && rm -rf ./aws awscliv2.zip
   from: bin
+  optional: true
   to: tests-private-pr
 promotion:
   excluded_images:
   - tests-private
   - tests-private-ui
   - tests-private-pr
-  - tests-private-cck
+  - tests-private-newpr
   name: 4.16-priv
   namespace: ocp-private
 releases:
@@ -98,10 +117,28 @@ tests:
   commands: make name-check
   container:
     from: src
-- as: code-check
-  commands: make check-code
+- as: bindata-check
+  commands: |
+    make update
+    ret=0 && git diff --quiet test/extended/testdata/bindata.go || ret=$?
+    if [ $ret -ne 0 ]; then
+        echo "bindata is not correct updated by your PR, please refer to the following and re-execute \"make update\" on your terminal and then update PR"
+        echo "---"
+        git diff test/extended/testdata/bindata.go || true
+        echo "---"
+        exit 1
+    fi
   container:
-    from: tests-private-cck
+    from: src
+  optional: true
+- as: code-check
+  commands: |
+    unset GOFLAGS
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1 2> /dev/null
+    which golangci-lint
+    make check-code
+  container:
+    from: src
   optional: true
 - as: e2e-aws
   optional: true
@@ -148,8 +185,8 @@ tests:
           ln -s "$(which oc)" ${HOME}/kubectl
         fi
 
-        make pr-test
-      from: tests-private-pr
+        python3 ./hack/pr.py
+      from: tests-private-newpr
       resources:
         limits:
           memory: 6Gi

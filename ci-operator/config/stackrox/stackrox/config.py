@@ -1,4 +1,4 @@
-#!/usr/bin/env -S bash -c 'python3 -m venv "$(dirname "$0")"/.venv && source "$(dirname "$0")"/.venv/bin/activate && pip3 --require-virtualenv --no-input --disable-pip-version-check install PyYAML==6.0 >/dev/null && exec python3 "$0" $*'
+#!/usr/bin/env -S bash -c 'python3 -m venv "$(dirname "$0")"/.venv && source "$(dirname "$0")"/.venv/bin/activate && pip3 --require-virtualenv --no-input --disable-pip-version-check install PyYAML==6.0 dataclasses >/dev/null && exec python3 "$0" $*'
 # The magic above inits virtual environment in the directory of the script to install PyYAML there and starts Python
 # to actually execute this script. It all can be done manually but requires writing readme and users following it
 # whereas having a self-sufficient script should be more user-friendly.
@@ -813,7 +813,7 @@ def check_entry(entry, config, data):
   {job.run_if_changed}""")
         entry_ok = False
     elif job.has_run_if_changed and not entry.has_run_if_changed:
-        check_error(f"""The value of run_if_changed should be copied to config/
+        check_error(f"""The value of run_if_changed should be reconciled with config/
   {job.run_if_changed}""")
         entry_ok = False
 
@@ -825,7 +825,7 @@ def check_entry(entry, config, data):
   {job.skip_if_only_changed}""")
         entry_ok = False
     elif job.has_skip_if_only_changed and not entry.has_skip_if_only_changed:
-        check_error(f"""The value of skip_if_only_changed should be copied to config/
+        check_error(f"""The value of skip_if_only_changed should be reconciled with config/
   {job.skip_if_only_changed}""")
         entry_ok = False
 

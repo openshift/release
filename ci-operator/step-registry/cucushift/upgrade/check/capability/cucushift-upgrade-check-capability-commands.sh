@@ -15,14 +15,14 @@ function create_postupgrade_junit() {
     if (( FRC == 0 )); then
         cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="1">
+<testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="$SECONDS">
   <testcase name="${subteam}:Post upgrade check on capability should succeed or skip"/>
 </testsuite>
 EOF
     else
         cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="1">
+<testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="$SECONDS">
   <testcase name="${subteam}:Post upgrade check on capability should succeed">
     <failure message="">Post upgrade check on capability failed</failure>
   </testcase>
@@ -30,13 +30,6 @@ EOF
 EOF
     fi
 }
-
-baselinecaps_from_cluster=$(oc get clusterversion version -ojson | jq -r '.spec.capabilities.baselineCapabilitySet')
-if [[ "${baselinecaps_from_cluster}" == "" ]]; then
-    echo "spec.capabilities.baselineCapabilitySet is not set, skip the check!"
-    exit 0
-fi
-echo "baselinecaps_from_cluster: ${baselinecaps_from_cluster}"
 
 # Get capabilities string based on release version and capset
 # Need update when new cap set pops up
@@ -159,7 +152,9 @@ function get_new_caps() {
     done
 
     # Combine the extra elements into a space-separated string
-    echo "${extra_caps[*]}"
+    if (( ${#extra_caps[@]} != 0 )); then
+        echo "${extra_caps[*]}"
+    fi
     #echo "Expected implicitly enabled capabilities list is ${expected_implicit_caps}"
 }
 
@@ -247,6 +242,14 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     # shellcheck disable=SC1091
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
+
+baselinecaps_from_cluster=$(oc get clusterversion version -ojson | jq -r '.spec.capabilities.baselineCapabilitySet')
+if [[ -z "${baselinecaps_from_cluster}" || "${baselinecaps_from_cluster}" == "null" ]]; then
+    echo "spec.capabilities.baselineCapabilitySet is not set or is null, skip the check!"
+    exit 0
+fi
+echo "baselinecaps_from_cluster: ${baselinecaps_from_cluster}"
+
 # shellcheck disable=SC2207
 version_set=($(oc get clusterversion version -ojson | jq -r .status.history[].version))
 

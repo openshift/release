@@ -8,27 +8,27 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-image-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -292,7 +292,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: baremetalds-e2e-ovn-dualstack
+    workflow: baremetalds-e2e-ovn-dualstack-cgroupsv1
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
@@ -415,6 +415,14 @@ tests:
   steps:
     cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-upi-zones
+- as: e2e-vsphere-ipi-ovn-cgroupsv1
+  interval: 168h
+  steps:
+    cluster_profile: vsphere-8-vpn
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-cgroupsv1
 - as: e2e-aws-ovn-workers-rhel8
   cron: '@daily'
   steps:
@@ -464,7 +472,7 @@ tests:
 - as: e2e-gcp-sdn
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     observers:
       enable:
       - observers-resource-watch
@@ -492,7 +500,7 @@ tests:
 - as: e2e-gcp-ovn-fips
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       FIPS_ENABLED: "true"
     observers:
@@ -578,7 +586,7 @@ tests:
 - as: e2e-gcp-ovn-rt
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       COMPUTE_NODE_TYPE: n2-standard-8
       RT_ENABLED: "true"
@@ -602,7 +610,7 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
-      TEST_UPGRADE_OPTIONS: abort-at=random
+      TEST_UPGRADE_OPTIONS: abort-at=100
     workflow: openshift-upgrade-aws
 - as: e2e-aws-sdn-upgrade
   interval: 168h
@@ -685,6 +693,16 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azurestack-upi-csi
+- as: e2e-azure-ovn-cgroupsv1
+  cron: '@daily'
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-cgroupsv1
 - as: e2e-aws-sdn-cgroupsv2
   interval: 168h
   steps:
@@ -695,6 +713,16 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-sdn-cgroupsv2
+- as: e2e-aws-ovn-cgroupsv1
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-cgroupsv1
 - as: e2e-aws-sdn-crun
   interval: 168h
   steps:
@@ -836,6 +864,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-cnf
+  timeout: 6h0m0s
 - as: e2e-telco5g-sno-cnftests
   cluster: build05
   cron: 40 13 */1 * 1-5
@@ -938,7 +967,7 @@ tests:
 - as: e2e-gcp-sdn-serial
   interval: 168h
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     observers:
       enable:
       - observers-resource-watch
@@ -1183,12 +1212,30 @@ tests:
       BASE_DOMAIN: vmc-ci.devcluster.openshift.com
     workflow: openshift-e2e-aws-local-zones-byo-vpc
   timeout: 6h0m0s
+- as: e2e-aws-ovn-shared-vpc-wavelengthzones
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-local-zones
+    env:
+      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
+      EDGE_ZONE_TYPE: wavelength-zone
+    workflow: openshift-e2e-aws-local-zones-byo-vpc
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-localzones
   cron: '@weekly'
   steps:
     cluster_profile: aws-local-zones
     env:
       BASE_DOMAIN: vmc-ci.devcluster.openshift.com
+    workflow: openshift-e2e-aws-local-zones
+  timeout: 6h0m0s
+- as: e2e-aws-ovn-wavelengthzones
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-local-zones
+    env:
+      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
+      EDGE_ZONE_TYPE: wavelength-zone
     workflow: openshift-e2e-aws-local-zones
   timeout: 6h0m0s
 zz_generated_metadata:

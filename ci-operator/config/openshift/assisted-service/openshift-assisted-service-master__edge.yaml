@@ -40,7 +40,7 @@ base_images:
     namespace: ci
     tag: 2.4.18
   hypershift-operator:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: hypershift-operator
   openshift_release_golang-1.20:
@@ -137,36 +137,17 @@ promotion:
   name: ocm-2.10
   namespace: edge-infrastructure
 releases:
-  candidate-4-11:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.11"
-  candidate-4-11-multi:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
-      version: "4.11"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.15"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.14"
-  stable-4-10:
-    integration:
-      name: "4.10"
-      namespace: ocp
-  stable-4-11:
-    integration:
-      name: "4.11"
-      namespace: ocp
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -631,29 +612,29 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
     workflow: assisted-baremetal-operator-capi
-- as: e2e-ai-operator-ztp-multiarch-3masters-ocp-411
+- always_run: false
+  as: e2e-ai-operator-ztp-multiarch-3masters-ocp
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate-4-11-multi
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-multi
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
-        ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.11.0-rc.6-multi"
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-multiarch-sno-ocp-411
+- always_run: false
+  as: e2e-ai-operator-ztp-multiarch-sno-ocp
   optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate-4-11-multi
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-multi
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
-        ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.11.0-rc.6-multi"
         SPOKE_CONTROLPLANE_AGENTS=1
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
@@ -775,22 +756,6 @@ tests:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-9
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.9
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-10
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.10
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-11
   steps:
     cluster_profile: packet-assisted
@@ -825,6 +790,16 @@ tests:
         OPENSHIFT_VERSION=4.14
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-4-15
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.15
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
@@ -832,20 +807,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.13
-        MASTER_MEMORY=17408
-        MASTER_CPU=8
-        WORKER_MEMORY=9216
-        WORKER_CPU=4
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv-4.14
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.13
+        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
         MASTER_MEMORY=17408
         MASTER_CPU=8
         WORKER_MEMORY=9216
@@ -869,19 +832,12 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.13
+        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-odf-4-14
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=odf
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-mce
+- always_run: false
+  as: e2e-metal-assisted-mce-4-15
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -889,6 +845,60 @@ tests:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=mce
         NUM_WORKERS=3
+        OPENSHIFT_VERSION=4.15
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+      PACKET_PLAN: m3.large.x86
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-mce-4-14
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=mce
+        NUM_WORKERS=3
+        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+      PACKET_PLAN: m3.large.x86
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-mce-4-13
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=mce
+        NUM_WORKERS=3
+        OPENSHIFT_VERSION=4.13
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+      PACKET_PLAN: m3.large.x86
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-mce-4-12
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=mce
+        NUM_WORKERS=3
+        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+      PACKET_PLAN: m3.large.x86
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-mce-4-11
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=mce
+        NUM_WORKERS=3
+        OPENSHIFT_VERSION=4.11
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-metallb
@@ -901,17 +911,6 @@ tests:
         METALLB_API_IP=10.0.0.1
         METALLB_INGRESS_IP=10.0.0.2
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-mce-4-10
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=mce
-        OPENSHIFT_VERSION=4.10
-        NUM_WORKERS=3
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-mce-sno
   optional: true
   steps:
@@ -921,6 +920,8 @@ tests:
         OLM_OPERATORS=mce
         NUM_MASTERS=1
         NUM_WORKERS=0
+        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
   optional: true
@@ -1040,6 +1041,18 @@ tests:
         OPENSHIFT_VERSION=4.13
       PLATFORM: vsphere
     workflow: assisted-vsphere
+- always_run: false
+  as: e2e-vsphere-assisted-4-14
+  optional: true
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.14
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
 - as: e2e-vsphere-assisted-umn
   optional: true
   steps:
@@ -1063,6 +1076,21 @@ tests:
         MAKEFILE_TARGET=test
         DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
         ISO_IMAGE_TYPE=minimal-iso
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
+- as: e2e-nutanix-assisted-4-14
+  cluster: build01
+  optional: true
+  run_if_changed: ^(internal/provider/.*\.go|internal/provider/nutanix/.*|internal/provider/registry/.*)$
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
+        OPENSHIFT_VERSION=4.14
       PLATFORM: nutanix
     workflow: assisted-nutanix
 - as: e2e-nutanix-assisted-2workers
@@ -1099,6 +1127,16 @@ tests:
   run_if_changed: ^(internal/provider/.*\.go|internal/provider/oci/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: oci-assisted
+    workflow: assisted-oci
+- always_run: false
+  as: e2e-oci-assisted-4-14
+  optional: true
+  steps:
+    cluster_profile: oci-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.14
+      PLATFORM: assisted-oci
     workflow: assisted-oci
 zz_generated_metadata:
   branch: master

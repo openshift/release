@@ -1,12 +1,4 @@
 base_images:
-  cli:
-    name: "4.14"
-    namespace: ocp
-    tag: cli
-  test-bin:
-    name: "4.14"
-    namespace: ocp
-    tag: tests
   test-runtime:
     name: test-runtime
     namespace: microshift
@@ -16,7 +8,21 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.20-openshift-4.14
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
+  inputs:
+    src:
+      as:
+      - src
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift
+  to: microshift-test-rpm
 promotion:
+  excluded_images:
+  - microshift-test-rpm
   name: "4.14"
   namespace: ocp
 releases:
@@ -61,11 +67,12 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: test-srpm
+- as: test-rpm
   cluster: build02
-  commands: make srpm
+  commands: make rpm srpm && find _output/rpmbuild/{RPMS,SRPMS} -type f -exec sh -c
+    'i=$1; echo "${i}" && rpm -qip --dump "${i}" && echo' shell {} \;
   container:
-    from: src
+    from: microshift-test-rpm
   run_if_changed: ^(rpm/*|packaging/.*|Makefile)
 - as: test-rebase
   cluster: build02
@@ -81,18 +88,8 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-02b8534ff4b424939
+      EC2_AMI: ami-0d5b3039c1132e1b2
       EC2_INSTANCE_TYPE: c5n.metal
-    workflow: openshift-microshift-e2e-metal-tests
-- always_run: false
-  as: microshift-metal-tests-arm
-  cluster: build02
-  optional: true
-  steps:
-    cluster_profile: aws
-    env:
-      EC2_AMI: ami-06df7225cc50ee1a3
-      EC2_INSTANCE_TYPE: c6g.metal
     workflow: openshift-microshift-e2e-metal-tests
 - as: rebase-on-nightlies
   cron: 0 5 * * 1-5
@@ -100,11 +97,11 @@ tests:
     workflow: openshift-microshift-rebase
 - as: metal-periodic-test
   cluster: build02
-  run_if_changed: ^(test/scenarios-periodics/.*)
+  run_if_changed: (.*periodic.*|^test/bin/.*)
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-02b8534ff4b424939
+      EC2_AMI: ami-0d5b3039c1132e1b2
       EC2_INSTANCE_TYPE: c5n.metal
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly
@@ -113,7 +110,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-02b8534ff4b424939
+      EC2_AMI: ami-0d5b3039c1132e1b2
       EC2_INSTANCE_TYPE: c5n.metal
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-conformance-nightly
@@ -123,7 +120,7 @@ tests:
     cluster_profile: aws
     env:
       BRANCH: release-4.14
-      EC2_AMI: ami-02b8534ff4b424939
+      EC2_AMI: ami-0d5b3039c1132e1b2
     workflow: openshift-microshift-e2e-conformance-from-source
 zz_generated_metadata:
   branch: release-4.14

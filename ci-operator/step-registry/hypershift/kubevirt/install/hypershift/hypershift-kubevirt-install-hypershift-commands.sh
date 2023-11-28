@@ -17,4 +17,5 @@ OPERATOR_IMAGE=${HYPERSHIFT_RELEASE_LATEST}
 bin/hypershift install --hypershift-image="${OPERATOR_IMAGE}" \
 --platform-monitoring=All \
 --enable-ci-debug-output \
---wait-until-available
+--wait-until-available \
+--enable-validating-webhook=true
