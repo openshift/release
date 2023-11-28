@@ -17,42 +17,27 @@ declare vsphere_portgroup
 declare dns_server
 source "${SHARED_DIR}/vsphere_context.sh"
 
-
 cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
 echo "$(date -u --rfc-3339=seconds) - Setting up external load balancer"
 
 SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
-if [[ ${vsphere_portgroup} == *"segment"* ]]; then
-  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${vsphere_portgroup}"))
-
-  gateway="192.168.${third_octet}.1"
-  external_lb_ip_address="192.168.${third_octet}.2"
-
-  mask="255.255.255.192"
-
-  echo "192.168.${third_octet}.2" >>"${SHARED_DIR}"/vips.txt
-  echo "192.168.${third_octet}.2" >>"${SHARED_DIR}"/vips.txt
-  echo "192.168.${third_octet}.0/25" >>"${SHARED_DIR}"/machinecidr.txt
-
-else
-  if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-    echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
-    exit 1
-  fi
-
-  # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
-
-  gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
-  mask=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].mask' "${SUBNETS_CONFIG}")
-  external_lb_ip_address=$(jq -r --argjson N 2 --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
-  dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
-
-  jq -r --argjson N 2 --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/vips.txt
-  jq -r --argjson N 2 --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/vips.txt
-  jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/machinecidr.txt
-
+if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
+  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+  exit 1
 fi
+
+# ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
+
+gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
+mask=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].mask' "${SUBNETS_CONFIG}")
+external_lb_ip_address=$(jq -r --argjson N 2 --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
+dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
+
+jq -r --argjson N 2 --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/vips.txt
+jq -r --argjson N 2 --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/vips.txt
+jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/machinecidr.txt
+
 
 echo "Reserved the following IP addresses..."
 cat "${SHARED_DIR}"/vips.txt
@@ -145,12 +130,8 @@ backend ${EP_NAMES[$i]}
 EOF
 
   for ip in {10..127}; do
-    if [[ ${vsphere_portgroup} == *"segment"* ]]; then
-      echo "   "server ${EP_NAMES[$i]}-${ip} 192.168.${third_octet}.${ip}:${EP_PORTS[$i]} check check-ssl >>$HAPROXY_PATH
-    else
-      ipaddress=$(jq -r --argjson N "$ip" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
-      echo "   "server ${EP_NAMES[$i]}-${ip} ${ipaddress}:${EP_PORTS[$i]} check check-ssl >>$HAPROXY_PATH
-    fi
+    ipaddress=$(jq -r --argjson N "$ip" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
+    echo "   "server ${EP_NAMES[$i]}-${ip} ${ipaddress}:${EP_PORTS[$i]} check check-ssl >>$HAPROXY_PATH
     if [[ -n "${VSPHERE_EXTRA_LEASED_RESOURCE:-}" ]]; then
       for extra_leased_resource in ${VSPHERE_EXTRA_LEASED_RESOURCE}; do
           extra_router=$(awk -F. '{print $1}' <(echo "${extra_leased_resource}"))
@@ -159,8 +140,8 @@ EOF
 	  extra_primaryrouterhostname="${extra_router}.${extra_phydc}"
 	  ipaddress=$(jq -r --argjson N "$ip" --arg PRH "$extra_primaryrouterhostname" --arg VLANID "$extra_vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
 	  echo "   "server ${EP_NAMES[$i]}${extra_vlanid}-${ip} ${ipaddress}:${EP_PORTS[$i]} check check-ssl >>$HAPROXY_PATH
-      done	      
-    fi    
+      done
+    fi
   done
 done
 
@@ -216,21 +197,26 @@ curl -sSL "https://mirror2.openshift.com/pub/openshift-v4/clients/butane/latest/
 
 LB_VMNAME="${cluster_name}-lb"
 export GOVC_NETWORK="${vsphere_portgroup}"
-# vlanid between 1287 and 1302 will use profile:vsphere-multizone-2
-if [ ${vlanid} -ge 1287 ] && [ ${vlanid} -le 1302 ]; then
-  govc vm.clone -on=false -dc=/${vsphere_datacenter} -ds /${vsphere_datacenter}/datastore/mdcnc-ds-shared -pool=/IBMCloud/host/vcs-mdcnc-workload-1/Resources -vm="${vm_template}" ${LB_VMNAME}
-  govc vm.network.change -dc=/${vsphere_datacenter} -vm ${LB_VMNAME} -net /${vsphere_datacenter}/host/vcs-mdcnc-workload-1/"${vsphere_portgroup}" ethernet-0
+
+if [[ $JOB_NAME_SAFE == *"zones"* ]]; then
+
+# todo: remove the hard coding of datastores here.
+# move to vault - selfservice/vsphere-vmc/config 'ibm.sh'"
+
+  govc vm.clone -on=false -dc=/${vsphere_datacenter} -ds /${vsphere_datacenter}/datastore/mdcnc-ds-shared -pool=/IBMCloud/host/vcs-mdcnc-workload-1/Resources -vm="${vm_template}" "${LB_VMNAME}"
+  govc vm.network.change -dc=/${vsphere_datacenter} -vm "${LB_VMNAME}" -net /${vsphere_datacenter}/host/vcs-mdcnc-workload-1/"${vsphere_portgroup}" ethernet-0
 else
-  govc vm.clone -on=false -vm="${vm_template}" ${LB_VMNAME}
-  govc vm.network.change -vm ${LB_VMNAME} -net "${vsphere_portgroup}" ethernet-0
+  govc vm.clone -on=false -vm="${vm_template}" "${LB_VMNAME}"
+  govc vm.network.change -vm "${LB_VMNAME}" -net "${vsphere_portgroup}" ethernet-0
 fi
+
 IGN=$(cat $BUTANE_CFG | /tmp/butane -r -d /tmp | gzip | base64 -w0)
 
 IPCFG="ip=${external_lb_ip_address}::${gateway}:${mask}:lb::none nameserver=${dns_server}"
 
-govc vm.change -vm ${LB_VMNAME} -e "guestinfo.afterburn.initrd.network-kargs=${IPCFG}"
-govc vm.change -vm ${LB_VMNAME} -e guestinfo.ignition.config.data=$IGN
-govc vm.change -vm ${LB_VMNAME} -e guestinfo.ignition.config.data.encoding=gzip+base64
-govc vm.power -on ${LB_VMNAME}
+govc vm.change -vm "${LB_VMNAME}" -e "guestinfo.afterburn.initrd.network-kargs=${IPCFG}"
+govc vm.change -vm "${LB_VMNAME}" -e guestinfo.ignition.config.data=$IGN
+govc vm.change -vm "${LB_VMNAME}" -e guestinfo.ignition.config.data.encoding=gzip+base64
+govc vm.power -on "${LB_VMNAME}"
 
-touch $SHARED_DIR/external_lb
+touch "$SHARED_DIR"/external_lb
