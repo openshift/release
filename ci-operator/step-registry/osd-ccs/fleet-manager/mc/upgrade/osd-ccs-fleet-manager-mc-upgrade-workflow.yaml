@@ -1,0 +1,24 @@
+workflow:
+  as: osd-ccs-fleet-manager-mc-upgrade
+  steps:
+    env:
+      HOSTED_CP: "true"
+      ZONES_COUNT: "1"
+      COMPUTE_MACHINE_TYPE: "m5.2xlarge"
+      REPLICAS: "3"
+      DISABLE_WORKLOAD_MONITORING: "false"
+      OCM_LOGIN_ENV: "integration"
+      ROSA_LOGIN_ENV: "integration"
+      MC_UPGRADE: "true"
+    pre:
+    - ref: osd-ccs-fleet-manager-sc-provision
+    - ref: osd-ccs-fleet-manager-mc-upgrade-toimage
+    - ref: osd-ccs-fleet-manager-mc-upgrade-health-check
+    - ref: osd-ccs-fleet-manager-mc-upgrade-complete-check
+    - chain: rosa-aws-sts-hypershift-provision
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    post:
+    - chain: rosa-aws-sts-hypershift-deprovision
+    - ref: osd-ccs-fleet-manager-sc-deprovision
+  documentation: |-
+    The workflow installs a service cluster and a management cluster with the specific configuration, then installs a rosa hypershift cluster in the same region. After finishing testing, clusters will be deprovisioned.

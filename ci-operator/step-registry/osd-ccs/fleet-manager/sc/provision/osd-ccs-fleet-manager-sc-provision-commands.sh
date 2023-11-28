@@ -58,8 +58,23 @@ fi
 sc_cluster_num=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters -p search="region='${OSDFM_REGION}'" | jq -r '.total')
 if ((${sc_cluster_num} > 0)); then
   sc_cluster_id=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters -p search="region='${OSDFM_REGION}'" | jq -r '.items[0].id')
-  echo "Service Cluster '${sc_cluster_id}' already exists in region '${OSDFM_REGION}', exit"
-  exit 1
+
+  if [[ "${MC_UPGRADE}" -eq "true" ]] ; then
+    echo "Find an existing SC ${sc_cluster_id}"
+    echo "${sc_cluster_id}" > "${SHARED_DIR}/osd-fm-sc-id"
+    mc_ocm_cluster=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters -p search="parent.id='${sc_cluster_id}' and status is 'ready'" -p size=1)
+    mc_ocm_cluster_id=$(echo $mc_ocm_cluster | jq -r '.items[0].cluster_management_reference.cluster_id')
+    mc_cluster_id=$(echo $mc_ocm_cluster | jq -r '.items[0].id')
+    echo "Management Cluster fm id:${mc_cluster_id}"
+    echo "Save ocm and osdfm cluster ID for MC with fm id:${mc_cluster_id}"
+    echo "${mc_cluster_id}" > "${ARTIFACT_DIR}/osd-fm-mc-id"
+    echo "${mc_ocm_cluster_id}" > "${ARTIFACT_DIR}/ocm-mc-id"
+    echo "${mc_cluster_id}" > "${SHARED_DIR}/osd-fm-mc-id"
+    exit 0
+  else
+    echo "Service Cluster '${sc_cluster_id}' already exists in region '${OSDFM_REGION}', exit"
+    exit 1
+  fi
 fi
 
 # Create SC
