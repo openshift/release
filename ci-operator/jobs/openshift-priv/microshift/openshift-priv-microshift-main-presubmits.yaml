@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -84,7 +84,7 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-main-metal-periodic-test
     path_alias: github.com/openshift/microshift
     rerun_command: /test metal-periodic-test
-    run_if_changed: (.*periodic.*|^test/bin/.*)
+    run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
     spec:
       containers:
       - args:
@@ -266,7 +266,7 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-main-microshift-metal-cache-arm
     path_alias: github.com/openshift/microshift
     rerun_command: /test microshift-metal-cache-arm
-    run_if_changed: ^(test/bin/ci_phase_iso_build.sh|test/bin/manage_build_cache.sh)
+    run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
     spec:
       containers:
       - args:
@@ -357,7 +357,7 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-main-microshift-metal-tests
     path_alias: github.com/openshift/microshift
     rerun_command: /test microshift-metal-tests
-    run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh|.*\.ks\.template)
+    run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
     spec:
       containers:
       - args:
@@ -429,12 +429,12 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )microshift-metal-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build02
-    context: ci/prow/ocp-conformance
+    context: ci/prow/ocp-conformance-rhel-eus
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -445,9 +445,10 @@ presubmits:
       ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-microshift-main-ocp-conformance
+    name: pull-ci-openshift-priv-microshift-main-ocp-conformance-rhel-eus
     path_alias: github.com/openshift/microshift
-    rerun_command: /test ocp-conformance
+    rerun_command: /test ocp-conformance-rhel-eus
+    run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|origin/.*|vendor/.*|Makefile.*|scripts/.*)$
     spec:
       containers:
       - args:
@@ -457,8 +458,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/ocp-conformance-cluster-profile
-        - --target=ocp-conformance
+        - --secret-dir=/usr/local/ocp-conformance-rhel-eus-cluster-profile
+        - --target=ocp-conformance-rhel-eus
         command:
         - ci-operator
         image: ci-operator:latest
@@ -474,7 +475,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/ocp-conformance-cluster-profile
+        - mountPath: /usr/local/ocp-conformance-rhel-eus-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -517,7 +518,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-conformance,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-conformance-rhel-eus,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -537,7 +538,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/microshift
     rerun_command: /test test-rebase
-    run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod)
+    run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod)$
     spec:
       containers:
       - args:
@@ -610,7 +611,7 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-main-test-rpm
     path_alias: github.com/openshift/microshift
     rerun_command: /test test-rpm
-    run_if_changed: ^(rpm/*|packaging/.*|Makefile)
+    run_if_changed: ^(rpm/.*|packaging/.*|Makefile)$
     spec:
       containers:
       - args:

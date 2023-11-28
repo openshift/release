@@ -11,7 +11,8 @@ base_images:
     name: "4.14"
     namespace: origin
     tag: operator-sdk
-binary_build_commands: make manager
+binary_build_commands: unset GOFLAGS && sed -i '/toolchain/d' /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/otel-allocator/go.mod
+  && make manager && make targetallocator
 build_root:
   image_stream_tag:
     name: builder
@@ -19,40 +20,26 @@ build_root:
     tag: rhel-8-golang-1.20-openshift-4.14
 canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
 images:
-- build_args:
-  - name: ARCH
-    value: amd64
-  - name: VERSION_PKG
-    value: github.com/open-telemetry/opentelemetry-operator/internal/version
-  - name: VERSION
-    value: 0.85.0-14-ga8109a6
-  - name: VERSION_DATE
-    value: "2023-09-28T14:15:14Z"
-  - name: OTELCOL_VERSION
-    value: 0.85.0
-  - name: TARGETALLOCATOR_VERSION
-    value: 0.85.0
-  - name: OPERATOR_OPAMP_BRIDGE_VERSION
-    value: 0.85.0
-  - name: AUTO_INSTRUMENTATION_JAVA_VERSION
-    value: 1.30.0
-  - name: AUTO_INSTRUMENTATION_NODEJS_VERSION
-    value: 0.41.1
-  - name: AUTO_INSTRUMENTATION_PYTHON_VERSION
-    value: 0.40b0
-  - name: AUTO_INSTRUMENTATION_DOTNET_VERSION
-    value: 1.0.0
-  - name: AUTO_INSTRUMENTATION_GO_VERSION
-    value: v0.3.0-alpha
-  - name: AUTO_INSTRUMENTATION_APACHE_HTTPD_VERSION
-    value: 1.0.3
-  context_dir: .
+- context_dir: .
   dockerfile_path: Dockerfile
+  from: src
+  inputs:
+    bin:
+      paths:
+      - destination_dir: ./bin
+        source_path: /go/src/github.com/open-telemetry/opentelemetry-operator/bin/manager_amd64
   to: opentelemetry-operator
 - context_dir: .
   dockerfile_path: ./tests/e2e-openshift/Dockerfile
   to: opentelemetry-tests-runner
-- dockerfile_path: ./cmd/otel-allocator/Dockerfile
+- context_dir: ./cmd/otel-allocator/
+  dockerfile_path: Dockerfile
+  from: src
+  inputs:
+    bin:
+      paths:
+      - destination_dir: ./bin
+        source_path: /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/otel-allocator/bin/targetallocator_amd64
   to: opentelemetry-target-allocator
 operator:
   bundles:
@@ -85,7 +72,7 @@ tests:
   cron: 0 6 * * 4
   steps:
     env:
-      SKIP_TESTS: tests/e2e-instrumentation/instrumentation-apache-httpd tests/e2e-openshift/multi-cluster
+      SKIP_TESTS: tests/e2e-openshift/multi-cluster tests/e2e/smoke-daemonset
     test:
     - ref: operatorhub-subscribe-amq-streams
     - ref: distributed-tracing-install-jaeger-product
