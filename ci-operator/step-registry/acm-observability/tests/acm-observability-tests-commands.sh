@@ -8,7 +8,7 @@ set -o verbose
 # Extract clusters archive from SHARED_DIR
 tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=/tmp/clusters-data
 
-KUBECONFIG=$(cat "${SHARED_DIR}/hub-kubeconfig-path")
+KUBECONFIG="${HUB_CLUSTER_DATA_DIR}/auth/kubeconfig"
 export KUBECONFIG
 
 RUN_COMMAND="poetry run pytest tests \

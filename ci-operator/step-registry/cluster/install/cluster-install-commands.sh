@@ -89,10 +89,6 @@ if [ $NUM_CLUSTERS -eq 1 ]; then
   grep 'cluster-id' "$CLUSTER_DATA_DIR/cluster_data.yaml" |  awk -F': ' '{print $2}' > "${SHARED_DIR}/cluster-id"
 fi
 
-if [ -n "$HUB_CLUSTER_DATA_DIR" ]; then
-  grep 'kubeconfig-path' "$HUB_CLUSTER_DATA_DIR/cluster_data.yaml" |  awk -F': ' '{print $2}' > "${SHARED_DIR}/hub-kubeconfig-path"
-fi
-
 # Save cluster_data.yaml and kubeconfig files to be used during cluster deletion
 # find $CLUSTER_DATA_DIR  -name "cluster_data.yaml"  | tar -zcvf "${SHARED_DIR}/clusters_data.tar.gz" -T -
 tar -zcvf "${SHARED_DIR}/clusters_data.tar.gz" --exclude=*.json --exclude=*terraform* --exclude=*.zip --exclude=*.tf* --exclude=tls --exclude=*.log  -C $CLUSTER_DATA_DIR .
