@@ -1,0 +1,94 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.12
+images:
+- dockerfile_path: ci/ci.Dockerfile
+  to: base-tests
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: automation/build-test.sh
+tests:
+- as: osp-112-ocp-412-e2e
+  cluster_claim:
+    architecture: amd64
+    as: latest
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  steps:
+    test:
+    - as: e2e
+      cli: latest
+      commands: "printenv KUBECONFIG\nprintenv KUBEADMIN_PASSWORD_FILE\noc get node\noc
+        config view\noc whoami   \n./automation/e2e-deploy-openshift-resources.sh
+        latest\nmake OSP_VERSION=1.12 test-e2e-openshift\n"
+      from: base-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: osp-111-ocp-412-e2e
+  cluster_claim:
+    architecture: amd64
+    as: latest
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  steps:
+    test:
+    - as: e2e
+      cli: latest
+      commands: "printenv KUBECONFIG\nprintenv KUBEADMIN_PASSWORD_FILE\noc get node\noc
+        config view\noc whoami   \n./automation/e2e-deploy-openshift-resources.sh
+        latest\nmake OSP_VERSION=1.11 test-e2e-openshift\n"
+      from: base-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: osp-nightly-ocp-412-e2e
+  cluster_claim:
+    architecture: amd64
+    as: latest
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  steps:
+    test:
+    - as: e2e
+      cli: latest
+      commands: "printenv KUBECONFIG\nprintenv KUBEADMIN_PASSWORD_FILE\noc get node\noc
+        config view\noc whoami   \n./automation/e2e-deploy-openshift-resources.sh
+        latest\nmake OSP_VERSION=nightly test-e2e-openshift\n"
+      from: base-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: openshift-pipelines
+  repo: task-containers
