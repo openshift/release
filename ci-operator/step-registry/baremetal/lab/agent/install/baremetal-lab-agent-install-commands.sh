@@ -220,6 +220,7 @@ mkdir -p "${INSTALL_DIR}"
 
 # Replace release image
 OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/aleskandrox/okd-release-argo:4.15.0-20231128-amd64-agent"
+export OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE="https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/39.20231101.3.0/x86_64/fedora-coreos-39.20231101.3.0-live.x86_64.iso"
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
