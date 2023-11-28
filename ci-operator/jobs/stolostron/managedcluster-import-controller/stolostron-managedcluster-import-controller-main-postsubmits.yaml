@@ -177,45 +177,6 @@ postsubmits:
         secret:
           secretName: result-aggregator
   - agent: kubernetes
-    branches:
-    - ^main$
-    cluster: build03
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: branch-ci-stolostron-managedcluster-import-controller-main-sonar
-    spec:
-      containers:
-      - args:
-        - -f
-        - /opt/build-harness/Makefile.prow
-        - sonar/go/prow
-        command:
-        - make
-        env:
-        - name: ARTIFACT_DIR
-          value: $(ARTIFACTS)
-        - name: GOPROXY
-          value: proxy.golang.org,direct
-        - name: SELF
-          value: make -f /opt/build-harness/Makefile.prow
-        image: registry.ci.openshift.org/stolostron/builder:go1.17-linux
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 100m
-            memory: 200Mi
-        volumeMounts:
-        - mountPath: /etc/sonarcloud
-          name: acm-sonarcloud-token
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: acm-sonarcloud-token
-        secret:
-          secretName: acm-sonarcloud-token
-  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
