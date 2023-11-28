@@ -98,9 +98,11 @@ function cleanup_ibmcloud_powervs() {
       sleep 60
     done
 
-    ic resource service-instance-update "${CRN}" --allow-cleanup true
+    echo "Updating the service instance"
+    ic resource service-instance-update "${CRN}" --allow-cleanup true || true
     sleep 30
-    ic resource service-instance-delete "${CRN}" --force --recursive
+    echo "Deleting the service instance"
+    ic resource service-instance-delete "${CRN}" --force --recursive || true
     for COUNT in $(seq 0 5)
     do
       FIND=$(ibmcloud pi sl 2> /dev/null| grep "${CRN}" || true)
