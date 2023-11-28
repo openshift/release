@@ -1,8 +1,8 @@
 base_images:
   base:
-    name: ubi
-    namespace: ocp
-    tag: "9"
+    name: gcloud-base
+    namespace: cri-o
+    tag: latest
 binary_build_commands: "echo \"no build commands\" \n"
 build_root:
   image_stream_tag:
@@ -12,27 +12,9 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM base
-    COPY . .
-  from: crio-gcloud-base
-  to: crio-crio-base-src
-- dockerfile_literal: |
-    FROM base
-    RUN dnf install -y jq git openssl python3.11 gzip jq unzip openssh-clients openssl bind-utils util-linux xz && \
-        alternatives  --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
-        dnf clean all
-    RUN curl https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz > /tmp/google-cloud-sdk.tar.gz
-    RUN mkdir -p /usr/local/gcloud \
-      && tar -C /usr/local/gcloud -xvf /tmp/google-cloud-sdk.tar.gz \
-      && rm -f /tmp/google-cloud-sdk.tar.gz
-    ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
-    WORKDIR /src
+    COPY . /workdir
   from: base
-  to: crio-gcloud-base
-promotion:
-  excluded_images:
-  - crio-crio-base-src
-  namespace: ci
-  tag: latest
+  to: crio-crio-base-src
 releases:
   initial:
     integration:
@@ -52,43 +34,43 @@ test_binary_build_commands: "echo \"no test commands\" \n"
 tests:
 - as: e2e
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: cri-o-e2e
 - as: e2e-conmonrs
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     env:
       USE_CONMONRS: "true"
     workflow: cri-o-e2e
 - as: e2e-evented-pleg
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     env:
       EVENTED_PLEG: "true"
     workflow: cri-o-e2e
 - as: fedora-integration
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: cri-o-fedora-integration
 - as: fedora-critest
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: cri-o-fedora-critest
 - as: fedora-kata
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: cri-o-fedora-kata
 - as: rhel-critest
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: cri-o-rhel-critest
 - as: rhel-e2e
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: cri-o-rhel-e2e
 - as: crun-e2e
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: cri-o-crun-e2e
 - as: cgroupv2-e2e
   steps:
@@ -96,11 +78,11 @@ tests:
     workflow: cri-o-cgroupv2-e2e
 - as: cgroupv2-e2e-crun
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: cri-o-cgroupv2-e2e-crun
 - as: cgroupv2-e2e-features
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: cri-o-cgroupv2-e2e-features
 - as: cgroupv2-integration
   steps:
