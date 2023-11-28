@@ -44,3 +44,12 @@ fi
 
 echo "Reserved the following IP addresses..."
 cat "${SHARED_DIR}"/vips.txt
+
+declare -a vips
+mapfile -t vips <"${SHARED_DIR}"/vips.txt
+/tmp/yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<<"
+platform:
+  vsphere:
+    apiVIP: ${vips[0]}
+    ingressVIP: ${vips[1]}
+"
