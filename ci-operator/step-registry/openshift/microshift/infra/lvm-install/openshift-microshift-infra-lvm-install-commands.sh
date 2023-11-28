@@ -19,7 +19,8 @@ EOF
 chmod 0600 "${HOME}/.ssh/config"
 
 device="/dev/xvdc"
-if [[ "${EC2_INSTANCE_TYPE%.*}" =~ .*"g".* ]]; then
+
+if [[ "${EC2_INSTANCE_TYPE%.*}" =~ .*"g".* || "${EC2_INSTANCE_TYPE%.*}" =~ "t3".* ]]; then
   device="/dev/nvme1n1"
 fi
 
