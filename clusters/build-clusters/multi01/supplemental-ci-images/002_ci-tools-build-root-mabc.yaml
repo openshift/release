@@ -1,0 +1,99 @@
+apiVersion: ci.openshift.io/v1
+kind: MultiArchBuildConfig
+metadata:
+  name: ci-tools-build-root
+  namespace: ci
+spec:
+  build_spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ci-tools-build-root:latest
+    source:
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: boskos:latest
+          namespace: ci
+        paths:
+        - destinationDir: .
+          sourcePath: /app
+      - from:
+          kind: ImageStreamTag
+          name: prometheus:latest
+          namespace: ci
+        paths:
+        - destinationDir: .
+          sourcePath: /bin/prometheus
+        - destinationDir: .
+          sourcePath: /bin/promtool
+      dockerfile: |
+        FROM quay.io/centos/centos:stream8
+
+        ENV VERSION=1.20 \
+            GOCACHE=/go/.cache \
+            GOARM=5 \
+            GOPATH=/go \
+            GOROOT=/usr/local/go \
+            GOFLAGS='-mod=vendor' \
+            LOGNAME=deadbeef
+        ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+
+        RUN mkdir $GOPATH
+
+        RUN yum install -y epel-release && \
+            rpm -V epel-release && \
+            INSTALL_PKGS="bc bind-utils bsdtar device-mapper device-mapper-persistent-data e2fsprogs ethtool file findutils gcc git glib2-devel hostname iptables jq krb5-devel libseccomp-devel libvirt-devel lsof make mercurial nmap-ncat openssl rsync socat systemd-devel tar tito tree util-linux wget which xfsprogs zip" && \
+            yum install -y $INSTALL_PKGS && \
+            rpm -V $INSTALL_PKGS && \
+            yum clean all && \
+            touch /os-build-image && \
+            git config --system user.name origin-release-container && \
+            git config --system user.email origin-release@redhat.com
+
+        RUN ARCH=$(uname -m) && \
+            case "$ARCH" in \
+                x86_64*) ARCH='amd64' ;; \
+                aarch64*) ARCH='arm64' ;; \
+                *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
+            esac && \
+            export ARCH && \
+            echo "Detected architecture: $ARCH" && \
+            curl --fail --retry 3 -L https://golang.org/dl/go$VERSION.linux-$ARCH.tar.gz | tar -C /usr/local -xzf - && \
+            curl --fail --retry 3 -L https://github.com/gotestyourself/gotestsum/releases/download/v1.11.0/gotestsum_1.11.0_linux_$ARCH.tar.gz | tar -C /usr/bin -xzf -
+
+        RUN chmod g+xw -R $GOPATH && \
+            chmod g+xw -R $(go env GOROOT)
+
+        ENV VAULT_DISABLE_MLOCK true
+        RUN yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
+            yum install -y vault-1.15.2-1 && \
+            setcap cap_ipc_lock= /usr/bin/vault
+
+        RUN yum install -y nodejs && npm install -g typescript
+        RUN npm config set cache /go/.npm --global
+
+        COPY ./app /go/bin/boskos
+
+        COPY ./prometheus /go/bin/prometheus
+        COPY ./promtool /go/bin/promtool
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: centos:stream8
+          namespace: origin
+        imageOptimizationPolicy: SkipLayers
+      type: Docker
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: centos:stream8
+          namespace: origin
+      type: ImageChange
+  external_registries:
+  - registry.ci.openshift.org
