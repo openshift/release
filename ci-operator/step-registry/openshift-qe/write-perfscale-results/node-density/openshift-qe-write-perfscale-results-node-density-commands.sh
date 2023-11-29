@@ -1,1 +1,0 @@
-../openshift-qe-write-perfscale-results-commands.sh
