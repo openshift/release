@@ -215,7 +215,6 @@ def _add_origin_resources(gendoc):
                                     "--tools-image-stream-tag=release-controller-bootstrap:tests",
                                     "--release-architecture=amd64",
                                     "-v=4",
-                                    "--process-legacy-results",
                                     "--manifest-list-mode"
                                 ],
                                 "image": "release-controller:latest",
