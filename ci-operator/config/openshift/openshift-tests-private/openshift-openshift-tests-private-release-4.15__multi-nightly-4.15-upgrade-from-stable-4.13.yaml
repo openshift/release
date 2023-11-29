@@ -1,0 +1,133 @@
+base_images:
+  ansible:
+    name: "4.14"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
+  tools:
+    name: "4.14"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  intermediate414:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.14"
+  latest:
+    release:
+      architecture: multi
+      channel: fast
+      version: "4.13"
+  target:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-ipi-ovn-ipsec-amd-mixarch-f14
+  cron: 23 23 1,16 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_TARGET}" >
+        ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE414
+        name: release:intermediate414
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: ipi-install-heterogeneous
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: azure-ipi-ovn-ipsec-arm-mixarch-f14
+  cron: 13 0 5,20 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_TARGET}" >
+        ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE414
+        name: release:intermediate414
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: ipi-install-heterogeneous
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
+zz_generated_metadata:
+  branch: release-4.15
+  org: openshift
+  repo: openshift-tests-private
+  variant: multi-nightly-4.15-upgrade-from-stable-4.13
