@@ -81,9 +81,19 @@ while read -a row ; do
 done < /tmp/zzz-tmp.log
 
 TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results"
-echo -e "\nfailures: $failures, errors: $errors, skipped: $skipped, tests: $tests in cucushift-e2e" | tee -a "${TEST_RESULT_FILE}"
+cat > "${TEST_RESULT_FILE}" <<- EOF
+cucushift:
+  failures: $failures
+  errors: $errors
+  skipped: $skipped
+  total: $tests
+EOF
+
 if [ $((failures)) != 0 ] ; then
-    echo "Failing Scenarios:" | tee -a "${TEST_RESULT_FILE}"
-    grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | grep -v grep | cut -d'#' -f2 | sort -t':' -k3 | sed -E 's/^( +)?/  /' | tee -a "${TEST_RESULT_FILE}" || true
+    echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
+    readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | cut -d':' -f3- | sed -E 's/^( +)//' | sort)
+    for (( i=0; i<failures; i++ )) ; do
+        echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
+    done
 fi
-cat "${TEST_RESULT_FILE}" >> "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
+cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
