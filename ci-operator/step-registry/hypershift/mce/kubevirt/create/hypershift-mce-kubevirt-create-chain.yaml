@@ -17,6 +17,7 @@ chain:
           source "${SHARED_DIR}/proxy-conf.sh"
         fi
 
+        OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
         MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
         HYPERSHIFT_NAME=hcp
         if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
@@ -26,8 +27,13 @@ chain:
 
         arch=$(arch)
         if [ "$arch" == "x86_64" ]; then
-          downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
-          cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
+          # NOTE: Delete this after MCE supports ocp 4.15
+          if (( $(echo "$OCP_VERSION < 4.15" | bc -l) )); then
+            downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
+            cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
+          else
+            oc image extract quay.io/hypershift/hypershift-operator:${OCP_VERSION} --path=/usr/bin/hcp:/tmp/ --confirm
+          fi
           chmod +x /tmp/${HYPERSHIFT_NAME}
           cd -
         fi
