@@ -146,6 +146,11 @@ export {{ item }}
 {% endif %}
 EOF
 
+cat << EOF > postinstall.sh.j2
+export OPENSHIFT_INSTALL_RELEASE_IMAGE={{ OPENSHIFT_INSTALL_RELEASE_IMAGE }}
+{{ POST_INSTALL_COMMANDS }}
+EOF
+
 cat > run_test_playbook.yaml <<-"EOF"
 - name: Prepare remote host
   hosts: primary
@@ -339,12 +344,12 @@ cat > run_test_playbook.yaml <<-"EOF"
             podman cp "src:{{ assisted_test_infra_src_path.stdout }}/." "{{ REPO_DIR }}"
             podman rm -f src
     - name: Create post install script
-      ansible.builtin.copy:
+      template:
+        src: ./postinstall.sh.j2
         dest: /root/assisted-post-install.sh
-        content: |
-          {{ POST_INSTALL_COMMANDS }}
-          echo "Finish running post installation script"
+
 EOF
 
 export ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
 ansible-playbook run_test_playbook.yaml -i "${SHARED_DIR}/inventory"
+
