@@ -26,26 +26,16 @@ cat > "${HOME}"/start_microshift.sh <<'EOF'
 set -xeuo pipefail
 
 sudo systemctl enable microshift --now
+sudo systemctl status microshift
 
-# If condition is true there is podman, it's not a rpm install.
-if [[ $(command -v podman) ]]; then
-  # podman is present so copy the config file
-  sudo mkdir -p /var/lib/microshift/resources/kubeadmin/
-  sudo podman cp microshift:/var/lib/microshift/resources/kubeadmin/kubeconfig /var/lib/microshift/resources/kubeadmin/kubeconfig  
-else
-  echo "This is rpm run";
-  # test if microshift is running
-  sudo systemctl status microshift;
+while ! sudo test -f "/var/lib/microshift/resources/kubeadmin/kubeconfig";
+do
+  echo "Waiting for kubeconfig..."
+  sleep 5;
+done
+sudo ls -la /var/lib/microshift/resources/kubeadmin/
+sudo systemctl restart greenboot-healthcheck
 
-  # test if microshift created the kubeconfig under /var/lib/microshift/resources/kubeadmin/kubeconfig
-  while ! sudo test -f "/var/lib/microshift/resources/kubeadmin/kubeconfig";
-  do
-    echo "Waiting for kubeconfig..."
-    sleep 5;
-  done
-  sudo ls -la /var/lib/microshift
-  sudo ls -la /var/lib/microshift/resources/kubeadmin/kubeconfig
-fi
 EOF
 
 chmod +x "${HOME}"/start_microshift.sh
@@ -60,25 +50,14 @@ set +e
 set -x
 PS4='+ $(date "+%T.%N")\011'
 
-retries=3
+retries=10
 while [ ${retries} -gt 0 ] ; do
   ((retries-=1))
-
-  KUBECONFIG="${SHARED_DIR}/kubeconfig" oc wait \
-    pod \
-    --for=condition=ready \
-    -l='app.kubernetes.io/name=topolvm-csi-driver' \
-    -n openshift-storage \
-    --timeout=5m
-  [ $? -eq 0 ] && exit 0
-
-  # Image pull operation sometimes get stuck for topolvm images
-  # Delete topolvm pods to retry image pull operation
-  KUBECONFIG="${SHARED_DIR}/kubeconfig" oc delete \
-    pod \
-    -l='app.kubernetes.io/name=topolvm-csi-driver' \
-    -n openshift-storage \
-    --timeout=30s
+  if ssh "${INSTANCE_PREFIX}" "sudo systemctl status greenboot-healthcheck | grep -q 'active (exited)'"; then
+    exit 0
+  fi
+  echo "Not ready yet. Waiting 30 seconds... (${retries} retries remaining)"
+  sleep 30
 done
 
 # All retries waiting for the cluster failed

@@ -1,16 +1,24 @@
 base_images:
+  assisted-test-infra:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
   builder:
     name: ubi
     namespace: ocp
     tag: "9"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.13"
+    tag: "4.14"
   tests-private-ui:
     name: tests-private-ui
     namespace: ci
-    tag: "4.13"
+    tag: "4.14"
 build_root:
   image_stream_tag:
     name: release
@@ -58,7 +66,7 @@ releases:
   latest:
     release:
       channel: fast
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -118,6 +126,26 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: openshift-e2e-aws-single-node-recert
   timeout: 8h0m0s
+- as: aws-sno-fips-recert
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-sno-recert
+  timeout: 8h0m0s
+- always_run: false
+  as: baremetalds-sno-recert-cluster-rename
+  steps:
+    cluster_profile: packet-sno
+    test:
+    - ref: baremetalds-sno-conf
+    - ref: baremetalds-sno-rename
+    - ref: baremetalds-sno-test
+    workflow: baremetalds-sno
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge

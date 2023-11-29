@@ -265,39 +265,6 @@ cat << EOF > ~/fetch-information.yml
     shell: kcli ssh root@${CLUSTER_NAME}-installer 'oc get node'
 EOF
 
-cat << EOF > $SHARED_DIR/check-cluster.yml
----
-- name: Check if cluster is ready
-  hosts: hypervisor
-  gather_facts: false
-  tasks:
-
-  - name: Check if cluster is available
-    shell: kcli ssh root@${CLUSTER_NAME}-installer "oc get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'"
-    register: ready_check
-
-  - name: Grab the kcli log from installer
-    shell: >-
-      kcli scp root@${CLUSTER_NAME}-installer:/var/log/cloud-init-output.log /tmp/kcli_${CLUSTER_NAME}_cloud-init-output.log
-    ignore_errors: true
-
-  - name: Grab the log from HV to artifacts
-    fetch:
-      src: /tmp/kcli_${CLUSTER_NAME}_cloud-init-output.log
-      dest: ${ARTIFACT_DIR}/cloud-init-output.log
-      flat: yes
-    ignore_errors: true
-
-  - name: Show last logs from cloud init if failed
-    shell: >-
-      kcli ssh root@${CLUSTER_NAME}-installer 'tail -100 /var/log/cloud-init-output.log'
-    when: "'True' not in ready_check.stdout"
-    ignore_errors: true
-
-  - name: Fail when cluster is not available
-    shell: "echo Cluster ready: {{ ready_check.stdout }}"
-    failed_when: "'True' not in ready_check.stdout"
-EOF
 
 cat << EOF > $SHARED_DIR/destroy-cluster.yml
 ---
@@ -319,12 +286,10 @@ EOF
 # in order to provide the desired return code later.
 PROCEED_AFTER_FAILURES="false"
 status=0
-if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
-    ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory $SHARED_DIR/check-cluster.yml -vv
-else
+if [[ "$T5_JOB_DESC" != "periodic-cnftests" ]]; then
     PROCEED_AFTER_FAILURES="true"
-    ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 fi
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || eval $PROCEED_AFTER_FAILURES
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
 exit ${status}
