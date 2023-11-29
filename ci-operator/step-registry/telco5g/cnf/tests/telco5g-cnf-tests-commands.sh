@@ -16,6 +16,11 @@ cat <<EOF >"${SKIP_TESTS_FILE}"
 # TESTNAME
 sriov "FPGA Programmable Acceleration Card N3000 for Networking"
 
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-24205
+# TESTNAME
+performance "Should have the correct RPS configuration"
+
 EOF
 }
 
