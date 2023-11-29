@@ -17,7 +17,6 @@ SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
 
 declare vlanid
 declare primaryrouterhostname
-declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 
 if ! command -v aws &>/dev/null; then
@@ -36,16 +35,11 @@ if ! command -v aws &>/dev/null; then
   fi
 fi
 
-if [[ ${vsphere_portgroup} == *"segment"* ]]; then
-  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${vsphere_portgroup}"))
-  load_balancer_ip="192.168.${third_octet}.2"
-else
-  if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-    echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
-    exit 1
-  fi
-  load_balancer_ip=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[2]' "${SUBNETS_CONFIG}")
+if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
+  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+  exit 1
 fi
+load_balancer_ip=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[2]' "${SUBNETS_CONFIG}")
 
 # Create Network Load Balancer in the subnet that is routable into VMC network
 vpc_id=$(aws ec2 describe-vpcs --filters Name=tag:"aws:cloudformation:stack-name",Values=vsphere-vpc --query 'Vpcs[0].VpcId' --output text)
