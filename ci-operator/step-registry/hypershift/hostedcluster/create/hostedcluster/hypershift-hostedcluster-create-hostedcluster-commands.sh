@@ -77,6 +77,7 @@ case "${PLATFORM}" in
       --node-selector "hypershift.openshift.io/control-plane=true" \
       --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
+      --annotations "cluster-profile=${CLUSTER_PROFILE_NAME}" \
       --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
       --annotations resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m \
       --annotations hypershift.openshift.io/cleanup-cloud-resources="false" \
