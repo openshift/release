@@ -2745,3 +2745,43 @@ periodics:
       resources:
         requests:
           cpu: 500m
+- agent: kubernetes
+  cluster: multi01
+  cron: '@daily'
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/cluster: multi01
+    ci.openshift.io/role: infra
+  name: periodic-trigger-ci-tools-build-root-mabc
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        ci_tools_build_root="$(oc -n ci get mabc/ci-tools-build-root -o json)"
+        if [ -z "$(jq -r '.status.state' <<<$ci_tools_build_root)" ]; then
+            echo 'mabc/ci-tools-build-root is running already'
+            exit 0
+        fi
+        oc -n ci delete --cascade=foreground --wait=true mabc/ci-tools-build-root
+        echo "mabc/ci-tools-build-root deleted"
+        oc -n ci apply --wait=true -f 'clusters/build-clusters/multi01/supplemental-ci-images/002_ci-tools-build-root_mabc.yaml'
+        echo "mabc/ci-tools-build-root created"
+      command:
+      - /bin/bash
+      image: registry.ci.openshift.org/ocp/cli-jq:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 100m
+    nodeSelector:
+      kubernetes.io/arch: amd64
+    serviceAccountName: mabc-updater
