@@ -15,7 +15,7 @@ periodics:
     ci-operator.openshift.io/variant: "4.7"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.7-operator-e2e-aws-periodic-slack
+  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.7-e2e-test-aws-periodic
   spec:
     containers:
     - args:
@@ -24,8 +24,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/operator-e2e-aws-periodic-slack-cluster-profile
-      - --target=operator-e2e-aws-periodic-slack
+      - --secret-dir=/usr/local/e2e-test-aws-periodic-cluster-profile
+      - --target=e2e-test-aws-periodic
       - --variant=4.7
       command:
       - ci-operator
@@ -42,7 +42,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/operator-e2e-aws-periodic-slack-cluster-profile
+      - mountPath: /usr/local/e2e-test-aws-periodic-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -95,7 +95,7 @@ periodics:
     ci-operator.openshift.io/variant: "4.7"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.7-operator-e2e-azure-periodic-slack
+  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.7-e2e-test-azure-periodic
   spec:
     containers:
     - args:
@@ -104,8 +104,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/operator-e2e-azure-periodic-slack-cluster-profile
-      - --target=operator-e2e-azure-periodic-slack
+      - --secret-dir=/usr/local/e2e-test-azure-periodic-cluster-profile
+      - --target=e2e-test-azure-periodic
       - --variant=4.7
       command:
       - ci-operator
@@ -122,7 +122,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/operator-e2e-azure-periodic-slack-cluster-profile
+      - mountPath: /usr/local/e2e-test-azure-periodic-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -175,7 +175,7 @@ periodics:
     ci-operator.openshift.io/variant: "4.7"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.7-operator-e2e-gcp-periodic-slack
+  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.7-e2e-test-gcp-periodic
   spec:
     containers:
     - args:
@@ -184,8 +184,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/operator-e2e-gcp-periodic-slack-cluster-profile
-      - --target=operator-e2e-gcp-periodic-slack
+      - --secret-dir=/usr/local/e2e-test-gcp-periodic-cluster-profile
+      - --target=e2e-test-gcp-periodic
       - --variant=4.7
       command:
       - ci-operator
@@ -202,7 +202,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/operator-e2e-gcp-periodic-slack-cluster-profile
+      - mountPath: /usr/local/e2e-test-gcp-periodic-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -244,68 +244,6 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
-  cron: 42 9 10,27 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: oadp-1.0
-    org: openshift
-    repo: oadp-operator
-  labels:
-    ci-operator.openshift.io/variant: "4.7"
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.7-operator-unit-test-periodic
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=operator-unit-test-periodic
-      - --variant=4.7
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
   cluster: build05
   cron: 11 3 9,21 * *
   decorate: true
@@ -321,7 +259,7 @@ periodics:
     ci-operator.openshift.io/variant: "4.8"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.8-operator-e2e-aws-periodic-slack
+  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.8-e2e-test-aws-periodic
   spec:
     containers:
     - args:
@@ -330,8 +268,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/operator-e2e-aws-periodic-slack-cluster-profile
-      - --target=operator-e2e-aws-periodic-slack
+      - --secret-dir=/usr/local/e2e-test-aws-periodic-cluster-profile
+      - --target=e2e-test-aws-periodic
       - --variant=4.8
       command:
       - ci-operator
@@ -348,7 +286,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/operator-e2e-aws-periodic-slack-cluster-profile
+      - mountPath: /usr/local/e2e-test-aws-periodic-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -401,7 +339,7 @@ periodics:
     ci-operator.openshift.io/variant: "4.8"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.8-operator-e2e-azure-periodic-slack
+  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.8-e2e-test-azure-periodic
   spec:
     containers:
     - args:
@@ -410,8 +348,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/operator-e2e-azure-periodic-slack-cluster-profile
-      - --target=operator-e2e-azure-periodic-slack
+      - --secret-dir=/usr/local/e2e-test-azure-periodic-cluster-profile
+      - --target=e2e-test-azure-periodic
       - --variant=4.8
       command:
       - ci-operator
@@ -428,7 +366,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/operator-e2e-azure-periodic-slack-cluster-profile
+      - mountPath: /usr/local/e2e-test-azure-periodic-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -481,7 +419,7 @@ periodics:
     ci-operator.openshift.io/variant: "4.8"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.8-operator-e2e-gcp-periodic-slack
+  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.8-e2e-test-gcp-periodic
   spec:
     containers:
     - args:
@@ -490,8 +428,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/operator-e2e-gcp-periodic-slack-cluster-profile
-      - --target=operator-e2e-gcp-periodic-slack
+      - --secret-dir=/usr/local/e2e-test-gcp-periodic-cluster-profile
+      - --target=e2e-test-gcp-periodic
       - --variant=4.8
       command:
       - ci-operator
@@ -508,7 +446,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/operator-e2e-gcp-periodic-slack-cluster-profile
+      - mountPath: /usr/local/e2e-test-gcp-periodic-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -550,68 +488,6 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
-  cron: 5 20 8,25 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: oadp-1.0
-    org: openshift
-    repo: oadp-operator
-  labels:
-    ci-operator.openshift.io/variant: "4.8"
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.8-operator-unit-test-periodic
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=operator-unit-test-periodic
-      - --variant=4.8
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
   cluster: build05
   cron: 13 19 14,28 * *
   decorate: true
@@ -627,7 +503,7 @@ periodics:
     ci-operator.openshift.io/variant: "4.9"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.9-operator-e2e-aws-periodic-slack
+  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.9-e2e-test-aws-periodic
   spec:
     containers:
     - args:
@@ -636,8 +512,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/operator-e2e-aws-periodic-slack-cluster-profile
-      - --target=operator-e2e-aws-periodic-slack
+      - --secret-dir=/usr/local/e2e-test-aws-periodic-cluster-profile
+      - --target=e2e-test-aws-periodic
       - --variant=4.9
       command:
       - ci-operator
@@ -654,7 +530,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/operator-e2e-aws-periodic-slack-cluster-profile
+      - mountPath: /usr/local/e2e-test-aws-periodic-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -707,7 +583,7 @@ periodics:
     ci-operator.openshift.io/variant: "4.9"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.9-operator-e2e-azure-periodic-slack
+  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.9-e2e-test-azure-periodic
   spec:
     containers:
     - args:
@@ -716,8 +592,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/operator-e2e-azure-periodic-slack-cluster-profile
-      - --target=operator-e2e-azure-periodic-slack
+      - --secret-dir=/usr/local/e2e-test-azure-periodic-cluster-profile
+      - --target=e2e-test-azure-periodic
       - --variant=4.9
       command:
       - ci-operator
@@ -734,7 +610,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/operator-e2e-azure-periodic-slack-cluster-profile
+      - mountPath: /usr/local/e2e-test-azure-periodic-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -787,7 +663,7 @@ periodics:
     ci-operator.openshift.io/variant: "4.9"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.9-operator-e2e-gcp-periodic-slack
+  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.9-e2e-test-gcp-periodic
   spec:
     containers:
     - args:
@@ -796,8 +672,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/operator-e2e-gcp-periodic-slack-cluster-profile
-      - --target=operator-e2e-gcp-periodic-slack
+      - --secret-dir=/usr/local/e2e-test-gcp-periodic-cluster-profile
+      - --target=e2e-test-gcp-periodic
       - --variant=4.9
       command:
       - ci-operator
@@ -814,7 +690,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/operator-e2e-gcp-periodic-slack-cluster-profile
+      - mountPath: /usr/local/e2e-test-gcp-periodic-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -857,7 +733,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build04
-  cron: 27 6 14,26 * *
+  cron: 0 4 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -866,19 +742,16 @@ periodics:
     org: openshift
     repo: oadp-operator
   labels:
-    ci-operator.openshift.io/variant: "4.9"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-oadp-operator-oadp-1.0-4.9-operator-unit-test-periodic
+  name: periodic-ci-openshift-oadp-operator-oadp-1.0-unit-test-periodic
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=operator-unit-test-periodic
-      - --variant=4.9
+      - --target=unit-test-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -888,9 +761,6 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -905,9 +775,6 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
