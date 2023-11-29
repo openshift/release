@@ -98,6 +98,14 @@ CONFIG = {
         'us-west-1': 40,
         'us-west-2': 40,
     },
+    'aws-telco-quota-slice': {
+        # Wild guesses. We can re-configure later
+        # https://docs.ci.openshift.org/docs/architecture/quota-and-leases/#adding-a-new-type-of-resource
+        'us-east-1': 40,
+        'us-east-2': 40,
+        'us-west-1': 40,
+        'us-west-2': 40,
+    },
     'aws-devfile-quota-slice': {
         'us-west-2': 10
     },
@@ -169,6 +177,9 @@ CONFIG = {
     },
     'gcp-opendatahub-quota-slice': {
         'us-central1': 30,
+    },
+    'gcp-telco-quota-slice': {
+        'us-central1': 40,
     },
     'libvirt-s390x-quota-slice': {},
     'libvirt-ppc64le-quota-slice': {},
@@ -304,10 +315,9 @@ CONFIG = {
     },
     'ossm-aws-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
+        'us-east-1': 50,
         'us-east-2': 50,
         'us-west-2': 50,
-        'eu-west-1': 50,
-        'eu-central-1': 50,
     },
 }
 
