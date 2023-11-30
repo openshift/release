@@ -126,7 +126,8 @@ function create_catalog_sources()
     kube_minor=$(oc version -o json |jq -r '.serverVersion.minor')
     index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 
-    echo "create QE catalogsource: qe-app-registry"
+    echo "Create QE catalogsource: qe-app-registry"
+    echo "Use $index_image in catalogsource/qe-app-registry"
     cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
