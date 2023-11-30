@@ -1,4 +1,12 @@
 base_images:
+  ocp_4.15_base:
+    name: "4.15"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
   tests-private:
     name: tests-private
     namespace: ci
@@ -7,7 +15,14 @@ binary_build_commands: make
 build_root:
   from_repository: true
 images:
-- to: ibm-vpc-block-csi-driver-operator
+- inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+  to: ibm-vpc-block-csi-driver-operator
 - dockerfile_path: Dockerfile.test
   from: src
   to: ibm-vpc-block-csi-driver-operator-test
