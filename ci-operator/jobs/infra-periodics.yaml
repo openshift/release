@@ -2785,3 +2785,46 @@ periodics:
     nodeSelector:
       kubernetes.io/arch: amd64
     serviceAccountName: mabc-updater
+- agent: kubernetes
+  cluster: multi01
+  cron: '@daily'
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/cluster: multi01
+    ci.openshift.io/role: infra
+  name: periodic-trigger-managed-clonerefs-mabc
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        managed_clonerefs="$(oc -n ci get mabc/managed-clonerefs -o json)"
+        if [ -z "$(jq -r '.status.state' <<<$managed_clonerefs)" ]; then
+            echo 'mabc/managed-clonerefs is running already'
+            exit 0
+        fi
+
+        oc -n ci delete --cascade=foreground --wait=true mabc/managed-clonerefs
+        echo "mabc/managed-clonerefs deleted"
+
+        oc -n ci apply --wait=true -f 'clusters/build-clusters/multi01/supplemental-ci-images/001_managed-clonerefs_mabc.yaml'
+        echo "mabc/managed-clonerefs created"
+      command:
+      - /bin/bash
+      image: registry.ci.openshift.org/ocp/cli-jq:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 100m
+    nodeSelector:
+      kubernetes.io/arch: amd64
+    serviceAccountName: mabc-updater
