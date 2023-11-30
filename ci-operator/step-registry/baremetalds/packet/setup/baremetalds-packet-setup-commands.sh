@@ -43,6 +43,7 @@ cat > packet-config.yaml <<-EOF
 - name: Create Config for host
   hosts: localhost
   collections:
+   - equinix.cloud
    - community.general
   gather_facts: no
   tasks:
@@ -92,11 +93,12 @@ cat > packet-config.yaml <<-EOF
         done
       dest: "${SHARED_DIR}/packet-conf.sh"
 EOF
+pip3.11 install -r https://raw.githubusercontent.com/equinix-labs/ansible-collection-equinix/main/requirements.txt
+ansible-galaxy collection install equinix.cloud
 ansible-playbook packet-config.yaml |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
-
 # Avoid requesting a bunch of servers at the same time so they
-# don't race each other for available resources in a facility
+# don't race each other for available resources in a metro
 SLEEPTIME=$(( RANDOM % 120 ))
 echo "Sleeping for $SLEEPTIME seconds"
 sleep $SLEEPTIME
@@ -106,6 +108,7 @@ cat > packet-setup.yaml <<-EOF
 - name: setup Packet host
   hosts: localhost
   collections:
+   - equinix.cloud
    - community.general
   gather_facts: no
   vars:
@@ -127,24 +130,23 @@ cat > packet-setup.yaml <<-EOF
   - name: create Packet host with error handling
     block:
     - name: create Packet host {{ packet_hostname }}
-      packet_device:
-        auth_token: "{{ packet_auth_token }}"
+      equinix.cloud.metal_device:
+        metal_api_token: "{{ packet_auth_token }}"
         project_id: "{{ packet_project_id }}"
-        hostnames: "{{ packet_hostname }}"
+        hostname: "{{ packet_hostname }}"
         operating_system: ${PACKET_OS}
         plan: ${PACKET_PLAN}
-        facility: ${PACKET_FACILITY}
+        metro: ${PACKET_METRO}
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME')[:77], 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
         user_data: "{{ user_data | default(omit) }}"
       register: hosts
-      no_log: true
     - name: write device info to file
       copy:
         content="{{ hosts }}"
         dest="${SHARED_DIR}/hosts.json"
 EOF
 
-ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
+ansible-playbook packet-setup.yaml -vvve "packet_hostname=ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
 DEVICEID=$(jq -r .devices[0].id < ${SHARED_DIR}/hosts.json)
 
