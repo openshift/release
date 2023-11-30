@@ -29,19 +29,22 @@ base_images:
     tag: latest
 releases:
   intermediate412:
-    release:
+    candidate:
       architecture: amd64
-      channel: fast
+      product: ocp
+      stream: nightly
       version: "4.12"
   intermediate413:
-    release:
+    candidate:
       architecture: amd64
-      channel: fast
+      product: ocp
+      stream: nightly
       version: "4.13"
   intermediate414:
-    release:
+    candidate:
       architecture: amd64
-      channel: fast
+      product: ocp
+      stream: nightly
       version: "4.14"
   latest:
     release:
@@ -60,23 +63,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-f14
-  cron: 19 16 2,16 * *
+- as: aws-ipi-baselinecaps-none-f14
+  cron: 52 16 2,17 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      LOKI_ENABLED: "false"
+      BASELINE_CAPABILITY_SET: None
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @aws-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @aws-ipi and not @fips'
-    post:
-    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
-    pre:
-    - ref: ipi-conf
-    - ref: ipi-conf-telemetry
-    - ref: ipi-conf-aws
-    - chain: ipi-install
-    - ref: enable-qe-catalogsource
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_TARGET}"
@@ -97,6 +92,68 @@ tests:
           memory: 200Mi
     - ref: cucushift-chainupgrade-toimage
     - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-ovn-ipsec-f14
+  cron: 33 23 9,24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @aws-ipi and not @fips
+        and @network-ovnkubernetes'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @aws-ipi and not @fips
+        and @network-ovnkubernetes'
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE414
+        name: release:intermediate414
+      - env: RELEASE_IMAGE_INTERMEDIATE413
+        name: release:intermediate413
+      - env: RELEASE_IMAGE_INTERMEDIATE412
+        name: release:intermediate412
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: nutanix-ipi-fips-f14
+  cluster: build01
+  cron: 14 20 4,19 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @nutanix-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @nutanix-ipi'
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE414
+        name: release:intermediate414
+      - env: RELEASE_IMAGE_INTERMEDIATE413
+        name: release:intermediate413
+      - env: RELEASE_IMAGE_INTERMEDIATE412
+        name: release:intermediate412
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-nutanix-ipi
 zz_generated_metadata:
   branch: release-4.15
   org: openshift
