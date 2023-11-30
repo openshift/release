@@ -1308,7 +1308,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-omr-ocp415-quay-omr-tests-omr-ocp410-disconnected
+  name: periodic-ci-quay-quay-tests-master-omr-ocp415-quay-omr-tests-omr-ocp415-disconnected
+  reporter_config:
+    slack:
+      channel: '#quay-qe'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -1318,8 +1329,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/quay-omr-tests-omr-ocp410-disconnected-cluster-profile
-      - --target=quay-omr-tests-omr-ocp410-disconnected
+      - --secret-dir=/usr/local/quay-omr-tests-omr-ocp415-disconnected-cluster-profile
+      - --target=quay-omr-tests-omr-ocp415-disconnected
       - --variant=omr-ocp415
       command:
       - ci-operator
@@ -1336,7 +1347,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/quay-omr-tests-omr-ocp410-disconnected-cluster-profile
+      - mountPath: /usr/local/quay-omr-tests-omr-ocp415-disconnected-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
