@@ -14,9 +14,4 @@ if [ "${FIREWATCH_FAIL_WITH_TEST_FAILURES,,}" = "true" ]; then
     report_command+=" --fail-with-test-failures"
 fi
 
-# If the user has specified to report successful  runs to Jira, then add the --report success flag
-if [ "${FIREWATCH_REPORT_SUCCESS,,}" = "true" ]; then
-    report_command+=" --report-success"
-fi
-
 eval "$command"
