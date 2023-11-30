@@ -1,5 +1,5 @@
 base_images:
-  base:
+  ocp_4.15_base:
     name: 4.15-priv
     namespace: ocp-private
     tag: base
@@ -11,8 +11,10 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-storage-operator
 images:
-- from: base
-  inputs:
+- inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
@@ -63,6 +65,11 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-csi
+- as: e2e-gcp-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity
 - always_run: false
   as: e2e-gcp-ovn
   optional: true
