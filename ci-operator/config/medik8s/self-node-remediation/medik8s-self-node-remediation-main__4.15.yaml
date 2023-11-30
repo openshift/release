@@ -1,0 +1,76 @@
+base_images:
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  operator-base:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: operator-base
+  to: self-node-remediation-operator
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-oc
+operator:
+  bundles:
+  - as: self-node-remediation-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/medik8s/self-node-remediation-operator:.*
+    with: pipeline:self-node-remediation-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+test_binary_build_commands: make test
+tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: openshift-e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-self-node-remediation-bundle
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: self-node-remediation
+      OO_PACKAGE: self-node-remediation
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e
+      commands: export SKIP_LOG_VERIFICATION="true" && make e2e-test
+      from: src-oc
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: self-node-remediation
+  variant: "4.15"
