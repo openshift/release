@@ -116,7 +116,39 @@ tests:
       cli: latest
       commands: |
         export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
-        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
+
+        # Make sure we can connect to the cluster
+        count=0
+        max_retries=10
+        sleeptime=30
+        while true; do
+          count=$(( count + 1 ))
+          NODE_COUNT=0
+          NODES=$(oc get nodes --no-headers=true) && echo "Connected to the cluster" && echo -e "$NODES" && NODE_COUNT=$(echo -e "$NODES" | wc -l)
+
+          echo "$NODE_COUNT Nodes ..."
+          if [[ $NODE_COUNT -gt 0 ]]; then
+            NODE_READY_COUNT=$(echo -e "$NODES" | grep Ready | grep -v NotReady | wc -l)
+            echo "$NODE_READY_COUNT Ready Nodes ..."
+
+            if [[ $NODE_READY_COUNT -eq $NODE_COUNT ]]; then
+              echo "All Nodes are ready"
+              break
+            fi
+          fi
+
+          echo "Cannot connect to cluster or not all nodes are ready"
+
+          if [[ $count -gt $max_retries ]]; then
+            echo "Timed out waiting for the cluster to be ready."
+            exit 1
+          fi
+
+          echo "WARN cluster is not ready, will retry in $sleeptime seconds ..."
+          sleep $sleeptime
+        done
+
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout 5m0s
         oc wait --for condition=Available -n openshift-operators deployment volsync-controller-manager
       dependencies:
       - env: OO_BUNDLE
@@ -175,7 +207,39 @@ tests:
       cli: latest
       commands: |
         export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
-        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
+
+        # Make sure we can connect to the cluster
+        count=0
+        max_retries=10
+        sleeptime=30
+        while true; do
+          count=$(( count + 1 ))
+          NODE_COUNT=0
+          NODES=$(oc get nodes --no-headers=true) && echo "Connected to the cluster" && echo -e "$NODES" && NODE_COUNT=$(echo -e "$NODES" | wc -l)
+
+          echo "$NODE_COUNT Nodes ..."
+          if [[ $NODE_COUNT -gt 0 ]]; then
+            NODE_READY_COUNT=$(echo -e "$NODES" | grep Ready | grep -v NotReady | wc -l)
+            echo "$NODE_READY_COUNT Ready Nodes ..."
+
+            if [[ $NODE_READY_COUNT -eq $NODE_COUNT ]]; then
+              echo "All Nodes are ready"
+              break
+            fi
+          fi
+
+          echo "Cannot connect to cluster or not all nodes are ready"
+
+          if [[ $count -gt $max_retries ]]; then
+            echo "Timed out waiting for the cluster to be ready."
+            exit 1
+          fi
+
+          echo "WARN cluster is not ready, will retry in $sleeptime seconds ..."
+          sleep $sleeptime
+        done
+
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout 5m0s
         oc wait --for condition=Available -n openshift-operators deployment volsync-controller-manager
       dependencies:
       - env: OO_BUNDLE
@@ -234,6 +298,37 @@ tests:
       commands: |
         set -x -e -o pipefail
         export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+
+        # Make sure we can connect to the cluster
+        count=0
+        max_retries=10
+        sleeptime=30
+        while true; do
+          count=$(( count + 1 ))
+          NODE_COUNT=0
+          NODES=$(oc get nodes --no-headers=true) && echo "Connected to the cluster" && echo -e "$NODES" && NODE_COUNT=$(echo -e "$NODES" | wc -l)
+
+          echo "$NODE_COUNT Nodes ..."
+          if [[ $NODE_COUNT -gt 0 ]]; then
+            NODE_READY_COUNT=$(echo -e "$NODES" | grep Ready | grep -v NotReady | wc -l)
+            echo "$NODE_READY_COUNT Ready Nodes ..."
+
+            if [[ $NODE_READY_COUNT -eq $NODE_COUNT ]]; then
+              echo "All Nodes are ready"
+              break
+            fi
+          fi
+
+          echo "Cannot connect to cluster or not all nodes are ready"
+
+          if [[ $count -gt $max_retries ]]; then
+            echo "Timed out waiting for the cluster to be ready."
+            exit 1
+          fi
+
+          echo "WARN cluster is not ready, will retry in $sleeptime seconds ..."
+          sleep $sleeptime
+        done
 
         # Install MinIO for rclone & restic
         ./hack/run-minio.sh
