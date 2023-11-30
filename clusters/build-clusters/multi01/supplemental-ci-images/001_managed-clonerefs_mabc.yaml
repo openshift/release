@@ -1,0 +1,35 @@
+apiVersion: ci.openshift.io/v1
+kind: MultiArchBuildConfig
+metadata:
+  name: managed-clonerefs
+  namespace: ci
+spec:
+  build_spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: managed-clonerefs:latest
+        namespace: ci
+    postCommit: {}
+    resources:
+      requests:
+        cpu: 100m
+        memory: 200Mi
+    runPolicy: Serial
+    source:
+      dockerfile: |-
+        FROM gcr.io/k8s-prow/git:latest
+        ADD ./clonerefs /clonerefs
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: clonerefs:latest
+        paths:
+        - destinationDir: .
+          sourcePath: /ko-app/clonerefs
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        imageOptimizationPolicy: SkipLayers
+        noCache: true
+      type: Docker
