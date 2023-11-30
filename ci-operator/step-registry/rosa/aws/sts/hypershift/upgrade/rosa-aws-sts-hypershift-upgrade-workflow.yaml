@@ -1,0 +1,21 @@
+workflow:
+  as: rosa-aws-sts-hypershift-upgrade
+  steps:
+    env:
+      HOSTED_CP: "true"
+      ZONES_COUNT: "1"
+      COMPUTE_MACHINE_TYPE: "m5.xlarge"
+      REPLICAS: "2"
+      DISABLE_WORKLOAD_MONITORING: "false"
+      AVAILABLE_UPGRADE: "yes"
+      CLUSTER_TYPE: "ROSA"
+    pre:
+    - ref: osd-ccs-cluster-version-available-upgrade
+    - chain: rosa-aws-sts-hypershift-provision
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-cluster-wait-ready-nodes
+    post:
+    - chain: rosa-aws-sts-hypershift-deprovision
+  documentation: |-
+    This workflow installs a rosa hypershift cluster. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
+    After finish testing, the cluster will be deprovsioned.

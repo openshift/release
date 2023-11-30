@@ -145,12 +145,13 @@ function build_push_operator_images {
   # Build and push bundle image
   oc new-build --binary --strategy=docker --name ${OPERATOR}-bundle --to=${IMAGE_TAG_BASE}-bundle:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
 
+  # this sets defaults but allows BUNDLE_DOCKERFILE to be overridden via .prow_ci.env
   if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
-    DOCKERFILE="custom-bundle.Dockerfile.pinned"
+    BUNDLE_DOCKERFILE=${BUNDLE_DOCKERFILE:-"custom-bundle.Dockerfile.pinned"}
   else
-    DOCKERFILE="bundle.Dockerfile"
+    BUNDLE_DOCKERFILE=${BUNDLE_DOCKERFILE:-"bundle.Dockerfile"}
   fi
-  DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\""${DOCKERFILE}"\"\}\}\}\})
+  DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\""${BUNDLE_DOCKERFILE}"\"\}\}\}\})
 
   oc patch bc ${OPERATOR}-bundle -p "${DOCKERFILE_PATH_PATCH[@]}"
   oc set build-secret --pull bc/${OPERATOR}-bundle ${DOCKER_REGISTRY_SECRET}
@@ -158,16 +159,16 @@ function build_push_operator_images {
   check_build_result ${OPERATOR}-bundle
 
   BASE_BUNDLE=${IMAGE_TAG_BASE}-bundle:${IMAGE_TAG}
-  DOCKERFILE="index.Dockerfile"
-  DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\""${DOCKERFILE}"\"\}\}\}\})
+  INDEX_DOCKERFILE="index.Dockerfile"
+  DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\""${INDEX_DOCKERFILE}"\"\}\}\}\})
 
 # todo: Improve include manila bundle workflow. For meta operaor only we need to add manila bundle in index and not for individual operators like keystone.
   if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
     local OPENSTACK_BUNDLES
     OPENSTACK_BUNDLES=$(/bin/bash hack/pin-bundle-images.sh)
-    opm index add --bundles "${BASE_BUNDLE}${OPENSTACK_BUNDLES}" --out-dockerfile "${DOCKERFILE}" --generate
+    opm index add --bundles "${BASE_BUNDLE}${OPENSTACK_BUNDLES}" --out-dockerfile "${INDEX_DOCKERFILE}" --generate
   else
-    opm index add --bundles "${BASE_BUNDLE}" --out-dockerfile "${DOCKERFILE}" --generate
+    opm index add --bundles "${BASE_BUNDLE}" --out-dockerfile "${INDEX_DOCKERFILE}" --generate
   fi
 
   oc new-build --binary --strategy=docker --name ${OPERATOR}-index --to=${IMAGE_TAG_BASE}-index:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
