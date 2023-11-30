@@ -20,5 +20,8 @@ Host ${IP_ADDRESS}
 EOF
 chmod 0600 "${HOME}/.ssh/config"
 
-ssh "${INSTANCE_PREFIX}" "sudo sos report --batch --all-logs --tmp-dir /tmp -p container,network,microshift -o logs && sudo chmod +r /tmp/sosreport*"
+plugin_list="container,network"
+
+ssh "${INSTANCE_PREFIX}" "sudo sos report --list-plugins | grep 'microshift.*inactive'" || plugin_list+=",microshift" 
+ssh "${INSTANCE_PREFIX}" "sudo sos report --batch --all-logs --tmp-dir /tmp -p ${plugin_list} -o logs && sudo chmod +r /tmp/sosreport*"
 scp "${INSTANCE_PREFIX}":/tmp/sosreport* "${ARTIFACT_DIR}"
