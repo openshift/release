@@ -58,6 +58,26 @@ resources:
       cpu: "6"
       memory: 12Gi
 tests:
+- as: openvino-model-server-unit
+  run_if_changed: ^(?!.*(?:ci|client|demos|docs)).*$
+  steps:
+    test:
+    - as: unit
+      commands: "yum install -y python39-pip python39\nmkdir -p /model/1\ncd $(mktemp
+        -d)      \ncurl -O https://storage.googleapis.com/tfhub-modules/tensorflow/faster_rcnn/resnet50_v1_640x640/1.tar.gz\ntar
+        xvf 1.tar.gz -C /model/1/\nif [ $? -eq 0 ]; then\n  echo \"File downloaded
+        successfully.\"\nelse\n  echo \"Failed to download file.\"\nfi\ncurl -O https://raw.githubusercontent.com/openvinotoolkit/model_server/main/demos/object_detection/python/object_detection.py
+        \ncurl -O https://raw.githubusercontent.com/openvinotoolkit/model_server/main/demos/object_detection/python/requirements.txt\ncurl
+        -O https://raw.githubusercontent.com/openvinotoolkit/open_model_zoo/master/data/dataset_classes/coco_91cl.txt\ncurl
+        -O https://storage.openvinotoolkit.org/repositories/openvino_notebooks/data/data/image/coco_bike.jpg\npip3
+        install -r requirements.txt\n/ovms/bin/ovms --model_name faster_rcnn --model_path
+        /model --port 9000 &\nsleep 15\npython3 object_detection.py --image coco_bike.jpg
+        --output output.jpg --service_url localhost:9000\necho $?\n"
+      from: model-server-release-cuda-intel-gpu
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: pr-image-mirror
   run_if_changed: ^(Dockerfile.redhat)
   steps:
