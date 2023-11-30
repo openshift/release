@@ -119,6 +119,7 @@ for _ in $(seq 1 10); do
   sleep 60
   if oc -n nfs-provisioner get pods --no-headers -l app=nfs-client-provisioner | grep -q -w Running; then
     echo "The nfs-provisioner pod is ready. Continuing..."
+    sleep 86400
     exit 0
   fi
 done
