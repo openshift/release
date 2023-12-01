@@ -30,7 +30,7 @@ echo "kubeconfig loc $KUBECONFIG"
 
 export CERBERUS_KUBECONFIG=$KUBECONFIG
 export CERBERUS_WATCH_NAMESPACES="[^.*$]"
-export CERBERUS_IGNORE_PODS="[^installer*,^kube-burner*,^redhat-operators*,^certified-operators*,^collect-profiles*]"
+export CERBERUS_IGNORE_PODS="[^installer*,^kube-burner*,^redhat-operators*,^certified-operators*,^collect-profiles*,^loki*]"
 
 mkdir -p ${ARTIFACT_DIR}/cerberus
 
