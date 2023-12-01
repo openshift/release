@@ -1,0 +1,32 @@
+ref:
+  as: cucushift-upgrade-mirror-images-by-oc-mirror
+  from_image:
+    namespace: ci
+    name: verification-tests
+    tag: latest
+  timeout: 1h
+  grace_period: 10m
+  commands: cucushift-upgrade-mirror-images-by-oc-mirror-commands.sh
+  cli: latest
+  resources:
+    limits:
+      cpu: "1"
+    requests:
+      cpu: 350m
+      memory: 1Gi
+  env:
+  - name: ENABLE_OTA_TEST
+    default: "false"
+    documentation: |-
+      Detemine if OTA test will be included
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  documentation: |-
+    Mirror target release images to local image registry for upgrade purpose.
+  dependencies:
+  - name: "release:latest"
+    env: "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
+  - name: "release:target"
+    env: "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"
