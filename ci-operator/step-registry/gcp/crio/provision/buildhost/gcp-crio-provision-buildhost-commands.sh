@@ -145,4 +145,5 @@ echo "export ZONE=${ZONE_0}" >>"${SHARED_DIR}/env"
 cat <<EOF >>"${SHARED_DIR}/env"
 export SSHOPTS=(-l ${SSH_USER} -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "\${SHARED_DIR}/vpc-sshkey")
 export PROJECT_ID=${GOOGLE_PROJECT_ID}
+export USER=${SSH_USER}
 EOF

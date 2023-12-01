@@ -1,0 +1,56 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+images:
+- dockerfile_path: Dockerfile
+  from: src
+  to: oadp-operator-1.2
+promotion:
+  name: oadp-operator
+  namespace: konveyor
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 512Mi
+tests:
+- as: unit-test
+  steps:
+    test:
+    - as: unit
+      commands: make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: unit-test-post
+  postsubmit: true
+  steps:
+    test:
+    - as: unit
+      commands: make test submit-coverage
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: unit-test-periodic
+  cron: 0 4 * * *
+  steps:
+    test:
+    - as: unit
+      commands: make test submit-coverage
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: oadp-1.2
+  org: openshift
+  repo: oadp-operator

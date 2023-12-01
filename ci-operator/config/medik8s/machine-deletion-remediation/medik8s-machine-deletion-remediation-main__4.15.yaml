@@ -1,0 +1,86 @@
+base_images:
+  operator-base:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+  operator-sdk:
+    name: "4.13"
+    namespace: origin
+    tag: operator-sdk
+binary_build_commands: make manager
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: operator-base
+  to: machine-deletion-remediation-operator
+operator:
+  bundles:
+  - as: machine-deletion-remediation-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/medik8s/machine-deletion-remediation-operator:latest
+    with: pipeline:machine-deletion-remediation-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.15"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: openshift-e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    env:
+      INSTALL_NAMESPACE: mdr-install
+    test:
+    - as: e2e-install
+      cli: latest
+      commands: |
+        oc create namespace "$INSTALL_NAMESPACE"
+
+        # workaround for OLM pod not running with restricted PSA
+        oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+
+        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment machine-deletion-remediation-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: machine-deletion-remediation-bundle
+      env:
+      - name: INSTALL_NAMESPACE
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      commands: export OPERATOR_NS="$INSTALL_NAMESPACE" && make test-e2e
+      env:
+      - name: INSTALL_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: machine-deletion-remediation
+  variant: "4.15"

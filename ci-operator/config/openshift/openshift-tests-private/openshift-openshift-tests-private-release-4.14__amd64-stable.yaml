@@ -220,7 +220,7 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: rosa-aws-sts
 - as: aws-rosa-sts-hypershift-sector-guest-prod-critical-f2
-  cron: 33 7 1,3,5,7,9,11,13,15,17,19,20,23,25,27,29 * *
+  cron: 53 9 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
   steps:
     cluster_profile: aws-sd-qe
     env:
@@ -237,6 +237,43 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-aws-sts-hypershift-sector
+- as: aws-rosa-sts-hypershift-sector-guest-prod-full-f2
+  cron: 33 7 1,3,5,7,9,11,13,15,17,19,20,23,25,27,29 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CLUSTER_SECTOR: canary
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @network-ovnkubernetes and
+        @hypershift-hosted and not @fips'
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.14"
+      REGION: us-east-1
+      ROSA_LOGIN_ENV: production
+      TAG_VERSION: '@4.14'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hypershift-sector
+- as: aws-rosa-sts-hypershift-sector-guest-prod-advanced-crit-f2
+  cron: 51 13 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CLUSTER_SECTOR: canary
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @network-ovnkubernetes and
+        @hypershift-hosted and @critical and not @fips'
+      ENABLE_AUTOSCALING: "false"
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.14"
+      REGION: us-east-1
+      REPLICAS: "3"
+      ROSA_LOGIN_ENV: production
+      TAG_VERSION: '@4.14'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hypershift-sector-advanced
 - as: aws-rosa-sts-hypershift-sector-guest-prod-advanced-full-f2
   cron: 12 3 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
   steps:
@@ -256,6 +293,24 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-aws-sts-hypershift-sector-advanced
+- as: aws-rosa-sts-hypershift-sec-guest-prod-private-link-crit-f2
+  cron: 20 7 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CLUSTER_SECTOR: canary
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @network-ovnkubernetes and
+        @hypershift-hosted and @critical and not @fips'
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.14"
+      REGION: us-east-1
+      ROSA_LOGIN_ENV: production
+      TAG_VERSION: '@4.14'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hypershift-sector-private-link
 - as: aws-rosa-sts-hypershift-sec-guest-prod-private-link-full-f2
   cron: 53 16 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   steps:
