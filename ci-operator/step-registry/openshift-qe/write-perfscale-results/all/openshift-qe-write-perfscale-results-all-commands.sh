@@ -5,7 +5,7 @@ cat /etc/os-release
 oc config view
 oc projects
 python --version
-pushd /tmp
+pushd /tmp || exit
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
@@ -32,10 +32,10 @@ git clone https://github.com/paigerube14/ocp-qe-perfscale-ci.git -b prow_write
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-pushd ocp-qe-perfscale-ci
+pushd ocp-qe-perfscale-ci || exit
 
 pip install -r requirements.txt
-pushd write_to_sheet
+pushd write_to_sheet|| exit
 
 if [ -f "${SHARED_DIR}/perfscale_run.json" ]; then
     cat ${SHARED_DIR}/perfscale_run.json
