@@ -14,4 +14,4 @@ if [ "${FIREWATCH_FAIL_WITH_TEST_FAILURES,,}" = "true" ]; then
     report_command+=" --fail-with-test-failures"
 fi
 
-eval "$command"
+eval "$report_command"
