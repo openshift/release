@@ -4,17 +4,17 @@ base_images:
     namespace: operator-lifecycle-manager
     tag: latest
   operator-lifecycle-manager:
-    name: "4.15"
+    name: "4.13"
     namespace: ocp
     tag: operator-lifecycle-manager
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.13"
       namespace: ocp
   latest:
     integration:
-      name: "4.15"
+      name: "4.13"
       namespace: ocp
 resources:
   '*':
@@ -22,11 +22,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-gcp-ovn
-  cron: 0 0 * * *
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-e2e-gcp
 - as: e2e-gcp-olm
   cron: 0 */6 * * *
   steps:
@@ -47,39 +42,8 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-olm-flaky
-  cron: 0 0 * * *
-  steps:
-    cluster_profile: gcp-3
-    test:
-    - as: test
-      cli: latest
-      commands: JUNIT_DIRECTORY=${ARTIFACT_DIR} make e2e/olm TEST='\[FLAKE\]'
-      from: ci-image
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-gcp
-- as: e2e-gcp-console-olm
-  cron: 0 0 * * *
-  steps:
-    cluster_profile: gcp
-    test:
-    - as: test
-      cli: latest
-      commands: ./test-prow-e2e.sh olmFull
-      from: stable:console-tests
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-gcp
-- as: e2e-upgrade
-  cron: 0 0 * * *
-  steps:
-    cluster_profile: aws
-    workflow: openshift-upgrade-aws
 zz_generated_metadata:
-  branch: master
+  branch: release-4.13
   org: openshift
   repo: operator-framework-olm
   variant: periodics
