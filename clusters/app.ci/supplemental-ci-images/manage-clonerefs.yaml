@@ -7,43 +7,6 @@ spec:
   lookupPolicy:
     local: true
 ---
-apiVersion: build.openshift.io/v1
-kind: BuildConfig
-metadata:
-  name: manage-clonerefs
-  namespace: ci
-spec:
-  failedBuildsHistoryLimit: 2
-  output:
-    to:
-      kind: ImageStreamTag
-      name: managed-clonerefs:latest
-      namespace: ci
-  runPolicy: Serial
-  resources:
-    requests:
-      cpu: 100m
-      memory: 200Mi
-  source:
-    dockerfile: |-
-      FROM gcr.io/k8s-prow/git:latest
-      ADD ./clonerefs /clonerefs
-    images:
-    - from:
-        kind: ImageStreamTag
-        name: clonerefs:latest
-      paths:
-      - destinationDir: .
-        sourcePath: /ko-app/clonerefs
-    type: Dockerfile
-  strategy:
-    dockerStrategy:
-      imageOptimizationPolicy: SkipLayers
-      noCache: true
-      pullSecret:
-        name: registry-pull-credentials
-    type: Docker
----
 kind: ServiceAccount
 apiVersion: v1
 metadata:
