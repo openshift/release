@@ -892,6 +892,69 @@ postsubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/variant: gcp-4.14-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.14"
+    max_concurrency: 1
+    name: branch-ci-openshift-qe-ocp-qe-perfscale-ci-main-gcp-4.14-nightly-x86-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=gcp-4.14-nightly-x86
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build04
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/variant: rosa-4.12-candidate-x86-loaded-upgrade-from-4.12
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
