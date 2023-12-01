@@ -1,0 +1,48 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: caikit-nlp
+promotion:
+  namespace: opendatahub-io
+  tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror
+  run_if_changed: ^(Dockerfile|pyproject.toml|caikit_nlp)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: caikit-nlp
+    env:
+      IMAGE_REPO: caikit-nlp
+    workflow: opendatahub-io-ci-image-mirror
+- as: fast-image-mirror
+  postsubmit: true
+  run_if_changed: ^(Dockerfile|pyproject.toml|caikit_nlp)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: caikit-nlp
+    env:
+      IMAGE_REPO: caikit-nlp
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: caikit-nlp
