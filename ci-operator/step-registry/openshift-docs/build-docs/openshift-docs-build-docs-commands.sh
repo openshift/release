@@ -13,7 +13,11 @@ echo "Building preview for PR#${PULL_NUMBER}..."
 
 git branch -m latest
 
-asciibinder build -d ${DISTRO}
+IFS=' ' read -r -a DISTROS <<< "${DISTROS}"
+
+for DISTRO in "${DISTROS[@]}"; do
+    asciibinder build -d "${DISTRO}"
+done
 
 cp scripts/ocpdocs/_previewpage _preview/index.html
 
