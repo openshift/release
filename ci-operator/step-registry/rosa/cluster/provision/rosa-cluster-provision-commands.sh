@@ -112,27 +112,31 @@ if [[ ! -z "$OLD_CLUSTER" ]]; then
 fi
 
 # Get the openshift version
-versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq -r '.[].raw_id')
-if [[ "$HOSTED_CP" == "true" ]]; then
-  versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} --hosted-cp -o json | jq -r '.[].raw_id')
-fi
-echo -e "Available cluster versions:\n${versionList}"
-
-if [[ -z "$OPENSHIFT_VERSION" ]]; then
-  if [[ "$EC_BUILD" == "true" ]]; then
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
-  else
-    OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
-  fi
-elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
-  if [[ "$EC_BUILD" == "true" ]]; then
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
-  else
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
-  fi
+if [[ ${AVAILABLE_UPGRADE} == "yes" ]] ; then
+  OPENSHIFT_VERSION=$(head -n 1 "${SHARED_DIR}/available_upgrade_version.txt")
 else
-  # Match the whole line
-  OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
+  versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq -r '.[].raw_id')
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} --hosted-cp -o json | jq -r '.[].raw_id')
+  fi
+  echo -e "Available cluster versions:\n${versionList}"
+
+  if [[ -z "$OPENSHIFT_VERSION" ]]; then
+    if [[ "$EC_BUILD" == "true" ]]; then
+      OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
+    else
+      OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
+    fi
+  elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
+    if [[ "$EC_BUILD" == "true" ]]; then
+      OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
+    else
+      OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
+    fi
+  else
+    # Match the whole line
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
+  fi
 fi
 
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
@@ -451,6 +455,9 @@ if [[ "$DRY_RUN" == "true" ]]; then
   DRY_RUN_SWITCH="--dry-run"
 fi
 
+# Save the cluster config to ARTIFACT_DIR
+cp "${SHARED_DIR}/cluster-config" "${ARTIFACT_DIR}/"
+
 echo "Parameters for cluster request:"
 echo "  Cluster name: ${CLUSTER_NAME}"
 echo "  STS mode: ${STS}"
@@ -521,7 +528,7 @@ ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
 ${SHARED_VPC_SWITCH} \
 ${SECURITY_GROUP_ID_SWITCH} \
 ${DRY_RUN_SWITCH}
-"
+" | sed -E 's/\s{2,}/ /g' > "${ARTIFACT_DIR}/create_cluster.sh"
 
 mkdir -p "${SHARED_DIR}"
 CLUSTER_ID_FILE="${SHARED_DIR}/cluster-id"

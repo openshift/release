@@ -122,16 +122,20 @@ EOF
 function create_catalog_sources()
 {
     # get cluster Major.Minor version
-    ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
-    index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
+    kube_major=$(oc version -o json |jq -r '.serverVersion.major')
+    kube_minor=$(oc version -o json |jq -r '.serverVersion.minor')
+    index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 
-    echo "create QE catalogsource: qe-app-registry"
+    echo "Create QE catalogsource: qe-app-registry"
+    echo "Use $index_image in catalogsource/qe-app-registry"
     cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
   name: qe-app-registry
   namespace: openshift-marketplace
+  annotations:
+    olm.catalogImageTemplate: "quay.io/openshift-qe-optional-operators/aosqe-index:v{kube_major_version}.{kube_minor_version}"
 spec:
   displayName: Production Operators
   image: ${index_image}

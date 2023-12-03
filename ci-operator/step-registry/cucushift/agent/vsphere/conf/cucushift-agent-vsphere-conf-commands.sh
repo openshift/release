@@ -46,9 +46,10 @@ else
 
   dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
   gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
+  gateway_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gatewayipv6' "${SUBNETS_CONFIG}")
   cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].cidr' "${SUBNETS_CONFIG}")
+  cidr_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].CidrIPv6' "${SUBNETS_CONFIG}")
   machine_cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
-
   # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
   rendezvous_ip_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[4]' "${SUBNETS_CONFIG}")
 
@@ -81,26 +82,22 @@ pullSecret: >
   ${pull_secret}
 EOF
 fi
-# Load array created in setup-vips:
-# 0: API
-# 1: Ingress
-declare -a vips
-mapfile -t vips <"${SHARED_DIR}"/vips.txt
 
 if [ "${MASTERS}" -eq 1 ]; then
+  yq --inplace 'del(.platform)' "${SHARED_DIR}"/install-config.yaml
   yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<<"
 platform:
   none: {}
 "
-else
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<<"
-platform:
-  vsphere:
-    apiVIPs:
-    - ${vips[0]}
-    ingressVIPs:
-    - ${vips[1]}
-"
+fi
+
+if [[ ${IP_FAMILIES} == "IPv4" ]]; then
+  yq e --inplace 'del(.networking)' "${SHARED_DIR}"/install-config.yaml
+  cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
+networking:
+  machineNetwork:
+  - cidr: ${machine_cidr}
+EOF
 fi
 
 cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
@@ -111,9 +108,6 @@ controlPlane:
 compute:
 - name: worker
   replicas: ${WORKERS}
-networking:
-  machineNetwork:
-  - cidr: ${machine_cidr}
 EOF
 
 # Create cluster-domain.txt
@@ -164,8 +158,35 @@ for ((i = 0; i < total_host; i++)); do
     cidr=25
   else
     ipaddress=$(jq -r --argjson N $((i + 4)) --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
+    ipv6_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].StartIPv6Address' "${SUBNETS_CONFIG}")
   fi
-
+  ipv4="
+        ipv4:
+          enabled: true
+          address:
+            - ip: ${ipaddress}
+              prefix-length: ${cidr}
+          dhcp: false"
+  ipv6="
+        ipv6:
+          enabled: true
+          address:
+            - ip: "${ipv6_address%%::*}::"$((i + 6))
+              prefix-length: ${cidr_ipv6}
+          dhcp: false"
+  route_ipv4="
+          - destination: 0.0.0.0/0
+            next-hop-address: ${gateway}
+            next-hop-interface: ens32
+            table-id: 254"
+  route_ipv6="
+          - destination: ::/0
+            next-hop-address: ${gateway_ipv6}
+            next-hop-interface: ens32
+            table-id: 254"
+  # Single-stack override conditions
+  if [[ ${IP_FAMILIES} == "IPv4" ]]; then ipv6=""; route_ipv6=""; fi
+  if [[ ${IP_FAMILIES} == "IPv6" ]]; then ipv4=""; route_ipv4=""; fi
   echo " - hostname: ${hostnames[$i]}
    role: $(echo "${hostnames[$i]}" | rev | cut -d'-' -f2 | rev | cut -f1)
    interfaces:
@@ -176,23 +197,13 @@ for ((i = 0; i < total_host; i++)); do
       - name: ens32
         type: ethernet
         state: up
-        mac-address: ${mac_addresses[$i]}
-        ipv4:
-          enabled: true
-          address:
-            - ip: ${ipaddress}
-              prefix-length: ${cidr}
-          dhcp: false
+        mac-address: ${mac_addresses[$i]}${ipv4}${ipv6}
     dns-resolver:
      config:
       server:
        - ${dns_server}
     routes:
-     config:
-       - destination: 0.0.0.0/0
-         next-hop-address: ${gateway}
-         next-hop-interface: ens32
-         table-id: 254"
+     config:${route_ipv4}${route_ipv6}"
 done >>"${SHARED_DIR}/agent-config.yaml.patch"
 
 agent_config_patch="${SHARED_DIR}/agent-config.yaml.patch"

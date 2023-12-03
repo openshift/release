@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.20
+    tag: golang-1.21
 images:
 - dockerfile_literal: |
     FROM base
@@ -20,7 +20,7 @@ images:
       && tar -C /usr/local/gcloud -xvf /tmp/google-cloud-sdk.tar.gz \
       && rm -f /tmp/google-cloud-sdk.tar.gz
     ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
-    WORKDIR /src
+    WORKDIR /workdir
     COPY . .
   from: base
   to: crio-crio-base-src
@@ -44,19 +44,19 @@ tests:
 - as: setup-periodic
   cron: 00 00 * * *
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: cri-o-setup
 - as: evented-pleg-periodic
   cron: 00 */6 * * *
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     env:
       EVENTED_PLEG: "true"
     workflow: cri-o-e2e
 - as: setup-fedora-periodic
   cron: 00 00 * * *
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: cri-o-setup-fedora
 zz_generated_metadata:
   branch: main

@@ -131,8 +131,11 @@ bastion_url=$(az storage blob generate-sas -c ${storage_contnainer} -n ${vhd_nam
 try=0 retries=30 interval=60
 while [ X"${status}" != X"success" ] && [ $try -lt $retries ]; do
     echo "check copy complete, ${try} try..."
-    #cmd="az storage blob show --container-name ${storage_contnainer} --name '${vhd_name}' --account-name ${sa_name} --account-key ${account_key} -o tsv --query properties.copy.status"
-    cmd="az storage blob show --blob-url '${bastion_url}' -o tsv --query properties.copy.status"
+    if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
+        cmd="az storage blob show --container-name ${storage_contnainer} --name '${vhd_name}' --account-name ${sa_name} --account-key ${account_key} -o tsv --query properties.copy.status"
+    else
+        cmd="az storage blob show --blob-url '${bastion_url}' -o tsv --query properties.copy.status"
+    fi
     echo "Command: $cmd"
     status=$(eval "$cmd" || echo "pending")
     echo "Status: $status"
