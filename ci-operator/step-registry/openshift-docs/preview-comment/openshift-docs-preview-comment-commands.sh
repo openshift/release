@@ -9,7 +9,7 @@ GITHUB_AUTH_TOKEN=$(cat /tmp/vault/ocp-docs-github-secret/GITHUB_AUTH_TOKEN)
 
 export GITHUB_AUTH_TOKEN
 
-PREVIEW_URL="https://${PULL_NUMBER}--previewdocs.netlify.app"
+PREVIEW_URL="https://${PULL_NUMBER}--${PREVIEW_SITE}.netlify.app"
 
 if [ -e "${SHARED_DIR}/NETLIFY_SUCCESS" ]; then
     COMMENT_DATA="🤖 $(date +'%a %b %d %T') - Prow CI generated the docs preview: ${PREVIEW_URL}"

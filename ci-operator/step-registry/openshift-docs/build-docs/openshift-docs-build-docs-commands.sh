@@ -20,4 +20,4 @@ cp scripts/ocpdocs/_previewpage _preview/index.html
 cp scripts/ocpdocs/robots_preview.txt _preview/robots.txt
 
 # Touch ${SHARED_DIR}/NETLIFY_SUCCESS if the build succeeds
-netlify deploy --site ocpdocs-pr --auth ${NETLIFY_AUTH_TOKEN} --alias ${PULL_NUMBER} --dir=_preview && touch ${SHARED_DIR}/NETLIFY_SUCCESS
+netlify deploy --site ${PREVIEW_SITE} --auth ${NETLIFY_AUTH_TOKEN} --alias ${PULL_NUMBER} --dir=_preview && touch ${SHARED_DIR}/NETLIFY_SUCCESS
