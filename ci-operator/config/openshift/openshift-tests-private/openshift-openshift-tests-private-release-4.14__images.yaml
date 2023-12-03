@@ -3,6 +3,10 @@ base_images:
     name: tests-private-base
     namespace: ci
     tag: "4.14"
+  ci_tests-private-baseui_4.14:
+    name: tests-private-baseui
+    namespace: ci
+    tag: "4.14"
   ci_tests-private-builder_4.14:
     name: tests-private-builder
     namespace: ci
@@ -29,22 +33,18 @@ images:
       - registry.ci.openshift.org/ci/tests-private-builder:4.14
   to: tests-private
 - dockerfile_literal: |
-    FROM src
-    ARG YQ_VERSION="v4.30.8"
-    RUN set -x && \
-        curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
-        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib" && \
-        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
-        declare -A YQ_HASH=([amd64]='6c911103e0dcc54e2ba07e767d2d62bcfc77452b39ebaee45b1c46f062f4fd26' \
-                            [arm64]='95092e8b5332890c46689679b5e4360d96873c025ad8bafd961688f28ea434c7') && \
-        arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" && \
-        YQ_URI="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${arch}" && \
-        curl -sSL "${YQ_URI}" -o /usr/local/bin/yq && \
-        echo "${YQ_HASH[$arch]} */usr/local/bin/yq" | sha256sum --strict --status --check && \
-        chmod +x /usr/local/bin/yq && \
-        yum clean all && rm -rf /var/cache/yum/*
-  from: src
+    FROM src AS builder
+    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.14
+    RUN mkdir -p /go/src/github.com/openshift
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+  inputs:
+    ci_tests-private-baseui_4.14:
+      as:
+      - registry.ci.openshift.org/ci/tests-private-baseui:4.14
+    src:
+      as:
+      - src
   to: tests-private-ui
 - dockerfile_literal: |
     FROM root

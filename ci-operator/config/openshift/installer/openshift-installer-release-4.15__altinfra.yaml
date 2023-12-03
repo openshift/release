@@ -14,10 +14,7 @@ base_images:
 build_root:
   from_repository: true
 images:
-- build_args:
-  - name: TAGS
-    value: altinfra
-  dockerfile_path: images/installer/Dockerfile.ci
+- dockerfile_path: images/installer-altinfra/Dockerfile.ci
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
@@ -175,6 +172,26 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-upi-proxy
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-wavelengthzones
+  optional: true
+  steps:
+    cluster_profile: aws-local-zones
+    env:
+      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
+      EDGE_ZONE_TYPE: wavelength-zone
+    workflow: openshift-e2e-aws-local-zones
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-shared-vpc-wavelengthzones
+  optional: true
+  steps:
+    cluster_profile: aws-local-zones
+    env:
+      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
+      EDGE_ZONE_TYPE: wavelength-zone
+    workflow: openshift-e2e-aws-local-zones-byo-vpc
   timeout: 6h0m0s
 - always_run: false
   as: e2e-azure-ovn

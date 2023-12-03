@@ -30,7 +30,7 @@ Testing released Tempo operator version with unreleased OpenShift version.
 3. Build the Tempo Operator bundle.
 4. Provision a OpenShift cluster on AWS.
 5. Install the Tempo Operator bundle built in the previous step.
-6. Install the Elasticsearch, AMQ streams, Jaeger and OpenTelemetry operators.
+6. Install the OpenTelemetry operators.
 7. Run the Tempo Operator tests.
 8. Gather the results.
 9. Deprovision the cluster.
@@ -42,7 +42,7 @@ Testing unreleased Tempo operator version with supported OpenShift versions and 
 3. Build the Tempo Operator bundle.
 4. Provision a OpenShift cluster on AWS.
 5. Install the Tempo Operator bundle built in the previous step.
-6. Install the Elasticsearch, AMQ streams, Jaeger and OpenTelemetry operators.
+6. Install the OpenTelemetry operators.
 7. Run the Tempo Operator tests.
 8. Gather the results.
 9. Deprovision the cluster. 
@@ -55,12 +55,9 @@ Please see the [`firewatch-ipi-aws`](https://steps.ci.openshift.org/workflow/fir
 
 Following the test cluster being provisioned, the following steps are executed.:
 
-1. [`operatorhub-subscribe-elasticsearch-operator-ref`](../../../step-registry/operatorhub/subscribe/elasticsearch-operator/README.md)
-2. [`operatorhub-subscribe-amq-streams-ref`](../../../step-registry/operatorhub/subscribe/amq-streams/README.md)
-3. [`distributed-tracing-install-tempo-product-ref`](../../../step-registry/distributed-tracing/install/tempo-product/README.md)
-4. [`distributed-tracing-install-opentelemetry-product-ref`](../../../step-registry/distributed-tracing/install/opentelemetry-product/README.md)
-5. [`distributed-tracing-install-jaeger-product-ref`](../../../step-registry/distributed-tracing/install/jaeger-product/README.md)
-6. [`distributed-tracing-tests-tempo-ref`](../../../step-registry/distributed-tracing/tests/tempo/README.md)
+1. [`distributed-tracing-install-tempo-product-ref`](../../../step-registry/distributed-tracing/install/tempo-product/README.md)
+2. [`distributed-tracing-install-opentelemetry-product-ref`](../../../step-registry/distributed-tracing/install/opentelemetry-product/README.md)
+3. [`distributed-tracing-tests-tempo-ref`](../../../step-registry/distributed-tracing/tests/tempo/README.md)
 
 ## Prerequisite(s)
 
@@ -69,12 +66,6 @@ Following the test cluster being provisioned, the following steps are executed.:
 - `BASE_DOMAIN`
   - **Definition**: A fully-qualified domain or subdomain name. The base domain of the cloud provider is used for setting baseDomain variable of the install configuration of the cluster.
   - **If left empty**: The [`firewatch-ipi-aws` workflow](../../../step-registry/firewatch/ipi/aws/firewatch-ipi-aws-workflow.yaml) will fail.
-- `EO_SUB_CHANNEL`
-  - **Definition**: The operator subscription channel from which to install the Elasticsearch Operator.
-  - **If left empty**: The [`operatorhub-subscribe-elasticsearch-operator`](../../../step-registry/operatorhub/subscribe/elasticsearch-operator/README.md) will use the `stable` channel.
-- `EO_SUB_SOURCE`
-  - **Definition**: The operator catalog source from which to install the Elasticsearch Operator.
-  - **If left empty**: The [`operatorhub-subscribe-elasticsearch-operator`](../../../step-registry/operatorhub/subscribe/elasticsearch-operator/README.md) will use the `qe-app-registry` catalog source.
 - `DOWNSTREAM_TESTS_COMMIT`
   - **Definition**: The Tempo operator commit to use downstream release compatible test cases.
   - **If left empty**: The [`distributed-tracing-tests-tempo`](../../../step-registry/distributed-tracing/tests/tempo/README.md) will use the latest commit.

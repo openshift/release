@@ -13,10 +13,61 @@ export HOME=/tmp
 export SSH_PRIV_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
 export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}"
 
-echo "$(date -u --rfc-3339=seconds) - Configuring gcloud..."
+# release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
+# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines 
+# release:initial image, once that, use 'oc get istag release:inital' to workaround it.
+echo "RELEASE_IMAGE_INITIAL: ${RELEASE_IMAGE_INITIAL:-}"
+if [[ -n ${RELEASE_IMAGE_INITIAL:-} ]]; then
+    tmp_release_image_initial=${RELEASE_IMAGE_INITIAL}
+    echo "Getting inital release image from RELEASE_IMAGE_INITIAL..."
+elif oc get istag "release:initial" -n ${NAMESPACE} &>/dev/null; then
+    tmp_release_image_initial=$(oc -n ${NAMESPACE} get istag "release:initial" -o jsonpath='{.tag.from.name}')
+    echo "Getting inital release image from build farm imagestream: ${tmp_release_image_initial}"
+fi
+# For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and 
+# RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has 
+# higher priority than RELEASE_IMAGE_LATEST
+TESTING_RELEASE_IMAGE=""
+if [[ -n ${tmp_release_image_initial:-} ]]; then
+    TESTING_RELEASE_IMAGE=${tmp_release_image_initial}
+else
+    TESTING_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
+fi
+echo "TESTING_RELEASE_IMAGE: ${TESTING_RELEASE_IMAGE}"
 
+# check if OCP version will be equal to or greater than the minimum version
+# $1 - the minimum version to be compared with
+# return 0 if OCP version >= the minimum version, otherwise 1
+function version_check() {
+  local -r minimum_version="$1"
+
+  dir=$(mktemp -d)
+  pushd "${dir}"
+
+  cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
+  KUBECONFIG="" oc registry login --to pull-secret
+  ocp_version=$(oc adm release info --registry-config pull-secret ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+
+  if [[ "${ocp_version}" == "${minimum_version}" ]] || [[ "${ocp_version}" > "${minimum_version}" ]]; then
+    ret=0
+  else
+    ret=1
+  fi
+
+  rm pull-secret
+  popd
+  return ${ret}
+}
+
+echo "$(date -u --rfc-3339=seconds) - Configuring gcloud..."
+if version_check "4.12"; then
+  GCLOUD_SDK_VERSION="447"
+else
+  GCLOUD_SDK_VERSION="256"
+fi
 if ! gcloud --version; then
-  GCLOUD_TAR="google-cloud-sdk-447.0.0-linux-x86_64.tar.gz"
+  GCLOUD_TAR="google-cloud-sdk-${GCLOUD_SDK_VERSION}.0.0-linux-x86_64.tar.gz"
   GCLOUD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$GCLOUD_TAR"
   echo "$(date -u --rfc-3339=seconds) - gcloud not installed: installing from $GCLOUD_URL"
   pushd ${HOME}

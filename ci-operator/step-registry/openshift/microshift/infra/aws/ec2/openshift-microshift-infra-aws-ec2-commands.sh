@@ -10,6 +10,22 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 #Save stacks events
 trap 'save_stack_events_to_shared' EXIT TERM INT
 
+# This map should be extended everytime AMIs from different regions/architectures/os versions
+# are added.
+declare -A ami_map=(
+  [us-west-2,x86_64,rhel-9.2]=ami-0d5b3039c1132e1b2
+  [us-west-2,x86_64,rhel-9.3]=ami-04b4d3355a2e2a403
+  [us-west-2,arm64,rhel-9.2]=ami-0addfb94c944af1cc
+  [us-west-2,arm64,rhel-9.3]=ami-0086e25ab5453b65e
+)
+
+# All graviton instances have a lower case g in the family part. Using
+# this we avoid adding the full map here.
+ARCH="x86_64"
+if [[ "${EC2_INSTANCE_TYPE%.*}" =~ .*"g".* ]]; then
+  ARCH="arm64"
+fi
+
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 REGION="${EC2_REGION:-$LEASED_RESOURCE}"
@@ -17,9 +33,15 @@ JOB_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 stack_name="${JOB_NAME}"
 cf_tpl_file="${SHARED_DIR}/${JOB_NAME}-cf-tpl.yaml"
 
+MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
+if [ -f "${MICROSHIFT_CLUSTERBOT_SETTINGS}" ]; then
+  : Overriding step defaults by sourcing clusterbot settings
+  # shellcheck disable=SC1090
+  source "${MICROSHIFT_CLUSTERBOT_SETTINGS}"
+fi
+
 if [[ "${EC2_AMI}" == "" ]]; then
-  echo "must supply an AMI to use for EC2 Instance"
-  exit 1
+  EC2_AMI="${ami_map[$REGION,$ARCH,$MICROSHIFT_OS]}"
 fi
 
 ec2Type="VirtualMachine"
@@ -29,16 +51,11 @@ fi
 
 ami_id=${EC2_AMI}
 instance_type=${EC2_INSTANCE_TYPE}
-host_device_name="/dev/xvdc"
-
-if [[ "$EC2_INSTANCE_TYPE" =~ a1.* ]] || [[ "$EC2_INSTANCE_TYPE" =~ c[0-9]+[gn].* ]]; then
-  host_device_name="/dev/nvme1n1"
-fi
 
 function save_stack_events_to_shared()
 {
   set +o errexit
-  aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json > "${SHARED_DIR}/stack-events-${stack_name}.json"
+  aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json > "${ARTIFACT_DIR}/stack-events-${stack_name}.json"
   set -o errexit
 }
 
@@ -93,9 +110,6 @@ Parameters:
   PublicKeyString:
     Type: String
     Description: The public key used to connect to the EC2 instance
-  HostDeviceName:
-    Type: String
-    Description: Disk device name to create pvs and vgs
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -303,19 +317,6 @@ Resources:
           echo "fs.inotify.max_user_instances = 8192" >> /etc/sysctl.conf
           sysctl --system |& tee -a /tmp/init_output.txt
           sysctl -a |& tee -a /tmp/init_output.txt
-          echo "====== Running DNF Install ======" | tee -a /tmp/init_output.txt
-          if ! ( sudo lsblk | grep 'xvdc' ); then
-              echo "/dev/xvdc device not found, assuming this is metal host, skipping LVM configuration" |& tee -a /tmp/init_output
-              exit 0
-          fi
-          sudo dnf install -y lvm2 |& tee -a /tmp/init_output.txt
-
-          # NOTE: wrapping script vars with {} since the cloudformation will see
-          # them as cloudformation vars instead.
-          echo "====== Creating PV ======" | tee -a /tmp/init_output.txt
-          sudo pvcreate "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
-          echo "====== Creating VG ======" | tee -a /tmp/init_output.txt
-          sudo vgcreate rhel "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
 
 Outputs:
   InstanceId:
@@ -349,7 +350,6 @@ aws --region "$REGION" cloudformation create-stack --stack-name "${stack_name}" 
         ParameterKey=HostInstanceType,ParameterValue="${instance_type}"  \
         ParameterKey=Machinename,ParameterValue="${stack_name}"  \
         ParameterKey=AmiId,ParameterValue="${ami_id}" \
-        ParameterKey=HostDeviceName,ParameterValue="${host_device_name}" \
         ParameterKey=EC2Type,ParameterValue="${ec2Type}" \
         ParameterKey=PublicKeyString,ParameterValue="$(cat ${CLUSTER_PROFILE_DIR}/ssh-publickey)"
 
