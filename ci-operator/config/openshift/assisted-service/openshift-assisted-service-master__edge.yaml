@@ -1124,7 +1124,7 @@ tests:
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-oci-assisted
   optional: true
-  run_if_changed: ^(internal/provider/.*\.go|internal/provider/oci/.*|internal/provider/registry/.*)$
+  run_if_changed: ^(internal/provider/.*\.go|internal/provider/external/.*|internal/provider/registry/.*)$
   steps:
     cluster_profile: oci-assisted
     workflow: assisted-oci
@@ -1147,6 +1147,25 @@ tests:
       ASSISTED_CONFIG: |
         OCI_BOOT_VOLUME_TYPE="ISCSI"
     workflow: assisted-oci
+- always_run: false
+  as: e2e-metal-assisted-external-4-14
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        PLATFORM=external
+        OPENSHIFT_VERSION=4.14
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-external
+  optional: true
+  run_if_changed: ^(internal/provider/.*\.go|internal/provider/external/.*|internal/provider/registry/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        PLATFORM=external
+    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master
   org: openshift
