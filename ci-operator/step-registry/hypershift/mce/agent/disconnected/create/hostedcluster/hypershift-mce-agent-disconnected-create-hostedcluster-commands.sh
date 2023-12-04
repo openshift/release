@@ -59,7 +59,6 @@ fi
   --agent-namespace="\${CLUSTER_NAMESPACE}" \
   --namespace local-cluster \
   --base-domain=\${BASEDOMAIN} \
-  --api-server-address=api.\${CLUSTER_NAME}.\${BASEDOMAIN} \
   --image-content-sources "/home/mgmt_iscp.yaml" \
   --release-image \${PLAYLOADIMAGE}
 
