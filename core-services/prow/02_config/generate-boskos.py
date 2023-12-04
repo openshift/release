@@ -32,8 +32,8 @@ CONFIG = {
         'us-east-1': 40,
     },
     'aws-cspi-qe-quota-slice': {
-        'us-east-1': 10,
-        'us-east-2': 10,
+        'us-east-1': 30,
+        'us-east-2': 30,
     },
     'aws-managed-cspi-qe-quota-slice': {
         'us-east-1': 10,

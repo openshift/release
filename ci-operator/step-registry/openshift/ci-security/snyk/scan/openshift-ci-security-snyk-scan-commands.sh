@@ -35,6 +35,10 @@ if [ -z "${PROJECT_NAME}" ]; then
 fi
 
 snyk_deps() {
+    if [ "$SNYK_ENABLE_DEPS_SCAN" != "true" ]; then
+        echo "Skipping snyk dependencies scan"
+        return 0
+    fi
     echo Starting snyk dependencies scan
     PARAMS=(--project-name="$PROJECT_NAME" --org="$ORG_NAME")
     if [ "$ALL_PROJECTS" = "true" ]; then
@@ -47,6 +51,10 @@ snyk_deps() {
 }
 
 snyk_code() {
+    if [ "$SNYK_ENABLE_CODE_SCAN" != "true" ]; then
+        echo "Skipping snyk code scan"
+        return 0
+    fi
     echo Starting snyk code scan
     PARAMS=(--project-name="$PROJECT_NAME" --org="$ORG_NAME"  --sarif-file-output="${ARTIFACT_DIR}/snyk.sarif.json" --report)
     if [ "$SNYK_CODE_ADDITIONAL_ARGS" ]; then
