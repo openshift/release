@@ -1,3 +1,8 @@
+base_images:
+  ubi9-python311:
+    name: ubi-python-311
+    namespace: ocp
+    tag: "9"
 build_root:
   image_stream_tag:
     name: release
@@ -27,10 +32,18 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
-  commands: make test-unit
+- as: verify
+  commands: pip install black && make verify
   container:
-    from: src
+    from: ubi9-python311
+- as: unit
+  commands: make install-deps && make install-deps-test && make test-unit
+  container:
+    from: ubi9-python311
+- as: integration
+  commands: make install-deps && make install-deps-test && make test-integration
+  container:
+    from: ubi9-python311
 - as: e2e
   steps:
     cluster_profile: aws

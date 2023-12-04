@@ -1,0 +1,88 @@
+base_images:
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  mtc-python-client:
+    name: mtc-python-client
+    namespace: mtc-qe
+    tag: master
+  oadp-apps-deployer:
+    name: oadp-apps-deployer
+    namespace: oadp-qe
+    tag: master
+  oadp-e2e-qe:
+    name: oadp-e2e-qe
+    namespace: oadp-qe
+    tag: master
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+images:
+- context_dir: .
+  dockerfile_path: dockerfiles/testing/interop/Dockerfile
+  inputs:
+    mtc-python-client:
+      paths:
+      - destination_dir: mtc-python-client.tar.gz
+        source_path: /mtc-python-client.tar.gz
+    oadp-apps-deployer:
+      paths:
+      - destination_dir: oadp-apps-deployer.tar.gz
+        source_path: /oadp-apps-deployer.tar.gz
+    oadp-e2e-qe:
+      paths:
+      - destination_dir: oadp-e2e-qe.tar.gz
+        source_path: /oadp-e2e-qe.tar.gz
+  to: oadp-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: oadp-interop-aws
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["4.15-lp","self-managed-lp","oadp-lp"]},
+          {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_project": "LPINTEROP", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["4.15-lp","self-managed-lp","oadp-lp"]},
+          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.15-lp","self-managed-lp","oadp-lp"]},
+          {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPINTEROP", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.15-lp","self-managed-lp","oadp-lp"]},
+          {"step": "oadp-s3-*", "failure_type": "all", "classification":  "Infrastructure Provisioning - S3 Buckets", "jira_project": "LPINTEROP", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["4.15-lp","self-managed-lp","oadp-lp","interop-tests"]},
+          {"step": "oadp-annotate-volsync", "failure_type": "all", "classification": "Infrastructure Provisioning - Misc.", "jira_project": "LPINTEROP", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["4.15-lp","self-managed-lp","oadp-lp","interop-tests"]},
+          {"step": "oadp-execute-tests", "failure_type": "pod_failure", "classification": "Test Execution", "jira_project": "LPINTEROP", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["4.15-lp","self-managed-lp","oadp-lp","interop-tests"]},
+          {"step": "oadp-execute-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "OADP", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["4.15-lp","self-managed-lp","oadp-lp","interop-tests"]}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OPERATORS: |
+        [
+          {"name": "redhat-oadp-operator", "source": "redhat-operators", "channel": "stable-1.3", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp", "operator_group":"oadp-operator-group"},
+          {"name": "volsync-product", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators", "target_namespaces": "", "operator_group":"global-operators"}
+        ]
+      USER_TAGS: |
+        scenario oadp
+    test:
+    - ref: install-operators
+    - ref: oadp-annotate-volsync
+    - ref: oadp-execute-tests
+    workflow: oadp-ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: oadp-qe
+  repo: oadp-qe-automation
+  variant: oadp1.3-ocp4.15-lp-interop
