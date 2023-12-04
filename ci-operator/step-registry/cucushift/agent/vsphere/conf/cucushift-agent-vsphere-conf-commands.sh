@@ -246,8 +246,16 @@ echo "agent.x86_64_${cluster_name}.iso" >"${SHARED_DIR}"/agent-iso.txt
 agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
 echo "uploading ${agent_iso} to iso-datastore.."
 
+export GOVC_DEBUG_PATH="${ARTIFACT_DIR}/govc"
+mkdir -p "${GOVC_DEBUG_PATH}"
+
+echo "${vsphere_datastore}"
+echo "${GOVC_DATACENTER}"
+
 for ((i = 0; i < 3; i++)); do
-  if /tmp/govc datastore.upload -ds "${vsphere_datastore}" agent.x86_64.iso agent-installer-isos/"${agent_iso}"; then
+  /tmp/govc datastore.ls -ds "${vsphere_datastore}" agent-installer-isos/ 
+
+  if /tmp/govc datastore.upload -debug -ds "${vsphere_datastore}" agent.x86_64.iso agent-installer-isos/"${agent_iso}"; then
     echo "$(date -u --rfc-3339=seconds) - Agent ISO has been uploaded successfully!!"
     status=0
     break
@@ -261,6 +269,7 @@ if [ $status -ne 0 ]; then
   echo "Agent ISO upload failed after 3 attempts!!!"
   exit 1
 fi
+unset GOVC_DEBUG_PATH
 
 echo "$(date -u --rfc-3339=seconds) - Creating platform-conf.sh file for post installation..."
 cat >>"${SHARED_DIR}/platform-conf.sh" <<EOF
