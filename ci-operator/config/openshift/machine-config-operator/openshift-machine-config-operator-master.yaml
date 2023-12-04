@@ -225,6 +225,80 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
+- as: e2e-aws-ovn-upgrade-ocb
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: enable-layering
+      cli: latest
+      commands: |-
+        #!/usr/bin/env bash
+
+        set -euo
+
+        namespace="openshift-machine-config-operator"
+        defaultTimeout="5m"
+
+        doPreOptInSetup() {
+          ocbConfigMapName="on-cluster-build-config"
+          imagestreamName="os-image"
+          globalPullSecretCloneName="global-pull-secret-copy"
+
+          oc create secret docker-registry "$globalPullSecretCloneName" --from-file=.dockerconfigjson=<(oc get secret/pull-secret -n openshift-config -o json | jq -r -c '.data[".dockerconfigjson"] | @base64d') -n "$namespace"
+
+          oc create imagestream "$imagestreamName" -n "$namespace"
+          builderSecretName="$(oc get secrets -n "$namespace" -o name | head -n1 | grep "secret/builder-dockercfg" | sed 's/secret\///g')"
+          finalPullspec="$(oc get "imagestream/$imagestreamName" -n "$namespace" -o=jsonpath='{.status.dockerImageRepository}')"
+          oc create configmap "$ocbConfigMapName" -n "$namespace" \
+            --from-literal=baseImagePullSecretName="$globalPullSecretCloneName" \
+            --from-literal=finalImagePullspec="$finalPullspec" \
+            --from-literal=finalImagePushSecretName="$builderSecretName"
+        }
+
+        optInPoolAndWait() {
+          pool="$1"
+          optInPool "$pool"
+          waitForPoolToBuild "$pool"
+          waitForPoolToUpdate "$pool"
+        }
+
+        optInPool() {
+          pool="$1"
+          object="mcp/$pool"
+          oc label "$object" 'machineconfiguration.openshift.io/layering-enabled=';
+        }
+
+        waitForPoolToBuild() {
+          pool="$1"
+          object="mcp/$pool"
+          echo "$pool: Waiting for build to start"
+          oc wait --timeout="$defaultTimeout" --for=condition=Building "$object";
+          echo "$pool: Build has started, waiting for build completion"
+          oc wait --timeout="$defaultTimeout" --for=condition=BuildSuccess "$object";
+          echo "$pool: Build has completed"
+        }
+
+        waitForPoolToUpdate() {
+          pool="$1"
+          object="mcp/$pool"
+          echo "$pool: Waiting for update to start"
+          oc wait --timeout="$defaultTimeout" --for=condition=Updating "$object";
+          echo "$pool: Update started, waiting for update to complete"
+          oc wait --timeout="30m" --for=condition=Updated "$object";
+          echo "$pool: Ready for on-cluster build testing"
+        }
+
+        doPreOptInSetup
+        optInPoolAndWait "master" &
+        optInPoolAndWait "worker" &
+        wait
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: openshift-e2e-test
+    workflow: openshift-upgrade-aws
 - as: e2e-aws-workers-rhel8
   optional: true
   steps:
