@@ -68,6 +68,17 @@ spec:
             curl --fail --retry 3 -L https://golang.org/dl/go$VERSION.linux-$ARCH.tar.gz | tar -C /usr/local -xzf - && \
             curl --fail --retry 3 -L https://github.com/gotestyourself/gotestsum/releases/download/v1.11.0/gotestsum_1.11.0_linux_$ARCH.tar.gz | tar -C /usr/bin -xzf -
 
+
+        RUN ARCH=$(uname -m) && \
+            OC_CLIENT_URL="https://mirror.openshift.com/pub/openshift-v4/clients/ocp/4.14.0/openshift-client-linux" && \
+            if [ "$ARCH" = "aarch64" ]; then \
+                OC_CLIENT_URL="${OC_CLIENT_URL}-arm64.tar.gz"; \
+            else \
+                OC_CLIENT_URL="${OC_CLIENT_URL}.tar.gz"; \
+            fi && \
+            echo "Downloading OpenShift client for $ARCH" && \
+            curl --fail --retry 3 -L $OC_CLIENT_URL | tar -C /usr/local/bin -xzf -
+
         RUN chmod g+xw -R $GOPATH && \
             chmod g+xw -R $(go env GOROOT)
 
