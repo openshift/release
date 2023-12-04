@@ -532,6 +532,21 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
+- as: aws-ocm-osd-ccs-fleet-manager-f7
+  cron: 2 15 4,11,18,26 * *
+  steps:
+    cluster_profile: fleet-manager-qe
+    env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @network-ovnkubernetes and
+        @hypershift-hosted and not @fips'
+      OPENSHIFT_VERSION: "4.14"
+      TAG_VERSION: '@4.14'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+    test:
+    - ref: osd-ccs-fleet-manager-test
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: osd-ccs-fleet-manager
 - as: vsphere-ipi-disconnected-f14
   cron: 15 16 5,20 * *
   steps:
