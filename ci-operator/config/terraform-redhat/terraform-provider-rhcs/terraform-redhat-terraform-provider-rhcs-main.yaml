@@ -38,51 +38,6 @@ tests:
     make unit-test
   container:
     from: src
-- always_run: false
-  as: rosa-classic-e2e-presubmit
-  steps:
-    cluster_profile: aws-terraform-qe
-    env:
-      TF_FOLDER: ci/e2e/terraform_provider_rhcs_files
-      TF_VARS: |
-        url = "https://api.stage.openshift.com"
-        channel_group = "stable"
-        aws_region = "ap-northeast-1"
-        aws_availability_zones = ["ap-northeast-1a"]
-    post:
-    - ref: rosa-terraform-e2e-teardown
-    pre:
-    - ref: rosa-terraform-e2e-setup
-- as: managed-oidc-config-e2e-presubmit
-  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
-  steps:
-    cluster_profile: aws-terraform-qe
-    env:
-      TF_FOLDER: ci/e2e/oidc_configuration/cluster_with_managed_oidc_config
-      TF_VARS: |
-        url = "https://api.stage.openshift.com"
-        channel_group = "candidate"
-        aws_region = "ap-northeast-1"
-        aws_availability_zones = ["ap-northeast-1a"]
-    post:
-    - ref: rosa-terraform-e2e-teardown
-    pre:
-    - ref: rosa-terraform-e2e-setup
-- as: unmanaged-oidc-config-e2e-presubmit
-  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
-  steps:
-    cluster_profile: aws-terraform-qe
-    env:
-      TF_FOLDER: ci/e2e/oidc_configuration/cluster_with_unmanaged_oidc_config
-      TF_VARS: |
-        url = "https://api.stage.openshift.com"
-        channel_group = "stable"
-        aws_region = "ap-northeast-1"
-        aws_availability_zones = ["ap-northeast-1a"]
-    post:
-    - ref: rosa-terraform-e2e-teardown
-    pre:
-    - ref: rosa-terraform-e2e-setup
 - as: managed-oidc-config-e2e-periodic
   cluster: build05
   cron: '@daily'
@@ -122,7 +77,7 @@ tests:
     test:
     - ref: openshift-extended-test
     - ref: rosa-terraform-e2e-tests-upload-polarion
-- as: rosa-sts-ad-critical-high-f3
+- as: rosa-sts-advanced-critical-high-f3
   cron: 38 11 3,6,9,12,15,18,21,23,27,30 * *
   steps:
     cluster_profile: aws-terraform-qe
@@ -135,12 +90,36 @@ tests:
     test:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
-- as: rosa-sts-pl-critical-high-f3
+- as: rosa-sts-private-critical-high-f3
   cron: 08 21 1,4,7,10,13,16,19,22,25,28 * *
   steps:
     cluster_profile: aws-terraform-qe
     env:
       CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-pl
+      REGION: us-east-1
+      RHCS_ENV: staging
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-sts-advanced-critical-high-presubmit
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-ad
+      REGION: ap-northeast-1
+      RHCS_ENV: staging
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-sts-private-critical-high-presubmit
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
       REGION: us-east-1

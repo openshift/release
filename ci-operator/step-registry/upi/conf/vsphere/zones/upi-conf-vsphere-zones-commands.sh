@@ -31,73 +31,49 @@ end_master_num=$((start_master_num + MASTER_REPLICAS - 1))
 start_worker_num=$((end_master_num + 1))
 end_worker_num=$((start_worker_num + WORKER_REPLICAS - 1))
 
-master_ips=()
-worker_ips=()
-
 SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
-if [[ ${LEASED_RESOURCE} == *"segment"* ]]; then
-  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${vsphere_portgroup}"))
-
-  machine_cidr="192.168.${third_octet}.0/25"
-  netmask="255.255.255.128"
-  gateway="192.168.${third_octet}.1"
-  bootstrap_ip_address="192.168.${third_octet}.3"
-  lb_ip_address="192.168.${third_octet}.2"
-
-  for num in $(seq "$start_master_num" "$end_master_num"); do
-    master_ips+=("192.168.${third_octet}.$num")
-  done
-
-  if [ "${WORKER_REPLICAS}" -ne 0 ]; then
-    for num in $(seq "$start_worker_num" "$end_worker_num"); do
-      worker_ips+=("192.168.${third_octet}.$num")
-    done
-  fi
-else
-  if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-    echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
-    exit 1
-  fi
-
-  dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
-  gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
-  netmask=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].mask' "${SUBNETS_CONFIG}")
-
-  lb_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[2]' "${SUBNETS_CONFIG}")
-  bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[3]' "${SUBNETS_CONFIG}")
-  machine_cidr=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
-
-  printf "***** DEBUG dns: %s lb: %s bootstrap: %s cidr: %s ******\n" "$dns_server" "$lb_ip_address" "$bootstrap_ip_address" "$machine_cidr"
-
-  control_plane_idx=0
-  control_plane_addrs=()
-  control_plane_hostnames=()
-  for n in $(seq "$start_master_num" "$end_master_num"); do
-    control_plane_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
-    control_plane_hostnames+=("control-plane-$((control_plane_idx++))")
-  done
-  printf "**** controlplane DEBUG %s ******\n" "${control_plane_addrs[@]}"
-
-  printf -v control_plane_ip_addresses "\"%s\"," "${control_plane_addrs[@]}"
-  control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
-
-
-  printf "**** DEBUG start_worker_num: %s end_worker_num: %s ******\n" "${start_worker_num}" "${end_worker_num}"
-
-  compute_idx=0
-  compute_addrs=()
-  compute_hostnames=()
-  for n in $(seq "$start_worker_num" "$end_worker_num"); do
-    compute_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
-    compute_hostnames+=("compute-$((compute_idx++))")
-  done
-
-  printf "**** compute DEBUG %s ******\n" "${compute_addrs[@]}"
-
-  printf -v compute_ip_addresses "\"%s\"," "${compute_addrs[@]}"
-  compute_ip_addresses="[${compute_ip_addresses%,}]"
-
+if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
+  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+  exit 1
 fi
+
+dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
+gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
+netmask=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].mask' "${SUBNETS_CONFIG}")
+
+lb_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[2]' "${SUBNETS_CONFIG}")
+bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[3]' "${SUBNETS_CONFIG}")
+machine_cidr=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
+
+printf "***** DEBUG dns: %s lb: %s bootstrap: %s cidr: %s ******\n" "$dns_server" "$lb_ip_address" "$bootstrap_ip_address" "$machine_cidr"
+
+control_plane_idx=0
+control_plane_addrs=()
+control_plane_hostnames=()
+for n in $(seq "$start_master_num" "$end_master_num"); do
+  control_plane_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+  control_plane_hostnames+=("control-plane-$((control_plane_idx++))")
+done
+printf "**** controlplane DEBUG %s ******\n" "${control_plane_addrs[@]}"
+
+printf -v control_plane_ip_addresses "\"%s\"," "${control_plane_addrs[@]}"
+control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
+
+
+printf "**** DEBUG start_worker_num: %s end_worker_num: %s ******\n" "${start_worker_num}" "${end_worker_num}"
+
+compute_idx=0
+compute_addrs=()
+compute_hostnames=()
+for n in $(seq "$start_worker_num" "$end_worker_num"); do
+  compute_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+  compute_hostnames+=("compute-$((compute_idx++))")
+done
+
+printf "**** compute DEBUG %s ******\n" "${compute_addrs[@]}"
+
+printf -v compute_ip_addresses "\"%s\"," "${compute_addrs[@]}"
+compute_ip_addresses="[${compute_ip_addresses%,}]"
 
 # First one for api, second for apps.
 echo "${lb_ip_address}" >>"${SHARED_DIR}"/vips.txt

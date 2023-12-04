@@ -24,7 +24,7 @@ CLUSTER_NAME=$(oc get infrastructure cluster -o json | jq -r '.status.apiServerU
 echo "Updating firewall rules for data-path test on cluster $CLUSTER_NAME"
 
 NETWORK_NAME=$(gcloud compute networks list --format="value(name)" | grep ^${CLUSTER_NAME})
-gcloud compute firewall-rules create ${NETWORK_NAME}-net --network ${NETWORK_NAME} --direction INGRESS --priority 101 --description 'allow tcp,udp network tests' --rules tcp:10000-20000,udp:10000-20000 --action allow
+gcloud compute firewall-rules create ${NETWORK_NAME}-net --network ${NETWORK_NAME} --direction INGRESS --priority 101 --description 'allow tcp,udp network tests' --rules tcp:10000-61000,udp:10000-61000 --action allow
 
 
 

@@ -1,0 +1,28 @@
+workflow:
+  as: openshift-e2e-aws-network-mtu-edge-zones
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: ipi-aws-pre-local-zones-opt-in
+    - chain: ipi-conf-aws
+    - ref: network-conf-aws-cluster-mtu
+    - chain: ipi-install
+    - ref: ipi-aws-pre-local-zones-csi-default
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-network
+    - chain: ipi-aws-post
+    env:
+      # FAIL_ON_CORE_DUMP: "false"
+      NETWORK_TYPE: "OVNKubernetes"
+      CLUSTER_NETWORK_MTU: 1200
+      AWS_EDGE_POOL_ENABLED: "yes"
+      EDGE_ZONE_TYPE: local-zone
+      # skip storage tests due the bug on upstream on parsing the region's endpoint URL:
+      # https://issues.redhat.com/browse/OCPBUGS-11609
+      TEST_SKIPS: >-
+        \[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Inline-volume (ext4)\] volumes should store data \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\|\[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Pre-provisioned PV (default fs)\] volumes should allow exec of files on the volume \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\|\[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Pre-provisioned PV (filesystem volmode)\] volumeMode should not mount / map unused volumes in a pod \[LinuxOnly\] \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\|\[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Inline-volume (ext4)\] volumes should allow exec of files on the volume \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\|\[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Pre-provisioned PV (ext4)\] volumes should allow exec of files on the volume \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\|\[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Pre-provisioned PV (block volmode)\] volumeMode should not mount / map unused volumes in a pod \[LinuxOnly\] \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\] \|\[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Pre-provisioned PV (default fs)\] volumes should store data \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\|\[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Inline-volume (default fs)\] volumes should allow exec of files on the volume \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\|\[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Pre-provisioned PV (block volmode)\] volumes should store data \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\|\[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Inline-volume (default fs)\] volumes should store data \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\|\[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Pre-provisioned PV (ext4)\] volumes should store data \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\|\[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)\] ephemeral should support two pods which have the same volume definition \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\|\[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)\] ephemeral should create read/write inline ephemeral volume \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\|\[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Pre-provisioned PV (block volmode)\] volumeMode should not mount / map unused volumes in a pod \[LinuxOnly\] \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\|\[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)\] ephemeral should create read-only inline ephemeral volume \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\|\[sig-storage\] In-tree Volumes \[Driver: aws\] \[Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)\] ephemeral should support expansion of pvcs created for ephemeral pvcs \[Skipped:NoOptionalCapabilities\] \[Suite:openshift/conformance/parallel\] \[Suite:k8s\]\|\[sig-network\]\[Feature:tap\] should create a pod with a tap interface \[apigroup:k8s.cni.cncf.io\] \[Suite:openshift/conformance/parallel\]
+  documentation: |-
+    The Openshift E2E workflow executes the installation with a custom MTU in overlay network,
+    running regular end-to-end test suite.
