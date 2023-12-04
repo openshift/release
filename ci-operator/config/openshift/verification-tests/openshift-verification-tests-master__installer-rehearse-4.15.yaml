@@ -1,0 +1,63 @@
+base_images:
+  ansible:
+    name: "4.15"
+    namespace: ocp
+    tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.15"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.15"
+    namespace: ocp
+    tag: openstack-installer
+  upi-installer:
+    name: "4.15"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.15"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: installer-rehearse-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      SLEEP_DURATION: 1h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-private-provision
+- as: installer-rehearse-azure
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_VNET_TAGS: qekey=qevalue
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    workflow: cucushift-installer-rehearse-azure-ipi-private
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: verification-tests
+  variant: installer-rehearse-4.15
