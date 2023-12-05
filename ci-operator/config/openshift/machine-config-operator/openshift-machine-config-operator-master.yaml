@@ -321,7 +321,51 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - as: get-rpmostree-status-pre-e2e
+      cli: latest
+      commands: |-
+        #!/usr/bin/env bash
+
+        runOnAllNodes() {
+          command="$1"
+
+          for node in $(oc get nodes -o name); do
+            printf "%s output:\n%s\n" "$node" "$(oc debug "$node" -- chroot /host /bin/bash -c "$command")" &
+          done
+          wait
+        }
+
+        runOnAllNodes "rpm-ostree status";
+        runOnAllNodes "yq --version";
+        runOnAllNodes "rg --version";
+        runOnAllNodes "cowsay --version";
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - ref: openshift-e2e-test
+    - as: get-rpmostree-status-post-e2e
+      cli: latest
+      commands: |-
+        #!/usr/bin/env bash
+
+        runOnAllNodes() {
+          command="$1"
+
+          for node in $(oc get nodes -o name); do
+            printf "%s output:\n%s\n" "$node" "$(oc debug "$node" -- chroot /host /bin/bash -c "$command")" &
+          done
+          wait
+        }
+
+        runOnAllNodes "rpm-ostree status";
+        runOnAllNodes "yq --version";
+        runOnAllNodes "rg --version";
+        runOnAllNodes "cowsay --version";
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     workflow: openshift-upgrade-aws
 - as: e2e-aws-workers-rhel8
   optional: true
