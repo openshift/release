@@ -1,8 +1,12 @@
 base_images:
   cli:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: cli
+  upi-installer:
+    name: "4.15"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
@@ -29,7 +33,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -38,71 +42,55 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: quay-e2e-tests-quay39-ocp414
-  cron: 0 12 * * 5
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m5.2xlarge
-      CSO_CHANNEL: stable-3.9
-      ODF_OPERATOR_CHANNEL: stable-4.13
-      QBO_CHANNEL: stable-3.9
-      QUAY_OPERATOR_CHANNEL: stable-3.9
-    test:
-    - chain: quay-tests-quay-e2e-test
-    - ref: quay-tests-qbo-qe-test
-    - ref: quay-tests-cso-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi
-- as: quay-e2e-tests-quay39-ocp414-fips
+- as: quay-e2e-tests-quay310-ocp415-fips
   cron: 0 12 * * 3
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      CSO_CHANNEL: stable-3.9
+      CSO_CHANNEL: stable-3.10
       FIPS_ENABLED: "true"
-      ODF_OPERATOR_CHANNEL: stable-4.13
-      QBO_CHANNEL: stable-3.9
-      QUAY_OPERATOR_CHANNEL: stable-3.9
+      QBO_CHANNEL: stable-3.10
+      QUAY_OPERATOR_CHANNEL: stable-3.10
     test:
-    - chain: quay-tests-quay-e2e-test
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-e2e
     - ref: quay-tests-qbo-qe-test
     - ref: quay-tests-cso-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: quay-e2e-tests-quay39-ocp414-aws-s3
+- as: quay-e2e-tests-quay310-ocp415-aws-s3
   cron: 0 12 * * 5
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      QUAY_OPERATOR_CHANNEL: stable-3.9
+      QUAY_OPERATOR_CHANNEL: stable-3.10
     test:
     - ref: quay-tests-deploy-quay-aws-s3
     - ref: quay-tests-test-quay-e2e
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: quay-e2e-tests-quay39-ocp414-azure
+- as: quay-e2e-tests-quay310-ocp415-azure
   cron: 0 12 * * 6
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      QUAY_OPERATOR_CHANNEL: stable-3.9
+      QUAY_OPERATOR_CHANNEL: stable-3.10
     test:
     - ref: quay-tests-deploy-quay-azure
     - ref: quay-tests-test-quay-e2e
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: quay-e2e-tests-quay39-ocp414-gcp
+- as: quay-e2e-tests-quay310-ocp415-gcp
   cron: 0 12 * * 5
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      QUAY_OPERATOR_CHANNEL: stable-3.9
+      QUAY_OPERATOR_CHANNEL: stable-3.10
     test:
     - ref: quay-tests-deploy-quay-gcp
     - ref: quay-tests-test-quay-e2e
