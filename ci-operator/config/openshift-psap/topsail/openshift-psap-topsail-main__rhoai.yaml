@@ -1,0 +1,191 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: build/Dockerfile
+  from: os
+  to: topsail
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+tests:
+- as: light
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.13"
+  steps:
+    pre:
+    - as: prepare
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run rhoai test prepare_ci
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    test:
+    - as: test
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run rhoai test test_ci
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: generic-claim
+- as: e2e
+  steps:
+    post:
+    - as: destroy-clusters
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run rhoai clusters destroy
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    pre:
+    - as: create-clusters
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run rhoai clusters create
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: prepare
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run rhoai test prepare_ci
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    test:
+    - as: test
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run rhoai test test_ci
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+- as: long
+  steps:
+    post:
+    - as: destroy-clusters
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run rhoai clusters destroy
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    pre:
+    - as: create-clusters
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run rhoai clusters create
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: prepare
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run rhoai test prepare_ci
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    test:
+    - as: test
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run rhoai test test_ci
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+      timeout: 5h0m0s
+  timeout: 7h0m0s
+- as: plot
+  steps:
+    test:
+    - as: test
+      commands: run rhoai test generate_plots_from_pr_args
+      from: topsail
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 1Gi
+zz_generated_metadata:
+  branch: main
+  org: openshift-psap
+  repo: topsail
+  variant: rhoai

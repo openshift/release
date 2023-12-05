@@ -87,8 +87,8 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-02b8534ff4b424939
       EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-tests
 - as: microshift-metal-cache
   cluster: build02
@@ -96,7 +96,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-02b8534ff4b424939
+      MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-cache
 - as: microshift-metal-cache-nightly
   cluster: build02
@@ -104,7 +104,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-02b8534ff4b424939
+      MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-cache
 - as: microshift-metal-cache-arm
   cluster: build02
@@ -112,8 +112,8 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-08c7e766098f8cb4f
       EC2_INSTANCE_TYPE: t4g.2xlarge
+      MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-cache
 - as: microshift-metal-cache-nightly-arm
   cluster: build02
@@ -121,8 +121,8 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-08c7e766098f8cb4f
       EC2_INSTANCE_TYPE: t4g.2xlarge
+      MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-cache
 - as: rebase-on-nightlies
   cron: 0 5 * * 1-5
@@ -130,12 +130,12 @@ tests:
     workflow: openshift-microshift-rebase
 - as: metal-periodic-test
   cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
+  run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*)$
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-02b8534ff4b424939
       EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly
   cluster: build02
@@ -143,8 +143,8 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-02b8534ff4b424939
       EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly-arm
   cluster: build02
@@ -152,8 +152,8 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-08c7e766098f8cb4f
       EC2_INSTANCE_TYPE: c6g.metal
+      MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly-presubmit-arm
   cluster: build02
@@ -161,24 +161,36 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-08c7e766098f8cb4f
       EC2_INSTANCE_TYPE: c6g.metal
+      MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-tests
-- as: ocp-conformance-nightly
+- as: ocp-conformance-rhel-eus-nightly
+  cluster: build02
+  cron: 0 1,13 * * *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
+- as: ocp-conformance-rhel-eus-nightly-arm
   cluster: build02
   cron: 0 1,13 * * *
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-02b8534ff4b424939
+      EC2_INSTANCE_TYPE: t4g.2xlarge
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
-- as: ocp-conformance
+- as: ocp-conformance-rhel-eus
+  cluster: build02
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|origin/.*|vendor/.*|Makefile.*|scripts/.*)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
+- as: ocp-conformance-rhel-eus-arm
   cluster: build02
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|origin/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-02b8534ff4b424939
+      EC2_INSTANCE_TYPE: t4g.2xlarge
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 zz_generated_metadata:
   branch: main
