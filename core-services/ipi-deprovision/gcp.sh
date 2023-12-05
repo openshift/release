@@ -79,6 +79,14 @@ if [[ "${#buckets[@]}" -gt 0 ]]; then
   timeout 30m gsutil -m rm -r "${buckets[@]}"
 fi
 
+# Prune Filestore instances
+export FILESTORE_FILTER="createTime.date('%Y-%m-%dT%H:%M%z')<${gce_cluster_age_cutoff} AND name~'-ci'"
+INSTANCES=$( gcloud --project="${GCP_PROJECT}" filestore instances list --filter "${FILESTORE_FILTER}" --uri )
+for INSTANCE in $INSTANCES; do
+    echo "Deleting Filestore instance $INSTANCE"
+    gcloud filestore instances delete "$INSTANCE" --async --force --quiet
+done
+
 FAILED="$(find ${clusters} -name failure -printf '%H\n' | sort)"
 if [[ -n "${FAILED}" ]]; then
   echo "Deprovision failed on the following clusters:"
