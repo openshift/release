@@ -1,4 +1,5 @@
 base_images:
+<<<<<<< HEAD
   cli-ocm:
     name: cli-ocm
     namespace: ci
@@ -7,6 +8,16 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
+=======
+  kiali-cypress-tests-runner:
+    name: kiali-cypress-tests
+    namespace: ci
+    tag: v1.65
+  kiali-int-tests-runner:
+    name: kiali-int-tests
+    namespace: ci
+    tag: v1.65
+>>>>>>> faded48e155 (service mesh operator tests on hypershift)
   upi-installer:
     name: "4.14"
     namespace: ocp
@@ -15,7 +26,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.19
 images:
 - context_dir: .
   dockerfile_path: Dockerfile
@@ -55,21 +66,37 @@ tests:
               {"step": "rosa-cluster-wait*", "failure_type": "all", "classification": "Infrastructure Provisioning - Rosa Cluster Operators", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "rosa-sts-account-roles-create", "failure_type": "all", "classification": "Account Roles Creation - AWS", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "rosa-sts-account-roles-delete", "failure_type": "all", "classification": "Account Roles Deletion - AWS", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["!default"]},
-              {"step": "rosa-conf-idp-htpasswd", "failure_type": "all", "classification": "Admin Access - Cluster", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]}
+              {"step": "rosa-conf-idp-htpasswd", "failure_type": "all", "classification": "Admin Access - Cluster", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "servicemesh-smcp-install", "failure_type": "all", "classification": "Infrastructure Provisioning - SMCP Install", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 2}, "jira_component": "Customer Impact", "jira_assignee": "rcernich@redhat.com", "jira_priority": "critical"},
+              {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Cypress Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": "Customer Impact", "jira_assignee": "rcernich@redhat.com", "jira_priority": "critical"},
+              {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "test_failure", "classification": "Kiali Cypress Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": "Customer Impact", "jira_assignee": "rcernich@redhat.com", "jira_priority": "critical"},
+              {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Integration Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": "Customer Impact", "jira_assignee": "rcernich@redhat.com", "jira_priority": "critical"},
+              {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "test_failure", "classification": "Kiali Integration Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": "Customer Impact", "jira_assignee": "rcernich@redhat.com", "jira_priority": "critical"},
+              {"step": "servicemesh-maistra-test-tool-execute", "failure_type": "pod_failure", "classification": "Maistra Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": "Customer Impact", "jira_assignee": "rcernich@redhat.com", "jira_priority": "critical"},
+              {"step": "servicemesh-maistra-test-tool-execute", "failure_type": "test_failure", "classification": "Maistra Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": "Customer Impact", "jira_assignee": "rcernich@redhat.com", "jira_priority": "critical"}
             ]
         }
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.14-lp","rosa-hypershift-lp","servicemesh-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      GATEWAY_API_ENABLED: "true"
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.14"
       OPERATORS: |
         [
+            {"name": "elasticsearch-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
             {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"}
         ]
       REGION: us-west-2
+      SMCP_VERSION: "2.4"
+      TEST_GROUP: interop
     test:
-    - ref: install-operators
-    - ref: cucushift-hypershift-extended-health-check
+    - chain: install-operators
+    - ref: servicemesh-maistra-test-tool-execute
+    - ref: servicemesh-smcp-install
+    - ref: servicemesh-kiali-int-tests-execute
+    - ref: servicemesh-kiali-cypress-tests-execute
     workflow: firewatch-rosa-aws-sts-hypershift
 zz_generated_metadata:
   branch: main
