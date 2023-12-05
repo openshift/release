@@ -15,7 +15,19 @@ RUN_COMMAND="poetry run pytest tests \
             -m ${TEST_MARKER} \
             --data-collector=data-collector-openshift-ci.yaml "
 
-KUBECONFIG_COMMAND="--kubeconfig-file-paths="${CLUSTER1_KUBECONFIG_PATH},${CLUSTER2_KUBECONFIG_PATH}" "
+if [[ -n "${CLUSTER1_KUBECONFIG_PATH}" ]]; then
+  if [[ -n "${CLUSTER2_KUBECONFIG_PATH}" ]]; then
+    KUBECONFIG_COMMAND="--kubeconfig-file-paths="${CLUSTER1_KUBECONFIG_PATH},${CLUSTER2_KUBECONFIG_PATH}""
+    if [[ -n "${CLUSTER3_KUBECONFIG_PATH}" ]]; then
+      KUBECONFIG_COMMAND+=",${CLUSTER3_KUBECONFIG_PATH} "
+    fi
+  else
+    export KUBECONFIG=${CLUSTER1_KUBECONFIG_PATH}
+  fi
+else
+    echo "At least one cluster kubeconfig must be provided."
+    exit 1
+fi
 
 RUN_COMMAND+=" ${KUBECONFIG_COMMAND} "
 
