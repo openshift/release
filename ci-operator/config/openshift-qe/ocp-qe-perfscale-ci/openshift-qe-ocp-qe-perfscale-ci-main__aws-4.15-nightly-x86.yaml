@@ -199,6 +199,68 @@ tests:
     - chain: openshift-qe-node-density
     workflow: openshift-qe-installer-aws-sdn-fips
   timeout: 5h0m0s
+- as: cilium-data-path-9nodes
+  cron: 0 1 3 * *
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      LOKI_USE_SERVICEMONITOR: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
+      SET_ENV_BY_PLATFORM: custom
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-aws-cilium
+  timeout: 5h0m0s
+- as: cilium-node-density-cni-24nodes
+  cron: 0 1 3 * *
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m6a.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.xlarge
+      KUBE_BURNER_VERSION: 1.8.0
+      PODS_PER_NODE: "200"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-aws-cilium
+  timeout: 5h0m0s
+- as: cilium-control-plane-24nodes
+  cron: 0 1 3 * *
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      KUBE_BURNER_VERSION: 1.8.0
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws-cilium
+  timeout: 6h0m0s
+- as: cilium-control-plane-120nodes
+  cron: 0 1 3 * *
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      KUBE_BURNER_VERSION: 1.8.0
+      SIZE_VARIANT: large
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws-cilium
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-qe
