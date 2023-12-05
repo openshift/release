@@ -34,6 +34,11 @@ def _cluster_scoped_rbac_resources(gendoc):
                     'verbs': ['*']
                 },
                 {
+                    'apiGroups': ['image.openshift.io'],
+                    'resources': ['imagestreamimports'],
+                    'verbs': ['create']
+                },
+                {
                     'apiGroups': ['config.openshift.io'],
                     'resources': ['infrastructures'],
                     'verbs': ['get', 'list', 'watch']
