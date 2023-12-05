@@ -876,7 +876,7 @@ tests:
 
           ### Create a VM ###
           Msg "Create a simple VM on the previous version cluster, before the upgrade"
-          ${CMD} create namespace ${VMS_NAMESPACE}
+          ${CMD} get namespace | grep "^${VMS_NAMESPACE}" || ${CMD} create namespace ${VMS_NAMESPACE}
           ssh-keygen -t ecdsa -f ./hack/test_ssh -q -N ""
           cat << END > ./hack/cloud-init.sh
         #!/bin/sh
@@ -887,7 +887,7 @@ tests:
         sudo chown -R \${NEW_USER}: /home/\${NEW_USER}/.ssh
         sudo chmod 600 /home/\${NEW_USER}/.ssh/authorized_keys
         END
-          ${CMD} create secret -n ${VMS_NAMESPACE} generic testvm-secret --from-file=userdata=./hack/cloud-init.sh
+          {$CMD} get secret | grep "^testvm-secret" || ${CMD} create secret -n ${VMS_NAMESPACE} generic testvm-secret --from-file=userdata=./hack/cloud-init.sh
           ${CMD} apply -n ${VMS_NAMESPACE} -f ./hack/vm.yaml
           ${CMD} get vm -n ${VMS_NAMESPACE} -o yaml testvm
           ~/virtctl start testvm -n ${VMS_NAMESPACE}
