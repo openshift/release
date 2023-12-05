@@ -48,7 +48,6 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.15
   ocp_os:
-    as: ocp_os
     name: "4.15"
     namespace: ocp
     tag: rhel-coreos
@@ -66,7 +65,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: machine-config-operator
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
+    FROM registry.ci.openshift.org/ocp/4.15:rhel-coreos
     RUN curl -L 'https://github.com/BurntSushi/ripgrep/releases/download/13.0.0/ripgrep-13.0.0-x86_64-unknown-linux-musl.tar.gz' | tar -xvz -C /usr/bin --strip-components=1 ripgrep-13.0.0-x86_64-unknown-linux-musl/rg && \
         chmod +x /usr/bin/rg && \
         curl -Lo /usr/bin/yq 'https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64' && \
@@ -76,11 +75,19 @@ images:
         systemctl enable tailscaled && \
         ostree container commit
   from: ocp_os
+  inputs:
+    ocp_os:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:rhel-coreos
   to: custom-os-image
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/ocp/4.15:rhel-coreos
     RUN echo "custom-image" > /etc/custom-image && ostree container commit
-  from: ocp-os
+  from: ocp_os
+  inputs:
+    ocp_os:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:rhel-coreos
   to: rhel-coreos
 promotion:
   excluded_images:
