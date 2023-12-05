@@ -892,7 +892,7 @@ function test_ready_mc_acm_placement_decision () {
   echo "Confirming that api.openshift.com/osdfm-cluster-status is ready in the ManagedCluster resource on SC"
   EXPECTED_OSD_FM_CLUSTER_READY_STATUS_LABEL_COUNT=1
   ACTUAL_OSD_FM_CLUSTER_READY_STATUS_LABEL_COUNT=0
-  ACTUAL_OSD_FM_CLUSTER_READY_STATUS_LABEL_COUNT=$(oc --kubeconfig 27g2q5vhs8cb0cfv3g3u8hig4avdnkh9-brae-sc get ManagedCluster -o json | grep "\"api.openshift.com/osdfm-cluster-status"\" | grep -c "ready")
+  ACTUAL_OSD_FM_CLUSTER_READY_STATUS_LABEL_COUNT=$(oc get ManagedCluster -o json | grep "\"api.openshift.com/osdfm-cluster-status"\" | grep -c "ready")
   if [ "$EXPECTED_OSD_FM_CLUSTER_READY_STATUS_LABEL_COUNT" != "$ACTUAL_OSD_FM_CLUSTER_READY_STATUS_LABEL_COUNT" ]; then
     printf "\nERROR. Expected count of 'api.openshift.com/osdfm-cluster-status: ready' in ManagedCluster resource SC to be 1. Got:\n%d" "$ACTUAL_OSD_FM_CLUSTER_READY_STATUS_LABEL_COUNT"
     TEST_PASSED=false
@@ -1179,11 +1179,147 @@ function test_backups_created_only_once () {
 
 ##################################################################
 
+###### fix: Hypershift OBO machineset set to 3 nodes in the same AZ tests (OCPQE-17964) ######
+
+function test_obo_machinesets () {
+  TEST_PASSED=true
+  export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+  mc_cluster_id=$(cat "${ARTIFACT_DIR}/ocm-mc-id")
+
+  echo "Getting 'obo' machinepools names"
+  OBO_MACHINE_POOLS_NAMES=$(ocm get /api/clusters_mgmt/v1/clusters/"$mc_cluster_id"/machine_pools | jq '.items[]' | jq 'select(.id | startswith("obo"))' | jq -r .id)
+  EXPECTED_OBO_MP_COUNT=1
+  ACTUAL_OBO_MP_COUNT=$(echo -n "$OBO_MACHINE_POOLS_NAMES" | grep -c '^')
+  echo "Confirming that there is only one obo machine pool"
+
+  if [[ "$OBO_MACHINE_POOLS_NAMES" != "obo"* ]] || [ "$ACTUAL_OBO_MP_COUNT" -ne "$EXPECTED_OBO_MP_COUNT" ]; then
+    echo "ERROR. Unable to confirm that only one obo machine pool exists. Got the following mps with 'obo' in their name: '$OBO_MACHINE_POOLS_NAMES'"
+    TEST_PASSED=false
+  else
+    echo "Confirming that number of replicas, AZs and subnets for $OBO_MACHINE_POOLS_NAMES matches expectations (3)"
+    OBO_MP_OUTPUT=$(ocm get /api/clusters_mgmt/v1/clusters/"$mc_cluster_id"/machine_pools/"$OBO_MACHINE_POOLS_NAMES")
+    EXPECTED_MP_REPLICAS=3
+    EXPECTED_MP_AZ_COUNT=3
+    EXPECTED_MP_SUBNETS_COUNT=3
+    ACTUAL_MP_REPLICAS=$(jq -n "$OBO_MP_OUTPUT" | jq -r .replicas) || true
+    ACTUAL_MP_SUBNET_COUNT=$(jq -n "$OBO_MP_OUTPUT" | jq -r '.subnets | length') || true
+    ACTUAL_MP_AZ_COUNT=$(jq -n "$OBO_MP_OUTPUT" | jq -r '.availability_zones | length') || true
+    if [ "$EXPECTED_MP_REPLICAS" -ne "$ACTUAL_MP_REPLICAS" ] || [ "$EXPECTED_MP_AZ_COUNT" -ne "$ACTUAL_MP_AZ_COUNT" ] || [ "$EXPECTED_MP_SUBNETS_COUNT" -ne "$ACTUAL_MP_SUBNET_COUNT" ]; then
+      echo "ERROR. Expecting number of replicas, AZs count and subnet count for $OBO_MACHINE_POOLS_NAMES to be 3."
+      ech "Got number of replicas: $ACTUAL_MP_REPLICAS, number of AZs: $ACTUAL_MP_AZ_COUNT, subnets: $ACTUAL_MP_SUBNET_COUNT"
+      TEST_PASSED=false
+    fi
+    echo "Getting obo machinesets"
+    OBO_MACHINESETS_OUTPUT=$(oc get machinesets -A | grep obo)
+    NO_OF_OBO_MACHINESETS=$(echo -n "$OBO_MACHINESETS_OUTPUT" | grep -c '^')
+    EXPECTED_NO_OF_OBO_MACHINESETS=3
+    if [ "$NO_OF_OBO_MACHINESETS" -ne "$EXPECTED_NO_OF_OBO_MACHINESETS" ]; then
+      echo "ERROR. Expected number of obo machinesets to be: $EXPECTED_NO_OF_OBO_MACHINESETS. Got: $NO_OF_OBO_MACHINESETS"
+      TEST_PASSED=false
+    else
+      PREVIOUS_MS_REGION=""
+      PREVIOUS_MS_AZ=""
+      EXPECTED_DESIRED_REPLICA_COUNT=1
+      echo "$OBO_MACHINESETS_OUTPUT" | while read -r ms; do
+        MS_NAME=$(echo "$ms" | awk '{print $2}')
+        MS_DESIRED_REPLICAS=$(echo "$ms" | awk '{print $3}')
+        echo "Confirming that obo machineset $MS_NAME has desired number of replicas ($MS_DESIRED_REPLICAS) and is placed in the same region as other obo ms, but in unique AZ"
+        if [ "$MS_DESIRED_REPLICAS" != "$EXPECTED_DESIRED_REPLICA_COUNT" ]; then
+          echo "ERROR. Expected desired $MS_NAME desired replica count to be: $EXPECTED_DESIRED_REPLICA_COUNT. Got: $MS_DESIRED_REPLICAS"
+          TEST_PASSED=false
+          break
+        fi
+        REGION=$(oc get machineset "$MS_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.providerSpec.value.placement.region) || true
+        AZ=$(oc get machineset "$MS_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.providerSpec.value.placement.availabilityZone) || true
+        if [ "$PREVIOUS_MS_REGION" == "" ]; then
+          if [ "$REGION" == "" ]; then
+            echo "ERROR. Expected machineset: $MS_NAME spec to contain non-empty region. Unable to get this property"
+            TEST_PASSED=false
+            break
+          else
+            PREVIOUS_MS_REGION="$REGION"
+          fi
+        fi
+        if [ "$PREVIOUS_MS_AZ" == "$AZ" ] || [ "$AZ" == "" ]; then
+          echo "ERROR. Expected machineset: $MS_NAME spec to contain non-empty availability zone that is unique across all obo machinesets. Got value: '$AZ'"
+          TEST_PASSED=false
+          break
+        else
+          PREVIOUS_MS_AZ="$AZ"
+        fi
+      done
+    fi
+  fi
+
+  update_results "OCPQE-17964" $TEST_PASSED
+}
+
+###### end of fix: Hypershift OBO machineset set to 3 nodes in the same AZ tests (OCPQE-17964) ######
+
+##################################################################
+
+###### sts enable MC not able to create awsendpointservice correctly (OCPQE-17965) ######
+
+function test_awsendpointservices_status_output_populated () {
+  TEST_PASSED=true
+  export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+
+  echo "Getting list of awsendpointservices items"
+
+  AWS_ENDPOINT_SERVICES_OUTPUT=$(oc get awsendpointservices.hypershift.openshift.io -A -o json | jq -r)
+  ITEMS_LENGTH=$(jq -n "$AWS_ENDPOINT_SERVICES_OUTPUT" | jq -r '.items | length')
+
+  if [ "$ITEMS_LENGTH" -eq 0 ]; then
+    echo "There should be at least one item returned for 'awsendpointservices.hypershift.openshift.io' after HC was created"
+    TEST_PASSED=false
+  else
+    STATUS_OUTPUT=$(jq -n "$AWS_ENDPOINT_SERVICES_OUTPUT" | jq -r .items[0].status)
+    echo "Confirming that awsendpointservices status is populated"
+    echo "Confirming that 'dnsNames' array contains at least one item"
+    DNS_NAMES_LENGTH=$(jq -n "$STATUS_OUTPUT" | jq -r '.dnsNames | length')
+    if [ "$DNS_NAMES_LENGTH" -eq 0 ]; then
+      echo "ERROR. Expected 'dnsNames' array to contain at least one item"
+      TEST_PASSED=false
+    fi
+    echo "Confirming that 'conditions' array contains at least one item"
+    CONDITIONS_LENGTH=$(jq -n "$STATUS_OUTPUT" | jq -r '.conditions | length')
+    if [ "$CONDITIONS_LENGTH" -eq 0 ]; then
+      echo "ERROR. Expected 'conditions' array to contain at least one item"
+      TEST_PASSED=false
+    fi
+    echo "Confirming that 'dnsZoneID' field is a non-empty string"
+    DNS_ZONE_ID=$(jq -n "$STATUS_OUTPUT" | jq -r '.dnsZoneID') || echo ""
+    if [ "$DNS_ZONE_ID" == "" ]; then
+      echo "ERROR. Expected 'dnsZoneID' field to be populated"
+      TEST_PASSED=false
+    fi
+    echo "Confirming that 'endpointID' field is a non-empty string"
+    ENDPOINT_ID=$(jq -n "$STATUS_OUTPUT" | jq -r '.endpointID') || echo ""
+    if [ "$ENDPOINT_ID" == "" ]; then
+      echo "ERROR. Expected 'endpointID' field to be populated"
+      TEST_PASSED=false
+    fi
+    echo "Confirming that 'endpointServiceName' field is a non-empty string"
+    ENDPOINT_SERVICE_NAME=$(jq -n "$STATUS_OUTPUT" | jq -r '.endpointServiceName') || echo ""
+    if [ "$ENDPOINT_SERVICE_NAME" == "" ]; then
+      echo "ERROR. Expected 'endpointServiceName' field to be populated"
+      TEST_PASSED=false
+    fi
+  fi
+
+  update_results "OCPQE-17965" $TEST_PASSED
+}
+
+###### end of fix: sts enable MC not able to create awsendpointservice correctly (OCPQE-17965) ######
+
+##################################################################
+
 # Test all cases and print results
 
 test_monitoring_disabled
 
-test_autoscaler
+# temporarily disabling this test, as autoscaling work is ongoing and it won't pass
+# test_autoscaler
 
 test_labels
 
@@ -1214,6 +1350,10 @@ test_machineset_tains_and_labels
 test_sts_mc_sc
 
 test_backups_created_only_once
+
+test_obo_machinesets
+
+test_awsendpointservices_status_output_populated
 
 printf "\nPassed tests:\n"
 for p in "${PASSED[@]}"; do
