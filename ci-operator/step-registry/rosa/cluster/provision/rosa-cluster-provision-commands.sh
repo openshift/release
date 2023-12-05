@@ -481,8 +481,8 @@ echo "  Enable Byovpc: ${ENABLE_BYOVPC}"
 echo "  Enable audit log: ${ENABLE_AUDIT_LOG}"
 echo "  Cluster Tags: ${TAGS}"
 echo "  Additional Security groups: ${ADDITIONAL_SECURITY_GROUP}"
-if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
-  echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
+echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
+if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then 
   echo "  Min replicas: ${MIN_REPLICAS}"
   echo "  Min replicas: ${MAX_REPLICAS}"  
 else
