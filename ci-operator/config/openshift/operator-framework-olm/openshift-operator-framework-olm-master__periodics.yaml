@@ -1,12 +1,32 @@
 base_images:
-  ci-image:
-    name: ci-image
-    namespace: operator-lifecycle-manager
-    tag: latest
-  operator-lifecycle-manager:
+  base:
     name: "4.15"
     namespace: ocp
-    tag: operator-lifecycle-manager
+    tag: base
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: operator-lifecycle-manager.Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+  to: operator-lifecycle-manager
+- dockerfile_path: operator-registry.Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+  to: operator-registry
+- dockerfile_path: base.Dockerfile
+  from: src
+  to: ci-image
 releases:
   initial:
     integration:
@@ -14,6 +34,7 @@ releases:
       namespace: ocp
   latest:
     integration:
+      include_built_images: true
       name: "4.15"
       namespace: ocp
 resources:
