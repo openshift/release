@@ -1,0 +1,75 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  test-image:
+    name: 3scale-interop-tests
+    namespace: ci
+    tag: v2.13
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: 3scale-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: 3scale-amp-interop-rosa-aws
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      AWS_REGION: us-east-2
+      DEPL_BUCKET_NAME: 3scale-apimanager-s3-bucket
+      DEPL_PROJECT_NAME: threescale
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "aws-*", "failure_type": "all", "classification": "Infrastructure AWS", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["4.14-lp", "rosa-lp", "3scale-lp"]},
+          {"step": "rosa-cluster-provision", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["4.14-lp", "rosa-lp", "3scale-lp"]},
+          {"step": "rosa-cluster-wait-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp", "rosa-lp", "3scale-lp"]},
+          {"step": "rosa-sts-account-roles-create", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp", "rosa-lp", "3scale-lp"]},
+          {"step": "rosa-cluster-deprovision", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp", "rosa-lp", "3scale-lp"]},
+          {"step": "rosa-conf-idp-htpasswd", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp", "rosa-lp", "3scale-lp"]},
+          {"step": "rosa-sts-account-roles-delete", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["4.14-lp", "rosa-lp", "3scale-lp"]},
+          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp", "rosa-lp", "3scale-lp"]},
+          {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["4.14-lp", "rosa-lp", "3scale-lp"]},
+          {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_project": "LPTOCPCI", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["4.14-lp", "rosa-lp", "3scale-lp"]},
+          {"step": "cucushift-*", "failure_type": "all", "classification": "Cluster Health Check", "jira_project": "LPTOCPCI", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["4.14-lp", "rosa-lp", "3scale-lp"]},
+          {"step": "3scale-apimanager-*", "failure_type": "pod_failure", "classification":  "Infrastructure Provisioning - API Manager", "jira_project": "LPTOCPCI", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["4.14-lp", "rosa-lp", "3scale-lp"]},
+          {"step": "3scale-apimanager-*", "failure_type": "test_failure", "classification":  "Infrastructure Provisioning - API Manager", "jira_project": "THREESCALE", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["4.14-lp", "rosa-lp", "3scale-lp"]},
+          {"step": "3scale-interop-tests", "failure_type": "all", "classification": "Test Failure", "jira_project": "THREESCALE", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["4.14-lp", "rosa-lp", "3scale-lp"]}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OPERATORS: |
+        [
+            {"name": "3scale-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "threescale", "target_namespaces": "threescale", "operator_group":"threescale-operator-group"}
+        ]
+    test:
+    - chain: install-operators
+    - ref: 3scale-apimanager-install
+    - ref: 3scale-interop-tests
+    - ref: 3scale-apimanager-uninstall
+    workflow: firewatch-rosa-aws-sts
+zz_generated_metadata:
+  branch: main
+  org: 3scale-qe
+  repo: 3scale-deploy
+  variant: 3scale-amp-ocp4.14-lp-rosa
