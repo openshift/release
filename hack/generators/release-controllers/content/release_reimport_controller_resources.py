@@ -127,7 +127,7 @@ def _namespace_scoped_rbac_resources(gendoc):
 def _namespace_list(namespaces):
     namespace_list = []
     for namespace in namespaces:
-        namespace_list.append("--namespaces=" + namespace + ",")
+        namespace_list.append("--namespaces=" + namespace)
     return namespace_list
 
 
