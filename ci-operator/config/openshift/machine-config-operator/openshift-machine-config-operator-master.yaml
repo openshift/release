@@ -248,8 +248,7 @@ tests:
       cli: latest
       commands: |-
         #!/usr/bin/env bash
-
-        set -euo
+        set -euo pipefail
 
         namespace="openshift-machine-config-operator"
         defaultTimeout="5m"
@@ -268,6 +267,17 @@ tests:
             --from-literal=baseImagePullSecretName="$globalPullSecretCloneName" \
             --from-literal=finalImagePullspec="$finalPullspec" \
             --from-literal=finalImagePushSecretName="$builderSecretName"
+
+          # I opted to Base64 encode the custom Containerfile to avoid issues with
+          # Heredoc. This is the same Containerfile I used for the on-cluster build
+          # demo.
+          containerfile="IyBQdWxsIHRoZSBjZW50b3MgYmFzZSBpbWFnZSBhbmQgZW5hYmxlIHRoZSBFUEVMIHJlcG9zaXRvcnkuCkZST00gcXVheS5pby9jZW50b3MvY2VudG9zOnN0cmVhbTkgQVMgY2VudG9zClJVTiBkbmYgaW5zdGFsbCAteSBlcGVsLXJlbGVhc2UKCiMgUHVsbCBhbm90aGVyIGltYWdlIGNvbnRhaW5pbmcgYSB1dGlsdHkgdG8gaW5jbHVkZS4KRlJPTSBkb2NrZXIuaW8vbWlrZWZhcmFoL3lxOmxhdGVzdCBBUyB5cQoKIyBCdWlsZCB0aGUgZmluYWwgT1MgaW1hZ2UgZm9yIHRoaXMgTWFjaGluZUNvbmZpZ1Bvb2wuCkZST00gY29uZmlncyBBUyBmaW5hbAoKIyBDb3B5IHRoZSBFUEVMIGNvbmZpZ3MgaW50byB0aGUgZmluYWwgaW1hZ2UuCkNPUFkgLS1mcm9tPXlxIC91c3IvYmluL3lxIC91c3IvYmluL3lxCkNPUFkgLS1mcm9tPWNlbnRvcyAvZXRjL3l1bS5yZXBvcy5kIC9ldGMveXVtLnJlcG9zLmQKQ09QWSAtLWZyb209Y2VudG9zIC9ldGMvcGtpL3JwbS1ncGcvUlBNLUdQRy1LRVktKiAvZXRjL3BraS9ycG0tZ3BnLwojIEluc3RhbGwgY293c2F5IGFuZCByaXBncmVwIGZyb20gdGhlIEVQRUwgcmVwb3NpdG9yeSBpbnRvIHRoZSBmaW5hbCBpbWFnZSwKIyBhbG9uZyB3aXRoIGEgY3VzdG9tIGNvdyBmaWxlLgpSVU4gc2VkIC1pICdzL1wkc3RyZWFtLzktc3RyZWFtL2cnIC9ldGMveXVtLnJlcG9zLmQvY2VudG9zKi5yZXBvICYmIFwKICAgIHJwbS1vc3RyZWUgaW5zdGFsbCBjb3dzYXkgcmlwZ3JlcCAmJiBcCiAgICBjdXJsIC1MbyAvdXNyL3NoYXJlL2Nvd3NheS9zaXRlLWNvd3Mvcm9ja28uY293ICdodHRwczovL3Jhdy5naXRodWJ1c2VyY29udGVudC5jb20vcGF1bGthZWZlci9jb3dzYXktZmlsZXMvbWFpbi9jb3dzL3JvY2tvLmNvdycK"
+
+          decoded_containerfile="$(echo "$containerfile" | base64 -d)"
+
+          oc create configmap on-cluster-build-custom-dockerfile -n "$namespace" \
+            --from-literal=worker="$decoded_containerfile" \
+            --from-literal=master="$decoded_containerfile"
         }
 
         optInPoolAndWait() {
