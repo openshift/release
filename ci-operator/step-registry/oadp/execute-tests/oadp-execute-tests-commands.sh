@@ -16,6 +16,7 @@ export ANSIBLE_REMOTE_TMP="/tmp/"
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 RESULTS_FILE="/alabama/cspi/e2e/junit_report.xml"
+LOGS_FOLDER="/alabama/cspi/e2e/logs"
 
 # Extract additional repository archives
 mkdir -p {$OADP_GIT_DIR,$OADP_APPS_DIR,$PYCLIENT_DIR}
@@ -52,6 +53,9 @@ function archive-results() {
     if [[ -f "${RESULTS_FILE}" ]] && [[ ! -f "${ARTIFACT_DIR}/junit_oadp_interop_results.xml" ]]; then
         echo "Copying ${RESULTS_FILE} to ${ARTIFACT_DIR}/junit_oadp_interop_results.xml..."
         cp "${RESULTS_FILE}" "${ARTIFACT_DIR}/junit_oadp_interop_results.xml"
+
+        echo "Copying ${LOGS_FOLDER} to ${ARTIFACT_DIR}..."
+        cp -r "${LOGS_FOLDER}" "${ARTIFACT_DIR}/logs"
     fi
 }
 
