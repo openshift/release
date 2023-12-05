@@ -164,6 +164,26 @@ if [ -n "${FEATURE_SET}" ]; then
 	" "$INSTALL_CONFIG"
 fi
 
+if [[ -n "${OVERRIDE_OPENSHIFT_SDN_DEPRECATION:-}" ]]; then
+        # Needed for 4.15+; see ci-operator/step-registry/sdn/conf/sdn-conf-commands.sh
+        cat > "${SHARED_DIR}/manifest_cluster-network-02-config.yml" << EOF
+apiVersion: config.openshift.io/v1
+kind: Network
+metadata:
+  name: cluster
+spec:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  networkType: OpenShiftSDN
+  serviceNetwork:
+  - 172.30.0.0/16
+EOF
+        yq --yaml-output --in-place ".
+		| .networking.networkType = \"OVNKubernetes\"
+	" "$INSTALL_CONFIG"
+fi
+
 # Regenerate install-config.yaml to fill in unset values with default values.
 # Note that this triggers some validation against the OpenStack infrastructure.
 (
