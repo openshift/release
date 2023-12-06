@@ -248,7 +248,8 @@ tests:
       cli: latest
       commands: |-
         #!/usr/bin/env bash
-        set -euo pipefail
+
+        set -xeuo pipefail
 
         namespace="openshift-machine-config-operator"
         defaultTimeout="5m"
@@ -261,7 +262,7 @@ tests:
           oc create secret docker-registry "$globalPullSecretCloneName" --from-file=.dockerconfigjson=<(oc get secret/pull-secret -n openshift-config -o json | jq -r -c '.data[".dockerconfigjson"] | @base64d') -n "$namespace"
 
           oc create imagestream "$imagestreamName" -n "$namespace"
-          builderSecretName="$(oc get secrets -n "$namespace" -o name | head -n1 | grep "secret/builder-dockercfg" | sed 's/secret\///g')"
+          builderSecretName="$(oc get secrets -n "$namespace" -o name | grep "secret/builder-dockercfg" | head -n1 | sed 's/secret\///g')"
           finalPullspec="$(oc get "imagestream/$imagestreamName" -n "$namespace" -o=jsonpath='{.status.dockerImageRepository}')"
           oc create configmap "$ocbConfigMapName" -n "$namespace" \
             --from-literal=baseImagePullSecretName="$globalPullSecretCloneName" \
