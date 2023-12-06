@@ -8,6 +8,12 @@ set -o pipefail
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+function collect_artifacts {
+  echo "Collecting systemd recert.service log and redacted recert summary to CI artifacts..."
+  scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/{recert.log,recert_summary_clean.yaml}" "${ARTIFACT_DIR}"
+}
+trap collect_artifacts EXIT TERM
+
 cat >"${SHARED_DIR}"/run-recert-cluster-rename-step.sh << "EOF"
 #!/usr/bin/env bash
 
@@ -18,15 +24,26 @@ export NEW_BASE_DOMAIN="${NEW_BASE_DOMAIN:-another.domain}"
 export SINGLE_NODE_IP="${SINGLE_NODE_IP:-192.168.127.10}"
 export SINGLE_NODE_NETWORK_PREFIX="$(echo ${SINGLE_NODE_IP} | cut -d '.' -f 1,2,3).0"
 
+export SSH_OPTS=(-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no)
+
+function gather_recert_logs {
+  echo "Saving systemd recert.service log to /tmp/recert.log..."
+  ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "journalctl -u recert.service > /tmp/recert.log"
+
+  echo "Adding systemd recert.service log to CI artifacts..."
+  scp ${SSH_OPTS[@]} core@${SINGLE_NODE_IP}:/tmp/recert.log /tmp/artifacts
+
+  echo "Adding recert_summary_clean.yaml to CI artifacts..."
+  scp ${SSH_OPTS[@]} core@${SINGLE_NODE_IP}:/etc/kubernetes/recert_summary_clean.yaml /tmp/artifacts
+}
+trap gather_recert_logs EXIT TERM
+
 # assisted-test-infra sets up 2 network interfaces that compete with each other
 # when setting the NODE_IP and KUBELET_NODEIP. Use KUBELET_NODEIP_HINT to
 # ensure the correct interface is chosen.
 #
 # https://access.redhat.com/articles/6956852
-ssh -o UserKnownHostsFile=/dev/null \
-  -o StrictHostKeyChecking=no \
-  -o LogLevel=ERROR \
-  "core@${SINGLE_NODE_IP}" \
+ssh ${SSH_OPTS[@]} "core@${SINGLE_NODE_IP}" \
   "echo KUBELET_NODEIP_HINT=${SINGLE_NODE_NETWORK_PREFIX} | sudo tee /etc/default/nodeip-configuration"
 
 recert_script=$(cat <<IEOF
@@ -120,6 +137,7 @@ function recert {
       --cn-san-replace api.\${previous_cluster_name}.\${previous_base_domain}:api.\${new_cluster_name}.\${new_base_domain} \
       --cn-san-replace *.apps.\${previous_cluster_name}.\${previous_base_domain}:*.apps.\${new_cluster_name}.\${new_base_domain} \
       --cluster-rename \${new_cluster_name}:\${new_base_domain} \
+      --summary-file-clean /kubernetes/recert_summary_clean.yaml \
 
   podman kill recert_etcd
 }
@@ -271,7 +289,7 @@ echo "Waiting for master MachineConfigPool to have condition=updating..."
 oc wait --for=condition=updating machineconfigpools master --timeout 10m
 
 echo "Waiting for recert to be completed..."
-until ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no core@${SINGLE_NODE_IP} "cat /var/recert.done" &> /dev/null
+until ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "cat /var/recert.done" &> /dev/null
 do
   echo "Waiting for recert to be completed..."
   sleep 5
