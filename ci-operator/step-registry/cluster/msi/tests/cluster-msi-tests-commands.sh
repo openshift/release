@@ -33,6 +33,6 @@ fi
 
 echo "$RUN_COMMAND"
 
-sleep infinite
+sleep 5000000000
 
 ${RUN_COMMAND}
