@@ -83,6 +83,7 @@ done < /tmp/zzz-tmp.log
 TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
 cat > "${TEST_RESULT_FILE}" <<- EOF
 cucushift:
+  type: cucushift-e2e
   total: $tests
   failures: $failures
   errors: $errors
