@@ -325,8 +325,8 @@ EOF
 
     if [ $((failures)) != 0 ] ; then
         echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
-        readarray -t failingscenarios < <(grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | cut -d'"' -f2 | sort --unique)
-        for (( i=0; i<failures; i++ )) ; do
+        readarray -t failingscenarios < <(grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | awk -v n=4 '{ for (i=n; i<=NF; i++) printf "%s%s", $i, (i<NF ? OFS : ORS)}' | sort --unique)
+        for (( i=0; i<${#failingscenarios[@]}; i++ )) ; do
             echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
         done
     fi
