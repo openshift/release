@@ -139,8 +139,9 @@ spec:
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
-        - --github-app-id=$(GITHUB_APP_ID)
-        - --github-app-private-key-path=/etc/github/cert
+        - --github-token-path=/etc/github/oauth
+        - --github-hourly-tokens=4000
+        - --github-allowed-burst=2000
         - --registry-cluster-name=app.ci
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:golang-1.10
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:golang-1.11
@@ -179,7 +180,7 @@ spec:
         - name: metrics
           containerPort: 8080
         volumeMounts:
-        - name: github-app-credentials
+        - name: oauth
           mountPath: /etc/github
           readOnly: true
         - name: kubeconfigs
@@ -198,9 +199,9 @@ spec:
             cpu: "1.5"
       serviceAccountName: dptp-controller-manager
       volumes:
-      - name: github-app-credentials
+      - name: oauth
         secret:
-          secretName: openshift-prow-github-app
+          secretName: github-credentials-openshift-merge-robot
       - name: kubeconfigs
         secret:
           secretName: dptp-controller-manager
