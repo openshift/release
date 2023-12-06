@@ -12,7 +12,7 @@ oc patch MachineConfigPool worker --type='merge' --patch '{"spec":{"paused":true
 # Reset the spec.migration before we can set it to other value
 oc patch Network.operator.openshift.io cluster --type='merge' --patch '{"spec":{"migration":null}}'
 # Wait until CNO update the applied-cluster cm to the latest
-timeout 60s bash <<EOT
+timeout 120s bash <<EOT
 until 
   ! oc get network -o yaml | grep migration  > /dev/null
 do
@@ -72,28 +72,30 @@ EOT
 
 oc wait mcp --all --for='condition=UPDATING=True' --timeout=300s
 
-# Wait until MCO finishes its work or it reaches the 20mins timeout
+# Check that MCO and clusteroperators are back to normal. requires the main checks
+# on clusteroperator and mcp status to succeed 3 times in a row with 30s pause in between checks
+# shellcheck disable=SC2034
+success_count=0
 timeout 2700s bash <<EOT
-until
-  oc wait mcp --all --for='condition=UPDATED=True' --timeout=10s && \
-  oc wait mcp --all --for='condition=UPDATING=False' --timeout=10s && \
-  oc wait mcp --all --for='condition=DEGRADED=False' --timeout=10s; 
-do
-  sleep 10
-  echo "Some MachineConfigPool Degraded=True,Progressing=True,or Available=False";
+until [ \$success_count -eq 3 ]; do
+  if oc wait co --all --for='condition=Available=True' --timeout=10s &&
+     oc wait co --all --for='condition=Progressing=False' --timeout=10s &&
+     oc wait co --all --for='condition=Degraded=False' --timeout=10s &&
+     oc wait mcp --all --for='condition=UPDATED=True' --timeout=10s &&
+     oc wait mcp --all --for='condition=UPDATING=False' --timeout=10s &&
+     oc wait mcp --all --for='condition=DEGRADED=False' --timeout=10s; then
+    echo "Check succeeded (\$success_count/3)"
+    ((success_count++))
+    if [ \$success_count -lt 3 ]; then
+      echo "Pausing for 30 seconds before the next check..."
+      sleep 30
+    fi
+  else
+    echo "Some ClusterOperators Degraded=False, Progressing=True, or Available=False"
+    success_count=0
+    sleep 10
+  fi
 done
+echo "All checks passed successfully 3 times in a row."
 EOT
-
-# Check all cluster operators back to normal
-timeout 2700s bash <<EOT
-until
-  oc wait co --all --for='condition=AVAILABLE=True' --timeout=10s && \
-  oc wait co --all --for='condition=PROGRESSING=False' --timeout=10s && \
-  oc wait co --all --for='condition=DEGRADED=False' --timeout=10s;
-do
-  sleep 10
-  echo "Some ClusterOperators Degraded=False,Progressing=True,or Available=False";
-done
-EOT
-
 oc get co
