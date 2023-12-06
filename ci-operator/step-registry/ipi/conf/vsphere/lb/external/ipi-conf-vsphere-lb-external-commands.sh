@@ -32,7 +32,7 @@ if [[ ${vsphere_portgroup} == *"segment"* ]]; then
   mask="255.255.255.192"
 
   echo "192.168.${third_octet}.2" >>"${SHARED_DIR}"/vips.txt
-  echo "192.168.${third_octet}.2" >>"${SHARED_DIR}"/vips.txt
+  echo "192.168.${third_octet}.3" >>"${SHARED_DIR}"/vips.txt
   echo "192.168.${third_octet}.0/25" >>"${SHARED_DIR}"/machinecidr.txt
 
 else
@@ -232,5 +232,7 @@ govc vm.change -vm ${LB_VMNAME} -e "guestinfo.afterburn.initrd.network-kargs=${I
 govc vm.change -vm ${LB_VMNAME} -e guestinfo.ignition.config.data=$IGN
 govc vm.change -vm ${LB_VMNAME} -e guestinfo.ignition.config.data.encoding=gzip+base64
 govc vm.power -on ${LB_VMNAME}
+
+sleep 300
 
 touch $SHARED_DIR/external_lb
