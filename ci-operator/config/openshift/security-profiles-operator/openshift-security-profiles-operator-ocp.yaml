@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.21
 canonical_go_repository: sigs.k8s.io/security-profiles-operator
 images:
 - dockerfile_path: Dockerfile.ubi
@@ -10,12 +10,12 @@ images:
 releases:
   initial:
     integration:
-      name: "4.12"
+      name: "4.14"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.14"
       namespace: ocp
 resources:
   '*':
@@ -50,6 +50,7 @@ tests:
         # https://issues.redhat.com/browse/CMP-1468
         #export E2E_TEST_SELINUX=true
         export E2E_TEST_LABEL_POD_DENIALS=true
+        export E2E_SELINUXD_IMAGE=quay.io/security-profiles-operator/selinuxd-el9
         make test-e2e
       dependencies:
       - env: IMAGE_FROM_CI
@@ -82,6 +83,7 @@ tests:
         export E2E_TEST_LOG_ENRICHER=true
         export E2E_TEST_SELINUX=true
         export E2E_TEST_LABEL_POD_DENIALS=true
+        export E2E_SELINUXD_IMAGE=quay.io/security-profiles-operator/selinuxd-el9
         make test-flaky-e2e
       dependencies:
       - env: IMAGE_FROM_CI
@@ -93,6 +95,6 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
 zz_generated_metadata:
-  branch: main
+  branch: ocp
   org: openshift
   repo: security-profiles-operator
