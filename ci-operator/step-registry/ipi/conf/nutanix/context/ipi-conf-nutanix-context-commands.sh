@@ -76,29 +76,39 @@ subnet_ip=$(echo "${subnets_json}" | jq ".entities[] | select(.spec.name==\"${su
 
 if [[ -z "${API_VIP}" ]]; then
   if [[ -z "${subnet_ip}" ]]; then
-    echo "$(date -u --rfc-3399=seconds) - Cannot get VIP for API"
+    echo "$(date -u --rfc-3339=seconds) - Cannot get VIP for API"
     exit 1
   fi
   RANDOM_API_VIP_BLOCK=$(( RANDOM % 254 ))
   API_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -v random=${RANDOM_API_VIP_BLOCK} -F. '{printf "%d.%d.%d.%d", $1, $2, $3, random}')
 
   if [[ ! -z  "${awk_ip_program}" ]]; then
-    API_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -F. -v num=${slice_number} -v type="api" "${awk_ip_program}")
+    echo "$(date -u --rfc-3339=seconds) - deriving API VIP from slice number ${slice_number}"
+    API_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -F. -v num=${slice_number} -v type="api" "${awk_ip_program}")    
+  else
+    echo "$(date -u --rfc-3339=seconds) - failing back to random API VIP"
   fi
 fi
 
 if [[ -z "${INGRESS_VIP}" ]]; then
   if [[ -z "${subnet_ip}" ]]; then
-    echo "$(date -u --rfc-3399=seconds) - Cannot get VIP for Ingress"
+    echo "$(date -u --rfc-3339=seconds) - Cannot get VIP for Ingress"
     exit 1
   fi
   RANDOM_INGRESS_VIP_BLOCK=$(( RANDOM % 254 ))
   INGRESS_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -v random=${RANDOM_INGRESS_VIP_BLOCK} -F. '{printf "%d.%d.%d.%d", $1, $2, $3, random}')
 
   if [[ ! -z  "${awk_ip_program}" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - deriving ingress VIP from slice number ${slice_number}"
     INGRESS_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -F. -v num=${slice_number} -v type="ingress" "${awk_ip_program}")
+  else
+    echo "$(date -u --rfc-3339=seconds) - failing back to random ingress VIP"
   fi
 fi
+
+echo "${API_VIP}" >> "${SHARED_DIR}"/vips.txt
+echo "${INGRESS_VIP}" >> "${SHARED_DIR}"/vips.txt
+
 
 echo "$(date -u --rfc-3339=seconds) - Creating nutanix_context.sh file..."
 cat > "${SHARED_DIR}/nutanix_context.sh" << EOF
