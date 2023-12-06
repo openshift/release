@@ -23,7 +23,8 @@ if [[ -n "${CLUSTER1_KUBECONFIG_PATH}" ]]; then
     fi
     RUN_COMMAND+=" ${KUBECONFIG_COMMAND} "
   else
-    export KUBECONFIG=${CLUSTER1_KUBECONFIG_PATH}
+    echo "${CLUSTER1_KUBECONFIG_PATH}"
+    export KUBECONFIG="${CLUSTER1_KUBECONFIG_PATH}"
   fi
 else
     echo "At least one cluster kubeconfig must be provided."
@@ -31,5 +32,7 @@ else
 fi
 
 echo "$RUN_COMMAND"
+
+sleep infinite
 
 ${RUN_COMMAND}
