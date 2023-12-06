@@ -571,9 +571,45 @@ function admin_ack() {
     fi
 }
 
+# Check if the cluster hit the image validation error, which caused by image signature
+function error_check_invalid_image() {
+    local try=0 max_retries=5 tmp_log cmd expected_msg
+    tmp_log=$(mktemp)
+    while (( try < max_retries )); do
+        echo "Trying #${try}"
+        cmd="oc adm upgrade"
+        expected_msg="failure=The update cannot be verified:"
+        run_command "${cmd} 2>&1 | tee ${tmp_log}"
+        if grep -q "${expected_msg}" "${tmp_log}"; then
+            echo "Found the expected validation error message"
+            break
+        fi
+        (( try += 1 ))
+        sleep 60
+    done
+    if (( ${try} >= ${max_retries} )); then
+        echo >&2 "Timed out catching image invalid error message..." && return 1
+    fi
+
+}
+
+function clear_upgrade() {
+    local cmd tmp_log expected_msg
+    tmp_log=$(mktemp)
+    cmd="oc adm upgrade --clear"
+    expected_msg="Cancelled requested upgrade to"
+    run_command "${cmd} 2>&1 | tee ${tmp_log}"
+    if grep -q "${expected_msg}" "${tmp_log}"; then
+        echo "Last upgrade is cleaned."
+    else
+        echo "Clear the last upgrade fail!"
+        return 1
+    fi
+}
+
 # Upgrade the cluster to target release
 function upgrade() {
-    local log_file history_len
+    local log_file history_len cluster_src_ver
     if check_ota_case_enabled "OCP-21588"; then
         log_file=$(mktemp)
         echo "Testing --allow-explicit-upgrade option"
@@ -590,13 +626,34 @@ function upgrade() {
             exit 1
         fi
     fi
+    if check_ota_case_enabled "OCP-24663"; then
+        cluster_src_ver=$(oc version -o json | jq -r '.openshiftVersion')
+        if [[ -z "${cluster_src_ver}" ]]; then
+            echo "Did not get cluster version at this moment"
+            exit 1
+        else
+            echo "Current cluster is on ${cluster_src_ver}"
+        fi
+        echo "Negative Testing: upgrade to an unsigned image without --force option"
+        admin_ack
+        cco_annotation
+        run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade"
+        error_check_invalid_image
+        clear_upgrade
+        check_upgrade_status "${cluster_src_ver}"
+    fi
     run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
 # Monitor the upgrade status
 function check_upgrade_status() {
-    local wait_upgrade="${TIMEOUT}" out avail progress
+    local wait_upgrade="${TIMEOUT}" out avail progress cluster_version
+    if [[ -n "${1:-}" ]]; then
+        cluster_version="$1"
+    else
+        cluster_version="${TARGET_VERSION}"
+    fi
     echo "Starting the upgrade checking on $(date "+%F %T")"
     while (( wait_upgrade > 0 )); do
         sleep 5m
@@ -607,7 +664,7 @@ function check_upgrade_status() {
         if ! out="$(oc get clusterversion --no-headers)"; then continue; fi
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
-        if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${TARGET_VERSION}" ]]; then
+        if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${cluster_version}" ]]; then
             echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
             return 0
         fi
