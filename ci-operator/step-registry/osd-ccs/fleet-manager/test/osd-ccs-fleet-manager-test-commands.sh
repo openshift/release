@@ -25,9 +25,8 @@ function update_results ()
 # Log in with OSDFM token
 OCM_VERSION=$(ocm version)
 OSDFM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/fleetmanager-token")
-echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
 if [[ ! -z "${OSDFM_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with osdfm offline token"
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
   ocm login --url "${OCM_LOGIN_ENV}" --token "${OSDFM_TOKEN}"
   if [ $? -ne 0 ]; then
     echo "Login failed"
@@ -218,7 +217,7 @@ function test_labels()
 {
   TEST_PASSED=true
   sc_cluster_id=$(cat "${SHARED_DIR}"/osd-fm-sc-id)
-  mc_cluster_id=$(cat "${ARTIFACT_DIR}"/osd-fm-mc-id)
+  mc_cluster_id=$(cat "${SHARED_DIR}"/osd-fm-mc-id)
 
   #Set up region
   OSDFM_REGION=${LEASED_RESOURCE}
@@ -855,8 +854,8 @@ function test_hypershift_crds_not_installed_on_sc () {
 
 function test_add_labels_to_sc_after_installing () {
   TEST_PASSED=true
-  sc_cluster_id=$(cat "${ARTIFACT_DIR}/ocm-sc-id")
-  mc_cluster_id=$(cat "${ARTIFACT_DIR}/ocm-mc-id")
+  sc_cluster_id=$(cat "${SHARED_DIR}/ocm-sc-id")
+  mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
   
   echo "Confirming that 'ext-hypershift.openshift.io/cluster-type' label is set to 'service-cluster' for SC with ID: $sc_cluster_id"
   EXPECTED_SC_LABEL="service-cluster"
@@ -1079,8 +1078,8 @@ function test_machineset_tains_and_labels () {
 
 function test_sts_mc_sc () {
   TEST_PASSED=true
-  mc_cluster_id=$(cat "${ARTIFACT_DIR}/ocm-mc-id")
-  sc_cluster_id=$(cat "${ARTIFACT_DIR}/ocm-sc-id")
+  mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
+  sc_cluster_id=$(cat "${SHARED_DIR}/ocm-sc-id")
 
   function check_sts_enabled () {
     cluster_type=$1
@@ -1184,7 +1183,7 @@ function test_backups_created_only_once () {
 function test_obo_machinesets () {
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
-  mc_cluster_id=$(cat "${ARTIFACT_DIR}/ocm-mc-id")
+  mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
 
   echo "Getting 'obo' machinepools names"
   OBO_MACHINE_POOLS_NAMES=$(ocm get /api/clusters_mgmt/v1/clusters/"$mc_cluster_id"/machine_pools | jq '.items[]' | jq 'select(.id | startswith("obo"))' | jq -r .id)
