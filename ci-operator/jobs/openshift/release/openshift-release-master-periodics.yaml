@@ -52062,6 +52062,186 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
+  cron: 22 18 7,14,23,30 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 6h0m0s
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: nightly-4.12
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.12"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-nightly-4.12-aws-ipi-byo-route53-upgrade-rollback-oldest-supported
+  reporter_config:
+    slack:
+      channel: '#alerts-ocp-rollback-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: Job {{.Spec.Job}} ended with {{.Status.State}}, see <{{.Status.URL}}|here>
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/aws-ipi-byo-route53-upgrade-rollback-oldest-supported-cluster-profile
+      - --target=aws-ipi-byo-route53-upgrade-rollback-oldest-supported
+      - --variant=nightly-4.12
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/aws-ipi-byo-route53-upgrade-rollback-oldest-supported-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-qe
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build04
+  cron: 22 18 1,8,16,23 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 6h0m0s
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+    ci-operator.openshift.io/variant: nightly-4.12
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.12"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-nightly-4.12-azure-upi-upgrade-rollback-oldest-supported
+  reporter_config:
+    slack:
+      channel: '#alerts-ocp-rollback-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: Job {{.Spec.Job}} ended with {{.Status.State}}, see <{{.Status.URL}}|here>
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/azure-upi-upgrade-rollback-oldest-supported-cluster-profile
+      - --target=azure-upi-upgrade-rollback-oldest-supported
+      - --variant=nightly-4.12
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/azure-upi-upgrade-rollback-oldest-supported-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-azure-qe
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
   cron: 28 16 */12,24 * *
   decorate: true
   decoration_config:
@@ -58286,6 +58466,186 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build04
+  cron: 22 18 2,9,17,24 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 6h0m0s
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
+    ci-operator.openshift.io/variant: nightly-4.12
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.12"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-nightly-4.12-gcp-ipi-ovn-ipsec-upgrade-rollback-oldest-supported
+  reporter_config:
+    slack:
+      channel: '#alerts-ocp-rollback-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: Job {{.Spec.Job}} ended with {{.Status.State}}, see <{{.Status.URL}}|here>
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/gcp-ipi-ovn-ipsec-upgrade-rollback-oldest-supported-cluster-profile
+      - --target=gcp-ipi-ovn-ipsec-upgrade-rollback-oldest-supported
+      - --variant=nightly-4.12
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/gcp-ipi-ovn-ipsec-upgrade-rollback-oldest-supported-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-gcp-qe
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build04
+  cron: 22 18 3,10,18,25 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 6h0m0s
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/cloud: ibmcloud
+    ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-qe
+    ci-operator.openshift.io/variant: nightly-4.12
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.12"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-nightly-4.12-ibmcloud-ipi-upgrade-rollback-oldest-supported
+  reporter_config:
+    slack:
+      channel: '#alerts-ocp-rollback-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: Job {{.Spec.Job}} ended with {{.Status.State}}, see <{{.Status.URL}}|here>
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/ibmcloud-ipi-upgrade-rollback-oldest-supported-cluster-profile
+      - --target=ibmcloud-ipi-upgrade-rollback-oldest-supported
+      - --variant=nightly-4.12
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/ibmcloud-ipi-upgrade-rollback-oldest-supported-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-ibmcloud-qe
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build04
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -58390,6 +58750,97 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 22 18 4,11,19,26 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 6h0m0s
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/cloud: nutanix
+    ci-operator.openshift.io/cloud-cluster-profile: nutanix-qe
+    ci-operator.openshift.io/cluster: build01
+    ci-operator.openshift.io/variant: nightly-4.12
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.12"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-nightly-4.12-nutanix-ipi-upgrade-rollback-oldest-supported
+  reporter_config:
+    slack:
+      channel: '#alerts-ocp-rollback-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: Job {{.Spec.Job}} ended with {{.Status.State}}, see <{{.Status.URL}}|here>
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/nutanix-ipi-upgrade-rollback-oldest-supported-cluster-profile
+      - --target=nutanix-ipi-upgrade-rollback-oldest-supported
+      - --variant=nightly-4.12
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/nutanix-ipi-upgrade-rollback-oldest-supported-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-nutanix-qe
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -58900,6 +59351,96 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-equinix-ocp-metal
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere02
+  cron: 22 18 5,12,20,27 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 6h0m0s
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/cloud: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
+    ci-operator.openshift.io/variant: nightly-4.12
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.12"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-nightly-4.12-vsphere-upi-upgrade-rollback-oldest-supported
+  reporter_config:
+    slack:
+      channel: '#alerts-ocp-rollback-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: Job {{.Spec.Job}} ended with {{.Status.State}}, see <{{.Status.URL}}|here>
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/vsphere-upi-upgrade-rollback-oldest-supported-cluster-profile
+      - --target=vsphere-upi-upgrade-rollback-oldest-supported
+      - --variant=nightly-4.12
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/vsphere-upi-upgrade-rollback-oldest-supported-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-vsphere
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
