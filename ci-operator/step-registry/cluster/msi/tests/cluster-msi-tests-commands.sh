@@ -15,9 +15,19 @@ RUN_COMMAND="poetry run pytest tests \
             -m ${TEST_MARKER} \
             --data-collector=data-collector-openshift-ci.yaml "
 
-KUBECONFIG_COMMAND="--kubeconfig-file-paths="${CLUSTER1_KUBECONFIG_PATH},${CLUSTER2_KUBECONFIG_PATH}" "
+if [[ -n "${CLUSTER1_KUBECONFIG_PATH}" ]]; then
+  KUBECONFIG_COMMAND="--kubeconfig-file-paths=${CLUSTER1_KUBECONFIG_PATH}"
+  if [[ -n "${CLUSTER2_KUBECONFIG_PATH}" ]]; then
+    KUBECONFIG_COMMAND+=",${CLUSTER2_KUBECONFIG_PATH}"
+    if [[ -n "${CLUSTER3_KUBECONFIG_PATH}" ]]; then
+      KUBECONFIG_COMMAND+=",${CLUSTER3_KUBECONFIG_PATH} "
+    fi
+    RUN_COMMAND+=" ${KUBECONFIG_COMMAND} "
+  fi
+else
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+fi
 
-RUN_COMMAND+=" ${KUBECONFIG_COMMAND} "
 
 echo "$RUN_COMMAND"
 

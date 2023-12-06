@@ -3,6 +3,10 @@ base_images:
     name: managed-services-integration-tests
     namespace: ci
     tag: latest
+  openshift-cli-installer:
+    name: openshift-cli-installer
+    namespace: ci
+    tag: latest
 releases:
   latest:
     candidate:
@@ -17,7 +21,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: singlecluster-rosa-4-14-candidate-smoke
+- as: single-cluster-rosa-4-14-candidate-smoke
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
@@ -34,6 +38,18 @@ tests:
     test:
     - ref: cluster-msi-cluster-sanity
     workflow: rosa-aws-sts
+- as: single-cluster-hypershift-4-14-candidate-smoke
+  cron: 0 21 * * *
+  steps:
+    cluster_profile: aws-managed-cspi-qe
+    env:
+      CLUSTER1_CONFIG: name=ci-hyper-smoke;platform=hypershift;region=us-west-2;version=4.14;channel-group=candidate;compute-machine-type=m5.4xlarge;replicas=2;expiration-time=4h;timeout=1h;ocm-env=stage
+      S3_BUCKET_NAME: openshift-cli-installer
+      S3_BUCKET_PATH: openshift-ci
+      TEST_MARKER: smoke_single_cluster
+    test:
+    - ref: cluster-msi-tests
+    workflow: cluster
 zz_generated_metadata:
   branch: single-cluster-smoke
   org: CSPI-QE
