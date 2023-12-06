@@ -1,0 +1,60 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+images:
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: amd64
+  context_dir: .
+  dockerfile_path: tests/Dockerfile
+  to: python-test-runner
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: amd64
+  context_dir: .
+  dockerfile_path: Dockerfile
+  to: thanos-metrics-analyzer
+promotion:
+  namespace: stolostron
+  tag: latest
+  tag_by_commit: true
+resources:
+  '*':
+    limits:
+      cpu: 512m
+      memory: 2Gi
+    requests:
+      cpu: 256m
+      memory: 512Mi
+tests:
+- as: lint
+  commands: pipenv run pylint src tests
+  container:
+    from: python-test-runner
+  timeout: 2h0m0s
+- as: code-style
+  commands: pipenv run pycodestyle src tests
+  container:
+    from: python-test-runner
+  timeout: 2h0m0s
+- as: doc-style
+  commands: pipenv run pydocstyle src tests
+  container:
+    from: python-test-runner
+  timeout: 2h0m0s
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: thanos-metrics-analyzer
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: thanos-metrics-analyzer

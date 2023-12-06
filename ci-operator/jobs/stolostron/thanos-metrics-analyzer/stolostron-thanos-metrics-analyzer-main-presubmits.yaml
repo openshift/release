@@ -1,32 +1,28 @@
 presubmits:
-  openshift-psap/special-resource-operator:
+  stolostron/thanos-metrics-analyzer:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.6$
-    - ^release-4\.6-
-    cluster: build05
-    context: ci/prow/e2e-aws
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/code-style
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 2h0m0s
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-special-resource-operator-release-4.6-e2e-aws
-    rerun_command: /test e2e-aws
+    name: pull-ci-stolostron-thanos-metrics-analyzer-main-code-style
+    rerun_command: /test code-style
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-cluster-profile
-        - --target=e2e-aws
+        - --target=code-style
         command:
         - ci-operator
         image: ci-operator:latest
@@ -36,14 +32,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -58,18 +46,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -79,34 +55,30 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )code-style,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.6$
-    - ^release-4\.6-
-    cluster: build05
-    context: ci/prow/e2e-aws-upgrade
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/doc-style
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 2h0m0s
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-special-resource-operator-release-4.6-e2e-aws-upgrade
-    rerun_command: /test e2e-aws-upgrade
+    name: pull-ci-stolostron-thanos-metrics-analyzer-main-doc-style
+    rerun_command: /test doc-style
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
-        - --target=e2e-aws-upgrade
+        - --target=doc-style
         command:
         - ci-operator
         image: ci-operator:latest
@@ -116,14 +88,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -138,18 +102,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -159,12 +111,12 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )doc-style,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.6$
-    - ^release-4\.6-
+    - ^main$
+    - ^main-
     cluster: build03
     context: ci/prow/images
     decorate: true
@@ -173,7 +125,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-special-resource-operator-release-4.6-images
+    name: pull-ci-stolostron-thanos-metrics-analyzer-main-images
     rerun_command: /test images
     spec:
       containers:
@@ -182,7 +134,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -219,25 +170,26 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.6$
-    - ^release-4\.6-
+    - ^main$
+    - ^main-
     cluster: build03
-    context: ci/prow/unit
+    context: ci/prow/lint
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 2h0m0s
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-special-resource-operator-release-4.6-unit
-    rerun_command: /test unit
+    name: pull-ci-stolostron-thanos-metrics-analyzer-main-lint
+    rerun_command: /test lint
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit
+        - --target=lint
         command:
         - ci-operator
         image: ci-operator:latest
@@ -270,29 +222,30 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.6$
-    - ^release-4\.6-
+    - ^main$
+    - ^main-
     cluster: build03
-    context: ci/prow/verify
+    context: ci/prow/security
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-special-resource-operator-release-4.6-verify
-    rerun_command: /test verify
+    name: pull-ci-stolostron-thanos-metrics-analyzer-main-security
+    optional: true
+    rerun_command: /test security
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=verify
+        - --target=security
         command:
         - ci-operator
         image: ci-operator:latest
@@ -325,4 +278,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )verify,?($|\s.*)
+    trigger: (?m)^/test( | .* )security,?($|\s.*)
