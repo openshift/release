@@ -162,6 +162,28 @@ tests:
     test:
     - chain: openshift-qe-ingress-perf
   timeout: 5h0m0s
+- always_run: false
+  as: perfscale-aws-fips-ingress-perf
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      FIPS_ENABLED: "true"
+      LOKI_USE_SERVICEMONITOR: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
+      SET_ENV_BY_PLATFORM: custom
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
+    - chain: openshift-qe-ingress-perf
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift
