@@ -87,7 +87,7 @@ caps_operator[NodeTuning]="node-tuning"
 caps_operator[MachineAPI]="machine-api control-plane-machine-set cluster-autoscaler"
 caps_operator[ImageRegistry]="image-registry"
 caps_operator[OperatorLifecycleManager]="operator-lifecycle-manager operator-lifecycle-manager-catalog operator-lifecycle-manager-packageserver"
-caps_operator[ClusterOperator]="cloud-credential"
+caps_operator[CloudCredential]="cloud-credential"
 
 # Mapping between optional capability and resources
 # Need to be updated when new resource marks as optional
