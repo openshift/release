@@ -61,19 +61,22 @@ tests:
   container:
     from: test-bin
 - as: e2e
-  cluster_claim:
-    architecture: amd64
-    as: custom
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.10"
   steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: cluster-proxy-addon
+    env:
+      CLUSTER_NAMES: none
+      CLUSTERPOOL_GROUP_NAME: Server Foundation
+      CLUSTERPOOL_HOST_NAMESPACE: server-foundation
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-sf-clusterpool
+      CLUSTERPOOL_LIFETIME: 2h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      SKIP_COMPONENT_INSTALL: "true"
     test:
     - as: test
       cli: latest
       commands: |
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
         KUBECTL=oc
         EXAMPLE_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:cluster-proxy-addon}
         export KUBECTL EXAMPLE_IMAGE_NAME
@@ -82,7 +85,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: generic-claim
+    workflow: ocm-e2e-clusterpool
 - as: publish
   postsubmit: true
   steps:
@@ -97,6 +100,8 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
         export OSCI_PIPELINE_REPO=backplane-pipeline
+        export OSCI_COMPONENT_NAME="cluster-proxy-addon"
+        export OSCI_COMPONENT_VERSION="2.2"
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
       credentials:

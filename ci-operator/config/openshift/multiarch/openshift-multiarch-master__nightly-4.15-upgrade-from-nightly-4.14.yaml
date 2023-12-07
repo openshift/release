@@ -165,6 +165,31 @@ tests:
       OCP_ARCH: arm64
       TEST_SUITE: upgrade-conformance
     workflow: openshift-upgrade-azure
+- as: ocp-e2e-upgrade-gcp-ovn-arm64
+  interval: 72h
+  steps:
+    cluster_profile: gcp-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+      TEST_SUITE: upgrade-conformance
+    workflow: openshift-upgrade-gcp
+- as: ocp-e2e-upgrade-gcp-ovn-heterogeneous
+  interval: 72h
+  steps:
+    cluster_profile: gcp-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      OCP_ARCH: amd64
+      TEST_SUITE: upgrade-conformance
+    workflow: openshift-upgrade-gcp-heterogeneous
 - as: ocp-ovn-remote-libvirt-s390x
   cluster: build01
   cron: 0 7,15,23 * * 1-5

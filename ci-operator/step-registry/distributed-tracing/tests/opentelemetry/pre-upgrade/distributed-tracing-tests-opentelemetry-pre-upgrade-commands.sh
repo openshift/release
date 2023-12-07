@@ -14,6 +14,7 @@ if [[ -n "${DOWNSTREAM_TESTS_COMMIT}" ]]; then
   git checkout -b downstream-release "${DOWNSTREAM_TESTS_COMMIT}"
   
   #Set parameters for running the test cases on OpenShift
+  unset NAMESPACE
   TARGETALLOCATOR_IMG=$TARGETALLOCATOR_IMG SED_BIN="$(which sed)" ./hack/modify-test-images.sh
   sed -i 's/- -duration=1m/- -duration=6m/' tests/e2e-autoscale/autoscale/03-install.yaml
 
@@ -56,6 +57,7 @@ else
   cp -R /tmp/opentelemetry-operator /tmp/opentelemetry-tests && cd /tmp/opentelemetry-tests
 
   #Set parameters for running the test cases on OpenShift
+  unset NAMESPACE
   TARGETALLOCATOR_IMG=$TARGETALLOCATOR_IMG SED_BIN="$(which sed)" ./hack/modify-test-images.sh
   sed -i 's/- -duration=1m/- -duration=6m/' tests/e2e-autoscale/autoscale/03-install.yaml
 

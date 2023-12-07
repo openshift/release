@@ -71,11 +71,15 @@ chain:
           ;;
       ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
       none)
-          if [[ "${DS_IP_STACK}" != "v6" ]];
-          then
-            export TEST_PROVIDER='{"type":"baremetal"}'
+          if [ -f "${SHARED_DIR}/ds-vars.conf" ] ; then
+            if [[ "${DS_IP_STACK}" != "v6" ]];
+            then
+              export TEST_PROVIDER='{"type":"baremetal"}'
+            else
+              mirror_test_images
+              export TEST_PROVIDER='{"type":"baremetal","disconnected":true}'
+            fi
           else
-            mirror_test_images
             export TEST_PROVIDER='{"type":"baremetal","disconnected":true}'
           fi
           ;;

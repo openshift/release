@@ -1,0 +1,109 @@
+base_images:
+  assisted-test-infra:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  builder:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.15"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- dockerfile_path: Dockerfile
+  to: recert
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-ovn-single-node-recert-serial
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SKIPS: Managed cluster should grow and decrease when scaling different
+        machineSets simultaneously
+      TEST_SUITE: openshift/conformance/serial
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node-recert
+- as: e2e-aws-ovn-single-node-recert-parallel
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SUITE: openshift/conformance/parallel
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node-recert
+- as: e2e-aws-ovn-single-node-recert-openshift-e2e-test-qe
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and @singlenode
+        and not @fips'
+      FILTERS_ADDITIONAL: ~LSO&
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: enable-qe-catalogsource
+    - chain: openshift-e2e-test-qe
+    workflow: openshift-e2e-aws-single-node-recert
+  timeout: 8h0m0s
+- as: aws-sno-fips-recert
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-sno-recert
+  timeout: 8h0m0s
+- as: baremetalds-sno-recert-cluster-rename
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    test:
+    - ref: baremetalds-sno-conf
+    - ref: baremetalds-sno-rename
+    - ref: baremetalds-sno-test
+    workflow: baremetalds-sno
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: recert
+  variant: "4.15"

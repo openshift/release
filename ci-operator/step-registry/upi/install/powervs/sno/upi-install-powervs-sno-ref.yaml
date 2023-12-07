@@ -1,0 +1,58 @@
+ref:
+  as: upi-install-powervs-sno
+  from: dev-scripts
+  commands: upi-install-powervs-sno-commands.sh
+  cli: latest
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100m
+  env:
+    - name: OCP_VERSION
+      documentation: OCP Version to use to create the SNO cluster
+    - name: BASE_DOMAIN
+      documentation: The cluster's FQDN will be a subdomain of the base domain
+    - name: BASTION
+      documentation: Hostname of the bastion node hosted in POWERVS_INSTANCE_CRN where services configured for PXE boot
+    - name: LIVE_ROOTFS_URL
+      default: "https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/${OCP_VERSION}/latest/rhcos-live-rootfs.ppc64le.img"
+      documentation: Http url to download the rootfs of the live iso to bringup the SNO node
+    - name: LIVE_KERNEL_URL
+      default: "https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/${OCP_VERSION}/latest/rhcos-live-kernel-ppc64le"
+      documentation: Http url to download the kernel of the live iso to bringup the SNO node
+    - name: LIVE_INITRAMFS_URL
+      default: "https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/${OCP_VERSION}/latest/rhcos-live-initramfs.ppc64le.img"
+      documentation: Http url to download the kernel of the live iso to bringup the SNO node
+    - name: POWERVS_INSTANCE_CRN
+      documentation: Custom Resource Number of IBM Cloud PowerVS service instance where SNO node will get hosted
+    - name: POWERVS_IMAGE
+      documentation: Image name of empty boot volume to boot the SNO node initially
+    - name: POWERVS_NETWORK
+      documentation: Name of the private network where SNO node will get hosted
+    - name: POWERVS_MACHINE_NETWORK_CIDR
+      documentation: CIDR of machine network to use for the cluster
+    - name: POWERVS_VSI_MEMORY
+      default: "32"
+      documentation: Memory in GB of SNO power node
+    - name: POWERVS_VSI_PROCESSORS
+      default: "0.5"
+      documentation: Processor unit of SNO power node
+    - name: POWERVS_VSI_PROC_TYPE
+      default: "shared"
+      documentation: Processor type of SNO power node
+    - name: POWERVS_VSI_SYS_TYPE
+      default: "e980"
+      documentation: System type of SNO power node
+    - name: CIS_INSTANCE
+      documentation: Name of IBM Cloud CIS instance where DNS records will be created
+    - name: CIS_DOMAIN_ID
+      documentation: ID of domain created under CIS_INSTANCE
+  timeout: 3h
+  grace_period: 15m
+  credentials:
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials
+    - mount_path: /etc/sno-power-credentials
+      name: sno-power-credentials
+      namespace: test-credentials

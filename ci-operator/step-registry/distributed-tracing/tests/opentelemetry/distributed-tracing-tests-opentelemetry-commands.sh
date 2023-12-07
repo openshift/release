@@ -14,8 +14,10 @@ if [[ -n "${DOWNSTREAM_TESTS_COMMIT}" ]]; then
   git checkout -b downstream-release "${DOWNSTREAM_TESTS_COMMIT}"
 
   #Set parameters for running the test cases on OpenShift
+  unset NAMESPACE
   TARGETALLOCATOR_IMG=$TARGETALLOCATOR_IMG SED_BIN="$(which sed)" ./hack/modify-test-images.sh
-  sed -i 's/- -duration=1m/- -duration=6m/' tests/e2e-autoscale/autoscale/03-install.yaml
+  sed -i 's/- -duration=1m/- -duration=7m/' tests/e2e-autoscale/autoscale/03-install.yaml
+  oc get nodes -o jsonpath='{.items[*].metadata.name}' | awk '{print $1}' | xargs -I {} oc label nodes {} ingress-ready=true
 
   # Remove test cases to be skipped from the test run
   IFS=' ' read -ra SKIP_TEST_ARRAY <<< "$SKIP_TESTS"
@@ -56,9 +58,10 @@ else
   cp -R /tmp/opentelemetry-operator /tmp/opentelemetry-tests && cd /tmp/opentelemetry-tests
 
   #Set parameters for running the test cases on OpenShift
-  #Skip setting the built Target Allocator image due to bug https://issues.redhat.com/browse/TRACING-3615 and use the pre-built upstream image.
-  TARGETALLOCATOR_IMG="" SED_BIN="$(which sed)" ./hack/modify-test-images.sh
+  unset NAMESPACE
+  TARGETALLOCATOR_IMG=$TARGETALLOCATOR_IMG SED_BIN="$(which sed)" ./hack/modify-test-images.sh
   sed -i 's/- -duration=1m/- -duration=6m/' tests/e2e-autoscale/autoscale/02-install.yaml
+  oc get nodes -o jsonpath='{.items[*].metadata.name}' | awk '{print $1}' | xargs -I {} oc label nodes {} ingress-ready=true
 
   # Remove test cases to be skipped from the test run
   IFS=' ' read -ra SKIP_TEST_ARRAY <<< "$SKIP_TESTS"

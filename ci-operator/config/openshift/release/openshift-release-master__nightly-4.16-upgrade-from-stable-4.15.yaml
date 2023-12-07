@@ -1,0 +1,125 @@
+base_images:
+  ansible:
+    name: "4.16"
+    namespace: ocp
+    tag: ansible
+  assisted-installer:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer-controller
+  assisted-service:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-service
+  assisted-test-infra:
+    name: assisted-test
+    namespace: ocp-kni
+    tag: assisted-test-infra
+  base:
+    name: "4.16"
+    namespace: ocp
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  libvirt-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: libvirt-installer
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    release:
+      channel: candidate
+      version: "4.15"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-metal-ipi-sdn-bm-upgrade
+  cluster: build05
+  cron: 0 12 1 1 *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CLUSTERTYPE: baremetal
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e-upgrade
+  timeout: 5h0m0s
+- as: e2e-metal-ipi-upgrade-ovn-ipv6
+  cluster: build05
+  cron: 0 12 1 1 *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e-upgrade-ovn-ipv6
+  timeout: 5h0m0s
+- as: e2e-aws-sdn-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-sdn
+- as: e2e-aws-upgrade-ovn-single-node
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-single-node
+- as: e2e-vsphere-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: vsphere-8-vpn
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-vsphere
+- as: e2e-vsphere-zones-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: vsphere-multizone-2
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-vsphere-zones
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: nightly-4.16-upgrade-from-stable-4.15

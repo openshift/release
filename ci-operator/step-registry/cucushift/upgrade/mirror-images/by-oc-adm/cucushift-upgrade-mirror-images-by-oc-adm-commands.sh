@@ -109,6 +109,20 @@ function extract_oc(){
     return 0
 }
 
+# check if any of cases is enabled via ENABLE_OTA_TEST
+function check_ota_case_enabled() {
+    local case_id
+    local cases_array=("$@")
+    for case_id in "${cases_array[@]}"; do
+        # shellcheck disable=SC2076
+        if [[ " ${ENABLE_OTA_TEST} " =~ " ${case_id} " ]]; then
+            echo "${case_id} is enabled via ENABLE_OTA_TEST on this job."
+            return 0
+        fi
+    done
+    return 1
+}
+
 if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
@@ -159,8 +173,8 @@ do
         echo "You're mirroring an unsigned images, don't apply signature"
         APPLY_SIG="false"
         SAVE_SIG_TO_DIR=""
-        if [[ "${ENABLE_OTA_TEST}" =~ "OCP-30832" ]] || [[ "${ENABLE_OTA_TEST}" =~ "OCP-27986" ]]; then
-            echo "ENABLE_OTA_TEST is enabled on this job, these cases need to run against a signed target image!"
+        if check_ota_case_enabled "OCP-30832" "OCP-27986"; then
+            echo "The case need to run against a signed target image!"
             exit 1
         fi
     else
@@ -173,7 +187,7 @@ do
 
     extract_oc
 
-    if [[ "${ENABLE_OTA_TEST}" =~ "OCP-30832" ]]; then
+    if check_ota_case_enabled "OCP-30832"; then
         MIRROR_RELEASE_IMAGE_REPO="${MIRROR_REGISTRY_HOST}/ota_auto/ocp"
         mirror_apply_sig_together="true"
     else

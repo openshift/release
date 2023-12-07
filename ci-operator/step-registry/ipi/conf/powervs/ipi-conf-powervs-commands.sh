@@ -214,7 +214,7 @@ platform:
   powervs:
     powervsResourceGroup: "${POWERVS_RESOURCE_GROUP}"
     region: ${POWERVS_REGION}
-    serviceInstanceID: "${POWERVS_SERVICE_INSTANCE_ID}"
+    serviceInstanceGUID: "${POWERVS_SERVICE_INSTANCE_ID}"
     userID: ${POWERVS_USER_ID}
     zone: ${POWERVS_ZONE}
     vpcRegion: ${VPCREGION}

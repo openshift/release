@@ -22,86 +22,61 @@ resources:
       memory: 200Mi
 tests:
 - as: control-plane-24nodes
-  cron: 29 5 */1 * 1-5
+  cron: 0 6 * * 3
   steps:
     cluster_profile: gcp-qe
     env:
-      WORKER_REPLICA_COUNT: "24"
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    - chain: workers-scale
-    workflow: openshift-qe-control-plane
+      COMPUTE_NODE_REPLICAS: "24"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-gcp
 - as: data-path-6nodes
   cron: 0 9 * * 3
   steps:
     cluster_profile: gcp-qe
     env:
-      WORKER_REPLICA_COUNT: "6"
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    - chain: workers-scale
+      COMPUTE_NODE_REPLICAS: "6"
     test:
     - ref: openshift-qe-perfscale-gcp-data-path-fw
     - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-gcp
   timeout: 5h0m0s
 - always_run: false
   as: router-perf-5nodes
   steps:
     cluster_profile: gcp-qe
     env:
-      WORKER_REPLICA_COUNT: "5"
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    - chain: workers-scale
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-router-perf
+      COMPUTE_NODE_REPLICAS: "5"
+    test:
+    - chain: openshift-qe-router-perf
+    workflow: openshift-qe-installer-gcp
 - as: node-density-cni-24nodes
   cron: 0 12 * * 1
   steps:
     cluster_profile: gcp-qe
     env:
-      WORKER_REPLICA_COUNT: "24"
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    - chain: workers-scale
-    workflow: openshift-qe-node-density-cni
+      COMPUTE_NODE_REPLICAS: "24"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-gcp
 - as: node-density-heavy-24nodes
   cron: 0 12 * * 1
   steps:
     cluster_profile: gcp-qe
     env:
-      WORKER_REPLICA_COUNT: "24"
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    - chain: workers-scale
-    workflow: openshift-qe-node-density-heavy
+      COMPUTE_NODE_REPLICAS: "24"
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-gcp
 - always_run: false
   as: network-policy-5nodes
   steps:
     cluster_profile: gcp-qe
     env:
-      WORKER_REPLICA_COUNT: "5"
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    - chain: workers-scale
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-network-policy
+      COMPUTE_NODE_REPLICAS: "5"
+    test:
+    - chain: openshift-qe-network-policy
+    workflow: openshift-qe-installer-gcp
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
