@@ -145,7 +145,7 @@ metadata:
   name: sriov-network-operator-subscription
   namespace: openshift-sriov-network-operator
 spec:
-  channel: "${oc_version}"
+  channel: stable
   name: sriov-network-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
