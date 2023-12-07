@@ -8,10 +8,10 @@ set -o pipefail
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 vnet_rg=$(yq-go r ${CONFIG} 'platform.azure.networkResourceGroupName')
-vnet_name=$(yq-go r ${CONFIG} '.platform.azure.virtualNetwork')
-compute_subnet=$(yq-go r ${CONFIG} '.platform.azure.computeSubnet')
+vnet_name=$(yq-go r ${CONFIG} 'platform.azure.virtualNetwork')
+compute_subnet=$(yq-go r ${CONFIG} 'platform.azure.computeSubnet')
 
-cat > ${SHARED_DIR}/imageregistry-config.yaml <<EOF
+cat > ${SHARED_DIR}/manifest_image_registry-config.yml <<EOF
 apiVersion: imageregistry.operator.openshift.io/v1
 kind: Config
 metadata:
