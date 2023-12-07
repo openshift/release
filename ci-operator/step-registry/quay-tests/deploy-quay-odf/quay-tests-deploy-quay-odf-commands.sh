@@ -7,6 +7,7 @@ set -o pipefail
 #Deploy ODF Operator to OCP namespace 'openshift-storage'
 OO_INSTALL_NAMESPACE=openshift-storage
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
+QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 ODF_OPERATOR_CHANNEL="$ODF_OPERATOR_CHANNEL"
 ODF_SUBSCRIPTION_NAME="$ODF_SUBSCRIPTION_NAME"
 
@@ -98,7 +99,7 @@ spec:
   installPlanApproval: Automatic
   name: quay-operator
   channel: $QUAY_OPERATOR_CHANNEL
-  source: redhat-operators
+  source: $QUAY_OPERATOR_SOURCE
   sourceNamespace: openshift-marketplace
 EOF
 )

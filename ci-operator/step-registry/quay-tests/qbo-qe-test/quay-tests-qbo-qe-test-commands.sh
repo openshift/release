@@ -6,6 +6,7 @@ set -o pipefail
 
 #Install QBO
 QBO_CHANNEL="$QBO_CHANNEL"
+QBO_SOURCE="$QBO_SOURCE"
 
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
@@ -17,7 +18,7 @@ spec:
   channel: $QBO_CHANNEL
   installPlanApproval: Automatic
   name: quay-bridge-operator
-  source: redhat-operators
+  source: $QBO_SOURCE
   sourceNamespace: openshift-marketplace
 EOF
 
@@ -29,6 +30,7 @@ for _ in {1..60}; do
             break
         fi
     fi
+    echo "CSV is NOT ready $_ times"
     sleep 10
 done
 echo "Quay Bridge Operator is deployed successfully"
@@ -71,6 +73,7 @@ for _ in {1..60}; do
         echo "Quay is running" >&2
         break
     fi
+    echo "Quay Pod is NOT ready $_ times"
     sleep 10
 done
 
@@ -502,6 +505,7 @@ for _ in {1..30}; do
     echo "Build image push to quay successfully"
     break
   fi
+  echo "Build is NOT ready $_ times"
   sleep 60
 done
 
@@ -511,6 +515,7 @@ for _ in {1..30}; do
     echo "App pod pull image from quay successfully"
     break
   fi
+  echo "App pod is NOT ready $_ times"
   sleep 20
 done
 echo "QE Test for Quay Bridge Operator is passed"
