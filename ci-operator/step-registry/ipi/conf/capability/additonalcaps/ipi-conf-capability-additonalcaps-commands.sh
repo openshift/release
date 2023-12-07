@@ -63,7 +63,7 @@ v413=" ${v412} NodeTuning"
 # shellcheck disable=SC2034
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
 # shellcheck disable=SC2034
-v415=" ${v414} OperatorLifecycleManager"
+v415=" ${v414} OperatorLifecycleManager CloudCredential"
 latest_version="v415"
 
 declare "v${ocp_major_version}${ocp_minor_version}"
@@ -96,6 +96,13 @@ fi
 if [[ "${selected_capability}" == "OperatorLifecycleManager" ]]; then
     echo "Capability 'marketplace' depends on Capability 'OperatorLifecycleManager', so disable marketplace along with OperatorLifecycleManager"
     enabled_capabilities=${enabled_capabilities/"marketplace"}
+fi
+
+# For OCP 4.15, CCO is required for non-BareMetal platforms
+if [[ "$ocp_major_version" == "4" ]] && [[ "$ocp_minor_version" == "15" ]] && [[ "${selected_capability}" == "CloudCredential" ]]; then
+    echo "WARNING: non-BareMetal platforms require CCO for OCP 4.15, so no capability to be disabled!"
+else
+    enabled_capabilities=${enabled_capabilities/${selected_capability}}
 fi
 
 # apply patch to install-config
