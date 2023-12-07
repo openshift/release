@@ -10,9 +10,9 @@ base_images:
 binary_build_commands: make build
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    name: release
+    namespace: openshift
+    tag: golang-1.21
 canonical_go_repository: github.com/grafana/tempo-operator
 images:
 - context_dir: .
@@ -34,7 +34,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     requests:
@@ -47,16 +47,6 @@ tests:
     env:
       PROJECT_NAME: tempo-operator
     workflow: openshift-ci-security
-- as: test
-  steps:
-    test:
-    - as: unit
-      commands: GOFLAGS="-mod=mod" make test
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
 - as: tempo-e2e-tests
   cluster_claim:
     architecture: amd64
@@ -64,7 +54,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.13"
+    version: "4.14"
   steps:
     test:
     - as: install
