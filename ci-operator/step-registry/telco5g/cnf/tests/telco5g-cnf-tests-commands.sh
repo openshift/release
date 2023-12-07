@@ -34,11 +34,6 @@ function create_tests_temp_skip_list_12 {
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/CNF-10321
-# TESTNAME
-metallb "coexist should have correct statuses"
-
 EOF
 }
 
