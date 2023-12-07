@@ -58,6 +58,7 @@ done
 
 printf "**** DEBUG %s ******\n" "${control_plane_addrs[@]}"
 
+printf -v control_plane_ip_addresses "\"%s\"," "${control_plane_addrs[@]}"
 control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
 
 compute_idx=0
