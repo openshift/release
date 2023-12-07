@@ -10,10 +10,15 @@ shopt -s nullglob
 sleep 4h
 
 CONSOLE_URL=$(cat "$SHARED_DIR"/console.url)
-export API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
-export KUBEADMIN_PWD=$(cat "$SHARED_DIR"/kubeadmin-password)
-export OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
-export KUBECONFIG=/var/run/secrets/ci.openshift.io/multi-stage/kubeconfig
+API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
+KUBEADMIN_PWD=$(cat "$SHARED_DIR"/kubeadmin-password)
+OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
+KUBECONFIG=/var/run/secrets/ci.openshift.io/multi-stage/kubeconfig
+
+export API_URL
+export KUBEADMIN_PWD
+export OCM_TOKEN
+export KUBECONFIG
 
 # login to oc
 # oc login --token=$OCM_TOKEN --server=$SERVER
@@ -22,8 +27,8 @@ export KUBECONFIG=/var/run/secrets/ci.openshift.io/multi-stage/kubeconfig
 #  --password=$KUBEADMIN_PWD \
 #  --insecure-skip-tls-verify=true
 
-export TOKEN=$(oc whoami -t)
-
+TOKEN=$(oc whoami -t)
+export TOKEN
 # Applying cluster credentials in test.properties file
 cat << EOF > test.properties
 xtf.openshift.url=$API_URL
