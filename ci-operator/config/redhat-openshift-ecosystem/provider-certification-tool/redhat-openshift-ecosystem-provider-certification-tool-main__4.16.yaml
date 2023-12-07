@@ -1,6 +1,6 @@
 base_images:
   upi-installer:
-    name: "4.14"
+    name: "4.16"
     namespace: ocp
     tag: upi-installer
 binary_build_commands: make linux-amd64
@@ -11,10 +11,10 @@ build_root:
     tag: golang-1.19
 releases:
   latest:
-    release:
-      architecture: amd64
-      channel: candidate
-      version: "4.14"
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -28,7 +28,7 @@ resources:
       memory: 5Gi
 tests:
 - as: platform-none-vsphere
-  cron: 0 0 * * 6
+  cron: 0 0 * * 4
   steps:
     cluster_profile: vsphere-2
     env:
@@ -36,7 +36,7 @@ tests:
     workflow: opct-test-platform-none-vsphere
   timeout: 6h0m0s
 - as: platform-external-vsphere
-  cron: 0 0 * * 6
+  cron: 0 0 * * 4
   steps:
     cluster_profile: vsphere-2
     env:
@@ -44,17 +44,8 @@ tests:
       PLATFORM_NAME: vsphere
     workflow: opct-test-platform-external-vsphere
   timeout: 6h0m0s
-- as: platform-none-vsphere-upgrade
-  cron: 0 0 * * 6
-  steps:
-    cluster_profile: vsphere-2
-    env:
-      OPCT_RUN_MODE: upgrade
-      UPGRADE_TO_CHANNEL_TYPE: candidate
-    workflow: opct-test-platform-none-vsphere
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-openshift-ecosystem
   repo: provider-certification-tool
-  variant: "4.14"
+  variant: "4.16"
