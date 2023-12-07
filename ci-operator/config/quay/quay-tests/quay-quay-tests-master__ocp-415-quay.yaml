@@ -27,14 +27,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: quay-e2e-tests-quay39-ocp415-lp-interop
+- as: quay-e2e-tests-quay310-ocp415-lp-interop
   cron: 0 6 25 10 *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      CSO_CHANNEL: stable-3.9
+      CSO_CHANNEL: stable-3.10
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -50,8 +50,8 @@ tests:
         }
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","quay-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      QBO_CHANNEL: stable-3.9
-      QUAY_OPERATOR_CHANNEL: stable-3.9
+      QBO_CHANNEL: stable-3.10
+      QUAY_OPERATOR_CHANNEL: stable-3.10
       USER_TAGS: |
         scenario quay
     test:
@@ -60,8 +60,40 @@ tests:
     - ref: quay-tests-qbo-qe-test
     - ref: quay-tests-cso-qe-test
     workflow: firewatch-cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay39-ocp415
+  cron: 0 12 * * 2
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CSO_CHANNEL: stable-3.9
+      QBO_CHANNEL: stable-3.9
+      QUAY_OPERATOR_CHANNEL: stable-3.9
+    test:
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay38-ocp415
+  cron: 0 12 * * 2
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CSO_CHANNEL: stable-3.8
+      QBO_CHANNEL: stable-3.8
+      QUAY_OPERATOR_CHANNEL: stable-3.8
+    test:
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay
   repo: quay-tests
-  variant: ocp-415-quay39
+  variant: ocp-415-quay
