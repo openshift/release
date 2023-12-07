@@ -88,7 +88,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "not tp_only" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks
+        pytest.sh -k "not tp_only and not UI" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -140,7 +140,8 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "not tp_only" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_periodic
+        pytest.sh -k "not tp_only" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_periodic &&
+        cp $(pwd)/test-report.xml ${ARTIFACT_DIR}/test-report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -181,7 +182,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -k "test_archive_uploaded_and_result_received" --junitxml=$(pwd)/test-report.xmls
+      commands: pytest.sh -k "test_archive_uploaded_and_result_received" --junitxml=${ARTIFACT_DIR}/test-report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -223,7 +224,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -m "not ui and techpreview" --junitxml=$(pwd)/test-report.xml
+      commands: pytest.sh -m "not UI and techpreview" --junitxml=$(pwd)/test-report.xml
         --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview
       credentials:
       - mount_path: /secrets
