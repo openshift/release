@@ -421,8 +421,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-capability-baselinecaps-vset-additionalcaps
-- as: azure-ipi-baselinecaps-vset-amd-f14
-  cron: 54 7 3,18 * *
+- as: azure-ipi-baselinecaps-vset-amd-f28-destructive
+  cron: 54 7 30 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -434,10 +434,10 @@ tests:
       PERSISTENT_MONITORING: "false"
       TAG_VERSION: '@4.15'
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-capability-baselinecaps-vset
-- as: azure-ipi-baselinecaps-vset-arm-f28-destructive
-  cron: 34 5 30 * *
+- as: azure-ipi-baselinecaps-vset-arm-f14
+  cron: 34 5 3,18 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -451,7 +451,7 @@ tests:
       PERSISTENT_MONITORING: "false"
       TAG_VERSION: '@4.15'
     test:
-    - chain: openshift-e2e-test-qe-destructive
+    - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-capability-baselinecaps-vset
 - as: azure-ipi-disc-fullypriv-arm-mixarch-f14
   cron: 6 22 2,17 * *
@@ -527,6 +527,66 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
+- as: azure-ipi-disk-encryption-set-amd-f28-destructive
+  cron: 45 14 13 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips'
+      ENABLE_DES_DEFAULT_MACHINE: "true"
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
+- as: azure-ipi-disk-encryption-set-arm-f14
+  cron: 2 22 13,28 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips'
+      ENABLE_DES_DEFAULT_MACHINE: "true"
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
+- as: azure-ipi-fullyprivate-proxy-amd-f28-destructive
+  cron: 44 14 20 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips
+        and @proxy'
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: azure-ipi-fullyprivate-proxy-arm-f14
+  cron: 37 17 10,25 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips
+        and @proxy'
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 - as: azure-ipi-ingress-controller-arm-mixarch-f28
   cron: 11 3 28 * *
   steps:
@@ -566,6 +626,38 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-controller
+- as: azure-ipi-nat-gateway-tp-amd-f28-destructive
+  cron: 33 4 14 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips'
+      FEATURE_SET: TechPreviewNoUpgrade
+      OUTBOUND_TYPE: NatGateway
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: azure-ipi-nat-gateway-tp-arm-f14
+  cron: 5 23 9,17 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips'
+      FEATURE_SET: TechPreviewNoUpgrade
+      OCP_ARCH: arm64
+      OUTBOUND_TYPE: NatGateway
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-oidc-amd-f28-destructive
   cron: 49 20 6 * *
   steps:
@@ -596,6 +688,64 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
+- as: azure-ipi-ovn-etcd-encryption-compact-amd-f28-destructive
+  cron: 42 8 19 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips'
+      SIZE_VARIANT: compact
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-etcd-encryption
+- as: azure-ipi-ovn-etcd-encryption-compact-arm-f14
+  cron: 24 10 7,22 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips'
+      OCP_ARCH: arm64
+      SIZE_VARIANT: compact
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-etcd-encryption
+- as: azure-ipi-ovn-ipsec-azurefile-csi-amd-f28-destructive
+  cron: 11 1 15 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec-azurefile-csi
+- as: azure-ipi-ovn-ipsec-azurefile-csi-arm-f14
+  cron: 2 0 8,23 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips'
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec-azurefile-csi
 - as: azure-ipi-sdn-migration-ovn-amd-f14
   cron: 32 2 15,30 * *
   steps:
@@ -628,7 +778,100 @@ tests:
     test:
     - chain: cucushift-sdn-migration-ovn
     workflow: cucushift-installer-rehearse-azure-ipi-sdn
-- as: azure-ipi-usertags-sa-encryption-amd-f28
+- as: azure-ipi-proxy-tp-amd-f28-destructive
+  cron: 36 23 14 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @azure-ipi and @proxy and @network-ovnkubernetes and
+        not @fips'
+      FEATURE_SET: TechPreviewNoUpgrade
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-proxy
+- as: azure-ipi-proxy-tp-arm-f14
+  cron: 17 21 15,28 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @proxy and @network-ovnkubernetes and
+        not @fips'
+      FEATURE_SET: TechPreviewNoUpgrade
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-proxy
+- as: azure-ipi-sdn-amd-f28-destructive
+  cron: 4 13 17 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-openshiftsdn and not @fips'
+      TAG_VERSION: '@4.15'
+      TEST_ADDITIONAL: Network_Observability
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-sdn
+- as: azure-ipi-sdn-arm-f14
+  cron: 28 23 10,20 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-openshiftsdn and not @fips'
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-sdn
+- as: azure-ipi-sno-amd-f28-destructive
+  cron: 19 4 22 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and @singlenode
+        and not @fips'
+      TAG_VERSION: '@4.15'
+      TEST_ADDITIONAL: Network_Observability
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-sno
+- as: azure-ipi-sno-arm-f14
+  cron: 21 13 12,24 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and @singlenode
+        and not @fips'
+      OCP_ARCH: arm64
+      SINGLE_NODE_AZURE_INSTANCE_TYPE: Standard_D32ps_v5
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-sno
+- as: azure-ipi-usertags-sa-encryption-amd-f28-destructive
   cron: 20 20 4 * *
   steps:
     cluster_profile: azure-qe
@@ -639,9 +882,9 @@ tests:
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips'
       TAG_VERSION: '@4.15'
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-usertags-storage-account-encryption
-- as: azure-ipi-usertags-sa-encryption-f28-destructive
+- as: azure-ipi-usertags-sa-encryption-arm-f28
   cron: 30 7 1 * *
   steps:
     cluster_profile: azure-qe
@@ -654,8 +897,38 @@ tests:
       OCP_ARCH: arm64
       TAG_VERSION: '@4.15'
     test:
-    - chain: openshift-e2e-test-qe-destructive
+    - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-usertags-storage-account-encryption
+- as: azure-upi-amd-f28-destructive
+  cron: 38 1 3 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @azure-upi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-upi
+- as: azure-upi-arm-f14
+  cron: 28 4 13,27 * *
+  steps:
+    cluster_profile: azure-arm64-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      BOOTSTRAP_NODE_TYPE: Standard_D4ps_v5
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      CONTROL_PLANE_NODE_TYPE: Standard_D8ps_v5
+      E2E_RUN_TAGS: '@arm64 and @azure-upi and @network-ovnkubernetes and not @fips'
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.15'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-upi
 - as: azure-ipi-arm-mixarch-disc-fullypriv-f28-day2-64k-pagesize
   cron: 14 4 23 * *
   steps:
