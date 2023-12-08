@@ -85,7 +85,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.15-upgrade-from-stable-4.14-images
     decorate: true
     labels:
@@ -220,7 +220,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/4.15-upgrade-from-stable-4.14-local-gateway-images
     decorate: true
     labels:
@@ -355,7 +355,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-hypershift
     decorate: true
     decoration_config:
@@ -671,6 +671,87 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-local-to-shared-gateway-mode-migration,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
+    context: ci/prow/e2e-aws-ovn-network-migration
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-network-migration
+    optional: true
+    rerun_command: /test e2e-aws-ovn-network-migration
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-aws-ovn-network-migration-cluster-profile
+        - --target=e2e-aws-ovn-network-migration
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-ovn-network-migration-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-network-migration,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -1076,7 +1157,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
@@ -1808,7 +1889,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -1863,7 +1944,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1919,7 +2000,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -2059,7 +2140,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/okd-images
     decorate: true
     labels:
@@ -2442,7 +2523,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/security
     decorate: true
     decoration_config:
@@ -2505,7 +2586,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     decoration_config:

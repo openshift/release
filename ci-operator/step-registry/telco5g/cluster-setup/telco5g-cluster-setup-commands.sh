@@ -52,10 +52,10 @@ ${BASTION_IP} ansible_ssh_user=centos ansible_ssh_common_args="$COMMON_SSH_ARGS"
 EOF
 
 ADDITIONAL_ARG=""
-# default to the first cluster in the array, unless 4.14 or 4.15
+# default to the first cluster in the array, unless 4.16
 if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
     ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force"
-    if [[ "$T5CI_VERSION" == "4.14" ]] || [[ "$T5CI_VERSION" == "4.15" ]]; then
+    if [[ "$T5CI_VERSION" == "4.16" ]]; then
         ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[1]} --force"
     fi
 else

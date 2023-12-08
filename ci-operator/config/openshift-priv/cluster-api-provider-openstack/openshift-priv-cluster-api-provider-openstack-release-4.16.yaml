@@ -13,7 +13,6 @@ build_root:
 canonical_go_repository: sigs.k8s.io/cluster-api-provider-openstack
 images:
 - dockerfile_path: Dockerfile.rhel
-  from: base
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
@@ -38,8 +37,18 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: verify
+  commands: make XDG_DATA_HOME=/tmp/data XDG_CACHE_HOME=/tmp/cache verify-modules
+    verify-gen verify-vendoring
+  container:
+    from: src
 - as: test
   commands: make KUBEBUILDER_ASSETS_DIR=/tmp/data test
+  container:
+    from: src
+- as: test-openshift
+  commands: make -C openshift XDG_DATA_HOME=/tmp/data XDG_CACHE_HOME=/tmp/cache KUBEBUILDER_ASSETS_DIR=/tmp/data
+    verify test
   container:
     from: src
 zz_generated_metadata:

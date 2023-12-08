@@ -81,11 +81,11 @@ tests:
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
-- as: e2e-agnostic
+- as: e2e-agnostic-ovn
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-agnostic-upgrade
+- as: e2e-agnostic-ovn-upgrade
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
@@ -112,6 +112,24 @@ tests:
 - as: e2e-operator
   steps:
     cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-operator-fips
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
     test:
     - as: test
       cli: latest
@@ -155,7 +173,6 @@ tests:
     workflow: baremetalds-e2e-serial-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
-  optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -164,11 +181,10 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-assisted
-  optional: true
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-baremetal
-- as: e2e-aws-single-node
+- as: e2e-aws-ovn-single-node
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
@@ -178,18 +194,48 @@ tests:
     cluster_profile: packet-sno
     workflow: baremetalds-sno
 - as: configmap-scale
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-perfscale-e2e-configmap-scale
-- as: e2e-aws-serial
+- as: e2e-aws-ovn-serial
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
+- as: e2e-aws-ovn-etcd-scaling
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-etcd-scaling
+- as: e2e-gcp-ovn-etcd-scaling
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-etcd-scaling
+- as: e2e-azure-ovn-etcd-scaling
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-etcd-scaling
+- as: e2e-vsphere-ovn-etcd-scaling
+  optional: true
+  steps:
+    cluster_profile: vsphere-2
+    workflow: openshift-e2e-vsphere-etcd-scaling
 - as: e2e-aws-etcd-recovery
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-etcd-recovery
+- as: e2e-gcp-qe-no-capabilities
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      BASELINE_CAPABILITY_SET: None
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-upi
 zz_generated_metadata:
   branch: release-4.11
   org: openshift
