@@ -92,7 +92,7 @@ case "${selected_capability}" in
     ;;
 # To be updated once OCP 4.16 is released
 "CloudCredential")
-    if [[ "$(yq-go r -j "${SHARED_DIR}/install-config.yaml" platform | jq 'has("baremetal") or has("none")')" == "true" ]]; then
+    if [[ "${CLUSTER_TYPE}" =~ ^packet.*$|^equinix.*$ ]]; then
         enabled_capabilities=${enabled_capabilities/${selected_capability}}
     else
         echo "WARNING: non-BareMetal platforms require CCO for OCP 4.15, so no capability to be disabled!"
