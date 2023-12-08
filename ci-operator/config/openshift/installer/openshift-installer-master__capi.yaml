@@ -1,0 +1,81 @@
+base_images:
+  base:
+    name: "4.15"
+    namespace: ocp
+    tag: base
+  ocp_4.10_cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: images/installer-altinfra/Dockerfile.ci
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+  to: installer
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN dnf install -y nmstate
+    # Cache dir must be accessible when running the integration tests
+    RUN mkdir /.cache -m 0777
+  from: src
+  inputs:
+    ocp_4.10_cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-oc
+promotion:
+  excluded_images:
+  - installer
+  - src-oc
+  name: "4.15"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.15"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.15"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- always_run: false
+  as: e2e-aws-ovn
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: installer
+  variant: capi
