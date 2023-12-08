@@ -391,6 +391,7 @@ image-ecosystem)
     ;;
 heavy-build)
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel heavy_build
+    echo "doing a test"
     ;;
 upgrade)
     upgrade
