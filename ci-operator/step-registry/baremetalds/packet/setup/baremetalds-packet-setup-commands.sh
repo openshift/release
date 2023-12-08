@@ -145,6 +145,8 @@ cat > packet-setup.yaml <<-EOF
 
 EOF
 
+sleep 3600
+
 ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
 DEVICEID=$(jq -r .devices[0].id < ${SHARED_DIR}/hosts.json)
