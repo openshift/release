@@ -78,7 +78,6 @@ operator:
   - pullspec: quay.io/openshift/origin-aws-efs-csi-driver-operator:latest
     with: pipeline:aws-efs-csi-driver-operator
 promotion:
-  disabled: true
   name: "4.15"
   namespace: ocp
 releases:
@@ -127,6 +126,16 @@ tests:
       OO_CHANNEL: stable
       TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
     workflow: openshift-e2e-aws-csi-efs-extended
+- as: nightly-operator-e2e
+  cron: 0 */12 * * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      OO_CHANNEL: stable
+      TEST_SUITE: openshift/csi
+    workflow: openshift-e2e-aws-csi-efs
 - as: verify-deps
   steps:
     test:

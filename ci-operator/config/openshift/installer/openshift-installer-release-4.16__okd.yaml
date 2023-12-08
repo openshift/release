@@ -38,7 +38,6 @@ images:
   - name: TAGS
     value: fcos
   dockerfile_path: images/installer-artifacts/Dockerfile.rhel
-  from: installer
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
@@ -102,6 +101,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: ovirt-installer
 promotion:
+  disabled: true
   name: "4.16"
   namespace: origin
 releases:
@@ -195,6 +195,15 @@ tests:
   steps:
     cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
+- as: e2e-aws-ovn-testing-stream
+  cron: 30 0 * * *
+  steps:
+    cluster_profile: aws
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-aws-fcos-ami
+    - chain: ipi-install
+    workflow: openshift-e2e-aws
 - as: e2e-agent-compact-ipv4
   cluster: build05
   optional: true

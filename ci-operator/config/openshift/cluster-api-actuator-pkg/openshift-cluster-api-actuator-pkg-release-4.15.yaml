@@ -8,7 +8,6 @@ build_root:
 promotion:
   additional_images:
     cluster-api-actuator-pkg: src
-  disabled: true
   name: "4.15"
   namespace: ocp
 releases:
@@ -125,6 +124,78 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-aws-operator-periodic
+  interval: 72h
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-vsphere-operator-periodic
+  interval: 72h
+  steps:
+    cluster_profile: vsphere-2
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere
+- as: e2e-azure-operator-periodic
+  interval: 72h
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+- as: e2e-gcp-operator-periodic
+  interval: 72h
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-multi-operator-periodic
+  interval: 72h
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+    test:
+    - ref: ipi-install-heterogeneous
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-periodic-pre
   optional: true
@@ -139,6 +210,21 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- as: e2e-openstack-operator-periodic
+  minimum_interval: 72h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      USE_RAMFS: "false"
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.15
   org: openshift
