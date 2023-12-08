@@ -10,14 +10,14 @@ mkdir /tmp/kuttl-manifests
 # If the DOWNSTREAM_TESTS_COMMIT variable is set, clone the repository with the specified commit
 if [[ -n "${DOWNSTREAM_TESTS_COMMIT}" ]]; then
   git clone https://github.com/open-telemetry/opentelemetry-operator.git /tmp/otel-tests
-  cd /tmp/otel-tests
+  cd /tmp/otel-tests 
   git checkout -b downstream-release "${DOWNSTREAM_TESTS_COMMIT}"
 
   #Set parameters for running the test cases on OpenShift
   unset NAMESPACE
-  TARGETALLOCATOR_IMG=$TARGETALLOCATOR_IMG SED_BIN="$(which sed)" ./hack/modify-test-images.sh
-  sed -i 's/- -duration=1m/- -duration=7m/' tests/e2e-autoscale/autoscale/03-install.yaml
-  oc get nodes -o jsonpath='{.items[*].metadata.name}' | awk '{print $1}' | xargs -I {} oc label nodes {} ingress-ready=true
+  OPERATOROPAMPBRIDGE_IMG=ghcr.io/open-telemetry/opentelemetry-operator/operator-opamp-bridge:v0.89.0 TARGETALLOCATOR_IMG=ghcr.io/open-telemetry/opentelemetry-operator/target-allocator:v0.89.0 SED_BIN="$(which sed)" ./hack/modify-test-images.sh
+  sed -i 's/- -duration=1m/- -duration=6m/' tests/e2e-autoscale/autoscale/02-install.yaml
+  oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | xargs -I {} oc label nodes {} ingress-ready=true
 
   # Remove test cases to be skipped from the test run
   IFS=' ' read -ra SKIP_TEST_ARRAY <<< "$SKIP_TESTS"
@@ -50,7 +50,28 @@ if [[ -n "${DOWNSTREAM_TESTS_COMMIT}" ]]; then
     --manifest-dir=$MANIFEST_DIR \
     tests/e2e \
     tests/e2e-autoscale \
-    tests/e2e-openshift 
+    tests/e2e-openshift \
+    tests/e2e-prometheuscr \
+    tests/e2e-instrumentation \
+    tests/e2e-pdb \
+    tests/e2e-opampbridge
+
+  # Enable required feature gates.
+  OTEL_CSV_NAME=$(oc get csv -n openshift-operators | grep "opentelemetry-operator" | awk '{print $1}')
+  oc -n openshift-operators patch csv $OTEL_CSV_NAME --type=json -p '[{"op":"replace","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args","value":["--metrics-addr=127.0.0.1:8080", "--enable-leader-election", "--zap-log-level=info", "--zap-time-encoding=rfc3339nano", "--feature-gates=+operator.autoinstrumentation.multi-instrumentation"]}]'
+  sleep 10
+  oc wait --for condition=Available -n openshift-operators deployment opentelemetry-operator-controller-manager
+
+  # Execute OpenTelemetry e2e tests
+  KUBECONFIG=$KUBECONFIG kuttl test \
+    --report=xml \
+    --artifacts-dir="$ARTIFACT_DIR" \
+    --parallel="$PARALLEL_TESTS" \
+    --report-name="$REPORT_NAME-2" \
+    --start-kind=false \
+    --timeout="$TIMEOUT" \
+    --manifest-dir=$MANIFEST_DIR \
+    tests/e2e-multi-instrumentation
 
 else
 
@@ -59,9 +80,9 @@ else
 
   #Set parameters for running the test cases on OpenShift
   unset NAMESPACE
-  TARGETALLOCATOR_IMG=$TARGETALLOCATOR_IMG SED_BIN="$(which sed)" ./hack/modify-test-images.sh
+  OPERATOROPAMPBRIDGE_IMG=$OPERATOROPAMPBRIDGE_IMG TARGETALLOCATOR_IMG=$TARGETALLOCATOR_IMG SED_BIN="$(which sed)" ./hack/modify-test-images.sh
   sed -i 's/- -duration=1m/- -duration=6m/' tests/e2e-autoscale/autoscale/02-install.yaml
-  oc get nodes -o jsonpath='{.items[*].metadata.name}' | awk '{print $1}' | xargs -I {} oc label nodes {} ingress-ready=true
+  oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | xargs -I {} oc label nodes {} ingress-ready=true
 
   # Remove test cases to be skipped from the test run
   IFS=' ' read -ra SKIP_TEST_ARRAY <<< "$SKIP_TESTS"
@@ -102,8 +123,7 @@ else
     tests/e2e-autoscale \
     tests/e2e-openshift \
     tests/e2e-prometheuscr \
-    tests/e2e-instrumentation \
-    tests/e2e-pdb
+    tests/e2e-instrumentation
   
   # Enable required feature gates.
   OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')

@@ -15,13 +15,12 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: upi-installer
-binary_build_commands: unset GOFLAGS && sed -i '/toolchain/d' /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/otel-allocator/go.mod
-  && make manager && make targetallocator
+binary_build_commands: make manager && make targetallocator && make operator-opamp-bridge
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    name: release
+    namespace: openshift
+    tag: golang-1.21
 canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
 images:
 - context_dir: .
@@ -45,6 +44,15 @@ images:
       - destination_dir: ./bin
         source_path: /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/otel-allocator/bin/targetallocator_amd64
   to: opentelemetry-target-allocator
+- context_dir: ./cmd/operator-opamp-bridge/
+  dockerfile_path: Dockerfile
+  from: src
+  inputs:
+    bin:
+      paths:
+      - destination_dir: ./bin
+        source_path: /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/operator-opamp-bridge/bin/opampbridge_amd64
+  to: opentelemetry-opampbridge
 operator:
   bundles:
   - as: opentelemetry-bundle
@@ -71,7 +79,7 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      SKIP_TESTS: tests/e2e-openshift/multi-cluster tests/e2e/smoke-daemonset
+      SKIP_TESTS: tests/e2e-openshift/multi-cluster tests/e2e/smoke-daemonset tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
     test:
     - ref: cucushift-hypershift-extended-health-check
     - ref: cucushift-pre
