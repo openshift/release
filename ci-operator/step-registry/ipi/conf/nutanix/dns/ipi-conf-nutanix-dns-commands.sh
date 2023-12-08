@@ -8,7 +8,7 @@ echo "${BASE_DOMAIN:?BASE_DOMAIN env variable should be defined}" > "${SHARED_DI
 
 cluster_name="mhans-compact"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
-cluster_domain="qe.devcluster.openshift.com"
+cluster_domain="${cluster_name}.${base_domain}"
 
 export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/nutanix/.awscred
 export AWS_MAX_ATTEMPTS=50
