@@ -18,7 +18,7 @@ if [[ "${API_SERVER}" =~ [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+ ]]; then
   EXTRACTED_API_SERVER=$(echo "${API_SERVER}" | grep -oP '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')
 elif [[ "${API_SERVER}" =~ [0-9a-fA-F:]+ ]]; then
   echo "It is an IPv6 address: ${API_SERVER}"
-  EXTRACTED_API_SERVER=$(echo "${API_SERVER}" | grep -oP '(?<=://\[)[^]]+')
+  EXTRACTED_API_SERVER=$(echo "${API_SERVER}" | grep -oP '\[.*?\]')
 else
   echo "It is a domain address: ${API_SERVER}"
   EXTRACTED_API_SERVER=".$(echo "${API_SERVER}" | grep -oP '(?<=://)([^:/]+)')"
