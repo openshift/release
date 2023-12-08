@@ -66,7 +66,9 @@ fi
 
 subnets_json=$(curl -ks -u "${un}":"${pw}" -X POST ${api_ep} -H "Content-Type: application/json" -d @-<<<"${data}")
 subnet_uuid=$(echo "${subnets_json}" | jq ".entities[] | select (.spec.name == \"${subnet_name}\") | .metadata.uuid ")
-
+cat > "${SHARED_DIR}/nutanix_subnet.sh" << EOF
+${subnets_json}
+EOF
 if [[ -z "${subnet_uuid}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Cannot get Subnet UUID"
   exit 1
@@ -98,6 +100,8 @@ if [[ -z "${INGRESS_VIP}" ]]; then
   if [[ ! -z  "${awk_ip_program}" ]]; then
     INGRESS_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -F. -v num=${slice_number} -v type="ingress" "${awk_ip_program}")
   fi
+  RANDOM_INGRESS_NODE_BLOCK=$(( RANDOM % 254 ))
+  NODE_IP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -v random=${RANDOM_INGRESS_NODE_BLOCK} -F. '{printf "%d.%d.%d.%d", $1, $2, $3, random}')
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Creating nutanix_context.sh file..."
@@ -115,5 +119,6 @@ export PE_STORAGE_CONTAINER='${prism_element_storage_container}'
 export SUBNET_UUID='${subnet_uuid}'
 export API_VIP='${API_VIP}'
 export INGRESS_VIP='${INGRESS_VIP}'
+export NODE_IP='${NODE_IP}'
 export OVERRIDE_RHCOS_IMAGE='${override_rhcos_image:-}'
 EOF
