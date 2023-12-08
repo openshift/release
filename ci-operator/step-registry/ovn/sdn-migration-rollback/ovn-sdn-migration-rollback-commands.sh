@@ -34,7 +34,7 @@ done
 EOT
 oc patch Network.config.openshift.io cluster --type='merge' --patch "{\"spec\":{\"networkType\":\"${TARGET}\"}}"
 
-oc wait co network --for='condition=PROGRESSING=True' --timeout=60s
+oc wait co network --for='condition=PROGRESSING=True' --timeout=120s
 # Wait until the multus pods are restarted
 timeout 300 oc rollout status ds/multus -n openshift-multus
 
