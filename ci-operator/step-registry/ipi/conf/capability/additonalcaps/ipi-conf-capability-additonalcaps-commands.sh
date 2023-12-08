@@ -90,8 +90,13 @@ case "${selected_capability}" in
 "MachineAPI")
     echo "WARNING: MachineAPI is selected, but it requires on IPI, so no capability to be disabled!"
     ;;
+# To be updated once OCP 4.16 is released
 "CloudCredential")
-    echo "WARNING: non-BareMetal platforms require CCO for OCP 4.15, so no capability to be disabled!"
+    if [[ "$(yq-go r -j "${SHARED_DIR}/install-config.yaml" platform | jq 'has("baremetal") or has("none")')" == "true" ]]; then
+        enabled_capabilities=${enabled_capabilities/${selected_capability}}
+    else
+        echo "WARNING: non-BareMetal platforms require CCO for OCP 4.15, so no capability to be disabled!"
+    fi
     ;;
 # Disable marketplace if OperatorLifecycleManager is selected to bo disabled
 "OperatorLifecycleManager")
