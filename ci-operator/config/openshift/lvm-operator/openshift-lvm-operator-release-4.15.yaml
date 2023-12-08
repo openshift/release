@@ -17,7 +17,6 @@ build_root:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.15
-  use_build_cache: true
 images:
 - dockerfile_literal: |-
     FROM ubi_minimal
@@ -33,13 +32,6 @@ images:
 
     ENV PRE_COMMIT_HOME=/.cache/precommit
     ENV GOLANGCI_LINT_CACHE=/.cache/golangci
-
-    # Snyk
-    ENV SNYK_DIR=/tmp/snyk
-    RUN mkdir -p ${SNYK_DIR}
-    RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
-    RUN chmod +x ${SNYK_DIR}/snyk
-    ENV PATH=$PATH:${SNYK_DIR}
   from: ubi_minimal
   inputs:
     root:
@@ -60,12 +52,6 @@ operator:
   substitutions:
   - pullspec: quay.io/lvms_dev/lvms-operator:latest
     with: pipeline:lvm-operator
-promotion:
-  excluded_images:
-  - lvms-pre-commit
-  namespace: lvms
-  tag: latest
-  tag_by_commit: true
 releases:
   initial:
     integration:
@@ -114,26 +100,6 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvm-operator-codecov-token
-- as: snyk-code
-  commands: |
-    SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-code
-  container:
-    clone: true
-    from: lvms-pre-commit
-  optional: true
-  secret:
-    mount_path: /tmp/secret
-    name: lvms-snyk-token
-- as: snyk-deps
-  commands: |
-    SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-deps
-  container:
-    clone: true
-    from: lvms-pre-commit
-  optional: true
-  secret:
-    mount_path: /tmp/secret
-    name: lvms-snyk-token
 - as: lvm-operator-e2e-aws-sno
   steps:
     cluster_profile: aws
@@ -171,6 +137,6 @@ tests:
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
-  branch: main
+  branch: release-4.15
   org: openshift
   repo: lvm-operator
