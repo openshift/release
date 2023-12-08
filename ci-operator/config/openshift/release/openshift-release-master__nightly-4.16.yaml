@@ -43,14 +43,6 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: base
-  cnv-ci-src:
-    name: "4.16"
-    namespace: cnv
-    tag: cnv-ci-src
-  cnv-ci-src-upgrade:
-    name: "4.16"
-    namespace: cnv
-    tag: cnv-ci-src-upgrade
   console-tests:
     name: "4.16"
     namespace: ocp
@@ -719,91 +711,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-sdn-crun
-- as: e2e-azure-deploy-cnv
-  interval: 168h
-  steps:
-    cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-    observers:
-      enable:
-      - observers-resource-watch
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        curl -L https://github.com/openshift-cnv/cnv-ci/tarball/release-4.16 -o /tmp/cnv-ci.tgz
-        mkdir -p /tmp/cnv-ci
-        tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
-        cd /tmp/cnv-ci
-        make deploy_test
-      credentials:
-      - mount_path: /var/run/cnv-ci-brew-pull-secret
-        name: cnv-ci-brew-pull-secret
-        namespace: test-credentials
-      env:
-      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
-        name: BREW_IMAGE_REGISTRY_USERNAME
-      - default: /var/run/cnv-ci-brew-pull-secret/token
-        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.55.0
-        name: KUBEVIRT_RELEASE
-      - default: "4.16"
-        name: OCP_VERSION
-      - default: /tmp/artifacts
-        name: ARTIFACTS_DIR
-      - default: openshift-cnv
-        name: TARGET_NAMESPACE
-      - default: "false"
-        name: PRODUCTION_RELEASE
-      from: cnv-ci-src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 600Mi
-    workflow: ipi-azure
-- as: e2e-azure-upgrade-cnv
-  interval: 168h
-  steps:
-    cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-    observers:
-      enable:
-      - observers-resource-watch
-    test:
-    - as: test
-      commands: |
-        curl -L https://github.com/openshift-cnv/cnv-ci/tarball/release-4.16 -o /tmp/cnv-ci.tgz
-        mkdir -p /tmp/cnv-ci
-        tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
-        cd /tmp/cnv-ci
-        make upgrade_test
-      credentials:
-      - mount_path: /var/run/cnv-ci-brew-pull-secret
-        name: cnv-ci-brew-pull-secret
-        namespace: test-credentials
-      env:
-      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
-        name: BREW_IMAGE_REGISTRY_USERNAME
-      - default: /var/run/cnv-ci-brew-pull-secret/token
-        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.55.0
-        name: KUBEVIRT_RELEASE
-      - default: "4.16"
-        name: OCP_VERSION
-      - default: /tmp/artifacts
-        name: ARTIFACTS_DIR
-      - default: openshift-cnv
-        name: TARGET_NAMESPACE
-      - default: "false"
-        name: PRODUCTION_RELEASE
-      from: cnv-ci-src-upgrade
-      resources:
-        requests:
-          cpu: 100m
-          memory: 600Mi
-    workflow: ipi-azure
 - as: e2e-aws-driver-toolkit
   cron: 0 */8 * * *
   steps:
