@@ -86,24 +86,22 @@ selected_capability="${vcurrent_capabilities_array[$selected_capability_index]}"
 echo "Selected capability to be disabled: ${selected_capability}"
 
 enabled_capabilities=${vcurrent_capabilities}
-if [[ ! "${selected_capability}" == "MachineAPI" ]]; then
-    enabled_capabilities=${enabled_capabilities/${selected_capability}}
-else
+case "${selected_capability}" in
+"MachineAPI")
     echo "WARNING: MachineAPI is selected, but it requires on IPI, so no capability to be disabled!"
-fi
-
-# Disable marketplace if OperatorLifecycleManager is selected to bo disabled
-if [[ "${selected_capability}" == "OperatorLifecycleManager" ]]; then
-    echo "Capability 'marketplace' depends on Capability 'OperatorLifecycleManager', so disable marketplace along with OperatorLifecycleManager"
-    enabled_capabilities=${enabled_capabilities/"marketplace"}
-fi
-
-# For OCP 4.15, CCO is required for non-BareMetal platforms
-if [[ "$ocp_major_version" == "4" ]] && [[ "$ocp_minor_version" == "15" ]] && [[ "${selected_capability}" == "CloudCredential" ]]; then
+    ;;
+"CloudCredential")
     echo "WARNING: non-BareMetal platforms require CCO for OCP 4.15, so no capability to be disabled!"
-else
+    ;;
+# Disable marketplace if OperatorLifecycleManager is selected to bo disabled
+"OperatorLifecycleManager")
+    echo "Capability 'marketplace' depends on Capability 'OperatorLifecycleManager', so disable marketplace along with OperatorLifecycleManager"
     enabled_capabilities=${enabled_capabilities/${selected_capability}}
-fi
+    enabled_capabilities=${enabled_capabilities/"marketplace"}
+    ;;
+*)
+    enabled_capabilities=${enabled_capabilities/${selected_capability}}
+esac
 
 # apply patch to install-config
 CONFIG="${SHARED_DIR}/install-config.yaml"
