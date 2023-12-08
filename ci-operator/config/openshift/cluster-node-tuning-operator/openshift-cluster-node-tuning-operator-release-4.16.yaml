@@ -35,6 +35,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: cluster-node-tuning-operator
 promotion:
+  disabled: true
   excluded_images:
   - cluster-node-tuning-operator-us-tuned
   name: "4.16"
@@ -80,6 +81,20 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: e2e-nightly
+  cron: 0 23 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: nightly
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 - as: e2e-aws-operator
   steps:
     cluster_profile: aws
