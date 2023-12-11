@@ -1,0 +1,34 @@
+base_images:
+  openshift-docs:
+    name: openshift-docs-asciidoc
+    namespace: ocp
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: openshift-docs-asciidoc
+    namespace: ocp
+    tag: latest
+  use_build_cache: true
+images:
+- from: openshift-docs
+  to: openshift-docs-builder
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: deploy-preview
+  steps:
+    env:
+      DISTROS: openshift-enterprise openshift-rosa openshift-dedicated microshift
+      PREVIEW_SITE: ocpdocs-pr
+    test:
+    - ref: openshift-docs-build-docs
+    - ref: openshift-docs-preview-comment
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: openshift-docs
