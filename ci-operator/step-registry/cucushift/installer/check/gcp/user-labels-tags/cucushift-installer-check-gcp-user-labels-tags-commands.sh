@@ -19,6 +19,7 @@ fi
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 INFRA_ID="$(oc get infrastructures.config.openshift.io cluster -o jsonpath='{.status.infrastructureName}')"
+GCP_REGION="${LEASED_RESOURCE}"
 
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${SHARED_DIR}/user_tags_sa.json"
@@ -46,6 +47,31 @@ function validate_user_labels() {
   done
 }
 
+# User-defined tags validation. It will check if each user-defined tag is applied. 
+# Return non-zero is one or more user-defined tag absent. 
+# $1 - the current tags of the resource under question
+function validate_user_tags() {
+  local -r current_tags="$1";  shift
+
+  printf '%s' "${USER_TAGS:-}" | while read -r PARENT KEY VALUE || [ -n "${PARENT}" ]
+  do
+    a_tag_value="${PARENT}/${KEY}/${VALUE}"
+    space_pattern="\ "
+    if [[ "${a_tag_value}" =~ ${space_pattern} ]] && [ ${#a_tag_value} -gt 64 ]; then
+    echo "$(date -u --rfc-3339=seconds) - Truncating tag '${a_tag_value}'"
+      a_tag_value="${a_tag_value::63}"
+      a_tag_value="${a_tag_value%* }"
+    fi
+    a_tag_value="namespacedTagValue: ${a_tag_value}"
+    if echo ${current_tags} | grep -Fq "${a_tag_value}"; then
+      continue
+    else
+      echo "$(date -u --rfc-3339=seconds) - Failed to find tag '${a_tag_value}' (PARENT/KEY/VALUE)."
+      return 1
+    fi
+  done
+}
+
 ## Try the validation
 set +e
 ret=0
@@ -65,6 +91,22 @@ for line in "${items[@]}"; do
   fi
 done
 
+echo "$(date -u --rfc-3339=seconds) - Checking userTags of machines..."
+readarray -t items < <(gcloud compute instances list --filter="name~${CLUSTER_NAME}" --format="table(name,zone)" | grep -v NAME)
+for line in "${items[@]}"; do
+  name="${line%% *}"
+  zone="${line##* }"
+  current_tags="$(gcloud resource-manager tags bindings list --parent=//compute.googleapis.com/projects/${GOOGLE_PROJECT_ID}/zones/${zone}/instances/${name} --location=${zone} --effective)"
+  echo "${current_tags}"
+  validate_user_tags "${current_tags}"
+  if [ $? -gt 0 ]; then
+    echo "$(date -u --rfc-3339=seconds) - FAILED for machine '${name}'."
+    ret=1
+  else
+    echo "$(date -u --rfc-3339=seconds) - PASSED for machine '${name}'."
+  fi
+done
+
 echo "$(date -u --rfc-3339=seconds) - Checking userLabels of disks..."
 readarray -t items < <(gcloud compute disks list --filter="name~${CLUSTER_NAME}" --format="table(name,zone)" | grep -v NAME)
 for line in "${items[@]}"; do
@@ -77,6 +119,24 @@ for line in "${items[@]}"; do
     ret=1
   else
     echo "$(date -u --rfc-3339=seconds) - Matched labels '${current_labels}' for '${name}'."
+  fi
+done
+
+echo "$(date -u --rfc-3339=seconds) - Checking userTags of disks..."
+readarray -t items < <(gcloud compute disks list --filter="name~${CLUSTER_NAME}" --format="table(name,zone)" | grep -v NAME)
+for line in "${items[@]}"; do
+  name="${line%% *}"
+  zone="${line##* }"
+  zone=$(basename ${zone})
+  disk_id=$(gcloud compute disks describe ${name} --zone ${zone} --format json | jq -r -c .id)
+  current_tags="$(gcloud resource-manager tags bindings list --parent=//compute.googleapis.com/projects/${GOOGLE_PROJECT_ID}/zones/${zone}/disks/${disk_id} --location=${zone} --effective)"
+  echo "${current_tags}"
+  validate_user_tags "${current_tags}"
+  if [ $? -gt 0 ]; then
+    echo "$(date -u --rfc-3339=seconds) - FAILED for disk '${name}'."
+    ret=1
+  else
+    echo "$(date -u --rfc-3339=seconds) - PASSED for disk '${name}'."
   fi
 done
 
@@ -120,6 +180,21 @@ for line in "${items[@]}"; do
     ret=1
   else
     echo "$(date -u --rfc-3339=seconds) - Matched labels '${current_labels}' for '${name}'."
+  fi
+done
+
+echo "$(date -u --rfc-3339=seconds) - Checking userTags of image-registry buckets..."
+readarray -t items < <(gsutil ls | grep "${INFRA_ID}-image-registry")
+for line in "${items[@]}"; do
+  name=$(basename "${line}")
+  current_tags="$(gcloud resource-manager tags bindings list --parent=//storage.googleapis.com/projects/_/buckets/${name} --location=${GCP_REGION} --effective)"
+  echo "${current_tags}"
+  validate_user_tags "${current_tags}"
+  if [ $? -gt 0 ]; then
+    echo "$(date -u --rfc-3339=seconds) - FAILED for bucket '${name}'."
+    ret=1
+  else
+    echo "$(date -u --rfc-3339=seconds) - PASSED for bucket '${name}'."
   fi
 done
 
