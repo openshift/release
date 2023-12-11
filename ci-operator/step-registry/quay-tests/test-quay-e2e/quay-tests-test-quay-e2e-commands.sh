@@ -32,8 +32,10 @@ trap copyArtifacts EXIT
 
 # Cypress Doc https://docs.cypress.io/guides/references/proxy-configuration
 if [ $QUAY_PROXY = "true" ]; then
-    export HTTPS_PROXY=$(cat $SHARED_DIR/proxy_public_url)
-    export HTTP_PROXY=$(cat $SHARED_DIR/proxy_public_url)
+    HTTPS_PROXY=$(cat $SHARED_DIR/proxy_public_url)
+    export HTTPS_PROXY
+    HTTP_PROXY=$(cat $SHARED_DIR/proxy_public_url)
+    export HTTP_PROXY
 fi
 
 #Trigget Quay E2E Testing
