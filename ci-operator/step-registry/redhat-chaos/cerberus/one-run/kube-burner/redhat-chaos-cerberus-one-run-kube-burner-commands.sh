@@ -1,1 +1,0 @@
-../redhat-chaos-cerberus-one-run-commands.sh
