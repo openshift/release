@@ -10,7 +10,7 @@ fi
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
-proxy_private_url=$(<"${SHARED_DIR}/proxy_public_url")
+proxy_public_url=$(<"${SHARED_DIR}/proxy_public_url")
 cat >>"${CONFIG}" <<EOF
 proxy:
   httpProxy: ${proxy_public_url}
