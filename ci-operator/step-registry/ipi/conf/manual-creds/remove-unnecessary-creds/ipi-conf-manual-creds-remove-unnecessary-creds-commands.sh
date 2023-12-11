@@ -58,7 +58,7 @@ v411="baremetal marketplace openshift-samples"
 v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
-v415=" ${v414} OperatorLifecycleManager"
+v415=" ${v414} OperatorLifecycleManager CloudCredential"
 latest_defined="v415"
 always_default="${!latest_defined}"
 
