@@ -87,6 +87,7 @@ caps_operator[NodeTuning]="node-tuning"
 caps_operator[MachineAPI]="machine-api control-plane-machine-set cluster-autoscaler"
 caps_operator[ImageRegistry]="image-registry"
 caps_operator[OperatorLifecycleManager]="operator-lifecycle-manager operator-lifecycle-manager-catalog operator-lifecycle-manager-packageserver"
+caps_operator[CloudCredential]="cloud-credential"
 
 # Mapping between optional capability and resources
 # Need to be updated when new resource marks as optional
@@ -100,7 +101,7 @@ v411="baremetal marketplace openshift-samples"
 v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
-v415=" ${v414} OperatorLifecycleManager"
+v415=" ${v414} OperatorLifecycleManager CloudCredential"
 latest_defined="v415"
 always_default="${!latest_defined}"
 
