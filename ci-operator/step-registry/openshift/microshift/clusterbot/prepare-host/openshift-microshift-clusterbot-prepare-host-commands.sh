@@ -36,6 +36,8 @@ export PS4='+ $(date "+%T.%N") \011'
 
 source /tmp/microshift-clusterbot-settings
 
+sudo dnf clean all
+
 if ! sudo subscription-manager status >&/dev/null; then
 	sudo subscription-manager register \
 		--org="$(cat /tmp/subscription-manager-org)" \
