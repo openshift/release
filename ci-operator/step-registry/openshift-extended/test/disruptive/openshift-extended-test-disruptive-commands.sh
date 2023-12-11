@@ -91,6 +91,11 @@ then
     TEST_ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token") || true
     export TEST_ROSA_TOKEN
 fi
+if test -f "${SHARED_DIR}/cluster-id"
+then
+    CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id") || true
+    export CLUSTER_ID
+fi
 
 # configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
