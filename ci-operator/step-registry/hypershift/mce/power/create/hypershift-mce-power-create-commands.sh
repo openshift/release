@@ -187,7 +187,12 @@ echo "$(date) Creating agent hosted cluster manifests"
 oc create ns ${HOSTED_CONTROL_PLANE_NAMESPACE}
 mkdir /tmp/hc-manifests
 
-${HYPERSHIFT_CLI_NAME} create cluster agent \
+ICSP_COMMAND=""
+if [[ $ENABLE_ICSP == "true" ]]; then
+  ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_iscp.yaml")
+fi
+
+${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --name=${HOSTED_CLUSTER_NAME} \
     --namespace=${CLUSTERS_NAMESPACE} \
     --pull-secret=${PULL_SECRET} \
@@ -197,6 +202,7 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent \
     --ssh-key=${SSH_PUB_KEY_FILE}\
     --release-image=${OCP_IMAGE_MULTI} \
     --control-plane-availability-policy=${CP_AVAILABILITY_POLICY} \
+    --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
     --render > /tmp/hc-manifests/cluster-agent.yaml
 
 # Split the manifest to replace routing strategy of various services
