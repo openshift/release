@@ -171,22 +171,22 @@ presubmits:
     - ^prow-test$
     - ^prow-test-
     cluster: build03
-    context: ci/prow/portal
+    context: ci/prow/portal-build
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-docs-prow-test-portal
-    rerun_command: /test portal
+    name: pull-ci-openshift-openshift-docs-prow-test-portal-build
+    rerun_command: /test portal-build
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=portal
+        - --target=portal-build
         command:
         - ci-operator
         image: ci-operator:latest
@@ -219,7 +219,62 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )portal,?($|\s.*)
+    trigger: (?m)^/test( | .* )portal-build,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^prow-test$
+    - ^prow-test-
+    cluster: build03
+    context: ci/prow/portal-build-for-portal
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-openshift-docs-prow-test-portal-build-for-portal
+    rerun_command: /test portal-build-for-portal
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=portal-build-for-portal
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )portal-build-for-portal,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
