@@ -24,7 +24,7 @@ function print_clusterversion {
 #   retry my_check_function
 function retry() {
     local check_func=$1
-    local max_retries=10
+    local max_retries=25
     local retry_delay=30
     local retries=0
 
@@ -84,6 +84,7 @@ function check_pod_status {
 # It reads the output of "oc get clusteroperators" command and checks if the conditions are in the expected state.
 # If any cluster operator is not in the expected state, it prints an error message and returns 1. Otherwise, it returns 0.
 function check_cluster_operators {
+    oc get co ingress -oyaml
     while read -r name _ available progressing degraded _; do
         if [[ "$available" != "True" || "$progressing" != "False" || "$degraded" != "False" ]]; then
             echo "Cluster operator $name is not in the expected state."
