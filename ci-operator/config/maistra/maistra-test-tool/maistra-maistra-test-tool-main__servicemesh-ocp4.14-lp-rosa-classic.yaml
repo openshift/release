@@ -1,0 +1,69 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: maistra-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: servicemesh-rosa-aws
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "aws-provision*", "failure_type": "all", "classification": "Infrastructure Provisioning - AWS", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "aws-deprovision*", "failure_type": "all", "classification": "Infrastructure Deprovisioning - AWS", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "cucushift-*", "failure_type": "all", "classification": "Health Check - Cluster", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels":["!default"]},
+              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Must Gather - Cluster", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["!default"]},
+              {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+              {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "rosa-cluster-deprovision", "failure_type": "all", "classification": "Infrastructure Deprovisioning - Cluster", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "rosa-cluster-provision", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "rosa-cluster-wait*", "failure_type": "all", "classification": "Infrastructure Provisioning - Rosa Cluster Operators", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "rosa-sts-account-roles-create", "failure_type": "all", "classification": "Account Roles Creation - AWS", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "rosa-sts-account-roles-delete", "failure_type": "all", "classification": "Account Roles Deletion - AWS", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["!default"]},
+              {"step": "rosa-conf-idp-htpasswd", "failure_type": "all", "classification": "Admin Access - Cluster", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]}
+            ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.14-lp","rosa-lp","servicemesh-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.14"
+      OPERATORS: |
+        [
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"}
+        ]
+      ROSA_LOGIN_ENV: staging
+    test:
+    - chain: install-operators
+    workflow: firewatch-rosa-aws-sts
+zz_generated_metadata:
+  branch: main
+  org: maistra
+  repo: maistra-test-tool
+  variant: servicemesh-ocp4.14-lp-rosa-classic
