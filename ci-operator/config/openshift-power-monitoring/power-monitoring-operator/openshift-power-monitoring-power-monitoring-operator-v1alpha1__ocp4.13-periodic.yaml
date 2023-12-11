@@ -1,10 +1,10 @@
 base_images:
   cli:
-    name: "4.14"
+    name: "4.13"
     namespace: ocp
     tag: cli
   operator-sdk:
-    name: "4.14"
+    name: "4.13"
     namespace: origin
     tag: operator-sdk
 binary_build_commands: make build
@@ -35,10 +35,9 @@ operator:
     with: pipeline:kepler-operator
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.14"
+    release:
+      channel: stable
+      version: "4.13"
 resources:
   '*':
     requests:
@@ -46,7 +45,7 @@ resources:
       memory: 200Mi
 tests:
 - as: kepler-operator-e2e-aws
-  postsubmit: true
+  cron: 0 6 * * 1,3,5
   steps:
     cluster_profile: aws
     test:
@@ -65,7 +64,7 @@ tests:
     - ref: openshift-power-monitoring-tests-kepler
     workflow: openshift-e2e-aws
 - as: kepler-operator-e2e-gcp
-  postsubmit: true
+  cron: 0 6 * * 1,3,5
   steps:
     cluster_profile: gcp
     test:
@@ -87,4 +86,4 @@ zz_generated_metadata:
   branch: v1alpha1
   org: openshift-power-monitoring
   repo: power-monitoring-operator
-  variant: post-submit
+  variant: ocp4.13-periodic
