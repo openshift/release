@@ -3,13 +3,12 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: cli
-binary_build_commands: unset GOFLAGS && sed -i '/toolchain/d' /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/otel-allocator/go.mod
-  && make manager && make targetallocator
+binary_build_commands: make manager && make targetallocator && make operator-opamp-bridge
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    name: release
+    namespace: openshift
+    tag: golang-1.21
 canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
 images:
 - context_dir: .
@@ -24,6 +23,15 @@ images:
       - destination_dir: ./bin
         source_path: /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/otel-allocator/bin/targetallocator_amd64
   to: opentelemetry-target-allocator
+- context_dir: ./cmd/operator-opamp-bridge/
+  dockerfile_path: Dockerfile
+  from: src
+  inputs:
+    bin:
+      paths:
+      - destination_dir: ./bin
+        source_path: /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/operator-opamp-bridge/bin/opampbridge_amd64
+  to: opentelemetry-opampbridge
 releases:
   latest:
     candidate:
@@ -42,7 +50,7 @@ tests:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      DOWNSTREAM_TESTS_COMMIT: c5e438ba41bec98e3ef54e41417ab01789ef156b
+      DOWNSTREAM_TESTS_COMMIT: 36a49339742e9bc9e3e6e19e653d73328e8d1110
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -59,9 +67,8 @@ tests:
         }
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","opentelemetry-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      SKIP_TESTS: tests/e2e/instrumentation-go tests/e2e/instrumentation-apache-httpd
-        tests/e2e/targetallocator-features tests/e2e/smoke-targetallocator tests/e2e/prometheus-config-validation
-        tests/e2e/instrumentation-sdk
+      SKIP_TESTS: tests/e2e/targetallocator-features tests/e2e-instrumentation/instrumentation-nginx
+        tests/e2e-openshift/multi-cluster tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
       USER_TAGS: |
         scenario opentelemetry
     test:
