@@ -13,7 +13,6 @@ terraform version
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
 mkdir -p $ARTIFACT_DIR
 
-
 function copyArtifacts {
     JUNIT_PREFIX="junit_"
     cp -r ./cypress/results/* $ARTIFACT_DIR
@@ -31,6 +30,12 @@ yarn install || true
 #Finally Copy the Junit Testing XML files and Screenshots to /tmp/artifacts
 trap copyArtifacts EXIT
 
+# Cypress Doc https://docs.cypress.io/guides/references/proxy-configuration
+if [ $QUAY_PROXY = "true" ]; then
+    export HTTPS_PROXY=$(cat $SHARED_DIR/proxy_public_url)
+    export HTTP_PROXY=$(cat $SHARED_DIR/proxy_public_url)
+fi
+
 #Trigget Quay E2E Testing
 set +x
 quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
@@ -39,4 +44,3 @@ quay_hostname=${quay_route#*//}
 echo "The Quay hostname is $quay_hostname"
 export CYPRESS_QUAY_ENDPOINT=$quay_hostname
 yarn run smoke || true
-
