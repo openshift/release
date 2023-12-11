@@ -14,4 +14,10 @@ if [ "${FIREWATCH_FAIL_WITH_TEST_FAILURES,,}" = "true" ]; then
     report_command+=" --fail-with-test-failures"
 fi
 
+# If the user has specified verbose test failure reporting
+if [ "${FIREWATCH_VERBOSE_TEST_FAILURE_REPORTING,,}" = "true" ]; then
+    report_command+=" --verbose-test-failure-reporting"
+    report_command+=" --verbose-test-failure-reporting-ticket-limit ${FIREWATCH_VERBOSE_TEST_FAILURE_REPORTING_LIMIT}"
+fi
+
 eval "$report_command"
