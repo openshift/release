@@ -112,6 +112,11 @@ case "${LEASED_RESOURCE}" in
       POWERVS_REGION=tok
       VPCREGION=jp-tok
    ;;
+   "wdc06")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_WDC06")
+      POWERVS_REGION=wdc
+      VPCREGION=us-east
+   ;;
    *)
       # Default Region & Zone
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID")
