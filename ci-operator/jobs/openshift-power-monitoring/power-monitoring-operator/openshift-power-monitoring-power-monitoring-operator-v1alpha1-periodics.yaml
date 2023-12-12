@@ -12,10 +12,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/variant: periodic
+    ci-operator.openshift.io/variant: ocp4.13-periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-power-monitoring-power-monitoring-operator-v1alpha1-periodic-kepler-operator-e2e-aws
+  name: periodic-ci-openshift-power-monitoring-power-monitoring-operator-v1alpha1-ocp4.13-periodic-kepler-operator-e2e-aws
   reporter_config:
     slack:
       channel: '#powermon-ci'
@@ -37,7 +37,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/kepler-operator-e2e-aws-cluster-profile
       - --target=kepler-operator-e2e-aws
-      - --variant=periodic
+      - --variant=ocp4.13-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -103,10 +103,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp
-    ci-operator.openshift.io/variant: periodic
+    ci-operator.openshift.io/variant: ocp4.13-periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-power-monitoring-power-monitoring-operator-v1alpha1-periodic-kepler-operator-e2e-gcp
+  name: periodic-ci-openshift-power-monitoring-power-monitoring-operator-v1alpha1-ocp4.13-periodic-kepler-operator-e2e-gcp
   reporter_config:
     slack:
       channel: '#powermon-ci'
@@ -128,7 +128,193 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/kepler-operator-e2e-gcp-cluster-profile
       - --target=kepler-operator-e2e-gcp
-      - --variant=periodic
+      - --variant=ocp4.13-periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/kepler-operator-e2e-gcp-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 0 6 * * 1,3,5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: v1alpha1
+    org: openshift-power-monitoring
+    repo: power-monitoring-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: ocp4.14-periodic
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-power-monitoring-power-monitoring-operator-v1alpha1-ocp4.14-periodic-kepler-operator-e2e-aws
+  reporter_config:
+    slack:
+      channel: '#powermon-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        <!subteam^S064F0MMYMS> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/kepler-operator-e2e-aws-cluster-profile
+      - --target=kepler-operator-e2e-aws
+      - --variant=ocp4.14-periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/kepler-operator-e2e-aws-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 0 6 * * 1,3,5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: v1alpha1
+    org: openshift-power-monitoring
+    repo: power-monitoring-operator
+  labels:
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp
+    ci-operator.openshift.io/variant: ocp4.14-periodic
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-power-monitoring-power-monitoring-operator-v1alpha1-ocp4.14-periodic-kepler-operator-e2e-gcp
+  reporter_config:
+    slack:
+      channel: '#powermon-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        <!subteam^S064F0MMYMS> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/kepler-operator-e2e-gcp-cluster-profile
+      - --target=kepler-operator-e2e-gcp
+      - --variant=ocp4.14-periodic
       command:
       - ci-operator
       image: ci-operator:latest
