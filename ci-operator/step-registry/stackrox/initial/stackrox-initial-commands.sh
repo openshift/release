@@ -3,6 +3,11 @@ job="${TEST_SUITE:-${JOB_NAME_SAFE#merge-}}"
 job="${job#nightly-}"
 
 set -x
+
+tee operator/tests/run.sh <<EOF
+#!/usr/bin/env bash
+
+set -x
 ns="testname"
 oc patch scc anyuid --type merge -p '{
     "allowHostDirVolumePlugin": true,
@@ -19,5 +24,11 @@ oc patch scc anyuid --type json -p '[{ "op": "add", "path": "/users/-", "value":
 oc -n "${ns}" create deployment nginx --image=nginx
 time oc -n "${ns}" rollout status deployment nginx -w
 
+EOF
 
-#exec .openshift-ci/dispatch.sh "${job}"
+echo "Check script:"
+cat operator/tests/run.sh
+
+echo "Dispatch..."
+
+exec .openshift-ci/dispatch.sh "${job}"
