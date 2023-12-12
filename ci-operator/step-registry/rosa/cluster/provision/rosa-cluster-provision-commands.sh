@@ -73,6 +73,16 @@ else
   echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 fi
 
+function notify_ocmqe() {
+  message=$1
+  slack_message='{"text": "'"${message}"'. Sleep 10 hours for debugging with the job '"${JOB_NAME}/${BUILD_ID}"'. <@UD955LPJL> <@UEEQ10T4L>"}'
+  if [[ -e ${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url ]]; then
+    slack_hook_url=$(cat "${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url")    
+    curl -X POST -H 'Content-type: application/json' --data "${slack_message}" "${slack_hook_url}"
+    sleep 36000
+  fi
+}
+
 # Configure aws
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 if [[ "$HOSTED_CP" == "true" ]] && [[ ! -z "$REGION" ]]; then
@@ -596,6 +606,14 @@ while true; do
   if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" && "${CLUSTER_STATE}" != "waiting" && "${CLUSTER_STATE}" != "validating" ]]; then
     rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}" || echo "error: Unable to pull installation log."
     echo "error: Cluster reported invalid state: ${CLUSTER_STATE}"
+
+    # If the cluster is in error state, notify the ocm qes for debugging.
+    if [[ "${CLUSTER_STATE}" == "error" ]]; then
+      current_time=$(date -u '+%H')
+      if [ $current_time -lt 10 ]; then
+        notify_ocmqe "Error: Cluster ${CLUSTER_ID} reported invalid state: ${CLUSTER_STATE}"
+      fi
+    fi
     exit 1
   fi
 done
@@ -608,12 +626,7 @@ API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
 CONSOLE_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.console.url')
 if [[ "${API_URL}" == "null" ]]; then
   # If api.url is null, call ocm-qe to analyze the root cause.
-  if [[ -e ${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url ]]; then
-    slack_hook_url=$(cat "${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url")
-    slack_message='{"text": "Warning: the api.url for the cluster '"${CLUSTER_ID}"' is null. Sleep 10 hours for debugging with the job '"${JOB_NAME}/${BUILD_ID}"'. <@UD955LPJL> <@UEEQ10T4L>"}'
-    curl -X POST -H 'Content-type: application/json' --data "${slack_message}" "${slack_hook_url}"
-    sleep 36000
-  fi
+  notify_ocmqe "Warning: the api.url for the cluster ${CLUSTER_ID} is null"
 
   port="6443"
   if [[ "$HOSTED_CP" == "true" ]]; then
