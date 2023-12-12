@@ -1,12 +1,12 @@
 base_images:
-  base:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-base-openshift-4.6
   nodejs-10:
     name: nodejs-10-rhel7
     namespace: openshift
     tag: latest
+  ocp_4.16_base:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base
   ocp_builder_rhel-8-base-nodejs-openshift-4.16:
     name: builder
     namespace: ocp
@@ -20,8 +20,10 @@ build_root:
 canonical_go_repository: github.com/openshift/console
 images:
 - dockerfile_path: Dockerfile
-  from: base
   inputs:
+    ocp_4.16_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base
     ocp_builder_rhel-8-base-nodejs-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-base-nodejs-openshift-4.16
@@ -35,17 +37,17 @@ images:
 promotion:
   additional_images:
     console-tests: src
-  name: 4.15-priv
+  name: 4.16-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':
