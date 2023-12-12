@@ -57,6 +57,7 @@ fi
 
 echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
 if [[ "${PLATFORM}" == "aws" ]]; then
+  set +e
   for _ in {1..10}; do
    bin/hypershift destroy cluster aws \
      --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
@@ -71,6 +72,7 @@ if [[ "${PLATFORM}" == "aws" ]]; then
      echo 'Failed to delete the cluster, retrying...'
    fi
   done
+  set -e
 elif [[ "${PLATFORM}" == "powervs" ]]; then
   if [[ -z "${POWERVS_GUID}" ]]; then
     POWERVS_GUID=$(jq -r '.cloudInstanceID' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
@@ -90,6 +92,7 @@ elif [[ "${PLATFORM}" == "powervs" ]]; then
   if [[ -z "${POWERVS_VPC_REGION}" ]]; then
     POWERVS_VPC_REGION=$(jq -r '.vpcRegion' "${CLUSTER_PROFILE_DIR}/existing-resources.json")
   fi
+  set +e
   for _ in {1..10}; do
    bin/hypershift destroy cluster powervs \
      --name ${CLUSTER_NAME} \
@@ -108,6 +111,7 @@ elif [[ "${PLATFORM}" == "powervs" ]]; then
       echo 'Failed to delete the cluster, retrying...'
    fi
   done
+  set -e
 else
   echo "Unsupported platform. Cluster deletion failed."
   exit 1
