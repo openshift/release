@@ -1,26 +1,25 @@
 base_images:
-  base:
-    name: 4.14-priv
-    namespace: ocp-private
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ocp_builder_rhel-9-base-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.14
   ocp_builder_rhel-9-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.14
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  from_repository: true
 canonical_go_repository: github.com/openshift/metallb
 images:
 - dockerfile_path: Dockerfile.openshift
-  from: base
   inputs:
+    ocp_builder_rhel-9-base-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.14
     ocp_builder_rhel-9-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14

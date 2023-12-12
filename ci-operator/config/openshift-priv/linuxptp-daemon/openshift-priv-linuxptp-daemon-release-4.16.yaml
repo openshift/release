@@ -1,7 +1,7 @@
 base_images:
   ocp_4.14_base-rhel9:
-    name: "4.14"
-    namespace: ocp
+    name: 4.14-priv
+    namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.20-openshift-4.14:
     name: builder
@@ -21,6 +21,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
   to: ptp
 promotion:
+  disabled: true
   name: 4.16-priv
   namespace: ocp-private
 releases:
@@ -51,6 +52,12 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: linuxptp-daemon
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

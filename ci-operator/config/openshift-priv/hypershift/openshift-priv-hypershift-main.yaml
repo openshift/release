@@ -1,16 +1,16 @@
 base_images:
-  base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
   cli:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: cli
   hypershift-operator-initial:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: hypershift-operator
+  ocp_4.15_base:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: base
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
@@ -24,15 +24,16 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/hypershift
 images:
-- from: base
-  inputs:
+- inputs:
     openshift_release_golang-1.20:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.20
   to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
@@ -40,7 +41,7 @@ images:
 promotion:
   additional_images:
     hypershift-tests: test-bin
-  name: 4.15-priv
+  name: 4.16-priv
   namespace: ocp-private
 releases:
   hosted-ocp-4-12-latest:
@@ -69,11 +70,11 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.14"
+      version: "4.15"
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':
@@ -104,6 +105,8 @@ tests:
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: hypershift
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
     workflow: hypershift-aws-e2e-nested
 - as: e2e-kubevirt-aws-ovn
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
@@ -113,6 +116,7 @@ tests:
       CNV_PRERELEASE_VERSION: "4.14"
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
       ETCD_STORAGE_CLASS: gp3-csi
       KUBEVIRT_CSI_INFRA: gp3-csi

@@ -8,8 +8,8 @@ base_images:
     namespace: ci
     tag: latest
   ocp_4.16_base-rhel9:
-    name: "4.16"
-    namespace: ocp
+    name: 4.16-priv
+    namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
@@ -28,6 +28,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: insights-operator
 promotion:
+  disabled: true
   name: 4.16-priv
   namespace: ocp-private
 releases:
@@ -81,7 +82,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "not tp_only" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks
+        pytest.sh -k "not tp_only and not UI" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -133,7 +134,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -m "not ui and techpreview" --junitxml=$(pwd)/test-report.xml
+      commands: pytest.sh -m "not UI and techpreview" --junitxml=$(pwd)/test-report.xml
         --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview
       credentials:
       - mount_path: /secrets

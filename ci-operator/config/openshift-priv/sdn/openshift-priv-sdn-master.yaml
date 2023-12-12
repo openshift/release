@@ -1,10 +1,10 @@
 base_images:
-  base:
+  ocp_4.15_base:
     name: 4.15-priv
     namespace: ocp-private
     tag: base
   ocp_4.15_cli:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: cli
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
@@ -21,8 +21,10 @@ build_root:
 canonical_go_repository: github.com/openshift/sdn
 images:
 - dockerfile_path: images/sdn/Dockerfile.rhel
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_4.15_cli:
       as:
       - registry.ci.openshift.org/ocp/4.15:cli
@@ -34,24 +36,26 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: sdn
 - dockerfile_path: images/kube-proxy/Dockerfile.rhel
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: kube-proxy
 promotion:
-  name: 4.15-priv
+  name: 4.16-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':
@@ -79,22 +83,32 @@ tests:
 - as: e2e-aws-sdn
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn
 - as: e2e-aws-sdn-upgrade
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-upgrade-aws-sdn
 - as: e2e-gcp-sdn
   steps:
     cluster_profile: gcp-3
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-gcp-sdn
 - as: e2e-aws-sdn-multitenant
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-aws-sdn-serial
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-serial
 zz_generated_metadata:
   branch: master

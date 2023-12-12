@@ -1,8 +1,8 @@
 base_images:
-  base:
+  ocp_4.15_base-rhel9:
     name: 4.15-priv
     namespace: ocp-private
-    tag: base
+    tag: base-rhel9
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
@@ -12,8 +12,10 @@ build_root:
 canonical_go_repository: github.com/openshift/ptp-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
-  from: base
   inputs:
+    ocp_4.15_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
@@ -25,17 +27,17 @@ operator:
   - pullspec: quay.io/openshift/origin-ptp-operator:4.15
     with: pipeline:ptp-operator
 promotion:
-  name: 4.15-priv
+  name: 4.16-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':

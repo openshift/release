@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
   commitchecker:
     name: commitchecker
     namespace: ci
@@ -15,6 +11,10 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: hypershift-tests
+  ocp_4.15_base-rhel9:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
@@ -25,14 +25,15 @@ build_root:
 canonical_go_repository: sigs.k8s.io/cluster-api-provider-aws
 images:
 - dockerfile_path: openshift/Dockerfile.openshift
-  from: base
   inputs:
+    ocp_4.15_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
     ocp_builder_rhel-9-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: aws-cluster-api-controllers
 promotion:
-  disabled: true
   name: 4.15-priv
   namespace: ocp-private
 releases:

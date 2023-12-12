@@ -22,7 +22,6 @@ images:
         source_path: /go/src/github.com/openshift/microshift
   to: microshift-test-rpm
 promotion:
-  disabled: true
   excluded_images:
   - microshift-test-rpm
   name: 4.15-priv
@@ -92,6 +91,15 @@ tests:
       EC2_INSTANCE_TYPE: c5n.metal
       MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-tests
+- as: microshift-metal-tests-arm
+  cluster: build02
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_AMI: ami-0addfb94c944af1cc
+      EC2_INSTANCE_TYPE: c6g.metal
+    workflow: openshift-microshift-e2e-metal-tests
 - as: microshift-metal-cache
   cluster: build02
   run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
@@ -117,6 +125,15 @@ tests:
     env:
       EC2_INSTANCE_TYPE: c5n.metal
       MICROSHIFT_OS: rhel-9.3
+    workflow: openshift-microshift-e2e-metal-tests
+- as: metal-periodic-test-arm
+  cluster: build02
+  run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_AMI: ami-0addfb94c944af1cc
+      EC2_INSTANCE_TYPE: c6g.metal
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-conformance-rhel-eus
   cluster: build02

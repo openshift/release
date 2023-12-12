@@ -1,8 +1,8 @@
 base_images:
-  base:
+  ocp_4.15_base-rhel9:
     name: 4.15-priv
     namespace: ocp-private
-    tag: base
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
@@ -12,8 +12,10 @@ build_root:
 canonical_go_repository: github.com/openshift/cluster-monitoring-operator
 images:
 - dockerfile_path: Dockerfile
-  from: base
   inputs:
+    ocp_4.15_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
     ocp_builder_rhel-9-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
@@ -23,7 +25,6 @@ images:
   from: src
   to: cluster-monitoring-operator-src
 promotion:
-  disabled: true
   name: 4.15-priv
   namespace: ocp-private
 releases:
@@ -89,6 +90,8 @@ tests:
 - as: e2e-aws-ovn
   steps:
     cluster_profile: aws
+    env:
+      TELEMETRY_ENABLED: "true"
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-techpreview
   steps:
@@ -104,6 +107,8 @@ tests:
 - as: e2e-agnostic-operator
   steps:
     cluster_profile: aws
+    env:
+      TELEMETRY_ENABLED: "true"
     test:
     - as: test
       cli: latest
@@ -116,6 +121,8 @@ tests:
 - as: e2e-aws-ovn-upgrade
   steps:
     cluster_profile: aws
+    env:
+      TELEMETRY_ENABLED: "true"
     workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: release-4.15

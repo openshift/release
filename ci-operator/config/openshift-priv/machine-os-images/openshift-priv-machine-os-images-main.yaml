@@ -1,15 +1,15 @@
 base_images:
-  base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ocp_4.16_base:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base
   ocp_4.16_installer:
-    name: "4.16"
-    namespace: ocp
+    name: 4.16-priv
+    namespace: ocp-private
     tag: installer
 build_root:
   from_repository: true
@@ -19,24 +19,26 @@ images:
   - name: DIRECT_DOWNLOAD
     value: "true"
   dockerfile_path: Dockerfile
-  from: base
   inputs:
+    ocp_4.16_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base
     ocp_4.16_installer:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer
   to: machine-os-images
 promotion:
-  name: 4.15-priv
+  name: 4.16-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':

@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: base
   dev-scripts:
@@ -8,15 +8,19 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   must-gather-base:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: must-gather
+  ocp_4.16_base:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base
   ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.21-openshift-4.16
   tests-base:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: tests
 binary_build_commands: make build --warn-undefined-variables
@@ -25,8 +29,10 @@ build_root:
 canonical_go_repository: github.com/openshift/oc
 images:
 - dockerfile_path: images/cli/Dockerfile.rhel
-  from: base
   inputs:
+    ocp_4.16_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base
     ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
@@ -70,7 +76,7 @@ promotion:
   - tests
   - must-gather
   - oc-base-with-rpms
-  name: 4.15-priv
+  name: 4.16-priv
   namespace: ocp-private
 raw_steps:
 - rpm_image_injection_step:
@@ -79,12 +85,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':
