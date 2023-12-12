@@ -1,0 +1,52 @@
+base_images:
+  openshift-docs:
+    name: openshift-docs-asciidoc
+    namespace: ocp
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: openshift-docs-asciidoc
+    namespace: ocp
+    tag: latest
+  use_build_cache: true
+images:
+- from: openshift-docs
+  to: openshift-docs-builder
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: deploy-preview
+  steps:
+    env:
+      DISTROS: openshift-enterprise
+      PREVIEW_SITE: ocpdocs-pr
+    test:
+    - ref: openshift-docs-build-docs
+    - ref: openshift-docs-preview-comment
+- as: asciidoctor
+  steps:
+    test:
+    - ref: openshift-docs-asciidoctor
+- as: portal-build-enterprise-build
+  steps:
+    env:
+      BUILD: build
+      DISTRO: openshift-enterprise
+      PRODUCT: OpenShift Container Platform
+      TOPIC_MAP: _topic_map.yml
+      VERSION: "4.15"
+    test:
+    - ref: openshift-docs-portal
+- as: topic-maps
+  steps:
+    test:
+    - ref: openshift-docs-lint-topicmaps
+zz_generated_metadata:
+  branch: enterprise-4.11
+  org: openshift
+  repo: openshift-docs
