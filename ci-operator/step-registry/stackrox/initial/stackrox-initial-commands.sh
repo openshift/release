@@ -3,6 +3,7 @@ job="${TEST_SUITE:-${JOB_NAME_SAFE#merge-}}"
 job="${job#nightly-}"
 
 set -x
+set +eu
 
 tee scripts/ci/jobs/shell-unit-tests.sh <<EOF
 #!/usr/bin/env bash
