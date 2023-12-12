@@ -1,12 +1,12 @@
 base_images:
-  base:
-    name: 4.16-priv
-    namespace: ocp-private
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ocp_4.15_base:
+    name: "4.15"
+    namespace: ocp
+    tag: base
   ocp_4.15_cli:
     name: 4.16-priv
     namespace: ocp-private
@@ -21,12 +21,18 @@ canonical_go_repository: github.com/openshift/assisted-installer
 images:
 - dockerfile_path: ./Dockerfile.assisted-installer.ocp
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: agent-installer-orchestrator
 - dockerfile_path: ./Dockerfile.assisted-installer-controller.ocp
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_4.15_cli:
       as:
       - registry.ci.openshift.org/ocp/4.15:cli

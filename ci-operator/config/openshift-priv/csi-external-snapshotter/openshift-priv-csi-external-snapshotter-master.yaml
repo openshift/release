@@ -3,58 +3,48 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: "4.15"
-  ocp_4.15_base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
-  ocp_4.15_base-rhel9:
-    name: 4.15-priv
-    namespace: ocp-private
+  ocp_4.16_base-rhel9:
+    name: "4.16"
+    namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
-  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    tag: rhel-9-golang-1.20-openshift-4.16
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
 canonical_go_repository: github.com/kubernetes-csi/external-snapshotter
 images:
 - dockerfile_path: Dockerfile.openshift
   inputs:
-    ocp_4.15_base:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.15:base
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
   to: csi-external-snapshotter
 - dockerfile_path: Dockerfile.snapshot-controller.openshift.rhel7
   inputs:
-    ocp_4.15_base-rhel9:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.15:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
   to: csi-snapshot-controller
 - dockerfile_path: Dockerfile.webhook.openshift.rhel7
   inputs:
-    ocp_4.15_base:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.15:base
-    ocp_4.15_base-rhel9:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/4.15:base-rhel9
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: csi-snapshot-validation-webhook
 promotion:
   name: 4.15-priv
