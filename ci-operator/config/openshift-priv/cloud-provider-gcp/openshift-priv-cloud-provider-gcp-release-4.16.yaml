@@ -4,8 +4,8 @@ base_images:
     namespace: ci
     tag: "4.15"
   ocp_4.15_base-rhel9:
-    name: "4.15"
-    namespace: ocp
+    name: 4.15-priv
+    namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.20-openshift-4.15:
     name: builder
@@ -29,6 +29,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: gcp-cloud-controller-manager
 promotion:
+  disabled: true
   name: 4.16-priv
   namespace: ocp-private
 releases:
@@ -53,26 +54,17 @@ tests:
   commands: gofmt -l $(find . -type f -name '*.go'| grep -v "/vendor/")
   container:
     from: src
-- as: e2e-gcp-ovn-ccm
+- as: e2e-gcp-ovn
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp-3
-    workflow: openshift-e2e-gcp-ccm
-- as: e2e-gcp-ovn-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: gcp
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
-- as: openshift-e2e-gcp-ovn-techpreview-upgrade
+- as: e2e-gcp-ovn-upgrade
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp-upgrade
 - as: verify-commits
   commands: |
