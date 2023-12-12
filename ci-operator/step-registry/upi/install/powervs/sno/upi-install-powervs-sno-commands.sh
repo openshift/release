@@ -89,7 +89,7 @@ chmod 0600 ${SSH_PRIVATE}
 SSH_OPTIONS=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'ServerAliveInterval=60' -o 'ServerAliveCountMax=60' -o 'UserKnownHostsFile=/dev/null' -i "${SSH_PRIVATE}")
 
 # https://codeload.github.com/ppc64le-cloud/ocp-sno-hacks/zip/refs/heads/main contains the scripts to setup the SNO cluster
-ssh "${SSH_OPTIONS[@]}" root@${BASTION} "mkdir ${BASTION_CI_SCRIPTS_DIR} && cd ${BASTION_CI_SCRIPTS_DIR} && curl https://codeload.github.com/ppc64le-cloud/ocp-ci-hacks/zip/refs/heads/main -o ocp-ci-hacks.zip && unzip ocp-ci-hacks.zip && mv ocp-ci-hacks-main/sno/sno/* ${BASTION_CI_SCRIPTS_DIR} && rm -rf ocp-ci-hacks.zip ocp-ci-hacks-main"
+ssh "${SSH_OPTIONS[@]}" root@${BASTION} "mkdir ${BASTION_CI_SCRIPTS_DIR} && cd ${BASTION_CI_SCRIPTS_DIR} && curl https://codeload.github.com/ppc64le-cloud/ocp-ci-hacks/zip/refs/heads/main -o ocp-ci-hacks.zip && unzip ocp-ci-hacks.zip && mv ocp-ci-hacks-main/sno/* ${BASTION_CI_SCRIPTS_DIR} && rm -rf ocp-ci-hacks.zip ocp-ci-hacks-main"
 
 # Setting up the SNO config, generating the ignition and network boot on the bastion
 ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR} && ./setup-sno.sh ${CLUSTER_NAME} ${BASE_DOMAIN} ${POWERVS_MACHINE_NETWORK_CIDR} ${INSTALLATION_DISK} $(eval "echo ${LIVE_ROOTFS_URL}") $(eval "echo ${LIVE_KERNEL_URL}") $(eval "echo ${LIVE_INITRAMFS_URL}") $(printf "http://%s" "${BASTION}") ${MAC_ADDRESS} ${IP_ADDRESS}"
