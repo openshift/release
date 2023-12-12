@@ -30,3 +30,5 @@ EOF
 sleep 300
 
 oc wait deployments -n mtr --all=true --for condition=Available --timeout=1800s
+
+sleep 3600
