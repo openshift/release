@@ -49,6 +49,7 @@ SCALE=${SCALE:=false}
 MAX_UNAVAILABLE=${MAX_UNAVAILABLE:=1}
 EUS_UPGRADE=${EUS_UPGRADE:=false}
 EUS_CHANNEL=${EUS_CHANNEL:="fast"} #fast,eus,candidate,stable
+UPGRADE_WAIT_NUM=${UPGRADE_WAIT_NUM="450"}
 echo TARGET_RELEASES is $TARGET_RELEASES
 IF_DEGRADED=$(oc get co -ojsonpath='{.items[*].status.conditions[?(@.type=="Degraded")].status}')
 IF_DEGRADED=$(echo $IF_DEGRADED | tr -s '[A-Z]' '[a-z]')
