@@ -11,7 +11,7 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.ocp
-  from: ironic-base
+  from: prevalidation-base
   inputs:
     ocp_builder_rhel-9-base-openshift-4.16:
       as:
@@ -24,10 +24,9 @@ promotion:
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      #NOTE(elfosardo): use ironic repos, cause we're special
-      curl http://base-4-16-rhel-9-server-ironic.ocp.svc > /etc/yum.repos.d/base-4-16-rhel-9-server-ironic.repo
+      curl http://base-4-16-rhel-9-ironic-prevalidation.ocp.svc > /etc/yum.repos.d/base-4-16-rhel-9-ironic-prevalidation.repo
     from: ocp_builder_rhel-9-base-openshift-4.16
-    to: ironic-base
+    to: prevalidation-base
 releases:
   initial:
     integration:
@@ -44,23 +43,23 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-ipi-bm
+- as: e2e-metal-ipi-bm-prevalidation
   cluster: build05
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ipv4
-- as: e2e-metal-ipi-virtualmedia
+- as: e2e-metal-ipi-virtualmedia-prevalidation
   cluster: build05
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
-- as: e2e-metal-ipi-ovn-ipv6
+- as: e2e-metal-ipi-ovn-ipv6-prevalidation
   cluster: build05
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
@@ -68,3 +67,4 @@ zz_generated_metadata:
   branch: release-4.16
   org: openshift
   repo: ironic-image
+  variant: prevalidation
