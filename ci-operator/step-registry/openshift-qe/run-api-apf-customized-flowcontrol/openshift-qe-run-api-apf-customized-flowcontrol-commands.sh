@@ -140,6 +140,7 @@ echo -e "\n$(date): FlowSchema and PriorityLevelConfiguration created\n"
 function delete_flow_schema() {
   # clean up the FlowSchema
   echo -e "\n$(date): Deleting Flowschema...\n"
+  oc get flowschema
   oc delete flowschema restrict-pod-lister
   echo -e "\n$(date): Flowschema deleted\n"
 }
@@ -147,6 +148,7 @@ function delete_flow_schema() {
 function delete_priority_level_configuration() {
   # clean up the PriorityLevelConfiguration
   echo -e "$(date): Deleting PriorityLevelConfiguration...\n"
+  oc get prioritylevelconfiguration
   oc delete prioritylevelconfiguration restrict-pod-lister
   echo -e "\n$(date): PriorityLevelConfiguration deleted\n"
 }
