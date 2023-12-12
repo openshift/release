@@ -3,10 +3,14 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: "4.15"
-  ocp_4.15_base:
+  ocp_4.16_base-rhel9:
     name: "4.16"
     namespace: ocp
-    tag: base
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.16
 binary_build_commands: make aws-cloud-controller-manager
 build_root:
   image_stream_tag:
@@ -17,9 +21,12 @@ canonical_go_repository: k8s.io/cloud-provider-aws
 images:
 - dockerfile_path: Dockerfile.openshift
   inputs:
-    ocp_4.15_base:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.15:base
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: aws-cloud-controller-manager
 promotion:
   name: "4.16"
