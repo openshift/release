@@ -1,36 +1,60 @@
 base_images:
-  ocp_builder_rhel-8-base-openshift-4.15:
+  ocp_4.14_base:
+    name: "4.14"
+    namespace: ocp
+    tag: base
+  ocp_4.15_base:
+    name: "4.15"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-base-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-base-openshift-4.15
-  ocp_builder_rhel-9-base-openshift-4.15:
+    tag: rhel-8-base-openshift-4.16
+  ocp_builder_rhel-9-base-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-base-openshift-4.15
+    tag: rhel-9-base-openshift-4.16
 build_root:
   from_repository: true
 images:
 - context_dir: base
   dockerfile_path: Dockerfile.rhel
   inputs:
-    ocp_builder_rhel-8-base-openshift-4.15:
+    ocp_builder_rhel-8-base-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.16
   to: base
 - context_dir: base
   dockerfile_path: Dockerfile.rhel9
   inputs:
-    ocp_builder_rhel-9-base-openshift-4.15:
+    ocp_builder_rhel-9-base-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.16
   to: base-rhel9
 - context_dir: egress/router
+  inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
   to: egress-router
 - context_dir: egress/http-proxy
+  inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
   to: egress-http-proxy
 - context_dir: egress/dns-proxy
+  inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
   to: egress-dns-proxy
 - context_dir: ipfailover/keepalived
+  inputs:
+    ocp_4.14_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base
   to: keepalived-ipfailover
 promotion:
   name: "4.16"
