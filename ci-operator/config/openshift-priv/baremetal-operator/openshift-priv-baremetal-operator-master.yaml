@@ -3,19 +3,26 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.15_base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
+  ocp_4.15_base-rhel9:
+    name: "4.15"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 canonical_go_repository: github.com/metal3-io/baremetal-operator
 images:
 - dockerfile_path: Dockerfile.ocp
   inputs:
-    ocp_4.15_base:
+    ocp_4.15_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.15:base
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: baremetal-operator
 promotion:
   name: 4.15-priv

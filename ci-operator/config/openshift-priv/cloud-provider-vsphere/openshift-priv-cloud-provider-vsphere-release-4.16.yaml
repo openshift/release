@@ -1,16 +1,16 @@
 base_images:
-  base:
-    name: 4.16-priv
-    namespace: ocp-private
-    tag: base
   commitchecker:
     name: commitchecker
     namespace: ci
     tag: "4.15"
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+  ocp_4.15_base-rhel9:
+    name: "4.15"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.20-openshift-4.15
 binary_build_commands: make binaries
 build_root:
   from_repository: true
@@ -18,9 +18,12 @@ canonical_go_repository: github.com/kubernetes/cloud-provider-vsphere
 images:
 - dockerfile_path: openshift-hack/images/cloud-controller-manager-openshift.Dockerfile
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.15_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: vsphere-cloud-controller-manager
 promotion:
   name: 4.16-priv
