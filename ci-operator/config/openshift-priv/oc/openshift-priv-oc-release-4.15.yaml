@@ -11,6 +11,10 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: must-gather
+  ocp_4.15_base:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: base
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
@@ -25,8 +29,10 @@ build_root:
 canonical_go_repository: github.com/openshift/oc
 images:
 - dockerfile_path: images/cli/Dockerfile.rhel
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
@@ -66,7 +72,6 @@ images:
 promotion:
   additional_images:
     oc-rpms: rpms
-  disabled: true
   excluded_images:
   - tests
   - must-gather

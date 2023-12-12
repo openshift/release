@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: base
   base-machine:
@@ -8,7 +8,7 @@ base_images:
     namespace: openshift
     tag: stream9
   cli:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: cli
   commitchecker:
@@ -20,31 +20,35 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   machine-os-content-base:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: machine-os-content
   oc-rpms:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: oc-rpms
-  ocp_4.13_tools:
-    name: "4.13"
-    namespace: ocp
+  ocp_4.15_base-rhel9:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_4.15_tools:
+    name: 4.16-priv
+    namespace: ocp-private
     tag: tools
-  ocp_4.14_base:
-    name: "4.14"
-    namespace: ocp
-    tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.15
   rhel-coreos-base:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: rhel-coreos
   tools:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: tools
 binary_build_commands: openshift-hack/build-go.sh
@@ -54,21 +58,21 @@ canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   inputs:
-    ocp_4.14_base:
+    ocp_4.15_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.14:base
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   inputs:
-    ocp_4.13_tools:
+    ocp_4.15_tools:
       as:
-      - registry.svc.ci.openshift.org/ocp/4.13:tools
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      - registry.ci.openshift.org/ocp/4.15:tools
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: kubernetes-tests
 - context_dir: openshift-hack/images/os/
   inputs:
@@ -102,12 +106,15 @@ images:
 - context_dir: build/pause
   dockerfile_path: Dockerfile.Rhel
   inputs:
-    ocp_4.14_base:
+    ocp_4.15_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.14:base
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: pod
 promotion:
   additional_images:
@@ -115,7 +122,7 @@ promotion:
   excluded_images:
   - machine-os-content
   - rhel-coreos
-  name: 4.15-priv
+  name: 4.16-priv
   namespace: ocp-private
 raw_steps:
 - pipeline_image_cache_step:
@@ -157,12 +164,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':
@@ -358,6 +365,8 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-metal-ipi
   cluster: build05

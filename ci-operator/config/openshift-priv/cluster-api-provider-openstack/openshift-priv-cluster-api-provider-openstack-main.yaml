@@ -1,36 +1,38 @@
 base_images:
-  base:
-    name: 4.15-priv
+  ocp_4.16_base:
+    name: 4.16-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-8-golang-1.21-openshift-4.16
 binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: sigs.k8s.io/cluster-api-provider-openstack
 images:
 - dockerfile_path: Dockerfile.rhel
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.16_base:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: openstack-cluster-api-controllers
 promotion:
-  name: 4.15-priv
+  name: 4.16-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':
@@ -52,6 +54,19 @@ tests:
     verify test
   container:
     from: src
+- as: e2e-techpreview
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: make -C openshift e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: main
   org: openshift-priv

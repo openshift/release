@@ -1,26 +1,35 @@
 base_images:
-  base:
-    name: 4.15-priv
+  ansible-runner-ovirt:
+    name: ansible-runner-ovirt
+    namespace: openshift
+    tag: latest
+  ocp_4.14_base:
+    name: 4.14-priv
     namespace: ocp-private
     tag: base
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  ovirt-prfinder:
+    name: ovirt-prfinder
+    namespace: openshift
+    tag: latest
 binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-api-provider-ovirt
 images:
 - dockerfile_path: Dockerfile.rhel
-  from: base
   inputs:
+    ocp_4.14_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: ovirt-machine-controllers
 promotion:
-  disabled: true
   name: 4.15-priv
   namespace: ocp-private
 releases:

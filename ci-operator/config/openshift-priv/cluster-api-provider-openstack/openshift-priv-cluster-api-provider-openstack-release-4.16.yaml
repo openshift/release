@@ -1,7 +1,7 @@
 base_images:
   ocp_4.16_base:
-    name: "4.16"
-    namespace: ocp
+    name: 4.16-priv
+    namespace: ocp-private
     tag: base
   ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
@@ -22,6 +22,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: openstack-cluster-api-controllers
 promotion:
+  disabled: true
   name: 4.16-priv
   namespace: ocp-private
 releases:
@@ -54,6 +55,19 @@ tests:
     verify test
   container:
     from: src
+- as: e2e-techpreview
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: make -C openshift e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

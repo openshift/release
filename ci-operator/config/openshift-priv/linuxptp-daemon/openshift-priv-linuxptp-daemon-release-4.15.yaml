@@ -1,6 +1,6 @@
 base_images:
-  base:
-    name: 4.15-priv
+  ocp_4.14_base-rhel9:
+    name: 4.14-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.20-openshift-4.14:
@@ -12,14 +12,15 @@ build_root:
 canonical_go_repository: github.com/openshift/linuxptp-daemon
 images:
 - dockerfile_path: Dockerfile
-  from: base
   inputs:
+    ocp_4.14_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base-rhel9
     ocp_builder_rhel-9-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
   to: ptp
 promotion:
-  disabled: true
   name: 4.15-priv
   namespace: ocp-private
 releases:
@@ -50,6 +51,12 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: linuxptp-daemon
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

@@ -1,8 +1,8 @@
 base_images:
-  base:
-    name: 4.15-priv
+  ocp_4.16_base-rhel9:
+    name: 4.16-priv
     namespace: ocp-private
-    tag: base
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
@@ -13,24 +13,26 @@ build_root:
 canonical_go_repository: github.com/aws/amazon-eks-pod-identity-webhook
 images:
 - dockerfile_path: Dockerfile.rhel7
-  from: base
   inputs:
+    ocp_4.16_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: aws-pod-identity-webhook
 promotion:
-  name: 4.15-priv
+  name: 4.16-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':
@@ -45,6 +47,7 @@ tests:
   steps:
     env:
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+      SNYK_ENABLE_DEPS_SCAN: "true"
     workflow: openshift-ci-security
 - as: e2e-aws
   steps:

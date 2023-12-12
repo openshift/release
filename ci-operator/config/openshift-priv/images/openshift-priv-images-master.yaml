@@ -1,4 +1,12 @@
 base_images:
+  ocp_4.14_base:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: base
+  ocp_4.15_base:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: base
   ocp_builder_rhel-8-base-openshift-4.16:
     name: builder
     namespace: ocp
@@ -26,29 +34,41 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.16
   to: base-rhel9
 - context_dir: egress/router
-  from: base
+  inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
   to: egress-router
 - context_dir: egress/http-proxy
-  from: base
+  inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
   to: egress-http-proxy
 - context_dir: egress/dns-proxy
-  from: base
+  inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
   to: egress-dns-proxy
 - context_dir: ipfailover/keepalived
-  from: base
+  inputs:
+    ocp_4.14_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base
   to: keepalived-ipfailover
 promotion:
-  name: 4.15-priv
+  name: 4.16-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':

@@ -16,8 +16,8 @@ base_images:
     namespace: ocp-private
     tag: hypershift-tests
   ocp_4.15_base:
-    name: "4.15"
-    namespace: ocp
+    name: 4.15-priv
+    namespace: ocp-private
     tag: base
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
@@ -38,6 +38,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: cluster-network-operator
 promotion:
+  disabled: true
   name: 4.16-priv
   namespace: ocp-private
 releases:
@@ -67,6 +68,8 @@ tests:
 - as: e2e-gcp-sdn
   steps:
     cluster_profile: gcp-3
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-gcp-sdn
 - as: e2e-gcp-ovn-upgrade
   steps:
@@ -76,10 +79,14 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-upgrade-aws-sdn
 - as: e2e-aws-sdn-multi
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-ovn-step-registry
   optional: true
@@ -185,6 +192,7 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
       NETWORK_TYPE: OpenShiftSDN
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-ovn
@@ -200,6 +208,8 @@ tests:
 - as: e2e-aws-ovn-network-migration
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-egress-ip
@@ -213,6 +223,8 @@ tests:
 - as: e2e-aws-sdn-network-migration-rollback
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-egress-ip
@@ -293,6 +305,7 @@ tests:
     env:
       MTU_DECREASE: "400"
       MTU_INCREASE: "200"
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     test:
     - chain: network-mtu-migration-decrease
     - chain: network-mtu-migration-increase

@@ -4,11 +4,11 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: hypershift-operator
   ocp_4.15_base-rhel9:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-8-golang-1.19-openshift-4.15:
@@ -50,17 +50,17 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: ovn-kubernetes-microshift
 promotion:
-  name: 4.15-priv
+  name: 4.16-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':
@@ -269,6 +269,23 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
+- always_run: false
+  as: e2e-aws-ovn-network-migration
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+    test:
+    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-config-multicast
+    - ref: ovn-sdn-migration
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-validate-multicast
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-sdn
 zz_generated_metadata:
   branch: master
   org: openshift-priv

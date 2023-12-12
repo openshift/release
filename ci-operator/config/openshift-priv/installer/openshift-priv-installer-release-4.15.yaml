@@ -23,10 +23,6 @@ base_images:
     name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
-  base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -39,6 +35,10 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: cli
+  ocp_4.15_base:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: base
   ocp_4.15_cli:
     name: 4.15-priv
     namespace: ocp-private
@@ -53,11 +53,14 @@ base_images:
     tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
+  use_build_cache: true
 canonical_go_repository: github.com/openshift/installer
 images:
 - dockerfile_path: images/installer/Dockerfile.ci
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -66,8 +69,10 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
-  from: installer
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -76,22 +81,22 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
-  from: base
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: libvirt-installer
 - dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
-  from: base
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_4.15_cli:
       as:
       - registry.ci.openshift.org/ocp/4.15:cli
@@ -100,8 +105,10 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -110,8 +117,10 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -134,7 +143,6 @@ images:
         source_path: /usr/bin/oc
   to: src-oc
 promotion:
-  disabled: true
   excluded_images:
   - src-oc
   name: 4.15-priv
@@ -512,6 +520,7 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
       NETWORK_TYPE: OpenShiftSDN
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
@@ -717,6 +726,8 @@ tests:
   run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
   steps:
     cluster_profile: nutanix
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-nutanix-sdn
   timeout: 6h0m0s
 - as: agent-integration-tests

@@ -1,5 +1,5 @@
 base_images:
-  base:
+  ocp_4.15_base:
     name: 4.15-priv
     namespace: ocp-private
     tag: base
@@ -13,14 +13,15 @@ build_root:
 canonical_go_repository: openshift/cloud-network-config-controller
 images:
 - dockerfile_path: Dockerfile
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: cloud-network-config-controller
 promotion:
-  disabled: true
   name: 4.15-priv
   namespace: ocp-private
 releases:
@@ -61,6 +62,8 @@ tests:
 - as: e2e-aws-sdn-serial
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-serial
 - as: e2e-aws-ovn-serial
   optional: true
@@ -75,6 +78,7 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
       NETWORK_TYPE: OpenShiftSDN
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_ARGS: --run \[sig-network\]\[Feature:EgressIP\]
       TEST_SUITE: openshift/conformance/serial
     test:
