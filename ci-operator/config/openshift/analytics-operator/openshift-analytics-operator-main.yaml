@@ -1,0 +1,71 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.53.1
+  operator-sdk:
+    name: "4.13"
+    namespace: origin
+    tag: operator-sdk
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+images:
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: amd64
+  context_dir: .
+  dockerfile_path: Dockerfile
+  to: observability-analytics-operator
+promotion:
+  namespace: osa
+  tag: latest
+  tag_by_commit: true
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: GOFLAGS="-mod=readonly" go fmt ./... && git diff --exit-code
+  container:
+    from: src
+  run_if_changed: \.go$
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOFLAGS="-mod=readonly"
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run --verbose --timeout=5m1s
+  container:
+    clone: true
+    from: golangci-lint
+  optional: true
+- as: unit
+  commands: GOFLAGS="-mod=readonly" go test ./...
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: analytics-operator
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: analytics-operator
