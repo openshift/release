@@ -1,0 +1,57 @@
+base_images:
+  base:
+    name: "4.14"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.14
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.14
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: base
+  inputs:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
+  to: loki
+- dockerfile_path: Dockerfile.promtail.ocp
+  from: base
+  inputs:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
+  to: promtail
+promotion:
+  name: v2.9.3
+  namespace: logging
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  steps:
+    test:
+    - as: unit
+      commands: GOFLAGS="" make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: upstream-v2.9.3
+  org: openshift
+  repo: loki
