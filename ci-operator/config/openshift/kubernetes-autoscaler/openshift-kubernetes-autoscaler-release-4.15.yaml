@@ -7,15 +7,41 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: hypershift-tests
+  ocp_4.15_base-rhel9:
+    name: "4.15"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-base-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.15
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.15
 binary_build_commands: make build BUILD_TAGS=clusterapi
 build_root:
   from_repository: true
 canonical_go_repository: k8s.io/autoscaler
 images:
 - dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
+  inputs:
+    ocp_builder_rhel-9-base-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.15
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: cluster-autoscaler
 - context_dir: vertical-pod-autoscaler
   dockerfile_path: Dockerfile.rhel
+  inputs:
+    ocp_4.15_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: vertical-pod-autoscaler
 promotion:
   name: "4.15"
