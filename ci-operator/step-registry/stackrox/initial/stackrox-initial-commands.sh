@@ -2,6 +2,7 @@
 job="${TEST_SUITE:-${JOB_NAME_SAFE#merge-}}"
 job="${job#nightly-}"
 
+set -x
 ns="testname"
 oc patch scc anyuid --type merge -p '{
     "allowHostDirVolumePlugin": true,
