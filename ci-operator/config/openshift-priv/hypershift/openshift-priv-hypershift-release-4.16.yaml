@@ -8,8 +8,8 @@ base_images:
     namespace: ocp-private
     tag: hypershift-operator
   ocp_4.15_base:
-    name: "4.15"
-    namespace: ocp
+    name: 4.15-priv
+    namespace: ocp-private
     tag: base
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
@@ -41,6 +41,7 @@ images:
 promotion:
   additional_images:
     hypershift-tests: test-bin
+  disabled: true
   name: 4.16-priv
   namespace: ocp-private
 releases:
@@ -70,7 +71,7 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.14"
+      version: "4.15"
   latest:
     integration:
       include_built_images: true
@@ -105,6 +106,8 @@ tests:
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: hypershift
+    env:
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
     workflow: hypershift-aws-e2e-nested
 - as: e2e-kubevirt-aws-ovn
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
@@ -114,6 +117,7 @@ tests:
       CNV_PRERELEASE_VERSION: "4.14"
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
       ETCD_STORAGE_CLASS: gp3-csi
       KUBEVIRT_CSI_INFRA: gp3-csi
