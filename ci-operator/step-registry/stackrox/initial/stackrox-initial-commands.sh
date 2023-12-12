@@ -4,7 +4,7 @@ job="${job#nightly-}"
 
 set -x
 
-tee operator/tests/run.sh <<EOF
+tee scripts/ci/jobs/shell-unit-tests.sh <<EOF
 #!/usr/bin/env bash
 
 set -x
@@ -27,7 +27,7 @@ time oc -n "${ns}" rollout status deployment nginx -w
 EOF
 
 echo "Check script:"
-cat operator/tests/run.sh
+cat scripts/ci/jobs/shell-unit-tests.sh
 
 echo "Dispatch..."
 
