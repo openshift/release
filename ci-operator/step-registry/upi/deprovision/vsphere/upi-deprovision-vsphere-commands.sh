@@ -9,6 +9,9 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 # TODO:
 # Worse case scenario tear down
 # Use govc to remove virtual machines if terraform fails
+#
+#
+echo "WHAT IS GOING ON ?!?"
 
 export HOME=/tmp
 export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere-aws/.awscred
@@ -30,7 +33,12 @@ echo "$(date -u --rfc-3339=seconds) - Collecting vCenter performance data and al
 echo "{\"hw_version\":  \"vmx-${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
 
 set +e
+declare GOVC_USERNAME
 source "${SHARED_DIR}/govc.sh"
+
+
+echo "${GOVC_USERNAME}"
+
 vm_path="/${GOVC_DATACENTER}/vm/${cluster_name}"
 vcenter_state=${ARTIFACT_DIR}/vcenter_state
 mkdir ${vcenter_state}
