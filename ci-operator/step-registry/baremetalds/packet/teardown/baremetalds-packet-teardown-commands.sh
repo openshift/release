@@ -20,6 +20,8 @@ cd
 cat > packet-teardown.yaml <<-EOF
 - name: teardown Packet host
   hosts: localhost
+  collections:
+   - equinix.cloud
   gather_facts: no
   vars:
     - cluster_type: "{{ lookup('env', 'CLUSTER_TYPE') }}"
@@ -58,4 +60,6 @@ cat > packet-teardown.yaml <<-EOF
         msg: "Packet teardown failed."
 EOF
 
+pip3.11 install -r https://raw.githubusercontent.com/equinix-labs/ansible-collection-equinix/main/requirements.txt
+ansible-galaxy collection install equinix.cloud
 ansible-playbook packet-teardown.yaml -vvve "packet_hostname=ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
