@@ -1,0 +1,79 @@
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  annotations:
+    # if instance type is unknown, so the autoscaler must be told about capacity:  https://access.redhat.com/solutions/6640721
+    machine.openshift.io/GPU: "0"
+    machine.openshift.io/memoryMb: "32768"
+    machine.openshift.io/vCPU: "16"
+  labels:
+    machine.openshift.io/cluster-api-cluster: build04-c92hb
+  name: build04-c92hb-ci-builds-worker-b
+  namespace: openshift-machine-api
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build04-c92hb
+      machine.openshift.io/cluster-api-machineset: build04-c92hb-ci-builds-worker-b
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build04-c92hb
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build04-c92hb-ci-builds-worker-b
+    spec:
+      metadata:
+        labels:
+          ci-workload: builds
+      providerSpec:
+        value:
+          apiVersion: machine.openshift.io/v1beta1
+          canIPForward: false
+          credentialsSecret:
+            name: gcp-cloud-credentials
+          deletionProtection: false
+          disks:
+          - autoDelete: true
+            boot: true
+            image: projects/rhcos-cloud/global/images/rhcos-49-84-202110081407-0-gcp-x86-64
+            # 200 GB * 30 IOPS = 6000 IOPS
+            sizeGb: 200
+            type: pd-ssd
+          kind: GCPMachineProviderSpec
+          machineType: e2-custom-16-32768
+          metadata: {}
+          networkInterfaces:
+          - network: build04-c92hb-network
+            subnetwork: build04-c92hb-worker-subnet
+          projectID: openshift-ci-build-farm
+          region: us-east1
+          serviceAccounts:
+          - email: build04-c92hb-w@openshift-ci-build-farm.iam.gserviceaccount.com
+            scopes:
+            - https://www.googleapis.com/auth/cloud-platform
+          tags:
+          - build04-c92hb-worker
+          - ci-cluster-build04
+          - ci-workload-builds
+          userDataSecret:
+            name: worker-user-data
+          zone: us-east1-b
+      taints:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-builds-worker
+        value: ci-builds-worker
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: build04-c92hb-ci-builds-worker-b
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 120
+  minReplicas: 0
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: build04-c92hb-ci-builds-worker-b
