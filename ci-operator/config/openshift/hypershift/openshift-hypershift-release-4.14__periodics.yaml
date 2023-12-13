@@ -127,11 +127,32 @@ tests:
     dependencies:
       INDEX_IMAGE: assisted-service-index
     workflow: hypershift-agent-conformance
-- as: e2e-agent-ovn-mce-conformance
+- as: e2e-mce-agent-connected-ipv4-conformance
+  cluster: build05
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.14
+      MCE_VERSION: "2.4"
+    workflow: hypershift-mce-agent-conformance
+- as: e2e-mce-agent-connected-dualstack-conformance
+  cluster: build05
   cron: 0 4 * * *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=1024G
+        NUM_EXTRA_WORKERS=3
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=16384
+        EXTRA_WORKER_DISK=100
+      IP_STACK: v4v6
       LVM_OPERATOR_SUB_CHANNEL: stable-4.14
       MCE_VERSION: "2.4"
     workflow: hypershift-mce-agent-conformance
