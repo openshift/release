@@ -170,7 +170,7 @@ cat << EOF > ~/ocp-install.yml
       - src: /tmp/${CLUSTER_NAME}_mno_ag.log
         dest: ${ARTIFACT_DIR}/openshift-install.log
       - src: /tmp/${CLUSTER_NAME}_mno_ci.log
-        dest: ${ARTIFACT_DIR}/mno-script.log
+        dest: ${ARTIFACT_DIR}/-script.log
     ignore_errors: true
 
   - name: Set fact if deployment passed
@@ -181,10 +181,10 @@ cat << EOF > ~/ocp-install.yml
     set_fact:
       deploy_failed: true
     when:
-      - (job_result.failed | bool) or (mno_deploy.failed | bool)
+      - (job_result.failed | bool) or (_deploy.failed | bool)
 
   - name: Show last logs from cloud init if failed
-    shell: tail -100 /tmp/${CLUSTER_NAME}_mno_ag.log
+    shell: tail -100 /tmp/${CLUSTER_NAME}__ag.log
     when: deploy_failed | bool
     ignore_errors: true
 
@@ -196,7 +196,7 @@ cat << EOF > ~/ocp-install.yml
   - name: Fail if deployment failed
     fail:
       msg: Installation has failed
-    when: mno_deploy.failed | bool
+    when: _deploy.failed | bool
 
 EOF
 
