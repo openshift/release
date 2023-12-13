@@ -288,7 +288,7 @@ scale_traffic
 
 echo -e "Sleeping for 15 minutes to let pods sending traffic to be ready."
 
-sleep 900
+sleep 600
 
 # wait until all podlister pods are up to send all traffic
 
