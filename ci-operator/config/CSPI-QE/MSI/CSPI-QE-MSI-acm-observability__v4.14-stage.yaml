@@ -34,12 +34,16 @@ tests:
       CLUSTER2_CONFIG: name=ci-rosa-mngd;platform=rosa;region=us-west-2;version=4.14;channel-group=stable;compute-machine-type=m5.16xlarge;replicas=6;expiration-time=10h;timeout=3h;ocm-env=stage
       CLUSTER3_CONFIG: name=ci-gcp-mngd;platform=gcp-osd;region=us-west1;version=4.14;channel-group=stable;compute-machine-type=custom-4-16384;replicas=2;expiration-time=10h;timeout=3h;ocm-env=stage
       FIREWATCH_CONFIG: |
-        [
-          {"step": "addon-install", "failure_type": "all", "classification": "Provisioning - Addons", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-559"},
-          {"step": "cluster-install-*", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-559", "group": {"name": "cluster-provision", "priority": 1}},
-          {"step": "cluster-uninstall-*", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-559", "group": {"name": "cluster-provision", "priority": 2}},
-          {"job_success": true, "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-558"}
-        ]
+        {
+          "failure_rules":
+            [
+              {"step": "addon-install", "failure_type": "all", "classification": "Provisioning - Addons",  "jira_epic": "!default"},
+              {"step": "cluster-install", "failure_type": "all", "classification":  "Cluster Creation - ROSA",  "jira_epic": "!default", "group": {"name": "cluster-provision", "priority": 1}},
+              {"step": "cluster-uninstall", "failure_type": "all", "classification":  "Cluster Creation - ROSA",  "jira_epic": "!default", "group": {"name": "cluster-provision", "priority": 2}}
+            ],
+          "success_rules": [{"jira_epic": "MSINTEROP-558"}]
+        }
+      FIREWATCH_DEFAULT_JIRA_EPIC: MSINTEROP-559
       FIREWATCH_DEFAULT_JIRA_PROJECT: MSINTEROP
       FIREWATCH_JIRA_API_TOKEN_PATH: /tmp/secrets/jira/access_token_msi
       GCP_SERVICE_ACCOUNT_NAME: gcp_service_account.json

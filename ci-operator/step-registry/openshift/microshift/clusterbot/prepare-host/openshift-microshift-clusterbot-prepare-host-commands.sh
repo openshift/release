@@ -36,12 +36,14 @@ export PS4='+ $(date "+%T.%N") \011'
 
 source /tmp/microshift-clusterbot-settings
 
+sudo dnf clean all
+
 if ! sudo subscription-manager status >&/dev/null; then
 	sudo subscription-manager register \
 		--org="$(cat /tmp/subscription-manager-org)" \
 		--activationkey="$(cat /tmp/subscription-manager-act-key)"
 fi
-sudo dnf install -y git-core
+hash git || sudo dnf install -y git-core
 
 sudo mkdir -p /etc/microshift
 sudo cp /tmp/config.yaml /etc/microshift/config.yaml

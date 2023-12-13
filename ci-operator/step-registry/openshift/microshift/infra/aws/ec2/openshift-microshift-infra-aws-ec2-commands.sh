@@ -19,6 +19,13 @@ declare -A ami_map=(
   [us-west-2,arm64,rhel-9.3]=ami-0086e25ab5453b65e
 )
 
+MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
+if [ -f "${MICROSHIFT_CLUSTERBOT_SETTINGS}" ]; then
+  : Overriding step defaults by sourcing clusterbot settings
+  # shellcheck disable=SC1090
+  source "${MICROSHIFT_CLUSTERBOT_SETTINGS}"
+fi
+
 # All graviton instances have a lower case g in the family part. Using
 # this we avoid adding the full map here.
 ARCH="x86_64"
@@ -32,13 +39,6 @@ REGION="${EC2_REGION:-$LEASED_RESOURCE}"
 JOB_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 stack_name="${JOB_NAME}"
 cf_tpl_file="${SHARED_DIR}/${JOB_NAME}-cf-tpl.yaml"
-
-MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
-if [ -f "${MICROSHIFT_CLUSTERBOT_SETTINGS}" ]; then
-  : Overriding step defaults by sourcing clusterbot settings
-  # shellcheck disable=SC1090
-  source "${MICROSHIFT_CLUSTERBOT_SETTINGS}"
-fi
 
 if [[ "${EC2_AMI}" == "" ]]; then
   EC2_AMI="${ami_map[$REGION,$ARCH,$MICROSHIFT_OS]}"

@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.21
 releases:
   latest:
     release:
@@ -20,10 +20,17 @@ tests:
 - as: test-ai-edge
   steps:
     cluster_profile: aws
+    env:
+      OPERATORS: |
+        [
+            {"name": "openshift-pipelines-operator-rh", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators"}
+        ]
     test:
+    - ref: install-operators
     - as: test-ai-edge
       cli: latest
       commands: |
+        unset GOFLAGS
         make test
       credentials:
       - mount_path: /secrets/ai-edge-aws
