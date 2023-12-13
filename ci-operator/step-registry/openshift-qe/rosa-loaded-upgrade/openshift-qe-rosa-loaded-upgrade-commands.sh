@@ -221,3 +221,4 @@ rosa_upgrade $CLOUD_PROVIDER_REGION
 echo "######################################################################"
 rosa describe cluster -c $CLUSTER_ID --region $REGION
 echo "######################################################################"
+
