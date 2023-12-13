@@ -225,6 +225,15 @@ function copy_logs() {
   echo "test log stored"
 }
 
+function cleanup_secrets() {
+  echo "Running cleanup"
+  oc delete configmap mvn-settings -n "${1}" --wait=true || true
+  oc delete configmap credentials -n "${1}" --wait=true || true
+  oc delete configmap test-properties -n "${1}" --wait=true || true
+}
+
+trap 'cleanup_secrets csb-interop' SIGINT SIGTERM ERR EXIT
+
 echo "Create permissions for sidecar tnb-tests project"
 create_openshift_role_permissions
 
