@@ -83,7 +83,9 @@ metadata:
   namespace: metallb-system
 EOF
 
-oc create -f - <<EOF
+echo "Configure IPAddressPool in different network environments separately."
+if [[ $IP_STACK == "v4" ]]; then
+  oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
@@ -95,6 +97,24 @@ spec:
   addresses:
   - 192.168.111.30-192.168.111.30
 EOF
+elif [[ $IP_STACK == "v4v6" ]]; then
+  oc create -f - <<EOF
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: ingress-public-ip
+  namespace: metallb-system
+spec:
+  protocol: layer2
+  autoAssign: false
+  addresses:
+  - 192.168.111.30-192.168.111.30
+  - fd2e:6f44:5dd8:c956::1e-fd2e:6f44:5dd8:c956::1e
+EOF
+else
+  echo "$IP_STACK don't support"
+  exit 1
+fi
 
 oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1
