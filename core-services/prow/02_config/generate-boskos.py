@@ -265,6 +265,9 @@ CONFIG = {
     'ibmcloud-qe-quota-slice': {
         'jp-tok': 10,
     },
+    'ibmcloud-qe-2-quota-slice': {
+        'us-east': 10,
+    },
     'ibmcloud-multi-ppc64le-quota-slice': {
         'us-south': 3,
     },
