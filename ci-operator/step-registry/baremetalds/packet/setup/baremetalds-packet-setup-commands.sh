@@ -148,8 +148,7 @@ EOF
 
 ansible-playbook packet-setup.yaml -vvve "packet_hostname=ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
-cat ${SHARED_DIR}/hosts.json
-DEVICEID=$(jq -r .devices[0].id < ${SHARED_DIR}/hosts.json)
+DEVICEID=$(jq -r .id < ${SHARED_DIR}/hosts.json)
 
 function refresh_device_info(){
     curl -H "X-Auth-Token: $(cat ${CLUSTER_PROFILE_DIR}/packet-auth-token)"  "https://api.equinix.com/metal/v1/devices/$DEVICEID" > /tmp/device.json
