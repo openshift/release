@@ -73,6 +73,16 @@ else
   echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 fi
 
+function notify_ocmqe() {
+  message=$1
+  slack_message='{"text": "'"${message}"'. Sleep 10 hours for debugging with the job '"${JOB_NAME}/${BUILD_ID}"'. <@UD955LPJL> <@UEEQ10T4L>"}'
+  if [[ -e ${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url ]]; then
+    slack_hook_url=$(cat "${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url")    
+    curl -X POST -H 'Content-type: application/json' --data "${slack_message}" "${slack_hook_url}"
+    sleep 36000
+  fi
+}
+
 # Configure aws
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 if [[ "$HOSTED_CP" == "true" ]] && [[ ! -z "$REGION" ]]; then
@@ -112,27 +122,31 @@ if [[ ! -z "$OLD_CLUSTER" ]]; then
 fi
 
 # Get the openshift version
-versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq -r '.[].raw_id')
-if [[ "$HOSTED_CP" == "true" ]]; then
-  versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} --hosted-cp -o json | jq -r '.[].raw_id')
-fi
-echo -e "Available cluster versions:\n${versionList}"
-
-if [[ -z "$OPENSHIFT_VERSION" ]]; then
-  if [[ "$EC_BUILD" == "true" ]]; then
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
-  else
-    OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
-  fi
-elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
-  if [[ "$EC_BUILD" == "true" ]]; then
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
-  else
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
-  fi
+if [[ ${AVAILABLE_UPGRADE} == "yes" ]] ; then
+  OPENSHIFT_VERSION=$(head -n 1 "${SHARED_DIR}/available_upgrade_version.txt")
 else
-  # Match the whole line
-  OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
+  versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq -r '.[].raw_id')
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} --hosted-cp -o json | jq -r '.[].raw_id')
+  fi
+  echo -e "Available cluster versions:\n${versionList}"
+
+  if [[ -z "$OPENSHIFT_VERSION" ]]; then
+    if [[ "$EC_BUILD" == "true" ]]; then
+      OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
+    else
+      OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
+    fi
+  elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
+    if [[ "$EC_BUILD" == "true" ]]; then
+      OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
+    else
+      OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
+    fi
+  else
+    # Match the whole line
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
+  fi
 fi
 
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
@@ -451,12 +465,16 @@ if [[ "$DRY_RUN" == "true" ]]; then
   DRY_RUN_SWITCH="--dry-run"
 fi
 
+# Save the cluster config to ARTIFACT_DIR
+cp "${SHARED_DIR}/cluster-config" "${ARTIFACT_DIR}/"
+
 echo "Parameters for cluster request:"
 echo "  Cluster name: ${CLUSTER_NAME}"
 echo "  STS mode: ${STS}"
 echo "  Hypershift: ${HOSTED_CP}"
 echo "  Byo OIDC: ${BYO_OIDC}"
 echo "  Compute machine type: ${COMPUTE_MACHINE_TYPE}"
+echo "  Worker disk size: ${WORKER_DISK_SIZE}"
 echo "  Cloud provider region: ${CLOUD_PROVIDER_REGION}"
 echo "  Multi-az: ${MULTI_AZ}"
 echo "  Openshift version: ${OPENSHIFT_VERSION}"
@@ -473,8 +491,8 @@ echo "  Enable Byovpc: ${ENABLE_BYOVPC}"
 echo "  Enable audit log: ${ENABLE_AUDIT_LOG}"
 echo "  Cluster Tags: ${TAGS}"
 echo "  Additional Security groups: ${ADDITIONAL_SECURITY_GROUP}"
-if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
-  echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
+echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
+if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then 
   echo "  Min replicas: ${MIN_REPLICAS}"
   echo "  Min replicas: ${MAX_REPLICAS}"  
 else
@@ -520,7 +538,7 @@ ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
 ${SHARED_VPC_SWITCH} \
 ${SECURITY_GROUP_ID_SWITCH} \
 ${DRY_RUN_SWITCH}
-"
+" | sed -E 's/\s{2,}/ /g' > "${ARTIFACT_DIR}/create_cluster.sh"
 
 mkdir -p "${SHARED_DIR}"
 CLUSTER_ID_FILE="${SHARED_DIR}/cluster-id"
@@ -588,6 +606,14 @@ while true; do
   if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" && "${CLUSTER_STATE}" != "waiting" && "${CLUSTER_STATE}" != "validating" ]]; then
     rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}" || echo "error: Unable to pull installation log."
     echo "error: Cluster reported invalid state: ${CLUSTER_STATE}"
+
+    # If the cluster is in error state, notify the ocm qes for debugging.
+    if [[ "${CLUSTER_STATE}" == "error" ]]; then
+      current_time=$(date -u '+%H')
+      if [ $current_time -lt 10 ]; then
+        notify_ocmqe "Error: Cluster ${CLUSTER_ID} reported invalid state: ${CLUSTER_STATE}"
+      fi
+    fi
     exit 1
   fi
 done
@@ -600,12 +626,7 @@ API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
 CONSOLE_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.console.url')
 if [[ "${API_URL}" == "null" ]]; then
   # If api.url is null, call ocm-qe to analyze the root cause.
-  if [[ -e ${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url ]]; then
-    slack_hook_url=$(cat "${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url")
-    slack_message='{"text": "Warning: the api.url for the cluster '"${CLUSTER_ID}"' is null. Sleep 10 hours for debugging with the job '"${JOB_NAME}/${BUILD_ID}"'. <@UD955LPJL> <@UEEQ10T4L>"}'
-    curl -X POST -H 'Content-type: application/json' --data "${slack_message}" "${slack_hook_url}"
-    sleep 36000
-  fi
+  notify_ocmqe "Warning: the api.url for the cluster ${CLUSTER_ID} is null"
 
   port="6443"
   if [[ "$HOSTED_CP" == "true" ]]; then

@@ -335,7 +335,6 @@ def _add_osd_rc_deployment(gendoc):
                                         '--supplemental-plugin-config-dir=/etc/plugins',
                                         '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.',
                                         f'--art-suffix={context.art_suffix}',
-                                        "--process-legacy-results",
                                         "--manifest-list-mode"
                                         ],
                             'image': 'release-controller:latest',

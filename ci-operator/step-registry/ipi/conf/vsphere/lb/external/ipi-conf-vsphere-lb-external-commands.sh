@@ -151,6 +151,16 @@ EOF
       ipaddress=$(jq -r --argjson N "$ip" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
       echo "   "server ${EP_NAMES[$i]}-${ip} ${ipaddress}:${EP_PORTS[$i]} check check-ssl >>$HAPROXY_PATH
     fi
+    if [[ -n "${VSPHERE_EXTRA_LEASED_RESOURCE:-}" ]]; then
+      for extra_leased_resource in ${VSPHERE_EXTRA_LEASED_RESOURCE}; do
+          extra_router=$(awk -F. '{print $1}' <(echo "${extra_leased_resource}"))
+	  extra_phydc=$(awk -F. '{print $2}' <(echo "${extra_leased_resource}"))
+	  extra_vlanid=$(awk -F. '{print $3}' <(echo "${extra_leased_resource}"))
+	  extra_primaryrouterhostname="${extra_router}.${extra_phydc}"
+	  ipaddress=$(jq -r --argjson N "$ip" --arg PRH "$extra_primaryrouterhostname" --arg VLANID "$extra_vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
+	  echo "   "server ${EP_NAMES[$i]}${extra_vlanid}-${ip} ${ipaddress}:${EP_PORTS[$i]} check check-ssl >>$HAPROXY_PATH
+      done	      
+    fi    
   done
 done
 

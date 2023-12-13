@@ -1,0 +1,80 @@
+base_images:
+  stolostron_builder_go1.20-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.19-linux
+images:
+- dockerfile_path: Dockerfile.prow
+  inputs:
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
+  to: cluster-curator-controller
+promotion:
+  disabled: true
+  name: "2.5"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-tests
+  commands: make unit-tests
+  container:
+    from: src
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-curator-controller
+    env:
+      IMAGE_REPO: cluster-curator-controller
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-curator-controller
+    env:
+      IMAGE_REPO: cluster-curator-controller
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=cluster-curator-controller
+        export OSCI_COMPONENT_VERSION=2.5.0
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-curator-controller
+    env:
+      IMAGE_REPO: cluster-curator-controller
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: backplane-2.5
+  org: stolostron
+  repo: cluster-curator-controller

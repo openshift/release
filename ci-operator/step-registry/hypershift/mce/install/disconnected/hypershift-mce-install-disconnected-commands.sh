@@ -18,21 +18,7 @@ scp "${SSHOPTS[@]}" "/tmp/mce-index-image" "root@${IP}:/home/mce-index-image"
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
 set -xeo pipefail
 
-echo "1. Update pull-secret"
-set +x
-QUAY_USERNAME=\$(cat /home/acm_d_mce_quay_username)
-QUAY_PASSWORD=\$(cat /home/acm_d_mce_quay_pullsecret)
-oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/global-pull-secret.json
-QUAY_AUTH=\$(echo -n "\${QUAY_USERNAME}:\${QUAY_PASSWORD}" | base64 -w 0)
-jq --arg QUAY_AUTH "\$QUAY_AUTH" '.auths += {"quay.io:443": {"auth":\$QUAY_AUTH,"email":""}}' /tmp/global-pull-secret.json > /tmp/global-pull-secret.json.tmp
-set -x
-mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
-oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
-rm /tmp/global-pull-secret.json
-sleep 60
-oc wait mcp master worker --for condition=updated --timeout=20m
-
-echo "2. Get mirror registry"
+echo "1. Get mirror registry"
 mirror_registry=\$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]')
 mirror_registry=\${mirror_registry%%/*}
 if [[ \$mirror_registry == "" ]] ; then
@@ -41,7 +27,7 @@ if [[ \$mirror_registry == "" ]] ; then
 fi
 echo "mirror registry is \${mirror_registry}"
 
-echo "3: Set registry credentials"
+echo "2: Set registry credentials"
 yum install -y skopeo
 oc -n openshift-config extract secret/pull-secret --to="/tmp" --confirm
 set +x
@@ -59,16 +45,16 @@ skopeo login registry.redhat.io -u "\${REGISTRY_REDHAT_IO_USER}" -p "\${REGISTRY
 set -x
 
 MCE_INDEX_IMAGE=\$(cat /home/mce-index-image)
-echo "4: skopeo copy docker://\${MCE_INDEX_IMAGE} oci:///home/mce-local-catalog --remove-signatures"
+echo "3: skopeo copy docker://\${MCE_INDEX_IMAGE} oci:///home/mce-local-catalog --remove-signatures"
 skopeo copy "docker://\${MCE_INDEX_IMAGE}" "oci:///home/mce-local-catalog" --remove-signatures
 
-echo "5. extract oc-mirror from image oc-mirror:v4.13.9"
+echo "4. extract oc-mirror from image oc-mirror:v4.14.1"
 set +x
 QUAY_USER=\$(cat "/home/registry_quay.json" | jq -r '.user')
 QUAY_PASSWORD=\$(cat "/home/registry_quay.json" | jq -r '.password')
 skopeo login quay.io -u "\${QUAY_USER}" -p "\${QUAY_PASSWORD}"
 set -x
-oc_mirror_image="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:278b6167e214992b2a40dd2fb44e8588f4a9ef100a70ec20cada58728350dd02"
+oc_mirror_image="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:80acc20087bec702fcb2624345f3dda071cd78092e5d3c972d75615b837549de"
 oc image extract \$oc_mirror_image --path /usr/bin/oc-mirror:/home --confirm
 if ls /home/oc-mirror >/dev/null ;then
     chmod +x /home/oc-mirror
@@ -77,7 +63,7 @@ else
     exit 1
 fi
 
-echo "6. oc-mirror --config /home/imageset-config.yaml docker://\${mirror_registry} --oci-registries-config=/home/registry.conf --continue-on-error --skip-missing"
+echo "5. oc-mirror --config /home/imageset-config.yaml docker://\${mirror_registry} --oci-registries-config=/home/registry.conf --continue-on-error --skip-missing"
 catalog_image="acm-d/mce-custom-registry"
 
 cat <<END |tee "/home/registry.conf"
@@ -136,14 +122,12 @@ mirror:
 END
 
 pushd /home
-echo "Because of OCPBUGS-20137, it's necessary to run multiple times."
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://\${mirror_registry}  --include-local-oci-catalogs --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://\${mirror_registry}  --include-local-oci-catalogs --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://\${mirror_registry}  --include-local-oci-catalogs --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-RESULTS_FILE=\$(find oc-mirror-workspace -type d -name '*results*')
-oc apply -f "\$RESULTS_FILE/catalogSource-mce-custom-registry.yaml"
+/home/oc-mirror --config "/home/imageset-config.yaml" docker://\${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
 popd
 
+echo "6. Create imageconentsourcepolicy and catalogsource"
+RESULTS_FILE=\$(find /home/oc-mirror-workspace -type d -name '*results*')
+oc apply -f "\$RESULTS_FILE/*.yaml"
 cat << END | oc apply -f -
 apiVersion: operator.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
@@ -161,10 +145,10 @@ spec:
     - \${mirror_registry}/multicluster-engine
     source: registry.redhat.io/multicluster-engine
 END
-
 echo "Waiting for the new ImageContentSourcePolicy to be updated on machines"
 oc wait clusteroperators/machine-config --for=condition=Upgradeable=true --timeout=15m
 
+echo "7. Install MCE Operator"
 oc apply -f - <<END
 apiVersion: v1
 kind: Namespace
@@ -194,7 +178,7 @@ spec:
   channel: stable-2.4
   installPlanApproval: Automatic
   name: multicluster-engine
-  source: mce-custom-registry
+  source: cs-mce-custom-registry
   sourceNamespace: openshift-marketplace
 END
 

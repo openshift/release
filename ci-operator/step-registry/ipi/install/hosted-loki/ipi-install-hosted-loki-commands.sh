@@ -158,6 +158,7 @@ data:
               - container
               - host
               - pod
+              - vm
       # If this entry is in an openshift- namespace, we don't pack the namespace (it remains a real label):
       - match:
           selector: '{namespace=~"openshift-addon-operator|openshift-apiserver|openshift-apiserver-operator|openshift-authentication|openshift-authentication-operator|openshift-cloud-controller-manager|openshift-cloud-controller-manager-operator|openshift-cloud-credential-operator|openshift-cloud-ingress-operator|openshift-cloud-network-config-controller|openshift-cluster-csi-drivers|openshift-cluster-machine-approver|openshift-cluster-node-tuning-operator|openshift-cluster-samples-operator|openshift-cluster-storage-operator|openshift-cluster-version|openshift-config|openshift-config-managed|openshift-config-operator|openshift-console|openshift-console-operator|openshift-console-user-settings|openshift-controller-manager|openshift-controller-manager-operator|openshift-custom-domains-operator|openshift-dns|openshift-dns-operator|openshift-etcd|openshift-etcd-operator|openshift-host-network|openshift-image-registry|openshift-infra|openshift-ingress|openshift-ingress-canary|openshift-ingress-operator|openshift-insights|openshift-kni-infra|openshift-kube-apiserver|openshift-kube-apiserver-operator|openshift-kube-controller-manager|openshift-kube-controller-manager-operator|openshift-kube-scheduler|openshift-kube-scheduler-operator|openshift-kube-storage-version-migrator|openshift-kube-storage-version-migrator-operator|openshift-logging|openshift-machine-api|openshift-machine-config-operator|openshift-managed-node-metadata-operator|openshift-managed-upgrade-operator|openshift-marketplace|openshift-monitoring|openshift-multus|openshift-network-diagnostics|openshift-network-operator|openshift-node|openshift-nutanix-infra|openshift-oauth-apiserver|openshift-observability-operator|openshift-ocm-agent-operator|openshift-openstack-infra|openshift-operator-lifecycle-manager|openshift-operators|openshift-operators-redhat|openshift-osd-metrics|openshift-ovirt-infra|openshift-priv|openshift-rbac-permissions|openshift-route-controller-manager|openshift-route-monitor-operator|openshift-sdn|openshift-security|openshift-service-ca|openshift-service-ca-operator|openshift-service-catalog-removed|openshift-user-workload-monitoring|openshift-validation-webhook|openshift-vsphere-infra"}'
@@ -168,6 +169,7 @@ data:
               - container
               - host
               - pod
+              - vm
       - labelallow:
           - invoker
           - namespace
@@ -198,6 +200,10 @@ data:
         source_labels:
         - __meta_kubernetes_pod_container_name
         target_label: container
+      - action: replace
+        source_labels:
+        - __meta_kubernetes_pod_label_vm_kubevirt_io_name
+        target_label: vm
       - replacement: /var/log/pods/*\$1/*.log
         separator: /
         source_labels:

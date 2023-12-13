@@ -18,7 +18,13 @@ presubmits:
       - args:
         - --bot=openshift-merge-robot
         - --bot=openshift-ci-robot
+        - --app=openshift-ci
+        - --app-check-mode=standard
         - --candidate-path=.
+        - --config-path=./core-services/prow/02_config/_config.yaml
+        - --supplemental-prow-config-dir=./core-services/prow/02_config
+        - --plugin-config=./core-services/prow/02_config/_plugins.yaml
+        - --supplemental-plugin-config-dir=./core-services/prow/02_config
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --github-endpoint=http://ghproxy
@@ -34,6 +40,7 @@ presubmits:
         - --ignore=insights-qe/iqe-cost-management-plugin
         - --ignore=ansible/tower-qa
         - --ignore=rh-openjdk/jdkContainerOcpTests
+        - --ignore=ran-telco5g/kpi-results
         command:
         - ./hack/check-gh-automation.sh
         env:
@@ -57,6 +64,65 @@ presubmits:
         secret:
           secretName: openshift-prow-github-app
     trigger: (?m)^/test( | .* )check-gh-automation,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: app.ci
+    context: ci/prow/check-gh-automation-tide
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-check-gh-automation-tide
+    rerun_command: /test check-gh-automation-tide
+    run_if_changed: ^ci-operator/config/.*
+    spec:
+      containers:
+      - args:
+        - --app=openshift-merge-bot
+        - --app-check-mode=tide
+        - --candidate-path=.
+        - --config-path=./core-services/prow/02_config/_config.yaml
+        - --supplemental-prow-config-dir=./core-services/prow/02_config
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --ignore=openshift/multiarch
+        - --ignore=kata-containers/kata-containers
+        - --ignore=containers/gvisor-tap-vsock
+        - --ignore=containers/podman-py
+        - --ignore=CSPI-QE
+        - --ignore=redhat-openshift-ecosystem/certified-operators-prod
+        - --ignore=redhat-openshift-ecosystem/preflight
+        - --ignore=redhat-openshift-ecosystem/cvp
+        - --ignore=insights-qe/iqe-cost-management-plugin
+        - --ignore=ansible/tower-qa
+        - --ignore=rh-openjdk/jdkContainerOcpTests
+        command:
+        - ./hack/check-gh-automation.sh
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              key: appid
+              name: openshift-merge-bot
+        image: registry.ci.openshift.org/ci/check-gh-automation:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: github-app-credentials
+          readOnly: true
+      volumes:
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-merge-bot
+    trigger: (?m)^/test( | .* )check-gh-automation-tide,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -267,6 +333,32 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )boskos-config-generation,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
+    context: ci/prow/build-clusters
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-build-clusters
+    optional: true
+    rerun_command: /test build-clusters
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-ci-build-clusters.sh
+        image: registry.ci.openshift.org/ci/cluster-init:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test build-clusters,?(\s+|$))
   - agent: kubernetes
     always_run: false
     branches:
@@ -606,6 +698,8 @@ presubmits:
         - ./ci-operator/config/
         - --registry
         - ./ci-operator/step-registry/
+        - --cluster-profiles-config
+        - ./core-services/cluster-profiles/_config.yaml
         command:
         - ci-operator-checkconfig
         image: ci-operator-checkconfig:latest
@@ -745,7 +839,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20231101-86c2fe4d89
+        image: gcr.io/k8s-prow/checkconfig:v20231206-f5c8e5872b
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1288,6 +1382,64 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build05
+    context: ci/prow/stackrox-stackrox-stackrox-stackrox-check
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: stackrox-stackrox
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-stackrox-stackrox-stackrox-stackrox-check
+    rerun_command: /test stackrox-stackrox-stackrox-stackrox-check
+    run_if_changed: ci-operator/(config|jobs)/stackrox/stackrox
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=stackrox-stackrox-check
+        - --variant=stackrox-stackrox
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )stackrox-stackrox-stackrox-stackrox-check,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
     context: ci/prow/step-registry-metadata
     decorate: true
     labels:
@@ -1358,56 +1510,6 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )supplemental-ci-images-mapping-files,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: app.ci
-    context: ci/build-farm/vsphere-dry
-    decorate: true
-    labels:
-      ci.openshift.io/build-farm: vsphere
-      ci.openshift.io/generator: cluster-init
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-vsphere-dry
-    optional: true
-    rerun_command: /test vsphere-dry
-    run_if_changed: ^clusters/.*
-    spec:
-      containers:
-      - args:
-        - --config-dir=clusters/build-clusters/vsphere
-        - --as=
-        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
-        command:
-        - applyconfig
-        env:
-        - name: HOME
-          value: /tmp
-        image: registry.ci.openshift.org/ci/applyconfig:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
-        - mountPath: /tmp
-          name: tmp
-      serviceAccountName: config-updater
-      volumes:
-      - name: build-farm-credentials
-        secret:
-          items:
-          - key: sa.config-updater.vsphere.config
-            path: kubeconfig
-          secretName: config-updater
-      - emptyDir: {}
-        name: tmp
-    trigger: (?m)^/test( | .* )vsphere-dry,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

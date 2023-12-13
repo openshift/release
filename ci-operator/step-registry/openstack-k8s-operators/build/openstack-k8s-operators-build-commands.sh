@@ -12,6 +12,8 @@ unset NAMESPACE
 # Check org and project from job's spec
 REF_REPO=$(echo ${JOB_SPEC} | jq -r '.refs.repo')
 REF_ORG=$(echo ${JOB_SPEC} | jq -r '.refs.org')
+REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+
 # PR SHA
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
 # Get Pull request info - Pull request
@@ -36,7 +38,7 @@ if [[ "$REF_ORG" != "$DEFAULT_ORG" ]]; then
     echo "Not a ${DEFAULT_ORG} job. Checking if isn't a rehearsal job..."
     EXTRA_REF_REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
     EXTRA_REF_ORG=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].org')
-    #EXTRA_REF_BASE_REF=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
+    REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
     if [[ "$EXTRA_REF_ORG" != "$DEFAULT_ORG" ]]; then
       echo "Failing since this step supports only ${DEFAULT_ORG} changes."
       exit 1
@@ -45,11 +47,13 @@ if [[ "$REF_ORG" != "$DEFAULT_ORG" ]]; then
     BASE_OP=${EXTRA_REF_REPO}
 fi
 SERVICE_NAME=$(echo "${BASE_OP}" | sed 's/\(.*\)-operator/\1/')
+# sets default branch for install_yamls
+export OPENSTACK_K8S_BRANCH=${REF_BRANCH}
 
 function create_openstack_namespace {
   pushd ${BASE_DIR}
   if [ ! -d "./install_yamls" ]; then
-    git clone https://github.com/openstack-k8s-operators/install_yamls.git
+    git clone https://github.com/openstack-k8s-operators/install_yamls.git -b ${REF_BRANCH}
   fi
   cd install_yamls
   make namespace
@@ -94,7 +98,7 @@ function check_build_result {
 # Clone the openstack-operator and checkout
 # the requested PR
 function clone_openstack_operator {
-    git clone https://github.com/openstack-k8s-operators/openstack-operator.git
+    git clone https://github.com/openstack-k8s-operators/openstack-operator.git -b ${REF_BRANCH}
     pushd openstack-operator
     local pr_num=""
     # Depends-On syntax detected in the PR description: get the PR ID
@@ -141,12 +145,13 @@ function build_push_operator_images {
   # Build and push bundle image
   oc new-build --binary --strategy=docker --name ${OPERATOR}-bundle --to=${IMAGE_TAG_BASE}-bundle:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
 
+  # this sets defaults but allows BUNDLE_DOCKERFILE to be overridden via .prow_ci.env
   if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
-    DOCKERFILE="custom-bundle.Dockerfile.pinned"
+    BUNDLE_DOCKERFILE=${BUNDLE_DOCKERFILE:-"custom-bundle.Dockerfile.pinned"}
   else
-    DOCKERFILE="bundle.Dockerfile"
+    BUNDLE_DOCKERFILE=${BUNDLE_DOCKERFILE:-"bundle.Dockerfile"}
   fi
-  DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\""${DOCKERFILE}"\"\}\}\}\})
+  DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\""${BUNDLE_DOCKERFILE}"\"\}\}\}\})
 
   oc patch bc ${OPERATOR}-bundle -p "${DOCKERFILE_PATH_PATCH[@]}"
   oc set build-secret --pull bc/${OPERATOR}-bundle ${DOCKER_REGISTRY_SECRET}
@@ -154,16 +159,16 @@ function build_push_operator_images {
   check_build_result ${OPERATOR}-bundle
 
   BASE_BUNDLE=${IMAGE_TAG_BASE}-bundle:${IMAGE_TAG}
-  DOCKERFILE="index.Dockerfile"
-  DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\""${DOCKERFILE}"\"\}\}\}\})
+  INDEX_DOCKERFILE="index.Dockerfile"
+  DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\""${INDEX_DOCKERFILE}"\"\}\}\}\})
 
 # todo: Improve include manila bundle workflow. For meta operaor only we need to add manila bundle in index and not for individual operators like keystone.
   if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
     local OPENSTACK_BUNDLES
     OPENSTACK_BUNDLES=$(/bin/bash hack/pin-bundle-images.sh)
-    opm index add --bundles "${BASE_BUNDLE}${OPENSTACK_BUNDLES}" --out-dockerfile "${DOCKERFILE}" --generate
+    opm index add --bundles "${BASE_BUNDLE}${OPENSTACK_BUNDLES}" --out-dockerfile "${INDEX_DOCKERFILE}" --generate
   else
-    opm index add --bundles "${BASE_BUNDLE}" --out-dockerfile "${DOCKERFILE}" --generate
+    opm index add --bundles "${BASE_BUNDLE}" --out-dockerfile "${INDEX_DOCKERFILE}" --generate
   fi
 
   oc new-build --binary --strategy=docker --name ${OPERATOR}-index --to=${IMAGE_TAG_BASE}-index:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true

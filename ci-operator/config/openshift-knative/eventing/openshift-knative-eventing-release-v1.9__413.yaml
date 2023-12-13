@@ -203,6 +203,9 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-eventing-test-wathola-sender
+- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+  from: src
+  to: knative-eventing-source-image
 promotion:
   additional_images:
     knative-eventing-src: src
@@ -224,13 +227,15 @@ tests:
     version: "4.13"
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-eventing-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
@@ -239,10 +244,24 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-eventing-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-eventing-source-image
+      grace_period: 1m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
       timeout: 20m0s
     test:
     - as: test
@@ -313,7 +332,9 @@ tests:
         name: knative-eventing-test-wathola-receiver
       - env: KNATIVE_EVENTING_TEST_WATHOLA_SENDER
         name: knative-eventing-test-wathola-sender
-      from: src
+      - env: KNATIVE_EVENTING_SOURCE_IMAGE
+        name: knative-eventing-source-image
+      from: knative-eventing-source-image
       resources:
         requests:
           cpu: 100m
@@ -330,13 +351,15 @@ tests:
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-eventing-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
@@ -345,10 +368,24 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-eventing-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-eventing-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
       timeout: 20m0s
     test:
     - as: test
@@ -419,7 +456,9 @@ tests:
         name: knative-eventing-test-wathola-receiver
       - env: KNATIVE_EVENTING_TEST_WATHOLA_SENDER
         name: knative-eventing-test-wathola-sender
-      from: src
+      - env: KNATIVE_EVENTING_SOURCE_IMAGE
+        name: knative-eventing-source-image
+      from: knative-eventing-source-image
       resources:
         requests:
           cpu: 100m
@@ -435,13 +474,15 @@ tests:
     version: "4.13"
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-eventing-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
@@ -450,10 +491,24 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-eventing-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-eventing-source-image
+      grace_period: 1m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
       timeout: 20m0s
     test:
     - as: test
@@ -524,7 +579,9 @@ tests:
         name: knative-eventing-test-wathola-receiver
       - env: KNATIVE_EVENTING_TEST_WATHOLA_SENDER
         name: knative-eventing-test-wathola-sender
-      from: src
+      - env: KNATIVE_EVENTING_SOURCE_IMAGE
+        name: knative-eventing-source-image
+      from: knative-eventing-source-image
       resources:
         requests:
           cpu: 100m
@@ -541,13 +598,15 @@ tests:
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-eventing-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
@@ -556,10 +615,24 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-eventing-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-eventing-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
       timeout: 20m0s
     test:
     - as: test
@@ -630,7 +703,9 @@ tests:
         name: knative-eventing-test-wathola-receiver
       - env: KNATIVE_EVENTING_TEST_WATHOLA_SENDER
         name: knative-eventing-test-wathola-sender
-      from: src
+      - env: KNATIVE_EVENTING_SOURCE_IMAGE
+        name: knative-eventing-source-image
+      from: knative-eventing-source-image
       resources:
         requests:
           cpu: 100m
@@ -646,13 +721,15 @@ tests:
     version: "4.13"
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-eventing-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
@@ -661,10 +738,24 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-eventing-source-image
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-eventing-source-image
+      grace_period: 1m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
       timeout: 20m0s
     test:
     - as: test
@@ -735,7 +826,9 @@ tests:
         name: knative-eventing-test-wathola-receiver
       - env: KNATIVE_EVENTING_TEST_WATHOLA_SENDER
         name: knative-eventing-test-wathola-sender
-      from: src
+      - env: KNATIVE_EVENTING_SOURCE_IMAGE
+        name: knative-eventing-source-image
+      from: knative-eventing-source-image
       resources:
         requests:
           cpu: 100m
@@ -752,13 +845,15 @@ tests:
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: knative-must-gather
       best_effort: true
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-eventing-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
@@ -767,10 +862,24 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-eventing-source-image
+      optional_on_success: false
       resources:
         requests:
           cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-eventing-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
       timeout: 20m0s
     test:
     - as: test
@@ -841,7 +950,9 @@ tests:
         name: knative-eventing-test-wathola-receiver
       - env: KNATIVE_EVENTING_TEST_WATHOLA_SENDER
         name: knative-eventing-test-wathola-sender
-      from: src
+      - env: KNATIVE_EVENTING_SOURCE_IMAGE
+        name: knative-eventing-source-image
+      from: knative-eventing-source-image
       resources:
         requests:
           cpu: 100m

@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: "4.15"
-    namespace: ocp
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -19,6 +15,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: hypershift-tests
+  ocp_4.15_base:
+    name: "4.15"
+    namespace: ocp
+    tag: base
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
@@ -28,14 +28,15 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: cluster-network-operator
 promotion:
-  disabled: true
   name: "4.15"
   namespace: ocp
 releases:
@@ -64,7 +65,9 @@ tests:
     from: src
 - as: e2e-gcp-sdn
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-gcp-sdn
 - as: e2e-gcp-ovn-upgrade
   steps:
@@ -74,10 +77,14 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-upgrade-aws-sdn
 - as: e2e-aws-sdn-multi
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-ovn-step-registry
   optional: true
@@ -183,6 +190,7 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
       NETWORK_TYPE: OpenShiftSDN
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-ovn
@@ -198,6 +206,8 @@ tests:
 - as: e2e-aws-ovn-network-migration
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-egress-ip
@@ -211,6 +221,8 @@ tests:
 - as: e2e-aws-sdn-network-migration-rollback
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-egress-ip
@@ -239,6 +251,11 @@ tests:
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-clusternetwork-cidr-expansion
+  cron: 0 3 * * 0,2,4,6
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-cidr-expansion
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
@@ -260,7 +277,7 @@ tests:
 - as: e2e-network-mtu-migration-ovn-ipv4
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     env:
       MTU_DECREASE: "400"
       MTU_INCREASE: "200"
@@ -291,6 +308,7 @@ tests:
     env:
       MTU_DECREASE: "400"
       MTU_INCREASE: "200"
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     test:
     - chain: network-mtu-migration-decrease
     - chain: network-mtu-migration-increase

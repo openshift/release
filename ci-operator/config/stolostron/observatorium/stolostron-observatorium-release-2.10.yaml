@@ -1,0 +1,106 @@
+base_images:
+  stolostron_builder_go1.18-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.18-linux
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.18-linux
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    stolostron_builder_go1.18-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
+  to: observatorium
+promotion:
+  disabled: true
+  name: "2.10"
+  namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: "4.8"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.8"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+test_binary_build_commands: "true"
+tests:
+- as: lint
+  commands: |
+    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make lint --always-make
+  container:
+    from: src
+- as: test
+  commands: |
+    make test --always-make
+  container:
+    from: test-bin
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: observatorium
+    env:
+      IMAGE_REPO: observatorium
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: observatorium
+    env:
+      IMAGE_REPO: observatorium
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_COMPONENT_NAME="observatorium"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.10
+  org: stolostron
+  repo: observatorium

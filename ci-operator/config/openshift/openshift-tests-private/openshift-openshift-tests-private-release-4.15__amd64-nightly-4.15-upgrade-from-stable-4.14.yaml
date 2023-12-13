@@ -132,6 +132,7 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-24663
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @aws-ipi and @disconnected
         and not @fips'
@@ -162,7 +163,7 @@ tests:
       ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
       BASE_DOMAIN: qe.devcluster.openshift.com
       BASELINE_CAPABILITY_SET: None
-      ENABLE_OTA_TEST: "66839"
+      ENABLE_OTA_TEST: OCP-66839
       EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST: MachineAPI
       FIPS_ENABLED: "true"
       PERSISTENT_MONITORING: "false"
@@ -299,6 +300,7 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-21588
       FIPS_ENABLED: "true"
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @aws-ipi'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @aws-ipi'
@@ -348,6 +350,7 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-24663
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @azure-ipi and @disconnected
         and not @fips'
@@ -398,6 +401,7 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-21588
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @azure-ipi and not @fips
         and @network-ovnkubernetes'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @azure-ipi and not @fips
@@ -489,7 +493,7 @@ tests:
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @baremetal-ipi and @network-ovnkubernetes'
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: gcp-ipi-confidential-computing-fips-f28
   cron: 58 17 16 * *
   steps:
@@ -517,6 +521,7 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
+      ENABLE_OTA_TEST: OCP-21588
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @gcp-ipi and not @fips
         and @network-ovnkubernetes'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @gcp-ipi and not @fips
@@ -660,6 +665,9 @@ tests:
         and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @vsphere-ipi and @disconnected
         and not @fips'
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
@@ -677,7 +685,7 @@ tests:
 - as: vsphere-ipi-external-lb-post-f28
   cron: 33 13 10 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @vsphere-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @vsphere-ipi and not @fips'
@@ -704,6 +712,9 @@ tests:
       FIPS_ENABLED: "true"
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @vsphere-ipi'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @vsphere-ipi'
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
@@ -715,6 +726,9 @@ tests:
       PLATFORM_VERSION: "8.6"
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @vsphere-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @vsphere-ipi and not @fips'
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy-workers-rhel8
@@ -748,6 +762,9 @@ tests:
         and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @vsphere-upi and @disconnected
         and not @fips'
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-sdn-workers-rhcos-rhel8
@@ -760,6 +777,9 @@ tests:
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @vsphere-upi and @disconnected'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @vsphere-upi and @disconnected'
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-secureboot
@@ -773,6 +793,19 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-upi
+- as: aws-ipi-ovn-winc-f7
+  cron: 48 23 3,10,17,26 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS_POSTUPG: Smokerun
+      TEST_FILTERS_PREUPG: Smokerun
+      TEST_SCENARIOS_POSTUPG: Windows_Containers
+      TEST_SCENARIOS_PREUPG: Windows_Containers
+    test:
+    - chain: openshift-upgrade-qe-test-winc
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-winc
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

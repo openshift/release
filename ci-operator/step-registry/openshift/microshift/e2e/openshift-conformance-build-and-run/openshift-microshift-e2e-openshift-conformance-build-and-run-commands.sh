@@ -22,6 +22,9 @@ chmod 0600 "${HOME}/.ssh/config"
 
 cat > /tmp/run.sh << EOF
 set -xe
+if [[ "$JOB_TYPE" == "presubmit" ]]; then
+    export MICROSHIFT_SKIP_MONITOR_TESTS=true
+fi
 sudo cat /var/lib/microshift/resources/kubeadmin/kubeconfig > /tmp/kubeconfig
 mkdir -p ${DEST_DIR}
 if [ -f "${ROOT_DIR}/origin/run.sh" ]; then

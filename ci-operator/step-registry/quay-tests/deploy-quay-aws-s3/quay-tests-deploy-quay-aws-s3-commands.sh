@@ -6,6 +6,7 @@ set -o pipefail
 
 #Create AWS S3 Storage Bucket
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
+QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 QUAY_AWS_S3_BUCKET="quayprowci$RANDOM"
 
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
@@ -83,7 +84,7 @@ spec:
   installPlanApproval: Automatic
   name: quay-operator
   channel: $QUAY_OPERATOR_CHANNEL
-  source: redhat-operators
+  source: $QUAY_OPERATOR_SOURCE
   sourceNamespace: openshift-marketplace
 EOF
 )
@@ -126,6 +127,7 @@ DISTRIBUTED_STORAGE_CONFIG:
       s3_access_key: $QUAY_AWS_ACCESS_KEY
       s3_secret_key: $QUAY_AWS_SECRET_KEY
       host: s3.us-east-2.amazonaws.com
+      s3_region: us-east-2
 EOF
 
 oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret

@@ -11,6 +11,49 @@ declare cloud_where_run
 declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
+
+# move private key to ~/.ssh/ so that sosreports can be collected if needed
+mkdir -p ~/.ssh
+cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/id_rsa
+chmod 0600 ~/.ssh/id_rsa
+
+# setup passwd for use by SSH if the current user isn't known
+if ! whoami &> /dev/null; then
+  if [[ -w /etc/passwd ]]; then
+      echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+  fi
+fi
+
+function collect_sosreport_from_unprovisioned_machines {  
+  set +e
+  echo "$(date -u --rfc-3339=seconds) - checking if any machines lack a nodeRef"
+
+  MACHINES=$(oc get machines.machine.openshift.io -n openshift-machine-api -o=jsonpath='{.items[*].metadata.name}')
+  for MACHINE in ${MACHINES}; do
+    echo "$(date -u --rfc-3339=seconds) - checking if machine $MACHINE lacks a nodeRef"
+    NODEREF=$(oc get machines.machine.openshift.io -n openshift-machine-api $MACHINE -o=jsonpath='{.status.nodeRef}')
+    if [ -z "$NODEREF" ]; then
+      echo "$(date -u --rfc-3339=seconds) - no nodeRef found, attempting to collect sos report"
+      ADDRESS=$(oc get machines.machine.openshift.io -n openshift-machine-api $MACHINE -o=jsonpath='{.status.addresses[0].address}')
+      if [ -z "$ADDRESS" ]; then
+        echo "$(date -u --rfc-3339=seconds) - could not derive address from machine. unable to collect sos report"
+        continue
+      fi
+      echo "$(date -u --rfc-3339=seconds) - executing sos report at $ADDRESS"
+      ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report -k crio.all=on -k crio.logs=on  -k podman.all=on -k podman.logs=on --batch --tmp-dir /home/core
+      echo "$(date -u --rfc-3339=seconds) - cleaning sos report"
+      ssh ${SSH_OPTS} core@$ADDRESS -- toolbox sos report --clean --batch --tmp-dir /home/core      
+      ssh ${SSH_OPTS} core@$ADDRESS -- sudo chown core:core /home/core/sosreport*
+      echo "$(date -u --rfc-3339=seconds) - retrieving sos report"
+      scp ${SSH_OPTS} core@$ADDRESS:/home/core/sosreport*obfuscated* "${vcenter_state}"
+    fi
+  done
+  set -e
+}
+
 function collect_diagnostic_data {
   set +e
 
@@ -504,3 +547,4 @@ EOF
 }
 
 collect_diagnostic_data
+collect_sosreport_from_unprovisioned_machines

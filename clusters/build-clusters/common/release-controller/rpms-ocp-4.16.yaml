@@ -1,0 +1,1335 @@
+##################################################################################
+#                                DO NOT EDIT
+# File generated during execution of: generate-release-controllers.py
+##################################################################################
+
+
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-4-16
+  namespace: ocp
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: base-4-16
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  labels:
+    app: base-4-16
+  name: base-4-16
+  namespace: ocp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: base-4-16
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
+      labels:
+        app: base-4-16
+    spec:
+      containers:
+      - command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/repos
+        image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-server/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
+        name: mirror
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /tmp/repos
+          name: repos
+          readOnly: true
+        - mountPath: /tmp/key
+          name: key
+          readOnly: true
+        - mountPath: /tmp/mirror-enterprise-basic-auth
+          name: mirror-enterprise-basic-auth
+          readOnly: true
+        - mountPath: /tmp/cache
+          name: cache
+        workingDir: /tmp/repos
+      volumes:
+      - configMap:
+          items:
+          - key: ocp-4.16-default.repo
+            path: ocp-4.16-default.repo
+          name: base-repos
+        name: repos
+      - name: key
+        secret:
+          secretName: mirror.openshift.com
+      - name: mirror-enterprise-basic-auth
+        secret:
+          defaultMode: 420
+          secretName: mirror-enterprise-basic-auth
+      - emptyDir: {}
+        name: cache
+      - emptyDir: {}
+        name: run
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: openstack-beta-4-16
+  namespace: ocp
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: openstack-beta-4-16
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  labels:
+    app: openstack-beta-4-16
+  name: openstack-beta-4-16
+  namespace: ocp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: openstack-beta-4-16
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
+      labels:
+        app: openstack-beta-4-16
+    spec:
+      containers:
+      - command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/repos
+        image: ' '
+        livenessProbe:
+          httpGet:
+            path: /openstack-beta-rhel8/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
+        name: mirror
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /tmp/repos
+          name: repos
+          readOnly: true
+        - mountPath: /tmp/key
+          name: key
+          readOnly: true
+        - mountPath: /tmp/mirror-enterprise-basic-auth
+          name: mirror-enterprise-basic-auth
+          readOnly: true
+        - mountPath: /tmp/cache
+          name: cache
+        workingDir: /tmp/repos
+      volumes:
+      - configMap:
+          items:
+          - key: ocp-4.16-openstack-beta.repo
+            path: ocp-4.16-openstack-beta.repo
+          name: base-repos
+        name: repos
+      - name: key
+        secret:
+          secretName: mirror.openshift.com
+      - name: mirror-enterprise-basic-auth
+        secret:
+          defaultMode: 420
+          secretName: mirror-enterprise-basic-auth
+      - emptyDir: {}
+        name: cache
+      - emptyDir: {}
+        name: run
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-openstack-4-16
+  namespace: ocp
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: base-openstack-4-16
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  labels:
+    app: base-openstack-4-16
+  name: base-openstack-4-16
+  namespace: ocp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: base-openstack-4-16
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
+      labels:
+        app: base-openstack-4-16
+    spec:
+      containers:
+      - command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/repos
+        image: ' '
+        livenessProbe:
+          httpGet:
+            path: /openstack-16-rhel8/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
+        name: mirror
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /tmp/repos
+          name: repos
+          readOnly: true
+        - mountPath: /tmp/key
+          name: key
+          readOnly: true
+        - mountPath: /tmp/mirror-enterprise-basic-auth
+          name: mirror-enterprise-basic-auth
+          readOnly: true
+        - mountPath: /tmp/cache
+          name: cache
+        workingDir: /tmp/repos
+      volumes:
+      - configMap:
+          items:
+          - key: ocp-4.16-openstack.repo
+            path: ocp-4.16-openstack.repo
+          name: base-repos
+        name: repos
+      - name: key
+        secret:
+          secretName: mirror.openshift.com
+      - name: mirror-enterprise-basic-auth
+        secret:
+          defaultMode: 420
+          secretName: mirror-enterprise-basic-auth
+      - emptyDir: {}
+        name: cache
+      - emptyDir: {}
+        name: run
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-4-16-ppc64le
+  namespace: ocp
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: base-4-16-ppc64le
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  labels:
+    app: base-4-16-ppc64le
+  name: base-4-16-ppc64le
+  namespace: ocp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: base-4-16-ppc64le
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
+      labels:
+        app: base-4-16-ppc64le
+    spec:
+      containers:
+      - command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/repos
+        image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-server/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
+        name: mirror
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /tmp/repos
+          name: repos
+          readOnly: true
+        - mountPath: /tmp/key
+          name: key
+          readOnly: true
+        - mountPath: /tmp/mirror-enterprise-basic-auth
+          name: mirror-enterprise-basic-auth
+          readOnly: true
+        - mountPath: /tmp/cache
+          name: cache
+        workingDir: /tmp/repos
+      volumes:
+      - configMap:
+          items:
+          - key: ocp-4.16-ppc64le.repo
+            path: ocp-4.16-ppc64le.repo
+          name: base-repos
+        name: repos
+      - name: key
+        secret:
+          secretName: mirror.openshift.com
+      - name: mirror-enterprise-basic-auth
+        secret:
+          defaultMode: 420
+          secretName: mirror-enterprise-basic-auth
+      - emptyDir: {}
+        name: cache
+      - emptyDir: {}
+        name: run
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-4-16-rhel-8-ironic-prevalidation
+  namespace: ocp
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: base-4-16-rhel-8-ironic-prevalidation
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  labels:
+    app: base-4-16-rhel-8-ironic-prevalidation
+  name: base-4-16-rhel-8-ironic-prevalidation
+  namespace: ocp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: base-4-16-rhel-8-ironic-prevalidation
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
+      labels:
+        app: base-4-16-rhel-8-ironic-prevalidation
+    spec:
+      containers:
+      - command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/repos
+        image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-8-ironic-prevalidation/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
+        name: mirror
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /tmp/repos
+          name: repos
+          readOnly: true
+        - mountPath: /tmp/key
+          name: key
+          readOnly: true
+        - mountPath: /tmp/mirror-enterprise-basic-auth
+          name: mirror-enterprise-basic-auth
+          readOnly: true
+        - mountPath: /tmp/cache
+          name: cache
+        workingDir: /tmp/repos
+      volumes:
+      - configMap:
+          items:
+          - key: ocp-4.16-rhel-8-ironic-prevalidation.repo
+            path: ocp-4.16-rhel-8-ironic-prevalidation.repo
+          name: base-repos
+        name: repos
+      - name: key
+        secret:
+          secretName: mirror.openshift.com
+      - name: mirror-enterprise-basic-auth
+        secret:
+          defaultMode: 420
+          secretName: mirror-enterprise-basic-auth
+      - emptyDir: {}
+        name: cache
+      - emptyDir: {}
+        name: run
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-4-16-rhel-8-server-ironic
+  namespace: ocp
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: base-4-16-rhel-8-server-ironic
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  labels:
+    app: base-4-16-rhel-8-server-ironic
+  name: base-4-16-rhel-8-server-ironic
+  namespace: ocp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: base-4-16-rhel-8-server-ironic
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
+      labels:
+        app: base-4-16-rhel-8-server-ironic
+    spec:
+      containers:
+      - command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/repos
+        image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-8-server-ironic-rpms/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
+        name: mirror
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /tmp/repos
+          name: repos
+          readOnly: true
+        - mountPath: /tmp/key
+          name: key
+          readOnly: true
+        - mountPath: /tmp/mirror-enterprise-basic-auth
+          name: mirror-enterprise-basic-auth
+          readOnly: true
+        - mountPath: /tmp/cache
+          name: cache
+        workingDir: /tmp/repos
+      volumes:
+      - configMap:
+          items:
+          - key: ocp-4.16-rhel-8-server-ironic.repo
+            path: ocp-4.16-rhel-8-server-ironic.repo
+          name: base-repos
+        name: repos
+      - name: key
+        secret:
+          secretName: mirror.openshift.com
+      - name: mirror-enterprise-basic-auth
+        secret:
+          defaultMode: 420
+          secretName: mirror-enterprise-basic-auth
+      - emptyDir: {}
+        name: cache
+      - emptyDir: {}
+        name: run
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-4-16-rhel-9-ironic-prevalidation
+  namespace: ocp
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: base-4-16-rhel-9-ironic-prevalidation
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  labels:
+    app: base-4-16-rhel-9-ironic-prevalidation
+  name: base-4-16-rhel-9-ironic-prevalidation
+  namespace: ocp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: base-4-16-rhel-9-ironic-prevalidation
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
+      labels:
+        app: base-4-16-rhel-9-ironic-prevalidation
+    spec:
+      containers:
+      - command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/repos
+        image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-9-ironic-prevalidation/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
+        name: mirror
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /tmp/repos
+          name: repos
+          readOnly: true
+        - mountPath: /tmp/key
+          name: key
+          readOnly: true
+        - mountPath: /tmp/mirror-enterprise-basic-auth
+          name: mirror-enterprise-basic-auth
+          readOnly: true
+        - mountPath: /tmp/cache
+          name: cache
+        workingDir: /tmp/repos
+      volumes:
+      - configMap:
+          items:
+          - key: ocp-4.16-rhel-9-ironic-prevalidation.repo
+            path: ocp-4.16-rhel-9-ironic-prevalidation.repo
+          name: base-repos
+        name: repos
+      - name: key
+        secret:
+          secretName: mirror.openshift.com
+      - name: mirror-enterprise-basic-auth
+        secret:
+          defaultMode: 420
+          secretName: mirror-enterprise-basic-auth
+      - emptyDir: {}
+        name: cache
+      - emptyDir: {}
+        name: run
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-4-16-rhel-9-server-ironic
+  namespace: ocp
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: base-4-16-rhel-9-server-ironic
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  labels:
+    app: base-4-16-rhel-9-server-ironic
+  name: base-4-16-rhel-9-server-ironic
+  namespace: ocp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: base-4-16-rhel-9-server-ironic
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
+      labels:
+        app: base-4-16-rhel-9-server-ironic
+    spec:
+      containers:
+      - command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/repos
+        image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-9-server-ironic-rpms/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
+        name: mirror
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /tmp/repos
+          name: repos
+          readOnly: true
+        - mountPath: /tmp/key
+          name: key
+          readOnly: true
+        - mountPath: /tmp/mirror-enterprise-basic-auth
+          name: mirror-enterprise-basic-auth
+          readOnly: true
+        - mountPath: /tmp/cache
+          name: cache
+        workingDir: /tmp/repos
+      volumes:
+      - configMap:
+          items:
+          - key: ocp-4.16-rhel-9-server-ironic.repo
+            path: ocp-4.16-rhel-9-server-ironic.repo
+          name: base-repos
+        name: repos
+      - name: key
+        secret:
+          secretName: mirror.openshift.com
+      - name: mirror-enterprise-basic-auth
+        secret:
+          defaultMode: 420
+          secretName: mirror-enterprise-basic-auth
+      - emptyDir: {}
+        name: cache
+      - emptyDir: {}
+        name: run
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-4-16-rhel8-aarch64
+  namespace: ocp
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: base-4-16-rhel8-aarch64
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  labels:
+    app: base-4-16-rhel8-aarch64
+  name: base-4-16-rhel8-aarch64
+  namespace: ocp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: base-4-16-rhel8-aarch64
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
+      labels:
+        app: base-4-16-rhel8-aarch64
+    spec:
+      containers:
+      - command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/repos
+        image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-8-baseos/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
+        name: mirror
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /tmp/repos
+          name: repos
+          readOnly: true
+        - mountPath: /tmp/key
+          name: key
+          readOnly: true
+        - mountPath: /tmp/mirror-enterprise-basic-auth
+          name: mirror-enterprise-basic-auth
+          readOnly: true
+        - mountPath: /tmp/cache
+          name: cache
+        workingDir: /tmp/repos
+      volumes:
+      - configMap:
+          items:
+          - key: ocp-4.16-rhel8-aarch64.repo
+            path: ocp-4.16-rhel8-aarch64.repo
+          name: base-repos
+        name: repos
+      - name: key
+        secret:
+          secretName: mirror.openshift.com
+      - name: mirror-enterprise-basic-auth
+        secret:
+          defaultMode: 420
+          secretName: mirror-enterprise-basic-auth
+      - emptyDir: {}
+        name: cache
+      - emptyDir: {}
+        name: run
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-4-16-rhel8
+  namespace: ocp
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: base-4-16-rhel8
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  labels:
+    app: base-4-16-rhel8
+  name: base-4-16-rhel8
+  namespace: ocp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: base-4-16-rhel8
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
+      labels:
+        app: base-4-16-rhel8
+    spec:
+      containers:
+      - command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/repos
+        image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-8-baseos/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
+        name: mirror
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /tmp/repos
+          name: repos
+          readOnly: true
+        - mountPath: /tmp/key
+          name: key
+          readOnly: true
+        - mountPath: /tmp/mirror-enterprise-basic-auth
+          name: mirror-enterprise-basic-auth
+          readOnly: true
+        - mountPath: /tmp/cache
+          name: cache
+        workingDir: /tmp/repos
+      volumes:
+      - configMap:
+          items:
+          - key: ocp-4.16-rhel8.repo
+            path: ocp-4.16-rhel8.repo
+          name: base-repos
+        name: repos
+      - name: key
+        secret:
+          secretName: mirror.openshift.com
+      - name: mirror-enterprise-basic-auth
+        secret:
+          defaultMode: 420
+          secretName: mirror-enterprise-basic-auth
+      - emptyDir: {}
+        name: cache
+      - emptyDir: {}
+        name: run
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-4-16-rhel86
+  namespace: ocp
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: base-4-16-rhel86
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  labels:
+    app: base-4-16-rhel86
+  name: base-4-16-rhel86
+  namespace: ocp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: base-4-16-rhel86
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
+      labels:
+        app: base-4-16-rhel86
+    spec:
+      containers:
+      - command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/repos
+        image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-8.6-baseos/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
+        name: mirror
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /tmp/repos
+          name: repos
+          readOnly: true
+        - mountPath: /tmp/key
+          name: key
+          readOnly: true
+        - mountPath: /tmp/mirror-enterprise-basic-auth
+          name: mirror-enterprise-basic-auth
+          readOnly: true
+        - mountPath: /tmp/cache
+          name: cache
+        workingDir: /tmp/repos
+      volumes:
+      - configMap:
+          items:
+          - key: ocp-4.16-rhel86.repo
+            path: ocp-4.16-rhel86.repo
+          name: base-repos
+        name: repos
+      - name: key
+        secret:
+          secretName: mirror.openshift.com
+      - name: mirror-enterprise-basic-auth
+        secret:
+          defaultMode: 420
+          secretName: mirror-enterprise-basic-auth
+      - emptyDir: {}
+        name: cache
+      - emptyDir: {}
+        name: run
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-4-16-rhel9
+  namespace: ocp
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: base-4-16-rhel9
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  labels:
+    app: base-4-16-rhel9
+  name: base-4-16-rhel9
+  namespace: ocp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: base-4-16-rhel9
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
+      labels:
+        app: base-4-16-rhel9
+    spec:
+      containers:
+      - command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/repos
+        image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-9-baseos/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
+        name: mirror
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /tmp/repos
+          name: repos
+          readOnly: true
+        - mountPath: /tmp/key
+          name: key
+          readOnly: true
+        - mountPath: /tmp/mirror-enterprise-basic-auth
+          name: mirror-enterprise-basic-auth
+          readOnly: true
+        - mountPath: /tmp/cache
+          name: cache
+        workingDir: /tmp/repos
+      volumes:
+      - configMap:
+          items:
+          - key: ocp-4.16-rhel9.repo
+            path: ocp-4.16-rhel9.repo
+          name: base-repos
+        name: repos
+      - name: key
+        secret:
+          secretName: mirror.openshift.com
+      - name: mirror-enterprise-basic-auth
+        secret:
+          defaultMode: 420
+          secretName: mirror-enterprise-basic-auth
+      - emptyDir: {}
+        name: cache
+      - emptyDir: {}
+        name: run
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-4-16-rhel92
+  namespace: ocp
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: base-4-16-rhel92
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  labels:
+    app: base-4-16-rhel92
+  name: base-4-16-rhel92
+  namespace: ocp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: base-4-16-rhel92
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
+      labels:
+        app: base-4-16-rhel92
+    spec:
+      containers:
+      - command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/repos
+        image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-9.2-baseos/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
+        name: mirror
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /tmp/repos
+          name: repos
+          readOnly: true
+        - mountPath: /tmp/key
+          name: key
+          readOnly: true
+        - mountPath: /tmp/mirror-enterprise-basic-auth
+          name: mirror-enterprise-basic-auth
+          readOnly: true
+        - mountPath: /tmp/cache
+          name: cache
+        workingDir: /tmp/repos
+      volumes:
+      - configMap:
+          items:
+          - key: ocp-4.16-rhel92.repo
+            path: ocp-4.16-rhel92.repo
+          name: base-repos
+        name: repos
+      - name: key
+        secret:
+          secretName: mirror.openshift.com
+      - name: mirror-enterprise-basic-auth
+        secret:
+          defaultMode: 420
+          secretName: mirror-enterprise-basic-auth
+      - emptyDir: {}
+        name: cache
+      - emptyDir: {}
+        name: run
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-4-16-s390x
+  namespace: ocp
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: base-4-16-s390x
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  labels:
+    app: base-4-16-s390x
+  name: base-4-16-s390x
+  namespace: ocp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: base-4-16-s390x
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: 'true'
+      labels:
+        app: base-4-16-s390x
+    spec:
+      containers:
+      - command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/repos
+        image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-server/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
+        name: mirror
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /tmp/repos
+          name: repos
+          readOnly: true
+        - mountPath: /tmp/key
+          name: key
+          readOnly: true
+        - mountPath: /tmp/mirror-enterprise-basic-auth
+          name: mirror-enterprise-basic-auth
+          readOnly: true
+        - mountPath: /tmp/cache
+          name: cache
+        workingDir: /tmp/repos
+      volumes:
+      - configMap:
+          items:
+          - key: ocp-4.16-s390x.repo
+            path: ocp-4.16-s390x.repo
+          name: base-repos
+        name: repos
+      - name: key
+        secret:
+          secretName: mirror.openshift.com
+      - name: mirror-enterprise-basic-auth
+        secret:
+          defaultMode: 420
+          secretName: mirror-enterprise-basic-auth
+      - emptyDir: {}
+        name: cache
+      - emptyDir: {}
+        name: run
