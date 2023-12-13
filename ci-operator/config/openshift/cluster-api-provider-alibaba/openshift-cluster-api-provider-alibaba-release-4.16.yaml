@@ -1,25 +1,25 @@
 base_images:
-  ocp_4.15_base:
-    name: "4.15"
+  ocp_4.16_base-rhel9:
+    name: "4.16"
     namespace: ocp
-    tag: base
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.20-openshift-4.16:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.16
-binary_build_commands: make build
+binary_build_commands: unset VERSION && GOPROXY=off NO_DOCKER=1 make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/cli/Dockerfile.ci
+- dockerfile_path: Dockerfile.rhel
   inputs:
-    ocp_4.15_base:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.15:base
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
     ocp_builder_rhel-9-golang-1.20-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
-  to: oc-mirror
+  to: alibaba-machine-controllers
 promotion:
   disabled: true
   name: "4.16"
@@ -41,21 +41,30 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: make build
 tests:
-- as: sanity
-  commands: make sanity
-  container:
-    from: src
 - as: unit
-  commands: make test-unit
+  commands: NO_DOCKER=1 make test
   container:
     from: src
-- as: e2e
-  commands: make test-e2e
+- as: fmt
+  commands: NO_DOCKER=1 make fmt
   container:
     from: src
+- as: vet
+  commands: NO_DOCKER=1 make vet
+  container:
+    from: src
+- as: e2e-aws
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-serial
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
 zz_generated_metadata:
   branch: release-4.16
   org: openshift
-  repo: oc-mirror
+  repo: cluster-api-provider-alibaba
