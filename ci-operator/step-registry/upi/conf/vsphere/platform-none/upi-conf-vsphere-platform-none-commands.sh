@@ -11,6 +11,7 @@ PLATFORM_TYPE="none: {}"
 if [[ $PLATFORM_NAME != "none" ]]; then
   PLATFORM_TYPE="external:
     platformName: ${PLATFORM_NAME}
+    cloudControllerManager: External
   "
 fi
 
