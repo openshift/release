@@ -22,7 +22,7 @@ COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 
 PREPARED_CLUSTER=("cnfdu1" "cnfdu3")
 
 source $SHARED_DIR/main.env
-echo "==========  Running with mno_PARAM=$mno_PARAM =========="
+echo "==========  Running with SNO_PARAM=$SNO_PARAM =========="
 
 # Set environment for jobs to run
 INTERNAL=true
@@ -51,7 +51,7 @@ cat << EOF > $SHARED_DIR/bastion_inventory
 ${BASTION_IP} ansible_ssh_user=centos ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
 
-ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]} --topology  "
+ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]} --topology sno "
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
@@ -118,10 +118,10 @@ EOF
 
 fi
 echo "#############################################################################..."
-echo "========  Deploying plan  on cluster $CLUSTER_NAME $(if $BASTION_ENV; then echo "with a bastion"; fi)  ========"
+echo "========  Deploying plan SNO on cluster $CLUSTER_NAME $(if $BASTION_ENV; then echo "with a bastion"; fi)  ========"
 echo "#############################################################################..."
 
-WORK_DIR="/home/kni/ag-mno/${CLUSTER_NAME}-${T5CI_VERSION}-nightly"
+WORK_DIR="/home/kni/ag-sno/${CLUSTER_NAME}-${T5CI_VERSION}-nightly"
 # Start the deployment
 cat << EOF > ~/ocp-install.yml
 ---
@@ -137,24 +137,24 @@ cat << EOF > ~/ocp-install.yml
 
   - name: Remove previous log file
     file:
-      path: /tmp/${CLUSTER_NAME}_mno_ag.log
+      path: /tmp/${CLUSTER_NAME}_sno_ag.log
       state: absent
 
   - name: Run deployment
     shell: >-
-        ./scripts/mno_ag.py $mno_PARAM --host ${CLUSTER_NAME} --debug --wait
+        ./scripts/sno_ag.py $SNO_PARAM --host ${CLUSTER_NAME} --debug --wait
         --host-ip ${HYPERV_IP} --registry --reset-bmc
-        -L /tmp/${CLUSTER_NAME}_mno_ci.log 2>&1 > /tmp/${CLUSTER_NAME}_mno_ag.log
+        -L /tmp/${CLUSTER_NAME}_sno_ci.log 2>&1 > /tmp/${CLUSTER_NAME}_sno_ag.log
     args:
       chdir: /home/kni/telco5g-lab-deployment
     async: 5500
     poll: 0
-    register: mno_deploy
+    register: sno_deploy
     ignore_errors: true
 
   - name: Check on deployment
     async_status:
-        jid: "{{ mno_deploy.ansible_job_id }}"
+        jid: "{{ sno_deploy.ansible_job_id }}"
     register: job_result
     until: job_result.finished
     retries: 90
@@ -167,10 +167,10 @@ cat << EOF > ~/ocp-install.yml
       dest: "{{ item.dest }}"
       flat: yes
     loop:
-      - src: /tmp/${CLUSTER_NAME}_mno_ag.log
+      - src: /tmp/${CLUSTER_NAME}_sno_ag.log
         dest: ${ARTIFACT_DIR}/openshift-install.log
-      - src: /tmp/${CLUSTER_NAME}_mno_ci.log
-        dest: ${ARTIFACT_DIR}/-script.log
+      - src: /tmp/${CLUSTER_NAME}_sno_ci.log
+        dest: ${ARTIFACT_DIR}/sno-script.log
     ignore_errors: true
 
   - name: Set fact if deployment passed
@@ -181,10 +181,10 @@ cat << EOF > ~/ocp-install.yml
     set_fact:
       deploy_failed: true
     when:
-      - (job_result.failed | bool) or (_deploy.failed | bool)
+      - (job_result.failed | bool) or (sno_deploy.failed | bool)
 
   - name: Show last logs from cloud init if failed
-    shell: tail -100 /tmp/${CLUSTER_NAME}__ag.log
+    shell: tail -100 /tmp/${CLUSTER_NAME}_sno_ag.log
     when: deploy_failed | bool
     ignore_errors: true
 
@@ -196,7 +196,7 @@ cat << EOF > ~/ocp-install.yml
   - name: Fail if deployment failed
     fail:
       msg: Installation has failed
-    when: _deploy.failed | bool
+    when: sno_deploy.failed | bool
 
 EOF
 
