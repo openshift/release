@@ -23,7 +23,7 @@ done
 EOT
 
 oc patch Network.operator.openshift.io cluster --type='merge'   --patch '{"spec":{"migration":null}}'
-cno_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-60s}
+cno_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-120s}
 timeout "$cno_timeout" bash <<EOT
 until 
   ! oc get network -o yaml | grep migration > /dev/null
@@ -84,15 +84,30 @@ do
 done
 EOT
 
-# Check all cluster operators back to normal
+
+# Check all cluster operators back to normal. requires the main check on clusteroperator
+# status to succeed 3 times in a row with 30s pause in between checks
 all_co_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-2700s}
+# shellcheck disable=SC2034
+success_count=0
+
 timeout "$all_co_timeout" bash <<EOT
-until
-  oc wait co --all --for='condition=Available=True' --timeout=10s && \
-  oc wait co --all --for='condition=Progressing=False' --timeout=10s && \
-  oc wait co --all --for='condition=Degraded=False' --timeout=10s; 
-do
-  sleep 10 && echo "Some ClusterOperators Degraded=False,Progressing=True,or Available=False";
+until [ \$success_count -eq 3 ]; do
+  if oc wait co --all --for='condition=Available=True' --timeout=10s &&
+     oc wait co --all --for='condition=Progressing=False' --timeout=10s &&
+     oc wait co --all --for='condition=Degraded=False' --timeout=10s; then
+    echo "Check succeeded (\$success_count/3)"
+    ((success_count++))
+    if [ \$success_count -lt 3 ]; then
+      echo "Pausing for 30 seconds before the next check..."
+      sleep 30
+    fi
+  else
+    echo "Some ClusterOperators Degraded=False, Progressing=True, or Available=False"
+    success_count=0
+    sleep 10
+  fi
 done
+echo "All checks passed successfully 3 times in a row."
 EOT
 oc get co

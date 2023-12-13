@@ -25,9 +25,8 @@ function update_results ()
 # Log in with OSDFM token
 OCM_VERSION=$(ocm version)
 OSDFM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/fleetmanager-token")
-echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
 if [[ ! -z "${OSDFM_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with osdfm offline token"
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
   ocm login --url "${OCM_LOGIN_ENV}" --token "${OSDFM_TOKEN}"
   if [ $? -ne 0 ]; then
     echo "Login failed"
@@ -37,6 +36,79 @@ else
   echo "Cannot login! You need to specify the offline token OSDFM_TOKEN!"
   exit 1
 fi
+
+# add label with specified key/ value to a cluster of specified type and id
+function add_label () {
+  local key=$1
+  local value=$2
+  local cluster_type=$3
+  local cluster_id=$4
+  local failure_expected=$5
+  local sleep=$6
+
+  echo "Adding label with key: '$key', value: '$value', to cluster with id: '$cluster_id'"
+
+  echo '{"key":"'"${key}"'", "value":"'"${value}"'"}' | ocm post /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels || true
+
+  if [ "$failure_expected" = true ]; then
+    echo "Expecting label addition to fail. Not waiting before it will be applied"
+  else
+    echo "Waiting $sleep seconds for the label to be applied"
+    sleep "$sleep"
+  fi
+}
+
+# confirm count of labels on a cluster and key/value label match when count > 0
+function confirm_labels () {
+  local cluster_type=$1
+  local cluster_id=$2
+  local count=$3
+  local key=$4
+  local value=$5
+
+  echo "Confirming correct state of labels for cluster with id: '$cluster_id'"
+
+  LABELS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels)
+  LABELS_COUNT=$(echo "$LABELS_OUTPUT" | jq -r .total)
+  if [[ "$LABELS_COUNT" -gt "$count" ]]; then
+    echo "ERROR. Expected labels count for $cluster_type with $cluster_id to be $count. Got: $LABELS_COUNT"
+    TEST_PASSED=false
+  fi
+  if [ "$LABELS_COUNT" -gt 0 ]; then
+    echo "Attempting to find expected label with key: '$key' and value: '$value'"
+    KEY_MATCH=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels | grep -c "$key")
+    if [[ "$KEY_MATCH" -lt 1 ]]; then
+      echo "ERROR. Expected previously added label key: '$key' to be returned in labels, but none was found"
+      TEST_PASSED=false
+    fi
+    VALUE_MATCH=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels | grep -c "$value")
+    if [[ "$VALUE_MATCH" -lt 1 ]]; then
+      echo "ERROR. Expected previously added label value: '$value' to be returned in labels, but none was found"
+      TEST_PASSED=false
+    fi
+  fi
+}
+
+# remove all labels for particular cluster
+cleanup_labels () 
+{
+  local cluster_type=$1
+  local cluster_id=$2
+
+  echo "Removing all labels from cluster with id: '$cluster_id'"
+
+  LABELS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels)
+  LABELS_COUNT=$(echo "$LABELS_OUTPUT" | jq -r .total)
+  while [ "$LABELS_COUNT" -gt 0 ]
+  do
+    LABEL_ID=$(echo "$LABELS_OUTPUT" | jq -r .items[0].id)
+    echo "Removing label with id: '$LABEL_ID' for $cluster_type with id: '$cluster_id'"
+    ocm delete /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels/"$LABEL_ID"
+    sleep 15
+    LABELS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels)
+    LABELS_COUNT=$(echo "$LABELS_OUTPUT" | jq -r .total)
+  done
+}
 
 ###### proportional autoscaler tests (OCP-63511) ######
 ## NOTE - to be executed against a management cluster
@@ -218,7 +290,7 @@ function test_labels()
 {
   TEST_PASSED=true
   sc_cluster_id=$(cat "${SHARED_DIR}"/osd-fm-sc-id)
-  mc_cluster_id=$(cat "${ARTIFACT_DIR}"/osd-fm-mc-id)
+  mc_cluster_id=$(cat "${SHARED_DIR}"/osd-fm-mc-id)
 
   #Set up region
   OSDFM_REGION=${LEASED_RESOURCE}
@@ -236,22 +308,6 @@ function test_labels()
 
   INITIAL_SC_SECTOR=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters/"$sc_cluster_id" | jq -r .sector)
   echo "Service cluster: '$sc_cluster_id' sector: '$INITIAL_SC_SECTOR'"
-
-  # add label with specified key/ value to a cluster of specified type and id
-
-  function add_label () {
-    local key=$1
-    local value=$2
-    local cluster_type=$3
-    local cluster_id=$4
-
-    echo "Adding label with key: '$key', value: '$value', to cluster with id: '$cluster_id'"
-
-    echo '{"key":"'"${key}"'", "value":"'"${value}"'"}' | ocm post /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels
-
-    echo "Waiting 60 seconds for the label to be applied"
-    sleep 60
-  }
 
   # confirm that both mc and sc are in the desired sector
 
@@ -281,61 +337,8 @@ function test_labels()
     fi
   }
 
-  # confirm count of labels on a cluster and key/value label match when count > 0
-
-  function confirm_labels () {
-    local cluster_type=$1
-    local cluster_id=$2
-    local count=$3
-    local key=$4
-    local value=$5
-
-    echo "Confirming correct state of labels for cluster with id: '$cluster_id'"
-
-    LABELS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels)
-    LABELS_COUNT=$(echo "$LABELS_OUTPUT" | jq -r .total)
-    if [[ "$LABELS_COUNT" -gt "$count" ]]; then
-      echo "ERROR. Expected labels count for $cluster_type with $cluster_id to be $count. Got: $LABELS_COUNT"
-      TEST_PASSED=false
-    fi
-    if [ "$LABELS_COUNT" -gt 0 ]; then
-      echo "Attempting to find expected label with key: '$key' and value: '$value'"
-      KEY_MATCH=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels | grep -c "$key")
-      if [[ "$KEY_MATCH" -lt 1 ]]; then
-        echo "ERROR. Expected previously added label key: '$key' to be returned in labels, but none was found"
-        TEST_PASSED=false
-      fi
-      VALUE_MATCH=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels | grep -c "$value")
-      if [[ "$VALUE_MATCH" -lt 1 ]]; then
-        echo "ERROR. Expected previously added label value: '$value' to be returned in labels, but none was found"
-        TEST_PASSED=false
-      fi
-    fi
-  }
-
-  # remove all labels for particular cluster
-  cleanup_labels () 
-  {
-    local cluster_type=$1
-    local cluster_id=$2
-
-    echo "Removing all labels from cluster with id: '$cluster_id'"
-
-    LABELS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels)
-    LABELS_COUNT=$(echo "$LABELS_OUTPUT" | jq -r .total)
-    while [ "$LABELS_COUNT" -gt 0 ]
-    do
-      LABEL_ID=$(echo "$LABELS_OUTPUT" | jq -r .items[0].id)
-      echo "Removing label with id: '$LABEL_ID' for $cluster_type with id: '$cluster_id'"
-      ocm delete /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels/"$LABEL_ID"
-      sleep 15
-      LABELS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels)
-      LABELS_COUNT=$(echo "$LABELS_OUTPUT" | jq -r .total)
-    done
-  }
-
   # add label with correct key and value - sector should change
-  add_label "label-qetesting-test" "qetesting" "service_clusters" "$sc_cluster_id"
+  add_label "label-qetesting-test" "qetesting" "service_clusters" "$sc_cluster_id" false 60
 
   confirm_sectors "qetesting"
 
@@ -362,7 +365,7 @@ function test_labels()
   confirm_mc_count
 
   # add label again and confirm its presence and sector change
-  add_label "label-qetesting-test" "qetesting" "service_clusters" "$sc_cluster_id"
+  add_label "label-qetesting-test" "qetesting" "service_clusters" "$sc_cluster_id"  false 60
 
   confirm_sectors "qetesting"
 
@@ -373,7 +376,7 @@ function test_labels()
   confirm_labels "management_clusters" "$mc_cluster_id" 0 "" ""
 
   # sector should not change when adding a label with incorrect key
-  add_label "label-qetesting-wrong" "qetesting" "service_clusters" "$sc_cluster_id"
+  add_label "label-qetesting-wrong" "qetesting" "service_clusters" "$sc_cluster_id" false 60
 
   confirm_labels "service_clusters" "$sc_cluster_id" 2 "label-qetesting-wrong" "qetesting"
 
@@ -383,7 +386,7 @@ function test_labels()
   cleanup_labels "service_clusters" "$sc_cluster_id"
 
   # sector should not change when adding a label with incorrect value
-  add_label "label-qetesting-test" "qetesting-wrong" "service_clusters" "$sc_cluster_id"
+  add_label "label-qetesting-test" "qetesting-wrong" "service_clusters" "$sc_cluster_id" false 60
 
   confirm_labels "service_clusters" "$sc_cluster_id" 1 "label-qetesting-test" "qetesting-wrong"
 
@@ -855,8 +858,8 @@ function test_hypershift_crds_not_installed_on_sc () {
 
 function test_add_labels_to_sc_after_installing () {
   TEST_PASSED=true
-  sc_cluster_id=$(cat "${ARTIFACT_DIR}/ocm-sc-id")
-  mc_cluster_id=$(cat "${ARTIFACT_DIR}/ocm-mc-id")
+  sc_cluster_id=$(cat "${SHARED_DIR}/ocm-sc-id")
+  mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
   
   echo "Confirming that 'ext-hypershift.openshift.io/cluster-type' label is set to 'service-cluster' for SC with ID: $sc_cluster_id"
   EXPECTED_SC_LABEL="service-cluster"
@@ -1079,8 +1082,8 @@ function test_machineset_tains_and_labels () {
 
 function test_sts_mc_sc () {
   TEST_PASSED=true
-  mc_cluster_id=$(cat "${ARTIFACT_DIR}/ocm-mc-id")
-  sc_cluster_id=$(cat "${ARTIFACT_DIR}/ocm-sc-id")
+  mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
+  sc_cluster_id=$(cat "${SHARED_DIR}/ocm-sc-id")
 
   function check_sts_enabled () {
     cluster_type=$1
@@ -1184,7 +1187,7 @@ function test_backups_created_only_once () {
 function test_obo_machinesets () {
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
-  mc_cluster_id=$(cat "${ARTIFACT_DIR}/ocm-mc-id")
+  mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
 
   echo "Getting 'obo' machinepools names"
   OBO_MACHINE_POOLS_NAMES=$(ocm get /api/clusters_mgmt/v1/clusters/"$mc_cluster_id"/machine_pools | jq '.items[]' | jq 'select(.id | startswith("obo"))' | jq -r .id)
@@ -1314,6 +1317,85 @@ function test_awsendpointservices_status_output_populated () {
 
 ##################################################################
 
+###### HCP: Management cluster request-serving pool autoscaling (OCPQE-18303) ######
+
+function test_mc_request_serving_pool_autoscaling () {
+  TEST_PASSED=true
+  MP_COUNT=0
+  mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
+  fm_mc_cluster_id=$(cat "${SHARED_DIR}/osd-fm-mc-id")
+  function get_serving_mp_count () {
+    MP_COUNT=$(ocm get /api/clusters_mgmt/v1/clusters/"$mc_cluster_id"/machine_pools | jq -r .items[].id | grep serving | grep -v non-serving | sort -V | wc -l )
+  }
+
+  function confirm_mp_count () {
+    EXPECTED_COUNT=$1
+    echo "Confirming that the expected machine pools count is: $EXPECTED_COUNT"
+    if [ "$MP_COUNT" -ne "$EXPECTED_COUNT" ]; then
+      echo "ERROR. Expected mp count should be $EXPECTED_COUNT mps. Got: $MP_COUNT"
+      TEST_PASSED=false
+    fi
+  }
+
+  EXPECTED_MP_COUNT=11 # 10 initial + 1 for already created HC
+  MAXIMUM_MP_COUNT=64
+
+  echo "Getting serving machine pool count for MC with osd clusters mgmt ID: $mc_cluster_id"
+  
+  get_serving_mp_count
+
+  echo "Confirming mp count with one HC and no mp count buffer labels added"
+
+  confirm_mp_count "$EXPECTED_MP_COUNT"
+
+  confirm_labels "management_clusters" "$fm_mc_cluster_id" 0 "" ""
+
+  SERVING_MP_MINIMUM_WARMUP_KEY="serving-mp-min-warmup"
+  MGMT_CLUSTER_TYPE="management_clusters"
+
+  # label value cannot be negative
+  add_label "$SERVING_MP_MINIMUM_WARMUP_KEY" "-1" "$MGMT_CLUSTER_TYPE" "$fm_mc_cluster_id" true 0
+
+  confirm_labels "management_clusters" "$fm_mc_cluster_id" 0 "" ""
+
+  # label value cannot be empty
+  add_label "$SERVING_MP_MINIMUM_WARMUP_KEY" "" "$MGMT_CLUSTER_TYPE" "$fm_mc_cluster_id" true 0
+
+  confirm_labels "management_clusters" "$fm_mc_cluster_id" 0 "" ""
+
+  # label value cannot be decimal point number 
+  add_label "$SERVING_MP_MINIMUM_WARMUP_KEY" "0.1" "$MGMT_CLUSTER_TYPE" "$fm_mc_cluster_id" true 0
+
+  confirm_labels "management_clusters" "$fm_mc_cluster_id" 0 "" ""
+
+  # # add a label with correct key and value, mps should be scaled up to maximum count (64)
+  add_label "$SERVING_MP_MINIMUM_WARMUP_KEY" "100" "$MGMT_CLUSTER_TYPE" "$fm_mc_cluster_id" false 120
+
+  confirm_labels "management_clusters" "$fm_mc_cluster_id" 1 "$SERVING_MP_MINIMUM_WARMUP_KEY" "100"
+
+  get_serving_mp_count
+
+  confirm_mp_count "$MAXIMUM_MP_COUNT"
+
+  cleanup_labels "management_clusters" "$fm_mc_cluster_id"
+
+  function scale_down_mps () {
+    echo "Scaling down autoscaled machine pools"
+    for i in {12..64}
+    do
+      MP_NAME="serving-$i"
+      echo "scale down $MP_NAME machine pool"
+      ocm delete "/api/clusters_mgmt/v1/clusters/$mc_cluster_id/machine_pools/$MP_NAME" || true
+    done
+  }
+
+  scale_down_mps
+
+  update_results "OCPQE-18303" $TEST_PASSED
+}
+
+###### end of HCP: Management cluster request-serving pool autoscaling (OCPQE-18303) ######
+
 # Test all cases and print results
 
 test_monitoring_disabled
@@ -1354,6 +1436,8 @@ test_backups_created_only_once
 test_obo_machinesets
 
 test_awsendpointservices_status_output_populated
+
+test_mc_request_serving_pool_autoscaling
 
 printf "\nPassed tests:\n"
 for p in "${PASSED[@]}"; do

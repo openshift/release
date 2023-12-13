@@ -49,14 +49,18 @@ tests:
       CLUSTER_NAME_PREFIX: coexist
       CLUSTER1_CONFIG: platform=rosa;region=us-east-2;version=4.15;channel-group=candidate;compute-machine-type=m5.4xlarge;timeout=90m;replicas=6;fips=false;ocm-env=stage
       FIREWATCH_CONFIG: |
-        [
-          {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
-          {"step": "addon-install", "failure_type": "all", "classification": "Provisioning - Addons", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
-          {"step": "addon-tests-*", "failure_type": "all", "classification": "Addons tests", "jira_project": "RHODS", "jira_epic": "RHODS-10718"},
-          {"step": "cluster-install", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435", "group": {"name": "cluster-provision", "priority": 1}},
-          {"step": "cluster-uninstall", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435", "group": {"name": "cluster-provision", "priority": 2}},
-          {"job_success": true, "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-553"}
-        ]
+        {
+          "failure_rules":
+            [
+              {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_epic": "!default"},
+              {"step": "addon-install", "failure_type": "all", "classification": "Provisioning - Addons", "jira_epic": "!default"},
+              {"step": "addon-tests-*", "failure_type": "all", "classification": "Addons tests", "jira_project": "RHODS", "jira_epic": "RHODS-10718"},
+              {"step": "cluster-install", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_epic": "!default", "group": {"name": "cluster-provision", "priority": 1}},
+              {"step": "cluster-uninstall", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_epic": "!default", "group": {"name": "cluster-provision", "priority": 2}}
+            ],
+          "success_rules": [{"jira_epic": "MSINTEROP-553"}]
+        }
+      FIREWATCH_DEFAULT_JIRA_EPIC: MSINTEROP-435
       FIREWATCH_DEFAULT_JIRA_PROJECT: MSINTEROP
       FIREWATCH_JIRA_API_TOKEN_PATH: /tmp/secrets/jira/access_token_msi
       S3_BUCKET_NAME: openshift-cli-installer
