@@ -14,7 +14,8 @@ SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
-BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
+BASTION_IP="10.19.232.216"
+#BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
@@ -88,7 +89,7 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     retries: 15
     delay: 2
   - name: Discover cluster to run job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $ADDITIONAL_ARG
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $ADDITIONAL_ARG --cluster-name cnfdu12
     register: cluster
     environment:
       JOB_NAME: ${JOB_NAME:-'unknown'}
