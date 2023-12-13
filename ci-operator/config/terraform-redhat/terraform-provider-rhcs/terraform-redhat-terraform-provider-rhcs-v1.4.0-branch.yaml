@@ -4,10 +4,9 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.18
-promotion:
-  disabled: true
-  name: "4.14"
-  namespace: ocp
+images:
+- dockerfile_path: build/ci-tf-e2e.Dockerfile
+  to: rhcs-tf-e2e
 releases:
   latest:
     integration:
@@ -29,6 +28,7 @@ tests:
   container:
     from: src
 - as: rosa-sts-advanced-critical-high-presubmit
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
   steps:
     cluster_profile: aws-terraform-qe
     env:
@@ -41,6 +41,7 @@ tests:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
 - as: rosa-sts-private-critical-high-presubmit
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
   steps:
     cluster_profile: aws-terraform-qe
     env:
