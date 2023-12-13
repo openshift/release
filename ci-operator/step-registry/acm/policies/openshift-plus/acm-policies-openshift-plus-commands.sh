@@ -21,7 +21,9 @@ sleep 120
 # wait for policies to be compliant
 RETRIES=40
 for try in $(seq "${RETRIES}"); do
-  if [[ $(oc get policies -n policies) != *"NonCompliant"* ]]; then
+  results=$(oc get policies -n policies)
+  notready=$(echo "$results" | grep -E 'NonCompliant|Pending' || true)
+  if [ "$notready" == "" ]; then
     echo "OPP policyset is applied and compliant"
     break
   else

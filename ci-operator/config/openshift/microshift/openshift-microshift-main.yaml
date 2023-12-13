@@ -23,20 +23,20 @@ images:
 promotion:
   excluded_images:
   - microshift-test-rpm
-  name: "4.15"
+  name: "4.16"
   namespace: ocp
 releases:
   nightly-amd64:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.16"
   nightly-arm64:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -45,7 +45,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.15"
+  name: "4.16"
   namespace: ocp
 tests:
 - as: verify
@@ -148,7 +148,7 @@ tests:
     workflow: openshift-microshift-e2e-metal-tests
 - as: metal-periodic-test-arm
   cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
+  run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*)$
   steps:
     cluster_profile: aws
     env:
@@ -165,15 +165,6 @@ tests:
       MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly-arm
-  cluster: build02
-  cron: 0 1,13 * * *
-  steps:
-    cluster_profile: aws
-    env:
-      EC2_INSTANCE_TYPE: c6g.metal
-      MICROSHIFT_OS: rhel-9.3
-    workflow: openshift-microshift-e2e-metal-tests
-- as: ocp-metal-nightly-presubmit-arm
   cluster: build02
   cron: 0 1,13 * * *
   steps:
