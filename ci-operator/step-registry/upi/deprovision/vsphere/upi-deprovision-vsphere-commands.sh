@@ -23,6 +23,9 @@ declare cloud_where_run
 declare target_hw_version
 source "${SHARED_DIR}/vsphere_context.sh"
 
+target_hw_version="${target_hw_version:-unknown}"
+cloud_where_run="${cloud_where_run:-unknown}"
+
 echo Deprovisioning $cluster_name
 
 echo "$(date -u --rfc-3339=seconds) - Collecting vCenter performance data and alerts"
