@@ -65,7 +65,7 @@ if [[ "${PLATFORM}" == "aws" ]]; then
      --infra-id ${INFRA_ID} \
      --region ${HYPERSHIFT_AWS_REGION} \
      --base-domain ${DOMAIN} \
-     --cluster-grace-period 40m
+     --cluster-grace-period 10m
    if [ $? == 0 ]; then
      break
    else
