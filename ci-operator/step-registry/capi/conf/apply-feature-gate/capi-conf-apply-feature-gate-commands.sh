@@ -46,7 +46,6 @@ export -f waitForRunningPod
 
 function ClusterCAPIOperatorPodsCreated() {
   waitForRunningPod "cluster-capi-operator" "Waiting for cluster-capi-operator creation"
-  waitForRunningPod "capi-operator-controller-manager" "Waiting for capi-operator-controller-manager creation"
   waitForRunningPod "capi-controller-manager" "Waiting for capi-controller-manager creation"
 }
 export -f ClusterCAPIOperatorPodsCreated
