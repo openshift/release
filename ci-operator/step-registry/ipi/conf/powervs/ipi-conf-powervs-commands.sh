@@ -242,3 +242,11 @@ pullSecret: >
 sshKey: |
   $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 EOF
+
+echo "OPTIONAL_INSTALL_CONFIG_PARMS=\"${OPTIONAL_INSTALL_CONFIG_PARMS}\""
+read -ra PARAMETERS <<< "${OPTIONAL_INSTALL_CONFIG_PARMS}"
+echo "count = ${#PARAMETERS[*]}"
+for PARAMETER in "${PARAMETERS[@]}"; do
+  echo "Removing ${PARAMETER}"
+  sed -i '/'${PARAMETER}':/d' "${CONFIG}"
+done
