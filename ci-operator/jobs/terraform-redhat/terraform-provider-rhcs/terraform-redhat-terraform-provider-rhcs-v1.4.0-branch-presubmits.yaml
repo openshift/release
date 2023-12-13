@@ -6,6 +6,61 @@ presubmits:
     - ^v1\.4\.0-branch$
     - ^v1\.4\.0-branch-
     cluster: build03
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-v1.4.0-branch-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^v1\.4\.0-branch$
+    - ^v1\.4\.0-branch-
+    cluster: build03
     context: ci/prow/rosa-sts-advanced-critical-high-presubmit
     decorate: true
     decoration_config:
@@ -17,6 +72,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-terraform-redhat-terraform-provider-rhcs-v1.4.0-branch-rosa-sts-advanced-critical-high-presubmit
     rerun_command: /test rosa-sts-advanced-critical-high-presubmit
+    skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
     spec:
       containers:
       - args:
@@ -81,7 +137,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )rosa-sts-advanced-critical-high-presubmit,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^v1\.4\.0-branch$
     - ^v1\.4\.0-branch-
@@ -97,6 +153,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-terraform-redhat-terraform-provider-rhcs-v1.4.0-branch-rosa-sts-private-critical-high-presubmit
     rerun_command: /test rosa-sts-private-critical-high-presubmit
+    skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
     spec:
       containers:
       - args:
