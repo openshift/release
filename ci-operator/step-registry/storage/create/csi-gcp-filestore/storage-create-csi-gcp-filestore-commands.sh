@@ -78,12 +78,13 @@ DriverInfo:
     multiplePVsSameID: true
 # Values take from https://github.com/kubernetes-sigs/gcp-filestore-csi-driver/blob/fa2463561c2f19e253a30d172e067e2f8628fa88/test/k8s-integration/driver-config.go#L32-L41
 Timeouts:
-  PodStart: 15m
-  ClaimProvision: 15m
-  PVCreate: 15m
-  PVDelete: 15m
-  DataSourceProvision: 15m
-  SnapshotCreate: 15m
+  PodStart: 25m
+  PodStartSlow: 30m
+  ClaimProvision: 25m
+  PVCreate: 25m
+  PVDelete: 25m
+  DataSourceProvision: 25m
+  SnapshotCreate: 25m
 EOF
 
 echo "Using manifest file ${MANIFEST_LOCATION}"
