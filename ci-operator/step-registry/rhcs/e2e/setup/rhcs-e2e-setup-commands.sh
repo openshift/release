@@ -71,7 +71,7 @@ ginkgo run \
 
 # tar the shared manifest dir to make it share between pods
 cd ${SHARED_DIR}
-find ./tf-manifests -name 'terraform.tfstate*' -print0 |tar --null -T - -zcvf statefiles.tar.gz
+find ./tf-manifests -name 'terraform.[tfstate|tfvars]*' -print0|tar --null -T - -zcvf statefiles.tar.gz
 ls ${SHARED_DIR}
 cd -
 
