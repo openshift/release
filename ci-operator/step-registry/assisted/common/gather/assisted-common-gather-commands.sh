@@ -142,7 +142,7 @@ cat > gather_logs.yaml <<-EOF
     - name: Collect and download logs from all hosts
       block:
       - name: Download log files
-        ansible.builtin.synchronize:
+        ansible.posix.synchronize:
           src: "{{ LOGS_DIR }}/"
           dest: "{{ lookup('env', 'ARTIFACT_DIR') }}"
           mode: pull
