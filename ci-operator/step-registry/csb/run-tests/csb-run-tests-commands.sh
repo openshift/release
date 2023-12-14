@@ -230,6 +230,8 @@ function cleanup_secrets() {
   oc delete configmap mvn-settings -n "${1}" --wait=true || true
   oc delete configmap credentials -n "${1}" --wait=true || true
   oc delete configmap test-properties -n "${1}" --wait=true || true
+  oc delete persistentvolume/persistent-csb-1 --wait=true || true
+  oc delete persistentvolumeclaim/persistent-tnb-tests --wait=true || true
 }
 
 trap 'cleanup_secrets csb-interop' SIGINT SIGTERM ERR EXIT
