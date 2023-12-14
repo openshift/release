@@ -1,0 +1,25 @@
+chain:
+  as: cucushift-installer-rehearse-azure-ipi-fullyprivate-internal-registry-provision
+  steps:
+  - ref: azure-provision-resourcegroup
+  - ref: azure-provision-vnet
+  - ref: azure-provision-nat
+  - chain: azure-provision-bastionhost
+  - ref: proxy-config-generate
+  - chain: ipi-conf-azure
+  - ref: ipi-conf-azure-provisionednetwork
+  - ref: ipi-conf-azure-internal-image-registry
+  - chain: ipi-install
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - chain: cucushift-installer-check-azure-fullyprivate
+  env:
+  - name: OUTBOUND_TYPE
+    default:  "UserDefinedRouting"
+  - name: OUTBOUND_UDR_TYPE
+    default:  "NAT"
+    documentation: "The outbound type of networking provisioned"
+  - name: PUBLISH
+    default:  "Internal"
+  documentation: |-
+    Running a fully private cluster with private endpoint for image registry storage account
