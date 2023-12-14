@@ -1,0 +1,80 @@
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  annotations:
+    machine.openshift.io/GPU: "0"
+    machine.openshift.io/cluster-api-autoscaler-node-group-max-size: "40"
+    machine.openshift.io/cluster-api-autoscaler-node-group-min-size: "0"
+    machine.openshift.io/memoryMb: "32768"
+    machine.openshift.io/vCPU: "16"
+  labels:
+    machine.openshift.io/cluster-api-cluster: build0-gstfj
+  name: build0-gstfj-ci-tests-worker-c
+  namespace: openshift-machine-api
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build0-gstfj
+      machine.openshift.io/cluster-api-machineset: build0-gstfj-ci-tests-worker-c
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build0-gstfj
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build0-gstfj-ci-tests-worker-c
+    spec:
+      metadata:
+        labels:
+          ci-workload: tests
+      providerSpec:
+        value:
+          apiVersion: gcpprovider.openshift.io/v1beta1
+          canIPForward: false
+          credentialsSecret:
+            name: gcp-cloud-credentials
+          deletionProtection: false
+          disks:
+          - autoDelete: true
+            boot: true
+            image: projects/rhcos-cloud/global/images/rhcos-46-82-202011260640-0-gcp-x86-64
+            sizeGb: 700
+            type: pd-balanced
+          kind: GCPMachineProviderSpec
+          machineType: e2-custom-16-32768
+          metadata:
+            creationTimestamp: null
+          networkInterfaces:
+          - network: build0-gstfj-network
+            publicIP: true
+            subnetwork: build0-gstfj-worker-subnet
+          projectID: openshift-ci-build-farm
+          region: us-east1
+          serviceAccounts:
+          - email: build0-gstfj-w@openshift-ci-build-farm.iam.gserviceaccount.com
+            scopes:
+            - https://www.googleapis.com/auth/cloud-platform
+          tags:
+          - build0-gstfj-worker
+          - ci-cluster-build02
+          - ci-workload-tests
+          userDataSecret:
+            name: worker-user-data-ignv3
+          zone: us-east1-c
+      taints:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-tests-worker
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  annotations:
+  name: build0-gstfj-ci-tests-worker-c
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 40
+  minReplicas: 0
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: build0-gstfj-ci-tests-worker-c
