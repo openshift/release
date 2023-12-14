@@ -1,0 +1,36 @@
+binary_build_commands: make controller
+build_root:
+  from_repository: true
+canonical_go_repository: sigs.k8s.io/aws-load-balancer-controller
+images:
+- dockerfile_path: Dockerfile.openshift
+  to: aws-load-balancer-controller
+promotion:
+  namespace: aws-load-balancer-operator
+  tag: "1.1"
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: go test -race ./pkg/... ./webhooks/...
+  container:
+    from: src
+zz_generated_metadata:
+  branch: openshift-rel-1.1
+  org: openshift
+  repo: aws-load-balancer-controller
