@@ -49,14 +49,23 @@ function check_signed() {
 }
 
 function mirror_image(){
-    local target_version cmd
+    local target_version cmd mirror_options
     local apply_sig_together="$1"
 
     target_version=$(oc adm release info "${TARGET}" --output=json | jq .metadata.version)
    
     echo "Mirroring ${target_version} (${TARGET}) to ${MIRROR_RELEASE_IMAGE_REPO}"
 
-    cmd="oc adm release mirror -a ${PULL_SECRET} --insecure=true --from=${TARGET} --to=${MIRROR_RELEASE_IMAGE_REPO}"
+    mirror_options="--insecure=true"
+    # check whether the oc command supports the --keep-manifest-list and add it to the args array.
+    if oc adm release mirror -h | grep -q -- --keep-manifest-list; then
+        echo "Adding --keep-manifest-list to the mirror command."
+        mirror_options="${mirror_options} --keep-manifest-list=true"
+    else
+        echo "This oc version does not support --keep-manifest-list, skip it."
+    fi
+
+    cmd="oc adm release mirror -a ${PULL_SECRET} ${mirror_options} --from=${TARGET} --to=${MIRROR_RELEASE_IMAGE_REPO}"
     if [[ "${APPLY_SIG}" == "true" ]]; then
         cmd="${cmd} --release-image-signature-to-dir=${SAVE_SIG_TO_DIR}"
         if [[ "${apply_sig_together=}" == "true" ]]; then
