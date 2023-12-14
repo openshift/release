@@ -568,11 +568,25 @@ tests:
       WORKER_MEMORY: "32768"
       WORKER_REPLICAS: "0"
     workflow: openshift-e2e-libvirt
-- as: ocp-e2e-ovn-ppc64le-powervs-per
+- as: ocp-e2e-ovn-ppc64le-powervs-siguid-per
   cluster: build01
-  cron: 0 0,6,12,18 * * *
+  cron: 0 0,12 * * *
   steps:
-    cluster_profile: powervs-3
+    cluster_profile: powervs-4
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.16"
+      INSTALLER: powervs
+      OPTIONAL_INSTALL_CONFIG_PARMS: serviceInstanceGUID
+      TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-powervs-ipi
+- as: ocp-e2e-ovn-ppc64le-powervs-original-per
+  cluster: build01
+  cron: 0 6,18 * * *
+  steps:
+    cluster_profile: powervs-4
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
     env:
