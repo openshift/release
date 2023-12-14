@@ -7,20 +7,21 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.16
-binary_build_commands: make build
 build_root:
   from_repository: true
-canonical_go_repository: sigs.k8s.io/cluster-api-provider-openstack
+canonical_go_repository: github.com/openshift/alibaba-disk-csi-driver-operator
 images:
-- dockerfile_path: Dockerfile.rhel
-  inputs:
+- inputs:
     ocp_4.16_base:
       as:
       - registry.ci.openshift.org/ocp/4.16:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
-  to: openstack-cluster-api-controllers
+  to: alibaba-disk-csi-driver-operator
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: alibaba-disk-csi-driver-operator-test
 promotion:
   name: 4.16-priv
   namespace: ocp-private
@@ -36,38 +37,30 @@ releases:
       namespace: ocp-private
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
 - as: verify
-  commands: make XDG_DATA_HOME=/tmp/data XDG_CACHE_HOME=/tmp/cache verify-modules
-    verify-gen verify-vendoring
+  commands: make verify
   container:
     from: src
-- as: test
-  commands: make KUBEBUILDER_ASSETS_DIR=/tmp/data test
-  container:
-    from: src
-- as: test-openshift
-  commands: make -C openshift XDG_DATA_HOME=/tmp/data XDG_CACHE_HOME=/tmp/cache KUBEBUILDER_ASSETS_DIR=/tmp/data
-    verify test
-  container:
-    from: src
-- as: e2e-techpreview
+- as: e2e-alibabacloud-disk-csi
+  optional: true
   steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
+    cluster_profile: alibabacloud
+    workflow: openshift-e2e-alibabacloud-disk-csi
+- as: verify-deps
+  steps:
     test:
-    - as: test
-      commands: make -C openshift e2e
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: openshift-e2e-openstack-ipi
+    - ref: go-verify-deps
 zz_generated_metadata:
-  branch: main
+  branch: master
   org: openshift-priv
-  repo: cluster-api-provider-openstack
+  repo: alibaba-disk-csi-driver-operator
