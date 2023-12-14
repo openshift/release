@@ -82,15 +82,17 @@ function rosa_upgrade()
   echo "######################################################################"
   rosa describe cluster -c $CLUSTER_ID --region $REGION
   echo "######################################################################"
-  rosa list upgrade -c $CLUSTER_ID --region $REGION
-  echo "######################################################################"
+  echo
 
-  RECOMMEND_VERSION=`rosa list upgrade -c $CLUSTER_ID --region $REGION | grep recommended | awk '{print $1}'`
+  RECOMMEND_VERSION=`! rosa list upgrade -c $CLUSTER_ID --region $REGION | grep recommended || rosa list upgrade -c $CLUSTER_ID --region $REGION | grep recommended | awk '{print $1}'`
 
   #prior to use RECOMMEND_VERSION
   if [[ -z $RECOMMEND_VERSION ]];then
 	 export UPGRADE_TO_VERSION=$TARGET_RELEASES
   else
+         echo "######################################################################"
+         rosa list upgrade -c $CLUSTER_ID --region $REGION
+         echo "######################################################################"
 	 export UPGRADE_TO_VERSION=$RECOMMEND_VERSION
   fi
 
