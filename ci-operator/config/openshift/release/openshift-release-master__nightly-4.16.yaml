@@ -1,4 +1,8 @@
 base_images:
+  alibaba-disk-csi-driver-operator-test:
+    name: "4.16"
+    namespace: ocp
+    tag: alibaba-disk-csi-driver-operator-test
   ansible:
     name: "4.16"
     namespace: ocp
@@ -779,6 +783,31 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-ptp
+- as: e2e-alibaba-ovn
+  cron: '@weekly'
+  steps:
+    cluster_profile: alibabacloud
+    env:
+      BASE_DOMAIN: alicloud-dev.devcluster.openshift.com
+      TEST_SKIPS: \[StatefulSetBasic\] should not deadlock when a pod.s predecessor
+        fails\|\[StatefulSetBasic\] should perform rolling updates and roll backs
+        of template modifications with PVCs\|\[StatefulSetBasic\] should provide basic
+        identity\|\[StatefulSetBasic\] should adopt matching orphans and release non-matching
+        pods\|PVC Protection
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-alibabacloud
+- as: e2e-alibaba-csi
+  interval: 168h
+  steps:
+    cluster_profile: alibabacloud
+    env:
+      BASE_DOMAIN: alicloud-dev.devcluster.openshift.com
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-alibabacloud-disk-csi
 - as: e2e-ibmcloud-csi
   interval: 168h
   steps:
