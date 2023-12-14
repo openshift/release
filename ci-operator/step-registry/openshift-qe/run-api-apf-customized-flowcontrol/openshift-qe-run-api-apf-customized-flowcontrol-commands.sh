@@ -247,9 +247,9 @@ function check_no_errors() {
 
 function check_errors() {
   # validate that there are errors after the scaling process
-  echo -e "\n======Verify that the API Servers never went down======"
-  oc get pods -n openshift-kube-apiserver
-  oc get pods -n openshift-apiserver
+  # echo -e "\n======Verify that the API Servers never went down======"
+  # oc get pods -n openshift-kube-apiserver
+  # oc get pods -n openshift-apiserver
 
   echo -e "\nChecking that there are errors after scaling traffic."
   dropped_requests=$(oc get --raw /debug/api_priority_and_fairness/dump_priority_levels | grep restrict-pod-lister | cut -d',' -f8 | tr -d ' ')
@@ -288,7 +288,7 @@ scale_traffic
 
 echo -e "Sleeping for 15 minutes to let pods sending traffic to be ready."
 
-sleep 600
+sleep 300
 
 # wait until all podlister pods are up to send all traffic
 
