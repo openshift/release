@@ -1,0 +1,82 @@
+base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.15"
+  ocp_4.16_base-rhel9:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.16
+binary_build_commands: make cloud-controller-manager
+build_root:
+  from_repository: true
+canonical_go_repository: k8s.io/cloud-provider-alibaba-cloud
+images:
+- dockerfile_path: openshift-hack/images/Dockerfile.openshift
+  inputs:
+    ocp_4.16_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
+  to: alibaba-cloud-controller-manager
+promotion:
+  name: 4.16-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.16-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.16-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  lint:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 2000m
+      memory: 4Gi
+tests:
+- as: fmt
+  commands: make gofmt
+  container:
+    from: src
+- as: lint
+  commands: GOLANGCI_LINT_CACHE=/tmp/.cache GOFLAGS="-mod=mod" make golint
+  container:
+    from: src
+- as: unit
+  commands: make unit-test
+  container:
+    from: src
+- as: e2e-alibabacloud
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: alibabacloud
+    workflow: openshift-e2e-alibabacloud
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
+  container:
+    from: commitchecker
+  optional: true
+zz_generated_metadata:
+  branch: master
+  org: openshift-priv
+  repo: cloud-provider-alibaba-cloud
