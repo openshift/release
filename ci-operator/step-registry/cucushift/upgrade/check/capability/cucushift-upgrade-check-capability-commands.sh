@@ -68,10 +68,10 @@ function get_caps_for_version_capset() {
     caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry"
     ;;
     "v4.15")
-    caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager"
+    caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager CloudCredential"
     ;;
     *)
-    caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager"
+    caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager CloudCredential"
     ;;
     esac
 
@@ -267,6 +267,7 @@ caps_operator[NodeTuning]="node-tuning"
 caps_operator[MachineAPI]="machine-api control-plane-machine-set cluster-autoscaler"
 caps_operator[ImageRegistry]="image-registry"
 caps_operator[OperatorLifecycleManager]="operator-lifecycle-manager operator-lifecycle-manager-catalog operator-lifecycle-manager-packageserver"
+caps_operator[CloudCredential]="cloud-credential"
 
 # Mapping between optional capability and resources
 # Need update when new resource marks as optional

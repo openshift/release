@@ -1,0 +1,19 @@
+# https://github.com/openshift/enhancements/blob/master/enhancements/dns/configurable-dns-pod-placement.md#proposal
+# dns-default-* pods do not tolerate all taints. This means our infra nodes and nodes tainted to support
+# pod classes are not getting these pods scheduled onto them.
+# This seemed to lead to https://bugzilla.redhat.com/show_bug.cgi?id=2086887 .
+apiVersion: operator.openshift.io/v1
+kind: DNS
+metadata:
+  name: default
+spec:
+  logLevel: Normal
+  nodePlacement:
+    tolerations:
+    - operator: Exists
+  operatorLogLevel: Normal
+  upstreamResolvers:
+    policy: Sequential
+    upstreams:
+      - port: 53
+        type: SystemResolvConf

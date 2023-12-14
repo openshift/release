@@ -11,10 +11,10 @@ build_root:
     tag: golang-1.19
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.15"
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -28,13 +28,31 @@ resources:
       memory: 5Gi
 tests:
 - as: platform-none-vsphere
-  cron: 0 0 * * 1
+  cron: 0 0 * * 3
   steps:
     cluster_profile: vsphere-2
     env:
       OPCT_DEV_EXTRA_CMD: --plugins-image=openshift-tests-provider-cert:devel
     workflow: opct-test-platform-none-vsphere
   timeout: 6h0m0s
+- as: platform-external-vsphere
+  cron: 0 0 * * 3
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      OPCT_DEV_EXTRA_CMD: --plugins-image=openshift-tests-provider-cert:devel
+      PLATFORM_NAME: vsphere
+    workflow: opct-test-platform-external-vsphere
+  timeout: 6h0m0s
+- as: platform-none-vsphere-upgrade
+  cron: 0 0 * * 3
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      OPCT_RUN_MODE: upgrade
+      UPGRADE_TO_CHANNEL_TYPE: candidate
+    workflow: opct-test-platform-none-vsphere
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-openshift-ecosystem
