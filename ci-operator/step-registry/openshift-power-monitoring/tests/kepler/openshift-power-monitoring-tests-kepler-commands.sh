@@ -6,6 +6,8 @@ declare -r LOGS_DIR="/$ARTIFACT_DIR/test-run-logs"
 declare -r OPERATOR_DEPLOY_NAME="kepler-operator-controller"
 declare -r OPERATORS_NS="openshift-operators"
 
+declare KEPLER_DEPLOYMENT_NS="${KEPLER_DEPLOYMENT_NS:-kepler-operator}"
+
 validate_install() {
 	echo "Validating Operator Install"
 
@@ -44,7 +46,7 @@ main() {
 	echo "Running e2e tests"
 
 	log_events "$OPERATORS_NS" &
-	log_events "openshift-kepler-operator" &
+	log_events "$KEPLER_DEPLOYMENT_NS" &
 
 	local ret=0
 
@@ -55,11 +57,12 @@ main() {
 	wait
 	sleep 1
 
-	if [[ "$ret" -ne 0 ]]; then
+	[[ "$ret" -ne 0 ]] && {
 		must_gather
 		echo "e2e tests failed"
-		return 1
-	fi
+		return $ret
+	}
 	echo "e2e tests passed"
+	return $ret
 }
 main "$@"
