@@ -49,8 +49,17 @@ oc registry login
 registry_cred="cXVheTpwYXNzd29yZA=="
 jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
 
+mirror_options="--insecure=true"
+# check whether the oc command supports the --keep-manifest-list and add it to the args array.
+if oc adm release mirror -h | grep -q -- --keep-manifest-list; then
+    echo "Adding --keep-manifest-list to the mirror command."
+    mirror_options="${mirror_options} --keep-manifest-list=true"
+else
+    echo "This oc version does not support --keep-manifest-list, skip it."
+fi
+
 # MIRROR IMAGES
-oc adm release -a "${new_pull_secret}" mirror --insecure=true \
+oc adm release -a "${new_pull_secret}" mirror ${mirror_options} \
  --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} \
  --to=${target_release_image_repo} \
  --to-release-image=${target_release_image} | tee "${mirror_output}"
