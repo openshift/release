@@ -16,9 +16,13 @@ declare vsphere_datacenter
 declare vsphere_datastore
 declare vsphere_url
 declare vsphere_cluster
+declare GOVC_USERNAME
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+
+echo "${GOVC_USERNAME}"
+
 
 declare -a vips
 mapfile -t vips < "${SHARED_DIR}/vips.txt"
