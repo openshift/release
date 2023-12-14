@@ -248,7 +248,7 @@ function check_no_errors() {
 function check_errors() {
   # validate that there are errors after the scaling process
   echo -e "\n======Verify that the API Servers never went down======"
-  oc get pods -n openshift-kube-apiserver | grep "kube-apiserver-ip"
+  oc get pods -n openshift-kube-apiserver
   oc get pods -n openshift-apiserver
 
   echo -e "\nChecking that there are errors after scaling traffic."
