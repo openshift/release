@@ -223,7 +223,7 @@ function install_required_tools() {
   export HOME=/tmp
 
   if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.20.0/IBM_Cloud_CLI_2.20.0_amd64.tar.gz
+    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.21.1/IBM_Cloud_CLI_2.21.1_amd64.tar.gz
     tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
 
     if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]; then
