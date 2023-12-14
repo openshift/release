@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# TODO: Remove once OpenShift CI supports it out of the box (see https://access.redhat.com/articles/4859371)
+fix_uid.sh
+
 echo "************ assisted common gather command ************"
 
 cat > gather_logs.yaml <<-EOF
