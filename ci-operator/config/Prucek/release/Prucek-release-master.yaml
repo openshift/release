@@ -1,0 +1,51 @@
+base_images:
+  machine-os-content:
+    name: "4.13"
+    namespace: ocp
+    tag: machine-os-content
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+releases:
+  initial:
+    release:
+      channel: candidate
+      version: "4.13"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: core-valid
+  commands: make check-core
+  container:
+    from: src
+- as: services-valid
+  commands: make check-services
+  container:
+    from: src
+- as: e2e-aws-sdn-upgrade
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-sdn
+zz_generated_metadata:
+  branch: master
+  org: Prucek
+  repo: release
