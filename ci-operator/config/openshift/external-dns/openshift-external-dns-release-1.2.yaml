@@ -1,7 +1,23 @@
+base_images:
+  ocp_4.12_base:
+    name: "4.12"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.12
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.openshift
+  inputs:
+    ocp_4.12_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.12:base
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: external-dns
 promotion:
   namespace: external-dns-operator
