@@ -28,7 +28,7 @@ Testing with released Jaeger Operator version with unreleased OpenShift version:
 1. Build the Jaeger tests assert image used for the E2E tests.
 2. Build the containerized Jaeger tests executor image.
 3. Provision a OpenShift cluster on AWS.
-4. Install the Jager, Elasticsearch, AMQ streams, OpenTelemetry and Tempo operators.
+4. Install the Jager, Elasticsearch, AMQ streams and OpenTelemetry.
 5. Run the Jaeger Operator tests.
 6. Gather the results.
 7. Deprovision the cluster.
@@ -41,7 +41,7 @@ Testing with unreleased Jaeger operator with supported OpenShift versiosn and co
 4. Build the Jaeger Operator bundle.
 5. Provision a OpenShift cluster on AWS.
 6. Install the Jaeger Operator bundle built in the previous step.
-7. Install the Elasticsearch, AMQ streams, OpenTelemetry and Tempo operators.
+7. Install the Elasticsearch, AMQ streams and OpenTelemetry.
 8. Run the Jaeger Operator tests.
 9. Gather the results.
 10. Deprovision the cluster. 
@@ -57,9 +57,8 @@ Following the test cluster being provisioned, the following steps are executed:
 1. [`operatorhub-subscribe-elasticsearch-operator-ref`](../../../step-registry/operatorhub/subscribe/elasticsearch-operator/README.md)
 2. [`operatorhub-subscribe-amq-streams-ref`](../../../step-registry/operatorhub/subscribe/amq-streams/README.md)
 3. [`distributed-tracing-install-opentelemetry-product-ref`](../../../step-registry/distributed-tracing/install/opentelemetry-product/README.md)
-4. [`distributed-tracing-install-tempo-product-ref`](../../../step-registry/distributed-tracing/install/tempo-product/README.md)
-5. [`distributed-tracing-install-jaeger-product-ref`](../../../step-registry/distributed-tracing/install/jaeger-product/README.md)
-6. [`distributed-tracing-tests-jaeger-ref`](../../../step-registry/distributed-tracing/tests/jaeger/README.md)
+4. [`distributed-tracing-install-jaeger-product-ref`](../../../step-registry/distributed-tracing/install/jaeger-product/README.md)
+5. [`distributed-tracing-tests-jaeger-ref`](../../../step-registry/distributed-tracing/tests/jaeger/README.md)
 
 ## Prerequisite(s)
 

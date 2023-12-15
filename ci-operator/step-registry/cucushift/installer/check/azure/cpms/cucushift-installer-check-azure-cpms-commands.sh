@@ -86,18 +86,36 @@ fi
 
 check_result=0
 echo "Check CPMS failureDomain contains expected plaform and zone setting"
-echo -e "expected_platform: ${expected_platform}\nexpected_zones: ${expected_zones}"
+echo -e "ocp_minor_version:${ocp_minor_version}\nregion:${REGION}\nexpected_platform: ${expected_platform}\nexpected_zones: ${expected_zones}"
 #check platform
+echo "cpms spec:"
+oc get controlplanemachineset cluster -n openshift-machine-api -ojson | jq -r '.spec.template."machines_v1beta1_machine_openshift_io"'
 platform_value=$(oc get controlplanemachineset cluster -n openshift-machine-api -ojson | jq -r '.spec.template."machines_v1beta1_machine_openshift_io".failureDomains.platform')
-if [[ "${platform_value}" != "${expected_platform}" ]]; then
-    echo "ERROR: the platform in CPMS failureDomain is ${platform_value}, which does not match expected value, unexpected!"
-    check_result=1
+if [[ "${platform_value}" != "null" ]]; then
+    if [[ "${platform_value}" == "${expected_platform}" ]]; then
+        echo "INFO: the platform in CPMS failureDomain is set as expected!"
+    else
+        echo "ERROR: the platform in CPMS failureDomain is ${platform_value}, which does not match expected value, unexpected!"
+        check_result=1
+    fi
 else
-    echo "INFO: the platform in CPMS failureDomain is set as expected!"
+    # On 4.15+, no failureDomain object is set when installing on singel zone or region without avaiable zone support.
+    if (( ${ocp_minor_version} > 14 )); then
+        failure_domain_value=$(oc get controlplanemachineset cluster -n openshift-machine-api -ojson | jq -r '.spec.template."machines_v1beta1_machine_openshift_io".failureDomains')
+        if [[ "${failure_domain_value}" == "null" ]] && [[ -z "${expected_platform}" ]]; then
+            echo "INFO: detect single zone or region without avaiable zone support on 4.15+, get expected behavior that no failureDomain object is set in cpms spec!"
+        else
+            echo "ERROR: detect single zone or region without avaiable zone support on 4.15+, failureDomain is still set in cpms spec, unexpected!"
+            check_result=1
+        fi
+    else
+        echo "ERROR: Not found field platform in cpms spec, unexpected!"
+        check_result=1
+    fi
 fi
 
 #check zones
-if [[ "${platform_value}" != "" ]]; then
+if [[ "${platform_value}" != "" ]] && [[ "${platform_value}" != "null" ]]; then
     zones_value=$(oc get controlplanemachineset cluster -n openshift-machine-api -oyaml | yq-go r - "spec.template.machines_v1beta1_machine_openshift_io.failureDomains.azure[*].zone" | sort -u | xargs)
     [[ "${expected_zones}" != "" ]] && expected_zones=$(echo ${expected_zones} | xargs -n1 | sort -u | xargs)
     if [[ "${zones_value}" != "${expected_zones}" ]]; then

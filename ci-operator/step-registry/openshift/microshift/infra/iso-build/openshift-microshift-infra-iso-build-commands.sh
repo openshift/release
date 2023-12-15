@@ -2,8 +2,8 @@
 set -xeuo pipefail
 export PS4='+ $(date "+%T.%N") \011'
 
-IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
-HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
+IP_ADDRESS="$(cat "${SHARED_DIR}/public_address")"
+HOST_USER="$(cat "${SHARED_DIR}/ssh_user")"
 INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
 
 echo "Using Host $IP_ADDRESS"
@@ -42,10 +42,42 @@ chmod 0400 ~/.ssh/id_rsa*
 export PULL_SECRET="\${HOME}/.pull-secret.json"
 cp /tmp/pull-secret "\${PULL_SECRET}"
 
+# Set up the AWS CLI keys at the expected location for accessing the cached data.
+# Also, set the environment variables for using the profile and bucket.
+if [ -e /tmp/aws_access_key_id ] && [ -e /tmp/aws_secret_access_key ] ; then
+    echo "Setting up AWS CLI configuration for the 'microshift-ci' profile"
+    mkdir -p -m 0700 \${HOME}/.aws/
+
+    # Profile configuration
+    cat <<EOF2 >>\${HOME}/.aws/config
+
+[microshift-ci]
+region = ${EC2_REGION}
+output = json
+EOF2
+
+    # Profile credentials
+    cat <<EOF2 >>\${HOME}/.aws/credentials
+
+[microshift-ci]
+aws_access_key_id = \$(cat /tmp/aws_access_key_id)
+aws_secret_access_key = \$(cat /tmp/aws_secret_access_key)
+EOF2
+
+    # Permissions and environment settings
+    chmod -R go-rwx \${HOME}/.aws/
+    export AWS_PROFILE=microshift-ci
+    export AWS_BUCKET_NAME="microshift-build-cache-${EC2_REGION}"
+fi
+
 cd ~/microshift
 
 export CI_JOB_NAME="${JOB_NAME}"
-./test/bin/ci_phase_iso_build.sh
+if [[ "${JOB_NAME}" =~ .*metal-cache.* ]] ; then
+    ./test/bin/ci_phase_iso_build.sh -update_cache
+else
+    ./test/bin/ci_phase_iso_build.sh
+fi
 EOF
 chmod +x /tmp/iso.sh
 
@@ -61,8 +93,16 @@ scp \
     /tmp/microshift.tgz \
     "${INSTANCE_PREFIX}:/tmp"
 
+if [ -e /var/run/microshift-dev-access-keys/aws_access_key_id ] && \
+   [ -e /var/run/microshift-dev-access-keys/aws_secret_access_key ] ; then
+    scp \
+        /var/run/microshift-dev-access-keys/aws_access_key_id \
+        /var/run/microshift-dev-access-keys/aws_secret_access_key \
+        "${INSTANCE_PREFIX}:/tmp"
+fi
+
 finalize() {
-  scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/build-logs" ${ARTIFACT_DIR}
+  scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/build-logs" "${ARTIFACT_DIR}" || true
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx_error.log" "${ARTIFACT_DIR}" || true
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx.log" "${ARTIFACT_DIR}" || true
 }
