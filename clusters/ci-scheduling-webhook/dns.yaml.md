@@ -1,3 +1,6 @@
+The following yaml is commented as the resource is cluster-scoped and allows a singleton object only.
+
+```yaml
 # https://github.com/openshift/enhancements/blob/master/enhancements/dns/configurable-dns-pod-placement.md#proposal
 # dns-default-* pods do not tolerate all taints. This means our infra nodes and nodes tainted to support
 # pod classes are not getting these pods scheduled onto them.
@@ -10,18 +13,11 @@ spec:
   logLevel: Normal
   nodePlacement:
     tolerations:
-    - operator: Exists
+      - operator: Exists
   operatorLogLevel: Normal
   upstreamResolvers:
     policy: Sequential
     upstreams:
       - port: 53
         type: SystemResolvConf
-  servers:
-    - name: rdu2-qe-dns
-      zones:
-        - arm.eng.rdu2.redhat.com
-      forwardPlugin:
-        policy: Sequential
-        upstreams:
-          - 10.1.235.40
+```
