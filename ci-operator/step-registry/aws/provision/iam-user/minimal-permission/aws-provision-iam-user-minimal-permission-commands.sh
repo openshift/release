@@ -260,6 +260,11 @@ if (( ocp_minor_version >= 14 && ocp_major_version == 4 )); then
   echo "sts:AssumeRole" >> "${PERMISION_LIST}"
 fi
 
+# additional permisions for 4.15+
+if (( ocp_minor_version >= 15 && ocp_major_version == 4 )); then
+  echo "iam:TagInstanceProfile" >> "${PERMISION_LIST}"
+fi
+
 # generte policy file
 
 PERMISION_JSON="${ARTIFACT_DIR}/permision_list.json"
