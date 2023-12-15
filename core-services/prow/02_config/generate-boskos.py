@@ -256,6 +256,9 @@ CONFIG = {
     'powervs-3-quota-slice': {
         'dal10': 1,
     },
+    'powervs-4-quota-slice': {
+        'wdc06': 1,
+    },
     'ibmcloud-cspi-qe-quota-slice': {
         'us-east': 10,
     },
@@ -264,6 +267,9 @@ CONFIG = {
     },
     'ibmcloud-qe-quota-slice': {
         'jp-tok': 10,
+    },
+    'ibmcloud-qe-2-quota-slice': {
+        'us-east': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
         'us-south': 3,
@@ -318,6 +324,11 @@ CONFIG = {
         'us-east-1': 50,
         'us-east-2': 50,
         'us-west-2': 50,
+    },
+    'medik8s-aws-quota-slice': {
+        'us-east-1': 10,
+        'us-east-2': 10,
+        'us-west-2': 10,
     },
 }
 

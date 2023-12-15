@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base-rhel9
   hypershift-operator:
     name: 4.15-priv
     namespace: ocp-private
@@ -11,6 +7,10 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: hypershift-tests
+  ocp_4.15_base-rhel9:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
@@ -24,21 +24,21 @@ build_root:
 canonical_go_repository: github.com/openshift/cluster-node-tuning-operator
 images:
 - dockerfile_path: Dockerfile
-  from: base
   inputs:
     openshift_release_golang-1.20:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.20
   to: cluster-node-tuning-operator-us-tuned
 - dockerfile_path: Dockerfile.rhel9
-  from: base
   inputs:
+    ocp_4.15_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
     ocp_builder_rhel-9-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: cluster-node-tuning-operator
 promotion:
-  disabled: true
   excluded_images:
   - cluster-node-tuning-operator-us-tuned
   name: 4.15-priv

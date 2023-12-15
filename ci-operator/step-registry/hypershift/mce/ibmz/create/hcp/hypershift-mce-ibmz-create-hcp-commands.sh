@@ -155,8 +155,8 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --base-domain=${HYPERSHIFT_BASEDOMAIN} \
     --api-server-address=api.${HC_NAME}.${HYPERSHIFT_BASEDOMAIN} \
     --ssh-key=${ssh_key_file} \
-    --control-plane-availability-policy "SingleReplica" \
-    --infra-availability-policy "SingleReplica" \
+    --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
+    --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
     --namespace $HC_NS \
     --release-image=${OCP_IMAGE_MULTI} --render > /tmp/hc-manifests/cluster-agent.yaml
 
