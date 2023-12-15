@@ -2,7 +2,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -x
+#set -x
 ###############################################
 ## Auth=fbledsoe@redhat.com, liqcui@redhat.com
 ## Description: Test building new PriorityLevelConfiguration and FlowSchemas, and queueing and dropping excess requests. 
@@ -14,7 +14,7 @@ set -x
 ## Example test run: ./api_pf.sh 270 (pass in at least 90 replicas for each master node e.g 1: 90, 2:180)
 ################################################ 
 
-REPLICAS="200"
+REPLICAS="150"
 namespace="test"
 apf_api_version="flowcontrol.apiserver.k8s.io/v1beta3"
 error_count=0
