@@ -820,6 +820,28 @@ tests:
       CLUSTER_NETWORK_MTU: "1200"
     workflow: openshift-e2e-aws-network-mtu
   timeout: 6h0m0s
+- always_run: false
+  as: azure-ovn-marketplace-images
+  optional: true
+  run_if_changed: azure
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: azure4
+    env:
+      FAIL_ON_CORE_DUMP: "false"
+      OS_IMAGE_PLAN: NoPurchasePlan
+      OS_IMAGE_URN: azureopenshift:aro4:aro_414:412.92.20231021
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-osimage
+    - ref: ovn-conf
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift-priv
