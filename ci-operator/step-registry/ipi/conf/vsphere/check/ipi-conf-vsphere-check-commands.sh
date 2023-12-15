@@ -76,6 +76,11 @@ account_loc=$(($RANDOM % 4))
 vsphere_user="${vcenter_usernames[$account_loc]}"
 vsphere_password="${vcenter_passwords[$account_loc]}"
 
+echo "$(date -u --rfc-3339=seconds) - DEBUG ${vsphere_user} ${account_loc} *************************"
+
+
+
+
 echo "$(date -u --rfc-3339=seconds) - Creating govc.sh file..."
 cat >>"${SHARED_DIR}/govc.sh" <<EOF
 export GOVC_URL="${vsphere_url}"

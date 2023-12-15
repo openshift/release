@@ -32,6 +32,10 @@ if [[ "$JOB_NAME" == *"4.12-e2e-vsphere-zones"* ]]; then
   TECH_PREVIEW_NO_UPGRADE="featureSet: TechPreviewNoUpgrade"
 fi
 
+
+echo "$(date -u --rfc-3339=seconds) - DEBUG ${GOVC_USERNAME}  *************************"
+
+
 cat >>"${CONFIG}" <<EOF
 baseDomain: $base_domain
 ${TECH_PREVIEW_NO_UPGRADE}

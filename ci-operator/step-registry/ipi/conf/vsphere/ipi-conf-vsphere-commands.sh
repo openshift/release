@@ -152,6 +152,8 @@ compute:
   replicas: 0"
 fi
 
+echo "$(date -u --rfc-3339=seconds) - DEBUG ${GOVC_USERNAME} *************************"
+
 cat >>"${CONFIG}" <<EOF
 baseDomain: $base_domain
 $MACHINE_POOL_OVERRIDES
