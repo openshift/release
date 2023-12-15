@@ -2250,7 +2250,33 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-upi
+- as: baremetalds-assisted-hypershift-agent-mce-dualstack-mgmt-f7
+  cluster: build05
+  cron: 14 4 7,14,21,28 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=1024G
+        NUM_EXTRA_WORKERS=3
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=16384
+        EXTRA_WORKER_DISK=100
+      IP_STACK: v4v6
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.14
+      MCE_VERSION: "2.4"
+      TEST_ADDITIONAL: Hypershift
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce
 - as: baremetalds-assisted-hypershift-agent-mce-guest-f7
+  cluster: build05
   cron: 7 4 2,9,17,25 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -2265,6 +2291,7 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
 - as: baremetalds-assisted-hypershift-agent-mce-guest-f14-des
+  cluster: build05
   cron: 51 18 10,25 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
@@ -2279,6 +2306,7 @@ tests:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
 - as: baremetalds-assisted-hypershift-agent-mce-mgmt-f7
+  cluster: build05
   cron: 15 1 4,11,18,26 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
