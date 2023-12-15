@@ -1,0 +1,42 @@
+base_images:
+  base:
+    name: 4.13-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/installer-aro
+images:
+- dockerfile_literal: |
+    FROM base
+    COPY . .
+  from: base
+  to: azure-installer-aro
+promotion:
+  additional_images:
+    azure-installer-aro-src: src
+  name: 4.13-priv
+  namespace: ocp-private
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.13-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: go test ./pkg/...
+  container:
+    from: src
+  optional: true
+zz_generated_metadata:
+  branch: release-4.13-azure
+  org: openshift-priv
+  repo: installer-aro
