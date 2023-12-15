@@ -252,7 +252,7 @@ function create_powervs_service_instance() {
   while [ -z "${SERVICE_STATE}" ]
   do
     COUNTER=$((COUNTER+1)) 
-    TEMP_STATE="$(ic resource service-instances -g "${resource_group}" --output json --type service_instance  | jq -r '.[] | select(.crn == "'"${CRN}"'") | .state')"
+    TEMP_STATE="$(ic resource service-instance -g "${resource_group}" "${CRN}" --output json --type service_instance  | jq -r '.state')"
     echo "Current State is: ${TEMP_STATE}"
     echo ""
     if [ "${TEMP_STATE}" == "active" ]
