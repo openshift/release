@@ -251,8 +251,12 @@ function create_powervs_service_instance() {
   SERVICE_STATE=""
   while [ -z "${SERVICE_STATE}" ]
   do
-    COUNTER=$((COUNTER+1)) 
-    TEMP_STATE="$(ic resource service-instance -g "${resource_group}" "${CRN}" --output json | jq -r '.state')"
+    COUNTER=$((COUNTER+1))
+    TEMP_STATE="NOT_READY"
+    if [ "$(ibmcloud resource search "crn:\"${CRN}\"" --output json | jq -r '.items | length')" != "0" ]
+    then
+        TEMP_STATE="$(ic resource service-instance -g "${resource_group}" "${CRN}" --output json | jq -r '.[].state')"
+    fi
     echo "Current State is: ${TEMP_STATE}"
     echo ""
     if [ "${TEMP_STATE}" == "active" ]
