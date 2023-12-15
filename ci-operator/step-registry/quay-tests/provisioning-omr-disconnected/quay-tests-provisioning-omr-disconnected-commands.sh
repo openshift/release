@@ -134,9 +134,9 @@ resource "aws_instance" "quaybuilder" {
   provisioner "remote-exec" {
     inline = [
       "sudo yum install podman openssl -y",
-      "podman login brew.registry.redhat.io -u \${OMR_BREW_USERNAME} -p \${OMR_BREW_PASSWORD}",
-      "if [[ \${OMR_RELEASE} == "false" ]]; then podman cp $(podman create --rm brew.registry.redhat.io/rh-osbs/\${OMR_IMAGE}):/mirror-registry.tar.gz .; fi",
-      "if [[ \${OMR_RELEASE} == "true" ]]; then curl -L -o mirror-registry.tar.gz https://developers.redhat.com/content-gateway/rest/mirror/pub/openshift-v4/clients/mirror-registry/latest/mirror-registry.tar.gz --retry 12; fi",
+      "podman login brew.registry.redhat.io -u ${OMR_BREW_USERNAME} -p ${OMR_BREW_PASSWORD}",
+      "if [[ ${OMR_RELEASE} == "false" ]]; then podman cp $(podman create --rm brew.registry.redhat.io/rh-osbs/${OMR_IMAGE}):/mirror-registry.tar.gz .; fi",
+      "if [[ ${OMR_RELEASE} == "true" ]]; then curl -L -o mirror-registry.tar.gz https://developers.redhat.com/content-gateway/rest/mirror/pub/openshift-v4/clients/mirror-registry/latest/mirror-registry.tar.gz --retry 12; fi",
       "tar -xzvf mirror-registry.tar.gz",
       "./mirror-registry --version",
       "./mirror-registry install --quayHostname \${aws_instance.quaybuilder.public_dns} --initPassword password --initUser quay -v"
