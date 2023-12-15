@@ -14,7 +14,7 @@ set -x
 ## Example test run: ./api_pf.sh 270 (pass in at least 90 replicas for each master node e.g 1: 90, 2:180)
 ################################################ 
 
-REPLICAS="270"
+REPLICAS="200"
 namespace="test"
 apf_api_version="flowcontrol.apiserver.k8s.io/v1beta3"
 error_count=0
@@ -288,7 +288,7 @@ scale_traffic
 
 echo -e "Sleeping for 15 minutes to let pods sending traffic to be ready."
 
-sleep 300
+sleep 720
 
 # wait until all podlister pods are up to send all traffic
 
@@ -297,12 +297,11 @@ echo -e "Logs after scaling traffic:"
 check_errors
 
 echo -e "\n======Starting cleanup======"
+delete_controller
 
 delete_flow_schema
 
 delete_priority_level_configuration
-
-delete_controller
 
 delete_namespace
 
