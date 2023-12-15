@@ -252,7 +252,7 @@ function check_errors() {
   # oc get pods -n openshift-apiserver
 
   echo -e "\nChecking that there are errors after scaling traffic."
-  dropped_requests=$(oc get --raw /debug/api_priority_and_fairness/dump_priority_levels | grep restrict-pod-lister | cut -d',' -f8 | tr -d ' ')
+  dropped_requests=$(! oc get --raw /debug/api_priority_and_fairness/dump_priority_levels | grep restrict-pod-lister || oc get --raw /debug/api_priority_and_fairness/dump_priority_levels | grep restrict-pod-lister | cut -d',' -f8 | tr -d ' ')
   echo -e "\nNumber of rejected requests: ${dropped_requests::-1}\n"
   for i in {0..2}; do
   ! oc -n $namespace logs deploy/podlister-$i --tail=5 | grep -i "context deadline" || log_count=$(oc -n $namespace logs deploy/podlister-$i | grep -i "context deadline" | wc -l)
