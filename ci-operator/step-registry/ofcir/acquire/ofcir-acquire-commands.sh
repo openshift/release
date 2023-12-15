@@ -85,7 +85,7 @@ function getCIR(){
     # wait upto 30 minutes for a CIR
     for _ in $(seq 60) ; do
         curl -kfs -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL/$NAME" -o $CIRFILE
-        if [ "$(jq -r .status < $CIRFILE)" == "in use" ] ; then
+        if [ "$(jq -r 'select(.status == "in use" and .ip != "")' < $CIRFILE)" ] ; then
             break
         fi
         sleep 30

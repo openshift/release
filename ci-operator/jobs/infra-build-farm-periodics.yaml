@@ -330,8 +330,6 @@ periodics:
     - command:
       - /cleanup-hypershift-leaks.sh
       env:
-      - name: AWS_CONFIG_FILE
-        value: /token/.awscred
       - name: KUBECONFIG
         value: /kubeconfig/kubeconfig
       image: dptp-3312-hypershift-leaks-cleaner:latest
@@ -341,16 +339,28 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /token
-        name: token
+      - mountPath: /cluster-profiles/aws
+        name: aws-token
+        readOnly: true
+      - mountPath: /cluster-profiles/aws-2
+        name: aws-2-token
+        readOnly: true
+      - mountPath: /cluster-profiles/aws-3
+        name: aws-3-token
         readOnly: true
       - mountPath: /kubeconfig
         name: hive
         readOnly: true
     volumes:
-    - name: token
+    - name: aws-token
+      secret:
+        secretName: cluster-secrets-aws
+    - name: aws-2-token
       secret:
         secretName: cluster-secrets-aws-2
+    - name: aws-3-token
+      secret:
+        secretName: cluster-secrets-aws-3
     - name: hive
       secret:
         secretName: hypershift-workload-credentials

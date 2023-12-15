@@ -65,52 +65,6 @@ tests:
   commands: HOME=/tmp make test-integration
   container:
     from: test-bin
-- as: e2e
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        KUBECTL=oc
-        export KUBECTL
-        make test-e2e
-      dependencies:
-      - env: IMAGE_NAME
-        name: work
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: publish
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: work
-    env:
-      IMAGE_REPO: work
-      REGISTRY_ORG: stolostron
-    test:
-    - as: publish
-      commands: |-
-        export OSCI_COMPONENT_NAME=work
-        export OSCI_COMPONENT_VERSION=2.4.0
-        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
-        export OSCI_PIPELINE_REPO=backplane-pipeline
-        export OSCI_PUBLISH_DELAY="0"
-        export SELF="make -f /opt/build-harness/Makefile.prow"
-        make -f /opt/build-harness/Makefile.prow osci/publish
-      credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ocm-ci-image-mirror
 - as: pr-merge-image-mirror
   postsubmit: true
   steps:

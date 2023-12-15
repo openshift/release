@@ -1,0 +1,65 @@
+base_images:
+  base:
+    name: "4.15"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
+binary_build_commands: hack/build-go.sh
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+  to: cluster-network-operator
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.15"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-ovn-upgrade
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws-ovn
+- as: e2e-azure-ovn-upgrade
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-azure-ovn
+- as: e2e-gcp-ovn-upgrade
+  optional: true
+  steps:
+    cluster_profile: gcp-3
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-gcp-ovn
+zz_generated_metadata:
+  branch: release-4.15
+  org: openshift
+  repo: cluster-network-operator
+  variant: 4.15-upgrade-from-stable-4.14

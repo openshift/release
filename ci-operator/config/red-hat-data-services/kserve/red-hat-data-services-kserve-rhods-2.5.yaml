@@ -1,0 +1,119 @@
+base_images:
+  golang:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi8/python-39:1
+
+      # Prow expects to be able to check out a repo under /go
+      USER 0:0
+      WORKDIR /go
+      RUN chown 1001:0 .
+
+      USER 1001:0
+
+      # The VENV that is activated by default conflicts with KServe
+      # scripts. These variables are set to empty to not activate any
+      # VENV by default.
+      ENV BASH_ENV="" ENV="" PROMPT_COMMAND=""
+images:
+- dockerfile_path: Dockerfile
+  from: ubi_minimal
+  inputs:
+    golang:
+      as:
+      - golang:1.20
+  to: kserve-controller
+- dockerfile_path: agent.Dockerfile
+  from: ubi_minimal
+  inputs:
+    golang:
+      as:
+      - golang:1.20
+  to: kserve-agent
+- context_dir: qpext/
+  dockerfile_path: qpext.Dockerfile
+  to: kserve-queue-proxy
+- context_dir: .
+  dockerfile_path: router.Dockerfile
+  to: kserve-router
+- context_dir: python/
+  dockerfile_path: storage-initializer.Dockerfile
+  to: kserve-storage-initializer
+- context_dir: python/
+  dockerfile_path: sklearn.Dockerfile
+  to: sklearn-serving-runtime
+promotion:
+  excluded_images:
+  - kserve-controller
+  - kserve-agent
+  - kserve-queue-proxy
+  - kserve-router
+  - kserve-storage-initializer
+  - sklearn-serving-runtime
+  namespace: red-hat-data-services
+  tag: rhods-2.5-final
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: stable-image-mirror-kserve-agent
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-agent
+    env:
+      IMAGE_REPO: kserve-agent
+      RELEASE_VERSION: rhods-2.5
+    workflow: red-hat-data-services-ci-image-mirror
+- as: stable-image-mirror-kserve-queue-proxy
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-queue-proxy
+    env:
+      IMAGE_REPO: kserve-queue-proxy
+      RELEASE_VERSION: rhods-2.5
+    workflow: red-hat-data-services-ci-image-mirror
+- as: stable-image-mirror-kserve-router
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-router
+    env:
+      IMAGE_REPO: kserve-router
+      RELEASE_VERSION: rhods-2.5
+    workflow: red-hat-data-services-ci-image-mirror
+- as: stable-image-mirror-kserve-controller
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-controller
+    env:
+      IMAGE_REPO: kserve-controller
+      RELEASE_VERSION: rhods-2.5
+    workflow: red-hat-data-services-ci-image-mirror
+- as: stable-image-mirror-kserve-storage-initializer
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-storage-initializer
+    env:
+      IMAGE_REPO: kserve-storage-initializer
+      RELEASE_VERSION: rhods-2.5
+    workflow: red-hat-data-services-ci-image-mirror
+zz_generated_metadata:
+  branch: rhods-2.5
+  org: red-hat-data-services
+  repo: kserve
