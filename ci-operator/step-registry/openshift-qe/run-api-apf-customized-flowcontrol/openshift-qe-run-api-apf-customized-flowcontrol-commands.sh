@@ -278,7 +278,7 @@ create_flow_control
 
 deploy_controller
 
-sleep 10
+sleep 14400
 
 echo -e "Logs before scaling traffic:"
 
