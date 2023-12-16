@@ -4,26 +4,38 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-RENDEZVOUS_IP="$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")"
+export RENDEZVOUS_IP="$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")"
 
-# Create an agent-config file containing only the minimum required configuration
+INSTALL_DIR="/tmp/installer"
+mkdir -p "${INSTALL_DIR}"
+git clone -b master https://github.com/openshift-qe/agent-qe.git "${INSTALL_DIR}/agent-qe"
 
-cat > "${SHARED_DIR}/agent-config-unconfigured.yaml" <<EOF
-apiVersion: v1beta1
-kind: AgentConfig
-rendezvousIP: ${RENDEZVOUS_IP}
-additionalNTPSources:
-- ${AUX_HOST}
-EOF
+pip install j2cli
 
-cat > "${SHARED_DIR}/agent-config.yaml" <<EOF
-apiVersion: v1beta1
-kind: AgentConfig
-rendezvousIP: ${RENDEZVOUS_IP}
-additionalNTPSources:
-- ${AUX_HOST}
-hosts: []
-EOF
+
+
+INVENTORY="${INSTALL_DIR}/agent-install-inventory.env"
+
+
+##mac,ip,host,arch,root_device,root_dev_hctl,provisioning_mac,switch_port,switch_port_v2,
+##ipi_disabled_ifaces,baremetal_iface,bmc_address,bmc_scheme,bmc_base_uri,bmc_user,bmc_pass,console_kargs,transfer_protocol_type,redfish_user,redfish_password,vendor,pdu_uri
+
+
+
+hosts=($(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"))
+echo "[hosts]" > ${INVENTORY}
+for i in "${!hosts[@]}"; do
+    . <(echo "${hosts[$i]}" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+    echo "node${i} hostname=${name} role=${name%%-[0-9]*} root_device=${root_device} mac=${mac} baremetal_iface=${baremetal_iface} \
+                   ip=${ip} ipv6=${ipv6} bmc_address=${bmc_address} bmc_user=${bmc_user} bmc_pass=${bmc_pass}" >> ${INVENTORY}
+done
+
+env >> "${INVENTORY}"
+
+cp "${INVENTORY}" "${ARTIFACT_DIR}/"
+
+/alabama/.local/bin/j2 "${INSTALL_DIR}/agent-qe/prow-utils/templates/agent-config.yaml.j2" "${INVENTORY}" -o "${ARTIFACT_DIR}/templated-agent-config.yaml" 
+
 
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
