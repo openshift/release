@@ -79,11 +79,6 @@ function rosa_upgrade()
        CLUSTER_ID=$(cat ${SHARED_DIR}/cluster-id)
   fi
 
-  echo "######################################################################"
-  rosa describe cluster -c $CLUSTER_ID --region $REGION
-  echo "######################################################################"
-  echo
-
   RECOMMEND_VERSION=`! rosa list upgrade -c $CLUSTER_ID --region $REGION | grep recommended || rosa list upgrade -c $CLUSTER_ID --region $REGION | grep recommended | awk '{print $1}'`
 
   #prior to use RECOMMEND_VERSION
@@ -114,10 +109,6 @@ function rosa_upgrade()
   else
       echo "Un-supported clsuter type $ROSA_CLUSTER_TYPE" 
   fi
-
-  echo "######################################################################"
-  rosa describe cluster -c $CLUSTER_ID --region $REGION
-  echo "######################################################################"
 
   echo "Checking if ROSA cluster upgrade scheduled ..."
   INIT=1
@@ -220,7 +211,3 @@ else
 fi
 rosa_login $CLOUD_PROVIDER_REGION
 rosa_upgrade $CLOUD_PROVIDER_REGION
-echo "######################################################################"
-rosa describe cluster -c $CLUSTER_ID --region $REGION
-echo "######################################################################"
-
