@@ -2,7 +2,7 @@
 
 set -o nounset
 set -x
-
+exit 0
 error_handler() {
   echo "Error: ($1) occurred on $2"
 }
