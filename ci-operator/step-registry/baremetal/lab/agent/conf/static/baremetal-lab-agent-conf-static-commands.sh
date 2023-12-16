@@ -28,7 +28,7 @@ echo "[hosts]" > ${INVENTORY}
 for i in "${!hosts[@]}"; do
     . <(echo "${hosts[$i]}" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
     echo "node${i} hostname=${name} role=${name%%-[0-9]*} root_device=${root_device} mac=${mac} baremetal_iface=${baremetal_iface} \
-                   ip=${ip} ipv6=${ipv6} bmc_address=${bmc_address} bmc_user=${bmc_user} bmc_pass=${bmc_pass}" >> ${INVENTORY}
+                   ip=${ip} bmc_address=${bmc_address} bmc_user=${bmc_user} bmc_pass=${bmc_pass}" >> ${INVENTORY}
 done
 
 
