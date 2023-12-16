@@ -63,7 +63,7 @@ env
 
 echo "Applying vars to template"
 
-j2 "${INSTALL_DIR}/agent-qe/prow-utils/templates/agent-config.yaml.j2" -o "${ARTIFACT_DIR}/templated-agent-config.yaml" 
+/alabama/.local/bin/j2 "${INSTALL_DIR}/agent-qe/prow-utils/templates/agent-config.yaml.j2" -o "${ARTIFACT_DIR}/templated-agent-config.yaml" 
 
 [ -f "${SHARED_DIR}/install-config.yaml" ] || echo "{}" >> "${SHARED_DIR}/install-config.yaml"
 yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
