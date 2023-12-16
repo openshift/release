@@ -8,7 +8,7 @@ error_handler() {
 }
 
 trap 'error_handler $? $LINENO' ERR
-
+exit 0
 IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
 echo "Invoking upi deprovision powervs cluster"
 echo "BUILD ID - ${BUILD_ID}"
