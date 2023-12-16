@@ -282,7 +282,11 @@ case "$CLUSTER_TYPE" in
       while [ -z "${SERVICE_STATE}" ]
       do
         COUNTER=$((COUNTER+1)) 
-        TEMP_STATE="$(ic resource service-instance -g "${RESOURCE_GROUP}" "${CRN}" --output json --type service_instance  | jq -r '.state')"
+        TEMP_STATE="NOT_READY"
+        if [ "$(ibmcloud resource search "crn:\"${CRN}\"" --output json | jq -r '.items | length')" != "0" ]
+        then
+            TEMP_STATE="$(ic resource service-instance -g "${RESOURCE_GROUP}" "${CRN}" --output json --type service_instance  | jq -r '.[].state')"
+        fi
         echo "Current State is: ${TEMP_STATE}"
         echo ""
         if [ "${TEMP_STATE}" == "active" ]
