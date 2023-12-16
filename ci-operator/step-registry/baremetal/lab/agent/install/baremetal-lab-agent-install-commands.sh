@@ -20,9 +20,9 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-curl https://github.com/openshift-qe/agent-qe/blob/master/prow-utils/scripts/agent-scripts.sh > "${SHARED_DIR}/agent-scripts.sh"
+git clone https://github.com/openshift-qe/agent-qe.git "${SHARED_DIR}"
 
-source "${SHARED_DIR}/agent-scripts.sh"
+pip install j2cli
 
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
@@ -31,11 +31,11 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
-BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
-PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
+export BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
+export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 INSTALL_DIR="/tmp/installer"
-API_VIP="$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")"
-INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
+export API_VIP="$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")"
+export INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
 mkdir -p "${INSTALL_DIR}"
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
@@ -52,7 +52,17 @@ fi
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
 # (e.g., hostname, NFV-related interface names, etc...)
-CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+export CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+
+
+
+echo "Printing ENV vars"
+env
+
+echo "Applying vars to template"
+
+j2 "${SHARED_DIR}/agent-bm-deployments/roles/create_iso/templates/agent-config.yaml.j2" -o "${ARTIFACT_DIR}/templated-agent-config.yaml" 
+
 [ -f "${SHARED_DIR}/install-config.yaml" ] || echo "{}" >> "${SHARED_DIR}/install-config.yaml"
 yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
 apiVersion: v1
