@@ -69,8 +69,6 @@ echo "Node reservation concluded successfully."
 scp "${SSHOPTS[@]}" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/*.yaml" "${SHARED_DIR}/"
 more "${SHARED_DIR}"/*.yaml |& sed 's/pass.*$/pass ** HIDDEN **/g'
 
-cp "${SHARED_DIR}/*.yaml" "${ARTIFACT_DIR}/"
-
 echo "${AUX_HOST}" >> "${SHARED_DIR}/bastion_public_address"
 echo "root" > "${SHARED_DIR}/bastion_ssh_user"
 
