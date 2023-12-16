@@ -21,7 +21,7 @@ fi
 TEST_NAME="$1"    # aws-c2s-ipi-disconnected-private-f7
 YAML_FILE="$2"    # openshift-openshift-tests-private-release-4.13__amd64-nightly.yaml
 
-if [[ "${TEST_NAME}" =~ (baremetal-|-disabled|-disasterrecovery|powervs-) ]] && [[ "$@" != *\ --force* ]]; then
+if [[ "${TEST_NAME}" =~ (-disabled|-disasterrecovery|powervs-) ]] && [[ "$@" != *\ --force* ]]; then
     echo "The test config ${TEST_NAME} should not get changes in the cron entry as
       the schedule rotation scheme is different than the other tests.
       Use --force to skip this check."
@@ -51,6 +51,15 @@ let HOUR=10#${NUMBERS:2:2}%24
 let DAY_OF_MONTH=10#${NUMBERS:4:2}%30+1
 let MONTH=10#${NUMBERS:6:2}%12+1
 let DAY_OF_WEEK=10#${NUMBERS:8:1}%7
+
+if [[ "${TEST_NAME}" =~ baremetal- ]] ; then
+	# Raleigh working hours, 8~17 (in UTC, 13~22)
+	WK_HOUR_BEGIN=13
+	WK_HOUR_END=22
+	if [[ $HOUR -lt $WK_HOUR_BEGIN ]] || [[ $HOUR -ge $WK_HOUR_END ]] ; then
+		let HOUR=HOUR%$((WK_HOUR_END-WK_HOUR_BEGIN))+WK_HOUR_BEGIN
+	fi
+fi
 
 if [[ $DEBUG = "true" ]] ; then
 	echo "MINUTE: $MINUTE"
