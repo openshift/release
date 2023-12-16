@@ -20,7 +20,7 @@ INVENTORY="${INSTALL_DIR}/agent-install-inventory.env"
 ##mac,ip,host,arch,root_device,root_dev_hctl,provisioning_mac,switch_port,switch_port_v2,
 ##ipi_disabled_ifaces,baremetal_iface,bmc_address,bmc_scheme,bmc_base_uri,bmc_user,bmc_pass,console_kargs,transfer_protocol_type,redfish_user,redfish_password,vendor,pdu_uri
 
-env >> "${INVENTORY}"
+#echo "$(echo -n 'hello'; cat "${SHARED_DIR}/hosts.yaml")" > "${INVENTORY}"
 
 
 hosts=($(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"))
