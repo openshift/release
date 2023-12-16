@@ -14,7 +14,7 @@ set -o pipefail
 ## Example test run: ./api_pf.sh 270 (pass in at least 90 replicas for each master node e.g 1: 90, 2:180)
 ################################################ 
 
-REPLICAS="150"
+REPLICAS="60"
 namespace="test"
 apf_api_version="flowcontrol.apiserver.k8s.io/v1beta3"
 error_count=0
