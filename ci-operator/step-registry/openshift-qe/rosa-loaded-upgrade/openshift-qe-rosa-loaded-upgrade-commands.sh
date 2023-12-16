@@ -138,7 +138,7 @@ function rosa_upgrade()
   echo "######################################################################"
   while true
   do
-	  CLUSTER_UPGRADE_STATE=$(rosa describe upgrade --region $REGION -c $CLUSTER_ID | grep 'Upgrade State:' | awk -F':' '{print $2}' | tr -d ' ')
+	  CLUSTER_UPGRADE_STATE=$(! rosa describe upgrade --region $REGION -c $CLUSTER_ID | grep 'Upgrade State:' ||rosa describe upgrade --region $REGION -c $CLUSTER_ID | grep 'Upgrade State:' | awk -F':' '{print $2}' | tr -d ' ')
 	  if [[ $CLUSTER_UPGRADE_STATE == "started" ]];then
                   echo
                   echo "######################################################################"
