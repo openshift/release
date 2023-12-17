@@ -121,6 +121,7 @@ function rosa_upgrade()
                   echo "######################################################################"
 		  echo "ROSA cluster Upgrade has been sucessfully scheduled"
                   echo "######################################################################"
+		  rosa describe upgrade --region $REGION -c $CLUSTER_ID
 		  break
 	  fi
 	  INIT=$(( $INIT + 1 ))
@@ -134,12 +135,12 @@ function rosa_upgrade()
 
   echo "Check ROSA cluster if upgrade started"
   INIT=1
-  MAXRETRY=180
+  MAXRETRY=240
   UPGRADE_STATE=""
   echo "######################################################################"
   while true
   do
-	  CLUSTER_UPGRADE_STATE=$(! rosa describe upgrade --region $REGION -c $CLUSTER_ID | grep 'Upgrade State:' ||rosa describe upgrade --region $REGION -c $CLUSTER_ID | grep 'Upgrade State:' | awk -F':' '{print $2}' | tr -d ' ')
+	  CLUSTER_UPGRADE_STATE=$(rosa describe upgrade --region $REGION -c $CLUSTER_ID | grep 'Upgrade State:' | awk -F':' '{print $2}' | tr -d ' ')
 	  if [[ $CLUSTER_UPGRADE_STATE == "started" ]];then
                   echo
                   echo "######################################################################"
