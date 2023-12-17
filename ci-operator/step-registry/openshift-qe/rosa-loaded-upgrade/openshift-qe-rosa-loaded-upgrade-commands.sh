@@ -45,6 +45,7 @@ function rosa_upgrade()
 
   RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST:=""}
   CURRENT_VERSION=$(oc get clusterversion -ojsonpath={..desired.version})
+  MAJOR_CURRENT_VERSION=$(echo $CURRENT_VERSION | cut -d'.' -f1-2)
   ROSA_CLUSTER_TYPE=${ROSA_CLUSTER_TYPE:="classic"}
   #OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:=$RELEASE_IMAGE_LATEST}
 
@@ -78,8 +79,8 @@ function rosa_upgrade()
   if [[ -z $CLUSTER_ID && -s "${SHARED_DIR}/cluster-id" ]];then
        CLUSTER_ID=$(cat ${SHARED_DIR}/cluster-id)
   fi
-
-  RECOMMEND_VERSION=`! rosa list upgrade -c $CLUSTER_ID --region $REGION | grep recommended || rosa list upgrade -c $CLUSTER_ID --region $REGION | grep recommended | awk '{print $1}'`
+  
+  RECOMMEND_VERSION=`rosa list upgrade -c $CLUSTER_ID --region $REGION| grep $MAJOR_CURRENT_VERSION | grep recommended | awk '{print $1}'`
 
   #prior to use RECOMMEND_VERSION
   if [[ -z $RECOMMEND_VERSION ]];then
