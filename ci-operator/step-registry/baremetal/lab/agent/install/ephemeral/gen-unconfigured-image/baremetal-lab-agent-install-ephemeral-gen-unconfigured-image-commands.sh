@@ -41,9 +41,10 @@ scp -r "${SSHOPTS[@]}" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/${COREOS_IMAG
 
 ### Create unconfigured ISO image
 echo -e "\nCreating unconfigured image..."
-coreos-installer iso ignition embed -f -i "${INSTALL_DIR}/${UNCONFIGURED_AGENT_IGNITION_FILENAME}" -o "${INSTALL_DIR}/${UNCONFIGURED_AGENT_IMAGE_FILENAME}" "${INSTALL_DIR}/${COREOS_IMAGE_NAME}"
+coreos-installer iso ignition embed -f -i "${INSTALL_DIR}/${UNCONFIGURED_AGENT_IGNITION_FILENAME}" \
+  -o "${INSTALL_DIR}/${UNCONFIGURED_AGENT_IMAGE_FILENAME}" "${INSTALL_DIR}/${COREOS_IMAGE_NAME}"
 
 ### Copy the unconfigured image to the auxiliary host, it will be used in other steps
 echo -e "\nCopying the unconfigured ISO image into the bastion host..."
-scp "${SSHOPTS[@]}" "${INSTALL_DIR}/${UNCONFIGURED_AGENT_IMAGE_FILENAME}" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/${UNCONFIGURED_AGENT_IMAGE_FILENAME}"
-
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}/${UNCONFIGURED_AGENT_IMAGE_FILENAME}" \
+  "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/${UNCONFIGURED_AGENT_IMAGE_FILENAME}"
