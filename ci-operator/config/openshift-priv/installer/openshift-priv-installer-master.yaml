@@ -249,7 +249,7 @@ tests:
   container:
     from: src
 - as: e2e-aws-ovn
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(agent|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: aws
     env:
@@ -339,6 +339,19 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-secureboot
+  timeout: 6h0m0s
+- as: e2e-alibaba
+  optional: true
+  run_if_changed: (alibabacloud|aliyun|alicloud)
+  steps:
+    cluster_profile: alibabacloud
+    env:
+      TEST_SKIPS: \[StatefulSetBasic\] should not deadlock when a pod.s predecessor
+        fails\|\[StatefulSetBasic\] should perform rolling updates and roll backs
+        of template modifications with PVCs\|\[StatefulSetBasic\] should provide basic
+        identity\|\[StatefulSetBasic\] should adopt matching orphans and release non-matching
+        pods\|PVC Protection
+    workflow: openshift-e2e-alibabacloud
   timeout: 6h0m0s
 - as: e2e-gcp-ovn-shared-vpc
   optional: true
@@ -806,6 +819,28 @@ tests:
     env:
       CLUSTER_NETWORK_MTU: "1200"
     workflow: openshift-e2e-aws-network-mtu
+  timeout: 6h0m0s
+- always_run: false
+  as: azure-ovn-marketplace-images
+  optional: true
+  run_if_changed: azure
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: azure4
+    env:
+      FAIL_ON_CORE_DUMP: "false"
+      OS_IMAGE_PLAN: NoPurchasePlan
+      OS_IMAGE_URN: azureopenshift:aro4:aro_414:412.92.20231021
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-osimage
+    - ref: ovn-conf
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: master

@@ -23,7 +23,10 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-export E2E_RUN_TAGS="${E2E_RUN_TAGS} and ${TAG_VERSION}"
+IFS='.' read xversion yversion _ < <(oc version -o yaml | yq '.openshiftVersion')
+if [[ -n $xversion ]] && [[ $xversion -eq 4 ]] && [[ -n $yversion ]] && [[ $yversion =~ [12][0-9] ]] ; then
+    export E2E_RUN_TAGS="${E2E_RUN_TAGS} and @${xversion}.${yversion}"
+fi
 for tag in ${FORCE_SKIP_TAGS} ; do
     if ! [[ "${E2E_SKIP_TAGS}" =~ $tag ]] ; then
         export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not $tag"
