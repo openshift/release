@@ -25,7 +25,7 @@ cp "${INVENTORY}" "${ARTIFACT_DIR}/"
 AGENT_CONFIG_YAML_FILENAME="agent-config.yaml"
 
 if [ "${UNCONFIGURED_INSTALL}" == "true" ]; then
-    AGENT_CONFIG_YAML_FILENAME="unconfigured-agent-config.yaml"
+    AGENT_CONFIG_YAML_FILENAME="agent-config-unconfigured.yaml"
 fi
 
 /alabama/.local/bin/j2 "${INSTALL_DIR}/agent-qe/prow-utils/templates/agent-config.yaml.j2" "${INVENTORY}" -o "${ARTIFACT_DIR}/${AGENT_CONFIG_YAML_FILENAME}" 
