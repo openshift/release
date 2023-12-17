@@ -4,7 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export RENDEZVOUS_IP="$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")"
+# implement rendezvous ip logic in jinja template rendezvousIP: {{ hosts[0].ip }}
+
+#export RENDEZVOUS_IP="$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")"
 
 INSTALL_DIR="/tmp/installer"
 mkdir -p "${INSTALL_DIR}"
