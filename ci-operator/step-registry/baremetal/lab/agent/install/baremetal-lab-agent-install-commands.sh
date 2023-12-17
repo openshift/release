@@ -22,7 +22,6 @@ fi
 
 
 
-#pip install j2cli
 
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
@@ -33,12 +32,17 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 export BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
-#INSTALL_DIR="/tmp/installer"
 export API_VIP="$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")"
 export INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
-#mkdir -p "${INSTALL_DIR}"
 
-#git clone -b master https://github.com/openshift-qe/agent-qe.git "${INSTALL_DIR}/agent-qe"
+INSTALL_DIR="/tmp/installer"
+mkdir -p "${INSTALL_DIR}"
+
+
+git clone -b master https://github.com/openshift-qe/agent-qe.git "${INSTALL_DIR}/agent-qe"
+
+pip install j2cli
+
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
@@ -57,63 +61,11 @@ fi
 export CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
 
-#/alabama/.local/bin/j2 "${INSTALL_DIR}/agent-qe/prow-utils/templates/agent-config.yaml.j2" -o "${ARTIFACT_DIR}/templated-agent-config.yaml" 
+/alabama/.local/bin/j2 "${INSTALL_DIR}/agent-qe/prow-utils/templates/install-config.yaml.j2" -o "${ARTIFACT_DIR}/install-config.yaml" 
 
 [ -f "${SHARED_DIR}/install-config.yaml" ] || echo "{}" >> "${SHARED_DIR}/install-config.yaml"
-yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
-apiVersion: v1
-baseDomain: ${BASE_DOMAIN}
-metadata:
-  name: ${CLUSTER_NAME}
-networking:
-  machineNetwork:
-  - cidr: ${INTERNAL_NET_CIDR}
-controlPlane:
-   architecture: ${architecture}
-   hyperthreading: Enabled
-   name: master
-   replicas: ${masters}
-"
 
-if [ "${masters}" -eq 1 ]; then
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
-platform:
-  none: {}
-compute:
-- architecture: ${architecture}
-  hyperthreading: Enabled
-  name: worker
-  replicas: 0
-"
-fi
-
-if [ "${masters}" -gt 1 ]; then
-  if [ "${AGENT_PLATFORM_TYPE}" = "none" ]; then
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
-compute:
-- architecture: ${architecture}
-  hyperthreading: Enabled
-  name: worker
-  replicas: ${workers}
-platform:
-  none: {}
-"
-  else
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
-compute:
-- architecture: ${architecture}
-  hyperthreading: Enabled
-  name: worker
-  replicas: ${workers}
-platform:
-  baremetal:
-    apiVIPs:
-    - ${API_VIP}
-    ingressVIPs:
-    - ${INGRESS_VIP}
-"
-  fi
-fi
+# Merge templated install-config.yaml with partial file containing FIPS, PULL_SECRET, SSH_KEY, PROXY info
 
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
