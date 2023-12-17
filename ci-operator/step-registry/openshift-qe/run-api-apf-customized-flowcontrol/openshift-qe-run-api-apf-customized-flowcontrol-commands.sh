@@ -14,7 +14,7 @@ set -o pipefail
 ## Example test run: ./api_pf.sh 270 (pass in at least 90 replicas for each master node e.g 1: 90, 2:180)
 ################################################ 
 
-REPLICAS="30"
+REPLICAS="15"
 namespace="test"
 apf_api_version="flowcontrol.apiserver.k8s.io/v1beta3"
 error_count=0
@@ -252,7 +252,7 @@ function check_errors() {
   # oc get pods -n openshift-apiserver
 
   echo -e "\nChecking that there are errors after scaling traffic."
-  dropped_requests=$(! oc get --raw /debug/api_priority_and_fairness/dump_priority_levels | grep restrict-pod-lister || oc get --raw /debug/api_priority_and_fairness/dump_priority_levels | grep restrict-pod-lister | cut -d',' -f8 | tr -d ' ')
+  dropped_requests=$(oc get --raw /debug/api_priority_and_fairness/dump_priority_levels | grep restrict-pod-lister | cut -d',' -f8 | tr -d ' ')
   echo -e "\nNumber of rejected requests: ${dropped_requests::-1}\n"
   for i in {0..2}; do
   ! oc -n $namespace logs deploy/podlister-$i --tail=50 |grep -v 'Throttling request' | grep -i "context deadline" || log_count=$(oc -n $namespace logs deploy/podlister-$i | grep -i "context deadline" | wc -l)
