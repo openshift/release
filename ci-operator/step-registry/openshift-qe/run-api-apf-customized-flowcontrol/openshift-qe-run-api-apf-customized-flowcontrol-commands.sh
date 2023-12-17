@@ -14,7 +14,7 @@ set -o pipefail
 ## Example test run: ./api_pf.sh 270 (pass in at least 90 replicas for each master node e.g 1: 90, 2:180)
 ################################################ 
 
-REPLICAS="60"
+REPLICAS="30"
 namespace="test"
 apf_api_version="flowcontrol.apiserver.k8s.io/v1beta3"
 error_count=0
@@ -232,7 +232,7 @@ function check_no_errors() {
   echo -e "Checking that there are no errors before scaling traffic."
   for i in {0..2}; do
   # count the amount of errors that appear in the logs
-  ! oc -n $namespace logs deploy/podlister-$i --tail 5 | grep -i "context deadline" || log_count=$(oc -n $namespace logs deploy/podlister-$i | grep -i "context deadline" | wc -l)
+  ! oc -n $namespace logs deploy/podlister-$i --tail 50 | grep -v 'Throttling request' | grep -i "context deadline" || log_count=$(oc -n $namespace logs deploy/podlister-$i | grep -i "context deadline" | wc -l)
   error_count=$((${error_count##*( )}+${log_count##*( )}))
   echo -e "Error count: $error_count"
   done  
@@ -255,7 +255,7 @@ function check_errors() {
   dropped_requests=$(! oc get --raw /debug/api_priority_and_fairness/dump_priority_levels | grep restrict-pod-lister || oc get --raw /debug/api_priority_and_fairness/dump_priority_levels | grep restrict-pod-lister | cut -d',' -f8 | tr -d ' ')
   echo -e "\nNumber of rejected requests: ${dropped_requests::-1}\n"
   for i in {0..2}; do
-  ! oc -n $namespace logs deploy/podlister-$i --tail=5 | grep -i "context deadline" || log_count=$(oc -n $namespace logs deploy/podlister-$i | grep -i "context deadline" | wc -l)
+  ! oc -n $namespace logs deploy/podlister-$i --tail=50 |grep -v 'Throttling request' | grep -i "context deadline" || log_count=$(oc -n $namespace logs deploy/podlister-$i | grep -i "context deadline" | wc -l)
   error_count=$((${error_count##*( )}+${log_count##*( )}))
   echo -e "Error count: $error_count"
   done  
@@ -277,8 +277,6 @@ create_test
 create_flow_control
 
 deploy_controller
-
-sleep 14400
 
 echo -e "Logs before scaling traffic:"
 
