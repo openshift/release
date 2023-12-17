@@ -20,6 +20,12 @@ echo "$(echo -en 'hosts:\n'; cat "${SHARED_DIR}/hosts.yaml")" > "${INVENTORY}"
 
 cp "${INVENTORY}" "${ARTIFACT_DIR}/"
 
-/alabama/.local/bin/j2 "${INSTALL_DIR}/agent-qe/prow-utils/templates/agent-config.yaml.j2" "${INVENTORY}" -o "${ARTIFACT_DIR}/agent-config.yaml" 
+AGENT_CONFIG_YAML_FILENAME="agent-config.yaml"
 
-cp "${ARTIFACT_DIR}/agent-config.yaml" "${SHARED_DIR}/"
+if [ "${UNCONFIGURED_INSTALL}" == "true" ]; then
+    AGENT_CONFIG_YAML_FILENAME="unconfigured-agent-config.yaml"
+fi
+
+/alabama/.local/bin/j2 "${INSTALL_DIR}/agent-qe/prow-utils/templates/agent-config.yaml.j2" "${INVENTORY}" -o "${ARTIFACT_DIR}/${AGENT_CONFIG_YAML_FILENAME}" 
+
+cp "${ARTIFACT_DIR}/${AGENT_CONFIG_YAML_FILENAME}" "${SHARED_DIR}/"
