@@ -15,6 +15,8 @@ declare primaryrouterhostname
 declare vsphere_datacenter
 declare vsphere_portgroup
 declare dns_server
+declare vsphere_datastore
+declare vsphere_resource_pool
 source "${SHARED_DIR}/vsphere_context.sh"
 
 
@@ -217,13 +219,14 @@ curl -sSL "https://mirror2.openshift.com/pub/openshift-v4/clients/butane/latest/
 LB_VMNAME="${cluster_name}-lb"
 export GOVC_NETWORK="${vsphere_portgroup}"
 # vlanid between 1287 and 1302 will use profile:vsphere-multizone-2
-if [ ${vlanid} -ge 1287 ] && [ ${vlanid} -le 1302 ]; then
-  govc vm.clone -on=false -dc=/${vsphere_datacenter} -ds /${vsphere_datacenter}/datastore/mdcnc-ds-shared -pool=/IBMCloud/host/vcs-mdcnc-workload-1/Resources -vm="${vm_template}" ${LB_VMNAME}
-  govc vm.network.change -dc=/${vsphere_datacenter} -vm ${LB_VMNAME} -net /${vsphere_datacenter}/host/vcs-mdcnc-workload-1/"${vsphere_portgroup}" ethernet-0
-else
-  govc vm.clone -on=false -vm="${vm_template}" ${LB_VMNAME}
-  govc vm.network.change -vm ${LB_VMNAME} -net "${vsphere_portgroup}" ethernet-0
-fi
+#if [ ${vlanid} -ge 1287 ] && [ ${vlanid} -le 1302 ]; then
+vsphere_portgroup_path=$(govc find /${vsphere_datacenter} -type n | grep "${vlanid}")
+govc vm.clone -on=false -dc=/${vsphere_datacenter} -ds /${vsphere_datacenter}/datastore/${vsphere_datastore} -pool=${vsphere_resource_pool} -vm="${vm_template}" ${LB_VMNAME}
+govc vm.network.change -dc=/${vsphere_datacenter} -vm ${LB_VMNAME} -net "${vsphere_portgroup_path}" ethernet-0
+#else
+#  govc vm.clone -on=false -vm="${vm_template}" ${LB_VMNAME}
+#  govc vm.network.change -vm ${LB_VMNAME} -net "${vsphere_portgroup}" ethernet-0
+#fi
 IGN=$(cat $BUTANE_CFG | /tmp/butane -r -d /tmp | gzip | base64 -w0)
 
 IPCFG="ip=${external_lb_ip_address}::${gateway}:${mask}:lb::none nameserver=${dns_server}"
