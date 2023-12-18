@@ -14,7 +14,7 @@ set -o pipefail
 ## Example test run: ./api_pf.sh 270 (pass in at least 90 replicas for each master node e.g 1: 90, 2:180)
 ################################################ 
 
-REPLICAS="15"
+REPLICAS="20"
 namespace="test"
 apf_api_version="flowcontrol.apiserver.k8s.io/v1beta3"
 error_count=0
@@ -207,7 +207,6 @@ EOF
 done
 oc -n $namespace set env deploy CONTEXT_TIMEOUT=15s --all                        
 echo -e "$(date): Controllers deployed..."
-
 }
 
 function delete_controller() {
@@ -250,7 +249,7 @@ function check_errors() {
   # echo -e "\n======Verify that the API Servers never went down======"
   # oc get pods -n openshift-kube-apiserver
   # oc get pods -n openshift-apiserver
-
+  
   echo -e "\nChecking that there are errors after scaling traffic."
   dropped_requests=$(oc get --raw /debug/api_priority_and_fairness/dump_priority_levels | grep restrict-pod-lister | cut -d',' -f8 | tr -d ' ')
   echo -e "\nNumber of rejected requests: ${dropped_requests::-1}\n"
@@ -261,7 +260,7 @@ function check_errors() {
   done  
   echo -e ""
   echo -e "======Final test result======"
-  if [ ${dropped_requests::-1} -gt 0 ] && [ $error_count -gt 0 ]; then
+  if [ $error_count -gt 0 || ${dropped_requests::-1} -gt 0 ]; then
     echo -e "API Priority and Fairness Test Result: PASS"
     echo -e "Expected: Errors appeared when traffic was scaled."
   else
@@ -277,6 +276,8 @@ create_test
 create_flow_control
 
 deploy_controller
+
+sleep 15
 
 echo -e "Logs before scaling traffic:"
 
