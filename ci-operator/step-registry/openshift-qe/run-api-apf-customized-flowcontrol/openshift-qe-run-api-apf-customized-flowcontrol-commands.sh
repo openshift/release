@@ -260,7 +260,7 @@ function check_errors() {
   done  
   echo -e ""
   echo -e "======Final test result======"
-  if [ $error_count -gt 0 || ${dropped_requests::-1} -gt 0 ]; then
+  if [ $error_count -gt 0 ] || [ ${dropped_requests::-1} -gt 0 ]; then
     echo -e "API Priority and Fairness Test Result: PASS"
     echo -e "Expected: Errors appeared when traffic was scaled."
   else
