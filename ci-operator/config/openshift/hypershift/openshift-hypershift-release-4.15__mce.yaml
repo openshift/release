@@ -1,0 +1,69 @@
+base_images:
+  base:
+    name: "4.15"
+    namespace: ocp
+    tag: base
+  openshift_release_golang-1.19:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.19-linux
+images:
+- from: base
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: hypershift-operator
+promotion:
+  name: "2.5"
+  namespace: stolostron
+releases:
+  latest:
+    integration:
+      name: "4.15"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: hypershift-operator
+    env:
+      IMAGE_REPO: hypershift-operator
+      REGISTRY_ORG: stolostron
+      RELEASE_REF: backplane-2.5
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_RELEASE_BRANCH="backplane-2.5"
+        export OSCI_COMPONENT_NAME=hypershift-operator
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-4.15
+  org: openshift
+  repo: hypershift
+  variant: mce
