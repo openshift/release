@@ -25,7 +25,7 @@ releases:
     release:
       architecture: amd64
       channel: fast
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -42,9 +42,11 @@ tests:
 - as: fvt
   skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-opendatahub
     env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
     test:
     - as: modelmesh-serving-fvt
       commands: |
@@ -58,7 +60,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
-    workflow: ipi-aws
+    workflow: hypershift-hostedcluster-workflow
 - as: pr-image-mirror
   skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
   steps:
