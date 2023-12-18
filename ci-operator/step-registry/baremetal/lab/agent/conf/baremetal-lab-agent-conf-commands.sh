@@ -10,17 +10,20 @@ set -o pipefail
 
 INSTALL_DIR="/tmp/installer"
 mkdir -p "${INSTALL_DIR}"
-git clone -b master https://github.com/openshift-qe/agent-qe.git "${INSTALL_DIR}/agent-qe"
+
+git clone -b master https://github.com/openshift-qe/agent-qe.git "${SHARED_DIR}/agent-qe"
 
 pip install j2cli
 
 
 
-INVENTORY="${INSTALL_DIR}/agent-install-inventory.yaml"
+INVENTORY="${SHARED_DIR}/agent-install-inventory.yaml"
 
 echo "$(echo -en 'hosts:\n'; cat "${SHARED_DIR}/hosts.yaml")" > "${INVENTORY}"
 
 cp "${INVENTORY}" "${ARTIFACT_DIR}/"
+#cp "${INVENTORY}" "${SHARED_DIR}/"
+
 
 AGENT_CONFIG_YAML_FILENAME="agent-config.yaml"
 
@@ -28,6 +31,6 @@ if [ "${UNCONFIGURED_INSTALL}" == "true" ]; then
     AGENT_CONFIG_YAML_FILENAME="agent-config-unconfigured.yaml"
 fi
 
-/alabama/.local/bin/j2 "${INSTALL_DIR}/agent-qe/prow-utils/templates/agent-config.yaml.j2" "${INVENTORY}" -o "${ARTIFACT_DIR}/${AGENT_CONFIG_YAML_FILENAME}" 
+/alabama/.local/bin/j2 "${SHARED_DIR}/agent-qe/prow-utils/templates/agent-config.yaml.j2" "${INVENTORY}" -o "${SHARED_DIR}/${AGENT_CONFIG_YAML_FILENAME}" 
 
-cp "${ARTIFACT_DIR}/${AGENT_CONFIG_YAML_FILENAME}" "${SHARED_DIR}/"
+cp "${SHARED_DIR}/${AGENT_CONFIG_YAML_FILENAME}" "${ARTIFACT_DIR}/"
