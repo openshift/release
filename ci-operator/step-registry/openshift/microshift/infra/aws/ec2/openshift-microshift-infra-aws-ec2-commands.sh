@@ -166,17 +166,6 @@ Resources:
         - Key: Name
           Value: RHELPublicSubnet
 
-  RHELNatGatewayEIP:
-    Type: AWS::EC2::EIP
-    DependsOn: RHELGatewayAttachment
-    Properties:
-      Domain: vpc
-  RHELNatGateway:
-    Type: AWS::EC2::NatGateway
-    Properties:
-      AllocationId: !GetAtt RHELNatGatewayEIP.AllocationId
-      SubnetId: !Ref RHELPublicSubnet
-
   RHELRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
