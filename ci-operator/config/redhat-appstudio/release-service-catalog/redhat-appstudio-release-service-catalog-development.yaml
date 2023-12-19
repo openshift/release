@@ -1,0 +1,38 @@
+base_images:
+  e2e-test-runner:
+    name: redhat-appstudio
+    namespace: ci
+    tag: e2e-test-runner
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: release-pipelines-e2e-suite
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitlint|.yamllint|LICENSE)$
+  steps:
+    test:
+    - ref: redhat-appstudio-e2e
+    workflow: redhat-appstudio-claim
+zz_generated_metadata:
+  branch: development
+  org: redhat-appstudio
+  repo: release-service-catalog
