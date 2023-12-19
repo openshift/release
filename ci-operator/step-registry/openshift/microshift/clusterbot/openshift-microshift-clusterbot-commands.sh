@@ -5,8 +5,6 @@ export PS4='+ $(date "+%T.%N") \011'
 # TODO:
 # - Handle MICROSHIFT_GIT=PR_URL
 
-CURRENT_RELEASE=4.15
-
 # | Instance Type | Arch   | vCPUs | GiB |
 # |---------------|--------|-------|-----|
 # | t3.large      | x86_64 | 2     | 8   |
@@ -45,7 +43,6 @@ ARCH=${MICROSHIFT_ARCH}
 MICROSHIFT_GIT=${MICROSHIFT_GIT}
 EC2_INSTANCE_TYPE=${EC2_INSTANCE_TYPE}
 OCP_VERSION=${OCP_VERSION}
-CURRENT_RELEASE=${CURRENT_RELEASE}
 EOF
 
 cat "${MICROSHIFT_CLUSTERBOT_SETTINGS}"

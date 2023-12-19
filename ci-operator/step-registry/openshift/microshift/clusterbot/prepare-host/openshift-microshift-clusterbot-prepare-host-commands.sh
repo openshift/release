@@ -36,13 +36,13 @@ export PS4='+ $(date "+%T.%N") \011'
 
 source /tmp/microshift-clusterbot-settings
 
-sudo dnf clean all
-
 if ! sudo subscription-manager status >&/dev/null; then
 	sudo subscription-manager register \
 		--org="$(cat /tmp/subscription-manager-org)" \
 		--activationkey="$(cat /tmp/subscription-manager-act-key)"
 fi
+
+sudo dnf clean all
 hash git || sudo dnf install -y git-core
 
 sudo mkdir -p /etc/microshift
@@ -52,16 +52,6 @@ if [[ -z "${MICROSHIFT_GIT+x}" ]] || [[ "${MICROSHIFT_GIT}" == "" ]]; then
 	: MICROSHIFT_GIT unset or empty - use release-OCP_VERSION to checkout right scripts and install MicroShift from repositories
 
 	git clone https://github.com/openshift/microshift -b "release-${OCP_VERSION}" ~/microshift
-
-	if [[ "${OCP_VERSION}" != "${CURRENT_RELEASE}" ]]; then
-		: Enabling right version of RHOCP repositories as the one from configure-vm.sh lags one behind
-        : But only for released versions
-		sudo subscription-manager config --rhsm.manage_repos=1
-		OS_VERSION=$(awk -F: '{print $5}' /etc/system-release-cpe)
-		sudo subscription-manager repos \
-			--enable "rhocp-${OCP_VERSION}-for-rhel-${OS_VERSION}-$(uname -m)-rpms" \
-			--enable "fast-datapath-for-rhel-${OS_VERSION}-$(uname -m)-rpms"
-	fi
 
     : Install oc, set up firewall, etc.
 	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall --no-build --no-build-deps /tmp/pull-secret
