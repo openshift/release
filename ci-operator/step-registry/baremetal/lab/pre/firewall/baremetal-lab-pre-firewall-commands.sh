@@ -37,16 +37,16 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   INTERNAL_NET_CIDR="${1}"
   IP_ARRAY="${@:2}"
   for ip in $IP_ARRAY; do
+    # TODO: change to firewalld or nftables
     iptables -A FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" -j DROP
   done
 EOF
 
 # mirror-images-by-oc-adm will run only if a specific file is found, see step code
-
 cp "${CLUSTER_PROFILE_DIR}/mirror_registry_url" "${SHARED_DIR}/mirror_registry_url"
 
 proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
-cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
+cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=${proxy}
 export HTTPS_PROXY=${proxy}
 

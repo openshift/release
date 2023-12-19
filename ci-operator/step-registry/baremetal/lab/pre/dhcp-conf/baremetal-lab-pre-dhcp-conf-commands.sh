@@ -22,7 +22,7 @@ fi
 
 echo "Generating the DHCP/PXE config..."
 
-DHCP_CONF="#DO NOT EDIT; BEGIN $CLUSTER_NAME
+DHCP_CONF="# DO NOT EDIT; BEGIN $CLUSTER_NAME
 dhcp-option-force=tag:$CLUSTER_NAME,15,$CLUSTER_NAME.$BASE_DOMAIN
 dhcp-option-force=tag:$CLUSTER_NAME,119,$CLUSTER_NAME.$BASE_DOMAIN"
 
@@ -43,6 +43,6 @@ DHCP_CONF="${DHCP_CONF}
 
 echo "Setting the DHCP/PXE config in the auxiliary host..."
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "'${DHCP_CONF}'" <<'EOF'
-  echo -e "${1}" >> /opt/dhcpd/root/etc/dnsmasq.conf
-  docker restart dhcpd
+  echo -e "${1}" >> /opt/dnsmasq/etc/dnsmasq.conf
+  systemctl restart dhcp
 EOF

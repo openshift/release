@@ -16,7 +16,7 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${CLUSTER_NA
   set -o nounset
   CLUSTER_NAME="${1}"
   sed -i "/; BEGIN ${CLUSTER_NAME}/,/; END ${CLUSTER_NAME}$/d" /opt/bind9_zones/{zone,internal_zone.rev}
-  docker start bind9
-  docker exec bind9 rndc reload
-  docker exec bind9 rndc flush
+  podman start bind9
+  podman exec bind9 rndc reload
+  podman exec bind9 rndc flush
 EOF

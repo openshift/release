@@ -27,6 +27,6 @@ dhcp-boot=tag:${CLUSTER_NAME},pxe.disabled
 echo "Restart the DHCP/PXE container in the auxiliary host..."
 
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "'${DHCP_CONF}'" <<'EOF'
-  echo -e "${1}" >> /opt/dhcpd/root/etc/dnsmasq.conf
-  docker restart dhcpd
+  echo -e "${1}" >> /opt/dnsmasq/etc/dnsmasq.conf
+  systemctl restart dhcp
 EOF

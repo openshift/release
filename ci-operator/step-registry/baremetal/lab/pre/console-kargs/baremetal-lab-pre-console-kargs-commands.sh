@@ -37,7 +37,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   mac_prefix=${mac//:/-}
   role=${name%%-[0-9]*}
   role=${role%%-a*}
-  echo "Rendering ignition for ${name} (${role}) - ${bmc_address}..."
+  echo "Rendering ignition for ${name} (${role}) - #${host}..."
   butane --strict --raw -o "${SHARED_DIR}/${mac_prefix}-console-hook.ign" <<EOF
 variant: fcos
 version: 1.3.0

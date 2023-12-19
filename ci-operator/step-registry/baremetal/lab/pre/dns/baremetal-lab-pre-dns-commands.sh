@@ -45,7 +45,6 @@ ${name}.${CLUSTER_NAME} IN A ${ip}"
 $(echo "${ip}." | ( rip=""; while read -r -d . b; do rip="$b${rip+.}${rip}"; done; echo "$rip" ))in-addr.arpa. IN PTR ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}."
 done
 
-# TODO verify if the installation works with no external reverse dns entries
 # TODO add ipv6 (single and dual stack?)
 
 DNS_REVERSE_INTERNAL="${DNS_REVERSE_INTERNAL}
@@ -72,7 +71,6 @@ echo -e "${DNS_REVERSE_INTERNAL}" >> /opt/bind9_zones/internal_zone.rev
 
 echo "Increasing the zones serial"
 sed -i "s/^.*; serial/$(date +%s); serial/" /opt/bind9_zones/{zone,internal_zone.rev}
-docker start bind9
-docker exec bind9 rndc reload
-docker exec bind9 rndc flush
+podman exec bind9 rndc reload
+podman exec bind9 rndc flush
 EOF
