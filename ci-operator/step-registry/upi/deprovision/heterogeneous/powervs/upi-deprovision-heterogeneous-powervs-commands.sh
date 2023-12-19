@@ -94,7 +94,7 @@ function cleanup_ibmcloud_powervs() {
     ic resource service-instance-delete "${CRN}" --force --recursive
     for COUNT in $(seq 0 5)
     do
-      FIND=$(ibmcloud pi sl 2> /dev/null| grep "${CRN}" || true)
+      FIND=$(ic pi sl 2> /dev/null| grep "${CRN}" || true)
       echo "FIND: ${FIND}"
       if [ -z "${FIND}" ]
       then

@@ -105,7 +105,7 @@ function cleanup_ibmcloud_powervs() {
     ic resource service-instance-delete "${CRN}" --force --recursive || true
     for COUNT in $(seq 0 5)
     do
-      FIND=$(ibmcloud pi sl 2> /dev/null| grep "${CRN}" || true)
+      FIND=$(ic pi sl 2> /dev/null| grep "${CRN}" || true)
       echo "FIND: ${FIND}"
       if [ -z "${FIND}" ]
       then
@@ -283,7 +283,7 @@ case "$CLUSTER_TYPE" in
       do
         COUNTER=$((COUNTER+1)) 
         TEMP_STATE="NOT_READY"
-        if [ "$(ibmcloud resource search "crn:\"${CRN}\"" --output json | jq -r '.items | length')" != "0" ]
+        if [ "$(ic resource search "crn:\"${CRN}\"" --output json | jq -r '.items | length')" != "0" ]
         then
             TEMP_STATE="$(ic resource service-instance -g "${RESOURCE_GROUP}" "${CRN}" --output json --type service_instance  | jq -r '.[].state')"
         fi
