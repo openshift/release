@@ -6,8 +6,17 @@ set -o pipefail
 
 shopt -s nullglob
 
+# Archive results function
+function cleanup-collect() {
+    #cleanup
+    echo "Running cleanup: deleting tests.properties file"
+    rm test.properties
+    echo "Collecting maven results into {$ARTIFACT_DIR}"
+    cp ./eap* $ARTIFACT_DIR
+}
+
 #Debug test execution
-trap 'sleep 4h' EXIT
+trap 'cleanup-collect' EXIT
 
 # Copy kubeconfig file into current dir
 cp /var/run/secrets/ci.openshift.io/multi-stage/kubeconfig ./
@@ -45,14 +54,14 @@ xtf.openshift.namespace=pit
 xtf.bm.namespace=pit-builds
 EOF
 
-# TOKEN=$(oc whoami -t)
 # oc delete configmap test-properties -n "${1}" || true
 # oc create configmap test-properties -n "${1}" --from-file=/tmp/test.properties
 
-# Execute tests
+echo "Executing pit-74 tests"
 mvn clean -e test -Dmaven.repo.local=./repo -Dxtf.operator.properties.skip.installation=true -P74-openjdk11,eap-pit-74 --log-file eap-74.txt
-# Tag for 4.15:
+echo "Executing pit-7.4.x tag for 4.15"
 mvn clean -e test -Dmaven.repo.local=./repo -P74-openjdk11,eap-pit-7.4.x --log-file eap_74x.txt
 
-#cleanup
-rm test.properties
+# rename TEST junit_TEST ${ARTIFACT_DIR}/TEST*.xml
+# cp eap-74.txt $ARTIFACT_DIR/eap-74.txt
+# cp eap_74x.txt $ARTIFACT_DIR/eap_74x.txt
