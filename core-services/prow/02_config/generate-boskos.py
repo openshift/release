@@ -93,6 +93,9 @@ CONFIG = {
     'aws-pipelines-performance-quota-slice': {
         'eu-west-1': 10
     },
+    'aws-rhdh-performance-quota-slice': {
+        'eu-west-1': 10
+    },
     'aws-opendatahub-quota-slice': {
         # Wild guesses. We can re-configure later
         # https://docs.ci.openshift.org/docs/architecture/quota-and-leases/#adding-a-new-type-of-resource
