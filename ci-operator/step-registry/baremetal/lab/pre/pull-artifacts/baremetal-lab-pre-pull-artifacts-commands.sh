@@ -32,8 +32,8 @@ function pull_artifacts() {
     set -o errexit
     set -o pipefail
     arch=${5}
-    wget -O "/opt/tftpboot/${1}/vmlinuz_${arch}" "${2}"
-    wget -O "/opt/tftpboot/${1}/initramfs_${arch}.img" "${3}"
+    wget -O "/opt/dnsmasq/tftpboot/${1}/vmlinuz_${arch}" "${2}"
+    wget -O "/opt/dnsmasq/tftpboot/${1}/initramfs_${arch}.img" "${3}"
     wget -O "/opt/html/${1}/rootfs-${arch}.img" "${4}"
 EOF
 }

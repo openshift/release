@@ -63,4 +63,4 @@ EOF
 done
 
 echo "Uploading the GRUB2 config to the auxiliary host..."
-scp "${SSHOPTS[@]}" "${GRUB_DIR}"/grub.cfg-01-* "root@${AUX_HOST}:/opt/tftpboot"
+scp "${SSHOPTS[@]}" "${GRUB_DIR}"/grub.cfg-01-* "root@${AUX_HOST}:/opt/dnsmasq/tftpboot"

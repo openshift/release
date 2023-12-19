@@ -36,10 +36,10 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   CLUSTER_NAME="${1}"; shift
   MAC_ARRAY=("$@")
   echo "Removing the DHCP/PXE config..."
-  sed -i "/; BEGIN ${CLUSTER_NAME}/,/; END ${CLUSTER_NAME}$/d" /opt/dhcpd/root/etc/dnsmasq.conf
-  docker restart dhcpd
+  sed -i "/; BEGIN ${CLUSTER_NAME}/,/; END ${CLUSTER_NAME}$/d" /opt/dnsmasq/etc/dnsmasq.conf
+  systemctl restart dhcp
   echo "Removing the grub config..."
   for mac in "${MAC_ARRAY[@]}"; do
-    rm -f "/opt/tftpboot/grub.cfg-01-$(echo "$mac" | tr ':' '-')" || echo "no grub.cfg for $mac."
+    rm -f "/opt/dnsmasq/tftpboot/grub.cfg-01-$(echo "$mac" | tr ':' '-')" || echo "no grub.cfg for $mac."
   done
 EOF

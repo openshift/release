@@ -27,13 +27,24 @@ function oinst() {
 }
 
 function prepare_bmc() {
-  local bmc_address="${1}"
-  local bmc_user="${2}"
-  local bmc_pass="${3}"
-  ipmitool -I lanplus -H "$bmc_address" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    chassis bootparam set bootflag force_pxe options=PEF,watchdog,reset,power
-  ipmitool -I lanplus -H "$bmc_address" \
+  local bmc_host="${1}"
+  local bmc_port="${2}"
+  local bmc_user="${3}"
+  local bmc_pass="${4}"
+  local ipxe_via_vmedia="${5}"
+  local host="${bmc_port##1[0-9]}"
+  host="${host##0}"
+  # HPE iLO6 BMCs on RL300 do not have drivers for BCM5720 NICs, use vmedia to load ipxe.usb
+  # See https://issues.redhat.com/browse/OCPQE-18370
+  if [ "$ipxe_via_vmedia" == "true" ]; then
+    echo "Host #$host will boot via ipxe on vmedia..."
+    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" mount.vmedia.ipxe "${host}"
+  else
+    ipmitool -I lanplus -H "${bmc_host}" -p "${bmc_port}" \
+      -U "$bmc_user" -P "$bmc_pass" \
+      chassis bootparam set bootflag force_pxe options=PEF,watchdog,reset,power
+  fi
+  ipmitool -I lanplus -H "${bmc_host}" -p "${bmc_port}" \
     -U "$bmc_user" -P "$bmc_pass" \
     power off || echo "Already off"
 }
@@ -149,8 +160,8 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # Patch the install-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
   yq --inplace eval-all 'select(fileIndex == 0).platform.baremetal.hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
     "$SHARED_DIR/install-config.yaml" - <<< "$ADAPTED_YAML"
-  echo "Power off ${bmc_address//.*/} (${name}) and prepare host bmc conf for installation..."
-  prepare_bmc "${bmc_address}" "${bmc_user}" "${bmc_pass}"
+  echo "Power off #${host} (${name}) and prepare host bmc conf for installation..."
+  prepare_bmc "${AUX_HOST}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}"
 done
 
 mkdir -p "${INSTALL_DIR}"
