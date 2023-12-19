@@ -45,6 +45,9 @@ fi
 echo "$(date -u --rfc-3339=seconds) - Creating platform-conf.sh file..."
 cat >>"${SHARED_DIR}/platform-conf.sh" <<EOF
 export PLATFORM=vsphere
+# disable capture logs in pytest to prevent leaking vsphere password
+export PYTEST_FLAGS="--error-for-skips --show-capture=no"
+
 export VIP_DHCP_ALLOCATION=false
 export VSPHERE_PARENT_FOLDER=assisted-test-infra-ci
 export VSPHERE_FOLDER="build-${BUILD_ID}"
