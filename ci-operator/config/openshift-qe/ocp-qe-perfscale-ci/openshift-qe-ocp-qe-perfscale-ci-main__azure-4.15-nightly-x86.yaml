@@ -1,0 +1,53 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: prow/Dockerfile
+  to: ocp-qe-perfscale-ci-azure-415
+promotion:
+  namespace: ci
+  tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: control-plane-ipsec-24nodes
+  cron: 0 12 * * 3
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: Standard_D4s_v3
+      CUSTOM_AZURE_REGION: centralus
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
+  timeout: 8h0m0s
+- always_run: false
+  as: control-plane-ipsec-3nodes
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      CUSTOM_AZURE_REGION: centralus
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: azure-4.15-nightly-x86
