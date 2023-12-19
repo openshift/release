@@ -83,5 +83,18 @@ capabilities:
   baselineCapabilitySet: ${selected_cap_set}
 EOF
 
+#To enable required capablities whatever baselineCapabilitySet setting
+if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "" ]]; then
+    echo "Enable required capabilities: ${ADDITIONAL_ENABLED_CAPABILITIES}"
+    cat >> "${PATCH}" << EOF
+  additionalEnabledCapabilities:
+EOF
+    for item in ${ADDITIONAL_ENABLED_CAPABILITIES}; do
+        cat >> "${PATCH}" << EOF
+    - ${item}
+EOF
+    done
+fi
+
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 cat ${PATCH}
