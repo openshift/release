@@ -12,6 +12,12 @@ HOME_PATH=$(pwd) && echo $HOME_PATH
 #Create new AWS EC2 Instatnce to deploy Quay OMR
 OMR_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-omr-secret/access_key)
 OMR_AWS_SECRET_KEY=$(cat /var/run/quay-qe-omr-secret/secret_key)
+
+#Retrieve the Credentials of image registry "brew.registry.redhat.io"
+OMR_BREW_USERNAME=$(cat /var/run/quay-qe-brew-secret/username)
+OMR_BREW_PASSWORD=$(cat /var/run/quay-qe-brew-secret/password)
+OMR_IMAGE_TAG="brew.registry.redhat.io/rh-osbs/${OMR_IMAGE}"
+OMR_RELEASED_TEST="${OMR_RELEASE}"
 OMR_CI_NAME="omrprowci$RANDOM"
 
 ####################
@@ -130,8 +136,12 @@ resource "aws_instance" "quaybuilder" {
   provisioner "remote-exec" {
     inline = [
       "sudo yum install podman openssl -y",
-      "curl -L -o mirror-registry.tar.gz https://developers.redhat.com/content-gateway/rest/mirror/pub/openshift-v4/clients/mirror-registry/latest/mirror-registry.tar.gz --retry 12",
+      "podman login brew.registry.redhat.io -u '${OMR_BREW_USERNAME}' -p ${OMR_BREW_PASSWORD}",
+      "echo ${OMR_IMAGE_TAG}",
+      "if [ ${OMR_RELEASED_TEST} = false ]; then podman cp \$(podman create --rm ${OMR_IMAGE_TAG}):/mirror-registry.tar.gz .; fi",
+      "if [ ${OMR_RELEASED_TEST} = true ]; then curl -L -o mirror-registry.tar.gz https://developers.redhat.com/content-gateway/rest/mirror/pub/openshift-v4/clients/mirror-registry/latest/mirror-registry.tar.gz --retry 12; fi",
       "tar -xzvf mirror-registry.tar.gz",
+      "./mirror-registry --version",
       "./mirror-registry install --quayHostname \${aws_instance.quaybuilder.public_dns} --initPassword password --initUser quay -v"
     ]
   }

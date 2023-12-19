@@ -1,0 +1,42 @@
+base_images:
+  upi-installer:
+    name: "4.15"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: quay-omr-tests-omr-ocp415-disconnected-unreleased
+  cron: 0 0 1 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OMR_RELEASE: "false"
+    post:
+    - chain: quay-tests-aws-ipi-disconnected-private-deprovision
+    test:
+    - chain: quay-tests-aws-ipi-disconnected-private-provision
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay-tests
+  variant: omr-ocp415-unreleased
