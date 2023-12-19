@@ -85,7 +85,7 @@ test -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" || echo "ssh-publickey file does 
 cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" ~/.ssh/ssh-publickey || true
 chmod 0644 ~/.ssh/ssh-publickey || true
 eval export SSH_CLOUD_PUB_KEY="~/.ssh/ssh-publickey"
-
+sleep 14400
 #set env for rosa which are required by hypershift qe team
 if test -f "${CLUSTER_PROFILE_DIR}/ocm-token"
 then
