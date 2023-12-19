@@ -50,9 +50,18 @@ images:
   to: tests-private-ui
 - dockerfile_literal: |
     FROM bin AS builder
+    RUN mkdir -p /tmp/opmbuild && cd /tmp/opmbuild && pwd && export MIRROR2URL="https://mirror2.openshift.com/pub/openshift-v4" && CLIENTURL=${MIRROR2URL}/x86_64/clients/ocp/candidate && \
+        curl -s -k -L ${MIRROR2URL}/x86_64/clients/ocp/ -o ocp.html && curl -s -k -L ${MIRROR2URL}/x86_64/clients/ocp-dev-preview/ -o pre.html  && \
+        ecver=$(grep -E "<a href=\"candidate-4\.15" pre.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${ecver}V"  && \
+        if [ "V${ecver}V" != "VV"  ]; then CLIENTURL=${MIRROR2URL}/x86_64/clients/ocp-dev-preview/${ecver}; fi  && \
+        rcgaver=$(grep -E "<a href=\"4\.15" ocp.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${rcgaver}V"  && \
+        if [ "V${rcgaver}V" != "VV"  ]; then CLIENTURL=${MIRROR2URL}/x86_64/clients/ocp/${rcgaver}; fi  && \
+        curl -s -k -L ${CLIENTURL}/opm-src.tar.gz -o opm-src.tar.gz  &&  tar -vzxf opm-src.tar.gz && opmdir=$(find ./ -type d -name "operator-framework-olm*") && \
+        cd $opmdir && make build/opm && cp ./bin/opm /tmp/opm
     FROM registry.ci.openshift.org/ci/tests-private-base:4.15
     RUN mkdir -p /go/src/github.com/openshift
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+    COPY --from=builder /tmp/opm /usr/bin
     RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
         rm -rf /usr/bin/oc /usr/bin/kubectl
     WORKDIR /go/src/github.com/openshift/openshift-tests-private
@@ -166,7 +175,8 @@ tests:
         if [ "V${ecver}V" != "VV"  ]; then CLIENTURL=${MIRROR2URL}/x86_64/clients/ocp-dev-preview/${ecver}; fi
         rcgaver=$(grep -E "<a href=\"4\.15" ocp.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo "V${rcgaver}V"
         if [ "V${rcgaver}V" != "VV"  ]; then CLIENTURL=${MIRROR2URL}/x86_64/clients/ocp/${rcgaver}; fi
-        curl -s -k -L ${CLIENTURL}/opm-linux.tar.gz -o opm.tar.gz && tar -C ${HOME} -xzvf opm.tar.gz && rm -fr opm.tar.gz
+        # curl -s -k -L ${CLIENTURL}/opm-linux.tar.gz -o opm.tar.gz && tar -C ${HOME} -xzvf opm.tar.gz && rm -fr opm.tar.gz
+        opm version
         curl -s -k -L ${CLIENTURL}/oc-mirror.tar.gz -o om.tar.gz && tar -C ${HOME} -xzvf om.tar.gz && chmod +x ${HOME}/oc-mirror && rm -f om.tar.gz
 
         SDKURL=${MIRROR2URL}/x86_64/clients/operator-sdk/pre-release
