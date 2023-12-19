@@ -53,7 +53,7 @@ EOF
 
 if [ $((failures)) != 0 ] ; then
     echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
-    readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | cut -d':' -f3- | sed -E 's/^( +)//' | sort)
+    readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | cut -d':' -f3- | sed -E 's/^( +)//;s/\x1b\[[0-9;]*m$//' | sort)
     for (( i=0; i<failures; i++ )) ; do
         echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
     done
