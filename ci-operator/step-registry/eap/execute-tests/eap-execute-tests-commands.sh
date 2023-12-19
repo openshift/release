@@ -16,7 +16,7 @@ function cleanup-collect() {
 }
 
 #Debug test execution
-trap 'cleanup-collect' EXIT
+trap 'cleanup-collect' SIGINT SIGTERM ERR EXIT
 
 # Copy kubeconfig file into current dir
 cp /var/run/secrets/ci.openshift.io/multi-stage/kubeconfig ./
