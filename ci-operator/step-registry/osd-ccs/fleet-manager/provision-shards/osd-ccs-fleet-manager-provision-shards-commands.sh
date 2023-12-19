@@ -17,7 +17,7 @@ ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 
 # Get the rovision shard list by region, by sector
 echo "Get the ${CLUSTER_SECTOR} provision shard list in ${REGION} ..."
-psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${REGION}'" | jq -r '.items[].provision_shard_reference.id')
+psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${REGION}' and status is 'ready' " | jq -r '.items[].provision_shard_reference.id')
 if [[ -z "$psList" ]]; then
   echo "No available provision shard!"
   exit 1
