@@ -90,6 +90,12 @@ CONFIG = {
     'aws-rhtap-performance-quota-slice': {
         'eu-west-1': 10
     },
+    'aws-pipelines-performance-quota-slice': {
+        'eu-west-1': 10
+    },
+    'aws-rhdh-performance-quota-slice': {
+        'eu-west-1': 10
+    },
     'aws-opendatahub-quota-slice': {
         # Wild guesses. We can re-configure later
         # https://docs.ci.openshift.org/docs/architecture/quota-and-leases/#adding-a-new-type-of-resource
@@ -324,6 +330,11 @@ CONFIG = {
         'us-east-1': 50,
         'us-east-2': 50,
         'us-west-2': 50,
+    },
+    'medik8s-aws-quota-slice': {
+        'us-east-1': 10,
+        'us-east-2': 10,
+        'us-west-2': 10,
     },
 }
 

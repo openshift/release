@@ -15,9 +15,10 @@ images:
 - dockerfile_path: build/ci-tf-bin.Dockerfile
   to: rhcs-tf-bin
 promotion:
-  namespace: ci
-  tag: latest
-  tag_by_commit: true
+  to:
+  - namespace: ci
+    tag: latest
+    tag_by_commit: true
 releases:
   latest:
     integration:
@@ -122,6 +123,32 @@ tests:
     cluster_profile: aws-terraform-qe
     env:
       CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-pl
+      REGION: us-east-1
+      RHCS_ENV: staging
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- always_run: false
+  as: rosa-sts-advanced-optional-critical-high-presubmit
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-ad
+      REGION: ap-northeast-1
+      RHCS_ENV: staging
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- always_run: false
+  as: rosa-sts-private-optional-critical-high-presubmit
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
       REGION: us-east-1
