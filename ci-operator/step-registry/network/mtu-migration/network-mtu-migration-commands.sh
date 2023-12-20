@@ -69,9 +69,9 @@ wait_for_mcp() {
   log "Waiting for all MachineConfigPools to finish updating..."
   timeout "${timeout}" bash <<EOT
     until
-      oc wait mcp --all --for='condition=UPDATED=True' --timeout=10s 2>/dev/null && \
-      oc wait mcp --all --for='condition=UPDATING=False' --timeout=10s 2>/dev/null && \
-      oc wait mcp --all --for='condition=DEGRADED=False' --timeout=10s;
+      oc wait mcp --all --for='condition=UPDATED=True' --timeout=30s 2>/dev/null && \
+      oc wait mcp --all --for='condition=UPDATING=False' --timeout=30s 2>/dev/null && \
+      oc wait mcp --all --for='condition=DEGRADED=False' --timeout=30s;
     do
       sleep 10
     done
@@ -84,9 +84,9 @@ wait_for_co() {
   log "Waiting for all ClusterOperators to update..."
   timeout "${timeout}" bash <<EOT
   until
-    oc wait co --all --for='condition=AVAILABLE=True' --timeout=10s &>/dev/null && \
-    oc wait co --all --for='condition=PROGRESSING=False' --timeout=10s &>/dev/null && \
-    oc wait co --all --for='condition=DEGRADED=False' --timeout=10s &>/dev/null;
+    oc wait co --all --for='condition=AVAILABLE=True' --timeout=30s >/dev/null && \
+    oc wait co --all --for='condition=PROGRESSING=False' --timeout=30s >/dev/null && \
+    oc wait co --all --for='condition=DEGRADED=False' --timeout=30s >/dev/null;
   do
     sleep 10
   done
