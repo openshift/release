@@ -1,8 +1,8 @@
 base_images:
-  openshift_release_rhel-9-release-golang-1.20-openshift-4.15:
+  openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.20-openshift-4.15
+    tag: rhel-9-release-golang-1.21-openshift-4.16
   operator-sdk:
     name: "4.16"
     namespace: origin
@@ -22,9 +22,9 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile.ci
   inputs:
-    openshift_release_rhel-9-release-golang-1.20-openshift-4.15:
+    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
   to: windows-machine-config-operator-test
 operator:
   bundles:
@@ -36,11 +36,12 @@ operator:
   - pullspec: REPLACE_IMAGE
     with: pipeline:windows-machine-config-operator-test
 promotion:
-  additional_images:
-    windows-machine-config-operator-bundle: wmco-bundle
-  disabled: true
-  name: "4.16"
-  namespace: ocp
+  to:
+  - additional_images:
+      windows-machine-config-operator-bundle: wmco-bundle
+    disabled: true
+    name: "4.16"
+    namespace: ocp
 releases:
   latest:
     integration:
@@ -83,7 +84,6 @@ tests:
     from: src
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: security
-  optional: true
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
