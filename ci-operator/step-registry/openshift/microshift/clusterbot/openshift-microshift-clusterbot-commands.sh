@@ -16,6 +16,7 @@ declare -A instance_types=(
 	[arm64]=t4g.large
 )
 
+# shellcheck disable=SC2153  # possible misspelling
 if [[ "${MICROSHIFT_OS}" != "rhel-9.2" ]] && [[ "${MICROSHIFT_OS}" != "rhel-9.3" ]]; then
 	echo "MICROSHIFT_OS must have value: rhel-9.2 or rhel-9.3"
 	exit 1
@@ -36,11 +37,17 @@ if [[ -z "${EC2_INSTANCE_TYPE+x}" ]] || [[ "${EC2_INSTANCE_TYPE}" == "" ]]; then
 	EC2_INSTANCE_TYPE="${instance_types[${MICROSHIFT_ARCH}]}"
 fi
 
+if [ -n "${MICROSHIFT_PR}" ] && [ -n "${MICROSHIFT_GIT}" ]; then
+	>&2 echo "Only MICROSHIFT_PR or MICROSHIFT_GIT can be provided"
+	exit 1
+fi
+
 MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
 cat <<EOF >"${MICROSHIFT_CLUSTERBOT_SETTINGS}"
 MICROSHIFT_OS=${MICROSHIFT_OS}
 ARCH=${MICROSHIFT_ARCH}
 MICROSHIFT_GIT=${MICROSHIFT_GIT}
+MICROSHIFT_PR=${MICROSHIFT_PR}
 EC2_INSTANCE_TYPE=${EC2_INSTANCE_TYPE}
 OCP_VERSION=${OCP_VERSION}
 EOF
