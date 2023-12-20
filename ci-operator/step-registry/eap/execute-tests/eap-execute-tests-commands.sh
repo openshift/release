@@ -12,7 +12,6 @@ function cleanup-collect() {
     echo "Running cleanup: deleting tests.properties file"
     rm test.properties
     echo "Collecting maven results into {$ARTIFACT_DIR}"
-    cp ./eap* $ARTIFACT_DIR
     cp ./test-eap/target/surefire-reports/TEST*.xml $ARTIFACT_DIR
     rename TEST junit_TEST ${ARTIFACT_DIR}/TEST*.xml
 }
