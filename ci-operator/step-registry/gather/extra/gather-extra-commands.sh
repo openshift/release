@@ -90,8 +90,6 @@ queue ${ARTIFACT_DIR}/persistentvolumeclaims.json oc --insecure-skip-tls-verify 
 queue ${ARTIFACT_DIR}/oc_cmds/persistentvolumeclaims oc --insecure-skip-tls-verify --request-timeout=5s get persistentvolumeclaims --all-namespaces -o wide
 FILTER=gzip queue ${ARTIFACT_DIR}/replicasets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/replicasets oc --insecure-skip-tls-verify --request-timeout=5s get replicasets --all-namespaces -o wide
-queue ${ARTIFACT_DIR}/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
-queue ${ARTIFACT_DIR}/oc_cmds/rolebindings oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces
 queue ${ARTIFACT_DIR}/roles.json oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/roles oc --insecure-skip-tls-verify --request-timeout=5s get roles --all-namespaces
 queue ${ARTIFACT_DIR}/services.json oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces -o json
@@ -105,6 +103,15 @@ queue ${ARTIFACT_DIR}/oc_cmds/subscriptions oc --insecure-skip-tls-verify --requ
 queue ${ARTIFACT_DIR}/clusterserviceversions.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterserviceversions --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/clusterserviceversions oc --insecure-skip-tls-verify --request-timeout=5s get clusterserviceversions --all-namespaces
 queue ${ARTIFACT_DIR}/releaseinfo.json oc --insecure-skip-tls-verify --request-timeout=5s adm release info -o json
+queue ${ARTIFACT_DIR}/clusterroles.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterroles --all-namespaces -o json
+queue ${ARTIFACT_DIR}/oc_cmds/clusterroles_rbac oc --insecure-skip-tls-verify --request-timeout=5s describe clusterroles.rbac
+queue ${ARTIFACT_DIR}/oc_cmds/clusterroles oc --insecure-skip-tls-verify --request-timeout=5s get clusterroles --all-namespaces
+queue ${ARTIFACT_DIR}/clusterrolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterrolebindings --all-namespaces -o json
+queue ${ARTIFACT_DIR}/oc_cmds/clusterrolebindings_rbac oc --insecure-skip-tls-verify --request-timeout=5s describe clusterrolebindings.rbac
+queue ${ARTIFACT_DIR}/oc_cmds/clusterrolebindings oc --insecure-skip-tls-verify --request-timeout=5s get clusterrolebindings --all-namespaces
+queue ${ARTIFACT_DIR}/rolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces -o json
+queue ${ARTIFACT_DIR}/oc_cmds/rolebindings_rbac oc --insecure-skip-tls-verify --request-timeout=5s describe rolebindings.rbac
+queue ${ARTIFACT_DIR}/oc_cmds/rolebindings oc --insecure-skip-tls-verify --request-timeout=5s get rolebindings --all-namespaces
 
 FILTER=gzip queue ${ARTIFACT_DIR}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 
