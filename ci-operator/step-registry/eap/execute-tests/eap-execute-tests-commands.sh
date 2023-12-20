@@ -13,8 +13,8 @@ function cleanup-collect() {
     rm test.properties
     echo "Collecting maven results into {$ARTIFACT_DIR}"
     cp ./eap* $ARTIFACT_DIR
-    # rename TEST junit_TEST ${ARTIFACT_DIR}/TEST*.xml
-    sleep 1h
+    cp ./test-eap/target/surefire-reports/TEST*.xml $ARTIFACT_DIR
+    rename TEST junit_TEST ${ARTIFACT_DIR}/TEST*.xml
 }
 
 #Debug test execution
@@ -29,7 +29,7 @@ KUBECONFIG=kubeconfig
 export KUBEADMIN_PWD
 export KUBECONFIG
 
-# oc login as kube:admin
+echo "Login to the cluster as kubeadmin"
 oc login -u kubeadmin -p $KUBEADMIN_PWD
 
 OPENSHIFT_API_URL=$(oc config view --minify -o jsonpath='{.clusters[*].cluster.server}')
@@ -55,7 +55,6 @@ xtf.config.master.ssh_username=core
 xtf.openshift.namespace=pit
 xtf.bm.namespace=pit-builds
 EOF
-
 
 echo "Executing EAP 74 tests"
 mvn clean -e test -Dmaven.repo.local=./repo -Dxtf.operator.properties.skip.installation=true -P74-openjdk11,eap-pit-74 --log-file eap-74.txt
