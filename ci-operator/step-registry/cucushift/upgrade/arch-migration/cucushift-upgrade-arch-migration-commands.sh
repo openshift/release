@@ -166,32 +166,47 @@ function wait_clusteroperators_continous_success() {
 }
 
 function check_mcp() {
-    local updating_mcp unhealthy_mcp
+    local updating_mcp unhealthy_mcp tmp_output
 
-    updating_mcp=$(oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status --no-headers | grep -v "False")
-    if [[ -n "${updating_mcp}" ]]; then
-        echo "Some mcp is updating..."
-        echo "${updating_mcp}"
+    tmp_output=$(mktemp)
+    oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status --no-headers > "${tmp_output}" || true
+    # using the size of output to determinate if oc command is executed successfully
+    if [[ -s "${tmp_output}" ]]; then
+        updating_mcp=$(cat "${tmp_output}" | grep -v "False")
+        if [[ -n "${updating_mcp}" ]]; then
+            echo "Some mcp is updating..."
+            echo "${updating_mcp}"
+            return 1
+        fi
+    else
+        echo "Did not run "oc get mcp" successfully!"
         return 1
     fi
 
     # Do not check UPDATED on purpose, beause some paused mcp would not update itself until unpaused
-    unhealthy_mcp=$(oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount --no-headers | grep -v "False.*False.*0")
-    if [[ -n "${unhealthy_mcp}" ]]; then
-        echo "Detected unhealthy mcp:"
-        echo "${unhealthy_mcp}"
-        echo "Real-time detected unhealthy mcp:"
-        oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount | grep -v "False.*False.*0"
-        echo "Real-time full mcp output:"
-        oc get mcp
-        echo ""
-        unhealthy_mcp_names=$(echo "${unhealthy_mcp}" | awk '{print $1}')
-        echo "Using oc describe to check status of unhealthy mcp ..."
-        for mcp_name in ${unhealthy_mcp_names}; do
-          echo "Name: $mcp_name"
-          oc describe mcp $mcp_name || echo "oc describe mcp $mcp_name failed"
-        done
-        return 2
+    oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount --no-headers > "${tmp_output}" || true
+    # using the size of output to determinate if oc command is executed successfully
+    if [[ -s "${tmp_output}" ]]; then
+        unhealthy_mcp=$(cat "${tmp_output}" | grep -v "False.*False.*0")
+        if [[ -n "${unhealthy_mcp}" ]]; then
+            echo "Detected unhealthy mcp:"
+            echo "${unhealthy_mcp}"
+            echo "Real-time detected unhealthy mcp:"
+            oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount | grep -v "False.*False.*0"
+            echo "Real-time full mcp output:"
+            oc get mcp
+            echo ""
+            unhealthy_mcp_names=$(echo "${unhealthy_mcp}" | awk '{print $1}')
+            echo "Using oc describe to check status of unhealthy mcp ..."
+            for mcp_name in ${unhealthy_mcp_names}; do
+              echo "Name: $mcp_name"
+              oc describe mcp $mcp_name || echo "oc describe mcp $mcp_name failed"
+            done
+            return 2
+        fi
+    else
+        echo "Did not run "oc get mcp" successfully!"
+        return 1
     fi
     return 0
 }
