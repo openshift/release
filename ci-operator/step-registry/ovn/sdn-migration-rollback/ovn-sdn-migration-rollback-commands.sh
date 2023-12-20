@@ -74,9 +74,8 @@ oc wait mcp --all --for='condition=UPDATING=True' --timeout=300s
 
 # Check that MCO and clusteroperators are back to normal. requires the main checks
 # on clusteroperator and mcp status to succeed 3 times in a row with 30s pause in between checks
-# shellcheck disable=SC2034
-success_count=0
 timeout 2700s bash <<EOT
+success_count=0
 until [ \$success_count -eq 3 ]; do
   if oc wait co --all --for='condition=Available=True' --timeout=10s &&
      oc wait co --all --for='condition=Progressing=False' --timeout=10s &&

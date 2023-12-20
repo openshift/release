@@ -14,7 +14,10 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-export E2E_RUN_TAGS="${E2E_RUN_TAGS} and ${TAG_VERSION}"
+IFS='.' read xversion yversion _ < <(oc version -o yaml | yq '.openshiftVersion')
+if [[ -n $xversion ]] && [[ $xversion -eq 4 ]] && [[ -n $yversion ]] && [[ $yversion =~ [12][0-9] ]] ; then
+    export E2E_RUN_TAGS="${E2E_RUN_TAGS} and @${xversion}.${yversion}"
+fi
 for tag in ${FORCE_SKIP_TAGS} ; do
     if ! [[ "${E2E_SKIP_TAGS}" =~ $tag ]] ; then
         export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not $tag"
@@ -50,7 +53,7 @@ EOF
 
 if [ $((failures)) != 0 ] ; then
     echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
-    readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | cut -d':' -f3- | sed -E 's/^( +)//' | sort)
+    readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | cut -d':' -f3- | sed -E 's/^( +)//;s/\x1b\[[0-9;]*m$//' | sort)
     for (( i=0; i<failures; i++ )) ; do
         echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
     done
