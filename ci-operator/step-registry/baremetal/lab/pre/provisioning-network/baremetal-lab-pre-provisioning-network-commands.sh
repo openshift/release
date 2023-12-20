@@ -127,9 +127,9 @@ interfaces:
       stp:
         enabled: false
     port:
-    - name: ${PROVISIONING_NET_DEV}.${VLAN_ID}
+    - name: prov.${VLAN_ID}
     # TODO verify
-- name: ${PROVISIONING_NET_DEV}.${VLAN_ID}
+- name: prov.${VLAN_ID}
   type: vlan
   state: up
   vlan:
