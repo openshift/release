@@ -332,9 +332,9 @@ CONFIG = {
         'us-west-2': 50,
     },
     'medik8s-aws-quota-slice': {
-        'us-east-1': 20,
-        'us-east-2': 3,
-        'us-west-2': 3,
+        'us-east-1': 4,
+        'us-east-2': 4,
+        'us-west-2': 4,
     },
 }
 
