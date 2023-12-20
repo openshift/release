@@ -73,6 +73,18 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-eventing-migrate
+- dockerfile_path: openshift/ci-operator/knative-images/mtbroker_filter/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-eventing-mtbroker-filter
+- dockerfile_path: openshift/ci-operator/knative-images/mtbroker_ingress/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-eventing-mtbroker-ingress
 - dockerfile_path: openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
   inputs:
     openshift_release_golang-1.19:
@@ -176,22 +188,27 @@ promotion:
   to:
   - additional_images:
       knative-eventing-src: src
+    name: knative-v1.12
     namespace: openshift
-    tag: knative-nightly
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.11"
 resources:
   '*':
     requests:
       cpu: 500m
       memory: 1Gi
 tests:
-- as: test-conformance-aws-ocp-413
+- as: test-conformance-aws-ocp-411
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.11"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -257,6 +274,10 @@ tests:
         name: knative-eventing-ingress
       - env: KNATIVE_EVENTING_MIGRATE
         name: knative-eventing-migrate
+      - env: KNATIVE_EVENTING_MTBROKER_FILTER
+        name: knative-eventing-mtbroker-filter
+      - env: KNATIVE_EVENTING_MTBROKER_INGRESS
+        name: knative-eventing-mtbroker-ingress
       - env: KNATIVE_EVENTING_MTCHANNEL_BROKER
         name: knative-eventing-mtchannel-broker
       - env: KNATIVE_EVENTING_MTPING
@@ -297,14 +318,14 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-conformance-aws-ocp-413-continuous
+- as: test-conformance-aws-ocp-411-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.11"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -371,6 +392,10 @@ tests:
         name: knative-eventing-ingress
       - env: KNATIVE_EVENTING_MIGRATE
         name: knative-eventing-migrate
+      - env: KNATIVE_EVENTING_MTBROKER_FILTER
+        name: knative-eventing-mtbroker-filter
+      - env: KNATIVE_EVENTING_MTBROKER_INGRESS
+        name: knative-eventing-mtbroker-ingress
       - env: KNATIVE_EVENTING_MTCHANNEL_BROKER
         name: knative-eventing-mtchannel-broker
       - env: KNATIVE_EVENTING_MTPING
@@ -411,14 +436,14 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-e2e-aws-ocp-413
+- as: test-e2e-aws-ocp-411
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.11"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -484,6 +509,10 @@ tests:
         name: knative-eventing-ingress
       - env: KNATIVE_EVENTING_MIGRATE
         name: knative-eventing-migrate
+      - env: KNATIVE_EVENTING_MTBROKER_FILTER
+        name: knative-eventing-mtbroker-filter
+      - env: KNATIVE_EVENTING_MTBROKER_INGRESS
+        name: knative-eventing-mtbroker-ingress
       - env: KNATIVE_EVENTING_MTCHANNEL_BROKER
         name: knative-eventing-mtchannel-broker
       - env: KNATIVE_EVENTING_MTPING
@@ -524,14 +553,14 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-e2e-aws-ocp-413-continuous
+- as: test-e2e-aws-ocp-411-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.11"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -598,6 +627,10 @@ tests:
         name: knative-eventing-ingress
       - env: KNATIVE_EVENTING_MIGRATE
         name: knative-eventing-migrate
+      - env: KNATIVE_EVENTING_MTBROKER_FILTER
+        name: knative-eventing-mtbroker-filter
+      - env: KNATIVE_EVENTING_MTBROKER_INGRESS
+        name: knative-eventing-mtbroker-ingress
       - env: KNATIVE_EVENTING_MTCHANNEL_BROKER
         name: knative-eventing-mtchannel-broker
       - env: KNATIVE_EVENTING_MTPING
@@ -638,14 +671,14 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-reconciler-aws-ocp-413
+- as: test-reconciler-aws-ocp-411
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.11"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -711,6 +744,10 @@ tests:
         name: knative-eventing-ingress
       - env: KNATIVE_EVENTING_MIGRATE
         name: knative-eventing-migrate
+      - env: KNATIVE_EVENTING_MTBROKER_FILTER
+        name: knative-eventing-mtbroker-filter
+      - env: KNATIVE_EVENTING_MTBROKER_INGRESS
+        name: knative-eventing-mtbroker-ingress
       - env: KNATIVE_EVENTING_MTCHANNEL_BROKER
         name: knative-eventing-mtchannel-broker
       - env: KNATIVE_EVENTING_MTPING
@@ -751,14 +788,14 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-reconciler-aws-ocp-413-continuous
+- as: test-reconciler-aws-ocp-411-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.11"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -825,6 +862,10 @@ tests:
         name: knative-eventing-ingress
       - env: KNATIVE_EVENTING_MIGRATE
         name: knative-eventing-migrate
+      - env: KNATIVE_EVENTING_MTBROKER_FILTER
+        name: knative-eventing-mtbroker-filter
+      - env: KNATIVE_EVENTING_MTBROKER_INGRESS
+        name: knative-eventing-mtbroker-ingress
       - env: KNATIVE_EVENTING_MTCHANNEL_BROKER
         name: knative-eventing-mtchannel-broker
       - env: KNATIVE_EVENTING_MTPING
@@ -866,7 +907,7 @@ tests:
       timeout: 4h0m0s
     workflow: generic-claim
 zz_generated_metadata:
-  branch: release-next
+  branch: release-v1.12
   org: openshift-knative
   repo: eventing
-  variant: "413"
+  variant: "411"
