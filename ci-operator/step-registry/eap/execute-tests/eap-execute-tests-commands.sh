@@ -13,6 +13,8 @@ function cleanup-collect() {
     rm test.properties
     echo "Collecting maven results into {$ARTIFACT_DIR}"
     cp ./eap* $ARTIFACT_DIR
+    # rename TEST junit_TEST ${ARTIFACT_DIR}/TEST*.xml
+    sleep 1h
 }
 
 #Debug test execution
@@ -54,14 +56,9 @@ xtf.openshift.namespace=pit
 xtf.bm.namespace=pit-builds
 EOF
 
-# oc delete configmap test-properties -n "${1}" || true
-# oc create configmap test-properties -n "${1}" --from-file=/tmp/test.properties
 
-echo "Executing pit-74 tests"
+echo "Executing EAP 74 tests"
 mvn clean -e test -Dmaven.repo.local=./repo -Dxtf.operator.properties.skip.installation=true -P74-openjdk11,eap-pit-74 --log-file eap-74.txt
-echo "Executing pit-7.4.x tag for 4.15"
-mvn clean -e test -Dmaven.repo.local=./repo -P74-openjdk11,eap-pit-7.4.x --log-file eap_74x.txt
+echo "Executing EAP XP tests"
+mvn clean test -Dmaven.repo.local=./repo -Pxp4-openjdk11,eap-pit-xp --log-file eap-xp.txt
 
-# rename TEST junit_TEST ${ARTIFACT_DIR}/TEST*.xml
-# cp eap-74.txt $ARTIFACT_DIR/eap-74.txt
-# cp eap_74x.txt $ARTIFACT_DIR/eap_74x.txt
