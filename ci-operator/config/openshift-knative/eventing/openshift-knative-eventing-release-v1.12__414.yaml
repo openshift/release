@@ -43,6 +43,12 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-eventing-event-display
+- dockerfile_path: openshift/ci-operator/knative-images/filter/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-eventing-filter
 - dockerfile_path: openshift/ci-operator/knative-images/heartbeats/Dockerfile
   inputs:
     openshift_release_golang-1.19:
@@ -55,6 +61,12 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-eventing-heartbeats-receiver
+- dockerfile_path: openshift/ci-operator/knative-images/ingress/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-eventing-ingress
 - dockerfile_path: openshift/ci-operator/knative-images/migrate/Dockerfile
   inputs:
     openshift_release_golang-1.19:
@@ -177,21 +189,26 @@ promotion:
   - additional_images:
       knative-eventing-src: src
     namespace: openshift
-    tag: knative-v1.10
+    tag: knative-v1.12
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.14"
 resources:
   '*':
     requests:
       cpu: 500m
       memory: 1Gi
 tests:
-- as: test-conformance-aws-ocp-413
+- as: test-conformance-aws-ocp-414
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.14"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -247,10 +264,14 @@ tests:
         name: knative-eventing-controller
       - env: KNATIVE_EVENTING_EVENT_DISPLAY
         name: knative-eventing-event-display
+      - env: KNATIVE_EVENTING_FILTER
+        name: knative-eventing-filter
       - env: KNATIVE_EVENTING_HEARTBEATS
         name: knative-eventing-heartbeats
       - env: KNATIVE_EVENTING_HEARTBEATS_RECEIVER
         name: knative-eventing-heartbeats-receiver
+      - env: KNATIVE_EVENTING_INGRESS
+        name: knative-eventing-ingress
       - env: KNATIVE_EVENTING_MIGRATE
         name: knative-eventing-migrate
       - env: KNATIVE_EVENTING_MTBROKER_FILTER
@@ -297,14 +318,14 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-conformance-aws-ocp-413-continuous
+- as: test-conformance-aws-ocp-414-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.14"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -361,10 +382,14 @@ tests:
         name: knative-eventing-controller
       - env: KNATIVE_EVENTING_EVENT_DISPLAY
         name: knative-eventing-event-display
+      - env: KNATIVE_EVENTING_FILTER
+        name: knative-eventing-filter
       - env: KNATIVE_EVENTING_HEARTBEATS
         name: knative-eventing-heartbeats
       - env: KNATIVE_EVENTING_HEARTBEATS_RECEIVER
         name: knative-eventing-heartbeats-receiver
+      - env: KNATIVE_EVENTING_INGRESS
+        name: knative-eventing-ingress
       - env: KNATIVE_EVENTING_MIGRATE
         name: knative-eventing-migrate
       - env: KNATIVE_EVENTING_MTBROKER_FILTER
@@ -411,14 +436,14 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-e2e-aws-ocp-413
+- as: test-e2e-aws-ocp-414
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.14"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -474,10 +499,14 @@ tests:
         name: knative-eventing-controller
       - env: KNATIVE_EVENTING_EVENT_DISPLAY
         name: knative-eventing-event-display
+      - env: KNATIVE_EVENTING_FILTER
+        name: knative-eventing-filter
       - env: KNATIVE_EVENTING_HEARTBEATS
         name: knative-eventing-heartbeats
       - env: KNATIVE_EVENTING_HEARTBEATS_RECEIVER
         name: knative-eventing-heartbeats-receiver
+      - env: KNATIVE_EVENTING_INGRESS
+        name: knative-eventing-ingress
       - env: KNATIVE_EVENTING_MIGRATE
         name: knative-eventing-migrate
       - env: KNATIVE_EVENTING_MTBROKER_FILTER
@@ -524,14 +553,14 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-e2e-aws-ocp-413-continuous
+- as: test-e2e-aws-ocp-414-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.14"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -588,10 +617,14 @@ tests:
         name: knative-eventing-controller
       - env: KNATIVE_EVENTING_EVENT_DISPLAY
         name: knative-eventing-event-display
+      - env: KNATIVE_EVENTING_FILTER
+        name: knative-eventing-filter
       - env: KNATIVE_EVENTING_HEARTBEATS
         name: knative-eventing-heartbeats
       - env: KNATIVE_EVENTING_HEARTBEATS_RECEIVER
         name: knative-eventing-heartbeats-receiver
+      - env: KNATIVE_EVENTING_INGRESS
+        name: knative-eventing-ingress
       - env: KNATIVE_EVENTING_MIGRATE
         name: knative-eventing-migrate
       - env: KNATIVE_EVENTING_MTBROKER_FILTER
@@ -638,14 +671,14 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-reconciler-aws-ocp-413
+- as: test-reconciler-aws-ocp-414
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.14"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -701,10 +734,14 @@ tests:
         name: knative-eventing-controller
       - env: KNATIVE_EVENTING_EVENT_DISPLAY
         name: knative-eventing-event-display
+      - env: KNATIVE_EVENTING_FILTER
+        name: knative-eventing-filter
       - env: KNATIVE_EVENTING_HEARTBEATS
         name: knative-eventing-heartbeats
       - env: KNATIVE_EVENTING_HEARTBEATS_RECEIVER
         name: knative-eventing-heartbeats-receiver
+      - env: KNATIVE_EVENTING_INGRESS
+        name: knative-eventing-ingress
       - env: KNATIVE_EVENTING_MIGRATE
         name: knative-eventing-migrate
       - env: KNATIVE_EVENTING_MTBROKER_FILTER
@@ -751,14 +788,14 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-reconciler-aws-ocp-413-continuous
+- as: test-reconciler-aws-ocp-414-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.14"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -815,10 +852,14 @@ tests:
         name: knative-eventing-controller
       - env: KNATIVE_EVENTING_EVENT_DISPLAY
         name: knative-eventing-event-display
+      - env: KNATIVE_EVENTING_FILTER
+        name: knative-eventing-filter
       - env: KNATIVE_EVENTING_HEARTBEATS
         name: knative-eventing-heartbeats
       - env: KNATIVE_EVENTING_HEARTBEATS_RECEIVER
         name: knative-eventing-heartbeats-receiver
+      - env: KNATIVE_EVENTING_INGRESS
+        name: knative-eventing-ingress
       - env: KNATIVE_EVENTING_MIGRATE
         name: knative-eventing-migrate
       - env: KNATIVE_EVENTING_MTBROKER_FILTER
@@ -866,7 +907,7 @@ tests:
       timeout: 4h0m0s
     workflow: generic-claim
 zz_generated_metadata:
-  branch: release-v1.10
+  branch: release-v1.12
   org: openshift-knative
   repo: eventing
-  variant: "413"
+  variant: "414"
