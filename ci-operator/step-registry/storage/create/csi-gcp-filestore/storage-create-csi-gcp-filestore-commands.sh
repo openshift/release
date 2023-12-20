@@ -45,14 +45,13 @@ provisioner: filestore.csi.storage.gke.io
 volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
 parameters:
+  connect-mode: DIRECT_PEERING
   network: $NETWORK_NAME
   labels: kubernetes-io-cluster-$CLUSTER_NAME=owned
 EOF
 
 if test -f "${SHARED_DIR}/filestore_csi_networkconf.txt"; then
-  cat <<EOF >>$STORAGECLASS_LOCATION
-  connect-mode: PRIVATE_SERVICE_ACCESS
-EOF
+  sed 's/DIRECT_PEERING/PRIVATE_SERVICE_ACCESS/' $STORAGECLASS_LOCATION >> $STORAGECLASS_LOCATION
 fi
 	
 echo "Using StorageClass file ${STORAGECLASS_LOCATION}"
