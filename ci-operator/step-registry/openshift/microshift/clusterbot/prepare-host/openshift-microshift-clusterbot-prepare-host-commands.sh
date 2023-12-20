@@ -53,8 +53,13 @@ if [[ -z "${MICROSHIFT_GIT+x}" ]] || [[ "${MICROSHIFT_GIT}" == "" ]]; then
 
 	git clone https://github.com/openshift/microshift -b "release-${OCP_VERSION}" ~/microshift
 
+	configure_args=""
+	if ~/microshift/scripts/devenv-builder/configure-vm.sh --help | grep -q -- "--skip-dnf-update"; then
+		configure_args="--skip-dnf-update"
+	fi
+
     : Install oc, set up firewall, etc.
-	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall --no-build --no-build-deps /tmp/pull-secret
+	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall --no-build --no-build-deps ${configure_args} /tmp/pull-secret
 
     : Fetch get_rel_version_repo.sh from o/microshift main so it is up to date - some release-4.Y might not have it
     curl https://raw.githubusercontent.com/openshift/microshift/main/test/bin/get_rel_version_repo.sh -o /tmp/get_rel_version_repo.sh
@@ -66,7 +71,7 @@ if [[ -z "${MICROSHIFT_GIT+x}" ]] || [[ "${MICROSHIFT_GIT}" == "" ]]; then
 
     if [[ -z "${version+x}" ]] || [[ "${version}" == "" ]]; then
         : version is empty - no RPMs for the release yet - build from source
-        bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall /tmp/pull-secret
+        bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
         exit 0
     fi
 
@@ -89,7 +94,12 @@ else
 	: MICROSHIFT_GIT is set - clone it, build it, run it
 
 	git clone https://github.com/openshift/microshift -b "${MICROSHIFT_GIT}" ~/microshift
-	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall /tmp/pull-secret
+
+	configure_args=""
+	if ~/microshift/scripts/devenv-builder/configure-vm.sh --help | grep -q -- "--skip-dnf-update"; then
+		configure_args="--skip-dnf-update"
+	fi
+	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
 fi
 EOF
 chmod +x /tmp/install.sh
