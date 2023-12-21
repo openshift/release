@@ -24,8 +24,8 @@ if [[ ${LEASED_RESOURCE} == *"segment"* ]]; then
   third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
   cat >>"${SHARED_DIR}/platform-conf.sh" <<EOF
-export API_VIP="192.168.${third_octet}.2"
-export INGRESS_VIP="192.168.${third_octet}.3"
+export API_VIPS="[{\"ip\": \"192.168.${third_octet}.2\"}]"
+export INGRESS_VIPS="[{\"ip\": \"192.168.${third_octet}.3\"}]"
 EOF
 else
   if ! jq -e --arg PRH "${primaryrouterhostname}" --arg VLANID "${vlanid}" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
@@ -37,8 +37,8 @@ else
   ingress_vip=$(jq -r --argjson N 3 --arg PRH "${primaryrouterhostname}" --arg VLANID "${vlanid}" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
 
   cat >>"${SHARED_DIR}/platform-conf.sh" <<EOF
-export API_VIP="${api_vip}"
-export INGRESS_VIP="${ingress_vip}"
+export API_VIPS="[{\"ip\": \"${api_vip}\"}]"
+export INGRESS_VIPS="[{\"ip\": \"${ingress_vip}\"}]"
 EOF
 fi
 
