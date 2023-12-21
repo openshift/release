@@ -26,8 +26,9 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: azure-cluster-api-controllers
 promotion:
-  name: 4.16-priv
-  namespace: ocp-private
+  to:
+  - name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -56,6 +57,15 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-azure-techpreview
   optional: true
   steps:

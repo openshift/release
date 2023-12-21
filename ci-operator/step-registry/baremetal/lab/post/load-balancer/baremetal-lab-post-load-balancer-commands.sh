@@ -24,17 +24,17 @@ for dev in "${devices[@]}"; do
   interface=${dev%%.*}
   bridge=${dev##*.}
   echo "Sending release dhcp lease for $interface in haproxy-$CLUSTER_NAME"
-  nsenter -m -u -n -i -p -t "$(docker inspect -f '{{ .State.Pid }}' "haproxy-$CLUSTER_NAME")" \
+  nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-$CLUSTER_NAME")" \
     /sbin/dhclient -r \
     -pf "/var/run/dhclient.$interface.pid" \
     -lf "/var/lib/dhcp/dhclient.$interface.lease" "$interface" || echo "No lease for $interface"
   echo "Removing $interface from $bridge in haproxy-$CLUSTER_NAME"
-  /usr/local/bin/ovs-docker del-port "$bridge" "$interface" "haproxy-$CLUSTER_NAME" || echo \
+  ovs-docker.sh del-port "$bridge" "$interface" "haproxy-$CLUSTER_NAME" || echo \
     "No $interface on $bridge for container haproxy-$CLUSTER_NAME"
 done
 
 echo Removing the HAProxy container
-docker rm --force "haproxy-$CLUSTER_NAME"
+podman rm --force "haproxy-$CLUSTER_NAME"
 rm -rf "/var/builds/$CLUSTER_NAME/haproxy"
 
 EOF
