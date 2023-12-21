@@ -1,0 +1,114 @@
+base_images:
+  ansible:
+    name: "4.16"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: "4.16"
+    namespace: ocp
+    tag: hypershift-operator
+  openstack-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.16"
+  tools:
+    name: "4.16"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.16"
+  ppc64le-latest:
+    candidate:
+      architecture: ppc64le
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: powervs-ipi-f7
+  cluster: build01
+  cron: 0 18 * * 4
+  steps:
+    cluster_profile: powervs-1
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+    env:
+      ARCH: ppc64le
+      BASE_DOMAIN: ocp-dev-ppc64le.com
+      BRANCH: "4.16"
+      E2E_RUN_TAGS: '@ppc64le and @baremetal-upi and @network-ovnkubernetes and not
+        @fips'
+    test:
+    - ref: enable-qe-catalogsource
+    - chain: openshift-e2e-test-qe
+    workflow: ipi-powervs
+- as: powervs-ipi-f7-destructive
+  cluster: build01
+  cron: 0 22 * * 4
+  steps:
+    cluster_profile: powervs-1
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+    env:
+      ARCH: ppc64le
+      BASE_DOMAIN: ocp-dev-ppc64le.com
+      BRANCH: "4.16"
+      E2E_RUN_TAGS: '@ppc64le and @baremetal-upi and @network-ovnkubernetes and not
+        @fips'
+    test:
+    - ref: enable-qe-catalogsource
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: ipi-powervs
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: openshift-tests-private
+  variant: ppc64le-nightly
