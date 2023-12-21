@@ -58,7 +58,7 @@ if [[ -n "${MICROSHIFT_PR}" ]]; then
 	git switch "${branch}"
 
 	configure_args=""
-	if ~/microshift/scripts/devenv-builder/configure-vm.sh --help | grep -q -- "--skip-dnf-update"; then
+	if grep -qw -- "--skip-dnf-update" ~/microshift/scripts/devenv-builder/configure-vm.sh; then
 		configure_args="--skip-dnf-update"
 	fi
 	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
@@ -69,7 +69,7 @@ elif [[ -n "${MICROSHIFT_GIT}" ]]; then
 	git clone https://github.com/openshift/microshift -b "${MICROSHIFT_GIT}" ~/microshift
 
 	configure_args=""
-	if ~/microshift/scripts/devenv-builder/configure-vm.sh --help | grep -q -- "--skip-dnf-update"; then
+	if grep -qw -- "--skip-dnf-update" ~/microshift/scripts/devenv-builder/configure-vm.sh; then
 		configure_args="--skip-dnf-update"
 	fi
 	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
@@ -80,7 +80,7 @@ else
 	git clone https://github.com/openshift/microshift -b "release-${OCP_VERSION}" ~/microshift
 
 	configure_args=""
-	if ~/microshift/scripts/devenv-builder/configure-vm.sh --help | grep -q -- "--skip-dnf-update"; then
+	if grep -qw -- "--skip-dnf-update" ~/microshift/scripts/devenv-builder/configure-vm.sh; then
 		configure_args="--skip-dnf-update"
 	fi
 
