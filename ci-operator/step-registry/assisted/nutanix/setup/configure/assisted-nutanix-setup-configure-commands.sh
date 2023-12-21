@@ -55,8 +55,8 @@ export NUTANIX_ENDPOINT='${NUTANIX_HOST}'
 export NUTANIX_PORT="${NUTANIX_PORT}"
 export NUTANIX_CLUSTER_NAME="${pe_name}"
 export NUTANIX_SUBNET_NAME="${subnet_name}"
-export API_VIP="${API_VIP}"
-export INGRESS_VIP="${INGRESS_VIP}"
+export API_VIPS="[{\"ip\": \"${API_VIP}\"}]"
+export INGRESS_VIPS="[{\"ip\": \"${INGRESS_VIP}\"}]"
 export BASE_DOMAIN="${base_domain}"
 export CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 EOF
