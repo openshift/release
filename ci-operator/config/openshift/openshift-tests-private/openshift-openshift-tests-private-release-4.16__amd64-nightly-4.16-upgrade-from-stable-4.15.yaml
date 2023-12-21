@@ -1,0 +1,813 @@
+base_images:
+  ansible:
+    name: "4.15"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: "4.16"
+    namespace: ocp
+    tag: hypershift-operator
+  openstack-installer:
+    name: "4.15"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
+  tools:
+    name: "4.15"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.15"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.15.0-0
+        upper: 4.16.0-0
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-c2s-ipi-disconnected-private-fips-f14
+  cron: 53 22 14,28 * *
+  steps:
+    cluster_profile: aws-c2s-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and @disconnected'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and @disconnected'
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
+- as: aws-ipi-byo-iam-role-fips-f28
+  cron: 44 8 15 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
+- as: aws-ipi-byo-kms-etcd-encryption-fips-f28
+  cron: 35 22 12 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-kms-etcd-encryption
+- as: aws-ipi-byo-route53-compact-f28
+  cron: 34 2 6 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      SIZE_VARIANT: compact
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
+- as: aws-ipi-disconnected-mtu-localzone-fips-f28
+  cron: 3 23 5 * *
+  steps:
+    cluster_profile: aws-1-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and @disconnected'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and @disconnected'
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-network-mtu-localzone
+- as: aws-ipi-disconnected-private-f28
+  cron: 22 14 6 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-24663
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and @disconnected
+        and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and @disconnected
+        and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
+- as: aws-ipi-disconnected-private-sno-f28
+  cron: 18 19 26 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and @disconnected
+        and not @fips and not @console'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and @disconnected
+        and not @fips and not @console'
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
+- as: aws-ipi-disconnected-sts-basecap-none-f28
+  cron: 22 7 13 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      ENABLE_OTA_TEST: OCP-66839
+      EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST: MachineAPI
+      FIPS_ENABLED: "true"
+      PERSISTENT_MONITORING: "false"
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CCO_MANUAL_MODE: oidc
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and @disconnected'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and @disconnected'
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
+- as: aws-ipi-disconnected-sts-ep-fips-f28
+  cron: 2 17 11 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and @disconnected'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and @disconnected'
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
+- as: aws-ipi-disconnected-sts-f28
+  cron: 36 20 23 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and @disconnected
+        and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and @disconnected
+        and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
+- as: aws-ipi-imdsv2-fips-f28
+  cron: 1 13 13 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-imdsv2
+- as: aws-ipi-ingress-lbtype-nlb-f28
+  cron: 35 12 5 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-nlb
+- as: aws-ipi-network-mtu-localzone-f28
+  cron: 23 1 21 * *
+  steps:
+    cluster_profile: aws-1-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-network-mtu-localzone
+- as: aws-ipi-network-mtu-localzone-sdn-f28
+  cron: 12 3 10 * *
+  steps:
+    cluster_profile: aws-1-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-network-mtu-localzone-sdn
+- as: aws-ipi-ovn-hypershift-replace-f7
+  cron: 46 21 1,10,17,24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and @hypershift-hosted
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and @hypershift-hosted
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+- as: aws-ipi-proxy-sts-f14
+  cron: 26 21 16,30 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: aws-ipi-shared-vpc-phz-f14
+  cron: 59 6 14,28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz
+- as: aws-ipi-shared-vpc-phz-sts-fips-f14
+  cron: 39 10 3,17 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
+- as: aws-ipi-usertags-custom-sg-fips-f28
+  cron: 20 22 25 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-21588
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
+- as: aws-upi-baselinecaps-none-f28
+  cron: 10 0 6 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      PERSISTENT_MONITORING: "false"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-upi and not @fips
+        and not @console and not @storage'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-upi and not @fips
+        and not @console and not @storage'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-upi
+- as: aws-usgov-ipi-private-f28
+  cron: 50 10 29 * *
+  steps:
+    cluster_profile: aws-usgov-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private
+- as: aws-usgov-ipi-private-sts-f28
+  cron: 26 12 25 * *
+  steps:
+    cluster_profile: aws-usgov-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
+- as: azure-ipi-disconnected-fullyprivate-f14
+  cron: 24 2 12,26 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-24663
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @azure-ipi and @disconnected
+        and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @azure-ipi and @disconnected
+        and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
+- as: azure-ipi-disk-encryption-set-fips-f28
+  cron: 29 15 20 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_DES_DEFAULT_MACHINE: "true"
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @azure-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @azure-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
+- as: azure-ipi-fullyprivate-proxy-f28
+  cron: 5 0 3 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @azure-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @azure-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: azure-ipi-ingress-custom-controller-fips-f28
+  cron: 58 9 25 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @azure-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @azure-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-controller
+- as: azure-ipi-ovn-ipsec-f14
+  cron: 24 3 13,27 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-21588
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @azure-ipi and not @fips
+        and @network-ovnkubernetes'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @azure-ipi and not @fips
+        and @network-ovnkubernetes'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
+- as: azure-ipi-proxy-workers-rhcos-rhel8-f28
+  cron: 12 1 22 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      PLATFORM_VERSION: "8.6"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @azure-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @azure-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-ipi-proxy-workers-rhcos-rhel8
+- as: azure-ipi-ultrassd-disks-fips-f28
+  cron: 7 15 19 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @azure-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @azure-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-ipi-ultrassd-disk
+- as: azure-ipi-workers-rhel8-f28
+  cron: 11 1 2 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      PLATFORM_VERSION: "8.6"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @azure-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @azure-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-ipi-workers-rhel8
+- as: azure-mag-ipi-fips-f14
+  cron: 18 17 7,21 * *
+  steps:
+    cluster_profile: azuremag-qe
+    env:
+      BASE_DOMAIN: qemag.azure.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @azure-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @azure-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-mag-ipi
+- as: azure-stack-ipi-proxy-fips-f28
+  cluster: build01
+  cron: 4 10 11 * *
+  steps:
+    cluster_profile: azurestack-qe
+    env:
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @azure-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @azure-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
+- as: azure-upi-f28
+  cron: 4 9 3 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @azure-upi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @azure-upi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-upi
+- as: baremetalds-ipi-ovn-ipv4-fips-f28
+  cron: 43 20 6 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        FIPS_MODE=true
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @baremetal-ipi and @network-ovnkubernetes'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @baremetal-ipi and @network-ovnkubernetes'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: gcp-ipi-confidential-computing-fips-f28
+  cron: 55 14 16 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @gcp-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @gcp-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-confidential-computing
+- as: gcp-ipi-disconnected-private-workload-identity-f14
+  cron: 30 10 8,24 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @gcp-ipi and @disconnected'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @gcp-ipi and @disconnected'
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
+- as: gcp-ipi-ovn-ipsec-f14
+  cron: 6 23 2,18 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      ENABLE_OTA_TEST: OCP-21588
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @gcp-ipi and not @fips
+        and @network-ovnkubernetes'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @gcp-ipi and not @fips
+        and @network-ovnkubernetes'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
+- as: gcp-ipi-proxy-private-f14
+  cron: 14 7 6,22 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @gcp-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @gcp-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
+- as: gcp-ipi-workload-identity-rt-fips-f14
+  cron: 24 4 8,22 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      FIPS_ENABLED: "true"
+      RT_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @gcp-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @gcp-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
+- as: gcp-ipi-xpn-fips-f28
+  cron: 35 21 5 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @gcp-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @gcp-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn
+- as: gcp-upi-f28
+  cron: 53 12 20 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @gcp-upi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @gcp-upi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-gcp-upi
+- as: ibmcloud-ipi-f28
+  cron: 45 4 12 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @ibmcloud-ipi and not
+        @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @ibmcloud-ipi and not
+        @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
+- as: ibmcloud-ipi-private-fips-f14
+  cron: 55 14 9,25 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @ibmcloud-ipi and not
+        @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @ibmcloud-ipi and not
+        @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
+- as: ibmcloud-ipi-workers-rhel8-f14
+  cron: 53 7 8,24 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @ibmcloud-ipi and not
+        @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @ibmcloud-ipi and not
+        @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-workers-rhel8
+- as: nutanix-ipi-boot-categories-project-f28
+  cluster: build01
+  cron: 42 5 4 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @nutanix-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @nutanix-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
+- as: nutanix-ipi-disconnected-f28
+  cluster: build01
+  cron: 21 6 14 * *
+  steps:
+    cluster_profile: nutanix-qe-dis
+    env:
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @nutanix-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @nutanix-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-nutanix-ipi-disconnected
+- as: nutanix-ipi-proxy-fips-f28
+  cluster: build01
+  cron: 21 1 25 * *
+  steps:
+    cluster_profile: nutanix-qe-dis
+    env:
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @nutanix-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @nutanix-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
+- as: vsphere-ipi-compact-etcd-encryption-f28
+  cron: 32 11 5 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      SIZE_VARIANT: compact
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @vsphere-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @vsphere-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-etcd-encryption
+- as: vsphere-ipi-disconnected-f28
+  cron: 6 4 17 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @vsphere-ipi and @disconnected
+        and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @vsphere-ipi and @disconnected
+        and not @fips'
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
+- as: vsphere-ipi-disk-encryption-tang-fips-f28
+  cron: 22 6 16 * *
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @vsphere-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @vsphere-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disk-encryption-tang
+- as: vsphere-ipi-external-lb-post-f28
+  cron: 53 12 25 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @vsphere-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @vsphere-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-external-lb-post
+- as: vsphere-ipi-ovn-ipsec-f14
+  cron: 36 14 3,19 * *
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @vsphere-ipi and not @fips
+        and @network-ovnkubernetes'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @vsphere-ipi and not @fips
+        and @network-ovnkubernetes'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
+- as: vsphere-ipi-proxy-fips-f28
+  cron: 4 5 26 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @vsphere-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @vsphere-ipi'
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- as: vsphere-ipi-proxy-workers-rhel8-f28
+  cron: 47 0 9 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      PLATFORM_VERSION: "8.6"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @vsphere-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @vsphere-ipi and not @fips'
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy-workers-rhel8
+- as: vsphere-ipi-sdn-f28
+  cron: 21 0 25 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @vsphere-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @vsphere-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-sdn
+- as: vsphere-ipi-zones-f28
+  cron: 13 21 15 * *
+  steps:
+    cluster_profile: vsphere-multizone-2
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @vsphere-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @vsphere-ipi'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-zones
+- as: vsphere-upi-disconnected-sdn-workers-rhcos-rhel8-f28
+  cron: 51 15 5 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @vsphere-upi and @disconnected
+        and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @vsphere-upi and @disconnected
+        and not @fips'
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-sdn-workers-rhcos-rhel8
+- as: vsphere-upi-disconnected-secureboot-fips-f28
+  cron: 2 13 2 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @vsphere-upi and @disconnected'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @vsphere-upi and @disconnected'
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-secureboot
+- as: vsphere-upi-f28
+  cron: 25 0 5 * *
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @vsphere-upi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @vsphere-upi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-upi
+- as: aws-ipi-ovn-winc-f7
+  cron: 45 0 6,13,20,29 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS_POSTUPG: Smokerun
+      TEST_FILTERS_PREUPG: Smokerun
+      TEST_SCENARIOS_POSTUPG: Windows_Containers
+      TEST_SCENARIOS_PREUPG: Windows_Containers
+    test:
+    - chain: openshift-upgrade-qe-test-winc
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-winc
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-nightly-4.16-upgrade-from-stable-4.15
