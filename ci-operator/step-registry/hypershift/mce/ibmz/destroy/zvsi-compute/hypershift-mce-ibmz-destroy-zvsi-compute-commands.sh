@@ -3,12 +3,12 @@
 set -x
 
 # session variables
-prow_job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
-export prow_job_id
+job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
+export job_id
 plugins_list=("vpc-infrastructure" "cloud-dns-services")
-infra_name="$HC_NAME-$prow_job_id"
+infra_name="$HC_NAME-$job_id"
 export infra_name
-hcp_domain="$prow_job_id-$HYPERSHIFT_BASEDOMAIN"
+hcp_domain="$job_id-$HYPERSHIFT_BASEDOMAIN"
 export hcp_domain
 IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
