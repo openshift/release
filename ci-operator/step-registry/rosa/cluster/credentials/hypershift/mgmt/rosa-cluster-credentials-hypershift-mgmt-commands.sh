@@ -9,8 +9,8 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 # Log in
 OCM_VERSION=$(ocm version)
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-echo "Logging into ${ROSA_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
-ocm login --url "${ROSA_LOGIN_ENV}" --token "${OCM_TOKEN}"
+echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
+ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 
 # Get the kubeconfig of the management cluster who manages the hosted cluster
 echo "Get the kubeconfig of the manangement cluster ..."
