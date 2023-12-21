@@ -57,6 +57,4 @@ EOF
 
 echo "Executing EAP 74 tests"
 mvn clean -e test -Dmaven.repo.local=./repo -Dxtf.operator.properties.skip.installation=true -P74-openjdk11,eap-pit-74 --log-file eap-74.txt
-echo "Executing EAP XP tests"
-mvn clean test -Dmaven.repo.local=./repo -Pxp4-openjdk11,eap-pit-xp --log-file eap-xp.txt
 
