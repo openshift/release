@@ -31,6 +31,14 @@ yarn install || true
 #Finally Copy the Junit Testing XML files and Screenshots to /tmp/artifacts
 trap copyArtifacts EXIT
 
+# Cypress Doc https://docs.cypress.io/guides/references/proxy-configuration
+if [ "${QUAY_PROXY}" = "true" ]; then
+    HTTPS_PROXY=$(cat $SHARED_DIR/proxy_public_url)
+    export HTTPS_PROXY
+    HTTP_PROXY=$(cat $SHARED_DIR/proxy_public_url)
+    export HTTP_PROXY
+fi
+
 #Trigget Quay E2E Testing
 set +x
 quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
