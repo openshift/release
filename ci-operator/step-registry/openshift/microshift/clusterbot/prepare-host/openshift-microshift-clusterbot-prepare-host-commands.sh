@@ -42,8 +42,25 @@ if ! sudo subscription-manager status >&/dev/null; then
 		--activationkey="$(cat /tmp/subscription-manager-act-key)"
 fi
 
-sudo dnf clean all
-hash git || sudo dnf install -y git-core
+function dnf_retry() {
+    local -r mode=$1
+    local -r args=$2
+
+    local retVal=1
+    for _ in $(seq 3) ; do
+        # shellcheck disable=SC2086
+        if ! sudo dnf "${mode}" -y ${args} ; then
+            sudo dnf clean -y all
+        else
+            retVal=0
+            break
+        fi
+    done
+
+    return ${retVal}
+}
+
+dnf_retry install "git-core make"
 
 sudo mkdir -p /etc/microshift
 sudo cp /tmp/config.yaml /etc/microshift/config.yaml
@@ -78,6 +95,13 @@ else
 	: Neither MICROSHIFT_PR nor MICROSHIFT_GIT are set - use release-OCP_VERSION to checkout right scripts and install MicroShift from repositories
 
 	git clone https://github.com/openshift/microshift -b "release-${OCP_VERSION}" ~/microshift
+
+	: ~/microshift/scripts/devenv-builder/configure-vm.sh --help
+	~/microshift/scripts/devenv-builder/configure-vm.sh --help
+	: ~/microshift/scripts/devenv-builder/configure-vm.sh --help | grep -- "--skip-dnf-update"
+	~/microshift/scripts/devenv-builder/configure-vm.sh --help | grep -- "--skip-dnf-update"
+	: ~/microshift/scripts/devenv-builder/configure-vm.sh --help | grep -- --skip-dnf-update
+	~/microshift/scripts/devenv-builder/configure-vm.sh --help | grep -- --skip-dnf-update
 
 	configure_args=""
 	if ~/microshift/scripts/devenv-builder/configure-vm.sh --help | grep -q -- "--skip-dnf-update"; then
