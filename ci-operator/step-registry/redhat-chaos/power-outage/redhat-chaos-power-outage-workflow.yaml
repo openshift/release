@@ -1,21 +1,20 @@
 workflow:
-  as: redhat-chaos-node-disruptions-master-outage
+  as: redhat-chaos-power-outage
   steps:
     test:
-      - ref: redhat-chaos-node-disruptions-master-outage
+      - ref: redhat-chaos-power-outage
     env:
-      ACTION: "node_stop_start_scenario"
-      LABEL_SELECTOR: "node-role.kubernetes.io/master="
+      SHUTDOWN_DURATION: 900
+      CLOUD_TYPE: "aws"
       TIMEOUT: "360"
-      INSTANCE_COUNT: "1"
       ENABLE_ALERTS: "True"
       ALERTS_PATH: "/tmp/krkn-hub/prow/node-disruptions/slos"       
       CHECK_CRITICAL_ALERTS: "True"
-      WAIT_DURATION: "600"     
+      WAIT_DURATION: "100"     
       TELEMETRY_ENABLED: "True"
       TELEMETRY_API_URL: "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production"
       TELEMETRY_USERNAME: "redhat-chaos"
-      TELEMETRY_RUN_TAG: "prow-hog-cpu"
+      TELEMETRY_RUN_TAG: "prow-power-outages"
       TELEMETRY_PROMETHEUS_BACKUP: "True"
       TELEMETRY_FULL_PROMETHEUS_BACKUP: "True"
       TELEMTRY_BACKUP_THREADS: "5"
@@ -26,4 +25,4 @@ workflow:
       TELEMTRY_CLI_PATH: "/usr/local/bin/oc"
       TELEMETRY_EVENTS_BACKUP: "True"
   documentation: >-
-    This step runs the krkn-hub config workload in the deployed cluster to cause master node outage to understand the impact on stability and performance.
+    This step runs the krkn-hub config workload in the deployed cluster to mimic power outages or cluster shutdown to understand the recovery timing and performance impact once the cluster is back on - users turn on and off the clusters depending on the load.
