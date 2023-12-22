@@ -6,7 +6,8 @@ set -o pipefail
 
 
 #Create AWS S3 Storage Bucket
-QUAY_OPERATOR_CHANNEL=stable-3.7
+QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
+QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 QUAY_GCP_STORAGE_ID="quaygcpci$RANDOM"
 GCP_ACCESS_KEY=$(cat /var/run/quay-qe-gcp-secret/access_key)
 GCP_SECRET_KEY=$(cat /var/run/quay-qe-gcp-secret/secret_key)
@@ -72,7 +73,7 @@ spec:
   installPlanApproval: Automatic
   name: quay-operator
   channel: $QUAY_OPERATOR_CHANNEL
-  source: redhat-operators
+  source: $QUAY_OPERATOR_SOURCE
   sourceNamespace: openshift-marketplace
 EOF
 )

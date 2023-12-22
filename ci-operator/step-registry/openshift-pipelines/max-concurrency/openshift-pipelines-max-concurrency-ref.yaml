@@ -1,0 +1,31 @@
+ref:
+  as: openshift-pipelines-max-concurrency
+  best_effort: true
+  grace_period: 300s
+  cli: latest
+  timeout: 8h0m0s
+  commands: openshift-pipelines-max-concurrency-commands.sh
+  env:
+    - name: DEPLOYMENT_TYPE
+      default: "downstream"
+      documentation: Is this supposed to install downstream or upstream?
+    - name: DEPLOYMENT_VERSION
+      default: "1.12"
+      documentation: For downstream this is "1.12" or so, for upstream either "stable" or "nightly"
+    - name: DEPLOYMENT_PIPELINES_CONTROLLER_RESOURCES
+      default: "1/2Gi/1/2Gi"
+      documentation: Configure these resources for pipelines-controller pods"
+    - name: DEPLOYMENT_PIPELINES_CONTROLLER_HA_REPLICAS
+      default: ""
+      documentation: Set to number 2-10 to setup pipelines controller into HA mode. Only supported for downstream now.
+    - name: TEST_RUN
+      default: "./run.yaml"
+      documentation: PipelineRun YAML test should use as a template.
+    - name: TEST_SCENARIOS
+      default: "100/10 200/20 300/30"
+      documentation: Scenarios to run in the job.
+  from: openshift-pipelines-performance-runner
+  resources:
+    requests:
+      cpu: 3000m
+      memory: 6Gi

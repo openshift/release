@@ -1,20 +1,20 @@
 base_images:
-  base:
-    name: "4.15"
-    namespace: ocp
-    tag: base-rhel9
   hypershift-operator:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: hypershift-operator
   hypershift-tests:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: hypershift-tests
-  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+  ocp_4.16_base-rhel9:
+    name: "4.16"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.21-openshift-4.16
   openshift_release_golang-1.20:
     name: release
     namespace: openshift
@@ -23,33 +23,35 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: base
   inputs:
     openshift_release_golang-1.20:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.20
   to: cluster-node-tuning-operator-us-tuned
 - dockerfile_path: Dockerfile.rhel9
-  from: base
   inputs:
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cluster-node-tuning-operator
 promotion:
-  excluded_images:
-  - cluster-node-tuning-operator-us-tuned
-  name: "4.15"
-  namespace: ocp
+  to:
+  - excluded_images:
+    - cluster-node-tuning-operator-us-tuned
+    name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -81,6 +83,22 @@ tests:
 - as: e2e-aws-ovn
   steps:
     cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-techpreview
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: e2e-pao-mixed-cpus
+      cli: latest
+      commands: CLUSTER=mcp-only make cluster-label-worker-cnf cluster-deploy-pao
+        pao-functests-mixedcpus
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: openshift-e2e-aws
 - as: e2e-nightly
   cron: 0 23 * * *

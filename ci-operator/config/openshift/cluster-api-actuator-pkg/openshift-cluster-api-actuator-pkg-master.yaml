@@ -1,24 +1,25 @@
 base_images:
   base:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: base
 build_root:
   from_repository: true
 promotion:
-  additional_images:
-    cluster-api-actuator-pkg: src
-  name: "4.15"
-  namespace: ocp
+  to:
+  - additional_images:
+      cluster-api-actuator-pkg: src
+    name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   multi-initial:
     candidate:
@@ -99,6 +100,9 @@ tests:
   skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openstack-vexxhost
+    env:
+      USE_RAMFS: "false"
+      WORKER_REPLICAS: "0"
     test:
     - as: test
       cli: latest
@@ -209,9 +213,11 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-openstack-operator-periodic
-  interval: 72h
+  minimum_interval: 72h
   steps:
     cluster_profile: openstack-vexxhost
+    env:
+      USE_RAMFS: "false"
     test:
     - as: test
       cli: latest

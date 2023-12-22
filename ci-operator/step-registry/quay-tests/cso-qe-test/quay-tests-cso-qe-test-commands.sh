@@ -6,6 +6,7 @@ set -o pipefail
 
 #Install CSO
 CSO_CHANNEL="$CSO_CHANNEL"
+CSO_SOURCE="$CSO_SOURCE"
 
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
@@ -17,7 +18,7 @@ spec:
   channel: $CSO_CHANNEL
   installPlanApproval: Automatic
   name: container-security-operator
-  source: redhat-operators
+  source: $CSO_SOURCE
   sourceNamespace: openshift-marketplace
 EOF
 
@@ -29,6 +30,7 @@ for _ in {1..60}; do
             break
         fi
     fi
+    echo "CSV is NOT ready $_ times"
     sleep 10
 done
 echo "Container Security Operator is deployed successfully"
@@ -95,6 +97,7 @@ for _ in {1..60}; do
         echo "Test Pod is in ready status" >&2
         break
     fi
+    echo "Test Pod is NOT ready $_ times"
     sleep 15
 done
 
@@ -105,6 +108,7 @@ for _ in {1..60}; do
         echo "$IMV"
         exit 0
     fi
+    echo "Can NOT get IMV $_ times"
     sleep 10
 done
 echo "QE Test for Container Security Operator is passed"

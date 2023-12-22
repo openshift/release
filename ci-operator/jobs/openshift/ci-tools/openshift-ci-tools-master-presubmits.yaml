@@ -215,6 +215,8 @@ presubmits:
     trigger: (?m)^/test( | .* )(e2e|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: pkg/steps/(index|bundle).*.go
     branches:
     - ^master$
     - ^master-
@@ -226,7 +228,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ci-tools-master-e2e-oo
     rerun_command: /test e2e-oo
-    run_if_changed: pkg/steps/(index|bundle).*.go
     spec:
       containers:
       - args:
@@ -556,7 +557,7 @@ presubmits:
         env:
         - name: BOOTSTRAP_BINARY
           value: /tmp/ci-secret-bootstrap
-        image: image-registry.openshift-image-registry.svc:5000/openshift/release:golang-1.19
+        image: image-registry.openshift-image-registry.svc:5000/openshift/release:golang-1.21
         imagePullPolicy: Always
         name: ""
         resources:
@@ -592,7 +593,7 @@ presubmits:
         - run
         - -race
         - ./cmd/ci-secret-generator
-        image: image-registry.openshift-image-registry.svc:5000/openshift/release:golang-1.19
+        image: image-registry.openshift-image-registry.svc:5000/openshift/release:golang-1.21
         imagePullPolicy: Always
         name: ""
         resources:
@@ -732,7 +733,7 @@ presubmits:
       containers:
       - command:
         - hack/check-test-infra-version.sh
-        image: registry.ci.openshift.org/openshift/release:golang-1.18
+        image: registry.ci.openshift.org/openshift/release:golang-1.21
         imagePullPolicy: Always
         name: ""
         resources:
