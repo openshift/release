@@ -98,6 +98,36 @@ if ! wait $!; then
   exit 1
 fi
 
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+
+wait_for_api_up() {
+  until oc cluster-info &>/dev/null; do
+    echo "Waiting for OpenShift API to be up..."
+    sleep 5
+  done
+}
+wait_for_api_up
+version=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
+
+## Add taint to the nodes until this bug OCPBUGS-25718 is fixed
+if [[ $(echo -e "4.15\n$version" | sort -V | tail -n 1) == "$version" ]]; then
+  echo "Found OCP version $version"
+  for ((i = 0; i < 15; i++)); do
+    wait_for_api_up
+    node_count=$(oc get nodes --no-headers | wc -l | tr -d '[:space:]')
+    echo "Waiting for nodes to reach count ${total_host}. Current count: ${node_count}"
+    if [ "${node_count}" -eq "${total_host}" ]; then
+      # Taint the nodes with the uninitialized taint
+      nodes=$(oc get nodes -o wide | awk '{print $1}' | tail -n +2)
+      for NODE in $nodes; do
+        oc adm taint node "$NODE" node.cloudprovider.kubernetes.io/uninitialized=true:NoSchedule || true
+      done
+      break
+    fi
+    sleep 60
+  done
+fi
+
 ## Monitor for cluster completion
 echo "$(date -u --rfc-3339=seconds) - Monitoring for cluster completion..."
 

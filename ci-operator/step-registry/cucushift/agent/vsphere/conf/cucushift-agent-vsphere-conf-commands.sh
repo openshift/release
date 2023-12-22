@@ -32,6 +32,15 @@ declare vlanid
 declare primaryrouterhostname
 declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
+source "${SHARED_DIR}/govc.sh"
+
+declare vsphere_url
+declare GOVC_USERNAME
+declare GOVC_PASSWORD
+declare vsphere_datacenter
+declare vsphere_datastore
+declare dns_server
+declare vsphere_cluster
 
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 if [[ ${vsphere_portgroup} == *"segment"* ]]; then
@@ -83,6 +92,30 @@ pullSecret: >
 EOF
 fi
 
+yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "${SHARED_DIR}/install-config.yaml" - <<<"
+platform:
+  vsphere:
+    failureDomains:
+    - name: test-failure-baseDomain
+      region: changeme-region
+      server: ${vsphere_url}
+      topology:
+        computeCluster: /${vsphere_datacenter}/host/${vsphere_cluster}
+        datacenter: ${vsphere_datacenter}
+        datastore: /${vsphere_datacenter}/datastore/${vsphere_datastore}
+        networks:
+        - ${vsphere_portgroup}
+        resourcePool: /${vsphere_datacenter}/host/${vsphere_cluster}/Resources
+        folder: /${vsphere_datacenter}/vm/${cluster_name}
+      zone: changeme-zone
+    vcenters:
+    - datacenters:
+      - ${vsphere_datacenter}
+      server: ${vsphere_url}
+      password: ${GOVC_PASSWORD}
+      user: ${GOVC_USERNAME}
+"
+
 if [ "${MASTERS}" -eq 1 ]; then
   yq --inplace 'del(.platform)' "${SHARED_DIR}"/install-config.yaml
   yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<<"
@@ -123,13 +156,6 @@ echo "$(date -u --rfc-3339=seconds) - Selected hardware version ${target_hw_vers
 
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 echo "export target_hw_version=${target_hw_version}" >>"${SHARED_DIR}"/vsphere_context.sh
-declare vsphere_url
-declare GOVC_USERNAME
-declare GOVC_PASSWORD
-declare vsphere_datacenter
-declare vsphere_datastore
-declare dns_server
-declare vsphere_cluster
 
 total_host="$((MASTERS + WORKERS))"
 declare -a mac_addresses=()
@@ -239,8 +265,6 @@ if ! wait $!; then
 fi
 
 curl -s -L https://github.com/vmware/govmomi/releases/latest/download/govc_Linux_x86_64.tar.gz -o ${HOME}/glx.tar.gz && tar -C ${HOME} -xvf ${HOME}/glx.tar.gz govc && rm -f ${HOME}/glx.tar.gz
-
-source "${SHARED_DIR}/govc.sh"
 
 echo "agent.x86_64_${cluster_name}.iso" >"${SHARED_DIR}"/agent-iso.txt
 agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
