@@ -22,7 +22,7 @@ spec:
   sourceNamespace: openshift-marketplace
 EOF
 
-for _ in {1..60}; do
+for p in {1..60}; do
     CSV=$(oc -n openshift-operators get sub quay-bridge-operator -o jsonpath='{.status.installedCSV}' || true)
     if [[ -n "$CSV" ]]; then
         if [[ "$(oc -n openshift-operators get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
@@ -30,7 +30,7 @@ for _ in {1..60}; do
             break
         fi
     fi
-    echo "CSV is NOT ready $_ times"
+    echo "CSV is NOT ready $p times"
     sleep 10
 done
 echo "Quay Bridge Operator is deployed successfully"
