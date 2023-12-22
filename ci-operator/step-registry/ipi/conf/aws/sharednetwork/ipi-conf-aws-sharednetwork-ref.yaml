@@ -21,97 +21,24 @@ ref:
       When wavelength-zone is set, in additional gateway, Carrier Gateway, is created and
       associated to the VPC.
   - name: EDGE_ZONE_TYPE
-    default: "local-zone"
+    default: ""
     documentation: |-
-      AWS Zone type to create the network infrastructure resources required by edge compute
+      [DEPRECATED] AWS Zone type to create the network infrastructure resources required by edge compute
       pool (worker nodes in Local or Wavelength zones). (e.g. local-zone, wavelength-zone)
+  - name: EDGE_ZONE_TYPES
+    default: ""
+    documentation: |-
+      EDGE_ZONE_TYPES is a comma sepparated AWS Zone types to create the network infrastructure resources required by edge compute
+      pool (worker nodes in Local or Wavelength zones), creating a file SHARED_DIR/edge-zone-names.txt with
+      AWS Zone names with new line as delimitator.
+      Example of valid values:
+      - local-zone
+      - wavelength-zone
+      - local-zone,wavelength-zone
+  - name: EDGE_PUBLIC_SUBNET
+    default: "no"
+    documentation: |-
+      EDGE_PUBLIC_SUBNET use the public subnet to create worker nodes, instead of Private (default).
   documentation: |-
-    The IPI AWS configure step generates the AWS-specific install-config.yaml contents based on the cluster profile and optional input files.
-
-    The following steps describes how to use this step in local/development environment:
-
-    1) Adjust and export the variables:
-    ~~~
-    # local path of cloned repository github.com/openshift/release
-    export RELEASE_REPO=$PWD
-
-    # workdir
-    export STEP_WORKDIR=/tmp/ci-op-$(cat /dev/random | env LC_CTYPE=C tr -cd 'a-f0-9' | head -c 6)
-
-    export CLUSTER_PROFILE_DIR=$STEP_WORKDIR
-    export SHARED_DIR=$STEP_WORKDIR/shared
-    export ARTIFACT_DIR=$STEP_WORKDIR/artifact
-    mkdir -pv $STEP_WORKDIR $SHARED_DIR $ARTIFACT_DIR
-
-    # fake job info
-    export BUILD_ID=000
-    export JOB_NAME=local-step-shared-vpc
-
-    # AWS credentials. Assuming it is saved in $HOME/.aws/credentials
-    export AWS_REGION=us-east-1
-    export LEASED_RESOURCE=${AWS_REGION}
-    ln -svf $HOME/.aws/credentials ${STEP_WORKDIR}/.awscred
-    ~~~
-
-    2) The following clients must be installed and available in the PATH:
-    - yq-go (must be v3):
-    ~~~
-    wget -O ~/bin/yq-go https://github.com/mikefarah/yq/releases/download/3.4.0/yq_linux_amd64 && \
-    chmod u+x ~/bin/yq-go
-    ~~~
-    - AWS CLI:
-    ~~~
-    pip install awscli
-    ~~~
-
-    3) Create install-config.yaml:
-    ~~~
-    cat << EOF > ${SHARED_DIR}/install-config.yaml
-    metadata:
-      name: $(basename $STEP_WORKDIR)
-    platform:
-      aws:
-        region: ${AWS_REGION}
-    EOF
-    ~~~
-
-    4) Create the variables according to the variant (choose one):
-    4.A) Regular BYO VPC used by shared-vpc:
-    ~~~
-    export ZONES_COUNT=2
-    export AWS_EDGE_POOL_ENABLED=no
-    ~~~
-
-    4.B) BYO VPC with  Local Zones used by *shared-vpc-localzones:
-    ~~~
-    export ZONES_COUNT=2
-    export AWS_EDGE_POOL_ENABLED=yes
-    export EDGE_ZONE_TYPE=local-zone
-    export EDGE_ZONE_NAME=us-east-1-nyc-1a
-    echo "${EDGE_ZONE_NAME}" > "${SHARED_DIR}"/edge-zone-name.txt
-    ~~~
-
-    4.C) BYO VPC with Wavelength Zones used by *shared-vpc-wavelengthzones:
-    ~~~
-    export ZONES_COUNT=2
-    export AWS_EDGE_POOL_ENABLED=yes
-    export EDGE_ZONE_TYPE=wavelength-zone
-    export EDGE_ZONE_NAME=us-east-1-wl1-nyc-wlz-1
-    echo "${EDGE_ZONE_NAME}" > "${SHARED_DIR}"/edge-zone-name.txt
-    ~~~
-
-    5) Run the step:
-    ~~~
-    $RELEASE_REPO/ci-operator/step-registry/ipi/conf/aws/sharednetwork/ipi-conf-aws-sharednetwork-commands.sh
-    ~~~
-
-    6) Check the results:
-    ~~~
-    ls -l ${STEP_WORKDIR}
-    cat ${STEP_WORKDIR}/install-config.yaml
-    ~~~
-
-    7) Run the deprovision:
-    ~~~
-    $RELEASE_REPO/ci-operator/step-registry/ipi/deprovision/aws/sharednetwork/ipi-deprovision-aws-sharednetwork-commands.sh
-    ~~~
+    The IPI AWS configure step generates the AWS-specific install-config.yaml contents based
+    on the cluster profile and optional input files.
