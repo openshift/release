@@ -11,19 +11,19 @@ base_images:
     name: tests-private-builder
     namespace: ci
     tag: "4.15"
-  ocp_4.15_tools:
-    name: "4.15"
+  ocp_4.16_tools:
+    name: "4.16"
     namespace: ocp
     tag: tools
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-8-golang-1.20-openshift-4.16
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-8-golang-1.20-openshift-4.16
 images:
 - dockerfile_path: images/Dockerfile.golang
   from: ci_tests-private-base_4.15
@@ -63,21 +63,18 @@ images:
         chmod +x /usr/local/bin/yq && \
         yum clean all && rm -rf /var/cache/yum/*
   from: root
-  optional: true
   to: tests-private-baseui
 - dockerfile_path: images/Dockerfile.base
   inputs:
-    ocp_4.15_tools:
+    ocp_4.16_tools:
       as:
-      - registry.ci.openshift.org/ocp/4.15:tools
-  optional: true
+      - registry.ci.openshift.org/ocp/4.16:tools
   to: tests-private-base
 - dockerfile_path: images/Dockerfile.builder
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
-  optional: true
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
   to: tests-private-builder
 promotion:
   to:
