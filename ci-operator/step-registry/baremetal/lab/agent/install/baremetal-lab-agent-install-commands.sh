@@ -56,7 +56,11 @@ function reset_host() {
   local ipxe_via_vmedia="${6}"
   local host="${bmc_forwarded_port##1[0-9]}"
   host="${host##0}"
-  echo "Resetting the host #${host}..."
+  echo "Powering off the host #${host}..."
+  ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
+    -U "$bmc_user" -P "$bmc_pass" \
+    power off || echo "Already off"
+  echo "Setting the one-time boot parameter for the host #${host}..."
   case "${vendor}" in
     ampere)
       boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && echo force_pxe || echo force_cdrom)
@@ -87,9 +91,6 @@ function reset_host() {
       echo "Unknown vendor ${vendor}"
       return 1
   esac
-  ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power off || echo "Already off"
   # If the host is not already powered off, the power on command can fail while the host is still powering off.
   # Let's retry the power on command multiple times to make sure the command is received in the correct state.
   for i in {1..10} max; do
@@ -97,10 +98,11 @@ function reset_host() {
       echo "Failed to reset #$host"
       return 1
     fi
+    echo -n "Powering on the host #${host}... "
     ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
       -U "$bmc_user" -P "$bmc_pass" \
       power on && break
-    echo "Failed to power on #$host, retrying..."
+    echo "Failed to power on the host #$host, retrying..."
     sleep 5
   done
 }
@@ -122,7 +124,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
-INSTALL_DIR="/tmp/installer"
+INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
 API_VIP="$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")"
 INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
 mkdir -p "${INSTALL_DIR}"
@@ -241,7 +243,7 @@ case "${BOOT_MODE}" in
       # Assuming HTTP or HTTPS
       iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${CLUSTER_NAME}.${arch}.iso"
     fi
-    mount_virtual_media "${host}" "${iso_path}" &
+    mount_virtual_media "${host}" "${iso_path}"
   done
 
   wait
@@ -280,7 +282,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   echo "Power on #${host} (${name})..."
-  reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${bmc_forwarded_port}" "${vendor}" "${ipxe_via_vmedia}" &
+  reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${bmc_forwarded_port}" "${vendor}" "${ipxe_via_vmedia}"
 done
 
 wait
