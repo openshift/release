@@ -10,6 +10,7 @@ function turn_down() {
 trap turn_down EXIT
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
+test -f "${SHARED_DIR}/deploy.env" && source "${SHARED_DIR}/deploy.env"
 
 function echo_date() {
   echo "$(date -u --rfc-3339=seconds) - $*"
@@ -34,10 +35,6 @@ if [[ "${PLATFORM_EXTERNAL_CCM_ENABLED-}" != "yes" ]]; then
 fi
 
 source ${SHARED_DIR}/ccm.env
-
-# export CCM_RESOURCE=$(<${SHARED_DIR}/CCM_RESOURCE)
-# export CCM_NAMESPACE=$(<${SHARED_DIR}/CCM_NAMESPACE)
-# export CCM_REPLICAS_COUNT=$(<${SHARED_DIR}/CCM_REPLICAS_COUNT)
 
 function stream_logs() {
   echo_date "[log-stream] Starting log streamer"
@@ -74,8 +71,14 @@ do
   oc create -f ${SHARED_DIR}/$manifest || true
 done <<< "$(cat "${SHARED_DIR}/ccm-manifests.txt")"
 
+## What will be an standard method?
+# For AWS:
 #CCM_STATUS_KEY=.status.availableReplicas
-CCM_STATUS_KEY=.status.numberAvailable
+# For OCI:
+#CCM_STATUS_KEY=.status.numberAvailable
+if [[ -z "${CCM_STATUS_KEY}" ]]; then
+  export CCM_STATUS_KEY=.status.availableReplicas
+fi
 until  oc wait --for=jsonpath="{${CCM_STATUS_KEY}}"=${CCM_REPLICAS_COUNT} ${CCM_RESOURCE} -n ${CCM_NAMESPACE} --timeout=10m &> /dev/null
 do
   echo_date "Waiting for minimum replicas avaialble..."

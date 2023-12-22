@@ -4,29 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-function turn_down() {
-  touch /tmp/ccm.done
-}
-trap turn_down EXIT
-
-export KUBECONFIG=${SHARED_DIR}/kubeconfig
-
 function echo_date() {
   echo "$(date -u --rfc-3339=seconds) - $*"
 }
 
-echo_date "Starting CCM setup"
+test -f "${SHARED_DIR}/infra_resources.env" && source "${SHARED_DIR}/infra_resources.env"
 
-echo_date "Collecting current cluster state"
-
-echo_date "Infrastructure CR:"
-oc get infrastructure -o yaml
-
-echo_date "Nodes:"
-oc get nodes
-
-echo_date "Pods:"
-oc get pods -A
 
 if [[ "${PLATFORM_EXTERNAL_CCM_ENABLED-}" != "yes" ]]; then
   echo_date "Ignoring CCM Installation setup. PLATFORM_EXTERNAL_CCM_ENABLED!=yes [${PLATFORM_EXTERNAL_CCM_ENABLED}]"
@@ -36,9 +19,12 @@ fi
 # Build from: https://github.com/openshift/cloud-provider-aws/blob/master/Dockerfile.openshift
 CCM_IMAGE="quay.io/mrbraga/openshift-cloud-provider-aws:latest"
 CCM_NAMESPACE=openshift-cloud-controller-manager
+CCM_MANIFEST=ccm-00-deployment.yaml
+CCM_MANIFEST_PATH="${SHARED_DIR}"/${CCM_MANIFEST}
 
-echo_date "Creating CloudController Manager deployment...."
-cat << EOF | envsubst > "${SHARED_DIR}"/ccm-00-deployment.yaml
+echo_date "Creating CloudController Manager deployment"
+
+cat << EOF | envsubst > $CCM_MANIFEST_PATH
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -146,54 +132,14 @@ spec:
 
 EOF
 
-function stream_logs() {
-  echo_date "[log-stream] Starting log streamer"
-  oc logs deployment/aws-cloud-controller-manager -n ${CCM_NAMESPACE} >> ${ARTIFACT_DIR}/logs-ccm.txt 2>&1
-  echo_date "[log-stream] Finish log streamer"
-}
 
-function watch_logs() {
-  echo_date "[watcher] Starting watcher"
-  while true; do
-    test -f /tmp/ccm.done && break
+echo_date "Created!"
+echo "$CCM_MANIFEST" >> ${SHARED_DIR}/ccm-manifests.txt
+echo "CCM_STATUS_KEY=.status.availableReplicas" >> "${SHARED_DIR}/deploy.env"
+cp -v ${SHARED_DIR}/ccm-manifests.txt ${ARTIFACT_DIR}/
 
-    echo_date "[watcher] creating streamer..."
-    stream_logs &
-    PID_STREAM="$!"
-    echo_date "[watcher] waiting streamer..."
-
-    test -f /tmp/ccm.done && break
-    sleep 10
-    kill -9 "${PID_STREAM}" || true
-  done
-  echo_date "[watcher] done!"
-}
-
-echo_date "Creating watcher"
-watch_logs &
-PID_WATCHER="$!"
-
-echo_date "Creating CCM deployment"
-# oc create -f ${SHARED_DIR}/ccm-00-namespace.yaml
-oc create -f "${SHARED_DIR}"/ccm-00-deployment.yaml
-
-until  oc wait --for=jsonpath='{.status.availableReplicas}'=2 deployment.apps/aws-cloud-controller-manager -n ${CCM_NAMESPACE} --timeout=10m &> /dev/null
-do
-  echo_date "Waiting for minimum replicas avaialble..."
-  sleep 10
-done
-
-echo_date "CCM Ready!"
-
-oc get all -n ${CCM_NAMESPACE}
-
-echo_date "Collecting logs for CCM initialization - initial 30 seconds"
-sleep 30
-touch /tmp/ccm.done
-
-echo_date "Sent signal to finish watcher"
-wait "$PID_WATCHER"
-
-echo_date "Watcher done!"
-
-oc get all -n ${CCM_NAMESPACE}
+cat << EOF > "${SHARED_DIR}/ccm.env"
+CCM_RESOURCE="Deployment/aws-cloud-controller-manager"
+CCM_NAMESPACE=${CCM_NAMESPACE}
+CCM_REPLICAS_COUNT=2
+EOF

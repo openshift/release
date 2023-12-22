@@ -1,3 +1,4 @@
+NÂO USAR
 
 install:
 
@@ -18,13 +19,12 @@ chmod u+x ~/bin/butane
 Run Local:
 
 ```sh
-
 INSTALLER=${HOME}/go/src/github.com/mtulio/installer-upi
 sudo ln -svf ${INSTALLER} /var/lib/openshift-install
 
 # workdir
-# export STEP_WORKDIR=/tmp/ci-op-$(cat /dev/random | env LC_CTYPE=C tr -cd 'a-f0-9' | head -c 6)
-# mkdir -v $STEP_WORKDIR
+export STEP_WORKDIR=/tmp/ci-op-$(cat /dev/random | env LC_CTYPE=C tr -cd 'a-f0-9' | head -c 6)
+mkdir -v $STEP_WORKDIR
 
 #export STEP_WORKDIR=/tmp/ci-op-9cd2a9
 
@@ -50,6 +50,5 @@ export WORKER_INSTANCE_TYPE=m6i.xlarge
 export OCP_ARCH=amd64
 
 REPO=${HOME}/go/src/github.com/mtulio/release
-bash -x $REPO/ci-operator/step-registry/opct/platform-external/install/aws/opct-platform-external-install-aws-commands.sh
-
+bash -x $REPO/ci-operator/step-registry/platform-external/cluster/aws/install/platform-external-cluster-aws-install-commands.sh
 ```

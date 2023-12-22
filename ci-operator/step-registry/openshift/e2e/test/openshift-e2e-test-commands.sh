@@ -23,6 +23,11 @@ if [[ "${CLUSTER_TYPE}" == "hypershift" ]]; then
     echo "Overriding 'hypershift' cluster type to be 'aws'"
 fi
 
+# HACK: Platform External
+# TODO? discover platform type == external or intro vars
+export CLUSTER_TYPE="external"
+
+
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
@@ -170,6 +175,7 @@ powervs*)
     export IBMCLOUD_API_KEY
     ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
+external) export TEST_PROVIDER='' ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 

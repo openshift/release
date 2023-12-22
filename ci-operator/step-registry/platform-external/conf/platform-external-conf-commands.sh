@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/openshift-release-dev/ocp-release:4.15.0-ec.2-x86_64"
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/openshift-release-dev/ocp-release:4.15.0-rc.5-x86_64"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH=/tmp/install-config-external.yaml.patch
@@ -33,7 +33,7 @@ if ! [ -x "$(command -v butane)" ]; then
 fi
 which butane
 
-SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
+#SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
 
 echo_date "Creating install-config.yaml patch"
 cat > "${PATCH}" << EOF
@@ -44,18 +44,14 @@ platform:
 compute:
 - name: worker
   replicas: 3
-  platform: {}
   architecture: amd64
-  hyperthreading: Enabled
 controlPlane:
   name: master
-  platform: {}
   replicas: 3
   architecture: amd64
-  hyperthreading: Enabled
 publish: External
-sshKey: |
-  ${SSH_PUB_KEY}
+#sshKey: |
+#  {SSH_PUB_KEY}
 EOF
 
 echo_date "Patching install-config.yaml"
