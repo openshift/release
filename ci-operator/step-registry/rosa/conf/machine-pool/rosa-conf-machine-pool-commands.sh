@@ -80,7 +80,7 @@ if [[ "$LOCAL_ZONE" == "true" ]]; then
   # Unify rosa localzones macnine pool config with ocp
   LABELS="${LABELS},node-role.kubernetes.io/edge="
   TAINTS="${TAINTS},node-role.kubernetes.io/edge=:NoSchedule"
-  localzone_subnet_id=$(head -n 1 "${SHARED_DIR}/localzone_subnet_id")
+  localzone_subnet_id=$(head -n 1 "${SHARED_DIR}/edge_zone_subnet_id")
   if [[ -z "${localzone_subnet_id}" ]]; then
     echo -e "The localzone_subnet_id is mandatory."
     exit 1
