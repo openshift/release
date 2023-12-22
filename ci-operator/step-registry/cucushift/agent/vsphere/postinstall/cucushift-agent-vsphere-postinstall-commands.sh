@@ -5,14 +5,21 @@ set -o errexit
 set -o pipefail
 
 echo "************ vsphere agent post-install ************"
+
+# Debug
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+version=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
+# Skip post installation if the version is 4.15 or more
+if [[ $(echo -e "4.15\n$version" | sort -V | tail -n 1) == "$version" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - credentials have been added to the cluster, there's no need to execute post-installation."
+  exit 0
+fi
 # Check for SNO cluster
 if [ "${MASTERS}" -eq 1 ]; then
   echo "$(date -u --rfc-3339=seconds) - no need to add vsphere credentials as the cluster is SNO"
   exit 0
 fi
 source "${SHARED_DIR}"/platform-conf.sh
-# Debug
-export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 oc get nodes
 
@@ -20,8 +27,6 @@ oc get nodes
 echo "Getting vsphere-creds and cloud-provider-config"
 oc get secret vsphere-creds -o yaml -n kube-system >"${SHARED_DIR}"/vsphere-creds.yaml
 oc get cm cloud-provider-config -o yaml -n openshift-config >"${SHARED_DIR}"/cloud-provider-config.yaml
-
-version=$(oc version | grep -oE 'Server Version: ([0-9]+\.[0-9]+)' | sed 's/Server Version: //')
 
 cat <<EOF | oc replace -f -
 apiVersion: v1
@@ -36,8 +41,6 @@ stringData:
   "${VSPHERE_VCENTER}.username": "${VSPHERE_USERNAME}"
   "${VSPHERE_VCENTER}.password": "${VSPHERE_PASSWORD}"
 EOF
-
-oc patch kubecontrollermanager cluster -p='{"spec": {"forceRedeploymentReason": "recovery-'"$(date --rfc-3339=ns)"'"}}' --type=merge
 
 echo "Applying changes on cloud-provider-config"
 oc get cm cloud-provider-config -o yaml -n openshift-config >"${SHARED_DIR}"/cloud-provider-config.yaml
@@ -69,6 +72,8 @@ if [[ $(echo -e "4.13\n$version" | sort -V | tail -n 1) == "$version" ]]; then
         -e "s/folderplaceholder/${VSPHERE_FOLDER}/g" "${SHARED_DIR}"/infrastructures.config.openshift.io.yaml
       oc apply -f "${SHARED_DIR}"/infrastructures.config.openshift.io.yaml --overwrite=true
 fi
+
+oc patch kubecontrollermanager cluster -p='{"spec": {"forceRedeploymentReason": "recovery-'"$(date --rfc-3339=ns)"'"}}' --type=merge
 
 oc patch clusterversion version --type json -p '[{"op": "remove", "path": "/spec/channel"}]}]'
 
