@@ -19,7 +19,7 @@ fi
 
 infra_id=$(head -n 1 ${SHARED_DIR}/infra_id)
 
-LOCALZONE_SUBNET_FILE="${SHARED_DIR}/localzone_subnet_id"
+LOCALZONE_SUBNET_FILE="${SHARED_DIR}/edge_zone_subnet_id"
 if [[ -e "${LOCALZONE_SUBNET_FILE}" ]]; then
   localzone_subnet_id=$(head -n 1 "${LOCALZONE_SUBNET_FILE}")
   echo "Adding tags for localzon subnets$localzone_subnet_id, tags: kubernetes.io/cluster/${infra_id}, value is shared."
