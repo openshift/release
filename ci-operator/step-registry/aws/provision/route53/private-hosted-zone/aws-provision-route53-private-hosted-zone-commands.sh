@@ -146,4 +146,8 @@ EOF
   cmd="aws --region $REGION iam attach-role-policy --role-name ${ROLE_NAME} --policy-arn '${POLICY_ARN}'"
   eval "${cmd}"
 
+  # # debug
+  # aws --region $REGION iam attach-role-policy --role-name ${ROLE_NAME} --policy-arn 'arn:aws:iam::aws:policy/ResourceGroupsandTagEditorFullAccess'
+  # aws --region $REGION iam attach-role-policy --role-name ${ROLE_NAME} --policy-arn 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
+
 fi
