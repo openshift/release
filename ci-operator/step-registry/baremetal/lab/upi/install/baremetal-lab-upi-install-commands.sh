@@ -187,30 +187,33 @@ function reset_host() {
   local ipxe_via_vmedia="${5}"
   local host="${bmc_port##1[0-9]}"
   host="${host##0}"
+  echo "Powering off the host #${host}..."
+  ipmitool -I lanplus -H "${bmc_host}" -p "${bmc_port}" \
+    -U "$bmc_user" -P "$bmc_pass" \
+    power off || echo "Already off"
   # HPE iLO6 BMCs on RL300 do not have drivers for BCM5720 NICs, use vmedia to load ipxe.usb
   # See https://issues.redhat.com/browse/OCPQE-18370
+  echo "Setting the one-time boot parameter for the host #${host}..."
   if [ "$ipxe_via_vmedia" == "true" ]; then
-    echo "Resetting host #$host (via ipxe on vmedia)..."
+    echo "host #$host will boot from PXE via ipxe on vmedia..."
     timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" mount.vmedia.ipxe "${host}"
   else
     ipmitool -I lanplus -H "${bmc_host}" -p "${bmc_port}" \
       -U "$bmc_user" -P "$bmc_pass" \
       chassis bootparam set bootflag force_pxe options=PEF,watchdog,reset,power
   fi
-  ipmitool -I lanplus -H "${bmc_host}" -p "${bmc_port}" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power off || echo "Already off"
   # If the host is not already powered off, the power on command can fail while the host is still powering off.
   # Let's retry the power on command multiple times to make sure the command is received in the correct state.
+  echo "Powering on the host #${host}..."
   for i in {1..10} max; do
     if [ "$i" == "max" ]; then
-      echo "Failed to reset host #${host}"
+      echo "Failed to power on the host #${host}"
       return 1
     fi
     ipmitool -I lanplus -H "${bmc_host}" -p "${bmc_port}" \
       -U "$bmc_user" -P "$bmc_pass" \
       power on && break
-    echo "Failed to power on host #${host}, retrying..."
+    echo "Failed to power on the host #${host}, retrying..."
     sleep 5
   done
 }
