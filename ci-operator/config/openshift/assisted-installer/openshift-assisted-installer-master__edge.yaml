@@ -67,8 +67,9 @@ images:
       - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-installer-build
 promotion:
-  name: ocm-2.10
-  namespace: edge-infrastructure
+  to:
+  - name: ocm-2.10
+    namespace: edge-infrastructure
 releases:
   latest:
     candidate:
@@ -83,6 +84,17 @@ resources:
 tests:
 - as: publish-multi-arch-images
   postsubmit: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      DOCKERFILE_IMAGE_PAIRS: |
+        Dockerfile.assisted-installer , quay.io/edge-infrastructure/assisted-installer-multi:latest |
+        Dockerfile.assisted-installer-controller , quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
+      DRY_RUN: "false"
+    workflow: assisted-tools-multi-arch
+- always_run: false
+  as: publish-multi-arch-images-dry-run
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
@@ -249,6 +261,15 @@ tests:
         OPENSHIFT_VERSION=4.14
       PLATFORM: assisted-oci
     workflow: assisted-oci
+- always_run: false
+  as: e2e-metal-assisted-external
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        PLATFORM=external
+    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master
   org: openshift

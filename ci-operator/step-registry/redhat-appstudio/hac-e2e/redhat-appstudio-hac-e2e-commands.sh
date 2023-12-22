@@ -16,7 +16,7 @@ PATH=$PATH:/tmp/go/bin
 #  Setup env variables
 
 export  OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD QONTRACT_BASE_URL \
-     QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN CYPRESS_HAC_BASE_URL CYPRESS_GH_TOKEN
+     QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN CYPRESS_HAC_BASE_URL CYPRESS_GH_TOKEN CYPRESS_SSO_URL
 
 QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_password)
 QONTRACT_USERNAME=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_username)
@@ -69,6 +69,7 @@ echo "=== HAC INSTALLED ==="
 echo "HAC NAMESPACE: $HAC_NAMESPACE"
 CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.hostname}")/preview/application-pipeline"
 echo "Cypress Base url: $CYPRESS_HAC_BASE_URL"
+CYPRESS_SSO_URL="$(oc get feenv env-$HAC_NAMESPACE --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.sso}")"
 
 echo "Deploying proxy plugin for tekton-results"
 oc apply --kubeconfig=$KUBECONFIG -f - <<EOF

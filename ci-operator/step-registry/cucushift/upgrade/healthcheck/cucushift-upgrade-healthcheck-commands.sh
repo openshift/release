@@ -60,18 +60,12 @@ function check_clusteroperators() {
     done < "${input}"
     rm -f "${tmp_clusteroperator}"
 
-    # oc get clusteroperator
-    # NAME                                  VERSION                             AVAILABLE   PROGRESSING   FAILING   SINCE
-    # operator-lifecycle-manager            4.0.0-0.nightly-2019-03-19-004004   True        False         False     4h26m
-    # service-ca                                                                True        False         False     4h26m
-    # "versions": null
     echo "Make sure every operator column reports version"
     if null_version=$(${OC} get clusteroperator -o json | jq '.items[] | select(.status.versions == null) | .metadata.name') && [[ ${null_version} != "" ]]; then
         echo >&2 "Null Version: ${null_version}"
         (( tmp_ret += 1 ))
     fi
 
-    # In disconnected install, marketplace often get into False state, so it is better to remove it from cluster from flexy post-action
     echo "Make sure every operator's AVAILABLE column is True"
     if unavailable_operator=$(${OC} get clusteroperator | awk '$3 == "False"' | grep "False"); then
         echo >&2 "Some operator's AVAILABLE is False"
@@ -83,6 +77,18 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
 
+    echo "Make sure every operator's PROGRESSING column is False"
+    if progressing_operator=$(${OC} get clusteroperator | awk '$4 == "True"' | grep "True"); then
+        echo >&2 "Some operator's PROGRESSING is True"
+        echo >&2 "$progressing_operator"
+        (( tmp_ret += 1 ))
+    fi
+    if ${OC} get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Progressing") | .status' | grep -iv "False"; then
+        echo >&2 "Some operators are Progressing, pls run 'oc get clusteroperator -o json' to check"
+        (( tmp_ret += 1 ))
+    fi
+
+    echo "Make sure every operator's DEGRADED column is False"
     # In disconnected install, openshift-sample often get into Degrade state, so it is better to remove them from cluster from flexy post-action
     #degraded_operator=$(${OC} get clusteroperator | grep -v "openshift-sample" | awk '$5 == "True"')
     if degraded_operator=$(${OC} get clusteroperator | awk '$5 == "True"' | grep "True"); then
@@ -125,32 +131,47 @@ function wait_clusteroperators_continous_success() {
 }
 
 function check_mcp() {
-    local updating_mcp unhealthy_mcp
+    local updating_mcp unhealthy_mcp tmp_output
 
-    updating_mcp=$(oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status --no-headers | grep -v "False")
-    if [[ -n "${updating_mcp}" ]]; then
-        echo "Some mcp is updating..."
-        echo "${updating_mcp}"
+    tmp_output=$(mktemp)
+    oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status --no-headers > "${tmp_output}" || true
+    # using the size of output to determinate if oc command is executed successfully
+    if [[ -s "${tmp_output}" ]]; then
+        updating_mcp=$(cat "${tmp_output}" | grep -v "False")
+        if [[ -n "${updating_mcp}" ]]; then
+            echo "Some mcp is updating..."
+            echo "${updating_mcp}"
+            return 1
+        fi
+    else
+        echo "Did not run "oc get mcp" successfully!"
         return 1
     fi
 
     # Do not check UPDATED on purpose, beause some paused mcp would not update itself until unpaused
-    unhealthy_mcp=$(oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount --no-headers | grep -v "False.*False.*0")
-    if [[ -n "${unhealthy_mcp}" ]]; then
-        echo "Detected unhealthy mcp:"
-        echo "${unhealthy_mcp}"
-        echo "Real-time detected unhealthy mcp:"
-        oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount | grep -v "False.*False.*0"
-        echo "Real-time full mcp output:"
-        oc get mcp
-        echo ""
-        unhealthy_mcp_names=$(echo "${unhealthy_mcp}" | awk '{print $1}')
-        echo "Using oc describe to check status of unhealthy mcp ..."
-        for mcp_name in ${unhealthy_mcp_names}; do
-          echo "Name: $mcp_name"
-          oc describe mcp $mcp_name || echo "oc describe mcp $mcp_name failed"
-        done
-        return 2
+    oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount --no-headers > "${tmp_output}" || true
+    # using the size of output to determinate if oc command is executed successfully
+    if [[ -s "${tmp_output}" ]]; then
+        unhealthy_mcp=$(cat "${tmp_output}" | grep -v "False.*False.*0")
+        if [[ -n "${unhealthy_mcp}" ]]; then
+            echo "Detected unhealthy mcp:"
+            echo "${unhealthy_mcp}"
+            echo "Real-time detected unhealthy mcp:"
+            oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount | grep -v "False.*False.*0"
+            echo "Real-time full mcp output:"
+            oc get mcp
+            echo ""
+            unhealthy_mcp_names=$(echo "${unhealthy_mcp}" | awk '{print $1}')
+            echo "Using oc describe to check status of unhealthy mcp ..."
+            for mcp_name in ${unhealthy_mcp_names}; do
+              echo "Name: $mcp_name"
+              oc describe mcp $mcp_name || echo "oc describe mcp $mcp_name failed"
+            done
+            return 2
+        fi
+    else
+        echo "Did not run "oc get mcp" successfully!"
+        return 1
     fi
     return 0
 }

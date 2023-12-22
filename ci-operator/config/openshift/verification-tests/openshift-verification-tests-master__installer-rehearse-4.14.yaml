@@ -54,7 +54,12 @@ tests:
     cluster_profile: aws-1-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-    workflow: cucushift-installer-rehearse-aws-ipi-localzone-byo-subnet-ovn-day2
+      SLEEP_DURATION: 3h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-provision
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
@@ -72,11 +77,9 @@ tests:
   cron: '@yearly'
   steps:
     cluster_profile: gcp-qe
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.14
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    workflow: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-filestore-csi
+      SIZE_VARIANT: compact
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:

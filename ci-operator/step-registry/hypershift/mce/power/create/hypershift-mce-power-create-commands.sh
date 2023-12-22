@@ -141,6 +141,27 @@ data:
         insecure = false
 EOF
 
+
+ oc adm release info ${OCP_IMAGE_MULTI} --filter-by-os=linux/ppc64le -o json > ocpversion.json
+ OPENSHIFT_VERSION="$(cat ocpversion.json | jq -r . | grep "BUILD_VERSION=v" |  tr -d 'v",' | awk -F '=' '{print $2}')"
+ export OPENSHIFT_VERSION
+
+ if [[ "${OPENSHIFT_VERSION}" == *"4.14."* ]]
+ then
+   RHCOS_VERSION="4.14-9.2"
+ elif [[ "${OPENSHIFT_VERSION}" == *"4.15."* ]]
+ then
+   RHCOS_VERSION="4.15-9.2"
+ else
+   echo "unrecognized version for RHCOS"
+   exit 1
+ fi
+
+ RHCOS_BUILD_VERSION=$(cat ocpversion.json | jq -r '.displayVersions."machine-os".Version')
+ export RHCOS_BUILD_VERSION
+ export ISO_URL="https://rhcos.mirror.openshift.com/art/storage/prod/streams/${RHCOS_VERSION}/builds/${RHCOS_BUILD_VERSION}/ppc64le/rhcos-${RHCOS_BUILD_VERSION}-live.ppc64le.iso"
+ export ROOT_FS_URL="https://rhcos.mirror.openshift.com/art/storage/prod/streams/${RHCOS_VERSION}/builds/${RHCOS_BUILD_VERSION}/ppc64le/rhcos-${RHCOS_BUILD_VERSION}-live-rootfs.ppc64le.img"
+
 # Creating AgentServiceConfig
 echo "$(date) Creating AgentServiceConfig"
 envsubst <<"EOF" | oc apply -f -
@@ -165,7 +186,7 @@ spec:
     name: mirror-config
   osImages:
     - openshiftVersion: "${OPENSHIFT_VERSION}"
-      version: "${RHCOS_VERSION}"
+      version: "${RHCOS_BUILD_VERSION}"
       url: "${ISO_URL}"
       rootFSUrl: "${ROOT_FS_URL}"
       cpuArchitecture: "${ARCH}"
@@ -187,7 +208,12 @@ echo "$(date) Creating agent hosted cluster manifests"
 oc create ns ${HOSTED_CONTROL_PLANE_NAMESPACE}
 mkdir /tmp/hc-manifests
 
-${HYPERSHIFT_CLI_NAME} create cluster agent \
+ICSP_COMMAND=""
+if [[ $ENABLE_ICSP == "true" ]]; then
+  ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_iscp.yaml")
+fi
+
+${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --name=${HOSTED_CLUSTER_NAME} \
     --namespace=${CLUSTERS_NAMESPACE} \
     --pull-secret=${PULL_SECRET} \
@@ -197,6 +223,7 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent \
     --ssh-key=${SSH_PUB_KEY_FILE}\
     --release-image=${OCP_IMAGE_MULTI} \
     --control-plane-availability-policy=${CP_AVAILABILITY_POLICY} \
+    --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
     --render > /tmp/hc-manifests/cluster-agent.yaml
 
 # Split the manifest to replace routing strategy of various services
@@ -391,3 +418,13 @@ ${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --nam
 # Setting nodeSelector on ingresscontroller  to first agent to make sure router pod spawns on first agent,
 # since *.apps DNS record is pointing to first agent's IP.
 oc patch ingresscontroller default -n openshift-ingress-operator -p '{"spec": {"nodePlacement": {"nodeSelector": { "matchLabels": { "kubernetes.io/hostname": "'"${INSTANCE_NAMES[0]}"'"}}, "tolerations": [{ "effect": "NoSchedule", "key": "kubernetes.io/hostname", "operator": "Exists"}]}}}' --type=merge --kubeconfig=${SHARED_DIR}/nested_kubeconfig
+
+cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
+export HTTP_PROXY=http://${BASTION}:2005/
+export HTTPS_PROXY=http://${BASTION}:2005/
+export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+
+export http_proxy=http://${BASTION}:2005/
+export https_proxy=http://${BASTION}:2005/
+export no_proxy="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+EOF

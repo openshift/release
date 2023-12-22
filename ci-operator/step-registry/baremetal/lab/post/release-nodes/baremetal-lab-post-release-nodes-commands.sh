@@ -11,7 +11,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'UserKnownHostsFile=/dev/null'
   -o 'ServerAliveInterval=90'
   -o LogLevel=ERROR
-  -i "${CLUSTER_PROFILE_DIR}/packet-ssh-key")
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
