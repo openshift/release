@@ -9,7 +9,7 @@ images:
     SHELL ["/bin/bash", "-c"]
     RUN yum install -y python3 python3-pip make gettext bc
     RUN curl -Lso /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /usr/local/bin/jq
-    RUN curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.25.2/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+    RUN curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.40.5/yq_linux_amd64 && chmod +x /usr/local/bin/yq
     RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
     RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh && helm version
   from: src
@@ -29,35 +29,9 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: baseline
-  steps:
-    cluster_profile: aws-rhdh-performance
-    env:
-      DURATION: 1h0m0s
-      SCENARIO: baseline-test
-      SPAWN_RATE: "100"
-      USE_PR_BRANCH: "false"
-      USERS: "10000"
-      WORKERS: "100"
-    workflow: redhat-performance-backstage-performance
-  timeout: 8h0m0s
-- always_run: false
-  as: baseline-pr
-  steps:
-    cluster_profile: aws-rhdh-performance
-    env:
-      DURATION: 1h0m0s
-      SCENARIO: baseline-test
-      SPAWN_RATE: "100"
-      USE_PR_BRANCH: "true"
-      USERS: "10000"
-      WORKERS: "100"
-    workflow: redhat-performance-backstage-performance
-  timeout: 8h0m0s
-- always_run: false
   as: search-catalog
   steps:
-    cluster_profile: aws-rhdh-performance
+    cluster_profile: aws
     env:
       DURATION: 1h0m0s
       SCENARIO: search-catalog
@@ -70,7 +44,7 @@ tests:
 - always_run: false
   as: list-catalog
   steps:
-    cluster_profile: aws-rhdh-performance
+    cluster_profile: aws
     env:
       DURATION: 1h0m0s
       SCENARIO: list-catalog
@@ -83,7 +57,7 @@ tests:
 - always_run: false
   as: list-catalog-empty
   steps:
-    cluster_profile: aws-rhdh-performance
+    cluster_profile: aws
     env:
       DURATION: 1h0m0s
       PRE_LOAD_DB: "false"
@@ -93,6 +67,42 @@ tests:
       USERS: "10000"
       WORKERS: "100"
     workflow: redhat-performance-backstage-performance
+  timeout: 8h0m0s
+- always_run: false
+  as: search-catalog-scalability
+  steps:
+    cluster_profile: aws
+    env:
+      DURATION: 5m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: 1:1 200:40
+      SCALE_BS_USERS_GROUPS: 1:1 15000:5000
+      SCALE_CATALOG_SIZES: 1 10000
+      SCALE_DB_STORAGES: 1Gi 2Gi
+      SCALE_REPLICAS: "5"
+      SCALE_WORKERS: "5"
+      SCENARIO: search-catalog
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "true"
+    workflow: redhat-performance-backstage-performance-scalability
+  timeout: 8h0m0s
+- always_run: false
+  as: list-catalog-scalability
+  steps:
+    cluster_profile: aws
+    env:
+      DURATION: 5m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: 1:1 200:40
+      SCALE_BS_USERS_GROUPS: 1:1 15000:5000
+      SCALE_CATALOG_SIZES: 1 10000
+      SCALE_DB_STORAGES: 1Gi 2Gi
+      SCALE_REPLICAS: "5"
+      SCALE_WORKERS: "5"
+      SCENARIO: list-catalog
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "false"
+    workflow: redhat-performance-backstage-performance-scalability
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
