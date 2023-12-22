@@ -5,10 +5,28 @@ set -o errexit
 set -o pipefail
 
 REGION="${LEASED_RESOURCE}"
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-localzone_subnet_id=$(head -n 1 "${SHARED_DIR}/localzone_subnet_id")
-localzone_az_name=$(head -n 1 "${SHARED_DIR}/localzone_az_name")
+edge_zone_subnet_id=$(head -n 1 "${SHARED_DIR}/edge_zone_subnet_id")
+edge_zone_name=$(head -n 1 "${SHARED_DIR}/edge-zone-name.txt")
+edge_zone_group_name=$(head -n 1 "${SHARED_DIR}"/edge-zone-group-name.txt)
+
+# keeping manifest_ prefix as this step can be used in manifest injection before installation 
 localzone_machineset="${SHARED_DIR}/manifest_localzone_machineset.yaml"
+
+
+if [[ ${LOCALZONE_INSTANCE_TYPE} != "" ]]; then
+  instance_type=${LOCALZONE_INSTANCE_TYPE}
+  echo "instance_type: using use provided ${LOCALZONE_INSTANCE_TYPE}"
+else
+  instance_type=$(aws --region ${REGION} ec2 describe-instance-type-offerings --location availability-zone --filters Name=location,Values=${edge_zone_name} | jq -r '.InstanceTypeOfferings[].InstanceType' | grep -E '^[rc][0-9][a-z]{0,1}\.2xlarge$' | sort | head -n 1)
+  echo "instance_type: auto selected ${instance_type}"
+fi
+
+if [[ ${instance_type} == "" ]]; then
+  echo "instance type is empty, exit now"
+  exit 1
+fi
 
 echo "Creating machineset manifests ... "
 # PLACEHOLDER_INFRA_ID
@@ -19,26 +37,26 @@ kind: MachineSet
 metadata:
   labels:
     machine.openshift.io/cluster-api-cluster: PLACEHOLDER_INFRA_ID
-  name: PLACEHOLDER_INFRA_ID-edge-${localzone_az_name}
+  name: PLACEHOLDER_INFRA_ID-edge-${edge_zone_name}
   namespace: openshift-machine-api
 spec:
   replicas: ${LOCALZONE_WORKER_NUMBER}
   selector:
     matchLabels:
       machine.openshift.io/cluster-api-cluster: PLACEHOLDER_INFRA_ID
-      machine.openshift.io/cluster-api-machineset: PLACEHOLDER_INFRA_ID-edge-${localzone_az_name}
+      machine.openshift.io/cluster-api-machineset: PLACEHOLDER_INFRA_ID-edge-${edge_zone_name}
   template:
     metadata:
       labels:
         machine.openshift.io/cluster-api-cluster: PLACEHOLDER_INFRA_ID
         machine.openshift.io/cluster-api-machine-role: edge
         machine.openshift.io/cluster-api-machine-type: edge
-        machine.openshift.io/cluster-api-machineset: PLACEHOLDER_INFRA_ID-edge-${localzone_az_name}
+        machine.openshift.io/cluster-api-machineset: PLACEHOLDER_INFRA_ID-edge-${edge_zone_name}
     spec:
       metadata:
         labels:
-          machine.openshift.io/zone-type: local-zone
-          machine.openshift.io/zone-group: ${localzone_az_name::-1}
+          machine.openshift.io/zone-type: ${EDGE_ZONE_TYPE}
+          machine.openshift.io/zone-group: ${edge_zone_group_name}
           node-role.kubernetes.io/edge: ""
       providerSpec:
         value:
@@ -54,10 +72,10 @@ spec:
           deviceIndex: 0
           iamInstanceProfile:
             id: PLACEHOLDER_INFRA_ID-worker-profile
-          instanceType: ${LOCALZONE_INSTANCE_TYPE}
+          instanceType: ${instance_type}
           kind: AWSMachineProviderConfig
           placement:
-            availabilityZone: ${localzone_az_name}
+            availabilityZone: ${edge_zone_name}
             region: ${REGION}
           securityGroups:
             - filters:
@@ -65,7 +83,7 @@ spec:
                 values:
                   - PLACEHOLDER_INFRA_ID-worker-sg
           subnet:
-            id: ${localzone_subnet_id}
+            id: ${edge_zone_subnet_id}
           tags:
             - name: kubernetes.io/cluster/PLACEHOLDER_INFRA_ID
               value: owned
@@ -99,24 +117,3 @@ EOF
   yq-go m -x -i "${localzone_machineset}" "${schedulable_patch}"
 fi
 cp "${localzone_machineset}" "${ARTIFACT_DIR}/"
-
-# default_ingress="${SHARED_DIR}/manifest_localzone_cluster-ingress-default-ingresscontroller.yaml"
-# echo "Creating ingress manifests ... "
-# cat <<EOF > "${default_ingress}"
-# apiVersion: operator.openshift.io/v1
-# kind: IngressController
-# metadata:
-#   creationTimestamp: null
-#   name: default
-#   namespace: openshift-ingress-operator
-# spec:
-#   endpointPublishingStrategy:
-#     loadBalancer:
-#       scope: External
-#       providerParameters:
-#         type: AWS
-#         aws:
-#           type: NLB
-#     type: LoadBalancerService
-# EOF
-# cp "${default_ingress}" "${ARTIFACT_DIR}/"

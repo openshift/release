@@ -31,6 +31,7 @@ if [[ $(aws --region "$REGION" ec2 describe-availability-zones --all-availabilit
 then
     echo "Zone group ${zone_group_name} already opted-in"
     echo -en "$zone_name" > "${SHARED_DIR}/edge-zone-name.txt"
+    echo -en "$zone_group_name" > "${SHARED_DIR}/edge-zone-group-name.txt"
     exit 0
 fi
 
@@ -54,3 +55,4 @@ done
 
 echo "Zone group ${zone_group_name} opted-in."
 echo -en "$zone_name" > "${SHARED_DIR}/edge-zone-name.txt"
+echo -en "$zone_group_name" > "${SHARED_DIR}/edge-zone-group-name.txt"

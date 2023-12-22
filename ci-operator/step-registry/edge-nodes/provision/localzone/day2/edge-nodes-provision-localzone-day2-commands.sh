@@ -41,7 +41,7 @@ count=$(yq-go r ${localzone_machineset} 'spec.replicas')
 echo "machineset_name: ${machineset_name}, expect count: ${count}"
 
 try=1
-total=30
+total=50
 interval=60
 t=$(mktemp)
 while [[ ${try} -le ${total} ]]; do
