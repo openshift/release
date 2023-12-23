@@ -26,6 +26,7 @@ if [[ "${CLUSTER_TYPE}" == *ocp-metal* ]]; then
     -o LogLevel=ERROR
     -i "${CLUSTER_PROFILE_DIR}/ssh-key")
   AUX_HOST="$(<"${CLUSTER_PROFILE_DIR}"/aux-host)"
+  PROXY="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 fi
 
 function approve_csrs() {
@@ -70,9 +71,12 @@ function wait_for_power_down_and_release() {
   local bmc_address="${1}"
   local bmc_user="${2}"
   local bmc_pass="${3}"
+  local bmc_forwarded_port="${4}"
+  local vendor="${5}"
+  local ipxe_via_vmedia="${6}"
   sleep 90
   local retry_max=40 # 15*40=600 (10 min)
-  while [ $retry_max -gt 0 ] && ! ipmitool -I lanplus -H "$bmc_address" \
+  while [ $retry_max -gt 0 ] && ! ipmitool -I lanplus -H "$AUX_HOST" -p "$bmc_forwarded_port" \
     -U "$bmc_user" -P "$bmc_pass" power status | grep -q "Power is off"; do
     echo "$bmc_address is not powered off yet... waiting"
     sleep 30
@@ -88,8 +92,8 @@ function wait_for_power_down_and_release() {
       # that sometimes keep the hosts frozen before POST.
       echo "retrying $bmc_address again to reboot..."
       touch "/tmp/$bmc_address"
-      reset_host "$bmc_address" "$bmc_user" "$bmc_pass"
-      wait_for_power_down "$bmc_address" "$bmc_user" "$bmc_pass"
+      reset_host "$bmc_address" "$bmc_user" "$bmc_pass" "$bmc_forwarded_port" "$vendor" "$ipxe_via_vmedia"
+      wait_for_power_down_and_release "$bmc_address" "$bmc_user" "$bmc_pass" "$bmc_forwarded_port" "$vendor" "$ipxe_via_vmedia"
       return $?
     fi
   fi
@@ -128,36 +132,79 @@ EOF
   return 0
 }
 
-## Valid for baremetal hosts only
+
 function reset_host() {
+  # bmc_address is used for redfish
+  # AUX_HOST:bmc_forwarded_port is used for ipmi
   local bmc_address="${1}"
   local bmc_user="${2}"
   local bmc_pass="${3}"
-  ipmitool -I lanplus -H "$bmc_address" \
+  local bmc_forwarded_port="${4}"
+  local vendor="${5}"
+  local ipxe_via_vmedia="${6}"
+  local host="${bmc_forwarded_port##1[0-9]}"
+  host="${host##0}"
+  echo "Powering off the host #${host}..."
+  until ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
     -U "$bmc_user" -P "$bmc_pass" \
-    chassis bootparam set bootflag force_pxe options=PEF,watchdog,reset,power
-  ipmitool -I lanplus -H "$bmc_address" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power off || echo "Already off"
-  # If the host is not already powered off, the power on command can fail while the host is still powering off.
-  # Let's retry the power on command multiple times to make sure the command
-  # is received when the host is in the correct state.
-  for i in {1..10} max; do
-    if [ "$i" == "max" ]; then
-      echo "Failed to reset $bmc_address"
-      return 1
-    fi
-    ipmitool -I lanplus -H "$bmc_address" \
+    power status | grep -i -q "Chassis Power is off"; do
+    echo "Host #${host} is powered on... forcing power off"
+    ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
       -U "$bmc_user" -P "$bmc_pass" \
-      power on && break
-    echo "Failed to power on $bmc_address, retrying..."
-    sleep 5
+      power off || true
+    sleep 30
   done
-  # Adding a 4th parameter with any string will enable the next step to wait for the host to be powered off and released
-  if [ -z "${4:-}" ]; then
+  if [ "${ipxe_via_vmedia}" == "true" ]; then
+    echo "The host #${host} requires an ipxe image to boot via vmedia in order to perform the pxe boot..."
+    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" mount.vmedia.ipxe "${host}"
+  fi
+  echo "Setting the one-time boot parameter for the host #${host}..."
+  power_on_cmd="on"
+  case "${vendor}" in
+    ampere)
+      ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
+        -U "$bmc_user" -P "$bmc_pass" \
+        chassis bootdev force_pxe
+    ;;
+    dell)
+      boot_selection=$([ "${ipxe_via_vmedia}" != "true" ] && echo PXE || echo VCD-DVD)
+      curl -x "${PROXY}" -k -u "${bmc_user}:${bmc_pass}" -X POST \
+        "https://$bmc_address/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Oem/EID_674_Manager.ImportSystemConfiguration" \
+         -H "Content-Type: application/json" -d \
+         '{"ShareParameters":{"Target":"ALL"},"ImportBuffer":
+            "<SystemConfiguration><Component FQDD=\"iDRAC.Embedded.1\">
+            <Attribute Name=\"ServerBoot.1#BootOnce\">Enabled</Attribute>
+            <Attribute Name=\"ServerBoot.1#FirstBootDevice\">'"$boot_selection"'</Attribute>
+            </Component></SystemConfiguration>"}'
+    ;;
+    hpe)
+      boot_selection=$([ "${ipxe_via_vmedia}" != "true" ] && echo Pxe || echo Cd)
+      power_on_cmd="cycle"
+      curl -x "${PROXY}" -k -u "${bmc_user}:${bmc_pass}" -X PATCH \
+        "https://$bmc_address/redfish/v1/Systems/1/" \
+        -H 'Content-Type: application/json' \
+        -d '{"Boot": {"BootSourceOverrideTarget": "'"$boot_selection"'"}}'
+    ;;
+    *)
+      echo "Unknown vendor ${vendor}"
+      return 1
+  esac
+  echo "Powering on the host #${host}..."
+  until ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
+    -U "$bmc_user" -P "$bmc_pass" \
+    power status | grep -i -q "Chassis Power is on"; do
+    echo "Host #${host} is not powered on yet... power on"
+    ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
+      -U "$bmc_user" -P "$bmc_pass" \
+      power "$power_on_cmd" || true
+    sleep 30
+  done
+  # Adding a 7th parameter with any string will enable the next step to wait for the host to be powered off and released
+  if [ -z "${7:-}" ]; then
     return 0
   fi
-  if ! wait_for_power_down_and_release "$bmc_address" "$bmc_user" "$bmc_pass"; then
+  if ! wait_for_power_down_and_release "$bmc_address" "$bmc_user" "$bmc_pass" "$bmc_forwarded_port" "$vendor" "$ipxe_via_vmedia" \
+    "$vendor" "$ipxe_via_vmedia"; then
     echo "$bmc_address" >> /tmp/failed
   fi
 }
@@ -182,7 +229,7 @@ case "$CLUSTER_TYPE" in
       exit 1
     fi
     echo "Power on ${bmc_address//.*/} (${name})..."
-    reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}"
+    reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${bmc_forwarded_port}" "${vendor}" "${ipxe_via_vmedia}" &
   done
 ;;
 *)
@@ -233,7 +280,7 @@ case "$CLUSTER_TYPE" in
       echo "Removing the grub.cfg file for host with mac ${mac}..."
       rm -f "/opt/tftpboot/grub.cfg-01-${mac//:/-}" || echo "no grub.cfg for $mac."
       echo "Removing the DHCP config for ${name}/${mac}..."
-      sed -i "/^dhcp-host=$mac/d" /opt/dhcpd/root/etc/dnsmasq.conf
+      sed -i "/^dhcp-host=$mac/d" /opt/dnsmasq/etc/dnsmasq.conf
       echo "Removing the DNS config for ${name}/${mac}..."
       sed -i "/${name}.*${CLUSTER_NAME:-glob-protected-from-empty-var}/d" /opt/bind9_zones/{zone,internal_zone.rev}
       # haproxy.cfg is mounted as a volume, and we need to remove the bootstrap node from being a backup:
@@ -247,9 +294,9 @@ case "$CLUSTER_TYPE" in
       cat "${F}.tmp" > "${F}"
       rm -rf "${F}.tmp"
       docker kill -s HUP "haproxy-${CLUSTER_NAME}"
-      docker exec bind9 rndc reload
-      docker exec bind9 rndc flush
-      docker restart dhcpd
+      podman exec bind9 rndc reload
+      podman exec bind9 rndc flush
+      systemctl restart dhcp
     done
 EOF
   echo "Wiping the disks and releasing the nodes for further reservations in other jobs..."
@@ -257,7 +304,7 @@ EOF
   for bmhost in $(yq e -o=j -I=0 ".[] | select(.arch|test(\"${REGEX}\") and .name|test(\"worker-\"))" "${SHARED_DIR}/hosts.yaml"); do
     # shellcheck disable=SC1090
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-    reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" wait &
+    reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${bmc_forwarded_port}" "${vendor}" "${ipxe_via_vmedia}" wait &
   done
   wait
   echo "All children terminated."

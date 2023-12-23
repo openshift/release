@@ -41,6 +41,11 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   butane --strict --raw -o "${SHARED_DIR}/${mac_prefix}-console-hook.ign" <<EOF
 variant: fcos
 version: 1.3.0
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+      - $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 systemd:
   units:
   - name: console-hook.service
@@ -57,7 +62,11 @@ systemd:
 
       [Service]
       Type=oneshot
-      ExecStart=/usr/bin/coreos-installer install $root_device \
+      # Ensure disks are wiped before running the installer. This should be done by the wiping steps, but since
+      # we can control installation in bm-upi, let's mitigate the risk of a previous installation that left data
+      # on the disks due to the wiping step failing or being skipped.
+      ExecStartPre=-bash -c 'set -x; for i in \$(lsblk -I8,259 -nd --output name); do wipefs -a /dev/\$i; done; set +x'
+      ExecStartPre=/usr/bin/coreos-installer install $root_device \
         --delete-karg console=ttyS0,115200n8 $(join_by_semicolon "${console_kargs}" "--append-karg console=" "") \
         --ignition-url ${base_url%%*(/)}/${role}.ign \
         --insecure-ignition --copy-network
@@ -68,7 +77,7 @@ systemd:
       # xrefs: https://bugzilla.redhat.com/show_bug.cgi?id=1997805
       #        https://github.com/coreos/fedora-coreos-tracker/issues/946
       #        https://github.com/coreos/fedora-coreos-tracker/issues/947
-      ExecStart=/usr/bin/bash -c ' \
+      ExecStartPre=/usr/bin/bash -c ' \
         ARCH=\$(uname -m | sed "s/x86_64/x64/;s/aarch64/aa64/"); \
         /usr/sbin/efibootmgr -c -d "$root_device" -p 2 -c -L "Red Hat CoreOS" -l "\\\\EFI\\\\redhat\\\\shim\$ARCH.efi" \
       '
