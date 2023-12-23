@@ -57,19 +57,29 @@ function reset_host() {
   local host="${bmc_forwarded_port##1[0-9]}"
   host="${host##0}"
   echo "Powering off the host #${host}..."
-  ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
+  until ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
     -U "$bmc_user" -P "$bmc_pass" \
-    power off || echo "Already off"
+    power status | grep -i -q "Chassis Power is off"; do
+    echo "Host #${host} is powered on... forcing power off"
+    ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
+      -U "$bmc_user" -P "$bmc_pass" \
+      power off || true
+    sleep 30
+  done
+  if [ "${ipxe_via_vmedia}" == "true" ]; then
+    echo "The host #${host} requires an ipxe image to boot via vmedia in order to perform the pxe boot..."
+    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" mount.vmedia.ipxe "${host}"
+  fi
   echo "Setting the one-time boot parameter for the host #${host}..."
+  power_on_cmd="on"
   case "${vendor}" in
     ampere)
       boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && echo force_pxe || echo force_cdrom)
       ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
         -U "$bmc_user" -P "$bmc_pass" \
-        chassis bootparam set bootflag "$boot_selection" options=PEF,watchdog,reset,power
+        chassis bootdev "$boot_selection"
     ;;
     dell)
-      # this is how sushy does it
       boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && [ "${ipxe_via_vmedia}" != "true" ] && echo PXE || echo VCD-DVD)
       curl -x "${proxy}" -k -u "${bmc_user}:${bmc_pass}" -X POST \
         "https://$bmc_address/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Oem/EID_674_Manager.ImportSystemConfiguration" \
@@ -82,6 +92,7 @@ function reset_host() {
     ;;
     hpe)
       boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && [ "${ipxe_via_vmedia}" != "true" ] && echo Pxe || echo Cd)
+      power_on_cmd="cycle"
       curl -x "${proxy}" -k -u "${bmc_user}:${bmc_pass}" -X PATCH \
         "https://$bmc_address/redfish/v1/Systems/1/" \
         -H 'Content-Type: application/json' \
@@ -91,19 +102,15 @@ function reset_host() {
       echo "Unknown vendor ${vendor}"
       return 1
   esac
-  # If the host is not already powered off, the power on command can fail while the host is still powering off.
-  # Let's retry the power on command multiple times to make sure the command is received in the correct state.
-  for i in {1..10} max; do
-    if [ "$i" == "max" ]; then
-      echo "Failed to reset #$host"
-      return 1
-    fi
-    echo -n "Powering on the host #${host}... "
+  echo "Powering on the host #${host}..."
+  until ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
+    -U "$bmc_user" -P "$bmc_pass" \
+    power status | grep -i -q "Chassis Power is on"; do
+    echo "Host #${host} is not powered on yet... power on"
     ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
       -U "$bmc_user" -P "$bmc_pass" \
-      power on && break
-    echo "Failed to power on the host #$host, retrying..."
-    sleep 5
+      power "$power_on_cmd" || true
+    sleep 30
   done
 }
 

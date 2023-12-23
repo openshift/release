@@ -52,7 +52,7 @@ N_MASTERS=${N_MASTERS} N_WORKERS=${N_WORKERS} \
   REQUEST_BOOTSTRAP_HOST=${REQUEST_BOOTSTRAP_HOST} REQUEST_VIPS=true APPEND="false" ARCH="${ARCH}" /usr/bin/reserve-hosts.sh
 # If the number of requested ADDITIONAL_WORKERS is greater than 0, we need to reserve the additional workers
 if [ "${ADDITIONAL_WORKERS}" -gt 0 ]; then
-  N_WORKERS="${ADDITIONAL_WORKERS}" N_MASTERS=0 RESERVE_BOOTSTRAP_HOST=false \
+  N_WORKERS="${ADDITIONAL_WORKERS}" N_MASTERS=0 REQUEST_BOOTSTRAP_HOST=false \
    ARCH="${ADDITIONAL_WORKER_ARCHITECTURE}" APPEND="true" REQUEST_VIPS=false reserve-hosts.sh
 fi
 EOF
