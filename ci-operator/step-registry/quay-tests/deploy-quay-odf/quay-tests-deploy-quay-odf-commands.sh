@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+#Get the credentials and Email of new Quay User
+QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
+QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
+QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
+
 #Deploy ODF Operator to OCP namespace 'openshift-storage'
 OO_INSTALL_NAMESPACE=openshift-storage
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
@@ -160,7 +165,7 @@ FEATURE_AUTO_PRUNE: true
 EOF
 
 echo "Creating Quay Config Bundle Secret..." >&2
-oc create secret generic --from-file config.yaml=./config.yaml config-bundle-secret -n quay-enterprise
+chmod 777 config.yaml && oc create secret generic --from-file config.yaml=./config.yaml config-bundle-secret -n quay-enterprise
 
 echo "Creating Quay registry..." >&2
 cat <<EOF | oc apply -f -
@@ -192,17 +197,19 @@ for _ in {1..60}; do
   if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')" == "True" ]]; then
     echo "Quay is in ready status" >&2
     oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' > "$ARTIFACT_DIR"/quayroute || true
+    oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
     quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
     echo "Quay Route is $quay_route"
     curl --location --request POST https://"$quay_route"/api/v1/user/initialize \
         --header 'Content-Type: application/json' \
         --data-raw '{
-            "username": "quay",
-            "password": "password",
-            "email": "quay@redhat,com",
+            "username": ${QUAY_USERNAME},
+            "password": ${QUAY_PASSWORD},
+            "email": ${QUAY_EMAIL},
             "access_token": true
-        }' -k | jq '.access_token' | tr -d '"' | tr -d '\n' > "$ARTIFACT_DIR"/quay_oauth2_token
-    curl -X -k https://$quay_route/api/v1/discovery | jq > "$ARTIFACT_DIR"/quay_api_discovery
+        }' -k | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token
+    curl -X -k https://$quay_route/api/v1/discovery | jq > "$SHARED_DIR"/quay_api_discovery
+    cp "$SHARED_DIR"/quay_oauth2_token "$ARTIFACT_DIR"/quay_oauth2_token && cp "$SHARED_DIR"/quay_api_discovery "$ARTIFACT_DIR"/quay_api_discovery
     exit 0
   fi
   sleep 15
