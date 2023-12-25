@@ -203,9 +203,9 @@ for _ in {1..60}; do
     curl --location --request POST https://"$quay_route"/api/v1/user/initialize \
         --header 'Content-Type: application/json' \
         --data-raw '{
-            "username": "$QUAY_USERNAME",
-            "password": "$QUAY_PASSWORD",
-            "email": "$QUAY_EMAIL",
+            "username": "'$QUAY_USERNAME'",
+            "password": "'$QUAY_PASSWORD'",
+            "email": "'$QUAY_EMAIL'",
             "access_token": true
         }' -k | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token
     curl -X -k https://$quay_route/api/v1/discovery | jq > "$SHARED_DIR"/quay_api_discovery
