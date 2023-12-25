@@ -506,8 +506,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-workers-marketplace
-- as: aws-ocm-osd-ccs-f7
-  cron: 45 14 4,11,18,26 * *
+- as: aws-ocm-osd-ccs-f14
+  cron: 44 1 12,27 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -518,8 +518,20 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: osd-ccs-aws
-- as: aws-rosa-sts-f7
-  cron: 32 12 6,13,20,28 * *
+- as: aws-rosa-non-sts-advanced-f14
+  cron: 15 9 8,23 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and not @fips'
+      OPENSHIFT_VERSION: "4.13"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: rosa-aws-non-sts-advanced
+- as: aws-rosa-sts-f14
+  cron: 38 21 12,27 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -530,6 +542,42 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: rosa-aws-sts
+- as: aws-rosa-sts-advanced-f14
+  cron: 53 15 8,23 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and not @fips'
+      OPENSHIFT_VERSION: "4.13"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: rosa-aws-sts-advanced
+- as: aws-rosa-sts-private-link-f14
+  cron: 15 2 12,27 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @disconnected and @rosa and not @fips'
+      OPENSHIFT_VERSION: "4.13"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: rosa-aws-sts-private-link
+- as: aws-rosa-sts-shared-vpc-f14
+  cron: 35 15 1,16 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and not @fips'
+      OPENSHIFT_VERSION: "4.13"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: rosa-aws-sts-shared-vpc
 - as: aws-sc2s-ipi-disconnected-private-f14
   cron: 33 21 3,18 * *
   steps:
