@@ -10,6 +10,27 @@ function run_command() {
     eval "${CMD}"
 }
 
+function run_command_with_retries()
+{
+    local try=0 cmd="$1" retries="${2:-}" ret=0
+    [[ -z ${retries} ]] && max="20" || max=${retries}
+    echo "Trying ${max} times max to run '${cmd}'"
+
+    eval "${cmd}" || ret=$?
+    while [ X"${ret}" != X"0" ] && [ ${try} -lt ${max} ]; do
+        echo "'${cmd}' did not return success, waiting 60 sec....."
+        sleep 60
+        (( try++ ))
+        eval "${cmd}" || ret=$?
+    done
+    if [ ${try} -eq ${max} ]; then
+        echo "Never succeed or Timeout"
+        return 1
+    fi
+    echo "Succeed"
+    return 0
+}
+
 function wait_public_dns() {
     echo "Wait public DNS - $1 take effect"
     local try=0 retries=10
@@ -117,8 +138,8 @@ echo "Create a Storage Account for bastion vhd"
 # 'account_name' must have length less than 24, so hardcode the basion sa name
 sa_name_prefix=$(echo "${NAMESPACE}" | sed "s/ci-op-//" | sed 's/[-_]//g')
 sa_name="${sa_name_prefix}${UNIQUE_HASH}basa"
-run_command "az storage account create -g ${bastion_rg} --name ${sa_name} --kind Storage --sku Standard_LRS" &&
-account_key=$(az storage account keys list -g ${bastion_rg} --account-name ${sa_name} --query "[0].value" -o tsv) || exit 3
+run_command_with_retries "az storage account create -g ${bastion_rg} --name ${sa_name} --kind Storage --sku Standard_LRS" "5"
+account_key=$(az storage account keys list -g ${bastion_rg} --account-name ${sa_name} --query "[0].value" -o tsv)
 
 echo "Copy bastion vhd from public blob URI to the bastion Storage Account"
 storage_contnainer="${bastion_name}vhd"

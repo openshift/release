@@ -5,6 +5,96 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
+    cluster: build04
+    context: ci/prow/e2e-alibaba-ovn
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: alibabacloud
+      ci-operator.openshift.io/cloud-cluster-profile: alibabacloud
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-cloud-controller-manager-operator-release-4.16-e2e-alibaba-ovn
+    optional: true
+    path_alias: github.com/openshift/cluster-cloud-controller-manager-operator
+    rerun_command: /test e2e-alibaba-ovn
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-alibaba-ovn-cluster-profile
+        - --target=e2e-alibaba-ovn
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-alibaba-ovn-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-alibabacloud
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-alibaba-ovn,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build03
     context: ci/prow/e2e-aws-ovn
     decorate: true
@@ -183,7 +273,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-azure-manual-oidc
     decorate: true
     decoration_config:
@@ -272,7 +362,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
@@ -362,7 +452,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
     decoration_config:
@@ -453,7 +543,7 @@ presubmits:
     - ^release-4\.16$
     - ^release-4\.16-
     cluster: build04
-    context: ci/prow/e2e-gcp-ovn-ccm
+    context: ci/prow/e2e-gcp-ovn
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -465,10 +555,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-cloud-controller-manager-operator-release-4.16-e2e-gcp-ovn-ccm
+    name: pull-ci-openshift-priv-cluster-cloud-controller-manager-operator-release-4.16-e2e-gcp-ovn
     optional: true
     path_alias: github.com/openshift/cluster-cloud-controller-manager-operator
-    rerun_command: /test e2e-gcp-ovn-ccm
+    rerun_command: /test e2e-gcp-ovn
     skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
@@ -479,8 +569,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-gcp-ovn-ccm-cluster-profile
-        - --target=e2e-gcp-ovn-ccm
+        - --secret-dir=/usr/local/e2e-gcp-ovn-cluster-profile
+        - --target=e2e-gcp-ovn
         command:
         - ci-operator
         image: ci-operator:latest
@@ -496,7 +586,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-ovn-ccm-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-ovn-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -540,14 +630,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-ovn-ccm,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
     cluster: build04
-    context: ci/prow/e2e-gcp-ovn-techpreview
+    context: ci/prow/e2e-gcp-ovn-upgrade
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -559,10 +649,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-cloud-controller-manager-operator-release-4.16-e2e-gcp-ovn-techpreview
+    name: pull-ci-openshift-priv-cluster-cloud-controller-manager-operator-release-4.16-e2e-gcp-ovn-upgrade
     optional: true
     path_alias: github.com/openshift/cluster-cloud-controller-manager-operator
-    rerun_command: /test e2e-gcp-ovn-techpreview
+    rerun_command: /test e2e-gcp-ovn-upgrade
     skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
@@ -573,8 +663,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-gcp-ovn-techpreview-cluster-profile
-        - --target=e2e-gcp-ovn-techpreview
+        - --secret-dir=/usr/local/e2e-gcp-ovn-upgrade-cluster-profile
+        - --target=e2e-gcp-ovn-upgrade
         command:
         - ci-operator
         image: ci-operator:latest
@@ -590,7 +680,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-ovn-techpreview-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-ovn-upgrade-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -634,7 +724,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-ovn-techpreview,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-ovn-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -911,7 +1001,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build03
+    cluster: build04
     context: ci/prow/fmt
     decorate: true
     decoration_config:
@@ -974,7 +1064,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build03
+    cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1037,7 +1127,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build03
+    cluster: build04
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -1100,7 +1190,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build03
+    cluster: build04
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -1170,7 +1260,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build03
+    cluster: build04
     context: ci/prow/vendor
     decorate: true
     decoration_config:
@@ -1233,7 +1323,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build03
+    cluster: build04
     context: ci/prow/vet
     decorate: true
     decoration_config:

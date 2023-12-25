@@ -507,6 +507,9 @@ gcp)
     elif [ -f "${SHARED_DIR}/user_tags_sa.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the userTags testing on GCP..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/user_tags_sa.json"
+    elif [ -f "${SHARED_DIR}/xpn_min_perm_passthrough.json" ]; then
+      echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC..."
+      export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_min_perm_passthrough.json"
     fi
     ;;
 ibmcloud*)
