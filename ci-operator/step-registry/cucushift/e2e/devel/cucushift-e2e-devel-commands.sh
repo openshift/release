@@ -65,9 +65,18 @@ function filter_test_by_network() {
     fi
     echo_e2e_tags
 }
+function filter_test_by_sno() {
+    local nodeno
+    nodeno="$(oc get nodes --no-headers | wc -l)"
+    if [[ $nodeno -eq 1 ]] ; then
+        export E2E_RUN_TAGS="${E2E_RUN_TAGS} and @singlenode"
+    fi
+    echo_e2e_tags
+}
 function filter_tests() {
     filter_test_by_version
     filter_test_by_network
+    filter_test_by_sno
     # the following check should be the last one in filter_tests
     for tag in ${CUCUSHIFT_FORCE_SKIP_TAGS} ; do
         if ! [[ "${E2E_SKIP_TAGS}" =~ $tag ]] ; then
