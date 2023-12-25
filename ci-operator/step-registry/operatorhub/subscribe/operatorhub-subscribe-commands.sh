@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 if [[ -z "${SUB_INSTALL_NAMESPACE}" ]]; then
   echo "ERROR: INSTALL_NAMESPACE is not defined"
   exit 1
@@ -34,7 +38,17 @@ metadata:
 EOF
 
 # deploy new operator group
-oc apply -f - <<EOF
+if [[ "${SUB_TARGET_NAMESPACES}" == "" ]]; then
+  oc apply -f - <<EOF
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: "${SUB_INSTALL_NAMESPACE}-operator-group"
+  namespace: "${SUB_INSTALL_NAMESPACE}"
+spec: {}
+EOF
+else
+  oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -44,6 +58,7 @@ spec:
   targetNamespaces:
   - $(echo \"${SUB_TARGET_NAMESPACES}\" | sed "s|,|\"\n  - \"|g")
 EOF
+fi
 
 # subscribe to the operator
 cat <<EOF | oc apply -f -
