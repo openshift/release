@@ -186,6 +186,25 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
+- as: aws-ipi-disc-amd-mixarch-f28-longduration-cloud
+  cron: 7 11 4 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      E2E_RUN_TAGS: '@heterogeneous and @aws-ipi and @disconnected and not @fips'
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_TIMEOUT: "90"
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-disc-arm-mixarch-tp-f14
   cron: 22 1 8,23 * *
   steps:
@@ -986,6 +1005,25 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
+- as: azure-ipi-disc-fullypriv-amd-mixarch-f28-longduration-cloud
+  cron: 29 21 9 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      E2E_RUN_TAGS: '@heterogeneous and @azure-ipi and @disconnected and not @fips'
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_TIMEOUT: "90"
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe-longduration
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
 - as: azure-ipi-disc-oidc-amd-f28-destructive
   cron: 31 10 15 * *
   steps:
@@ -1560,6 +1598,24 @@ tests:
     test:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
+- as: gcp-ipi-disc-priv-amd-mixarch-f28-longduration-cloud
+  cron: 53 6 23 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      E2E_RUN_TAGS: '@heterogeneous and @gcp-ipi and @disconnected and not @fips'
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_TIMEOUT: "90"
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe-longduration
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
 - as: gcp-ipi-disc-priv-oidc-arm-mixarch-f14
   cron: 29 5 14,29 * *
