@@ -191,7 +191,7 @@ EOF
 for _ in {1..60}; do
   if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')" == "True" ]]; then
     echo "Quay is in ready status" >&2
-    oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' > "$ARTIFACT_DIR/quayroute || true
+    oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' > "$ARTIFACT_DIR"/quayroute || true
     quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
     echo "Quay Route is $quay_route"
     curl --location --request POST https://"$quay_route"/api/v1/user/initialize \
@@ -201,12 +201,12 @@ for _ in {1..60}; do
             "password": "password",
             "email": "quay@redhat,com",
             "access_token": true
-        }' -k | jq '.access_token' | tr -d '"' | tr -d '\n' > "$ARTIFACT_DIR/quay_oauth2_token
-    curl -X -k https://$quay_route/api/v1/discovery | jq > "$ARTIFACT_DIR/quay_api_discovery
+        }' -k | jq '.access_token' | tr -d '"' | tr -d '\n' > "$ARTIFACT_DIR"/quay_oauth2_token
+    curl -X -k https://$quay_route/api/v1/discovery | jq > "$ARTIFACT_DIR"/quay_api_discovery
     exit 0
   fi
   sleep 15
 done
 echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
-oc -n quay-enterprise get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
+oc -n quay-enterprise get quayregistries -o yaml >"$ARTIFACT_DIR"/quayregistries.yaml
 exit 2
