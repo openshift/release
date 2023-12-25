@@ -40,9 +40,7 @@ fi
 echo ${NUTANIX_OS_ENDPOINT}
 sleep 3600
 # configure image registry to use nutanix object bucket
-#debug info
-oc patch config.image/cluster -p '{"spec":{"managementState":"Managed","replicas":2,"storage":{"managementState":"Unmanaged","s3":{"bucket":"ocp-registry-4-'"${OCP_MINOR_VERSION}"'","region":"us-east-1","regionEndpoint":"https://ocp-registry-4-14.os.lts-cluster.internal.nutanix-dev.devcluster.openshift.com","trustedCA":{"name":"custom-ca"}}}}}' --type=merge
-#oc patch config.image/cluster -p '{"spec":{"managementState":"Managed","replicas":2,"storage":{"managementState":"Unmanaged","s3":{"bucket":"ocp-registry-4-'"${OCP_MINOR_VERSION}"'","region":"us-east-1","regionEndpoint":"'"${NUTANIX_OS_ENDPOINT}"'","trustedCA":{"name":"custom-ca"}}}}}' --type=merge
+oc patch config.image/cluster -p '{"spec":{"managementState":"Managed","replicas":2,"storage":{"managementState":"Unmanaged","s3":{"bucket":"ocp-registry-4-'"${OCP_MINOR_VERSION}"'","region":"us-east-1","regionEndpoint":"'"${NUTANIX_OS_ENDPOINT}"'","trustedCA":{"name":"custom-ca"}}}}}' --type=merge
 # wait image registry to redeploy with new set
 check_imageregistry_back_ready(){
   local result="" iter=10 period=60
