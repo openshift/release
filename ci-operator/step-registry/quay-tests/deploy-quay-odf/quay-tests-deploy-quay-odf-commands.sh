@@ -137,6 +137,31 @@ EOF
 echo "Waiting for NooBaa Storage to be ready..." >&2
 oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=180s
 
+#Create Quay Config Bundle Secret
+cat >>config.yaml <<EOF
+BROWSER_API_CALLS_XHR_ONLY: false
+PERMANENTLY_DELETE_TAGS: true
+RESET_CHILD_MANIFEST_EXPIRATION: true
+CREATE_REPOSITORY_ON_PUSH_PUBLIC: true
+FEATURE_EXTENDED_REPOSITORY_NAMES: true
+CREATE_PRIVATE_REPO_ON_PUSH: true
+CREATE_NAMESPACE_ON_PUSH: true
+FEATURE_QUOTA_MANAGEMENT: true
+FEATURE_PROXY_CACHE: true
+FEATURE_USER_INITIALIZE: true
+FEATURE_GENERAL_OCI_SUPPORT: true
+FEATURE_HELM_OCI_SUPPORT: true
+FEATURE_PROXY_STORAGE: true
+SUPER_USERS:
+  - quay
+FEATURE_UI_V2: true
+FEATURE_SUPERUSERS_FULL_ACCESS: true
+FEATURE_AUTO_PRUNE: true
+EOF
+
+echo "Creating Quay Config Bundle Secret..." >&2
+oc create secret generic --from-file config.yaml=./config.yaml config-bundle-secret -n quay-enterprise
+
 echo "Creating Quay registry..." >&2
 cat <<EOF | oc apply -f -
 apiVersion: quay.redhat.com/v1
@@ -145,6 +170,7 @@ metadata:
   name: quay
   namespace: quay-enterprise
 spec:
+  configBundleSecret: config-bundle-secret
   components:
   - kind: monitoring
     managed: false
@@ -165,6 +191,18 @@ EOF
 for _ in {1..60}; do
   if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')" == "True" ]]; then
     echo "Quay is in ready status" >&2
+    oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' > "$ARTIFACT_DIR/quayroute || true
+    quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
+    echo "Quay Route is $quay_route"
+    curl --location --request POST https://"$quay_route"/api/v1/user/initialize \
+        --header 'Content-Type: application/json' \
+        --data-raw '{
+            "username": "quay",
+            "password": "password",
+            "email": "quay@redhat,com",
+            "access_token": true
+        }' -k | jq '.access_token' | tr -d '"' | tr -d '\n' > "$ARTIFACT_DIR/quay_oauth2_token
+    curl -X -k https://$quay_route/api/v1/discovery | jq > "$ARTIFACT_DIR/quay_api_discovery
     exit 0
   fi
   sleep 15
