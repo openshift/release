@@ -669,6 +669,68 @@ function check_upgrade_status() {
     else
         cluster_version="${TARGET_VERSION}"
     fi
+
+    if check_ota_case_enabled "OCP-23309"; then
+        SSH_CLOUD_PUB_KEY="${CLUSTER_PROFILE_DIR}/ssh-privatekey" #ssh-publickey
+        QE_BASTION_SSH_USER=$(cat "${SHARED_DIR}/bastion_ssh_user")
+        QE_BASTION_PUBLIC_ADDRESS=$(cat "${SHARED_DIR}/bastion_public_address")
+
+        # block quay
+        remote_cmd="sudo sed -i.backup '/^auth_param basic program/i\\acl blocklist dstdomain quay.io\\nhttp_access deny  blocklist' \
+/srv/squid/etc/squid.conf && sudo systemctl restart squid-proxy.service && echo success"
+        run_command "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+-o VerifyHostKeyDNS=yes -i \"${SSH_CLOUD_PUB_KEY}\" \"${QE_BASTION_SSH_USER}@${QE_BASTION_PUBLIC_ADDRESS}\" \"${remote_cmd}\""
+
+        # wait until upgrade blocked
+        result='False'
+        i=0
+        while [[ "$result" != "True" && i -lt 60 ]]; do
+            i=$((i + 1))
+            sleep 1m
+            result="$(oc get clusterversion -ojsonpath='{.items[].status.conditions[?(@.type==\"Failing\")].status}')"
+        done
+
+        if [[ "$result" != "True" ]]; then
+            echo "Timed out waiting for Failing=True"
+            exit 1
+        fi
+
+        # Check basic oc command still working well
+        oc get clusterversion
+        if [ $? -ne 0 ]; then
+            echo "'oc get clusterversion' does not work"
+            exit 1
+        fi
+        oc get clusteroperator
+        if [ $? -ne 0 ]; then
+            echo "'oc get clusteroperator' does not work"
+            exit 1
+        fi
+        oc describe clusterversion
+        if [ $? -ne 0 ]; then
+            echo "'oc describe clusterversion' does not work"
+            exit 1
+        fi
+
+        # unblock quay
+        remote_cmd="sudo mv /srv/squid/etc/squid.conf.backup /srv/squid/etc/squid.conf && sudo systemctl restart squid-proxy.service && echo success"
+        run_command "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o VerifyHostKeyDNS=yes -i \"${SSH_CLOUD_PUB_KEY}\" \"${QE_BASTION_SSH_USER}@${QE_BASTION_PUBLIC_ADDRESS}\" \"${remote_cmd}\""
+
+        # wait for failing is false again
+        i=0
+        while [[ "$result" != "False" && i -lt 60 ]]; do
+            i=$((i + 1))
+            sleep 1m
+            result="$(oc get clusterversion -ojsonpath='{.items[].status.conditions[?(@.type==\"Failing\")].status}')"
+        done
+
+        if [[ "$result" != "False" ]]; then
+            echo "Timed out waiting for Failing=False"
+            exit 1
+        fi
+    fi
+
     echo "Starting the upgrade checking on $(date "+%F %T")"
     while (( wait_upgrade > 0 )); do
         sleep 5m
