@@ -202,7 +202,7 @@ for _ in {1..60}; do
     echo "Quay Route is $quay_route"
     curl --location --request POST https://"$quay_route"/api/v1/user/initialize \
         --header 'Content-Type: application/json' \
-        --data-raw '{
+        --data '{
             "username": "'$QUAY_USERNAME'",
             "password": "'$QUAY_PASSWORD'",
             "email": "'$QUAY_EMAIL'",
