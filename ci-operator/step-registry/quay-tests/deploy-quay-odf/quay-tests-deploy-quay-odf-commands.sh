@@ -200,14 +200,8 @@ for _ in {1..60}; do
     oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
     quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
     echo "Quay Route is $quay_route"
-    curl --location --request POST $quay_route/api/v1/user/initialize \
-        --header 'Content-Type: application/json' \
-        --data '{
-            "username": "'$QUAY_USERNAME'",
-            "password": "'$QUAY_PASSWORD'",
-            "email": "'$QUAY_EMAIL'",
-            "access_token": true
-        }' -k | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token
+    curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
+         --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token
     curl -X -k $quay_route/api/v1/discovery | jq > "$SHARED_DIR"/quay_api_discovery
     cp "$SHARED_DIR"/quay_oauth2_token "$ARTIFACT_DIR"/quay_oauth2_token && cp "$SHARED_DIR"/quay_api_discovery "$ARTIFACT_DIR"/quay_api_discovery
     exit 0
