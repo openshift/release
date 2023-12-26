@@ -29,7 +29,7 @@ EOF2
 cat <<EOF > /tmp/install.sh
 #!/bin/bash
 set -xeuo pipefail
-sudo dnf install -y git
+
 if ! sudo subscription-manager status >&/dev/null; then
     sudo subscription-manager register \
         --org="\$(cat /tmp/subscription-manager-org)" \
@@ -42,7 +42,14 @@ cp /tmp/pull-secret "\${PULL_SECRET}"
 sudo mkdir -p /etc/microshift
 sudo cp /tmp/config.yaml /etc/microshift/config.yaml
 
+if ! hash git ; then
+  DNF_RETRY=\$(mktemp /tmp/dnf_retry.XXXXXXXX.sh)
+  curl -s https://raw.githubusercontent.com/openshift/microshift/main/scripts/dnf_retry.sh -o "\${DNF_RETRY}"
+  chmod 755 "\${DNF_RETRY}"
+  "\${DNF_RETRY}" "install" "git-core"
+fi
 git clone https://github.com/openshift/microshift -b ${BRANCH} \${HOME}/microshift
+
 cd \${HOME}/microshift
 chmod 0755 \${HOME}
 bash -x ./scripts/devenv-builder/configure-vm.sh --force-firewall "\${PULL_SECRET}"
