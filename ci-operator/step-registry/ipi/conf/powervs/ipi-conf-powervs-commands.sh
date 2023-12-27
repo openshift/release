@@ -4,8 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-CONFIG="${SHARED_DIR}/install-config.yaml"
+echo "ARCH=${ARCH}"
+echo "BRANCH=${BRANCH}"
 
+CONFIG="${SHARED_DIR}/install-config.yaml"
 
 # Temporarily commenting out this section (lines 11 - 50 below) until profiles are supported in powervs environment
 # if [[ -z "${SIZE_VARIANT}" ]]; then
@@ -112,6 +114,11 @@ case "${LEASED_RESOURCE}" in
       POWERVS_REGION=tok
       VPCREGION=jp-tok
    ;;
+   "wdc06")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_WDC06")
+      POWERVS_REGION=wdc
+      VPCREGION=us-east
+   ;;
    *)
       # Default Region & Zone
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID")
@@ -184,6 +191,17 @@ EOF
 
 export POWERVS_SHARED_CREDENTIALS_FILE
 
+if echo ${BRANCH} | awk -F. '{ if ($1 == 4 && $2 <= 14) { exit 0 } else { exit 1 } }'; then
+  # In 4.14 releases or earlier, the parameter is named serviceInstanceID and is a required
+  # parameter.
+  SERVICE_INSTANCE="serviceInstanceID"
+else
+  # In 4.15 releases or later, the parameter is named serviceInstanceGUID and is an optional
+  # parameter.
+  SERVICE_INSTANCE="serviceInstanceGUID"
+fi
+echo "SERVICE_INSTANCE=${SERVICE_INSTANCE}"
+
 cat > "${CONFIG}" << EOF
 apiVersion: v1
 baseDomain: ${BASE_DOMAIN}
@@ -214,7 +232,7 @@ platform:
   powervs:
     powervsResourceGroup: "${POWERVS_RESOURCE_GROUP}"
     region: ${POWERVS_REGION}
-    serviceInstanceID: "${POWERVS_SERVICE_INSTANCE_ID}"
+    ${SERVICE_INSTANCE}: "${POWERVS_SERVICE_INSTANCE_ID}"
     userID: ${POWERVS_USER_ID}
     zone: ${POWERVS_ZONE}
     vpcRegion: ${VPCREGION}
@@ -224,3 +242,11 @@ pullSecret: >
 sshKey: |
   $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 EOF
+
+echo "OPTIONAL_INSTALL_CONFIG_PARMS=\"${OPTIONAL_INSTALL_CONFIG_PARMS}\""
+read -ra PARAMETERS <<< "${OPTIONAL_INSTALL_CONFIG_PARMS}"
+echo "count = ${#PARAMETERS[*]}"
+for PARAMETER in "${PARAMETERS[@]}"; do
+  echo "Removing ${PARAMETER}"
+  sed -i '/'${PARAMETER}':/d' "${CONFIG}"
+done

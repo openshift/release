@@ -1,0 +1,86 @@
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  annotations:
+    # if instance type is unknown, so the autoscaler must be told about capacity:  https://access.redhat.com/solutions/6640721
+    machine.openshift.io/GPU: "0"
+    machine.openshift.io/memoryMb: "32768"
+    machine.openshift.io/vCPU: "16"
+  labels:
+    machine.openshift.io/cluster-api-cluster: build01-9hdwj
+  name: build01-9hdwj-ci-tests-worker-us-east-1b
+  namespace: openshift-machine-api
+spec:
+  deletePolicy: Oldest
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build01-9hdwj
+      machine.openshift.io/cluster-api-machineset: build01-9hdwj-ci-tests-worker-us-east-1b
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build01-9hdwj
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build01-9hdwj-ci-tests-worker-us-east-1b
+    spec:
+      metadata:
+        labels:
+          ci-workload: tests
+      providerSpec:
+        value:
+          ami:
+            id: ami-06f85a7940faa3217
+          apiVersion: awsproviderconfig.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              volumeSize: 500
+              volumeType: gp3
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: build01-9hdwj-worker-profile
+          instanceType: c6a.4xlarge
+          kind: AWSMachineProviderConfig
+          metadata: {}
+          placement:
+            availabilityZone: us-east-1b
+            region: us-east-1
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - build01-9hdwj-worker-sg
+          subnet:
+            filters:
+            - name: tag:Name
+              values:
+              - build01-9hdwj-private-us-east-1b
+          tags:
+          - name: kubernetes.io/cluster/build01-9hdwj
+            value: owned
+          - name: ci-cluster
+            value: build01
+          - name: ci-workload
+            value: tests
+          userDataSecret:
+            name: worker-user-data
+      taints:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-tests-worker
+        value: ci-tests-worker
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: build01-9hdwj-ci-tests-worker-us-east-1b
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 120
+  minReplicas: 0
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: build01-9hdwj-ci-tests-worker-us-east-1b

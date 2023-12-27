@@ -1,16 +1,28 @@
 base_images:
-  base:
-    name: "4.15"
-    namespace: origin
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.15_cli:
+  ocp_4.15_base:
     name: "4.15"
     namespace: ocp
+    tag: base
+  ocp_4.15_cli:
+    name: "4.16"
+    namespace: ocp
     tag: cli
+  ocp_4.15_installer-terraform-providers:
+    name: "4.15"
+    namespace: ocp
+    tag: installer-terraform-providers
+  ocp_4.16_base:
+    name: "4.16"
+    namespace: ocp
+    tag: base
+  ocp_4.16_installer-terraform-providers:
+    name: "4.16"
+    namespace: ocp
+    tag: installer-terraform-providers
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -19,6 +31,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.15
+  ocp_builder_rhel-8-golang-1.20-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.16
 build_root:
   from_repository: true
 images:
@@ -26,8 +42,13 @@ images:
   - name: TAGS
     value: fcos
   dockerfile_path: images/installer/Dockerfile.ci
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
+    ocp_4.15_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -39,21 +60,37 @@ images:
   - name: TAGS
     value: fcos
   dockerfile_path: images/installer-artifacts/Dockerfile.rhel
-  from: installer
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
+    ocp_4.15_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
+    ocp_4.16_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base
+    ocp_4.16_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+    ocp_builder_rhel-8-golang-1.20-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
   to: installer-artifacts
 - build_args:
   - name: TAGS
     value: libvirt fcos
   dockerfile_path: images/libvirt/Dockerfile.ci
-  from: base
   inputs:
+    ocp_4.15_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -62,7 +99,6 @@ images:
   - name: TAGS
     value: fcos
   dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
-  from: base
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
@@ -72,11 +108,16 @@ images:
   - name: TAGS
     value: fcos
   dockerfile_path: images/openstack/Dockerfile.ci
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_4.15_cli:
       as:
       - registry.ci.openshift.org/ocp/4.15:cli
+    ocp_4.15_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -85,8 +126,13 @@ images:
   - name: TAGS
     value: baremetal libvirt fcos
   dockerfile_path: images/baremetal/Dockerfile.ci
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
+    ocp_4.15_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -98,8 +144,13 @@ images:
   - name: TAGS
     value: fcos
   dockerfile_path: images/installer/Dockerfile.ci
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
+    ocp_4.15_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -108,17 +159,18 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: ovirt-installer
 promotion:
-  name: "4.15"
-  namespace: origin
+  to:
+  - name: "4.16"
+    namespace: origin
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: origin
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: origin
 resources:
   '*':
