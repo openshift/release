@@ -3,6 +3,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+sleep 4h
+
 echo "Extracting cluster data"
 tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=/tmp/clusters-data
 
@@ -11,12 +13,12 @@ echo "Installing the MTC operator on the source cluster"
 ansible-playbook /mtc-interop/install-mtc.yml \
     -e version=${MTC_VERSION} \
     -e isController=true \
-    -e kubeconfig_path=/tmp/clusters-data/aws/mtc-aws-ipi-target/auth/kubeconfig
+    -e kubeconfig_path=/tmp/clusters-data/${TEST_PLATFORM}/${TARGET_CLUSTER_NAME}/auth/kubeconfig
 
 echo "Installing the MTC operator on the target cluster"
 ansible-playbook /mtc-interop/install-mtc.yml \
     -e version=${MTC_VERSION} \
-    -e kubeconfig_path=/tmp/clusters-data/aws/mtc-aws-ipi-source/auth/kubeconfig
+    -e kubeconfig_path=/tmp/clusters-data/${TEST_PLATFORM}/${SOURCE_CLUSTER_NAME}/auth/kubeconfig
 
 # Log into target cluster
 cp /mtc-interop/usr/bin/oc/oc /usr/bin/oc
@@ -33,6 +35,6 @@ EXPOSED_REGISTRY_PATH=$(oc get route default-route  -n openshift-image-registry 
 # Configure the clusters prior to executing tests
 echo "Configuring the source and target clusters"
 ansible-playbook /mtc-interop/config_mtc.yml \
-    -e controller_kubeconfig=/tmp/clusters-data/aws/mtc-aws-ipi-target/auth/kubeconfig \
-    -e cluster_kubeconfig=/tmp/clusters-data/aws/mtc-aws-ipi-source/auth/kubeconfig \
+    -e controller_kubeconfig=/tmp/clusters-data/${TEST_PLATFORM}/${TARGET_CLUSTER_NAME}/auth/kubeconfig \
+    -e cluster_kubeconfig=/tmp/clusters-data/${TEST_PLATFORM}/${SOURCE_CLUSTER_NAME}/auth/kubeconfig \
     -e exposed_registry_path=${EXPOSED_REGISTRY_PATH}
