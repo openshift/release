@@ -171,13 +171,13 @@ case "${BOOT_MODE}" in
   echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
   # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+    # shellcheck disable=SC1090
+    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
     if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
       # Do not power on the additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
       # on a single-arch payload migrated to a multi-arch cluster)
       continue
     fi
-    # shellcheck disable=SC1090
-    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
     if [ "${transfer_protocol_type}" == "cifs" ]; then
       IP_ADDRESS="$(dig +short "${AUX_HOST}")"
       iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.${arch}.iso"
@@ -221,13 +221,13 @@ cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
 proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
     # Do not power on the additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
     # on a single-arch payload migrated to a multi-arch cluster)
     continue
   fi
-  # shellcheck disable=SC1090
-  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   echo "Power on #${host} (${name})..."
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "${BOOT_MODE}"
 done
