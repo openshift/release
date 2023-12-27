@@ -14,7 +14,7 @@ SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
-BASTION_IP="10.19.232.216"
+BASTION_IP="10.19.232.237"
 #BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
