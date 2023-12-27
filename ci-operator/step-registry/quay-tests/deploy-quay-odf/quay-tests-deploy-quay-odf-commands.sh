@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+#Get the credentials and Email of new Quay User
+QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
+QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
+QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
+
 #Deploy ODF Operator to OCP namespace 'openshift-storage'
 OO_INSTALL_NAMESPACE=openshift-storage
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
@@ -137,6 +142,31 @@ EOF
 echo "Waiting for NooBaa Storage to be ready..." >&2
 oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=180s
 
+#Create Quay Config Bundle Secret
+cat >>config.yaml <<EOF
+BROWSER_API_CALLS_XHR_ONLY: false
+PERMANENTLY_DELETE_TAGS: true
+RESET_CHILD_MANIFEST_EXPIRATION: true
+CREATE_REPOSITORY_ON_PUSH_PUBLIC: true
+FEATURE_EXTENDED_REPOSITORY_NAMES: true
+CREATE_PRIVATE_REPO_ON_PUSH: true
+CREATE_NAMESPACE_ON_PUSH: true
+FEATURE_QUOTA_MANAGEMENT: true
+FEATURE_PROXY_CACHE: true
+FEATURE_USER_INITIALIZE: true
+FEATURE_GENERAL_OCI_SUPPORT: true
+FEATURE_HELM_OCI_SUPPORT: true
+FEATURE_PROXY_STORAGE: true
+SUPER_USERS:
+  - quay
+FEATURE_UI_V2: true
+FEATURE_SUPERUSERS_FULL_ACCESS: true
+FEATURE_AUTO_PRUNE: true
+EOF
+
+echo "Creating Quay Config Bundle Secret..." >&2
+chmod 777 config.yaml && oc create secret generic --from-file config.yaml=./config.yaml config-bundle-secret -n quay-enterprise
+
 echo "Creating Quay registry..." >&2
 cat <<EOF | oc apply -f -
 apiVersion: quay.redhat.com/v1
@@ -145,6 +175,7 @@ metadata:
   name: quay
   namespace: quay-enterprise
 spec:
+  configBundleSecret: config-bundle-secret
   components:
   - kind: monitoring
     managed: false
@@ -165,10 +196,17 @@ EOF
 for _ in {1..60}; do
   if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')" == "True" ]]; then
     echo "Quay is in ready status" >&2
+    oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
+    quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
+    echo "Quay Route is $quay_route" || true
+    curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
+         --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
+    curl -k $quay_route/api/v1/discovery | jq > "$SHARED_DIR"/quay_api_discovery
+    cp "$SHARED_DIR"/quay_api_discovery "$ARTIFACT_DIR"/quay_api_discovery || true
     exit 0
   fi
   sleep 15
 done
 echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
-oc -n quay-enterprise get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
+oc -n quay-enterprise get quayregistries -o yaml >"$ARTIFACT_DIR"/quayregistries.yaml || true
 exit 2
