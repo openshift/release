@@ -29,10 +29,29 @@ if ! sudo subscription-manager status >&/dev/null; then
         --activationkey="\$(cat /tmp/subscription-manager-act-key)"
 fi
 
-sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
+sudo dnf install -y pcp-zeroconf git-core; sudo systemctl start pmcd; sudo systemctl start pmlogger
 
 chmod 0755 ~
-tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
+# TODO: Revert this change
+#tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
+git clone https://github.com/ggiguash/microshift.git -b tmpfs_cache \${HOME}/microshift
+
+pushd /tmp
+
+cp \${HOME}/microshift/test/bin/manage_tmpfs_config.sh /tmp/
+chmod 755 ./manage_tmpfs_config.sh
+# TODO: Need to subtract from the total memory amount to get 110
+./manage_tmpfs_config.sh create 110
+
+popd
+
+mkdir -p \${HOME}/.config/containers
+export CONTAINERS_STORAGE_CONF=\${HOME}/.config/containers/storage.conf
+cat <<EOF2 >"\${CONTAINERS_STORAGE_CONF}"
+[storage]
+driver = "vfs"
+rootless_storage_path = "/tmp/\$(whoami)/containers/storage"
+EOF2
 
 cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
 cp /tmp/ssh-privatekey ~/.ssh/id_rsa
