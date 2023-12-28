@@ -19,6 +19,10 @@ base_images:
     name: 4.2-priv
     namespace: ocp-private
     tag: oc-rpms
+  ocp_builder_golang-1.12:
+    name: builder
+    namespace: ocp
+    tag: golang-1.12
 binary_build_commands: make build WHAT='vendor/k8s.io/kubernetes/cmd/hyperkube'
 build_root:
   image_stream_tag:
@@ -29,9 +33,17 @@ canonical_go_repository: github.com/openshift/origin
 images:
 - dockerfile_path: images/hyperkube/Dockerfile.rhel
   from: base
+  inputs:
+    ocp_builder_golang-1.12:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
   to: hyperkube
 - dockerfile_path: images/tests/Dockerfile.rhel
   from: cli
+  inputs:
+    ocp_builder_golang-1.12:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
   to: tests
 - context_dir: images/os/
   from: base
