@@ -11,6 +11,10 @@ base_images:
     name: tests-private-builder
     namespace: ci
     tag: "4.16"
+  ocp_4.16_base-rhel9:
+    name: "4.16"
+    namespace: ocp
+    tag: base-rhel9
   ocp_4.16_tools:
     name: "4.16"
     namespace: ocp
@@ -19,6 +23,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.16
+  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.16
 build_root:
   image_stream_tag:
     name: builder
@@ -72,6 +80,12 @@ images:
       - registry.ci.openshift.org/ocp/4.16:tools
   optional: true
   to: tests-private-base
+- dockerfile_path: images/Dockerfile.base.rhel9
+  inputs:
+    ocp_4.16_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+  to: tests-private-base-rhel9
 - dockerfile_path: images/Dockerfile.builder
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.16:
@@ -79,6 +93,12 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
   optional: true
   to: tests-private-builder
+- dockerfile_path: images/Dockerfile.builder.rhel9
+  inputs:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
+  to: tests-private-builder-rhel9
 promotion:
   to:
   - namespace: ci
