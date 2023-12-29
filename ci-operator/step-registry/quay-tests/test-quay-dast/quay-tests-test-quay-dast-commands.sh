@@ -75,5 +75,5 @@ scanners:
 EOF
 
 #Execute Quay DAST Testing
-cp config-zap-template-prwoci.yaml > config || true
-./rapidast.py --config ./config/config-template-zap-mac.yaml || true
+cp config-zap-template-prwoci.yaml config || true
+./rapidast.py --config ./config/config-zap-template-prwoci.yaml || true
