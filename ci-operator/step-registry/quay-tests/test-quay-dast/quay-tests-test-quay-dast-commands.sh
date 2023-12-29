@@ -6,7 +6,7 @@ set -euo pipefail
 QUAY_ACCESS_TOKEN=$(cat /var/run/quay-qe-stagequayio-secret/oauth2token)
 QUAY_OAUTH2_TOEKN="Bearer $QUAY_ACCESS_TOKEN"
 
-echo"I am use $(whoami)" && sleep 1200
+echo "I am use $(whoami)" && sleep 1200
 echo "The current ZAP Version is $(zap.sh -version)"
 
 #Clone Redhat Rapidast Repository
