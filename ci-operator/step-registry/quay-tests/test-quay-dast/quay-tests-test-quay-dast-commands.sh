@@ -6,12 +6,15 @@ set -euo pipefail
 QUAY_ACCESS_TOKEN=$(cat /var/run/quay-qe-stagequayio-secret/oauth2token)
 QUAY_OAUTH2_TOEKN="Bearer $QUAY_ACCESS_TOKEN"
 
+echo"I am use $(whoami)" && sleep 1200
 echo "The current ZAP Version is $(zap.sh -version)"
 
 #Clone Redhat Rapidast Repository
+echo "Clone Redhat Rapidast Repository..."
 git clone https://github.com/RedHatProductSecurity/rapidast.git && cd rapidast || true
 
 #Generate Quay OpenAPI File
+echo "Generating Quay OpenAPI file..."
 curl https://stage.quay.io/api/v1/discovery | jq > openapi.json || true
 
 cat >>config-zap-template-prwoci.yaml <<EOF
@@ -76,5 +79,4 @@ EOF
 
 #Execute Quay DAST Testing
 cp config-zap-template-prwoci.yaml config || true
-whoami && sleep 1200
 ./rapidast.py --config ./config/config-zap-template-prwoci.yaml || true
