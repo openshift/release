@@ -76,4 +76,5 @@ EOF
 
 #Execute Quay DAST Testing
 cp config-zap-template-prwoci.yaml config || true
+whoami && sleep 1200
 ./rapidast.py --config ./config/config-zap-template-prwoci.yaml || true
