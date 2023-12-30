@@ -30,7 +30,8 @@ if ! sudo subscription-manager status >&/dev/null; then
 fi
 
 DNF_RETRY=\$(mktemp /tmp/dnf_retry.XXXXXXXX.sh)
-curl -s https://raw.githubusercontent.com/openshift/microshift/main/scripts/dnf_retry.sh -o "\${DNF_RETRY}"
+curl -s https://raw.githubusercontent.com/ggiguash/microshift/fix_dnf_retries/scripts/dnf_retry.sh -o "\${DNF_RETRY}"
+# curl -s https://raw.githubusercontent.com/openshift/microshift/main/scripts/dnf_retry.sh -o "\${DNF_RETRY}"
 chmod 755 "\${DNF_RETRY}"
 
 bash -x "\${DNF_RETRY}" "install" "pcp-zeroconf git-core"
