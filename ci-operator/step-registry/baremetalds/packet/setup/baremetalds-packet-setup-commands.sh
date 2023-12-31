@@ -133,7 +133,7 @@ cat > packet-setup.yaml <<-EOF
         hostnames: "{{ packet_hostname }}"
         operating_system: ${PACKET_OS}
         plan: ${PACKET_PLAN}
-        facility: ${PACKET_FACILITY}
+        metros: ${PACKET_METROS}
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME')[:77], 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
         user_data: "{{ user_data | default(omit) }}"
       register: hosts
