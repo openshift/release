@@ -9,14 +9,14 @@ shopt -s nullglob
 # Archive results function
 function cleanup-collect() {
     #cleanup
-    echo "Running cleanup: deleting tests.properties file"
+    echo "Running cleanup; deleting tests.properties file"
     rm test.properties
     echo "Collecting maven results into {$ARTIFACT_DIR}"
     cp ./test-eap/target/surefire-reports/TEST*.xml $ARTIFACT_DIR
     rename TEST junit_TEST ${ARTIFACT_DIR}/TEST*.xml
 }
 
-#Debug test execution
+# Post test execution
 trap 'cleanup-collect' SIGINT SIGTERM ERR EXIT
 
 # Copy kubeconfig file into current dir
