@@ -89,21 +89,19 @@ testsuite="fips-check-node-scan"
 subteam="Security_and_Compliance"
 if $pass; then
     cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="$SECONDS">
-    <testcase name="${subteam}:Node scan of fips check should succeedded or skipped"/>
-</testsuite>
+    <testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="$SECONDS">
+        <testcase name="${subteam}:Node scan of fips check should succeedded or skipped"/>
+    </testsuite>
 EOF
 else
     cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="$SECONDS">
-    <testcase name="${subteam}:Node scan of fips check should succeedded or skipped">
-        <failure message="">Fips node scan check failed</failure>
-        <system-out>
-          $res
-        </system-out>
-    </testcase>
-</testsuite>
+    <testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="$SECONDS">
+        <testcase name="${subteam}:Node scan of fips check should succeedded or skipped"/>
+            <failure message="">
+                Node scan failed due to errors or warnings.
+                $res
+            </failure>
+        </testcase>
+    </testsuite>
 EOF
 fi
