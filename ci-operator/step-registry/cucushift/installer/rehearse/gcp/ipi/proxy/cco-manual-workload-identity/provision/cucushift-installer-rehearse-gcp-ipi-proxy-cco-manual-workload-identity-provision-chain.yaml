@@ -1,0 +1,20 @@
+chain:
+  as: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity-provision
+  steps: 
+  - ref: gcp-provision-vpc
+  - ref: ignition-bastionhost
+  - ref: gcp-provision-bastionhost
+  - chain: ipi-conf-gcp
+  - ref: ipi-conf-proxy
+  - ref: ipi-conf-manual-creds
+  - ref: ipi-conf-gcp-oidc-creds-provision
+  - ref: ipi-conf-manual-creds-remove-unnecessary-creds
+  - chain: ipi-install
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-gcp-credentials-mode
+  env:
+  - name: RESTRICTED_NETWORK
+    default:  "yes"
+  documentation: |-
+    Launch an IPI disconnected cluster (behind proxy) using Workload Identity on GCP for QE e2e tests.
