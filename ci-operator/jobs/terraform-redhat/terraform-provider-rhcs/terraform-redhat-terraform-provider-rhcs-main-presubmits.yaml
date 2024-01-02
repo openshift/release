@@ -142,7 +142,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-sts-advanced-optional-critical-high-presubmit
+    context: ci/prow/rosa-sts-advanced-day1-negative-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -151,8 +151,8 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-sts-advanced-optional-critical-high-presubmit
-    rerun_command: /test rosa-sts-advanced-optional-critical-high-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-sts-advanced-day1-negative-optional-presubmit
+    rerun_command: /test rosa-sts-advanced-day1-negative-optional-presubmit
     spec:
       containers:
       - args:
@@ -161,8 +161,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-sts-advanced-optional-critical-high-presubmit-cluster-profile
-        - --target=rosa-sts-advanced-optional-critical-high-presubmit
+        - --secret-dir=/usr/local/rosa-sts-advanced-day1-negative-optional-presubmit-cluster-profile
+        - --target=rosa-sts-advanced-day1-negative-optional-presubmit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -178,7 +178,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-sts-advanced-optional-critical-high-presubmit-cluster-profile
+        - mountPath: /usr/local/rosa-sts-advanced-day1-negative-optional-presubmit-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -215,7 +215,87 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(rosa-sts-advanced-optional-critical-high-presubmit|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(rosa-sts-advanced-day1-negative-optional-presubmit|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/rosa-sts-advanced-optional-presubmit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-sts-advanced-optional-presubmit
+    rerun_command: /test rosa-sts-advanced-optional-presubmit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/rosa-sts-advanced-optional-presubmit-cluster-profile
+        - --target=rosa-sts-advanced-optional-presubmit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/rosa-sts-advanced-optional-presubmit-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-terraform-qe
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-sts-advanced-optional-presubmit|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -303,7 +383,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/rosa-sts-private-optional-critical-high-presubmit
+    context: ci/prow/rosa-sts-private-day1-negative-optional-presubmit
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -312,8 +392,8 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-sts-private-optional-critical-high-presubmit
-    rerun_command: /test rosa-sts-private-optional-critical-high-presubmit
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-sts-private-day1-negative-optional-presubmit
+    rerun_command: /test rosa-sts-private-day1-negative-optional-presubmit
     spec:
       containers:
       - args:
@@ -322,8 +402,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-sts-private-optional-critical-high-presubmit-cluster-profile
-        - --target=rosa-sts-private-optional-critical-high-presubmit
+        - --secret-dir=/usr/local/rosa-sts-private-day1-negative-optional-presubmit-cluster-profile
+        - --target=rosa-sts-private-day1-negative-optional-presubmit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -339,7 +419,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-sts-private-optional-critical-high-presubmit-cluster-profile
+        - mountPath: /usr/local/rosa-sts-private-day1-negative-optional-presubmit-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -376,7 +456,87 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(rosa-sts-private-optional-critical-high-presubmit|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(rosa-sts-private-day1-negative-optional-presubmit|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/rosa-sts-private-optional-presubmit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-terraform-qe
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-terraform-redhat-terraform-provider-rhcs-main-rosa-sts-private-optional-presubmit
+    rerun_command: /test rosa-sts-private-optional-presubmit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/rosa-sts-private-optional-presubmit-cluster-profile
+        - --target=rosa-sts-private-optional-presubmit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/rosa-sts-private-optional-presubmit-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-terraform-qe
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-sts-private-optional-presubmit|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
