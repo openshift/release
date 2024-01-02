@@ -1,12 +1,8 @@
 base_images:
-  base:
-    name: "4.13"
+  ocp_4.14_base:
+    name: "4.14"
     namespace: ocp
     tag: base
-  cli:
-    name: "4.13"
-    namespace: ocp
-    tag: cli
   ocp_4.14_cli:
     name: "4.14"
     namespace: ocp
@@ -31,17 +27,46 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.19
+  origin_4.14_operator-registry:
+    name: "4.14"
+    namespace: origin
+    tag: operator-registry
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 images:
-- context_dir: openshift/ci-operator/source-image
+- dockerfile_path: knative-operator/Dockerfile
+  inputs:
+    ocp_4.14_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: serverless-knative-operator
+- dockerfile_path: olm-catalog/serverless-operator/Dockerfile
+  to: serverless-bundle
+- dockerfile_path: olm-catalog/serverless-operator/index/Dockerfile
+  inputs:
+    ocp_4.14_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base
+    origin_4.14_operator-registry:
+      as:
+      - registry.ci.openshift.org/origin/4.14:operator-registry
+  to: serverless-index
+- dockerfile_path: openshift-knative-operator/Dockerfile
+  inputs:
+    ocp_4.14_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: serverless-openshift-knative-operator
+- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
   inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
     ocp_4.14_cli:
       as:
       - registry.ci.openshift.org/ocp/4.14:cli
@@ -57,42 +82,25 @@ images:
     openshift_knative-serving-src_knative-v1.11:
       as:
       - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.11
-  to: serverless-operator-src
-- context_dir: .
-  dockerfile_path: serving/ingress/Dockerfile
-  from: base
+  to: serverless-source-image
+- dockerfile_path: serving/ingress/Dockerfile
   inputs:
+    ocp_4.14_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base
     openshift_release_golang-1.19:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
-  to: knative-openshift-ingress
-- context_dir: .
-  dockerfile_path: knative-operator/Dockerfile
-  from: base
+  to: serverless-ingress
+- dockerfile_path: serving/metadata-webhook/Dockerfile
   inputs:
+    ocp_4.14_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base
     openshift_release_golang-1.19:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
-  to: knative-operator
-- context_dir: .
-  dockerfile_path: openshift-knative-operator/Dockerfile
-  from: base
-  inputs:
-    openshift_release_golang-1.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
-  to: openshift-knative-operator
-- context_dir: .
-  dockerfile_path: serving/metadata-webhook/Dockerfile
-  from: base
-  inputs:
-    openshift_release_golang-1.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
-  to: metadata-webhook
-- dockerfile_path: olm-catalog/serverless-operator/Dockerfile
-  from: base
-  to: serverless-bundle
+  to: serverless-metadata-webhook
 releases:
   latest:
     release:
@@ -106,7 +114,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-sno-413-continuous
+- as: e2e-sno-continuous
   cron: 0 0 * * 0
   steps:
     cluster_profile: gcp
@@ -114,13 +122,21 @@ tests:
     - as: operator-e2e
       commands: make install-mesh test-e2e-with-kafka
       dependencies:
-      - env: KNATIVE_OPENSHIFT_INGRESS
-        name: knative-openshift-ingress
-      - env: KNATIVE_OPERATOR
-        name: knative-operator
-      - env: OPENSHIFT_KNATIVE_OPERATOR
-        name: openshift-knative-operator
-      from: serverless-operator-src
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
       resources:
         limits:
           memory: 6Gi
@@ -133,4 +149,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: 4.13-single-node
+  variant: 413-single-node
