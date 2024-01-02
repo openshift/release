@@ -17,7 +17,7 @@ Currently, [pit-7.4.x](https://github.com/jboss-eap-qe/openshift-eap-tests/tree/
 
 ## Purpose
 
-Execute a collection of tests for testing EAP images on OpenShift for both EAP 74 stream. The results of these tests will be reported to the appropriate sources following execution.
+Execute a collection of tests for testing EAP images on OpenShift for the EAP 74 stream. The results of these tests will be reported to the appropriate sources following execution.
 
 ## Process
 
