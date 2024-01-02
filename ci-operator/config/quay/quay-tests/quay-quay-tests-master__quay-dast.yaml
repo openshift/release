@@ -2,13 +2,13 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.21
 images:
-- dockerfile_literal: |
-    FROM quay.io/quay-qetest/quaydast:latest
-    RUN zap.sh -cmd -silent -addonupdate && \
-        cp /home/rapidast/.ZAP/plugin/*.zap /opt/zap/plugin/ || :  && \
-        zap.sh -version
+- dockerfile_literal: "FROM src \nRUN curl -L https://github.com/zaproxy/zaproxy/releases/download/v2.13.0/ZAP_2.13.0_Linux.tar.gz
+    -o ZAP_2.13.0_Linux.tar.gz\nRUN PACKAGES=\"java-11-openjdk git python3\" && yum
+    install -y $PACKAGES\nRUN git --version && python3 --version\nRUN tar zxvf ZAP_2.13.0_Linux.tar.gz\nRUN
+    ZAP_2.13.0/zap.sh -version\n"
+  from: src
   to: quay-test-dast
 promotion:
   to:
