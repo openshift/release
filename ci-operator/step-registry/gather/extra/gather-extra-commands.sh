@@ -105,7 +105,6 @@ queue ${ARTIFACT_DIR}/oc_cmds/clusterserviceversions oc --insecure-skip-tls-veri
 queue ${ARTIFACT_DIR}/releaseinfo.json oc --insecure-skip-tls-verify --request-timeout=5s adm release info -o json
 queue ${ARTIFACT_DIR}/clusterroles.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterroles --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/clusterroles_rbac oc --insecure-skip-tls-verify --request-timeout=5s describe clusterroles.rbac
-queue ${ARTIFACT_DIR}/oc_cmds/clusterroles oc --insecure-skip-tls-verify --request-timeout=5s get clusterroles --all-namespaces
 queue ${ARTIFACT_DIR}/clusterrolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterrolebindings --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/clusterrolebindings_rbac oc --insecure-skip-tls-verify --request-timeout=5s describe clusterrolebindings.rbac
 queue ${ARTIFACT_DIR}/oc_cmds/clusterrolebindings oc --insecure-skip-tls-verify --request-timeout=5s get clusterrolebindings --all-namespaces
