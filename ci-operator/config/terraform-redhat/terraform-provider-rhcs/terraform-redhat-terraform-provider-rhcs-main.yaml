@@ -104,6 +104,56 @@ tests:
     test:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
+- as: rosa-sts-advanced-medium-low-f7
+  cron: 38 17 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-ad
+      REGION: ap-northeast-1
+      RHCS_ENV: staging
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-sts-private-medium-low-f7
+  cron: 38 2 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-pl
+      REGION: us-east-1
+      RHCS_ENV: staging
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-sts-advanced-day1-negative-f7
+  cron: 38 6 1,8,15,22,29 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: day1-negative&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-ad
+      REGION: ap-northeast-1
+      RHCS_ENV: staging
+    test:
+    - ref: rhcs-e2e-general-tests
+- as: rosa-sts-private-day1-negative-f7
+  cron: 38 2 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: day1-negative&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-pl
+      REGION: us-east-1
+      RHCS_ENV: staging
+    test:
+    - ref: rhcs-e2e-general-tests
 - as: rosa-sts-advanced-critical-high-presubmit
   skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
   steps:
@@ -131,7 +181,7 @@ tests:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
 - always_run: false
-  as: rosa-sts-advanced-optional-critical-high-presubmit
+  as: rosa-sts-advanced-optional-presubmit
   steps:
     cluster_profile: aws-terraform-qe
     env:
@@ -144,7 +194,7 @@ tests:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
 - always_run: false
-  as: rosa-sts-private-optional-critical-high-presubmit
+  as: rosa-sts-private-optional-presubmit
   steps:
     cluster_profile: aws-terraform-qe
     env:
@@ -156,6 +206,30 @@ tests:
     test:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
+- always_run: false
+  as: rosa-sts-advanced-day1-negative-optional-presubmit
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: day1-negative&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-ad
+      REGION: ap-northeast-1
+      RHCS_ENV: staging
+    test:
+    - ref: rhcs-e2e-general-tests
+- always_run: false
+  as: rosa-sts-private-day1-negative-optional-presubmit
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: day1-negative&&!Exclude
+      CHANNEL_GROUP: candidate
+      CLUSTER_PROFILE: rosa-sts-pl
+      REGION: us-east-1
+      RHCS_ENV: staging
+    test:
+    - ref: rhcs-e2e-general-tests
 zz_generated_metadata:
   branch: main
   org: terraform-redhat
