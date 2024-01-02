@@ -1,0 +1,34 @@
+workflow:
+  as: rosa-aws-sts-shared-vpc
+  steps:
+    env:
+      HOSTED_CP: "false"
+      STS: "true"
+      MULTI_AZ: "false"
+      COMPUTE_MACHINE_TYPE: "m5.xlarge"
+      ENABLE_BYOVPC: "true"
+      REPLICAS: "2"
+      BYO_OIDC: "true"
+      OIDC_CONFIG_MANAGED: "true"
+      ZONES_COUNT: "1"
+      ENABLE_SHARED_VPC: "yes"
+      ENABLE_SHARED_PHZ: "yes"
+    pre:
+    - ref: rosa-dnsdomain-create
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+    - ref: aws-provision-route53-private-hosted-zone
+    - chain: rosa-sts-oidc-config-create
+    - chain: rosa-cluster-provision
+    - ref: aws-provision-tags-for-byo-vpc
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-cluster-wait-ready-nodes
+    post:
+    - chain: rosa-cluster-deprovision
+    - chain: rosa-sts-oidc-config-delete
+    - ref: aws-deprovision-route53-private-hosted-zone
+    - ref: aws-deprovision-stacks
+    - ref: rosa-dnsdomain-delete
+  documentation: |-
+    This workflow installs a single AZ rosa sts shared-vpc cluster. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
+    After finish testing, the cluster will be deprovsioned.

@@ -1,12 +1,22 @@
 base_images:
-  base:
+  builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+  cli:
     name: "4.14"
     namespace: ocp
-    tag: base
+    tag: cli
 build_root:
-  project_image:
-    context_dir: must-gather
-    dockerfile_path: Dockerfile
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: cli
+  inputs:
+    builder:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: odf-must-gather
 releases:
   initial:
     integration:
@@ -28,7 +38,7 @@ tests:
 - as: check-must-gather-binary
   commands: test -e /usr/bin/gather || exit 1
   container:
-    from: src
+    from: odf-must-gather
 zz_generated_metadata:
   branch: main
   org: red-hat-storage

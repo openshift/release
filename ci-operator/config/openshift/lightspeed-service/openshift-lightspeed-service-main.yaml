@@ -1,0 +1,67 @@
+base_images:
+  ubi9-python311:
+    name: ubi-python-311
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Containerfile
+  to: lightspeed-service-api
+promotion:
+  to:
+  - namespace: ols
+    tag: latest
+releases:
+  initial:
+    integration:
+      name: "4.15"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.15"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: pip install black ruff && make verify
+  container:
+    from: ubi9-python311
+- as: unit
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make install-deps && make install-deps-test && make test-unit
+  container:
+    from: ubi9-python311
+- as: integration
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make install-deps && make install-deps-test && make test-integration
+  container:
+    from: ubi9-python311
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: lightspeed-service

@@ -3,9 +3,8 @@
 set -x
 
 # session variables
-infra_name="hcp-ci-$(echo -n $PROW_JOB_ID|cut -c-8)"
+infra_name="$HC_NAME-$(echo -n $PROW_JOB_ID|cut -c-8)"
 plugins_list=("vpc-infrastructure" "cloud-dns-services")
-hc_name="agent-ibmz"
 IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
 httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
@@ -51,7 +50,7 @@ done
 
 # Deleting the DNS Service
 echo "Triggering the $infra_name-dns DNS instance deletion in the resource group $infra_name-rg."
-dns_zone_id=$(ibmcloud dns zones -i $infra_name-dns | grep $hc_name.$HYPERSHIFT_BASEDOMAIN | awk '{print $1}')
+dns_zone_id=$(ibmcloud dns zones -i $infra_name-dns | grep $HC_NAME.$HYPERSHIFT_BASEDOMAIN | awk '{print $1}')
 glb_id=$(ibmcloud dns glbs $dns_zone_id -i $infra_name-dns --output json | jq -r '.[]|.id')
 glb_pool_id=$(ibmcloud dns glb-pools -i $infra_name-dns --output json | jq -r '.[]|.id')
 network_id=$(ibmcloud is vpc $infra_name-vpc --output JSON | jq -r '.id')

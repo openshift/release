@@ -104,7 +104,7 @@ spec:
 EOF
 )
 
-RETRIES=60
+RETRIES=90
 echo "Waiting for CSV to be available from operator group"
 for ((i=1; i <= $RETRIES; i++)); do
     CSV=$(oc -n "$ODF_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)

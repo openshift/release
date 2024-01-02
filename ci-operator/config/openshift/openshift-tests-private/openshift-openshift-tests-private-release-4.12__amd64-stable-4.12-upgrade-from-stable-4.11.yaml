@@ -69,7 +69,6 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       FIPS_ENABLED: "true"
     test:
-    - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-sanity-disconnected
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
 - as: aws-ipi-disconnected-sts-ep-fips-f28
@@ -78,9 +77,9 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-30832
       FIPS_ENABLED: "true"
     test:
-    - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-sanity-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
 - as: aws-ipi-ovn-fips-f28
@@ -91,7 +90,6 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       FIPS_ENABLED: "true"
     test:
-    - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-aws-ipi-ovn
 - as: aws-ipi-proxy-sts-f28
@@ -100,8 +98,8 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-24358
     test:
-    - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: azure-ipi-disconnected-fullyprivate-f14
@@ -110,8 +108,8 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-27986
     test:
-    - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-sanity-disconnected
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
 - as: azure-ipi-fips-f14
@@ -122,7 +120,6 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       FIPS_ENABLED: "true"
     test:
-    - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-fullyprivate-proxy-f14
@@ -131,53 +128,61 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-24358
     test:
-    - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 - as: gcp-ipi-disconnected-private-workload-identity-f14
   cron: 4 16 14,29 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      ENABLE_OTA_TEST: OCP-30832
     test:
-    - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-sanity-disconnected
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
 - as: gcp-ipi-proxy-private-f14
   cron: 16 7 2,17 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      ENABLE_OTA_TEST: OCP-24358
     test:
-    - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
 - as: nutanix-ipi-fips-f14
   cluster: build01
-  cron: 36 11 4,19 * *
+  cron: 45 19 3,18 * *
   steps:
     cluster_profile: nutanix-qe
     env:
       FIPS_ENABLED: "true"
     test:
-    - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-nutanix-ipi
-- as: vsphere-ipi-disconnected-registry-pvc-f14
-  cron: 27 15 13,28 * *
+- as: vsphere-ipi-disconnected-f14
+  cron: 41 21 2,17 * *
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
+    env:
+      ENABLE_OTA_TEST: OCP-30832
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     test:
-    - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-sanity-disconnected
-    workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected-image-registry-pvc
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
 - as: vsphere-ipi-proxy-fips-f14
   cron: 55 4 10,25 * *
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
     env:
+      ENABLE_OTA_TEST: OCP-24358
       FIPS_ENABLED: "true"
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     test:
-    - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-sanity
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 zz_generated_metadata:

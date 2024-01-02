@@ -70,10 +70,11 @@ periodics:
             name: "$(BRANCH)"
             namespace: ocp
           promotion:
-            name: "$(BRANCH)"
-            namespace: ocp
-            additional_images:
-              $(TAG): $(TAG)
+            to:
+            - name: "$(BRANCH)"
+              namespace: ocp
+              additional_images:
+                $(TAG): $(TAG)
           build_root:
             image_stream_tag:
               name: release
@@ -230,6 +231,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -249,6 +253,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build05
   cron: 20 6 1 */12 *
@@ -313,6 +320,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -332,3 +342,6 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher

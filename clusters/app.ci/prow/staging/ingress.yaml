@@ -1,0 +1,36 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    # Although we need longer timeout only for prow.ci.openshift.org
+    # it will apply to all hosts below.
+    # Or we have to separate it to another ingress.
+    haproxy.router.openshift.io/timeout: "90s"
+  name: prow
+  namespace: ci-staging
+spec:
+  tls:
+  - secretName: prow-tls
+    hosts:
+    - prow.staging.ci.openshift.org
+    - hook.staging.ci.openshift.org
+  rules:
+  - host: prow.staging.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: deck
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+  - host: hook.staging.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: hook
+            port:
+              number: 8888
+        pathType: ImplementationSpecific

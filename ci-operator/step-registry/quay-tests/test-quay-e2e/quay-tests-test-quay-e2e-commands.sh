@@ -15,7 +15,14 @@ mkdir -p $ARTIFACT_DIR
 
 
 function copyArtifacts {
-    cp -r ./cypress/results/* $ARTIFACT_DIR && cp -r ./cypress/videos/smoke/* $ARTIFACT_DIR
+    JUNIT_PREFIX="junit_"
+    cp -r ./cypress/results/* $ARTIFACT_DIR
+    for file in "$ARTIFACT_DIR"/*; do
+        if [[ ! "$(basename "$file")" =~ ^"$JUNIT_PREFIX" ]]; then
+            mv "$file" "$ARTIFACT_DIR"/"$JUNIT_PREFIX""$(basename "$file")"
+        fi
+    done
+    cp -r ./cypress/videos/* $ARTIFACT_DIR
 }
 
 # Install Dependcies defined in packages.json
@@ -23,6 +30,14 @@ yarn install || true
 
 #Finally Copy the Junit Testing XML files and Screenshots to /tmp/artifacts
 trap copyArtifacts EXIT
+
+# Cypress Doc https://docs.cypress.io/guides/references/proxy-configuration
+if [ "${QUAY_PROXY}" = "true" ]; then
+    HTTPS_PROXY=$(cat $SHARED_DIR/proxy_public_url)
+    export HTTPS_PROXY
+    HTTP_PROXY=$(cat $SHARED_DIR/proxy_public_url)
+    export HTTP_PROXY
+fi
 
 #Trigget Quay E2E Testing
 set +x

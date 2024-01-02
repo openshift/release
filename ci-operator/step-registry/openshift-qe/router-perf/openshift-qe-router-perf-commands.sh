@@ -16,11 +16,11 @@ ES_USERNAME=$(cat "/secret/username")
 GSHEET_KEY_LOCATION="/ga-gsheet/gcp-sa-account"
 export GSHEET_KEY_LOCATION
 
-git clone https://github.com/cloud-bulldozer/e2e-benchmarking --depth=1
+REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
+LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
+git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/router-perf-v2
-# UUID Generation
-UUID="perfscale-cpt-$(uuidgen)"
-export UUID
 # ES configuration
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 export ES_INDEX='router-test-results'
@@ -46,5 +46,9 @@ export GEN_CSV='true'
 
 export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
 
-rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
-./ingress-performance.sh  |& tee "${SHARED_DIR}/${OUTPUT_FILE}"
+rm -f ${SHARED_DIR}/index.json
+
+./ingress-performance.sh 
+
+folder_name=$(ls -t -d /tmp/*/ | head -1)
+cp $folder_name/index_data.json ${SHARED_DIR}/index_data.json

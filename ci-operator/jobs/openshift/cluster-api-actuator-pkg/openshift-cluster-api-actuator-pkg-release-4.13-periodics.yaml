@@ -1,12 +1,12 @@
 periodics:
 - agent: kubernetes
   cluster: build05
+  cron: 0 23 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.13
     org: openshift
     repo: cluster-api-actuator-pkg
-  interval: 72h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -43,6 +43,9 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -63,6 +66,9 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-aws
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -71,12 +77,12 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build02
+  cron: 39 2 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.13
     org: openshift
     repo: cluster-api-actuator-pkg
-  interval: 72h
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure4
@@ -113,6 +119,9 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -133,6 +142,9 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-azure4
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -141,12 +153,12 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build02
+  cron: 36 12 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.13
     org: openshift
     repo: cluster-api-actuator-pkg
-  interval: 72h
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp
@@ -183,6 +195,9 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -207,6 +222,9 @@ periodics:
             name: cluster-secrets-gcp
         - configMap:
             name: cluster-profile-gcp
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -220,13 +238,21 @@ periodics:
   - base_ref: release-4.13
     org: openshift
     repo: cluster-api-actuator-pkg
-  interval: 72h
   labels:
     ci-operator.openshift.io/cloud: openstack-vexxhost
     ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  minimum_interval: 72h
   name: periodic-ci-openshift-cluster-api-actuator-pkg-release-4.13-e2e-openstack-operator-periodic
+  reporter_config:
+    slack:
+      channel: '#shiftstack-bot'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> :volcano:'
   spec:
     containers:
     - args:
@@ -257,6 +283,9 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -277,6 +306,9 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-openstack-vexxhost
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -284,16 +316,16 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
+  cron: 55 9 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.13
     org: openshift
     repo: cluster-api-actuator-pkg
-  interval: 72h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-cluster-api-actuator-pkg-release-4.13-e2e-vsphere-operator-periodic
@@ -327,6 +359,9 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -347,6 +382,9 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-vsphere
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

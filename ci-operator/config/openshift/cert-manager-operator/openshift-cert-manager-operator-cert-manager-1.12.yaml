@@ -2,15 +2,15 @@ base_images:
   cert-manager-cainjector:
     name: cert-manager-cainjector
     namespace: ci
-    tag: v1.12.4
+    tag: v1.12.5
   cert-manager-controller:
     name: cert-manager-controller
     namespace: ci
-    tag: v1.12.4
+    tag: v1.12.5
   cert-manager-webhook:
     name: cert-manager-webhook
     namespace: ci
-    tag: v1.12.4
+    tag: v1.12.5
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
@@ -88,6 +88,14 @@ tests:
       OO_INSTALL_NAMESPACE: cert-manager-operator
       OO_SECURITY_CONTEXT: restricted
     test:
+    - as: install
+      cli: latest
+      commands: |
+        oc -n cert-manager-operator rollout status deployment cert-manager-operator-controller-manager
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - as: test
       cli: latest
       commands: make test-e2e

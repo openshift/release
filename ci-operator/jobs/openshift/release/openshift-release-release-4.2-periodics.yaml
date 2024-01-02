@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build04
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -70,10 +70,11 @@ periodics:
             name: "$(BRANCH)"
             namespace: ocp
           promotion:
-            name: "$(BRANCH)"
-            namespace: ocp
-            additional_images:
-              $(TAG): $(TAG)
+            to:
+            - name: "$(BRANCH)"
+              namespace: ocp
+              additional_images:
+                $(TAG): $(TAG)
           build_root:
             image_stream_tag:
               name: release
@@ -154,7 +155,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build04
+  cluster: build01
   decorate: true
   interval: 8h
   labels:
@@ -294,6 +295,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -313,6 +317,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build05
   cron: 12 1 3 */12 *
@@ -391,6 +398,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -410,6 +420,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build05
   cron: 2 1 9 */12 *
@@ -475,6 +488,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -494,6 +510,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build05
   cron: 11 11 2 */12 *
@@ -559,6 +578,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -578,6 +600,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build02
   cron: 19 1 6 */12 *
@@ -643,6 +668,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -662,8 +690,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build04
+  cluster: build01
   cron: 10 0 2 */12 *
   decorate: true
   labels:
@@ -727,6 +758,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -746,3 +780,6 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher

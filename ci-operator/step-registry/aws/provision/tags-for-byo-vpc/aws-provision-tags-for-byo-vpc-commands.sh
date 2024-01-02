@@ -4,12 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
-  echo "Using shared account"
-  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
-else
-  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-fi
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 REGION=${REGION:-$LEASED_RESOURCE}
 

@@ -37,8 +37,9 @@ images:
       - registry.ci.openshift.org/openshift/release:golang-1.17
   to: ztp-site-generator
 promotion:
-  name: "4.11"
-  namespace: ocp-kni
+  to:
+  - name: "4.11"
+    namespace: ocp-kni
 releases:
   initial:
     integration:
@@ -77,7 +78,9 @@ tests:
 - as: e2e-aws-ran-profile
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: sysdeseng.devcluster.openshift.com
     test:
     - as: e2e-aws-ran-profile
       commands: FEATURES_ENVIRONMENT=cn-ran-overlays FEATURES=ran-profile-gcp SKIP_TESTS="xt_u32
@@ -88,21 +91,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws-ovn
-- as: e2e-gcp-ovn-periodic
-  cron: 26 21 */1 * 1-5
-  steps:
-    cluster_profile: gcp
-    env:
-      COMPUTE_NODE_TYPE: n2-standard-8
-    test:
-    - as: e2e-gcp-ovn-periodic
-      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" make functests-on-ci
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: openshift-e2e-gcp-ovn
 zz_generated_metadata:
   branch: release-4.11
   org: openshift-kni

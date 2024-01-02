@@ -1,19 +1,14 @@
 #!/bin/bash
 
 set -x
-
-hc_ns="hcp-ci"
-export hc_ns
-hc_name="agent-ibmz"
-export hc_name
-hcp_ns="${hc_ns}-${hc_name}"
+hcp_ns="${HC_NS}-${HC_NAME}"
 export hcp_ns
 
-echo "$(date) Scaling down nodepool ${hc_ns} to 0"
-oc -n ${hc_ns} scale nodepool ${hc_name} --replicas 0
+echo "$(date) Scaling down nodepool ${HC_NS} to 0"
+oc -n ${HC_NS} scale nodepool ${HC_NAME} --replicas 0
 
-echo "$(date) Waiting for the compute nodes to successfully detach from the hosted cluster ${hc_name}"
-oc wait --for=jsonpath='{.status.replicas}'=0 np/${hc_name} -n ${hc_ns} --timeout=10m
+echo "$(date) Waiting for the compute nodes to successfully detach from the hosted cluster ${HC_NAME}"
+oc wait --for=jsonpath='{.status.replicas}'=0 np/${HC_NAME} -n ${HC_NS} --timeout=10m
 
 echo "$(date) Deleting agents from the namespace ${hcp_ns}"
 agents=$(oc get agents -n ${hcp_ns} --no-headers | awk '{print $1}')
@@ -39,6 +34,6 @@ tar -xvf /tmp/${HYPERSHIFT_CLI_NAME}.tar.gz -C /tmp/${HYPERSHIFT_CLI_NAME}_cli
 chmod +x /tmp/${HYPERSHIFT_CLI_NAME}_cli/${HYPERSHIFT_CLI_NAME}
 export PATH=$PATH:/tmp/${HYPERSHIFT_CLI_NAME}_cli
 
-echo "$(date) Triggering the hosted cluster ${hc_name} deletion"
-${HYPERSHIFT_CLI_NAME} destroy cluster agent --name ${hc_name} --namespace ${hc_ns}
-echo "$(date) Hosted cluster ${hc_name} deletion is successful"
+echo "$(date) Triggering the hosted cluster ${HC_NAME} deletion"
+${HYPERSHIFT_CLI_NAME} destroy cluster agent --name ${HC_NAME} --namespace ${HC_NS}
+echo "$(date) Hosted cluster ${HC_NAME} deletion is successful"

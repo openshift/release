@@ -6,21 +6,24 @@ workflow:
     env:
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: "m6i.2xlarge"
       ZONES_COUNT: "3"
+      TEST_SKIPS: etcd leader changes are not excessive
+      SKIP_MONITOR_TEST: "true"
     leases:
       - env: LEASED_RESOURCE
         resource_type: aws-3-quota-slice
-    post:
-    - ref: hypershift-mce-dump
-    - chain: gather-core-dump
-    - chain: hypershift-mce-kubevirt-destroy
-    - chain: ipi-aws-post
+    pre:
+      - chain: ipi-aws-ovn-pre
+      - chain: ipi-install
+      - ref: hypershift-kubevirt-install-odf
+      - ref: hypershift-kubevirt-install
+      - ref: hypershift-mce-install
+      - chain: hypershift-mce-kubevirt-create
     test:
     - chain: hypershift-conformance
-    pre:
-    - chain: ipi-aws-ovn-pre
-    - chain: ipi-install
-    - ref: hypershift-kubevirt-install-odf
-    - ref: hypershift-kubevirt-install
-    - ref: hypershift-mce-install
-    - chain: hypershift-mce-kubevirt-create
+    post:
+      - ref: hypershift-mce-dump
+      - chain: gather-core-dump
+      - chain: hypershift-mce-kubevirt-destroy
+      - chain: ipi-aws-post

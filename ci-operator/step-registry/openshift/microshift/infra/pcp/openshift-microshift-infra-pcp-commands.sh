@@ -20,4 +20,8 @@ Host ${IP_ADDRESS}
 EOF
 chmod 0600 "${HOME}/.ssh/config"
 
-ssh "${IP_ADDRESS}" "sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger"
+ssh "${IP_ADDRESS}" "\
+    sudo dnf install -y pcp-zeroconf pcp-pmda-libvirt && \
+    cd /var/lib/pcp/pmdas/libvirt/ && sudo ./Install &&
+    sudo systemctl start pmcd && \
+    sudo systemctl start pmlogger"

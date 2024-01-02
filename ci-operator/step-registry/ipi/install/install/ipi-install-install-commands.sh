@@ -504,6 +504,12 @@ gcp)
     if [ -f "${SHARED_DIR}/gcp_min_permissions.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the minimum permissions testing on GCP..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions.json"
+    elif [ -f "${SHARED_DIR}/user_tags_sa.json" ]; then
+      echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the userTags testing on GCP..."
+      export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/user_tags_sa.json"
+    elif [ -f "${SHARED_DIR}/xpn_min_perm_passthrough.json" ]; then
+      echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC..."
+      export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_min_perm_passthrough.json"
     fi
     ;;
 ibmcloud*)
@@ -530,7 +536,7 @@ cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 
 echo "install-config.yaml"
 echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
 
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure

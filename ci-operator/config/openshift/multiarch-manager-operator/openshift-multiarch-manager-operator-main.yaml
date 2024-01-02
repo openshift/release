@@ -1,8 +1,4 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.14
   ubi:
     name: ubi
     namespace: ocp
@@ -13,10 +9,6 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: ubi
-  inputs:
-    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: multiarch-manager-operator
 releases:
   initial:
@@ -65,9 +57,15 @@ tests:
   container:
     from: src
 - as: unit
-  commands: NO_DOCKER=1 make test
+  commands: NO_DOCKER=1 make unit
   container:
     from: src
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: multiarch-manager-operator
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: openshift

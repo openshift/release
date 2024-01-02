@@ -143,7 +143,7 @@ cat << EOF > ~/ocp-install.yml
   - name: Run deployment
     shell: >-
         ./scripts/sno_ag.py $SNO_PARAM --host ${CLUSTER_NAME} --debug --wait
-        --host-ip ${HYPERV_IP} --registry
+        --host-ip ${HYPERV_IP} --registry --reset-bmc
         -L /tmp/${CLUSTER_NAME}_sno_ci.log 2>&1 > /tmp/${CLUSTER_NAME}_sno_ag.log
     args:
       chdir: /home/kni/telco5g-lab-deployment
@@ -226,6 +226,10 @@ cat << EOF > ~/fetch-kubeconfig.yml
       replace: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
     delegate_to: localhost
 
+  - name: Add docker auth to enable pulling containers from CI registry
+    shell: >-
+      oc --kubeconfig=${WORK_DIR}/auth/kubeconfig set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/home/kni/pull-secret.txt
+
 EOF
 
 cat << EOF > ~/fetch-information.yml
@@ -256,10 +260,14 @@ cat << EOF > ~/check-cluster.yml
     shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'
     register: ready_check
 
+  - name: Check for errors in cluster deployment
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion
+    register: error_check
+
   - name: Fail if deployment failed
     fail:
       msg: Installation has failed
-    when: "'True' not in ready_check.stdout"
+    when: "'True' not in ready_check.stdout or 'Error while reconciling' in error_check.stdout"
 
 EOF
 

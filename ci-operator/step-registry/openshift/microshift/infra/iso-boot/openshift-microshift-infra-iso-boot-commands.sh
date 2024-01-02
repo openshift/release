@@ -1,8 +1,11 @@
 #!/bin/bash
 set -xeuo pipefail
+export PS4='+ $(date "+%T.%N") \011'
 
 finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
+  scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx_error.log" "${ARTIFACT_DIR}" || true
+  scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx.log" "${ARTIFACT_DIR}" || true
 
   STEP_NAME="${HOSTNAME##${JOB_NAME_SAFE}-}"
   REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
@@ -96,7 +99,7 @@ trap 'finalize' EXIT
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} || true; wait; fi' TERM
 
 SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios"
-if [[ "$JOB_NAME" =~ .*periodic.* ]]; then
+if [[ "$JOB_NAME" =~ .*periodic.* ]] && [[ ! "$JOB_NAME" =~ .*nightly-presubmit.* ]]; then
   SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios-periodics"
 fi
 

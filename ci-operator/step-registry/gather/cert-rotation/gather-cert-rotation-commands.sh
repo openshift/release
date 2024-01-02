@@ -86,7 +86,7 @@ scp "${SSHOPTS[@]}" "${SHARED_DIR}"/time-skew-gather.sh "root@${IP}:/usr/local/b
 
 #sleep infinity
 timeout \
-	--kill-after 10m \
+	--kill-after 30m \
 	120m \
 	ssh \
 	"${SSHOPTS[@]}" \

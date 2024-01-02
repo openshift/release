@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.9"
+    name: "4.11"
     namespace: ocp
     tag: base
 binary_build_commands: make build
@@ -24,7 +24,7 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.9"
+      version: "4.11"
 resources:
   '*':
     requests:
@@ -33,12 +33,14 @@ resources:
 tests:
 - as: openshift-e2e
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-virtualization
     env:
+      BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
       OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: default
       OO_PACKAGE: node-maintenance-operator
       OO_TARGET_NAMESPACES: '!install'
+      SPOT_INSTANCES: "true"
     test:
     - as: e2e
       commands: make cluster-functest

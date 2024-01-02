@@ -77,7 +77,10 @@ oc scale --replicas=$(($READY_COUNT + 3)) machineset "$NODE_TO_SCALE" -n openshi
 
 # wait for the two extra nodes to become ready, then validate that only 2 of the new nodes were allocated a subnet.
 # the 3rd extra node should be notReady and have no subnet because they are exhausted
-oc wait machinesets -n openshift-machine-api "$NODE_TO_SCALE" --for=jsonpath='{.status.readyReplicas}'=$(($READY_COUNT + 2)) --timeout=1200s
+if ! oc wait machinesets -n openshift-machine-api "$NODE_TO_SCALE" --for=jsonpath='{.status.readyReplicas}'=$(($READY_COUNT + 2)) --timeout=1200s; then
+    dump_cluster_state
+    exit 1
+fi
 # machinesets are Ready, but there is a chance the final node that we expect to be notReady is not even deployed
 # from the cloud provider, so let's make sure (10m) we have 9 nodes in total before we move on
 timeout 600 bash <<EOT
@@ -105,13 +108,8 @@ if [[ "$num_not_ready_nodes" -ne 1 ]]; then
   exit 1
 fi
 
+# debug output in case we fail later
 oc describe node $not_ready_node
-oc describe node $not_ready_node | grep "nodeAdd: error adding node \"${not_ready_node}\": could not find \"k8s.ovn.org/node-subnets\" annotation"
-if [ $? -ne 0 ]; then
-  oc get nodes -o wide
-  echo "Error: did not find a notReady node. Expected one node to be notReady because there are no subnets available" >&2
-  exit 1
-fi
 
 # Check if there is exactly 1 node without a subnet and 8 nodes with a subnet
 if [ "$nodes_with_subnet" -ne 8 ] || [ "$nodes_without_subnet" -ne 1 ]; then

@@ -15,6 +15,10 @@ mkdir -p ~/.config/openstack
 cat > ~/.config/openstack/clouds.yaml << EOF
 $(oc get cm openstack-config -o json | jq -r '.data["clouds.yaml"]')
 EOF
+
+# Disable TLS CA verification for now
+yq -i ".clouds.default.verify = False" ~/.config/openstack/clouds.yaml
+
 export OS_CLOUD=default
 KEYSTONE_SECRET_NAME=$(oc get keystoneapi keystone -o json | jq -r .spec.secret)
 KEYSTONE_PASSWD_SELECT=$(oc get keystoneapi keystone -o json | jq -r .spec.passwordSelectors.admin)
@@ -22,7 +26,8 @@ OS_PASSWORD=$(oc get secret "${KEYSTONE_SECRET_NAME}" -o json | jq -r .data.${KE
 export OS_PASSWORD
 
 # Because tempestconf complain if we don't have the password in the clouds.yaml
-sed -i "/project_domain_name/ a \      password: ${OS_PASSWORD}" ~/.config/openstack/clouds.yaml
+YQ_PASSWD=(".clouds.default.auth.password = ${OS_PASSWORD}")
+yq -i "${YQ_PASSWD[@]}" ~/.config/openstack/clouds.yaml
 
 # Configuring tempest
 
@@ -36,7 +41,9 @@ pushd ~/tempest/openshift
 TEMPEST_CONF_OVERRIDES=${TEMPEST_CONF_OVERRIDES:-}
 
 discover-tempest-config --os-cloud ${OS_CLOUD} --debug --create \
-identity.v3_endpoint_type public ${TEMPEST_CONF_OVERRIDES}
+identity.v3_endpoint_type public \
+identity.disable_ssl_certificate_validation true \
+dashboard.disable_ssl_certificate_validation true ${TEMPEST_CONF_OVERRIDES}
 
 # Generate skiplist and allow list
 ORG="openstack-k8s-operators"

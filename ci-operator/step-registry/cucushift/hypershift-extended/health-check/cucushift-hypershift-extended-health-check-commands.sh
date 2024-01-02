@@ -108,10 +108,15 @@ function check_node_status {
     return 0
 }
 
+###Main###
 if [ -f "${SHARED_DIR}/cluster-type" ] ; then
     CLUSTER_TYPE=$(cat "${SHARED_DIR}/cluster-type")
     if [[ "$CLUSTER_TYPE" == "osd" ]] || [[ "$CLUSTER_TYPE" == "rosa" ]]; then
         echo "this cluster is ROSA-HyperShift"
+        export KUBECONFIG=${SHARED_DIR}/kubeconfig
+        if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+            source "${SHARED_DIR}/proxy-conf.sh"
+        fi
         print_clusterversion
         check_node_status || exit 1
         retry check_cluster_operators || exit 1

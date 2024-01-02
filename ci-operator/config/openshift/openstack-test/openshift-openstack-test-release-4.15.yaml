@@ -9,11 +9,11 @@ images:
   from: bin
   to: openstack-tests
 promotion:
-  additional_images:
-    openstack-tests: bin
-  disabled: true
-  name: "4.15"
-  namespace: ocp
+  to:
+  - additional_images:
+      openstack-tests: bin
+    name: "4.15"
+    namespace: ocp
 releases:
   latest:
     integration:
@@ -44,17 +44,6 @@ tests:
     test:
     - ref: openstack-test-openstack
     workflow: openshift-e2e-openstack-ipi
-- as: test-kuryr
-  optional: true
-  steps:
-    cluster_profile: openstack-kuryr
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: Kuryr
-    test:
-    - ref: openstack-test-openstack
-    workflow: openshift-e2e-openstack-ipi
 - always_run: false
   as: e2e-openstack-ccpmso
   optional: true
@@ -79,7 +68,10 @@ tests:
   as: e2e-openstack-ccpmso-zone
   optional: true
   steps:
-    cluster_profile: openstack-kuryr
+    cluster_profile: openstack-vh-mecha-az0
+    env:
+      ETCD_ON_LOCAL_DISK: "true"
+      USE_RAMFS: "false"
     test:
     - as: openstack-test-cpms
       commands: |
