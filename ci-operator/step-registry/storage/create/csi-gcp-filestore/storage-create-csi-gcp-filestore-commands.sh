@@ -9,23 +9,23 @@ set -o pipefail
 # environment variables, as well as their lowercase equivalents (note
 # that libcurl doesn't recognize the uppercase variables).
 
-if test -f "${SHARED_DIR}/proxy-conf.sh"
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]
 then
-        # shellcheck disable=SC1090
-        source "${SHARED_DIR}/proxy-conf.sh"
+	# shellcheck disable=SC1090
+	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
 CLUSTER_NAME="$(oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster)"
-if test -f "${SHARED_DIR}/filestore_csi_networkconf.txt" 
-then 
-  echo "Reading variables from 'xpn_project_setting.json'..."
-  cat ${CLUSTER_PROFILE_DIR}/xpn_project_setting.json
-  HOST_PROJECT=$(jq -r '.hostProject' "${CLUSTER_PROFILE_DIR}/xpn_project_setting.json")
-  HOST_PROJECT_NETWORK=$(jq -r '.clusterNetwork' "${CLUSTER_PROFILE_DIR}/xpn_project_setting.json")
-  NETWORK=$(basename ${HOST_PROJECT_NETWORK})
-  NETWORK_NAME=projects/${HOST_PROJECT}/global/networks/${NETWORK}
+if [[ -s "${SHARED_DIR}/xpn.json" ]]
+then
+	echo "Reading variables from 'xpn_project_setting.json'..."
+	cat ${CLUSTER_PROFILE_DIR}/xpn_project_setting.json
+	HOST_PROJECT=$(jq -r '.hostProject' "${CLUSTER_PROFILE_DIR}/xpn_project_setting.json")
+	HOST_PROJECT_NETWORK=$(jq -r '.clusterNetwork' "${CLUSTER_PROFILE_DIR}/xpn_project_setting.json")
+	NETWORK=$(basename ${HOST_PROJECT_NETWORK})
+	NETWORK_NAME=projects/${HOST_PROJECT}/global/networks/${NETWORK}
 else 
-  NETWORK_NAME="$CLUSTER_NAME-network"
+	NETWORK_NAME="$CLUSTER_NAME-network"
 fi
 
 export CLUSTER_NAME
@@ -50,8 +50,9 @@ parameters:
   labels: kubernetes-io-cluster-$CLUSTER_NAME=owned
 EOF
 
-if test -f "${SHARED_DIR}/filestore_csi_networkconf.txt"; then
-  sed 's/DIRECT_PEERING/PRIVATE_SERVICE_ACCESS/' $STORAGECLASS_LOCATION >> $STORAGECLASS_LOCATION
+if [[ -s "${SHARED_DIR}/xpn.json" ]]
+then
+	sed -i 's/DIRECT_PEERING/PRIVATE_SERVICE_ACCESS/' $STORAGECLASS_LOCATION 
 fi
 	
 echo "Using StorageClass file ${STORAGECLASS_LOCATION}"
