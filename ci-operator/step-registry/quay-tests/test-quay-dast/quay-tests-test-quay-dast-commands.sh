@@ -5,8 +5,10 @@ set -euo pipefail
 #Create new AWS EC2 Instatnce to deploy Quay OMR
 QUAY_ACCESS_TOKEN=$(cat /var/run/quay-qe-stagequayio-secret/oauth2token)
 QUAY_OAUTH2_TOEKN="Bearer $QUAY_ACCESS_TOKEN"
+
 echo "The current ZAP Version is:"
-ZAP_2.13.0/zap.sh -dir zap_test_version -version
+mkdir -p zap_test_version && sleep 600
+ZAP_2.13.0/zap.sh -dir ../zap_test_version -version
 
 #Clone Redhat Rapidast Repository
 echo "Clone Redhat Rapidast Repository..."
