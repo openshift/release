@@ -15,7 +15,7 @@ SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
-BASTION_USER="cloud-user"
+BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
