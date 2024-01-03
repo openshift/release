@@ -56,7 +56,7 @@ cluster_http_proxy=$(oc get proxy cluster -o=jsonpath='{.spec.httpProxy}')
 cluster_https_proxy=$(oc get proxy cluster -o=jsonpath='{.spec.httpProxy}')
 attempt=0
 while true; do
-    out=$(oc --request-timeout=60s -n "$project" debug node/"$master_node_0" -- chroot /host bash -c "export http_proxy=$cluster_http_proxy; curl -sSI ifconfig.me --connect-timeout 5" 2> /dev/null || true)
+    out=$(oc --request-timeout=60s -n "$project" debug node/"$master_node_0" -- chroot /host bash -c "export http_proxy=$cluster_http_proxy; export https_proxy=$cluster_https_proxy; curl -sSI ifconfig.me --connect-timeout 5" 2> /dev/null || true)
     if [[ $out == *"Via: 1.1"* ]]; then
         echo "This is not a disconnected cluster"
         break
@@ -76,9 +76,9 @@ oc --request-timeout=300s -n "$project" debug node/"$master_node_0" -- chroot /h
 out=$(oc --request-timeout=300s -n "$project" debug node/"$master_node_0" -- chroot /host bash -c "cat /$report" || true)
 echo "The report is: $out"
 oc delete ns $project || true
-sub='Successful run'
-if [[ "$out" != *"$sub"* ]]; then
-    echo "Fail to find keyword $sub"
+res=$(echo $out | grep -E 'Failure Report|Successful run with warnings|Warning Report')
+if [[ -n $res ]];then
+    echo "The result is: $res"
     pass=false
 fi
 
@@ -89,18 +89,19 @@ testsuite="fips-check-node-scan"
 subteam="Security_and_Compliance"
 if $pass; then
     cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="$SECONDS">
-<testcase name="${subteam}:Node scan of fips check should succeedded or skipped"/>
-</testsuite>
+    <testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="$SECONDS">
+        <testcase name="${subteam}:Node scan of fips check should succeedded or skipped"/>
+    </testsuite>
 EOF
 else
     cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="$SECONDS">
-<testcase name="${subteam}:Node scan of fips check should succeedded or skipped">
-<failure message="">Fips node scan check failed</failure>
-</testcase>
-</testsuite>
+    <testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="$SECONDS">
+        <testcase name="${subteam}:Node scan of fips check should succeedded or skipped"/>
+            <failure message="">
+                Node scan failed due to errors or warnings.
+                $res
+            </failure>
+        </testcase>
+    </testsuite>
 EOF
 fi
