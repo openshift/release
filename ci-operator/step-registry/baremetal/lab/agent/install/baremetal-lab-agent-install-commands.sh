@@ -15,7 +15,6 @@ trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
 [ -z "${workers}" ] && { echo "\$workers is not filled. Failing."; exit 1; }
 [ -z "${masters}" ] && { echo "\$masters is not filled. Failing."; exit 1; }
 
-
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
@@ -43,75 +42,6 @@ function get_ready_nodes_count() {
   oc get nodes \
     -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | \
     grep -c -E ",True$"
-}
-
-function reset_host() {
-  # bmc_address is used for redfish
-  # AUX_HOST:bmc_forwarded_port is used for ipmi
-  local bmc_address="${1}"
-  local bmc_user="${2}"
-  local bmc_pass="${3}"
-  local bmc_forwarded_port="${4}"
-  local vendor="${5}"
-  local ipxe_via_vmedia="${6}"
-  local host="${bmc_forwarded_port##1[0-9]}"
-  host="${host##0}"
-  echo "Powering off the host #${host}..."
-  until ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power status | grep -i -q "Chassis Power is off"; do
-    echo "Host #${host} is powered on... forcing power off"
-    ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-      -U "$bmc_user" -P "$bmc_pass" \
-      power off || true
-    sleep 30
-  done
-  if [ "${ipxe_via_vmedia}" == "true" ]; then
-    echo "The host #${host} requires an ipxe image to boot via vmedia in order to perform the pxe boot..."
-    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" mount.vmedia.ipxe "${host}"
-  fi
-  echo "Setting the one-time boot parameter for the host #${host}..."
-  power_on_cmd="on"
-  case "${vendor}" in
-    ampere)
-      boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && echo force_pxe || echo force_cdrom)
-      ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-        -U "$bmc_user" -P "$bmc_pass" \
-        chassis bootdev "$boot_selection"
-    ;;
-    dell)
-      boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && [ "${ipxe_via_vmedia}" != "true" ] && echo PXE || echo VCD-DVD)
-      curl -x "${proxy}" -k -u "${bmc_user}:${bmc_pass}" -X POST \
-        "https://$bmc_address/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Oem/EID_674_Manager.ImportSystemConfiguration" \
-         -H "Content-Type: application/json" -d \
-         '{"ShareParameters":{"Target":"ALL"},"ImportBuffer":
-            "<SystemConfiguration><Component FQDD=\"iDRAC.Embedded.1\">
-            <Attribute Name=\"ServerBoot.1#BootOnce\">Enabled</Attribute>
-            <Attribute Name=\"ServerBoot.1#FirstBootDevice\">'"$boot_selection"'</Attribute>
-            </Component></SystemConfiguration>"}'
-    ;;
-    hpe)
-      boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && [ "${ipxe_via_vmedia}" != "true" ] && echo Pxe || echo Cd)
-      power_on_cmd="cycle"
-      curl -x "${proxy}" -k -u "${bmc_user}:${bmc_pass}" -X PATCH \
-        "https://$bmc_address/redfish/v1/Systems/1/" \
-        -H 'Content-Type: application/json' \
-        -d '{"Boot": {"BootSourceOverrideTarget": "'"$boot_selection"'"}}'
-    ;;
-    *)
-      echo "Unknown vendor ${vendor}"
-      return 1
-  esac
-  echo "Powering on the host #${host}..."
-  until ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power status | grep -i -q "Chassis Power is on"; do
-    echo "Host #${host} is not powered on yet... power on"
-    ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-      -U "$bmc_user" -P "$bmc_pass" \
-      power "$power_on_cmd" || true
-    sleep 30
-  done
 }
 
 function update_image_registry() {
@@ -289,7 +219,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   echo "Power on #${host} (${name})..."
-  reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${bmc_forwarded_port}" "${vendor}" "${ipxe_via_vmedia}"
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "${BOOT_MODE}"
 done
 
 wait
