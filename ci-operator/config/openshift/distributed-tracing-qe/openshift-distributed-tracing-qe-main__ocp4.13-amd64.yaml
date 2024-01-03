@@ -12,6 +12,10 @@ images:
 - context_dir: .
   dockerfile_path: Dockerfile
   to: distributed-tracing-tests-runner
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
 releases:
   latest:
     candidate:
@@ -33,8 +37,16 @@ tests:
     timeout: 3h0m0s
     version: "4.13"
   steps:
+    env:
+      EO_SUB_CHANNEL: stable-5.8
+      EO_SUB_SOURCE: redhat-operators
     test:
-    - chain: distributed-tracing-tests-common
+    - ref: operatorhub-subscribe-elasticsearch-operator
+    - ref: operatorhub-subscribe-amq-streams
+    - ref: distributed-tracing-install-jaeger-product
+    - ref: distributed-tracing-install-tempo-product
+    - ref: distributed-tracing-install-opentelemetry-product
+    - ref: distributed-tracing-tests-common
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
