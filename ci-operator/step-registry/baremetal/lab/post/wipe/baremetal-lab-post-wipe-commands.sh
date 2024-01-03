@@ -19,8 +19,6 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
-proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
-
 function wait_for_power_down() {
   local bmc_host="${1}"
   local bmc_forwarded_port="${2}"
@@ -66,62 +64,7 @@ function reset_host() {
   local pdu_uri="${7:-}"
   local host="${bmc_forwarded_port##1[0-9]}"
   host="${host##0}"
-  echo "Powering off the host #${host}..."
-  until ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power status | grep -i -q "Chassis Power is off"; do
-    echo "Host #${host} is powered on... forcing power off"
-    ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-      -U "$bmc_user" -P "$bmc_pass" \
-      power off || true
-    sleep 30
-  done
-  if [ "${ipxe_via_vmedia}" == "true" ]; then
-    echo "The host #${host} requires an ipxe image to boot via vmedia in order to perform the pxe boot..."
-    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" mount.vmedia.ipxe "${host}"
-  fi
-  echo "Setting the one-time boot parameter for the host #${host}..."
-  power_on_cmd="on"
-  case "${vendor}" in
-    ampere)
-      ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-        -U "$bmc_user" -P "$bmc_pass" \
-        chassis bootdev "force_pxe"
-    ;;
-    dell)
-      boot_selection=$([ "${ipxe_via_vmedia}" != "true" ] && echo PXE || echo VCD-DVD)
-      curl -x "${proxy}" -k -u "${bmc_user}:${bmc_pass}" -X POST \
-        "https://$bmc_address/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Oem/EID_674_Manager.ImportSystemConfiguration" \
-         -H "Content-Type: application/json" -d \
-         '{"ShareParameters":{"Target":"ALL"},"ImportBuffer":
-            "<SystemConfiguration><Component FQDD=\"iDRAC.Embedded.1\">
-            <Attribute Name=\"ServerBoot.1#BootOnce\">Enabled</Attribute>
-            <Attribute Name=\"ServerBoot.1#FirstBootDevice\">'"${boot_selection}"'</Attribute>
-            </Component></SystemConfiguration>"}'
-    ;;
-    hpe)
-      boot_selection=$([ "${ipxe_via_vmedia}" != "true" ] && echo Pxe || echo Cd)
-      power_on_cmd="cycle"
-      curl -x "${proxy}" -k -u "${bmc_user}:${bmc_pass}" -X PATCH \
-        "https://$bmc_address/redfish/v1/Systems/1/" \
-        -H 'Content-Type: application/json' \
-        -d '{"Boot": {"BootSourceOverrideTarget": "'"${boot_selection}"'"}}'
-    ;;
-    *)
-      echo "Unknown vendor ${vendor}"
-      return 1
-  esac
-  echo "Powering on the host #${host}..."
-  until ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power status | grep -i -q "Chassis Power is on"; do
-    echo "Host #${host} is not powered on yet... power on"
-    ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-      -U "$bmc_user" -P "$bmc_pass" \
-      power "$power_on_cmd" || true
-    sleep 30
-  done
-
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
   if ! wait_for_power_down "$bmc_address" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"; then
     echo "$bmc_host:$bmc_forwarded_port" >> /tmp/failed
   fi
