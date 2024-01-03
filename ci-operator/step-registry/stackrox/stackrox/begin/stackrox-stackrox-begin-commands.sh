@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export OPENSHIFT_CI_STEP_NAME="stackrox-stackrox-e2e-begin"
+
 if [[ -f .openshift-ci/begin.sh ]]; then
     exec .openshift-ci/begin.sh
 else
