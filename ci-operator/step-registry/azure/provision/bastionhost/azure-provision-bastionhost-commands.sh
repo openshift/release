@@ -21,6 +21,7 @@ function run_command_with_retries()
         echo "'${cmd}' did not return success, waiting 60 sec....."
         sleep 60
         (( try++ ))
+        ret=0
         eval "${cmd}" || ret=$?
     done
     if [ ${try} -eq ${max} ]; then
