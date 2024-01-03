@@ -16,7 +16,7 @@ git clone https://github.com/RedHatProductSecurity/rapidast.git && cd rapidast |
 
 #Generate Quay OpenAPI File
 echo "Generating Quay OpenAPI file..."
-curl https://stage.quay.io/api/v1/discovery | jq > openapi.json || true
+curl https://stage.quay.io/api/v1/discovery > openapi.json || true
 
 export PATH=$PATH:/go/src/github.com/quay/quay-tests/ZAP_2.13.0
 
@@ -74,4 +74,5 @@ EOF
 #Execute Quay DAST Testing
 cp config-zap-template-prwoci.yaml config || true
 sleep 600
+pip3 install -r requirements.txt || true
 ./rapidast.py -dir zaphome --config ./config/config-zap-template-prwoci.yaml || true
