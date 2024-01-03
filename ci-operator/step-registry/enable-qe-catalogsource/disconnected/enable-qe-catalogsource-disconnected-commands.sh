@@ -4,6 +4,8 @@ set -e
 set -u
 set -o pipefail
 
+sleep 6h
+
 # use it as a bool
 marketplace=0
 mirror=0
