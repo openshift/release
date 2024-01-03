@@ -31,10 +31,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  hypershift-operator:
-    name: "4.15"
-    namespace: ocp
-    tag: hypershift-operator
   hypershift-tests:
     name: "4.15"
     namespace: ocp
@@ -43,6 +39,35 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: upi-installer
+  ocp_4.15_base-rhel9:
+    name: "4.15"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.15
+  openshift_release_golang-1.20:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+build_root:
+  from_repository: true
+images:
+- inputs:
+    openshift_release_golang-1.20:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.20
+  to: hypershift-operator
+- dockerfile_path: Dockerfile.control-plane
+  inputs:
+    ocp_4.15_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+  to: hypershift
 releases:
   initial:
     candidate:
