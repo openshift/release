@@ -192,6 +192,17 @@ required_permissions="""
 \"Microsoft.Storage/storageAccounts/listKeys/action\"
 """
 
+if [[ "${ENABLE_MIN_PERMISSION_FOR_MARKETPLACE}" == "true" ]]; then
+    required_permissions="""
+\"Microsoft.MarketplaceOrdering/offertypes/publishers/offers/plans/agreements/read\",
+\"Microsoft.MarketplaceOrdering/offertypes/publishers/offers/plans/agreements/write\",
+\"Microsoft.Compute/images/read\",
+\"Microsoft.Compute/images/write\",
+\"Microsoft.Compute/images/delete\",
+${required_permissions}
+"""    
+fi
+
 role_description="the custom role with minimal permissions for cluster ${CLUSTER_NAME}"
 assignable_scopes="""
 \"/subscriptions/${AZURE_AUTH_SUBSCRIPTOIN_ID}\"
