@@ -73,10 +73,19 @@ function filter_test_by_sno() {
     fi
     echo_e2e_tags
 }
+function filter_test_by_fips() {
+    local data
+    data="$(oc get configmap cluster-config-v1 -n kube-system -o yaml | yq '.data')"
+    if ! (grep --ignore-case --quiet 'fips' <<< "$data") ; then
+        export E2E_RUN_TAGS="${E2E_RUN_TAGS} and not @fips"
+    fi
+    echo_e2e_tags
+}
 function filter_tests() {
     filter_test_by_version
     filter_test_by_network
     filter_test_by_sno
+    filter_test_by_fips
     # the following check should be the last one in filter_tests
     for tag in ${CUCUSHIFT_FORCE_SKIP_TAGS} ; do
         if ! [[ "${E2E_SKIP_TAGS}" =~ $tag ]] ; then
