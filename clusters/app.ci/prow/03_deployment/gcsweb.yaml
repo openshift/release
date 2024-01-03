@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+  labels:
+    app: gcsweb
+  name: gcsweb
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: gcsweb
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: gcsweb
+    spec:
+      containers:
+      - args:
+        - -b
+        - gs://origin-ci-test=gs://test-platform-results
+        - -b
+        - origin-federated-results
+        image: gcr.io/k8s-prow/gcsweb:v20240102-43c89140b5
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 3
+        name: gcsweb
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.openshift.io/infrastructure: "true"
+  labels:
+    app: gcsweb
+  name: gcsweb
+  namespace: ci
+spec:
+  ports:
+  - name: web
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    component: gcsweb
+  type: ClusterIP
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  annotations:
+    haproxy.router.openshift.io/timeout: 1h
+  labels:
+    app: gcsweb
+  name: gcsweb
+  namespace: ci
+spec:
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: gcsweb
