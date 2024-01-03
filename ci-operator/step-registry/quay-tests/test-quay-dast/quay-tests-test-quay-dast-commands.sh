@@ -18,6 +18,8 @@ git clone https://github.com/RedHatProductSecurity/rapidast.git && cd rapidast |
 echo "Generating Quay OpenAPI file..."
 curl https://stage.quay.io/api/v1/discovery | jq > openapi.json || true
 
+export PATH=$PATH:/go/src/github.com/quay/quay-tests/ZAP_2.13.0
+
 cat >>config-zap-template-prwoci.yaml <<EOF
 config:
   # WARNING: `configVersion` indicates the schema version of the config file.
