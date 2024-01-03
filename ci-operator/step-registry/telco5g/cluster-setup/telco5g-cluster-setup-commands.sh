@@ -7,7 +7,7 @@ set -o pipefail
 echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
 ~/fix_uid.sh
-
+# test
 date +%s > $SHARED_DIR/start_time
 
 SSH_PKEY_PATH=/var/run/ci-key/cikey

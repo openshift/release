@@ -23,7 +23,7 @@ PREPARED_CLUSTER=("cnfdu1" "cnfdu3")
 
 source $SHARED_DIR/main.env
 echo "==========  Running with SNO_PARAM=$SNO_PARAM =========="
-
+# test
 # Set environment for jobs to run
 INTERNAL=true
 INTERNAL_ONLY=true
