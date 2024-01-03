@@ -17,7 +17,6 @@ trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
-proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 
 function oinst() {
   /tmp/openshift-install --dir="${INSTALL_DIR}" --log-level=debug "${@}" 2>&1 | grep\
@@ -85,7 +84,7 @@ function destroy_bootstrap() {
 EOF
   # do not fail if unable to wipe the bootstrap disk and do not release it, to retry later in post steps
   # shellcheck disable=SC2154
-  reset_host "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${vendor}" "${ipxe_via_vmedia}"
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
   if ! wait_for_power_down "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${vendor}" "${ipxe_via_vmedia}"; then
     echo "The bootstrap node didn't power off and it will not be released to retry in the deprovisioning steps..."
     return 0
@@ -173,81 +172,13 @@ function wait_for_power_down() {
       # that sometimes keep the hosts frozen before POST.
       echo "retrying $ again to reboot..."
       touch "/tmp/$host"
-      reset_host "$bmc_address" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"
+      timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
       wait_for_power_down "$bmc_address" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"
       return $?
     fi
   fi
   echo "#$host is now powered off"
   return 0
-}
-
-function reset_host() {
-  local bmc_address="${1}"
-  local bmc_forwarded_port="${2}"
-  local bmc_user="${3}"
-  local bmc_pass="${4}"
-  local vendor="${5}"
-  local ipxe_via_vmedia="${6}"
-  local host="${bmc_forwarded_port##1[0-9]}"
-  host="${host##0}"
-  echo "Powering off the host #${host}..."
-  until ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power status | grep -i -q "Chassis Power is off"; do
-    echo "Host #${host} is powered on... forcing power off"
-    ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-      -U "$bmc_user" -P "$bmc_pass" \
-      power off || true
-    sleep 30
-  done
-  if [ "${ipxe_via_vmedia}" == "true" ]; then
-    echo "The host #${host} requires an ipxe image to boot via vmedia in order to perform the pxe boot..."
-    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" mount.vmedia.ipxe "${host}"
-  fi
-  echo "Setting the one-time boot parameter for the host #${host}..."
-  power_on_cmd="on"
-  case "${vendor}" in
-    ampere)
-      ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-        -U "$bmc_user" -P "$bmc_pass" \
-        chassis bootdev "force_pxe"
-    ;;
-    dell)
-      boot_selection=$([ "${ipxe_via_vmedia}" != "true" ] && echo PXE || echo VCD-DVD)
-      curl -x "${proxy}" -k -u "${bmc_user}:${bmc_pass}" -X POST \
-        "https://$bmc_address/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Oem/EID_674_Manager.ImportSystemConfiguration" \
-         -H "Content-Type: application/json" -d \
-         '{"ShareParameters":{"Target":"ALL"},"ImportBuffer":
-            "<SystemConfiguration><Component FQDD=\"iDRAC.Embedded.1\">
-            <Attribute Name=\"ServerBoot.1#BootOnce\">Enabled</Attribute>
-            <Attribute Name=\"ServerBoot.1#FirstBootDevice\">'"${boot_selection}"'</Attribute>
-            </Component></SystemConfiguration>"}'
-    ;;
-    hpe)
-      power_on_cmd="cycle"
-      boot_selection=$([ "${ipxe_via_vmedia}" != "true" ] && echo Pxe || echo Cd)
-      curl -x "${proxy}" -k -u "${bmc_user}:${bmc_pass}" -X PATCH \
-        "https://$bmc_address/redfish/v1/Systems/1/" \
-        -H 'Content-Type: application/json' \
-        -d '{"Boot": {"BootSourceOverrideTarget": "'"${boot_selection}"'"}}'
-    ;;
-    *)
-      echo "Unknown vendor ${vendor}"
-      return 1
-  esac
-  echo "Powering on the host #${host}..."
-  until ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power status | grep -i -q "Chassis Power is on"; do
-    echo "Host #${host} is not powered on yet... power on"
-    ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
-      -U "$bmc_user" -P "$bmc_pass" \
-      power "$power_on_cmd" || true
-    sleep 30
-  done
-
-
 }
 
 function approve_csrs() {
@@ -363,7 +294,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     continue
   fi
   echo "Power on #${host} (${name})..."
-  reset_host "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${vendor}" "${ipxe_via_vmedia}"
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
 done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"

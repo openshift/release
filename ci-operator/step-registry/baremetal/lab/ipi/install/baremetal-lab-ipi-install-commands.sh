@@ -26,29 +26,6 @@ function oinst() {
    --line-buffered -v 'password\|X-Auth-Token\|UserData:'
 }
 
-function prepare_bmc() {
-  local bmc_host="${1}"
-  local bmc_port="${2}"
-  local bmc_user="${3}"
-  local bmc_pass="${4}"
-  local ipxe_via_vmedia="${5}"
-  local host="${bmc_port##1[0-9]}"
-  host="${host##0}"
-  # HPE iLO6 BMCs on RL300 do not have drivers for BCM5720 NICs, use vmedia to load ipxe.usb
-  # See https://issues.redhat.com/browse/OCPQE-18370
-  if [ "$ipxe_via_vmedia" == "true" ]; then
-    echo "Host #$host will boot via ipxe on vmedia..."
-    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" mount.vmedia.ipxe "${host}"
-  else
-    ipmitool -I lanplus -H "${bmc_host}" -p "${bmc_port}" \
-      -U "$bmc_user" -P "$bmc_pass" \
-      chassis bootparam set bootflag force_pxe options=PEF,watchdog,reset,power
-  fi
-  ipmitool -I lanplus -H "${bmc_host}" -p "${bmc_port}" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power off || echo "Already off"
-}
-
 function update_image_registry() {
   while ! oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
                  --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'; do
@@ -161,7 +138,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   yq --inplace eval-all 'select(fileIndex == 0).platform.baremetal.hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
     "$SHARED_DIR/install-config.yaml" - <<< "$ADAPTED_YAML"
   echo "Power off #${host} (${name}) and prepare host bmc conf for installation..."
-  prepare_bmc "${AUX_HOST}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}"
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe" "no_power_on"
 done
 
 mkdir -p "${INSTALL_DIR}"
