@@ -840,8 +840,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-upi
-- as: aws-upi-baselinecaps-none-amd-f14
-  cron: 7 9 6,20 * *
+- as: aws-upi-baselinecaps-none-amd-f28-destructive
+  cron: 14 2 7 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -854,10 +854,10 @@ tests:
         and not @workloads'
       PERSISTENT_MONITORING: "false"
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-upi
-- as: aws-upi-baselinecaps-none-arm-f28-destructive
-  cron: 45 19 8 * *
+- as: aws-upi-baselinecaps-none-arm-f14
+  cron: 33 12 4,18 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -874,7 +874,7 @@ tests:
       PERSISTENT_MONITORING: "false"
       WORKER_INSTANCE_TYPE: m6g.xlarge
     test:
-    - chain: openshift-e2e-test-qe-destructive
+    - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-upi
 - as: azure-ipi-amd-mixarch-f28-destructive
   cron: 19 13 24 * *
@@ -1811,6 +1811,30 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy
+- as: gcp-ipi-proxy-workload-identity-amd-f28-destructive
+  cron: 12 19 3 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      E2E_RUN_TAGS: '@amd64 and @gcp-ipi and @proxy and not @fips'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
+- as: gcp-ipi-proxy-workload-identity-arm-f28
+  cron: 32 2 13 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      E2E_RUN_TAGS: '@arm64 and @gcp-ipi and @proxy and not @fips'
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
 - as: gcp-ipi-sdn-amd-f28-destructive
   cron: 33 2 15 * *
   steps:
@@ -1918,8 +1942,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-filestore-csi
-- as: gcp-ipi-xpn-minimal-permission-amd-f28
-  cron: 31 9 6 * *
+- as: gcp-ipi-xpn-minimal-permission-amd-f28-destructive
+  cron: 34 15 25 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
@@ -1927,10 +1951,10 @@ tests:
     env:
       E2E_RUN_TAGS: '@amd64 and @gcp-ipi and not @fips'
     test:
-    - chain: openshift-e2e-test-qe
+    - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission
-- as: gcp-ipi-xpn-minimal-permission-arm-f28-destructive
-  cron: 5 10 27 * *
+- as: gcp-ipi-xpn-minimal-permission-arm-f28
+  cron: 23 13 24 * *
   steps:
     cluster_profile: gcp-qe
     dependencies:
@@ -1940,7 +1964,7 @@ tests:
       E2E_RUN_TAGS: '@arm64 and @gcp-ipi and not @fips'
       OCP_ARCH: arm64
     test:
-    - chain: openshift-e2e-test-qe-destructive
+    - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission
 - as: gcp-ipi-xpn-private-amd-f28-destructive
   cron: 44 6 17 * *
@@ -1966,6 +1990,30 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-private
+- as: gcp-ipi-xpn-workload-identity-amd-f28-destructive
+  cron: 4 10 6 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      E2E_RUN_TAGS: '@amd64 and @gcp-ipi and not @fips'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-workload-identity
+- as: gcp-ipi-xpn-workload-identity-arm-f28
+  cron: 56 1 17 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      E2E_RUN_TAGS: '@arm64 and @gcp-ipi and not @fips'
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-workload-identity
 - as: gcp-upi-private-xpn-ingress-glb-amd-f28-destructive
   cron: 35 13 7 * *
   steps:

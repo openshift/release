@@ -90,34 +90,6 @@ tests:
     - ref: cucushift-chainupgrade-toimage
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: azure-ipi-fullyprivate-proxy-f28
-  cron: 9 22 10 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      ENABLE_OTA_TEST: OCP-23309
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @azure-ipi and not @fips
-        and @network-ovnkubernetes'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @azure-ipi and not @fips
-        and @network-ovnkubernetes'
-    test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_TARGET}" >
-        ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE414
-        name: release:intermediate414
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - ref: cucushift-chainupgrade-toimage
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 zz_generated_metadata:
   branch: release-4.15
   org: openshift
