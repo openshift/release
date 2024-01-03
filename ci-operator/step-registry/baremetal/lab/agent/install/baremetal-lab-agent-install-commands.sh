@@ -56,16 +56,30 @@ function reset_host() {
   local ipxe_via_vmedia="${6}"
   local host="${bmc_forwarded_port##1[0-9]}"
   host="${host##0}"
-  echo "Resetting the host #${host}..."
+  echo "Powering off the host #${host}..."
+  until ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
+    -U "$bmc_user" -P "$bmc_pass" \
+    power status | grep -i -q "Chassis Power is off"; do
+    echo "Host #${host} is powered on... forcing power off"
+    ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
+      -U "$bmc_user" -P "$bmc_pass" \
+      power off || true
+    sleep 30
+  done
+  if [ "${ipxe_via_vmedia}" == "true" ]; then
+    echo "The host #${host} requires an ipxe image to boot via vmedia in order to perform the pxe boot..."
+    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" mount.vmedia.ipxe "${host}"
+  fi
+  echo "Setting the one-time boot parameter for the host #${host}..."
+  power_on_cmd="on"
   case "${vendor}" in
     ampere)
       boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && echo force_pxe || echo force_cdrom)
       ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
         -U "$bmc_user" -P "$bmc_pass" \
-        chassis bootparam set bootflag "$boot_selection" options=PEF,watchdog,reset,power
+        chassis bootdev "$boot_selection"
     ;;
     dell)
-      # this is how sushy does it
       boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && [ "${ipxe_via_vmedia}" != "true" ] && echo PXE || echo VCD-DVD)
       curl -x "${proxy}" -k -u "${bmc_user}:${bmc_pass}" -X POST \
         "https://$bmc_address/redfish/v1/Managers/iDRAC.Embedded.1/Actions/Oem/EID_674_Manager.ImportSystemConfiguration" \
@@ -78,6 +92,7 @@ function reset_host() {
     ;;
     hpe)
       boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && [ "${ipxe_via_vmedia}" != "true" ] && echo Pxe || echo Cd)
+      power_on_cmd="cycle"
       curl -x "${proxy}" -k -u "${bmc_user}:${bmc_pass}" -X PATCH \
         "https://$bmc_address/redfish/v1/Systems/1/" \
         -H 'Content-Type: application/json' \
@@ -87,21 +102,15 @@ function reset_host() {
       echo "Unknown vendor ${vendor}"
       return 1
   esac
-  ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
+  echo "Powering on the host #${host}..."
+  until ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
     -U "$bmc_user" -P "$bmc_pass" \
-    power off || echo "Already off"
-  # If the host is not already powered off, the power on command can fail while the host is still powering off.
-  # Let's retry the power on command multiple times to make sure the command is received in the correct state.
-  for i in {1..10} max; do
-    if [ "$i" == "max" ]; then
-      echo "Failed to reset #$host"
-      return 1
-    fi
+    power status | grep -i -q "Chassis Power is on"; do
+    echo "Host #${host} is not powered on yet... power on"
     ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
       -U "$bmc_user" -P "$bmc_pass" \
-      power on && break
-    echo "Failed to power on #$host, retrying..."
-    sleep 5
+      power "$power_on_cmd" || true
+    sleep 30
   done
 }
 
@@ -122,7 +131,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
-INSTALL_DIR="/tmp/installer"
+INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
 API_VIP="$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")"
 INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
 mkdir -p "${INSTALL_DIR}"
@@ -241,7 +250,7 @@ case "${BOOT_MODE}" in
       # Assuming HTTP or HTTPS
       iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${CLUSTER_NAME}.${arch}.iso"
     fi
-    mount_virtual_media "${host}" "${iso_path}" &
+    mount_virtual_media "${host}" "${iso_path}"
   done
 
   wait
@@ -280,7 +289,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   echo "Power on #${host} (${name})..."
-  reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${bmc_forwarded_port}" "${vendor}" "${ipxe_via_vmedia}" &
+  reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${bmc_forwarded_port}" "${vendor}" "${ipxe_via_vmedia}"
 done
 
 wait

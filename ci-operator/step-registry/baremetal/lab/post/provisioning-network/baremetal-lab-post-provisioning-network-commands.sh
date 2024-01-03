@@ -97,7 +97,7 @@ interfaces:
 - name: br-${CLUSTER_NAME: -12}
   type: linux-bridge
   state: absent
-- name: ${PROVISIONING_NET_DEV}.${VLAN_ID}
+- name: prov.${VLAN_ID}
   type: vlan
   state: absent
 "
