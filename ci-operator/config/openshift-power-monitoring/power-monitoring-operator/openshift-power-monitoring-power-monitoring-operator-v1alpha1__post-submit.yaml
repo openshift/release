@@ -21,18 +21,18 @@ images:
     value: amd64
   context_dir: .
   dockerfile_path: Dockerfile
-  to: kepler-operator
+  to: power-monitoring-operator
 - context_dir: .
   dockerfile_path: tests/Dockerfile
-  to: kepler-tests-runner
+  to: power-monitoring-operator-tests-runner
 operator:
   bundles:
-  - as: kepler-bundle
+  - as: power-monitoring-operator-bundle
     context_dir: .
     dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/sustainable_computing_io/kepler-operator:.*
-    with: pipeline:kepler-operator
+    with: pipeline:power-monitoring-operator
 releases:
   latest:
     candidate:
@@ -45,7 +45,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: kepler-operator-e2e-aws
+- as: power-monitoring-operator-e2e-aws
   postsubmit: true
   steps:
     cluster_profile: aws
@@ -56,15 +56,15 @@ tests:
         operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
       dependencies:
       - env: OO_BUNDLE
-        name: kepler-bundle
+        name: power-monitoring-operator-bundle
       from: operator-sdk
       resources:
         requests:
           cpu: 100m
           memory: 400Mi
-    - ref: openshift-power-monitoring-tests-kepler
+    - ref: openshift-power-monitoring-tests-power-monitoring-operator
     workflow: openshift-e2e-aws
-- as: kepler-operator-e2e-gcp
+- as: power-monitoring-operator-e2e-gcp
   postsubmit: true
   steps:
     cluster_profile: gcp
@@ -75,13 +75,13 @@ tests:
         operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
       dependencies:
       - env: OO_BUNDLE
-        name: kepler-bundle
+        name: power-monitoring-operator-bundle
       from: operator-sdk
       resources:
         requests:
           cpu: 100m
           memory: 400Mi
-    - ref: openshift-power-monitoring-tests-kepler
+    - ref: openshift-power-monitoring-tests-power-monitoring-operator
     workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: v1alpha1
