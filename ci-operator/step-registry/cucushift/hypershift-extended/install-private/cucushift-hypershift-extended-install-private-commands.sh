@@ -14,6 +14,8 @@ bin/hypershift install --hypershift-image="${HYPERSHIFT_RELEASE_LATEST}" \
 --external-dns-credentials=${CLUSTER_PROFILE_DIR}/.awscred \
 --external-dns-provider=aws \
 --external-dns-domain-filter=hypershift-ext.qe.devcluster.openshift.com \
---wait-until-available
+--wait-until-available \
+--enable-cvo-management-cluster-metrics-access=true \
+--enable-uwm-telemetry-remote-write=true
 
 echo "" > ${SHARED_DIR}/.awsprivatecred
