@@ -25,6 +25,8 @@ if [[ "X${status}" == "X" || "${status}" == "True"  ]] ; then
   exit 0
 fi
 
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+
 echo "start worker node ${node_name} with instance ID ${instance_id}"
 aws ec2 start-instances --instance-ids ${instance_id}
 echo "wait until the worker node ${node_name} Ready"

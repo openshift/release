@@ -17,6 +17,7 @@ if [[ -n ${node_name} ]] ; then
   instance_id=$(aws ec2 describe-instances --filters "Name=private-dns-name,Values=${node_name}" --query "Reservations[].Instances[].InstanceId" --output text)
 fi
 
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 echo "stop worker node ${node_name} with instance ID ${instance_id}"
 aws ec2 stop-instances --instance-ids ${instance_id}
 echo "wait until the worker node ${node_name} NotReady"
