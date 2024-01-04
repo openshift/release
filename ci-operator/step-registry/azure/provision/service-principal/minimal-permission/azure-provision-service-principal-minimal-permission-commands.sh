@@ -76,6 +76,13 @@ else
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
+echo "OC Version:"
+which oc
+oc version --client
+
+sleep 600
+exit 1
+
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 ROLE_DEFINITION="${ARTIFACT_DIR}/azure-custom-role-definition-minimal-permissions.json"
 CUSTOM_ROLE_NAME="${CLUSTER_NAME}-custom-role"
