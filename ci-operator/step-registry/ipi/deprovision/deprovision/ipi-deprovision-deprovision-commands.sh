@@ -37,7 +37,11 @@ export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
 export OVIRT_CONFIG=${SHARED_DIR}/ovirt-config.yaml
 
 if [[ "${CLUSTER_TYPE}" == "ibmcloud"* ]]; then
-  IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+  if [ -f "${SHARED_DIR}/ibmcloud-min-permission-api-key" ]; then
+    IC_API_KEY="$(< "${SHARED_DIR}/ibmcloud-min-permission-api-key")"
+  else
+    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+  fi
   export IC_API_KEY
 fi
 if [[ "${CLUSTER_TYPE}" == "vsphere"* ]]; then
