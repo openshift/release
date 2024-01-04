@@ -1,6 +1,6 @@
 base_images:
-  base:
-    name: ubi
+  ubi_minimal:
+    name: ubi-minimal
     namespace: ocp
     tag: "9"
 build_root:
@@ -10,18 +10,20 @@ build_root:
     tag: golang-1.21
 images:
 - dockerfile_literal: |
-    FROM base
-    RUN dnf install -y java-11-openjdk jq git openssl python3.11 && \
-        ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
-        dnf clean all
+    FROM ubi_minimal
+    RUN microdnf install -y java-11-openjdk tar jq git openssl python3.11 python3-pip && \
+        ln -sf /usr/bin/python3.11 /usr/bin/python3
     RUN curl -L https://github.com/zaproxy/zaproxy/releases/download/v2.13.0/ZAP_2.13.0_Linux.tar.gz > /tmp/ZAP_2.13.0_Linux.tar.gz
     RUN python3 --version
+    RUN python3 -m ensurepip --upgrade
+    RUN pip3 install python-dotenv pyyaml requests
     RUN mkdir -p /usr/local/zap \
       && tar xzvf /tmp/ZAP_2.13.0_Linux.tar.gz -C /usr/local/zap \
-      && rm -f /tmp/ZAP_2.13.0_Linux.tar.gz
+      && rm -f /tmp/ZAP_2.13.0_Linux.tar.gz \
+      && chmod 777 -R ${HOME}
     ENV PATH $PATH:/usr/local/zap/ZAP_2.13.0
     RUN zap.sh -version
-  from: base
+  from: ubi_minimal
   to: quay-test-dast
 promotion:
   to:
