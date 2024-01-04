@@ -2,23 +2,19 @@
 
 set -euo pipefail
 
-#Create new AWS EC2 Instatnce to deploy Quay OMR
 QUAY_ACCESS_TOKEN=$(cat /var/run/quay-qe-stagequayio-secret/oauth2token)
 QUAY_OAUTH2_TOEKN="Bearer $QUAY_ACCESS_TOKEN"
 
 echo "The current ZAP Version is:"
 cd /tmp && mkdir -p zap_test_version && zap.sh -dir /tmp/zap_test_version -version
 
-#Clone Redhat Rapidast Repository
 echo "Clone Redhat Rapidast Repository..."
 git clone https://github.com/RedHatProductSecurity/rapidast.git && cd rapidast || true
 
-#Generate Quay OpenAPI File
 echo "Generating Quay OpenAPI file..."
 curl https://stage.quay.io/api/v1/discovery > quay.json || true
 cat quay.json | jq > openapi.json && cp openapi.json $ARTIFACT_DIR || true
 
-#Generate Quay DAST Testing Config file
 cat >>config-zap-template-prwoci.yaml <<EOF
 config:
   # WARNING: `configVersion` indicates the schema version of the config file.
@@ -70,8 +66,5 @@ scanners:
       additionalAddons: "ascanrulesBeta"
 EOF
 
-#Execute Quay DAST Testing
 cp config-zap-template-prwoci.yaml config || true
-sleep 900
-pip install -r requirements.txt || true
 ./rapidast.py --config ./config/config-zap-template-prwoci.yaml || true
