@@ -61,7 +61,11 @@ function ibmcloud_login {
   region="${LEASED_RESOURCE}"
   export region
   echo "Try to login..."
-  "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+  if [ -f "${SHARED_DIR}/ibmcloud-min-permission-api-key" ]; then
+      "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${SHARED_DIR}/ibmcloud-min-permission-api-key"
+  else
+      "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+  fi
 }
 
 
