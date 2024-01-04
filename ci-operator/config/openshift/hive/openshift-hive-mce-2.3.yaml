@@ -20,8 +20,9 @@ images:
       - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.20-openshift-4.14
   to: hive
 promotion:
-  name: mce-2.3
-  namespace: openshift
+  to:
+  - name: mce-2.3
+    namespace: openshift
 releases:
   initial:
     integration:
@@ -72,6 +73,13 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: hive-codecov-token
+- as: security
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+      SNYK_ENABLE_DEPS_SCAN: "true"
+    workflow: openshift-ci-security
 - as: e2e
   cluster_claim:
     architecture: amd64
@@ -161,7 +169,7 @@ tests:
 - as: e2e-gcp
   run_if_changed: gcp
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     test:
     - as: test
       cli: latest

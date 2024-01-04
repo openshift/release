@@ -7,6 +7,8 @@ set -o pipefail
 declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 
+echo "$(date -u --rfc-3339=seconds) vsphere_portgroup: ${vsphere_portgroup}"
+
 KUBECONFIG=${SHARED_DIR}/kubeconfig
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
@@ -52,7 +54,7 @@ for count in $(seq 1 ${RHEL_WORKER_COUNT}); do
   done
 
   if [ "x${rhel_node_ip}" == "x" ]; then
-    echo "Unabel to get ip of rhel instance ${infra_id}-rhel-${count}!"
+    echo "Unable to get ip of rhel instance ${infra_id}-rhel-${count}!"
     exit 1
   fi
 
@@ -67,6 +69,8 @@ if test -n "$(govc ls ${vcenter_folder} | grep "lb-0")"; then
   lb_group="[lb]\n${lb_ip}"
   lb_vars="[lb:vars]\nansible_user=core\nansible_become=True"
 fi
+
+echo "$(date -u --rfc-3339=seconds) rhel_node_ip: ${rhel_node_ip}"
 
 #Generate ansible-hosts file
 cat >"${SHARED_DIR}/ansible-hosts" <<EOF

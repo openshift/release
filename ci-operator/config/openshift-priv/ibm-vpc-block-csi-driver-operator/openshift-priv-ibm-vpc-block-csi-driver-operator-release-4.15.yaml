@@ -1,5 +1,5 @@
 base_images:
-  base:
+  ocp_4.15_base:
     name: 4.15-priv
     namespace: ocp-private
     tag: base
@@ -10,14 +10,16 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.14"
+    tag: "4.15"
 binary_build_commands: make
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ibm-vpc-block-csi-driver-operator
 images:
-- from: base
-  inputs:
+- inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
@@ -26,9 +28,9 @@ images:
   from: src
   to: ibm-vpc-block-csi-driver-operator-test
 promotion:
-  disabled: true
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - name: 4.15-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:

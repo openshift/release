@@ -19,8 +19,10 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: cli-manager
 promotion:
-  name: 4.16-priv
-  namespace: ocp-private
+  to:
+  - disabled: true
+    name: 4.16-priv
+    namespace: ocp-private
 resources:
   '*':
     requests:
@@ -38,6 +40,10 @@ tests:
   commands: make test-unit
   container:
     from: src
+- as: security
+  optional: true
+  steps:
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

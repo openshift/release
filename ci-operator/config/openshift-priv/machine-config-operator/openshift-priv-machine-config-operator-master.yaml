@@ -1,44 +1,44 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
-  base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: hypershift-operator
   hypershift-tests:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: hypershift-tests
+  ocp_4.15_base:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: base
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
@@ -48,7 +48,7 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.15
   ocp_os:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: rhel-coreos
 build_root:
@@ -56,8 +56,10 @@ build_root:
 canonical_go_repository: github.com/openshift/machine-config-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
@@ -78,19 +80,20 @@ images:
   from: ocp_os
   to: custom-os-image
 promotion:
-  excluded_images:
-  - custom-os-image
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - excluded_images:
+    - custom-os-image
+    name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':
@@ -192,7 +195,7 @@ tests:
 - as: e2e-gcp-op
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     test:
     - as: test
       cli: latest
@@ -211,6 +214,8 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: test
       cli: latest
@@ -260,7 +265,7 @@ tests:
 - as: e2e-vsphere-upi
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-upi-zones
   optional: true
@@ -310,12 +315,12 @@ tests:
 - as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-upgrade
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-upgrade-vsphere
 - as: e2e-ovn-step-registry
   optional: true
@@ -411,7 +416,7 @@ tests:
     cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
 - always_run: false
-  as: e2e-openstack-dualstack-techpreview
+  as: e2e-openstack-dualstack
   optional: true
   steps:
     cluster_profile: openstack-hwoffload

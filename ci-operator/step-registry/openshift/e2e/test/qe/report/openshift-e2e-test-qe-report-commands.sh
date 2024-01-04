@@ -4,22 +4,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-EXIT_STATUS=0
-
 # the exit code of this step is not expected to be caught from the overall test suite in RP. Excluding it
 touch "${ARTIFACT_DIR}/skip_overall_if_fail"
 
-# only exit 0 if junit result has no failures
-if [[ -f "${SHARED_DIR}/openshift-e2e-test-qe-report-openshift-extended-test-failures" ]]; then
-    cat "${SHARED_DIR}/openshift-e2e-test-qe-report-openshift-extended-test-failures"
-    echo "Please investigate these ginkgo test failures from build artifacts"
-    let EXIT_STATUS+=1
-fi
+TEST_REPORT_FILE='openshift-e2e-test-qe-report'
+TEST_RESULT_FILE='test-results.yaml'
+if [[ -f "${SHARED_DIR}/${TEST_REPORT_FILE}" ]] ; then
+    cat "${SHARED_DIR}/${TEST_REPORT_FILE}"
+    cp "${SHARED_DIR}/${TEST_REPORT_FILE}" "${ARTIFACT_DIR}/${TEST_RESULT_FILE}" || true
 
-if [[ -f "${SHARED_DIR}/openshift-e2e-test-qe-report-cucushift-failures" ]]; then
-    cat "${SHARED_DIR}/openshift-e2e-test-qe-report-cucushift-failures"
-    echo "Please investigate these cucushift failures from build artifacts"
-    let EXIT_STATUS+=2
+    # only exit 0 if rest result has no 'failingScenarios:'
+    if (grep -q 'failingScenarios:' "${ARTIFACT_DIR}/${TEST_RESULT_FILE}") ; then
+        exit 1
+    fi
 fi
-
-exit $EXIT_STATUS

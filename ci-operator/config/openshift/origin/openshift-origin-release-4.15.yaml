@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: "4.15"
-    namespace: ocp
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -15,6 +11,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: hypershift-operator
+  ocp_4.14_base:
+    name: "4.14"
+    namespace: ocp
+    tag: base
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -42,16 +42,18 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: tests
 - dockerfile_path: images/hello-openshift/Dockerfile.rhel
-  from: base
   inputs:
+    ocp_4.14_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: hello-openshift
 promotion:
-  disabled: true
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.15"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -111,7 +113,7 @@ tests:
 - as: e2e-gcp-fips-serial
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -187,7 +189,7 @@ tests:
     workflow: openshift-e2e-aws-image-registry
 - as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     workflow: openshift-upgrade-gcp
 - as: e2e-gcp-ovn-rt-upgrade
   optional: true
@@ -229,7 +231,7 @@ tests:
 - as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-vsphere-upi
@@ -252,6 +254,7 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-metal-ipi-sdn
   cluster: build05
@@ -261,7 +264,6 @@ tests:
     workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
-  optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
@@ -362,7 +364,7 @@ tests:
 - as: e2e-vsphere-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-etcd-scaling
 - as: e2e-aws-etcd-recovery
   optional: true
@@ -393,6 +395,15 @@ tests:
   steps:
     cluster_profile: aws
     workflow: hypershift-kubevirt-conformance
+- as: e2e-baremetalds-kubevirt
+  optional: true
+  run_if_changed: ^test/extended/kubevirt/.*
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.14
+    workflow: hypershift-kubevirt-baremetalds-conformance
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

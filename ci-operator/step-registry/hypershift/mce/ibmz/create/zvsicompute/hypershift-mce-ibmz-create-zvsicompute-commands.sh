@@ -173,7 +173,7 @@ else
 fi
 
 echo "Fetching the hosted cluster IP address for resolution"
-hc_url=$(cat ${SHARED_DIR}/${HC_NAME}_kubeconfig | awk '/server/{print $2}' | cut -c 9- | cut -d ':' -f 1)
+hc_url=$(cat ${SHARED_DIR}/nested_kubeconfig | awk '/server/{print $2}' | cut -c 9- | cut -d ':' -f 1)
 hc_ip=$(dig +short $hc_url | head -1)
 
 echo "Adding A records in the DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN to resolve the api URLs of hosted cluster to the hosted cluster IP."
@@ -285,5 +285,6 @@ echo "$(date) All the agents are attached as compute nodes to the hosted control
 
 # Verifying the compute nodes status
 echo "$(date) Checking the compute nodes in the hosted control plane"
-oc get no --kubeconfig="${SHARED_DIR}/${HC_NAME}_kubeconfig"
+oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=30m
 echo "$(date) Successfully completed the e2e creation chain"

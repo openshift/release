@@ -67,7 +67,7 @@ tests:
     workflow: ipi-gcp
 - as: bitbucket-no-pat-oauth-flow
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     test:
     - as: che-server-test
       cli: latest
@@ -93,7 +93,7 @@ tests:
     workflow: ipi-gcp
 - as: bitbucket-no-pat-oauth-flow-ssh-url
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     test:
     - as: che-server-test
       cli: latest
@@ -139,7 +139,7 @@ tests:
     workflow: ipi-gcp
 - as: github-no-pat-oauth-flow-ssh-url
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     test:
     - as: che-server-test
       cli: latest
@@ -180,7 +180,7 @@ tests:
     workflow: ipi-gcp
 - as: gitlab-with-pat-setup-flow
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     test:
     - as: che-server-test
       cli: latest
@@ -201,7 +201,7 @@ tests:
     workflow: ipi-gcp
 - as: azure-with-pat-setup-flow
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     test:
     - as: che-server-test
       cli: latest
@@ -298,6 +298,26 @@ tests:
       credentials:
       - mount_path: /usr/local/ci-secrets/gitea
         name: gitea
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: gitlab-with-oauth-setup-flow
+  steps:
+    cluster_profile: gcp-3
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export ADMIN_ACCESS_TOKEN=$(cat /usr/local/ci-secrets/gitlab/admin-access-token)
+        export GIT_PROVIDER_PASSWORD=$(cat /usr/local/ci-secrets/gitlab/git-provider-password)
+        /bin/bash .ci/openshift-ci/test-gitlab-with-oauth-setup-flow.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/gitlab
+        name: gitlab
         namespace: test-credentials
       from: src
       resources:

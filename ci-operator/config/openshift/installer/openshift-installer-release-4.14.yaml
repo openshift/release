@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
@@ -120,10 +120,11 @@ images:
         source_path: /usr/bin/oc
   to: src-oc
 promotion:
-  excluded_images:
-  - src-oc
-  name: "4.14"
-  namespace: ocp
+  to:
+  - excluded_images:
+    - src-oc
+    name: "4.14"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -385,13 +386,6 @@ tests:
     workflow: openshift-e2e-aws-workers-rhel
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-aws-ovn-disruptive
-  optional: true
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-disruption
-  timeout: 6h0m0s
-- always_run: false
   as: e2e-gcp-upgrade
   optional: true
   steps:
@@ -557,7 +551,7 @@ tests:
 - as: e2e-vsphere-ovn
   run_if_changed: vsphere
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 - as: e2e-vsphere-static-ovn
@@ -569,7 +563,7 @@ tests:
 - as: e2e-vsphere-upi
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere-upi
   timeout: 6h0m0s
 - as: e2e-vsphere-upi-zones
@@ -586,11 +580,20 @@ tests:
     cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-zones
   timeout: 6h0m0s
+- as: e2e-vsphere-zones-techpreview
+  optional: true
+  run_if_changed: vsphere
+  steps:
+    cluster_profile: vsphere-multizone-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-vsphere-zones
+  timeout: 6h0m0s
 - always_run: false
   as: e2e-crc
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: openshift-e2e-gcp-crc
   timeout: 6h0m0s
 - as: e2e-libvirt
@@ -728,11 +731,7 @@ tests:
   run_if_changed: /agent/
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=SNO_IPV6
-        AGENT_USE_ZTP_MANIFESTS=true
-    workflow: agent-e2e-generic
+    workflow: agent-e2e-sno-ipv6
   timeout: 6h0m0s
 - as: e2e-agent-sno-ipv4-pxe
   cluster: build05
@@ -770,6 +769,8 @@ tests:
   optional: true
   steps:
     cluster_profile: openstack-hwoffload
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-openstack-dualstack
 zz_generated_metadata:
   branch: release-4.14

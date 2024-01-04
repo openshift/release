@@ -35,6 +35,8 @@ function cvoCapabilityCheck() {
             else
                 echo "ERROR: ${expected_status} capabilities does not match with cvo ${cvo_field}!"
                 echo -e "cvo_caps: ${cvo_caps_str}\n${expected_status} capability set: ${capability_set}"
+                echo "diff [cvo_caps] [${expected_status} capability set]"
+                diff <( echo $cvo_caps_str | tr " " "\n" | sort | uniq) <( echo $capability_set | tr " " "\n" | sort | uniq )
                 result=1
             fi
         fi
@@ -84,6 +86,8 @@ caps_operator[Storage]="storage"
 caps_operator[NodeTuning]="node-tuning"
 caps_operator[MachineAPI]="machine-api control-plane-machine-set cluster-autoscaler"
 caps_operator[ImageRegistry]="image-registry"
+caps_operator[OperatorLifecycleManager]="operator-lifecycle-manager operator-lifecycle-manager-catalog operator-lifecycle-manager-packageserver"
+caps_operator[CloudCredential]="cloud-credential"
 
 # Mapping between optional capability and resources
 # Need to be updated when new resource marks as optional
@@ -97,7 +101,8 @@ v411="baremetal marketplace openshift-samples"
 v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
-latest_defined="v414"
+v415=" ${v414} OperatorLifecycleManager CloudCredential"
+latest_defined="v415"
 always_default="${!latest_defined}"
 
 # Determine vCurrent
@@ -132,6 +137,9 @@ case ${baselinecaps_from_config} in
 "v4.14")
   enabled_capability_set="${v414}"
   ;;
+"v4.15")
+  enabled_capability_set="${v415}"
+  ;;
 "vCurrent")
   enabled_capability_set="${vCurrent}"
   ;;
@@ -140,14 +148,10 @@ case ${baselinecaps_from_config} in
   ;;
 esac
 
-if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "" ]]; then
-    enabled_capability_set="${enabled_capability_set} ${ADDITIONAL_ENABLED_CAPABILITIES}"
-else
-    declare -a additional_caps_from_config_array=()
-    readarray -t additional_caps_from_config_array < <(yq-go r "${SHARED_DIR}/install-config.yaml" "capabilities.additionalEnabledCapabilities[*]")
-    [[ ${#additional_caps_from_config_array[@]} -gt 0 ]] && enabled_capability_set="${enabled_capability_set} ${additional_caps_from_config_array[*]}"
+additional_caps_from_config=$(yq-go r "${SHARED_DIR}/install-config.yaml" "capabilities.additionalEnabledCapabilities[*]" | xargs -n1 | sort -u | xargs)
+if [[ "${additional_caps_from_config}" != "" ]]; then
+    enabled_capability_set="${enabled_capability_set} ${additional_caps_from_config}"
 fi
-
 enabled_capability_set=$(echo ${enabled_capability_set} | xargs -n1 | sort -u | xargs)
 disabled_capability_set="${vCurrent}"
 for cap in $enabled_capability_set; do
@@ -206,6 +210,28 @@ for cap in $disabled_capability_set; do
         fi
     done
 done
+
+# cvo spec check
+# Check baselineCapabilitySet in cvo spec
+echo "------check baselineCapabilitySet setting in cvo spec-----"
+baselinecaps_from_cvo=$(oc get clusterversion version -ojson | jq -r ".spec.capabilities.baselineCapabilitySet")
+if [[ "${baselinecaps_from_cvo}" != "${baselinecaps_from_config}" ]]; then
+    echo "ERROR: baselineCapabilitySet in install-config.yaml does not match with setting in cvo spec!"
+    echo -e "baselineCapabilitySet in install-config.yaml: ${baselinecaps_from_config}\nbaselineCapabilitySet in cvo spec: ${baselinecaps_from_cvo}"
+    check_result=1
+else
+    echo "INFO: baselineCapabilitySet in install-config.yaml matches with setting in cvo spec!"
+fi
+# Check additionalEnabledCapabilities in cvo spec
+echo "------check additionalEnabledCapabilities setting in cvo spec-----"
+addtional_caps_from_cvo=$(oc get clusterversion version -oyaml | yq-go r - "spec.capabilities.additionalEnabledCapabilities[*]" | xargs -n1 | sort -u | xargs)
+if [[ "${addtional_caps_from_cvo}" != "${additional_caps_from_config}" ]]; then
+    echo "ERROR: additionalEnabledCapabilities in install-config.yaml does not match with setting in cvo spec!"
+    echo -e "additionalEnabledCapabilities in install-config.yaml: ${additional_caps_from_config}\nadditionalEnabledCapabilities in cvo spec: ${addtional_caps_from_cvo}"
+    check_result=1
+else
+    echo "INFO: additionalEnabledCapabilities in install-config.yaml matches with setting in cvo spec!"
+fi
 
 # cvo status capability check
 echo "------check cvo status capabilities check-----"

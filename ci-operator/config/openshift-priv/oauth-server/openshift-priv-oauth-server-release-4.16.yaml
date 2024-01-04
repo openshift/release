@@ -1,6 +1,6 @@
 base_images:
-  base:
-    name: 4.16-priv
+  ocp_4.14_base:
+    name: 4.14-priv
     namespace: ocp-private
     tag: base
   ocp_builder_rhel-8-golang-1.19-openshift-4.14:
@@ -13,15 +13,19 @@ build_root:
 canonical_go_repository: github.com/openshift/oauth-server
 images:
 - dockerfile_path: images/Dockerfile.rhel
-  from: base
   inputs:
+    ocp_4.14_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base
     ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
   to: oauth-server
 promotion:
-  name: 4.16-priv
-  namespace: ocp-private
+  to:
+  - disabled: true
+    name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -56,7 +60,7 @@ tests:
     from: test-bin
 - as: e2e-gcp
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: openshift-e2e-gcp
 - as: e2e-agnostic-upgrade
   steps:

@@ -98,12 +98,14 @@ function cleanup_ibmcloud_powervs() {
       sleep 60
     done
 
-    ic resource service-instance-update "${CRN}" --allow-cleanup true
+    echo "Updating the service instance"
+    ic resource service-instance-update "${CRN}" --allow-cleanup true || true
     sleep 30
-    ic resource service-instance-delete "${CRN}" --force --recursive
+    echo "Deleting the service instance"
+    ic resource service-instance-delete "${CRN}" --force --recursive || true
     for COUNT in $(seq 0 5)
     do
-      FIND=$(ibmcloud pi sl 2> /dev/null| grep "${CRN}" || true)
+      FIND=$(ic pi sl 2> /dev/null| grep "${CRN}" || true)
       echo "FIND: ${FIND}"
       if [ -z "${FIND}" ]
       then
@@ -280,7 +282,11 @@ case "$CLUSTER_TYPE" in
       while [ -z "${SERVICE_STATE}" ]
       do
         COUNTER=$((COUNTER+1)) 
-        TEMP_STATE="$(ic resource service-instances -g "${RESOURCE_GROUP}" --output json --type service_instance  | jq -r '.[] | select(.crn == "'"${CRN}"'") | .state')"
+        TEMP_STATE="NOT_READY"
+        if [ "$(ic resource search "crn:\"${CRN}\"" --output json | jq -r '.items | length')" != "0" ]
+        then
+            TEMP_STATE="$(ic resource service-instance -g "${RESOURCE_GROUP}" "${CRN}" --output json | jq -r '.[].state')"
+        fi
         echo "Current State is: ${TEMP_STATE}"
         echo ""
         if [ "${TEMP_STATE}" == "active" ]

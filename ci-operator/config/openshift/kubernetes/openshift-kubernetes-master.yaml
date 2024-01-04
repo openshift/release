@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: base
   base-machine:
@@ -8,31 +8,31 @@ base_images:
     namespace: openshift
     tag: stream9
   cli:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: cli
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.14"
+    tag: "4.15"
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
   machine-os-content-base:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: machine-os-content
   oc-rpms:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: oc-rpms
   ocp_4.15_base-rhel9:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: base-rhel9
   ocp_4.15_tools:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: tools
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
@@ -44,11 +44,11 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.15
   rhel-coreos-base:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: rhel-coreos
   tools:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: tools
 binary_build_commands: openshift-hack/build-go.sh
@@ -117,13 +117,14 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: pod
 promotion:
-  additional_images:
-    artifacts: artifacts
-  excluded_images:
-  - machine-os-content
-  - rhel-coreos
-  name: "4.15"
-  namespace: ocp
+  to:
+  - additional_images:
+      artifacts: artifacts
+    excluded_images:
+    - machine-os-content
+    - rhel-coreos
+    name: "4.16"
+    namespace: ocp
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -164,12 +165,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -345,7 +346,7 @@ tests:
 - as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-vsphere
@@ -378,6 +379,8 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-metal-ipi
   cluster: build05

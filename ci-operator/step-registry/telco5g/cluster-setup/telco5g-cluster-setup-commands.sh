@@ -15,6 +15,7 @@ SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
+BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
@@ -48,14 +49,14 @@ fi
 
 cat << EOF > $SHARED_DIR/bastion_inventory
 [bastion]
-${BASTION_IP} ansible_ssh_user=centos ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
+${BASTION_IP} ansible_ssh_user=${BASTION_USER} ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
 
 ADDITIONAL_ARG=""
-# default to the first cluster in the array, unless 4.14 or 4.15
+# default to the first cluster in the array, unless 4.16
 if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
     ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force"
-    if [[ "$T5CI_VERSION" == "4.14" ]] || [[ "$T5CI_VERSION" == "4.15" ]]; then
+    if [[ "$T5CI_VERSION" == "4.16" ]]; then
         ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[1]} --force"
     fi
 else
@@ -127,7 +128,7 @@ if $BASTION_ENV; then
 # Run on upstream lab with bastion
 cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
-${HYPERV_IP} ansible_host=${HYPERV_IP} ansible_user=kni ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_common_args='${COMMON_SSH_ARGS} -o ProxyCommand="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -p 22 -W %h:%p -q centos@${BASTION_IP}"'
+${HYPERV_IP} ansible_host=${HYPERV_IP} ansible_user=kni ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_common_args='${COMMON_SSH_ARGS} -o ProxyCommand="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -p 22 -W %h:%p -q ${BASTION_USER}@${BASTION_IP}"'
 EOF
 
 else
@@ -265,39 +266,6 @@ cat << EOF > ~/fetch-information.yml
     shell: kcli ssh root@${CLUSTER_NAME}-installer 'oc get node'
 EOF
 
-cat << EOF > $SHARED_DIR/check-cluster.yml
----
-- name: Check if cluster is ready
-  hosts: hypervisor
-  gather_facts: false
-  tasks:
-
-  - name: Check if cluster is available
-    shell: kcli ssh root@${CLUSTER_NAME}-installer "oc get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'"
-    register: ready_check
-
-  - name: Grab the kcli log from installer
-    shell: >-
-      kcli scp root@${CLUSTER_NAME}-installer:/var/log/cloud-init-output.log /tmp/kcli_${CLUSTER_NAME}_cloud-init-output.log
-    ignore_errors: true
-
-  - name: Grab the log from HV to artifacts
-    fetch:
-      src: /tmp/kcli_${CLUSTER_NAME}_cloud-init-output.log
-      dest: ${ARTIFACT_DIR}/cloud-init-output.log
-      flat: yes
-    ignore_errors: true
-
-  - name: Show last logs from cloud init if failed
-    shell: >-
-      kcli ssh root@${CLUSTER_NAME}-installer 'tail -100 /var/log/cloud-init-output.log'
-    when: "'True' not in ready_check.stdout"
-    ignore_errors: true
-
-  - name: Fail when cluster is not available
-    shell: "echo Cluster ready: {{ ready_check.stdout }}"
-    failed_when: "'True' not in ready_check.stdout"
-EOF
 
 cat << EOF > $SHARED_DIR/destroy-cluster.yml
 ---
@@ -319,12 +287,10 @@ EOF
 # in order to provide the desired return code later.
 PROCEED_AFTER_FAILURES="false"
 status=0
-if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
-    ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory $SHARED_DIR/check-cluster.yml -vv
-else
+if [[ "$T5_JOB_DESC" != "periodic-cnftests" ]]; then
     PROCEED_AFTER_FAILURES="true"
-    ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 fi
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || eval $PROCEED_AFTER_FAILURES
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
 exit ${status}

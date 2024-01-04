@@ -24,8 +24,8 @@ fi
 # Log in
 ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${ROSA_LOGIN_ENV} with offline token"
-  rosa login --env "${ROSA_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token"
+  rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
   if [ $? -ne 0 ]; then
     echo "Login failed"
     exit 1
@@ -45,8 +45,8 @@ if [[ "$HOSTED_CP" == "true" ]]; then
 fi
 
 SHARED_VPC_SWITCH=""
-if [[ "$ENABLE_SHARED_VPC" == "true" ]]; then
-  shared_vpc_role_arn=$(cat "${SHARED_DIR}/shared-vpc-role-arn")
+if [[ "$ENABLE_SHARED_VPC" == "yes" ]]; then
+  shared_vpc_role_arn=$(cat "${SHARED_DIR}/hosted_zone_role_arn")
   SHARED_VPC_SWITCH="--shared-vpc-role-arn ${shared_vpc_role_arn}"
 fi
 

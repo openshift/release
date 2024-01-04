@@ -367,16 +367,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
-- as: gcp-ipi-workload-identity-f28
-  cron: 55 2 28 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @gcp-ipi and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @gcp-ipi and not @fips'
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
 - as: gcp-ipi-workload-identity-rt-fips-f14
   cron: 4 7 13,28 * *
   steps:
@@ -400,20 +390,23 @@ tests:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-upi
 - as: vsphere-ipi-disconnected-f28
-  cron: 32 21 14 * *
+  cron: 34 16 17 * *
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
     env:
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @vsphere-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @vsphere-ipi and not @fips'
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
 - as: vsphere-ipi-ovn-ipsec-f28
   cron: 6 22 13 * *
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @vsphere-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @vsphere-ipi and not @fips'
@@ -423,29 +416,35 @@ tests:
 - as: vsphere-ipi-proxy-fips-f28
   cron: 37 16 25 * *
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
     env:
       FIPS_ENABLED: "true"
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @vsphere-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @vsphere-ipi and not @fips'
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-workers-rhel8-f28
   cron: 7 8 6 * *
   steps:
-    cluster_profile: vsphere-dis
+    cluster_profile: vsphere-dis-2
     env:
       PLATFORM_VERSION: "8.6"
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @vsphere-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @vsphere-ipi and not @fips'
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy-workers-rhel8
 - as: vsphere-upi-f28
   cron: 33 22 30 * *
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @vsphere-upi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @vsphere-upi and not @fips'

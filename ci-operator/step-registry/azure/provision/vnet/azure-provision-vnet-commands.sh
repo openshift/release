@@ -118,6 +118,13 @@ run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clust
 #Add port 22 to debug easily and to gather bootstrap log
 run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'ssh-allow' --priority 1001 --access Allow --source-port-ranges '*' --destination-port-ranges 22" || exit 3
 
+if [[ ! -z "${AZURE_VNET_TAGS}" ]]; then
+  echo "Adding custom tags ${AZURE_VNET_TAGS} on vnet ${vnet_name}"
+  vnet_id=$(az network vnet list -g ${RESOURCE_GROUP} --query "[].id" -otsv)
+  az tag update --resource-id "${vnet_id}" --operation merge --tags ${AZURE_VNET_TAGS}
+  echo "az tag list --resource-id ${vnet_id}" > ${SHARED_DIR}/list_azure_existing_vnet_tags.sh
+fi
+
 if [ X"${RESTRICTED_NETWORK}" == X"yes" ]; then
     echo "Remove outbound internet access from the Network Security groups used for master and worker subnets"
     create_disconnected_network "${RESOURCE_GROUP}" "${clusterSubnetSNG}"

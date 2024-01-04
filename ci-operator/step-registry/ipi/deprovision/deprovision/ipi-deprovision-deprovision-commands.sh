@@ -26,12 +26,22 @@ export GOOGLE_CLOUD_KEYFILE_JSON=$CLUSTER_PROFILE_DIR/gce.json
 if [ -f "${SHARED_DIR}/gcp_min_permissions.json" ]; then
   echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the minimum permissions testing on GCP..."
   export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions.json"
+elif [ -f "${SHARED_DIR}/user_tags_sa.json" ]; then
+  echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the userTags testing on GCP..."
+  export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/user_tags_sa.json"
+elif [ -f "${SHARED_DIR}/xpn_min_perm_passthrough.json" ]; then
+  echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC..."
+  export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_min_perm_passthrough.json"
 fi
 export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
 export OVIRT_CONFIG=${SHARED_DIR}/ovirt-config.yaml
 
 if [[ "${CLUSTER_TYPE}" == "ibmcloud"* ]]; then
-  IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+  if [ -f "${SHARED_DIR}/ibmcloud-min-permission-api-key" ]; then
+    IC_API_KEY="$(< "${SHARED_DIR}/ibmcloud-min-permission-api-key")"
+  else
+    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+  fi
   export IC_API_KEY
 fi
 if [[ "${CLUSTER_TYPE}" == "vsphere"* ]]; then

@@ -1,36 +1,43 @@
 base_images:
-  base:
-    name: 4.15-priv
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.15"
+  ocp_4.16_base-rhel9:
+    name: 4.16-priv
     namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.21-openshift-4.16
 binary_build_commands: make manager
 build_root:
   from_repository: true
 canonical_go_repository: sigs.k8s.io/cluster-api-provider-azure
 images:
 - dockerfile_path: openshift/Dockerfile.openshift
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: azure-cluster-api-controllers
 promotion:
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':
@@ -50,6 +57,15 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-azure-techpreview
   optional: true
   steps:
@@ -62,6 +78,12 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-serial
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
+  container:
+    from: commitchecker
+  optional: true
 zz_generated_metadata:
   branch: master
   org: openshift-priv

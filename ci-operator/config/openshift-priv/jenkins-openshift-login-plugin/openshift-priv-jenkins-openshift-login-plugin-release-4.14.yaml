@@ -19,11 +19,12 @@ images:
     mvn --version
   to: jenkins-maven-builder
 promotion:
-  excluded_images:
-  - jenkins
-  - jenkins-maven-builder
-  name: 4.14-priv
-  namespace: ocp-private
+  to:
+  - excluded_images:
+    - jenkins
+    - jenkins-maven-builder
+    name: 4.14-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -52,6 +53,12 @@ tests:
     test:
     - ref: jenkins-sync-plugin-e2e
     workflow: ipi-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: ocptools-jenkins-openshift-login-plugin
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.14
   org: openshift-priv

@@ -6,20 +6,18 @@ set -o pipefail
 
 echo "************ vsphere assisted test-infra setup machine command ************"
 
-# ensure LEASED_RESOURCE is set
-if [[ -z "${LEASED_RESOURCE}" ]]; then
-  echo "Failed to acquire lease"
-  exit 1
-fi
+declare vsphere_cluster
+declare vsphere_portgroup
 
-export vsphere_cluster=""
-source $SHARED_DIR/vsphere_context.sh
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/vsphere_context.sh"
 
 # Ensures that the vsphere template exists.
-source ${SHARED_DIR}/govc.sh
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc.sh"
 mkdir -p build/govc
 export GOVMOMI_HOME=/home/assisted-test-infra/build/govc/
-govc object.collect /${GOVC_DATACENTER}/vm/assisted-test-infra-ci/assisted-test-infra-machine-template || { echo 'Assisted service ci template does not exist' ; exit 1; }
+govc object.collect "/${GOVC_DATACENTER}/vm/assisted-test-infra-ci/assisted-test-infra-machine-template" || { echo 'Assisted service ci template does not exist' ; exit 1; }
 
 # Cloning the template into a new CI VM.
 mkdir -p /home/assisted-test-infra/build/terraform
@@ -34,13 +32,14 @@ vsphere_password = "${GOVC_PASSWORD}"
 vsphere_datacenter = "${GOVC_DATACENTER}"
 vsphere_datastore = "${GOVC_DATASTORE}"
 vsphere_cluster = "${vsphere_cluster}"
-vsphere_network = "${LEASED_RESOURCE}"
+vsphere_network = "${vsphere_portgroup}"
 template_name = "assisted-test-infra-machine-template"
 build_id = "${BUILD_ID}"
 EOF
 
-terraform init -input=false
-terraform apply -var-file=vsphere-params.hcl -input=false -auto-approve
+export TF_LOG=DEBUG
+terraform init -input=false -no-color
+terraform apply -var-file=vsphere-params.hcl -input=false -auto-approve -no-color
 IP=$(terraform output ip_address)
 
 cd ..

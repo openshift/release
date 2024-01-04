@@ -62,7 +62,9 @@ v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
 # shellcheck disable=SC2034
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
-latest_version="v414"
+# shellcheck disable=SC2034
+v415=" ${v414} OperatorLifecycleManager CloudCredential"
+latest_version="v415"
 
 declare "v${ocp_major_version}${ocp_minor_version}"
 v_current_version="v${ocp_major_version}${ocp_minor_version}"
@@ -84,17 +86,27 @@ selected_capability="${vcurrent_capabilities_array[$selected_capability_index]}"
 echo "Selected capability to be disabled: ${selected_capability}"
 
 enabled_capabilities=${vcurrent_capabilities}
-if [[ ! "${selected_capability}" == "MachineAPI" ]]; then
-    enabled_capabilities=${enabled_capabilities/${selected_capability}}
-else
+case "${selected_capability}" in
+"MachineAPI")
     echo "WARNING: MachineAPI is selected, but it requires on IPI, so no capability to be disabled!"
-fi
-
-# Disable Build if ImageRegistry is selected to bo disabled
-if [[ "${selected_capability}" == "ImageRegistry" ]]; then
-    echo "Capability 'Build' depends on Capability 'ImageRegistry', so disable Build along with ImageRegistry"
-    enabled_capabilities=${enabled_capabilities/"Build"}
-fi
+    ;;
+# To be updated once OCP 4.16 is released
+"CloudCredential")
+    if [[ "${CLUSTER_TYPE}" =~ ^packet.*$|^equinix.*$ ]]; then
+        enabled_capabilities=${enabled_capabilities/${selected_capability}}
+    else
+        echo "WARNING: non-BareMetal platforms require CCO for OCP 4.15, so no capability to be disabled!"
+    fi
+    ;;
+# Disable marketplace if OperatorLifecycleManager is selected to bo disabled
+"OperatorLifecycleManager")
+    echo "Capability 'marketplace' depends on Capability 'OperatorLifecycleManager', so disable marketplace along with OperatorLifecycleManager"
+    enabled_capabilities=${enabled_capabilities/${selected_capability}}
+    enabled_capabilities=${enabled_capabilities/"marketplace"}
+    ;;
+*)
+    enabled_capabilities=${enabled_capabilities/${selected_capability}}
+esac
 
 # apply patch to install-config
 CONFIG="${SHARED_DIR}/install-config.yaml"

@@ -3,18 +3,18 @@ base_images:
     name: "4.15"
     namespace: origin
     tag: base
-  dev-scripts:
-    name: test
-    namespace: ocp-kni
-    tag: dev-scripts
-  ocp_4.10_cli:
+  ocp_4.15_cli:
     name: "4.15"
     namespace: ocp
     tag: cli
-  ocp_4.14_cli:
+  ocp_4.15_installer-terraform-providers:
     name: "4.15"
     namespace: ocp
-    tag: cli
+    tag: installer-terraform-providers
+  ocp_4.16_installer-terraform-providers:
+    name: "4.16"
+    namespace: ocp
+    tag: installer-terraform-providers
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -23,6 +23,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.15
+  ocp_builder_rhel-8-golang-1.20-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.16
 build_root:
   from_repository: true
 images:
@@ -32,9 +36,9 @@ images:
   dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_4.15_installer-terraform-providers:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
@@ -43,27 +47,26 @@ images:
   - name: TAGS
     value: scos
   dockerfile_path: images/installer-artifacts/Dockerfile.rhel
-  from: installer
+  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_4.15_installer-terraform-providers:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
+    ocp_4.16_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+    ocp_builder_rhel-8-golang-1.20-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
   to: installer-artifacts
 - build_args:
   - name: TAGS
     value: scos
   dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
   from: base
-  inputs:
-    ocp_4.10_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.10:cli
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: upi-installer
 - build_args:
   - name: TAGS
@@ -71,9 +74,12 @@ images:
   dockerfile_path: images/openstack/Dockerfile.ci
   from: base
   inputs:
-    ocp_4.14_cli:
+    ocp_4.15_cli:
       as:
-      - registry.ci.openshift.org/ocp/4.14:cli
+      - registry.ci.openshift.org/ocp/4.15:cli
+    ocp_4.15_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -84,16 +90,17 @@ images:
   dockerfile_path: images/baremetal/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_4.15_installer-terraform-providers:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: baremetal-installer
 promotion:
-  name: scos-4.15
-  namespace: origin
+  to:
+  - name: scos-4.15
+    namespace: origin
 releases:
   initial:
     integration:
@@ -159,7 +166,7 @@ tests:
   optional: true
 - as: e2e-aws-ovn
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: (fcos|scos|okd)
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
@@ -169,7 +176,8 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-aws-upgrade
+- always_run: false
+  as: e2e-aws-upgrade
   optional: true
   steps:
     cluster_profile: aws
@@ -184,22 +192,8 @@ tests:
   as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
-- as: e2e-agent-compact-ipv4
-  cluster: build05
-  optional: true
-  run_if_changed: /agent/
-  steps:
-    cluster_profile: equinix-ocp-metal
-    workflow: agent-e2e-compact-ipv4
-- as: e2e-agent-sno-ipv6
-  cluster: build05
-  optional: true
-  run_if_changed: /agent/
-  steps:
-    cluster_profile: equinix-ocp-metal
-    workflow: agent-e2e-sno-ipv6
 zz_generated_metadata:
   branch: master
   org: openshift

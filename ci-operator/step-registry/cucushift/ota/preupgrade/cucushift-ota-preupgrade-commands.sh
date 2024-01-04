@@ -21,13 +21,14 @@ function extract_oc(){
 }
 
 # Define the checkpoints/steps needed for the specific case
-function pre-ocp-66839(){
+function pre-OCP-66839(){
     if [[ "${BASELINE_CAPABILITY_SET}" != "None" ]]; then
         echo "Test Skipped: ${FUNCNAME[0]}"
         return 0
     fi
 
-    echo "Test Start: ${FUNCNAME[0]}"    
+    echo "Test Start: ${FUNCNAME[0]}"
+    extract_oc || return 1
     # Extract all manifests from live cluster with --included
     manifestsDir="/tmp/pre-include-manifest"
     mkdir "${manifestsDir}"
@@ -35,12 +36,15 @@ function pre-ocp-66839(){
         echo "Failed to extract manifests!"
         return 1
     fi
-    # There should not be any cap annotation in all extracted manifests 
-    curCap=$(grep -rh "capability.openshift.io/name:" "${manifestsDir}"|awk -F": " '{print $NF}'|sort -u)
-    if [[ "${curCap}" != "" ]]; then
-        echo "Caps in extracted manifests found: ${curCap}, but expected nothing"
+
+    # There should be only enabled cap annotaion in all extracted manifests
+    curCap=$(grep -rh "capability.openshift.io/name:" "${manifestsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
+    expectedCap=$(echo ${ADDITIONAL_ENABLED_CAPABILITIES} | sort -u|xargs)
+    if [[ "${curCap}" != "${expectedCap}" ]]; then
+        echo "Caps in extracted manifests found: ${curCap}, but expected ${expectedCap}"
         return 1
     fi
+
     # No featureset or only Default featureset annotation in all extarcted manifests
     curFS=$(grep -rh "release.openshift.io/feature-set:" "${manifestsDir}"|awk -F": " '{print $NF}'|sort -u)
     if [[ "${curFS}" != "Default" ]] && [[ "${curFS}" != "" ]]; then
@@ -64,21 +68,43 @@ function pre-ocp-66839(){
         echo "Failed to extract CRs from live cluster!"
         return 1
     fi
-    if grep -r "capability.openshift.io/name:" "${preCredsDir}"; then
-        echo "Extracted CRs has cap annotation, but expected nothing"
-        return 1
+
+    if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "" ]]; then
+        curCapInCR=$(grep -rh "capability.openshift.io/name:" "${preCredsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
+        if [[ "${curCapInCR}" != "${expectedCap}" ]]; then
+            echo "Extracted CRs has cap annotation: ${curCapInCR}, but expected ${expectedCap}"
+            return 1
+        fi
+    else
+        if grep -r "capability.openshift.io/name:" "${preCredsDir}"; then
+            echo "Extracted CRs has cap annotation, but expected nothing"
+            return 1
+        fi
     fi
+
     # Extract all CRs from tobe upgrade release payload with --included
     if ! oc adm release extract --to "${tobeCredsDir}" --included --credentials-requests "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"; then
         echo "Failed to extract CRs from tobe upgrade release payload!"
         return 1
     fi
     tobecap=$(grep -rh "capability.openshift.io/name:" "${tobeCredsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-    if [[ "${tobecap}" != "MachineAPI ImageRegistry" ]] && [[ "${tobecap}" != "ImageRegistry MachineAPI" ]]; then
-        echo "Tobe gained CRs with cap annotation: ${tobecap}, but expected: MachineAPI and ImageRegistry"
+    expectedCapCR=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST} | sort -u|xargs)
+    if [[ "${tobecap}" != "${expectedCapCR}" ]]; then
+        echo "CRs with cap annotation: ${tobecap}, but expected: ${expectedCapCR}"
         return 1
     fi
     echo "Test Passed: ${FUNCNAME[0]}"
+    return 0
+}
+
+function pre-OCP-24358(){
+    local pre_proxy_spec="${SHARED_DIR}/OCP-24358_spec_pre.out"
+    
+    oc get proxy -ojson | jq -r '.items[].spec' > "${pre_proxy_spec}"
+    if [[ ! -s "${pre_proxy_spec}" ]]; then
+        echo "Fail to get proxy spec!"
+        return 1
+    fi
     return 0
 }
 
@@ -91,18 +117,27 @@ function run_ota_multi_test(){
 
 # Run single case through case ID
 function run_ota_single_case(){
-    if ! type pre-ocp-"${1}" &>/dev/null; then
-        echo "Test Failed: pre-ocp-${1} due to no case id found!" >> "${report_file}"
+    if ! type pre-"${1}" &>/dev/null; then
+        echo "WARN: no pre-${1} function found" >> "${report_file}"
     else
-        pre-ocp-"${1}"
-        if [[ $? == 1 ]]; then
-            echo "Test Failed: pre-ocp-${1}" >> "${report_file}"
+        echo "------> ${1}"
+        pre-"${1}"
+        if [[ $? == 0 ]]; then
+            echo "PASS: pre-${1}" >> "${report_file}"
+        else
+            echo "FAIL: pre-${1}" >> "${report_file}"
         fi
-    fi 
+    fi
 }
+
+if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
+  exit 0
+fi
+
 report_file="${ARTIFACT_DIR}/ota-test-result.txt"
 export PATH=/tmp:${PATH}
-extract_oc
+which oc
+oc version --client
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
@@ -111,11 +146,8 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 set +e
-if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
-  exit 0
-elif [[ "${ENABLE_OTA_TEST}" == "true" ]]; then
+if [[ "${ENABLE_OTA_TEST}" == "true" ]]; then
   run_ota_multi_test
 else
   run_ota_single_case ${ENABLE_OTA_TEST}
 fi
-

@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: base
   dev-scripts:
@@ -8,15 +8,23 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   must-gather-base:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: must-gather
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+  ocp_4.16_base:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-8-golang-1.21-openshift-4.16
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.16
   tests-base:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: tests
 binary_build_commands: make build --warn-undefined-variables
@@ -25,11 +33,13 @@ build_root:
 canonical_go_repository: github.com/openshift/oc
 images:
 - dockerfile_path: images/cli/Dockerfile.rhel
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.16_base:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: cli
 - context_dir: images/tools
   from: cli
@@ -37,16 +47,16 @@ images:
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: tests-base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: tests
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: must-gather-base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: must-gather
 - context_dir: images/deployer
   dockerfile_path: Dockerfile.rhel
@@ -55,23 +65,27 @@ images:
 - dockerfile_path: images/cli-artifacts/Dockerfile.rhel
   from: cli
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cli-artifacts
 - context_dir: images/recycler/
   dockerfile_path: Dockerfile.rhel
   from: cli
   to: recycler
 promotion:
-  additional_images:
-    oc-rpms: rpms
-  excluded_images:
-  - tests
-  - must-gather
-  - oc-base-with-rpms
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - additional_images:
+      oc-rpms: rpms
+    excluded_images:
+    - tests
+    - must-gather
+    - oc-base-with-rpms
+    name: 4.16-priv
+    namespace: ocp-private
 raw_steps:
 - rpm_image_injection_step:
     from: base
@@ -79,12 +93,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':
@@ -171,6 +185,10 @@ tests:
         IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
+- as: security
+  optional: true
+  steps:
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift-priv

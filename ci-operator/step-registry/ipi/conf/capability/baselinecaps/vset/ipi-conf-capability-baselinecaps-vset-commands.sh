@@ -50,9 +50,10 @@ ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}
 v411_set="vCurrent v4.11"
 v412_set="${v411_set} v4.12"
 v413_set="${v412_set} v4.13"
-# shellcheck disable=SC2034
 v414_set="${v413_set} v4.14"
-latest_version_set="v414_set"
+# shellcheck disable=SC2034
+v415_set="${v414_set} v4.15"
+latest_version_set="v415_set"
 
 declare "v${ocp_major_version}${ocp_minor_version}_set"
 v_current_version="v${ocp_major_version}${ocp_minor_version}_set"
@@ -81,6 +82,19 @@ cat > "${PATCH}" << EOF
 capabilities:
   baselineCapabilitySet: ${selected_cap_set}
 EOF
+
+#To enable required capablities whatever baselineCapabilitySet setting
+if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "" ]]; then
+    echo "Enable required capabilities: ${ADDITIONAL_ENABLED_CAPABILITIES}"
+    cat >> "${PATCH}" << EOF
+  additionalEnabledCapabilities:
+EOF
+    for item in ${ADDITIONAL_ENABLED_CAPABILITIES}; do
+        cat >> "${PATCH}" << EOF
+    - ${item}
+EOF
+    done
+fi
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 cat ${PATCH}

@@ -18,30 +18,18 @@ AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
     az cloud set --name AzureUSGovernment
 elif [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
-    if [ ! -f "${CLUSTER_PROFILE_DIR}/cloud_name" ]; then
-        echo "Unable to get specific ASH cloud name!"
-        exit 1
-    fi
-    cloud_name=$(< "${CLUSTER_PROFILE_DIR}/cloud_name")
-
-    AZURESTACK_ENDPOINT=$(cat "${SHARED_DIR}"/AZURESTACK_ENDPOINT)
-    SUFFIX_ENDPOINT=$(cat "${SHARED_DIR}"/SUFFIX_ENDPOINT)
-
-    if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
-        cp "${CLUSTER_PROFILE_DIR}/ca.pem" /tmp/ca.pem
-        cat /usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem >> /tmp/ca.pem
-        export REQUESTS_CA_BUNDLE=/tmp/ca.pem
-    fi
-    az cloud register \
-        -n ${cloud_name} \
-        --endpoint-resource-manager "${AZURESTACK_ENDPOINT}" \
-        --suffix-storage-endpoint "${SUFFIX_ENDPOINT}"
-    az cloud set --name ${cloud_name}
-    az cloud update --profile 2019-03-01-hybrid
+    # Login using the shared dir scripts created in the ipi-conf-azurestack-commands.sh
+    chmod +x "${SHARED_DIR}/azurestack-login-script.sh"
+    source ${SHARED_DIR}/azurestack-login-script.sh
 else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+
+list_vnet_tags="${SHARED_DIR}/list_azure_existing_vnet_tags.sh"
+if [ -f "${list_vnet_tags}" ]; then
+    sh -x "${list_vnet_tags}"
+fi
 
 remove_resources_by_cli="${SHARED_DIR}/remove_resources_by_cli.sh"
 if [ -f "${remove_resources_by_cli}" ]; then

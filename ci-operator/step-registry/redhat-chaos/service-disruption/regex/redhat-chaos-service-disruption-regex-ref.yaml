@@ -1,0 +1,56 @@
+ref:
+  as: redhat-chaos-service-disruption-regex
+  from_image:
+    namespace: chaos
+    name: krkn
+    tag: latest
+  commands: redhat-chaos-service-disruption-regex-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aws-chaos
+    mount_path: /secret/telemetry
+  env:
+  - name: TARGET_NAMESPACE
+    default: "openshift-.*$"
+  - name: ACTION
+    default: "delete"
+  - name: SLEEP
+    default: "25"
+  - name: DELETE_COUNT
+    default: "1"
+  - name: RUNS
+    default: "1"
+  - name: ENABLE_ALERTS
+    default: "True"
+  - name: ALERTS_PATH
+    default: "/root/kraken/config/alerts"
+  - name: CHECK_CRITICAL_ALERTS
+    default: "True"
+  - name: WAIT_DURATION
+    default: "600"
+  - name: TELEMETRY_ENABLED
+    default: "True"
+  - name: TELEMETRY_API_URL
+    default: "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production"
+  - name: TELEMETRY_USERNAME
+    default: "redhat-chaos"
+  - name: TELEMETRY_RUN_TAG
+    default: "prow-regex-service-disruption"
+  - name: TELEMETRY_PROMETHEUS_BACKUP
+    default: "True"
+  - name: TELEMETRY_FULL_PROMETHEUS_BACKUP
+    default: "True"
+  - name: TELEMTRY_BACKUP_THREADS
+    default: "5"
+  - name: TELEMETRY_ARCHIVE_PATH
+    default: "/tmp"
+  - name: TELEMETRY_MAX_RETRIES
+    default: "0"
+  - name: TELEMETRY_ARCHIVE_SIZE
+    default: "1000000"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the krkn-hub config workload to disrupt entire regex fleet by deleting all the pods and checks its recovery/health

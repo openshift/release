@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build05
+    cluster: build02
     context: ci/prow/e2e-agnostic-ovn-cmd
     decorate: true
     labels:
@@ -1505,7 +1505,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build05
+    cluster: build02
     context: ci/prow/e2e-azure
     decorate: true
     labels:
@@ -1584,7 +1584,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build05
+    cluster: build02
     context: ci/prow/e2e-azure-ovn-etcd-scaling
     decorate: true
     labels:
@@ -1658,6 +1658,86 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure-ovn-etcd-scaling,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build01
+    context: ci/prow/e2e-baremetalds-kubevirt
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.16-e2e-baremetalds-kubevirt
+    optional: true
+    rerun_command: /test e2e-baremetalds-kubevirt
+    run_if_changed: ^test/extended/kubevirt/.*
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-baremetalds-kubevirt-cluster-profile
+        - --target=e2e-baremetalds-kubevirt
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-baremetalds-kubevirt-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-equinix-ocp-metal
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-baremetalds-kubevirt,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -1834,7 +1914,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.16-e2e-gcp-fips-serial
@@ -1894,9 +1974,9 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-gcp
+              name: cluster-secrets-gcp-3
           - configMap:
-              name: cluster-profile-gcp
+              name: cluster-profile-gcp-3
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2497,7 +2577,7 @@ presubmits:
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp-openshift-gce-devel-ci-2
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.16-e2e-gcp-ovn-upgrade
@@ -2556,9 +2636,9 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-gcp-openshift-gce-devel-ci-2
+              name: cluster-secrets-gcp-3
           - configMap:
-              name: cluster-profile-gcp-openshift-gce-devel-ci-2
+              name: cluster-profile-gcp-3
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2664,7 +2744,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.16-e2e-metal-ipi-ovn-ipv6
-    optional: true
     rerun_command: /test e2e-metal-ipi-ovn-ipv6
     spec:
       containers:
@@ -3212,12 +3291,12 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: vsphere
+    cluster: vsphere02
     context: ci/prow/e2e-vsphere
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.16-e2e-vsphere
@@ -3291,12 +3370,12 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: vsphere
+    cluster: vsphere02
     context: ci/prow/e2e-vsphere-ovn-etcd-scaling
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-origin-release-4.16-e2e-vsphere-ovn-etcd-scaling
@@ -3370,7 +3449,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build05
+    cluster: build02
     context: ci/prow/images
     decorate: true
     labels:
@@ -3385,7 +3464,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -3424,7 +3502,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build05
+    cluster: build02
     context: ci/prow/lint
     decorate: true
     labels:
@@ -3477,7 +3555,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build05
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     labels:
@@ -3530,7 +3608,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build05
+    cluster: build02
     context: ci/prow/verify
     decorate: true
     labels:
@@ -3583,7 +3661,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build05
+    cluster: build02
     context: ci/prow/verify-deps
     decorate: true
     labels:

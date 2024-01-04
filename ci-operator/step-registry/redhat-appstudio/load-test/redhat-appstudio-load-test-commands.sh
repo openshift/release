@@ -8,7 +8,7 @@ export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
 
 export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN QUAY_OAUTH_TOKEN_RELEASE_SOURCE QUAY_OAUTH_TOKEN_RELEASE_DESTINATION OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
-    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT BYOC_KUBECONFIG GITHUB_TOKENS_LIST OAUTH_REDIRECT_PROXY_URL
+    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT BYOC_KUBECONFIG GITHUB_TOKENS_LIST OAUTH_REDIRECT_PROXY_URL PUSHGATEWAY_URL
 
 DEFAULT_QUAY_ORG=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/default-quay-org)
 DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/default-quay-org-token)
@@ -26,6 +26,7 @@ PYXIS_STAGE_CERT=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pyxis-stage-cer
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 PREVIOUS_RATE_REMAINING=0
+PUSHGATEWAY_URL="$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/pushgateway-url)"
 
 # user stored: username:token,username:token
 IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<<"$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/github_accounts)"

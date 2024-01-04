@@ -22,10 +22,11 @@ images:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: registration-operator
 promotion:
-  additional_images:
-    registration-operator-src: src
-  name: "1.0"
-  namespace: stolostron
+  to:
+  - additional_images:
+      registration-operator-src: src
+    name: "1.0"
+    namespace: stolostron
 releases:
   initial:
     integration:
@@ -69,28 +70,6 @@ tests:
   commands: make test-integration
   container:
     from: test-bin
-- as: e2e
-  steps:
-    cluster_profile: aws
-    test:
-    - as: operator-e2e-test
-      commands: |
-        KUBECTL=oc
-        REGISTRATION_TAG=backplane-1.0
-        WORK_TAG=backplane-1.0
-        PLACEMENT_TAG=backplane-1.0
-        PATH=.:$PATH
-        export KUBECTL PATH REGISTRATION_TAG WORK_TAG PLACEMENT_TAG
-        make test-e2e
-      dependencies:
-      - env: IMAGE_NAME
-        name: registration-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: openshift-e2e-aws
 - as: publish
   postsubmit: true
   steps:

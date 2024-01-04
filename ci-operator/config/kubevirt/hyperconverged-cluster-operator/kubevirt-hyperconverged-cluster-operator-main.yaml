@@ -765,6 +765,117 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-azure
+- as: hco-e2e-consecutive-operator-sdk-upgrades-aws
+  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+  steps:
+    cluster_profile: aws-virtualization
+    dependencies:
+      OO_BUNDLE: hco-bundle-reg-prev
+    env:
+      BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
+      INITIAL_VERSION: 1.10.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+    test:
+    - as: deploy-cr
+      commands: |
+        export OUTPUT_DIR=${SHARED_DIR}
+        export CMD=oc
+        source ./hack/compare_scc.sh
+        dump_sccs_before
+        # compressing the SCC files into one tar file, as the CI does not support sub-directories in the  SHARED_DIR
+        tar -C "${SHARED_DIR}" -czvf "${SHARED_DIR}/scc.tar.gz" scc/
+        KVM_EMULATION=true make deploy_cr
+      from: hco-oc-bin-operator-sdk-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: consecutive-upgrade-bundle
+      commands: |
+        # un-compressing to get all the original SCC files from the previous phase
+        tar -C "${SHARED_DIR}" -xzvf "${SHARED_DIR}/scc.tar.gz"
+        OUTPUT_DIR=${SHARED_DIR} make consecutive-upgrades-test
+      dependencies:
+      - env: OO_MID_BUNDLE
+        name: hco-bundle
+      - env: OO_LAST_BUNDLE
+        name: hco-upgrade-operator-sdk-bundle
+      env:
+      - name: INITIAL_VERSION
+      from: hco-oc-bin-operator-sdk-image
+      grace_period: 45m0s
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: e2e-test
+      commands: |
+        make functest
+      dependencies:
+      - env: FUNCTEST_IMAGE
+        name: hyperconverged-cluster-functest
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-operator-sdk-aws
+- as: hco-e2e-consecutive-operator-sdk-upgrades-azure
+  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+  steps:
+    cluster_profile: azure-virtualization
+    dependencies:
+      OO_BUNDLE: hco-bundle-reg-prev
+    env:
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
+      INITIAL_VERSION: 1.10.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_INSTALL_TIMEOUT_MINUTES: "15"
+    test:
+    - as: deploy-cr
+      commands: |
+        export OUTPUT_DIR=${SHARED_DIR}
+        export CMD=oc
+        source ./hack/compare_scc.sh
+        dump_sccs_before
+        # compressing the SCC files into one tar file, as the CI does not support sub-directories in the  SHARED_DIR
+        tar -C "${SHARED_DIR}" -czvf "${SHARED_DIR}/scc.tar.gz" scc/
+        make deploy_cr
+      from: hco-oc-bin-operator-sdk-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: consecutive-upgrade-bundle
+      commands: |
+        # un-compressing to get all the original SCC files from the previous phase
+        tar -C "${SHARED_DIR}" -xzvf "${SHARED_DIR}/scc.tar.gz"
+        OUTPUT_DIR=${SHARED_DIR} make consecutive-upgrades-test
+      dependencies:
+      - env: OO_MID_BUNDLE
+        name: hco-bundle
+      - env: OO_LAST_BUNDLE
+        name: hco-upgrade-operator-sdk-bundle
+      env:
+      - name: INITIAL_VERSION
+      from: hco-oc-bin-operator-sdk-image
+      grace_period: 45m0s
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: e2e-test
+      commands: |
+        make functest
+      dependencies:
+      - env: FUNCTEST_IMAGE
+        name: hyperconverged-cluster-functest
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-operator-sdk-azure
 - as: hco-e2e-deploy-nightly-main-aws
   cron: 2 4 * * *
   steps:

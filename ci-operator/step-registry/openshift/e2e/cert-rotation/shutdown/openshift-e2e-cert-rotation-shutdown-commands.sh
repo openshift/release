@@ -66,14 +66,6 @@ echo "Wrote control_node_ips: $(cat /srv/control_node_ips), compute_node_ips: $(
 # Error: initializing source ...: tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time ... is after <now + 6m>"
 run-on-all-nodes "podman pull --authfile /var/lib/kubelet/config.json registry.redhat.io/rhel8/support-tools:latest"
 
-# Disable telemeter - its unable to upload snapshots due to significant time skews
-run-on-first-master "
-  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
-  echo "telemeterClient:" > /tmp/config.yaml
-  echo "  enabled: false" >> /tmp/config.yaml
-  oc create configmap cluster-monitoring-config -n openshift-monitoring --from-file=config.yaml=/tmp/config.yaml
-"
-
 # Stop chrony service on all nodes
 run-on-all-nodes "systemctl disable chronyd --now"
 
@@ -92,6 +84,9 @@ run-on-all-nodes "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/defau
 # Shutdown nodes
 mapfile -d ' ' -t VMS < <( virsh list --all --name )
 for vm in ${VMS[@]}; do
+  if [[ "${vm}" == "minikube" ]]; then
+    continue
+  fi
   virsh shutdown ${vm}
   until virsh domstate ${vm} | grep "shut off"; do
     echo "${vm} still running"
@@ -106,6 +101,9 @@ sudo timedatectl status
 
 # Start nodes again
 for vm in ${VMS[@]}; do
+  if [[ "${vm}" == "minikube" ]]; then
+    continue
+  fi
   virsh start ${vm}
   until virsh domstate ${vm} | grep "running"; do
     echo "${vm} still not yet running"
