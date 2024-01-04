@@ -72,5 +72,6 @@ EOF
 
 #Execute Quay DAST Testing
 cp config-zap-template-prwoci.yaml config || true
-pip3 install -r requirements.txt || true
+sleep 900
+pip install -r requirements.txt || true
 ./rapidast.py --config ./config/config-zap-template-prwoci.yaml || true
