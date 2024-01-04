@@ -5,6 +5,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ ! -f "${SHARED_DIR}/hypershift-dr-worker-node-name" ]] ; then
+  echo "${SHARED_DIR}/hypershift-dr-worker-node-name" file not found, skip step
+  exit 0
+fi
+
 echo "get mgmt cluster's kubeconfig"
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 if test -s "${SHARED_DIR}/mgmt_kubeconfig" ; then
@@ -15,8 +20,8 @@ node_name=$(cat "${SHARED_DIR}/hypershift-dr-worker-node-name")
 instance_id=$(cat "${SHARED_DIR}/hypershift-dr-worker-instance-id")
 
 status=$(oc get no ${node_name} -ojsonpath='{.status.conditions[?(@.type=="Ready")].status}')
-if [[ "${status}" == "True"  ]] ; then
-  echo "worker node ${node_name} has been recovered, skip this step"
+if [[ "X${status}" == "X" || "${status}" == "True"  ]] ; then
+  echo "worker node ${node_name} could not found or it has been recovered, skip this step"
   exit 0
 fi
 
