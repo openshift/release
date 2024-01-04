@@ -101,6 +101,9 @@ cd "${REPO_DIR}"
 
 # Get assisted logs
 export LOGS_DEST=/tmp/artifacts
+echo "export HYPERSHIFT_IMAGE=${HYPERSHIFT_IMAGE}" >> /root/config
+source /root/config
+
 deploy/operator/gather.sh
 
 EOF
