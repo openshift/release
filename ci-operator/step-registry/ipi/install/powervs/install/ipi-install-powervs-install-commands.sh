@@ -345,7 +345,11 @@ function init_ibmcloud() {
     exit 1
   fi
 
-  SERVICE_INSTANCE_CRN="$(ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .crn')"
+  # BUG, this:
+  #  ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .crn'
+  # does not always return a match!  This also is likely to fail:
+  #  ibmcloud pi service-list --json | jq -r '.[] | select(.CRN|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .CRN'
+  SERVICE_INSTANCE_CRN="$(ibmcloud resource search "crn:*${POWERVS_SERVICE_INSTANCE_ID}*" --output json | jq -r '.items[].crn')"
   if [ -z "${SERVICE_INSTANCE_CRN}" ]; then
     echo "Error: SERVICE_INSTANCE_CRN is empty!"
     exit 1
