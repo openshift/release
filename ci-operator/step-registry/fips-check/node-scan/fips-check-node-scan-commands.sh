@@ -76,7 +76,7 @@ oc --request-timeout=300s -n "$project" debug node/"$master_node_0" -- chroot /h
 out=$(oc --request-timeout=300s -n "$project" debug node/"$master_node_0" -- chroot /host bash -c "cat /$report" || true)
 echo "The report is: $out"
 oc delete ns $project || true
-res=$(echo $out | grep -E 'Failure Report|Successful run with warnings|Warning Report')
+res=$(echo "$out" | grep -E 'Failure Report|Successful run with warnings|Warning Report' || true)
 if [[ -n $res ]];then
     echo "The result is: $res"
     pass=false
@@ -96,10 +96,10 @@ EOF
 else
     cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
     <testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="$SECONDS">
-        <testcase name="${subteam}:Node scan of fips check should succeedded or skipped"/>
+        <testcase name="${subteam}:Node scan of fips check should succeedded or skipped">
             <failure message="">
-                Node scan failed due to errors or warnings.
-                $res
+                Node scan failed due to errors or warnings:
+                <![CDATA[$res]]>
             </failure>
         </testcase>
     </testsuite>
