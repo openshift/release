@@ -301,3 +301,31 @@ items:
   - kind: ServiceAccount
     name: ci-operator
     namespace: ci
+
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: route-getter
+    namespace: openshift-image-registry
+  rules:
+  - apiGroups:
+    - "route.openshift.io"
+    resources:
+    - routes
+    verbs:
+    - get
+    - list
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: route-getter
+    namespace: openshift-image-registry
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: route-getter
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
