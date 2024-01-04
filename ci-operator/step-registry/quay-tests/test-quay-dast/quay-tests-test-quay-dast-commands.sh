@@ -7,7 +7,7 @@ QUAY_ACCESS_TOKEN=$(cat /var/run/quay-qe-stagequayio-secret/oauth2token)
 QUAY_OAUTH2_TOEKN="Bearer $QUAY_ACCESS_TOKEN"
 
 echo "The current ZAP Version is:"
-mkdir -p zap_test_version && zap.sh -dir zap_test_version -version
+cd /tmp && mkdir -p zap_test_version && zap.sh -dir zap_test_version -version
 
 #Clone Redhat Rapidast Repository
 echo "Clone Redhat Rapidast Repository..."
