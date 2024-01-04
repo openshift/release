@@ -48,7 +48,7 @@ else
 fi
 
 cd "$(mktemp -d)"
-git clone --branch master https://github.com/openshift-pipelines/performance.git .
+git clone --branch main https://github.com/openshift-pipelines/performance.git .
 
 # Collect load test results at the end
 trap './ci-scripts/collect-results.sh; trap EXIT' SIGINT EXIT
