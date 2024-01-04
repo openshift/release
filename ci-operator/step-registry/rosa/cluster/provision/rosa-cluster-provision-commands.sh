@@ -358,7 +358,7 @@ fi
 SECURITY_GROUP_ID_SWITCH=""
 if [[ "$ADDITIONAL_SECURITY_GROUP" == "true" ]]; then
   SECURITY_GROUP_IDs=$(cat ${SHARED_DIR}/security_groups_ids | xargs |sed 's/ /,/g')
-  SECURITY_GROUP_ID_SWITCH="--additional-compute-security-group-ids ${SECURITY_GROUP_IDs}"
+  SECURITY_GROUP_ID_SWITCH="--additional-compute-security-group-ids ${SECURITY_GROUP_IDs} --additional-infra-security-group-ids ${SECURITY_GROUP_IDs} --additional-control-plane-security-group-ids ${SECURITY_GROUP_IDs}"
   record_cluster "security_groups" "enabled" ${SECURITY_GROUP_IDs}
 fi
 
