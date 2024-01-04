@@ -48,7 +48,7 @@ else
 fi
 
 cd "$(mktemp -d)"
-git clone --branch master https://github.com/openshift-pipelines/performance.git .
+git clone --branch main https://github.com/openshift-pipelines/performance.git .
 
 # Setup Tekton cluster
 ./ci-scripts/setup-cluster.sh
