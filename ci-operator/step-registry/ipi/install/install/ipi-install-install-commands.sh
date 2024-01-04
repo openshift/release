@@ -513,7 +513,12 @@ gcp)
     fi
     ;;
 ibmcloud*)
-    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    if [ -f "${SHARED_DIR}/ibmcloud-min-permission-api-key" ]; then
+      IC_API_KEY="$(< "${SHARED_DIR}/ibmcloud-min-permission-api-key")"
+      echo "using the specified key for minimal permission!!"
+    else
+      IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    fi
     export IC_API_KEY
     ;;
 alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini;;
