@@ -38,12 +38,6 @@ general:
       #value_from_var: "EXPORTED_TOKEN"
       value: "${QUAY_OAUTH2_TOEKN}"
   container:
-    # This configures what technology is to be used for RapiDAST to run each scanner.
-    # Currently supported: `podman`, `flatpak` and `none`
-    #   podman: RapiDAST runs each scanner using podman
-    #   flatpak: RapiDAST runs each scanner using flatpak
-    #   none: RapiDAST runs each scanner in the same host or container (where RapiDAST itself is running in a container)
-    # When undefined, relies on rapidast-defaults.yaml, or `podman` if nothing is set
     type: "none"
 scanners:
   zap:
@@ -68,4 +62,4 @@ EOF
 
 cp config-zap-prowci.yaml config || true
 ./rapidast.py --config ./config/config-zap-prowci.yaml || true
-cp ./results/**/zap/zap-report.json $ARTIFACT_DIR/quay_dast_testing_report.json || true
+cp ./results/**/zap-report.json $ARTIFACT_DIR || true
