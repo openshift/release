@@ -6,16 +6,16 @@ QUAY_ACCESS_TOKEN=$(cat /var/run/quay-qe-stagequayio-secret/oauth2token)
 QUAY_OAUTH2_TOEKN="Bearer $QUAY_ACCESS_TOKEN"
 
 echo "The current ZAP Version is:"
-#zap.sh -version
+zap.sh -version
 
 echo "Clone Redhat Rapidast Repository..."
 cd /tmp && git clone https://github.com/RedHatProductSecurity/rapidast.git && cd rapidast || true
 
 echo "Generating Quay OpenAPI File..."
 curl https://stage.quay.io/api/v1/discovery > quay.json || true
-cat quay.json | jq > openapi.json && cp openapi.json $ARTIFACT_DIR || true
+cat quay.json | jq > quay_openapi.json && cp quay_openapi.json $ARTIFACT_DIR || true
 
-cat >>config-zap-template-prwoci.yaml <<EOF
+cat >>config-zap-prwoci.yaml <<EOF
 config:
   # WARNING: `configVersion` indicates the schema version of the config file.
   # This value tells RapiDAST what schema should be used to read this configuration.
@@ -66,6 +66,5 @@ scanners:
       additionalAddons: "ascanrulesBeta"
 EOF
 
-cp config-zap-template-prwoci.yaml config || true
-sleep 900
-./rapidast.py --config ./config/config-zap-template-prwoci.yaml || true
+cp config-zap-prwoci.yaml config || true
+./rapidast.py --config ./config/config-zap-prwoci.yaml || true
