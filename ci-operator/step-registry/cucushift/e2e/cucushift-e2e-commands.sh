@@ -46,6 +46,26 @@ function filter_test_by_version() {
     fi
     echo_e2e_tags
 }
+function filter_test_by_arch() {
+    local node_archs arch_tags
+    mapfile -t node_archs < <(oc get nodes -o yaml | yq '.items[].status.nodeInfo.architecture' | sort -u)
+    arch_tags="${node_archs[*]/#/ and @}"
+    case "${#node_archs[@]}" in
+        0)
+            echo "=========================="
+            echo "Error: got unexpected arch"
+            oc get nodes -o yaml
+            echo "=========================="
+            ;;
+        1)
+            export E2E_RUN_TAGS="${E2E_RUN_TAGS} ${arch_tags[*]}"
+            ;;
+        *)
+            export E2E_RUN_TAGS="${E2E_RUN_TAGS} ${arch_tags[*]} and @heterogeneous"
+            ;;
+    esac
+    echo_e2e_tags
+}
 function filter_test_by_network() {
     local networktype
     networktype="$(oc get network.config/cluster -o yaml | yq '.spec.networkType')"
@@ -84,6 +104,7 @@ function filter_test_by_fips() {
 }
 function filter_tests() {
     filter_test_by_version
+    filter_test_by_arch
     filter_test_by_network
     filter_test_by_sno
     filter_test_by_fips
