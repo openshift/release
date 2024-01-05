@@ -88,13 +88,26 @@ tests:
           cpu: 100m
     workflow: openshift-e2e-aws
 - as: e2e-gcp-ovn-techpreview
-  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
+- as: e2e-openstack-capi-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: hack/e2e-openstack.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
 - as: e2e-gcp-capi-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
