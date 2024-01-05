@@ -90,15 +90,19 @@ cd "$(mktemp -d)"
 git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
 git version
 
+export PR=3006
+echo PR
+echo $PR
+
 echo PULL_NUMBER
 echo $PULL_NUMBER
-UPGRADE_BRANCH=$(curl -s "https://api.github.com/repos/redhat-appstudio/infra-deployments/pulls/${PULL_NUMBER}" | jq -r .head.ref)
+UPGRADE_BRANCH=$(curl -s "https://api.github.com/repos/redhat-appstudio/infra-deployments/pulls/${PR}" | jq -r .head.ref)
 echo UPGRADE_BRANCH
 echo $UPGRADE_BRANCH
 
 export UPGRADE_BRANCH
 
-REPO_URL=$(curl -s "https://api.github.com/repos/redhat-appstudio/infra-deployments/pulls/${PULL_NUMBER}" | jq -r .head.repo.html_url)
+REPO_URL=$(curl -s "https://api.github.com/repos/redhat-appstudio/infra-deployments/pulls/${PR}" | jq -r .head.repo.html_url)
 OWNER=$(echo $REPO_URL | sed 's|https://github.com/||' | sed 's|/infra-deployments||'  )
 
 echo UPGRADE_FORK_ORGANIZATION
