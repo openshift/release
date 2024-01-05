@@ -6,7 +6,7 @@ QUAY_ACCESS_TOKEN=$(cat /var/run/quay-qe-stagequayio-secret/oauth2token)
 QUAY_OAUTH2_TOEKN="Bearer $QUAY_ACCESS_TOKEN"
 
 echo "The current ZAP Version is:"
-zap.sh -version
+#zap.sh -version
 
 echo "Clone Redhat Rapidast Repository..."
 git clone https://github.com/RedHatProductSecurity/rapidast.git && cd rapidast || true
@@ -67,4 +67,5 @@ scanners:
 EOF
 
 cp config-zap-template-prwoci.yaml config || true
+sleep 900
 ./rapidast.py --config ./config/config-zap-template-prwoci.yaml || true
