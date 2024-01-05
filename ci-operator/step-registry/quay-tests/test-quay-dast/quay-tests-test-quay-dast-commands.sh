@@ -62,4 +62,4 @@ EOF
 
 cp config-zap-prowci.yaml config || true
 ./rapidast.py --config ./config/config-zap-prowci.yaml || true
-cp ./results/**/zap-report.json $ARTIFACT_DIR || true
+mv results $ARTIFACT_DIR || true
