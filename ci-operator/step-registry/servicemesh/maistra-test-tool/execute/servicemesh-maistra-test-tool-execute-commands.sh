@@ -9,7 +9,7 @@ OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."
 # OCP_CRED_USR="kubeadmin"
 # OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
 
-# export OCP_API_URL
+export OCP_API_URL
 # export OCP_CRED_USR
 # export OCP_CRED_PSW
 sleep 1800
