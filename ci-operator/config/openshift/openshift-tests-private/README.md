@@ -3,17 +3,36 @@ The intention of creating the Prow job naming regulation is to make sure we name
 # Job Configuration Location
 In https://github.com/openshift/release.git under the *ci-operator/config/openshift/openshift-tests-private* directory
 
-# File Naming
+## Configuration File Types
+There are two types of Prow configuration files under *openshift-tests-private*:
+- Infrastructure file
+  - This kind of file do not define test cases
+  - These files are used to setup test environment, like creating images in image stream
+  - There are two types of infrastructure files:
+    - Pre-merge files: these files will be triggered when image file changes are submitted, it will generate new images or update existing images in image stream against the change in image file. Pre-merge file name like: *openshift-openshift-tests-private-release-4.15.yaml*
+    - Image files: these files define images,and export images into image stream. Image file name like: *openshift-openshift-tests-private-release-4.15__images.yaml*
+- Test case config file
+  - We define test cases in these kind of files.
+  - There are two kind of test files: E2E tests and Upgrade Tests.
+  - Tests will be triggered periodically against its settings.
+
+## E2E Test File Naming
 All E2E jobs under the job configuration location should have a consistent file naming rule as openshift-openshift-tests-private-release-VERSION__ARCH-STREAM.yaml, we will break down this to detail:
-- VERSION: the OCP version, namely 4.10, 4.11, 4.12..
-- ARCH: architecture of the OCP build, valid values are: amd64, arm64, multi
+- VERSION: the OCP version, namely 4.14, 4.15, 4.16...
+- ARCH: architecture of the OCP build, valid values are: amd64, arm64, multi, ppc64le
 - STREAM: the release stream, valid values are: nightly, stable
 
 Example: **openshift-openshift-tests-private-release-4.12__arm64-nightly.yaml**: a 4.12 job that runs tests for ocp 4.12 nightly in arm64 architecture.
 
+## Upgrade Test File Naming
+Upgrade jobs have same location as E2E files but different file naming.
+Upgrade job file naming rule is:
+openshift-openshift-tests-private-release-VERSION__ARCH-TargetStream-TargetVersion-upgrade-from-InitStream-InitVersion
 
-# Job Naming
-All E2E jobs under the job configuration location should have a consistent file naming rule as e2e-PLATFORM-INSTALLMETHOD-CONFIG1-CONFIG2-CONFIG*-FREQUENCY
+For example: **openshift-openshift-tests-private-release-4.15__multi-nightly-4.15-upgrade-from-stable-4.14.yaml**
+
+## Job Naming
+All jobs under the job configuration location should have a consistent file naming rule as e2e-PLATFORM-INSTALLMETHOD-CONFIG1-CONFIG2-CONFIG*-FREQUENCY
 
 - PLATFORM: the platform to run e2e, valid values are: alicloud, aws, azure, baremetal, gcp, ibmcloud, nutanix, openstack, vsphere
 - INSTALLMETHOD: valid values are: ipi, upi
@@ -23,7 +42,7 @@ All E2E jobs under the job configuration location should have a consistent file 
 Example: **e2e-aws-ipi-ovn-ipsec-f1**: runs e2e tests on profile aws ipi with ovn, ipsec, and test frequency is f1 (daily)
 
 
-# Job Frequency
+## Job Frequency
 Job frequency is defined by cron according to the test requirements
 - f1: daily
 - f2: every 2 days
@@ -31,6 +50,76 @@ Job frequency is defined by cron according to the test requirements
 - f4: every 4 days
 - f5: every 5 days
 - ...
+
+~~~
+NOTE: We can use below script to generate cron settings against the frequency:
+      ci-operator/config/openshift/openshift-tests-private/tools/generate-cron-entry.sh
+~~~
+
+# Installer (base_images)
+Available installers can be found in: ci-operator/config/openshift/installer
+Examples:
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
+
+  openstack-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: openstack-installer
+
+# releases:
+The releases configuration option allows specification of a version of OpenShift that a component will be tested on.
+For details, please refer [Testing With an Ephemeral OpenShift Release](https://docs.ci.openshift.org/docs/architecture/ci-operator/#testing-with-an-ephemeral-openshift-release)
+
+## For E2E test
+latest: latest release describes the version that will be installed before tests are run.
+
+## For Upgrade Test
+initial: initial release describes the version of OpenShift which is initially installed, after which an upgrade is executed to the latest release, after which tests are run.
+latest: upgrade to version.
+
+## For non-amd64 tests, we have to keep latest and target settings as test framework need them.
+
+## Suggest to use fast channel as the init installed payload for upgrade tests
+
+## Examples
+###  Below is the script used to get a stable/ec build
+Get payload from release page(a release page like https://amd64.ocp.releases.ci.openshift.org/)
+```
+releases:
+  latest: # User defined name, can be accessed in all test steps
+    # Below is Prow definde structure
+    prerelease: # references a version known to a release controller (release page)
+      architecture: arm64   # amd64, arm64, multi, ppc64le
+      product: ocp
+      version_bounds:   # find latest version >= lower and < upper
+        lower: 4.14.0-0
+        upper: 4.15.0-0
+```
+get payload from channel
+```
+releases:
+  arm64-latest:
+    # Below is Prow definde structure
+    release:    # references a version from Red Hat's Cincinnati update service https://api.openshift.com/api/upgrades_info/v1/graph
+      architecture: arm64
+      channel: fast # candidate, fast, stable, eus
+      version: "4.12"
+```
+### Below is the script used to get a nightly/ci build
+```
+releases:
+  previous: # anything is accepted here, it can be override in the tests
+    # Below is Prow definde structure
+    candidate:
+      product: ocp
+      architecture: amd64
+      stream: nightly     # specifies a candidate release stream
+      version: "4.5"
+      relative: 1         # resolves to the Nth latest payload in this stream
+```
 
 
 # Trigger a new test for an existing periodic job in Prow
