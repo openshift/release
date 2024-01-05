@@ -68,3 +68,4 @@ EOF
 
 cp config-zap-prowci.yaml config || true
 ./rapidast.py --config ./config/config-zap-prowci.yaml || true
+cp ./results/**/zap/zap-report.json $ARTIFACT_DIR/quay_dast_testing_report.json || true
