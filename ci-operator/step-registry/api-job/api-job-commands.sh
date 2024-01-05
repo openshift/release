@@ -14,4 +14,5 @@ which python3
 python3 --version
 job --version
 job --help
-job get_payloads 4.9.0,4.10.0,4.11.0,4.12.0,4.13.0,4.14.0,4.15.0,4.16.0 --push true --run true
+# it runs the jobs from the https://github.com/openshift/release-tests/blob/master/_releases/required-jobs.json
+job run_z_stream_test
