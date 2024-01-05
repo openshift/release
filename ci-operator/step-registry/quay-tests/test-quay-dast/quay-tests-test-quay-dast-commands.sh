@@ -13,9 +13,9 @@ cd /tmp && git clone https://github.com/RedHatProductSecurity/rapidast.git && cd
 
 echo "Generating Quay OpenAPI File..."
 curl https://stage.quay.io/api/v1/discovery > quay.json || true
-cat quay.json | jq > quay_openapi.json && cp quay_openapi.json $ARTIFACT_DIR || true
+cat quay.json | jq > openapi.json && cp openapi.json $ARTIFACT_DIR || true
 
-cat >>config-zap-prwoci.yaml <<EOF
+cat >>config-zap-prowci.yaml <<EOF
 config:
   # WARNING: `configVersion` indicates the schema version of the config file.
   # This value tells RapiDAST what schema should be used to read this configuration.
@@ -66,5 +66,5 @@ scanners:
       additionalAddons: "ascanrulesBeta"
 EOF
 
-cp config-zap-prwoci.yaml config || true
-./rapidast.py --config ./config/config-zap-prwoci.yaml || true
+cp config-zap-prowci.yaml config || true
+./rapidast.py --config ./config/config-zap-prowci.yaml || true
