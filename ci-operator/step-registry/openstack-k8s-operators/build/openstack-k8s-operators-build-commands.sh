@@ -13,6 +13,8 @@ unset NAMESPACE
 REF_REPO=$(echo ${JOB_SPEC} | jq -r '.refs.repo')
 REF_ORG=$(echo ${JOB_SPEC} | jq -r '.refs.org')
 REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+# Prow build id
+PROW_BUILD=$(echo ${JOB_SPEC} | jq -r '.buildid')
 
 # PR SHA
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
@@ -201,7 +203,8 @@ oc create secret generic ${PUSH_REGISTRY_SECRET} --from-file=.dockerconfigjson=/
 
 # Build operator
 IMAGE_TAG_BASE=${PUSH_REGISTRY}/${PUSH_ORGANIZATION}/${BASE_OP}
-build_push_operator_images "${BASE_OP}" "${BASE_DIR}/${BASE_OP}" "${IMAGE_TAG_BASE}" "${PR_SHA}"
+BUILD_TAG="${PR_SHA}-${PROW_BUILD}"
+build_push_operator_images "${BASE_OP}" "${BASE_DIR}/${BASE_OP}" "${IMAGE_TAG_BASE}" "${BUILD_TAG}"
 
 # If operator being tested is not meta-operator, we need to build openstack-operator
 if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
@@ -246,7 +249,8 @@ if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
 
   # Build openstack-operator bundle and index
   IMAGE_TAG_BASE=${PUSH_REGISTRY}/${PUSH_ORGANIZATION}/${META_OPERATOR}
-  build_push_operator_images "${META_OPERATOR}" "${BASE_DIR}/${META_OPERATOR}" "${IMAGE_TAG_BASE}" "${PR_SHA}"
+  BUILD_TAG="${PR_SHA}-${PROW_BUILD}"
+  build_push_operator_images "${META_OPERATOR}" "${BASE_DIR}/${META_OPERATOR}" "${IMAGE_TAG_BASE}" "${BUILD_TAG}"
 
   popd
   popd
