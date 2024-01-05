@@ -16,9 +16,13 @@ unset NAMESPACE
 REF_REPO=$(echo ${JOB_SPEC} | jq -r '.refs.repo')
 REF_ORG=$(echo ${JOB_SPEC} | jq -r '.refs.org')
 REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+# Prow build id
+PROW_BUILD=$(echo ${JOB_SPEC} | jq -r '.buildid')
 
 # PR SHA
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
+# Build tag
+BUILD_TAG="${PR_SHA}-${PROW_BUILD}"
 
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name
@@ -56,7 +60,7 @@ if [ ${SERVICE_NAME} == "openstack-ansibleee" ]; then
 fi
 
 
-export ${SERVICE_NAME^^}_IMG=${IMAGE_TAG_BASE}-index:${PR_SHA}
+export ${SERVICE_NAME^^}_IMG=${IMAGE_TAG_BASE}-index:${BUILD_TAG}
 export ${SERVICE_NAME^^}_KUTTL_CONF=/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml
 if [ -d  /go/src/github.com/${ORG}/${BASE_OP}/tests ]; then
     export ${SERVICE_NAME^^}_KUTTL_DIR=/go/src/github.com/${ORG}/${BASE_OP}/tests/kuttl/tests
@@ -71,7 +75,7 @@ fi
 export ${SERVICE_NAME^^}_REPO=/go/src/github.com/${ORG}/${BASE_OP}
 
 # Use built META_OPERATOR bundle image
-export OPENSTACK_BUNDLE_IMG=${REGISTRY}/${ORGANIZATION}/${META_OPERATOR}-bundle:${PR_SHA}
+export OPENSTACK_BUNDLE_IMG=${REGISTRY}/${ORGANIZATION}/${META_OPERATOR}-bundle:${BUILD_TAG}
 
 if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   if [ ! -d "${HOME}/install_yamls" ]; then
