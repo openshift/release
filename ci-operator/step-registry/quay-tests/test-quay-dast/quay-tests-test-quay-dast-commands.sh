@@ -9,7 +9,7 @@ echo "The current ZAP Version is:"
 #zap.sh -version
 
 echo "Clone Redhat Rapidast Repository..."
-git clone https://github.com/RedHatProductSecurity/rapidast.git && cd rapidast || true
+cd /tmp && git clone https://github.com/RedHatProductSecurity/rapidast.git && cd rapidast || true
 
 echo "Generating Quay OpenAPI File..."
 curl https://stage.quay.io/api/v1/discovery > quay.json || true
