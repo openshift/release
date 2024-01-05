@@ -19,8 +19,13 @@ ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 echo "Get the ${CLUSTER_SECTOR} provision shard list in ${REGION} ..."
 psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${REGION}' and status is 'ready' " | jq -r '.items[].provision_shard_reference.id')
 if [[ -z "$psList" ]]; then
-  echo "No available provision shard!"
-  exit 1
+  echo "no ready provision shard found, trying to find maintenance status provision shard"
+  # try to find maintenance mode SC, currently osdfm api doesn't support status in ('ready', 'maintenance') query.
+  psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${REGION}' and status is 'maintenance' " | jq -r '.items[].provision_shard_reference.id')
+  if [[ -z "$psList" ]]; then
+    echo "No available provision shard!"
+    exit 1
+  fi
 fi
 
 echo -e "Available provision shards:\n${psList}"
