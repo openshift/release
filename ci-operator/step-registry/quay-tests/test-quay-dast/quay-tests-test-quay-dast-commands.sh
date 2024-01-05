@@ -6,12 +6,12 @@ QUAY_ACCESS_TOKEN=$(cat /var/run/quay-qe-stagequayio-secret/oauth2token)
 QUAY_OAUTH2_TOEKN="Bearer $QUAY_ACCESS_TOKEN"
 
 echo "The current ZAP Version is:"
-cd /tmp && mkdir -p zap_test_version && zap.sh -dir /tmp/zap_test_version -version
+zap.sh -version
 
 echo "Clone Redhat Rapidast Repository..."
 git clone https://github.com/RedHatProductSecurity/rapidast.git && cd rapidast || true
 
-echo "Generating Quay OpenAPI file..."
+echo "Generating Quay OpenAPI File..."
 curl https://stage.quay.io/api/v1/discovery > quay.json || true
 cat quay.json | jq > openapi.json && cp openapi.json $ARTIFACT_DIR || true
 
