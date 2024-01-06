@@ -92,6 +92,23 @@ tests:
     - ref: quay-tests-deploy-quay-gcp
     - ref: quay-tests-test-quay-e2e
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay310-ocp415-proxy
+  cron: 0 0 15 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CSO_CHANNEL: stable-3.10
+      QBO_CHANNEL: stable-3.10
+      QUAY_OPERATOR_CHANNEL: stable-3.10
+      QUAY_PROXY: "true"
+    test:
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 zz_generated_metadata:
   branch: master
   org: quay

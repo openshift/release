@@ -102,8 +102,8 @@ fi
 ROSA_VERSION=$(rosa version)
 ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${ROSA_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
-  rosa login --env "${ROSA_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+  rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
   if [ $? -ne 0 ]; then
     echo "Login failed"
     exit 1
@@ -358,7 +358,7 @@ fi
 SECURITY_GROUP_ID_SWITCH=""
 if [[ "$ADDITIONAL_SECURITY_GROUP" == "true" ]]; then
   SECURITY_GROUP_IDs=$(cat ${SHARED_DIR}/security_groups_ids | xargs |sed 's/ /,/g')
-  SECURITY_GROUP_ID_SWITCH="--additional-compute-security-group-ids ${SECURITY_GROUP_IDs}"
+  SECURITY_GROUP_ID_SWITCH="--additional-compute-security-group-ids ${SECURITY_GROUP_IDs} --additional-infra-security-group-ids ${SECURITY_GROUP_IDs} --additional-control-plane-security-group-ids ${SECURITY_GROUP_IDs}"
   record_cluster "security_groups" "enabled" ${SECURITY_GROUP_IDs}
 fi
 

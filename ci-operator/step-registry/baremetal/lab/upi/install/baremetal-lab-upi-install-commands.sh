@@ -83,8 +83,9 @@ function destroy_bootstrap() {
   systemctl restart dhcp
 EOF
   # do not fail if unable to wipe the bootstrap disk and do not release it, to retry later in post steps
-  reset_host "${AUX_HOST}" "${bmc_port}" "${bmc_user}" "${bmc_pass}" "${ipxe_via_vmedia}"
-  if ! wait_for_power_down "${AUX_HOST}" "${bmc_port}" "${bmc_user}" "${bmc_pass}" "${ipxe_via_vmedia}"; then
+  # shellcheck disable=SC2154
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
+  if ! wait_for_power_down "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${vendor}" "${ipxe_via_vmedia}"; then
     echo "The bootstrap node didn't power off and it will not be released to retry in the deprovisioning steps..."
     return 0
   fi
@@ -105,7 +106,7 @@ EOF
 olReboot $pdu_socket
 quit
 EOF
-    if ! wait_for_power_down "${AUX_HOST}" "${bmc_port}" "${bmc_user}" "${bmc_pass}" "${ipxe_via_vmedia}"; then
+    if ! wait_for_power_down "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${ipxe_via_vmedia}" "${vendor}"; then
       echo "The bootstrap node PDU reset was not successful... it will not be released to retry in the deprovisioning steps..."
       return 0
     fi
@@ -145,16 +146,17 @@ EOF
 }
 
 function wait_for_power_down() {
-  local bmc_host="${1}"
-  local bmc_port="${2}"
+  local bmc_address="${1}"
+  local bmc_forwarded_port="${2}"
   local bmc_user="${3}"
   local bmc_pass="${4}"
-  local ipxe_via_vmedia="${4}"
-  local host="${bmc_port##1[0-9]}"
+  local vendor="${5}"
+  local ipxe_via_vmedia="${6}"
+  local host="${bmc_forwarded_port##1[0-9]}"
   host="${host##0}"
   sleep 90
   local retry_max=40 # 15*40=600 (10 min)
-  while [ $retry_max -gt 0 ] && ! ipmitool -I lanplus -H "${bmc_host}" -p "${bmc_port}" \
+  while [ $retry_max -gt 0 ] && ! ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
     -U "$bmc_user" -P "$bmc_pass" power status | grep -q "Power is off"; do
     echo "${host} is not powered off yet... waiting"
     sleep 30
@@ -170,49 +172,13 @@ function wait_for_power_down() {
       # that sometimes keep the hosts frozen before POST.
       echo "retrying $ again to reboot..."
       touch "/tmp/$host"
-      reset_host "$AUX_HOST" "$bmc_port" "$bmc_user" "$bmc_pass"  "$ipxe_via_vmedia"
-      wait_for_power_down "$AUX_HOST" "$bmc_port" "$bmc_user" "$bmc_pass" "$ipxe_via_vmedia"
+      timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
+      wait_for_power_down "$bmc_address" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"
       return $?
     fi
   fi
   echo "#$host is now powered off"
   return 0
-}
-
-function reset_host() {
-  local bmc_host="${1}"
-  local bmc_port="${2}"
-  local bmc_user="${3}"
-  local bmc_pass="${4}"
-  local ipxe_via_vmedia="${5}"
-  local host="${bmc_port##1[0-9]}"
-  host="${host##0}"
-  # HPE iLO6 BMCs on RL300 do not have drivers for BCM5720 NICs, use vmedia to load ipxe.usb
-  # See https://issues.redhat.com/browse/OCPQE-18370
-  if [ "$ipxe_via_vmedia" == "true" ]; then
-    echo "Resetting host #$host (via ipxe on vmedia)..."
-    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" mount.vmedia.ipxe "${host}"
-  else
-    ipmitool -I lanplus -H "${bmc_host}" -p "${bmc_port}" \
-      -U "$bmc_user" -P "$bmc_pass" \
-      chassis bootparam set bootflag force_pxe options=PEF,watchdog,reset,power
-  fi
-  ipmitool -I lanplus -H "${bmc_host}" -p "${bmc_port}" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power off || echo "Already off"
-  # If the host is not already powered off, the power on command can fail while the host is still powering off.
-  # Let's retry the power on command multiple times to make sure the command is received in the correct state.
-  for i in {1..10} max; do
-    if [ "$i" == "max" ]; then
-      echo "Failed to reset host #${host}"
-      return 1
-    fi
-    ipmitool -I lanplus -H "${bmc_host}" -p "${bmc_port}" \
-      -U "$bmc_user" -P "$bmc_pass" \
-      power on && break
-    echo "Failed to power on host #${host}, retrying..."
-    sleep 5
-  done
 }
 
 function approve_csrs() {
@@ -328,7 +294,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     continue
   fi
   echo "Power on #${host} (${name})..."
-  reset_host "${AUX_HOST}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${ipxe_via_vmedia}"
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
 done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"

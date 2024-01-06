@@ -336,6 +336,9 @@ CONFIG = {
         'us-east-2': 4,
         'us-west-2': 4,
     },
+    'gitops-aws-quota-slice': {
+        'us-west-2': 10
+    },
 }
 
 for i in range(3):
