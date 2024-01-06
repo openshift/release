@@ -43,7 +43,7 @@ declare -A compute_azs=(
 	['openstack-vexxhost']=''
         ['openstack-operators-vexxhost']=''
 	['openstack-vh-mecha-central']=''
-	['openstack-vh-mecha-az0']='az0'
+	['openstack-vh-mecha-az0']='nova'
 	['openstack-nfv']=''
 	['openstack-hwoffload']=''
 	)
