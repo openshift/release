@@ -40,6 +40,10 @@ function hasCPMS() {
         # 4.14+
         REQUIRED_OCP_VERSION="4.14"
         ;;
+    vsphere*)
+        # 4.15+
+        REQUIRED_OCP_VERSION="4.15"
+        ;;
     *)
         return ${ret}
         ;;
@@ -97,6 +101,11 @@ fi
 
 if ! hasCPMS; then
     echo "INFO: 'controlplanemachinesets' is not supproted (OCP ${version} on ${CLUSTER_TYPE}), skip."
+    exit 0
+fi
+
+if [ ${CLUSTER_TYPE} == "vsphere" ] && [ ${version} == "4.15" ] && [ ${FEATURE_SET} != "TechPreviewNoUpgrade" ]; then
+    echo "INFO: controlplanemachinesets is TP feature in 4.15 on vsphere platform, will skip due to TP not enable"    
     exit 0
 fi
 
