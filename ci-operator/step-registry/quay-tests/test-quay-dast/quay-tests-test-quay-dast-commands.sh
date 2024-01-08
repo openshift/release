@@ -21,7 +21,7 @@ fi
 if [ ${QUAY_ENV} = 'QUAY' ]; then
    echo "Generating Quay OpenAPI File..."
    QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute)
-   curl "$QUAY_ROUTE/api/v1/discovery" > quay.json || true
+   curl --insecure "$QUAY_ROUTE"api/v1/discovery > quay.json || true
    QUAY_URL="$QUAY_ROUTE"
    QUAY_SHORT_NAME="quay"
    QUAY_ACCESS_TOKEN=$(cat "$SHARED_DIR"/quay_oauth2_token)
