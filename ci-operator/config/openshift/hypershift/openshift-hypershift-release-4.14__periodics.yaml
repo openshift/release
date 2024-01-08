@@ -158,10 +158,29 @@ tests:
       LVM_OPERATOR_SUB_CHANNEL: stable-4.14
       MCE_VERSION: "2.4"
     workflow: hypershift-mce-agent-conformance
-- as: e2e-agent-ovn-mce-disconnected-conformance
+- as: e2e-agent-ovn-mce-disconnected-ipv6-conformance
+  cluster: build05
   cron: 0 8 * * *
   steps:
     cluster_profile: equinix-ocp-metal
+    workflow: hypershift-mce-agent-disconnected-conformance
+- as: e2e-agent-ovn-mce-disconnected-dualstack-conformance
+  cluster: build05
+  cron: 0 12 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+        WORKER_DISK=300
+        NUM_EXTRA_WORKERS=3
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=16384
+        EXTRA_WORKER_DISK=100
+      IP_STACK: v4v6
     workflow: hypershift-mce-agent-disconnected-conformance
 - as: e2e-kubevirt-csi-conformance
   cron: 0 4 * * *
