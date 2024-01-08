@@ -8,7 +8,7 @@ zap.sh -version
 echo "Clone Redhat Rapidast Repository..."
 cd /tmp && git clone https://github.com/RedHatProductSecurity/rapidast.git && cd rapidast || true
 
-if [ ${OMR_ENV} = 'STAGE_QUAY_IO' ]; then
+if [ ${QUAY_ENV} = 'STAGE_QUAY_IO' ]; then
    echo "Generating Stage Quay.io OpenAPI File..."
    curl https://stage.quay.io/api/v1/discovery > quay.json || true
    QUAY_URL="https://stage.quay.io"
@@ -18,7 +18,7 @@ if [ ${OMR_ENV} = 'STAGE_QUAY_IO' ]; then
    cat quay.json | jq > openapi.json && cp openapi.json $ARTIFACT_DIR || true 
 fi
 
-if [ ${OMR_ENV} = 'QUAY' ]; then
+if [ ${QUAY_ENV} = 'QUAY' ]; then
    echo "Generating Quay OpenAPI File..."
    QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute)
    curl "$QUAY_ROUTE/api/v1/discovery" > quay.json || true
