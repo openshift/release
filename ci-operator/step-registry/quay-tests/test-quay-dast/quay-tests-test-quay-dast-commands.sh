@@ -18,6 +18,16 @@ if [ ${QUAY_ENV} = 'STAGE_QUAY_IO' ]; then
    cat quay.json | jq > openapi.json && cp openapi.json $ARTIFACT_DIR || true 
 fi
 
+if [ ${QUAY_ENV} = 'QUAY_IO' ]; then
+   echo "Generating Quay.io OpenAPI File..."
+   curl https://quay.io/api/v1/discovery > quay.json || true
+   QUAY_URL="https://stage.quay.io"
+   QUAY_SHORT_NAME="quayio"
+   QUAY_ACCESS_TOKEN=$(cat /var/run/quay-qe-quayio-secret/oauth2token)
+   QUAY_OAUTH2_TOEKN="Bearer $QUAY_ACCESS_TOKEN"
+   cat quay.json | jq > openapi.json && cp openapi.json $ARTIFACT_DIR || true 
+fi
+
 if [ ${QUAY_ENV} = 'QUAY' ]; then
    echo "Generating Quay OpenAPI File..."
    QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute)
