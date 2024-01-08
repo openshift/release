@@ -87,6 +87,15 @@ date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 echo "Creating manifests"
 openshift-install --dir=${ARTIFACT_DIR}/installer create manifests
 
+echo "Will include manifests:"
+find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
+
+while IFS= read -r -d '' item
+do
+  manifest="$( basename "${item}" )"
+  cp "${item}" "${ARTIFACT_DIR}/installer/manifests/${manifest##manifest_}"
+done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
+
 echo "Editing manifests"
 sed -i '/^  channel:/d' manifests/cvo-overrides.yaml
 rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
@@ -269,6 +278,23 @@ BOOTSTRAP_PUBLIC_IP=$(az network public-ip list -g $RESOURCE_GROUP --query "[?na
 GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_PUBLIC_IP}"
 
 echo "Deploying 05_masters"
+# add additonal disk for disk partition on /var or its subdirectory
+master_new_disk_config="${SHARED_DIR}/azure_arm_template_new_disk_master"
+if [[ -f "${master_new_disk_config}" ]]; then
+  #update 05_master.json
+  echo "update 05_master.json to create addtional disk"
+  temp_json_file=$(mktemp)
+  parameter_json=$(sed -n '1p' "${master_new_disk_config}")
+  resource_json=$(sed -n '2p' "${master_new_disk_config}")
+  jq ".parameters.additionalDiskSizeGB += ${parameter_json}" 05_masters.json > "${temp_json_file}"
+  jq ".resources[1].properties.storageProfile += ${resource_json}" "${temp_json_file}" > 05_masters.json
+  if [[ -f "${SHARED_DIR}/azure_master_new_disk_info" ]]; then
+      master_new_disk_size=$(jq -r '.disk_size' ${SHARED_DIR}/azure_master_new_disk_info)
+  else
+      #set default value
+      master_new_disk_size=256
+  fi
+fi
 MASTER_IGNITION=$(cat ${ARTIFACT_DIR}/installer/master.ign | base64 -w0)
 # shellcheck disable=SC2046
 az deployment group create -g $RESOURCE_GROUP \
@@ -276,7 +302,8 @@ az deployment group create -g $RESOURCE_GROUP \
   --parameters masterIgnition="$MASTER_IGNITION" \
   --parameters sshKeyData="$SSH_PUB_KEY" \
   --parameters privateDNSZoneName="${CLUSTER_NAME}.${BASE_DOMAIN}" \
-  --parameters baseName="$INFRA_ID" ${az_deployment_optional_parameters}
+  --parameters baseName="$INFRA_ID" ${az_deployment_optional_parameters} \
+  $([[ -f "${master_new_disk_config}" ]] && echo "--parameters additionalDiskSizeGB=${master_new_disk_size}")
 
 #on az version previouse to 2.45.0, property name is privateIpAddress
 #on 2.45.0+, it changes to privateIPAddress
@@ -287,6 +314,23 @@ MASTER2_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA
 GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${MASTER0_IP} --master ${MASTER1_IP} --master ${MASTER2_IP}"
 
 echo "Deploying 06_workers"
+# add additonal disk for disk partition on /var or its subdirectory
+worker_new_disk_config="${SHARED_DIR}/azure_arm_template_new_disk_worker"
+if [[ -f "${worker_new_disk_config}" ]]; then
+  #update 06_workers.json.json
+  echo "update 06_workers.json to create addtional disk"
+  temp_json_file=$(mktemp)
+  parameter_json=$(sed -n '1p' "${worker_new_disk_config}")
+  resource_json=$(sed -n '2p' "${worker_new_disk_config}")
+  jq ".parameters.additionalDiskSizeGB += ${parameter_json}" 06_workers.json > "${temp_json_file}"
+  jq ".resources[].properties.template.resources[1].properties.storageProfile += ${resource_json}" "${temp_json_file}" > 06_workers.json
+  if [[ -f "${SHARED_DIR}/azure_worker_new_disk_info" ]]; then
+      worker_new_disk_size=$(jq -r '.disk_size' ${SHARED_DIR}/azure_worker_new_disk_info)
+  else
+      #set default value
+      worker_new_disk_size=256
+  fi
+fi
 WORKER_IGNITION=$(cat ${ARTIFACT_DIR}/installer/worker.ign | base64 -w0)
 export WORKER_IGNITION
 # shellcheck disable=SC2046
@@ -294,7 +338,8 @@ az deployment group create -g $RESOURCE_GROUP \
   --template-file "06_workers.json" $([ -n "${COMPUTE_NODE_TYPE}" ] && echo "--parameters nodeVMSize=${COMPUTE_NODE_TYPE}") \
   --parameters workerIgnition="$WORKER_IGNITION" \
   --parameters sshKeyData="$SSH_PUB_KEY" \
-  --parameters baseName="$INFRA_ID" ${az_deployment_optional_parameters}
+  --parameters baseName="$INFRA_ID" ${az_deployment_optional_parameters} \
+  $([[ -f "${worker_new_disk_config}" ]] && echo "--parameters additionalDiskSizeGB=${worker_new_disk_size}")
 
 popd
 echo "Waiting for bootstrap to complete"
