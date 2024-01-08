@@ -24,10 +24,11 @@ QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/github/QONTRACT_PASSWORD)
 QONTRACT_USERNAME=$(cat /usr/local/ci-secrets/github/QONTRACT_USERNAME)
 QONTRACT_BASE_URL="https://app-interface.devshift.net/graphql"
 
+#TODO switch back to prod server once the outage ends
 #Ephemeral-bot
 export OC_LOGIN_TOKEN OC_LOGIN_SERVER
-OC_LOGIN_TOKEN=$(cat /usr/local/ci-secrets/ephemeralbot/oc-login-token)
-OC_LOGIN_SERVER=$(cat /usr/local/ci-secrets/ephemeralbot/oc-login-server)
+OC_LOGIN_TOKEN=$(cat /usr/local/ci-secrets/ephemeralbot/oc-login-token-dev)
+OC_LOGIN_SERVER=$(cat /usr/local/ci-secrets/ephemeralbot/oc-login-server-dev)
 
 echo "Installing bonfire."
 export LANG LC_ALL
