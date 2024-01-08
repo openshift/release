@@ -9,8 +9,22 @@ build_root:
     namespace: openshift
     tag: golang-1.19
 images:
-- context_dir: .
-  dockerfile_path: dockerfiles/interop/Dockerfile
+- dockerfile_literal: |-
+    FROM registry.redhat.io/ansible-automation-platform/ee-29-rhel8:latest
+    RUN microdnf update -y --nodocs --setopt=install_weak_deps=0 --setopt=*.excludepkgs=ansible-core  \
+    && microdnf clean all \
+    && rm -rf /var/cache/{dnf,yum} \
+    && rm -rf /var/lib/dnf/history.* \
+    && rm -rf /var/log/* \
+    && microdnf install git \
+    && microdnf install python3-lxml \
+    && microdnf install wget
+    RUN mkdir -p /tmp/tests/ansible-tests
+    WORKDIR /tmp/tests/ansible-tests
+    COPY . .
+    RUN chmod g=u /etc/passwd /etc/group \
+    && chgrp -R 0 /tmp \
+    && chmod -R g=u /tmp
   to: rhscl-runner
 releases:
   latest:
@@ -44,6 +58,7 @@ tests:
         }
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","rhscl-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       USER_TAGS: |
         scenario rhscl
     test:
