@@ -7,7 +7,7 @@ set -o pipefail
 TARGET=${TARGET:-OVNKubernetes}
 # Check if the OVN_SDN_MIGRATION_TIMEOUT environment variable is set and is equal to "0s"
 if [ -n "$OVN_SDN_MIGRATION_TIMEOUT" ] && [ "$OVN_SDN_MIGRATION_TIMEOUT" = "0s" ]; then
-  unset OVN_SDN_MIGRATION_TIMEOUT
+    unset OVN_SDN_MIGRATION_TIMEOUT
 fi
 
 co_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-1200s}
@@ -25,7 +25,7 @@ EOT
 oc patch Network.operator.openshift.io cluster --type='merge'   --patch '{"spec":{"migration":null}}'
 cno_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-120s}
 timeout "$cno_timeout" bash <<EOT
-until 
+until
   ! oc get network -o yaml | grep migration > /dev/null
 do
   echo "migration field is not cleaned by CNO"
@@ -45,7 +45,7 @@ timeout "$mcp_timeout" bash <<EOT
 until
   oc wait mcp --all --for='condition=UPDATED=True' --timeout=10s && \
   oc wait mcp --all --for='condition=UPDATING=False' --timeout=10s && \
-  oc wait mcp --all --for='condition=DEGRADED=False' --timeout=10s; 
+  oc wait mcp --all --for='condition=DEGRADED=False' --timeout=10s;
 do
   sleep 10
   echo "Some MachineConfigPool DEGRADED=True,UPDATING=True,or UPDATED=False";
@@ -62,16 +62,31 @@ ovn_multus_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-300s}
 timeout "$ovn_multus_timeout" oc rollout status ds/multus -n openshift-multus
 
 # Reboot all the nodes
-readarray -t POD_NODES <<< "$(oc get pod -n openshift-machine-config-operator -o wide| grep daemon|awk '{print $1" "$7}')"
-
-for i in "${POD_NODES[@]}"
-do
-    read -r POD NODE <<< "$i"
-    until oc rsh -n openshift-machine-config-operator "$POD" chroot /rootfs shutdown -r +1; do echo "cannot reboot node $NODE, retry"&&sleep 3; done
-done 
+# Get the list of nodes in the cluster
+master_nodes=$(oc get nodes -o jsonpath='{.items[?(@.metadata.labels.node-role\.kubernetes\.io/master=="")].metadata.name}')
+worker_nodes=$(oc get nodes -o jsonpath='{.items[?(@.metadata.labels.node-role\.kubernetes\.io/worker=="")].metadata.name}')
+daemonset_name="machine-config-daemon"
+delay=1
+# reboot all the master nodes in sequence
+for node in $master_nodes; do
+    pods_on_node=$(oc get pods -n openshift-machine-config-operator -o jsonpath='{.items[?(@.spec.nodeName=="'$node'")].metadata.name}' -l k8s-app=$daemonset_name)
+    if [[ -n $pods_on_node ]]; then
+        echo "reboot master node $node in ${delay}m"
+        until oc rsh -n openshift-machine-config-operator "$pods_on_node" chroot /rootfs shutdown -r +$delay; do echo "cannot reboot node $node, retry"&&sleep 3; done
+        delay=$((delay+3))
+    fi
+done
+# reboot all the worker nodes
+for node in $worker_nodes; do
+    pods_on_node=$(oc get pods -n openshift-machine-config-operator -o jsonpath='{.items[?(@.spec.nodeName=="'$node'")].metadata.name}' -l k8s-app=$daemonset_name)
+    if [[ -n $pods_on_node ]]; then
+        echo "reboot worker node $node in ${delay}m"
+        until oc rsh -n openshift-machine-config-operator "$pods_on_node" chroot /rootfs shutdown -r +$delay; do echo "cannot reboot node $node, retry"&&sleep 3; done
+    fi
+done
 
 # Wait until all nodes reboot and the api-server is unreachable.
-sleep 65
+sleep ${delay}m
 
 # Wait for nodes come back
 ovn_node_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-1800s}
