@@ -98,11 +98,11 @@ spec:
             - key: test.properties
               path: test.properties
         - name: credentials
-          configMap:
-            name: credentials
+          secret:
+            secretName: credentials
             items:
-            - key: credentials.yaml
-              path: credentials.yaml
+              - key: credentials.yaml
+                path: credentials.yaml
         - name: tnb-volume
           persistentVolumeClaim:
             claimName: persistent-tnb-tests
@@ -146,6 +146,7 @@ spec:
               mountPath: /mnt/
             - name: credentials
               mountPath: /mnt/secrets
+              readOnly: true
             - name: tnb-volume
               mountPath: /tmp/failsafe-reports/
               subPath: failsafe-reports
