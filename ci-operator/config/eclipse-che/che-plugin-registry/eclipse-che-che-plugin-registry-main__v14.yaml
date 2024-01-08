@@ -1,15 +1,18 @@
 build_root:
   project_image:
     dockerfile_path: .ci/openshift-ci/Dockerfile
+images:
+- dockerfile_path: .ci/openshift-ci/build/Dockerfile
+  to: che-plugin-registry
 releases:
   initial:
     integration:
-      name: "4.11"
+      name: "4.14"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.11"
+      name: "4.14"
       namespace: ocp
 resources:
   '*':
@@ -19,22 +22,27 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: che-operator-update
+- as: plugins-test-pr-check
   steps:
     cluster_profile: che-aws
     env:
       BASE_DOMAIN: crw-qe.com
     test:
-    - as: test
+    - as: plugins-pr-check
       cli: latest
-      commands: build/scripts/oc-tests/oc-test-upgrade-from-stable-to-stable.sh
+      commands: |
+        /bin/bash .ci/openshift-ci/smoke-test.sh
+      dependencies:
+      - env: CHE_PLUGIN_REGISTRY
+        name: che-plugin-registry
       from: src
       resources:
         requests:
           cpu: 100m
+          memory: 200Mi
     workflow: openshift-e2e-aws
 zz_generated_metadata:
-  branch: 7.82.x
+  branch: main
   org: eclipse-che
-  repo: che-operator
-  variant: v11
+  repo: che-plugin-registry
+  variant: v14

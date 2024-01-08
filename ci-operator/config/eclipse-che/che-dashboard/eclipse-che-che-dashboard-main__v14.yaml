@@ -1,16 +1,15 @@
 build_root:
   project_image:
     dockerfile_path: .ci/openshift-ci/Dockerfile
+images:
+- dockerfile_path: build/dockerfiles/Dockerfile
+  to: che-dashboard-image
 releases:
-  initial:
-    integration:
-      name: "4.12"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.12"
-      namespace: ocp
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -19,30 +18,36 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: chectl
+- as: dashboard-happy-path
   steps:
     cluster_profile: che-aws
     env:
       BASE_DOMAIN: crw-qe.com
     test:
-    - as: chectl
+    - as: test
       cli: latest
-      commands: .ci/oc-test-chectl.sh
+      commands: /bin/bash .ci/oci-dashboard-happy-path.sh
+      dependencies:
+      - env: CI_CHE_DASHBOARD_IMAGE
+        name: che-dashboard-image
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws
-- as: chectl-devworkspace-happy-path
+- as: e2e-puppeteer
   steps:
     cluster_profile: che-aws
     env:
       BASE_DOMAIN: crw-qe.com
     test:
-    - as: chectl-devworkspace-happy-path
+    - as: test
       cli: latest
-      commands: .ci/oc-test-happy-path.sh
+      commands: /bin/bash .ci/oci-dashboard-puppeteer.sh
+      dependencies:
+      - env: CI_CHE_DASHBOARD_IMAGE
+        name: che-dashboard-image
       from: src
       resources:
         requests:
@@ -50,7 +55,7 @@ tests:
           memory: 200Mi
     workflow: openshift-e2e-aws
 zz_generated_metadata:
-  branch: 7.83.x
-  org: che-incubator
-  repo: chectl
-  variant: v12
+  branch: main
+  org: eclipse-che
+  repo: che-dashboard
+  variant: v14
