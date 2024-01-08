@@ -30,13 +30,11 @@ fi
 
 if [ ${QUAY_ENV} = 'QUAY' ]; then
    echo "Generating Quay OpenAPI File..."
-   QUAY_ROUTE=$(cat "$SHARED_DIR"/quayroute)
-   curl --insecure "$QUAY_ROUTE"api/v1/discovery > quay.json || true
-   QUAY_URL="$QUAY_ROUTE"
+   QUAY_URL=$(cat "$SHARED_DIR"/quayroute)
    QUAY_SHORT_NAME="quay"
    QUAY_ACCESS_TOKEN=$(cat "$SHARED_DIR"/quay_oauth2_token)
    QUAY_OAUTH2_TOEKN="Bearer $QUAY_ACCESS_TOKEN"
-   cat quay.json | jq > openapi.json && cp openapi.json $ARTIFACT_DIR || true 
+   cat "$SHARED_DIR"/quay_api_discovery | jq > openapi.json && cp openapi.json $ARTIFACT_DIR || true 
 fi
 
 
