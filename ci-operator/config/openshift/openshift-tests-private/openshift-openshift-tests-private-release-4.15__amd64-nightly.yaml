@@ -580,6 +580,46 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: aws-ipi-ovn-hypershift-mce-guest-f7
+  cron: 31 11 5,12,19,26 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @hypershift-hosted'
+      MCE_VERSION: "2.5"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-guest-f28-destructive
+  cron: 32 15 19 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @hypershift-hosted'
+      MCE_VERSION: "2.5"
+      TEST_ADDITIONAL: Network_Observability
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-mgmt-f7
+  cron: 11 6 5,12,19,28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_VERSION: "2.5"
+      TEST_ADDITIONAL: Hypershift
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce
 - as: aws-ipi-ovn-ipsec-f7-obo
   cron: 15 12 7,15,22,29 * *
   steps:
