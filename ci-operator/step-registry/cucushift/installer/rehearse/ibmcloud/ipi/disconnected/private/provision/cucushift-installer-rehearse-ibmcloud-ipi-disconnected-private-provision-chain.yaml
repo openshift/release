@@ -1,0 +1,55 @@
+chain:
+  as: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-provision
+  steps:
+  - ref: ibmcloud-provision-vpc
+  - ref: ibmcloud-provision-vpc-endpoints-gateway
+  - chain: ibmcloud-provision-bastionhost
+  - chain: mirror-images-by-oc-adm
+  - chain: ipi-conf-ibmcloud
+  - ref: ipi-conf-ibmcloud-provisionednetwork
+  - ref: ipi-conf-ibmcloud-custom-endpoints
+  - ref: ipi-conf-mirror
+  - ref: proxy-config-generate
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-install-hosted-loki
+  - ref: ipi-install-install
+  - ref: ipi-install-times-collection
+  - ref: enable-qe-catalogsource-disconnected
+  - ref: mirror-images-tag-images
+  - ref: set-sample-operator-disconnected
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-ibmcloud
+  - ref: cucushift-installer-check-ibmcloud-private
+  env:
+  - name: BASE_DOMAIN
+    default: "ibmcloud.qe.devcluster.openshift.com"
+  - name: IBMCLOUD_DNS_INSTANCE_NAME
+    default: "preserved-openshift-qe-private"
+  - name: REGISTER_MIRROR_REGISTRY_DNS
+    default: "yes"
+  - name: MIRROR_REG_PUBLIC_DNS
+    default: "yes"
+  - name: MIRROR_REG_PRIVATE_DNS
+    default: "yes"
+  - name: RESTRICTED_NETWORK
+    default:  "yes"
+  - name: PUBLISH
+    default: "Internal"
+  - name: SERVICE_ENDPOINT_IAM
+    default: "DEFAULT_ENDPOINT"
+  - name: SERVICE_ENDPOINT_VPC
+    default: "DEFAULT_ENDPOINT"
+  - name: SERVICE_ENDPOINT_ResourceController
+    default: "DEFAULT_ENDPOINT"
+  - name: SERVICE_ENDPOINT_ResourceManager
+    default: "DEFAULT_ENDPOINT"
+  - name: SERVICE_ENDPOINT_DNSServices
+    default: "DEFAULT_ENDPOINT"
+  - name: SERVICE_ENDPOINT_COS
+    default: "DEFAULT_ENDPOINT"
+  - name: SERVICE_ENDPOINT_GlobalSearch
+    default: "DEFAULT_ENDPOINT"
+  - name: SERVICE_ENDPOINT_GlobalTagging
+    default: "DEFAULT_ENDPOINT"
+  documentation: |-
+    Create an IPI cluster in a restricted network on IBMCloud for QE e2e tests.

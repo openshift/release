@@ -60,6 +60,7 @@ function ibmcloud_login {
   export IBMCLOUD_HOME=/output
   region="${LEASED_RESOURCE}"
   export region
+  "${IBMCLOUD_CLI}" config --check-version=false
   echo "Try to login..."
   if [ -f "${SHARED_DIR}/ibmcloud-min-permission-api-key" ]; then
       "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${SHARED_DIR}/ibmcloud-min-permission-api-key"
