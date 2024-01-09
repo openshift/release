@@ -1,8 +1,16 @@
 base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
@@ -34,7 +42,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -46,8 +54,31 @@ tests:
 - as: quay-dast-test-stage-quay-io
   cron: 0 10 * * 5
   steps:
+    env:
+      QUAY_ENV: STAGE_QUAY_IO
     test:
     - ref: quay-tests-test-quay-dast
+- as: quay-dast-test-prod-quay-io
+  cron: 0 11 * * 5
+  steps:
+    env:
+      QUAY_ENV: QUAY_IO
+    test:
+    - ref: quay-tests-test-quay-dast
+- as: quay-dast-test-quay310
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.14
+      QUAY_ENV: QUAY
+      QUAY_OPERATOR_CHANNEL: stable-3.10
+    test:
+    - ref: quay-tests-deploy-quay-odf
+    - ref: quay-tests-test-quay-dast
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay
