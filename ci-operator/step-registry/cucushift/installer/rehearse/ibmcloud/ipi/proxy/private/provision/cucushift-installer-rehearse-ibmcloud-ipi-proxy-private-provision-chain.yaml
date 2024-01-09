@@ -1,0 +1,23 @@
+chain:
+  as: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private-provision
+  steps:
+  - ref: ibmcloud-provision-vpc
+  - chain: ibmcloud-provision-bastionhost
+  - ref: proxy-config-generate
+  - chain: ipi-conf-ibmcloud
+  - ref: ipi-conf-proxy
+  - ref: ipi-conf-ibmcloud-provisionednetwork
+  - chain: ipi-install
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-ibmcloud
+  - ref: cucushift-installer-check-ibmcloud-private
+  env:
+  - name: BASE_DOMAIN
+    default:  "private-ibmcloud.qe.devcluster.openshift.com"
+  - name: PUBLISH
+    default: "Internal"
+  - name: RESTRICTED_NETWORK
+    default:  "yes"
+  documentation: |-
+    Create an IPI cluster behind proxy in a restricted network on IBMCloud for QE e2e tests.
