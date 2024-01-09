@@ -24,9 +24,21 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: aws-ebs-csi-driver-operator
+- dockerfile_path: Dockerfile.azure-disk
+  inputs:
+    ocp_4.16_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: azure-disk-csi-driver-operator
 - dockerfile_path: Dockerfile.aws-ebs.test
   from: src
   to: aws-ebs-csi-driver-operator-test
+- dockerfile_path: Dockerfile.azure-disk.test
+  from: src
+  to: azure-disk-csi-driver-operator-test
 promotion:
   to:
   - disabled: true
@@ -75,6 +87,38 @@ tests:
   steps:
     cluster_profile: aws-qe
     workflow: openshift-e2e-aws-csi-extended
+- as: e2e-azure
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-azure-csi
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-csi
+- as: e2e-azure-ovn-upgrade
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+- as: e2e-azure-csi-extended
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_SCENARIOS: \[CSI-Driver\]|\[Azure-Disk-CSI-Driver\]|\[Azure-Disk-CSI-Driver-Operator\]
+    workflow: openshift-e2e-azure-csi-extended
+- as: e2e-azurestack-csi
+  optional: true
+  steps:
+    cluster_profile: azurestack
+    env:
+      TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
+    workflow: openshift-e2e-azurestack-upi-csi
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: verify-deps
   steps:
     test:
