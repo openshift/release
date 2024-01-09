@@ -107,10 +107,10 @@ CONFIG = {
     'aws-telco-quota-slice': {
         # Wild guesses. We can re-configure later
         # https://docs.ci.openshift.org/docs/architecture/quota-and-leases/#adding-a-new-type-of-resource
-        'us-east-1': 40,
-        'us-east-2': 40,
-        'us-west-1': 40,
-        'us-west-2': 40,
+        'us-east-1': 60,
+        'us-east-2': 60,
+        'us-west-1': 60,
+        'us-west-2': 60,
     },
     'aws-devfile-quota-slice': {
         'us-west-2': 10
