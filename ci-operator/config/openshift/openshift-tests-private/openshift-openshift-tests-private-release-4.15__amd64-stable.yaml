@@ -11,6 +11,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -23,6 +27,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: openstack-installer
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
   tests-private:
     name: tests-private
     namespace: ci
@@ -128,7 +136,7 @@ tests:
       RELEASE_IMAGE_LATEST: release:multi-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @hypershift-hosted'
+      E2E_RUN_TAGS: '@aws-ipi and @hypershift-hosted'
       EXTRA_ARGS: --arch=arm64
       HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
@@ -238,6 +246,45 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: rosa-aws-sts-advanced
+- as: aws-rosa-sts-hcp-advanced-stage-critical-f14
+  cron: 35 6 3,17 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@aws-ipi and @rosa and @hypershift-hosted and @critical'
+      OPENSHIFT_VERSION: "4.15"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hypershift-advanced
+- as: aws-rosa-sts-hcp-private-link-stage-critical-f14
+  cron: 31 5 14,28 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@aws-ipi and @rosa and @hypershift-hosted and @critical'
+      OPENSHIFT_VERSION: "4.15"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hypershift-private-link
+- as: aws-rosa-sts-hcp-stage-critical-f14
+  cron: 4 2 6,22 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@aws-ipi and @rosa and @hypershift-hosted and @critical'
+      OPENSHIFT_VERSION: "4.15"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hypershift
 - as: aws-rosa-sts-hcp-sector-prod-critical-f7
   cron: 28 6 3,10,17,26 * *
   steps:
@@ -245,7 +292,7 @@ tests:
     env:
       CHANNEL_GROUP: candidate
       CLUSTER_SECTOR: canary
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @hypershift-hosted and @critical'
+      E2E_RUN_TAGS: '@aws-ipi and @rosa and @hypershift-hosted and @critical'
       OCM_LOGIN_ENV: production
       OPENSHIFT_VERSION: "4.15"
       REGION: us-east-1
@@ -261,7 +308,7 @@ tests:
     env:
       CHANNEL_GROUP: candidate
       CLUSTER_SECTOR: canary
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @hypershift-hosted and @critical'
+      E2E_RUN_TAGS: '@aws-ipi and @rosa and @hypershift-hosted and @critical'
       OCM_LOGIN_ENV: production
       OPENSHIFT_VERSION: "4.15"
       REGION: us-east-1
@@ -277,7 +324,7 @@ tests:
     env:
       CHANNEL_GROUP: candidate
       CLUSTER_SECTOR: canary
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @hypershift-hosted and @critical'
+      E2E_RUN_TAGS: '@aws-ipi and @rosa and @hypershift-hosted and @critical'
       OCM_LOGIN_ENV: production
       OPENSHIFT_VERSION: "4.15"
       REGION: us-east-1
@@ -471,6 +518,13 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-arch-migration
     workflow: cucushift-installer-rehearse-gcp-ipi
+- as: ibmcloud-ipi-disconnected-private-f14
+  cron: 12 5 2,16 * *
+  steps:
+    cluster_profile: ibmcloud-qe-2
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
 - as: ibmcloud-ipi-proxy-private-f14
   cron: 12 5 2,16 * *
   steps:
