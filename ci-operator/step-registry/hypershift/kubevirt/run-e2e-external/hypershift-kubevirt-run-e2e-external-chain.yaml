@@ -15,8 +15,16 @@ chain:
         name: pipeline:hypershift-operator
   - ref: hypershift-kubevirt-install-hypershift
     env:
-      - default: ${SHARED_DIR}/nested_kubeconfig
+      - default: "${SHARED_DIR}/nested_kubeconfig"
         name: KUBECONFIG
+  - ref: hypershift-kubevirt-install-create-external-infra-kubeconfig
+    env:
+      - default: "/tmp/secret/kubeconfig"
+        name: KUBECONFIG
+      - default: "/tmp/secret/restricted_infra_kubeconfig"
+        name: RESTRICTED_INFRA_KUBECONFIG
+      - default: "guest-external-infra-ns"
+        name: EXTERNAL_INFRA_NS
   - as: run-e2e-external
     cli: latest
     commands: |-
@@ -31,10 +39,18 @@ chain:
           STORAGE_CLASS_FLAG="--e2e.etcd-storage-class=${ETCD_STORAGE_CLASS}"
         fi
       
-        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig    
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        export RESTRICTED_INFRA_KUBECONFIG="/tmp/secret/restricted_infra_kubeconfig"
+
+        while [ ! -e "${RESTRICTED_INFRA_KUBECONFIG}" ]; do
+          sleep 10
+          echo "Waiting for "${RESTRICTED_INFRA_KUBECONFIG}" file to appear"
+        done
+        echo "The user used against the external infra cluster: $(oc --kubeconfig ${RESTRICTED_INFRA_KUBECONFIG} whoami)
+        echo "Permissions of this user on ${EXTERNAL_INFRA_NS} namespace on the external infra cluster:
+        oc --kubeconfig "${RESTRICTED_INFRA_KUBECONFIG}" auth can-i --list --namespace ${EXTERNAL_INFRA_NS}
       
         # run external infra e2e test
-        oc --kubeconfig ${INFRA_KUBECONFIG} create ns guest-external-infra-ns
         bin/test-e2e \
                   --test.v \
                   --test.timeout=0 \
@@ -46,9 +62,9 @@ chain:
                   --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
                   --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
-                  --e2e.kubevirt-infra-kubeconfig=${INFRA_KUBECONFIG} \
+                  --e2e.kubevirt-infra-kubeconfig=${RESTRICTED_INFRA_KUBECONFIG} \
                   ${STORAGE_CLASS_FLAG} \
-                  --e2e.kubevirt-infra-namespace=guest-external-infra-ns
+                  --e2e.kubevirt-infra-namespace=${EXTERNAL_INFRA_NS}
 
     credentials:
       - mount_path: /etc/ci-pull-credentials
@@ -62,12 +78,12 @@ chain:
       - env: CI_HYPERSHIFT_OPERATOR
         name: pipeline:hypershift-operator
     env:
-      - default: ${SHARED_DIR}/nested_kubeconfig
+      - default: "${SHARED_DIR}/nested_kubeconfig"
         name: KUBECONFIG
-      - default: /tmp/secret/kubeconfig
-        name: INFRA_KUBECONFIG        
       - default: "true"
         name: RUN_EXTERNAL_INFRA_TEST
+      - default: "guest-external-infra-ns"
+        name: EXTERNAL_INFRA_NS
       - default: ""
         name: ETCD_STORAGE_CLASS
     from: test-bin
