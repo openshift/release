@@ -54,7 +54,13 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 # Populate install-config with Powervs Platform specifics
 # Note: we will visit this creation of install-config.yaml file section once the profile support is added to the powervs environment
 POWERVS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.powervscred"
-CLUSTER_NAME="rdr-multiarch-${LEASED_RESOURCE}"
+if [[ -n "${CLUSTER_NAME_MODIFIER}" ]]; then
+  # Hopefully the entire hostname (including the BASE_DOMAIN) is less than 255 bytes.
+  # Also, the CLUSTER_NAME seems to be truncated at 21 characters long.
+  CLUSTER_NAME="p-${LEASED_RESOURCE}-${CLUSTER_NAME_MODIFIER}"
+else
+  CLUSTER_NAME="p-${LEASED_RESOURCE}"
+fi
 POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
 POWERVS_USER_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_USER_ID")
 
