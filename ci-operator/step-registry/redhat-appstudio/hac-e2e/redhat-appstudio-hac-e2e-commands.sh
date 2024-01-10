@@ -85,23 +85,13 @@ spec:
 EOF
 
 # Register user `user1`
+REGISTRATION_SERVICE=https://$(oc get route/registration-service --kubeconfig="$KUBECONFIG" -n toolchain-host-operator -o jsonpath="{.spec.host}")
+curl -o keycloak.py https://raw.githubusercontent.com/openshift/hac-dev/main/tmp/keycloak.py
 
-cd /tmp/e2e
-oc apply -f - <<EOF
-apiVersion: toolchain.dev.openshift.com/v1alpha1
-kind: UserSignup
-metadata:
-    name: user1
-    namespace: toolchain-host-operator
-    labels:
-        toolchain.dev.openshift.com/email-hash: 826df0a2f0f2152550b0d9ee11099d85
-    annotations:
-        toolchain.dev.openshift.com/user-email: user1@user.us
-spec:
-    username: user1
-    userid: user1
-    approved: true
-EOF
+B64_USER="$(echo -n $CYPRESS_USERNAME | base64)"
+B64_PASS="$(echo -n $CYPRESS_PASSWORD | base64)"
+
+python keycloak.py $CYPRESS_SSO_URL $CYPRESS_USERNAME $CYPRESS_PASSWORD $B64_USER $B64_PASS $REGISTRATION_SERVICE
 sleep 5
 oc get UserSignup -n toolchain-host-operator
 
