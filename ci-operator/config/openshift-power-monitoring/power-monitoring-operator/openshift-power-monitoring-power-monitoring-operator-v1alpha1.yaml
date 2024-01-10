@@ -7,6 +7,10 @@ base_images:
     name: "4.14"
     namespace: origin
     tag: operator-sdk
+  shellcheck:
+    name: shellcheck
+    namespace: ci
+    tag: latest
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -45,6 +49,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: shellcheck
+  commands: find . -type f -path "./hack/*" -name "*.sh" -exec shellcheck -x -S style
+    {} \;
+  container:
+    from: shellcheck
 - as: power-monitoring-operator-e2e
   cluster_claim:
     architecture: amd64
