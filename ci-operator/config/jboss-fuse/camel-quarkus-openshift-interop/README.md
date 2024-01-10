@@ -28,7 +28,7 @@ Please see the [`step-registry/camel-quarkus/execute-tests/README.md`](../../../
 
 Results are posted into `#camel-quarkus-qe` channel in `redhat-internal` Slack, and new issue in [CEQ Jira](https://issues.redhat.com/projects/CEQ/summary) is created automatically for every failure. 
 
-Job history can be accessed from the [Prow Dashboard](https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/periodic-ci-jboss-fuse-camel-quarkus-openshift-interop-main-camel-quarkus-ocp4.14-lp-interop-camel-quarkus-interop-aws) 
+Job history can be accessed from the [Prow Dashboard](https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/periodic-ci-jboss-fuse-camel-quarkus-openshift-interop-main-camel-quarkus-ocp4.14-lp-interop-camel-quarkus-interop-aws) 
 or via [dashboard](https://testgrid.k8s.io/redhat-openshift-lp-interop-release-4.14-informing#periodic-ci-jboss-fuse-camel-quarkus-openshift-interop-main-camel-quarkus-ocp4.14-lp-interop-camel-quarkus-interop-aws)
 
 ## Prerequisite(s)
