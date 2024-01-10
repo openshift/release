@@ -54,6 +54,9 @@ CONFIG = {
     'aws-outpost-quota-slice': {
         'us-east-1': 10,
     },
+    'aws-outpost-qe-quota-slice': {
+        'us-east-1': 5,
+    },
     'aws-china-qe-quota-slice': {
         'cn-north-1': 1,
         'cn-northwest-1': 1,
