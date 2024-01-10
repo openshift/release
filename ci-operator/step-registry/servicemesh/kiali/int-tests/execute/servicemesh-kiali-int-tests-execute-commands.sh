@@ -4,8 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-CONSOLE_URL=$(cat $SHARED_DIR/console.url)
-
 # login via kubeconfig which should be available in both standard OCP and ROSA
 oc login --kubeconfig=${KUBECONFIG} --insecure-skip-tls-verify=true
 hack/istio/install-bookinfo-demo.sh -c oc -n bookinfo -tg -in ${SMCP_NAMESPACE}
