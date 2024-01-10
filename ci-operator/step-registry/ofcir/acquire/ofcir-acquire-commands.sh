@@ -11,7 +11,7 @@ function send_slack(){
     set +x
     SLACK_AUTH_TOKEN="T027F3GAJ/B011TAG710V/$(cat $CLUSTER_PROFILE_DIR/slackhook)"
 
-    curl -X POST --data "payload={\"text\":\"<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Ofcir setup failed> $1\n\"}" \
+    curl -X POST --data "payload={\"text\":\"<https://prow.ci.openshift.org/view/gs/test-platform-results/logs/$JOB_NAME/$BUILD_ID|Ofcir setup failed> $1\n\"}" \
         "https://hooks.slack.com/services/${SLACK_AUTH_TOKEN}"
     set -x
 }
