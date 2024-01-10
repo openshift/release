@@ -5,7 +5,6 @@ set -o errexit
 set -o pipefail
 
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
-OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 
 # login via kubeconfig which should be available in both standard OCP and ROSA
 oc login --kubeconfig=${KUBECONFIG} --insecure-skip-tls-verify=true
