@@ -6,12 +6,15 @@ set -o pipefail
 
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
-OCP_CRED_USR="kubeadmin"
-OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
+
+# login via kubeconfig which should be available in both standard OCP and ROSA
+oc login --kubeconfig=${KUBECONFIG} --insecure-skip-tls-verify=true
+
+OCP_TOKEN="$(oc whoami -t)"
 
 export OCP_API_URL
-export OCP_CRED_USR
-export OCP_CRED_PSW
+export OCP_TOKEN
+export ROSA
 
 make test
 
