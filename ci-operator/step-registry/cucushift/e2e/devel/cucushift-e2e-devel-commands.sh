@@ -101,12 +101,80 @@ function filter_test_by_fips() {
     fi
     echo_e2e_tags
 }
+function filter_test_by_capability() {
+    local enabledcaps xversion yversion
+    enabledcaps="$(oc get clusterversion version -o yaml | yq '.status.capabilities.enabledCapabilities[]')"
+    IFS='.' read xversion yversion _ < <(oc version -o yaml | yq '.openshiftVersion')
+    local v411 v412 v413 v414 v415 v416
+    v411="baremetal marketplace openshift-samples"
+    v412="${v411} Console Insights Storage CSISnapshot"
+    v413="${v412} NodeTuning"
+    v414="${v413} MachineAPI Build DeploymentConfig ImageRegistry"
+    v415="${v414} OperatorLifecycleManager CloudCredential"
+    v416="${v415}"
+    # [console]=console
+    # the first `console` is the capability name
+    # the second `console` is the tag name in verification-tests
+    declare -A tagmaps
+    tagmaps=([baremetal]=xxx
+             [Build]=xxx
+             [CloudCredential]=xxx
+             [Console]=console
+             [CSISnapshot]=xxx
+             [DeploymentConfig]=xxx
+             [ImageRegistry]=xxx
+             [Insights]=xxx
+             [MachineAPI]=xxx
+             [marketplace]=xxx
+             [NodeTuning]=xxx
+             [openshift-samples]=xxx
+             [OperatorLifecycleManager]=xxx
+             [Storage]=storage
+    )
+    local versioncaps
+    versioncaps="$v416"
+    case "$xversion.$yversion" in
+        4.16)
+            versioncaps="$v416"
+            ;;
+        4.15)
+            versioncaps="$v415"
+            ;;
+        4.14)
+            versioncaps="$v414"
+            ;;
+        4.13)
+            versioncaps="$v413"
+            ;;
+        4.12)
+            versioncaps="$v412"
+            ;;
+        4.11)
+            versioncaps="$v411"
+            ;;
+        *)
+            versioncaps=""
+            echo "Got unexpected version: $xversion.$yversion"
+            ;;
+    esac
+    for cap in ${versioncaps} ; do
+        if ! (grep --ignore-case --quiet "$cap" <<< "$enabledcaps") ; then
+            if [[ "${tagmaps[$cap]}" != 'xxx' ]] ; then
+                export E2E_RUN_TAGS="${E2E_RUN_TAGS} and not @${tagmaps[$cap]}"
+            else
+                echo "TO_BE_DONE: find tag map for '$cap'"
+            fi
+        fi
+    done
+    echo_e2e_tags
+}
 function filter_tests() {
     filter_test_by_version
     filter_test_by_arch
     filter_test_by_network
     filter_test_by_sno
     filter_test_by_fips
+    filter_test_by_capability
     # the following check should be the last one in filter_tests
     for tag in ${CUCUSHIFT_FORCE_SKIP_TAGS} ; do
         if ! [[ "${E2E_SKIP_TAGS}" =~ $tag ]] ; then
