@@ -70,6 +70,38 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-preserve-bootstrap-ign
+- as: azure-ipi-disktype-premium-lrs-f14
+  cron: 9 15 5,21 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_DEFAULT_MACHINE_DISK_TYPE: Premium_LRS
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-disktype
+- as: azure-ipi-disktype-standardssd-lrs-f14
+  cron: 16 10 11,27 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_COMPUTE_DISK_TYPE: StandardSSD_LRS
+      AZURE_CONTROL_PLANE_DISK_TYPE: StandardSSD_LRS
+      AZURE_DEFAULT_MACHINE_DISK_TYPE: Premium_LRS
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-disktype
+- as: azure-ipi-disktype-worker-standard-lrs-f14
+  cron: 18 0 11,25 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_COMPUTE_DISK_TYPE: Standard_LRS
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-disktype
 - as: azure-ipi-marketplace-image-gen1-vm-type-gen1-f14
   cron: 30 19 9,23 * *
   steps:
@@ -96,6 +128,59 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace-generation
+- as: azure-ipi-vmgenv2-f14
+  cron: 30 2 4,18 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_DC4s_v3
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_DC4s_v3
+      CUSTOM_AZURE_REGION: southcentralus
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-generation
+- as: azure-mag-ipi-fullyprivate-reboot-nodes-f14
+  cron: 52 20 3,19 * *
+  steps:
+    cluster_profile: azuremag-qe
+    env:
+      BASE_DOMAIN: qemag.azure.devcluster.openshift.com
+      ENABLE_REBOOT_CHECK: "true"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
+- as: azure-upi-proxy-reboot-nodes-f14
+  cron: 31 22 5,19 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_REBOOT_CHECK: "true"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-upi-proxy
+- as: gcp-ipi-cco-manual-users-static-f28
+  cron: 29 9 27 * *
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-users-static
+- as: gcp-ipi-nested-virtualization-osdisk-type-size-f28
+  cron: 42 2 2 * *
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-nested-virtualization-osdisk-type-size
+- as: gcp-ipi-xpn-cco-manual-users-static-f28
+  cron: 24 20 27 * *
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-users-static
 zz_generated_metadata:
   branch: master
   org: openshift
