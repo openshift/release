@@ -3,6 +3,35 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+cp "${CLUSTER_PROFILE_DIR}/pull-secret" /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+ocp_version=$(oc adm release info --registry-config /tmp/pull-secret "${RELEASE_IMAGE_LATEST}" --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+
+if (( ocp_minor_version >= 15 && ocp_major_version == 4 )); then
+cat >> "${SHARED_DIR}/manifest_cluster-network-03-config.yml" << EOF
+apiVersion: operator.openshift.io/v1
+kind: Network
+metadata:
+  creationTimestamp: null
+  name: cluster
+spec:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  externalIP:
+    policy: {}
+  networkType: OVNKubernetes
+  serviceNetwork:
+  - 172.30.0.0/16
+  defaultNetwork:
+    type: OVNKubernetes
+    ovnKubernetesConfig:
+      ipsecConfig:
+        mode: Full
+EOF
+else
 cat >> "${SHARED_DIR}/manifest_cluster-network-03-config.yml" << EOF
 apiVersion: operator.openshift.io/v1
 kind: Network
@@ -23,15 +52,10 @@ spec:
     ovnKubernetesConfig:
       ipsecConfig: {}
 EOF
+fi
 
-# additional os extension for 4.14+
-cp "${CLUSTER_PROFILE_DIR}/pull-secret" /tmp/pull-secret
-oc registry login --to /tmp/pull-secret
-ocp_version=$(oc adm release info --registry-config /tmp/pull-secret "${RELEASE_IMAGE_LATEST}" --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
-
-if (( ocp_minor_version >= 14 && ocp_major_version == 4 )); then
+# additional os extension for 4.14 only
+if (( ocp_minor_version == 14 && ocp_major_version == 4 )); then
     for role in master worker; do
 cat >> "${SHARED_DIR}/manifest_${role}-ipsec-extension.yml" <<-EOF
 apiVersion: machineconfiguration.openshift.io/v1
