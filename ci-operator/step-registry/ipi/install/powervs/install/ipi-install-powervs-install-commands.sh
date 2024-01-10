@@ -240,7 +240,7 @@ function install_required_tools() {
       exit 1
     fi
 
-    for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns; do
+    for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns tg-cli; do
       ibmcloud plugin install ${I}
     done
     ibmcloud plugin list
@@ -253,6 +253,17 @@ function install_required_tools() {
         exit 1
       fi
     done
+
+    # Handle the following:
+    #   $ ibmcloud tg
+    #   FAILED
+    #   Not logged in. Use 'ibmcloud login' to log in.
+    if [ ! -d ${HOME}/.bluemix/plugins/tg-cli ]; then
+      echo "Error: ibmcloud's tg-cli plugin dir is not installed?"
+      ls -la ${HOME}/.bluemix/
+      ls -la ${HOME}/.bluemix/plugins/
+      exit 1
+    fi
   fi
 
   if [ ! -f /tmp/jq ]; then
@@ -493,27 +504,22 @@ function dump_resources() {
   echo "INFRA_ID=${INFRA_ID}"
   export INFRA_ID
 
-  echo "8<--------8<--------8<--------8<-------- Cloud Connection 8<--------8<--------8<--------8<--------"
+# "8<--------8<--------8<--------8<-------- Transit Gateways 8<--------8<--------8<--------8<--------"
 
-  CLOUD_UUID=$(ibmcloud pi connections --json | jq -r '.cloudConnections[] | select (.name|test("'${INFRA_ID}'")) | .cloudConnectionID')
+(
+  echo "8<--------8<--------8<--------8<-------- Transit Gateways 8<--------8<--------8<--------8<--------"
 
-  if [ -z "${CLOUD_UUID}" ]
+  ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | "\(.name) - \(.id)"'
+
+  GATEWAY_ID=$(ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
+  if [ -z "${GATEWAY_ID}" ]
   then
-    echo "Error: Could not find a Cloud Connection with the name ${INFRA_ID}"
-  else
-    ibmcloud pi connection ${CLOUD_UUID}
+    echo "Error: GATEWAY_ID is empty"
+    exit
   fi
 
-  echo "8<--------8<--------8<--------8<-------- Direct Link 8<--------8<--------8<--------8<--------"
-
-  DL_UUID=$(ibmcloud dl gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
-
-  if [ -z "${DL_UUID}" ]
-  then
-    echo "Error: Could not find a Direct Link with the name ${INFRA_ID}"
-  else
-    ibmcloud dl gateway ${DL_UUID}
-  fi
+  ibmcloud tg connections ${GATEWAY_ID}
+)
 
 # "8<--------8<--------8<--------8<-------- Load Balancers 8<--------8<--------8<--------8<--------"
 
