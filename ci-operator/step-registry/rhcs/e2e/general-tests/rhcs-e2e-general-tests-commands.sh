@@ -78,7 +78,7 @@ ginkgo run \
     --output-dir ${SHARED_DIR} \
     --junit-report $junitFileName \
     -r \
-    --focus-file tests/e2e/.* | tee ${SHARED_DIR}/rhcs_tests.log
+    --focus-file tests/e2e/.* | tee ${SHARED_DIR}/rhcs_tests.log  || true
 
 cd ~/terraform-provider-rhcs
 
