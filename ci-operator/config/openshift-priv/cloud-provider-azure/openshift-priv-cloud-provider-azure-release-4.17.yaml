@@ -1,0 +1,93 @@
+base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.15"
+  ocp_4.16_base-rhel9:
+    name: 4.17-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.16
+binary_build_commands: make binaries
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/kubernetes-sigs/cloud-provider-azure
+images:
+- dockerfile_path: openshift-hack/images/cloud-controller-manager-openshift.Dockerfile
+  inputs:
+    ocp_4.16_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: azure-cloud-controller-manager
+- dockerfile_path: openshift-hack/images/cloud-node-manager-openshift.Dockerfile
+  inputs:
+    ocp_4.16_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: azure-cloud-node-manager
+promotion:
+  to:
+  - name: 4.17-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.17-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.17-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify-git-history
+  commands: make verify-history
+  container:
+    from: src
+  optional: true
+- as: verify
+  commands: |
+    # Set $HOME for golangci-lint cache
+    HOME=/tmp make verify
+  container:
+    from: src
+- as: unit
+  commands: make test-unit-ci
+  container:
+    from: src
+- as: e2e-azure-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-azure-ovn-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
+  container:
+    from: commitchecker
+  optional: true
+zz_generated_metadata:
+  branch: release-4.17
+  org: openshift-priv
+  repo: cloud-provider-azure
