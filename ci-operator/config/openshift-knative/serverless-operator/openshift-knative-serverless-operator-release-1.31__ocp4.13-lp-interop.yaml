@@ -1,28 +1,28 @@
 base_images:
   base:
-    name: "4.14"
+    name: "4.13"
     namespace: ocp
     tag: base
   cli:
-    name: "4.14"
+    name: "4.13"
     namespace: ocp
     tag: cli
-  openshift_eventing-istio-src_knative-v1.9:
+  openshift_eventing-istio-src_knative-v1.10:
     name: eventing-istio-src
     namespace: openshift
-    tag: knative-v1.9
-  openshift_eventing-kafka-broker-src_knative-v1.9:
+    tag: knative-v1.10
+  openshift_eventing-kafka-broker-src_knative-v1.10:
     name: eventing-kafka-broker-src
     namespace: openshift
-    tag: knative-v1.9
-  openshift_knative-eventing-src_knative-v1.9:
+    tag: knative-v1.10
+  openshift_knative-eventing-src_knative-v1.10:
     name: knative-eventing-src
     namespace: openshift
-    tag: knative-v1.9
-  openshift_knative-serving-src_knative-v1.9:
+    tag: knative-v1.10
+  openshift_knative-serving-src_knative-v1.10:
     name: knative-serving-src
     namespace: openshift
-    tag: knative-v1.9
+    tag: knative-v1.10
   openshift_release_golang-1.19:
     name: release
     namespace: openshift
@@ -38,18 +38,18 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    openshift_eventing-istio-src_knative-v1.9:
+    openshift_eventing-istio-src_knative-v1.10:
       as:
-      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.9
-    openshift_eventing-kafka-broker-src_knative-v1.9:
+      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.10
+    openshift_eventing-kafka-broker-src_knative-v1.10:
       as:
-      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.9
-    openshift_knative-eventing-src_knative-v1.9:
+      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.10
+    openshift_knative-eventing-src_knative-v1.10:
       as:
-      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.9
-    openshift_knative-serving-src_knative-v1.9:
+      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.10
+    openshift_knative-serving-src_knative-v1.10:
       as:
-      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.9
+      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.10
   to: serverless-operator-src
 - context_dir: .
   dockerfile_path: serving/ingress/Dockerfile
@@ -88,10 +88,12 @@ images:
   to: serverless-bundle
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.14"
+      version_bounds:
+        lower: 4.13.0-0
+        stream: 4-stable
+        upper: 4.14.0-0
 resources:
   '*':
     limits:
@@ -118,7 +120,7 @@ tests:
               {"step": "operator-e2e", "failure_type": "test_failure", "classification": "operator-e2e Test Failure", "jira_project": "SRVCOM"}
             ]
         }
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.14-lp","self-managed-lp","serverless-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.13-lp","self-managed-lp","serverless-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       USER_TAGS: |
         scenario serverless
@@ -174,7 +176,7 @@ tests:
     workflow: firewatch-ipi-aws
   timeout: 8h0m0s
 zz_generated_metadata:
-  branch: release-1.30
+  branch: release-1.31
   org: openshift-knative
   repo: serverless-operator
-  variant: ocp4.14-lp-interop
+  variant: ocp4.13-lp-interop
