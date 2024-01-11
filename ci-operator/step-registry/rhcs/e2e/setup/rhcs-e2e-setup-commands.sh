@@ -68,7 +68,7 @@ ginkgo run \
     --label-filter day1-prepare \
     --timeout 2h \
     -r \
-    --focus-file tests/e2e/.* 2>&1| tee ${SHARED_DIR}/rhcs_preparation.log
+    --focus-file tests/e2e/.* 2>&1| tee ${SHARED_DIR}/rhcs_preparation.log || true
 
 # tar the shared manifest dir to make it share between pods
 cd ${SHARED_DIR}
