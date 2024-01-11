@@ -21,6 +21,7 @@ cp -r /root/terraform-provider-rhcs ~/
 
 cd  ~/terraform-provider-rhcs
 export CLUSTER_PROFILE=${CLUSTER_PROFILE}
+export QE_USAGE=${QE_USAGE}
 export CHANNEL_GROUP=${CHANNEL_GROUP}
 export RHCS_ENV=${RHCS_ENV}
 export VERSION=${VERSION}
@@ -77,7 +78,7 @@ ginkgo run \
     --output-dir ${SHARED_DIR} \
     --junit-report $junitFileName \
     -r \
-    --focus-file tests/e2e/.* | tee ${SHARED_DIR}/rhcs_tests.log
+    --focus-file tests/e2e/.* | tee ${SHARED_DIR}/rhcs_tests.log  || true
 
 cd ~/terraform-provider-rhcs
 

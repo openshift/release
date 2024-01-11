@@ -27,10 +27,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
   ocp_builder_rhel-8-golang-1.20-openshift-4.16:
     name: builder
     namespace: ocp
@@ -49,12 +45,18 @@ images:
     ocp_4.15_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
+    ocp_4.16_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base
+    ocp_4.16_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
   to: installer
 - build_args:
   - name: TAGS
@@ -76,9 +78,6 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
     ocp_builder_rhel-8-golang-1.20-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
@@ -133,12 +132,18 @@ images:
     ocp_4.15_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
+    ocp_4.16_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base
+    ocp_4.16_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
   to: baremetal-installer
 - build_args:
   - name: TAGS
@@ -151,12 +156,18 @@ images:
     ocp_4.15_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
+    ocp_4.16_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base
+    ocp_4.16_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
   to: ovirt-installer
 promotion:
   to:
@@ -254,6 +265,15 @@ tests:
   steps:
     cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
+- as: e2e-aws-ovn-testing-stream
+  cron: 30 0 * * *
+  steps:
+    cluster_profile: aws
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-aws-fcos-ami
+    - chain: ipi-install
+    workflow: openshift-e2e-aws
 - as: e2e-agent-compact-ipv4
   cluster: build05
   optional: true
