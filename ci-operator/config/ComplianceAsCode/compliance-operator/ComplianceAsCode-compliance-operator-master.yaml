@@ -3,6 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
+  ocp-4:
+    name: automation-flavors
+    namespace: stackrox
+    tag: openshift-4-0.9.1
   openshift_release_rhel-8-release-golang-1.20-openshift-4.14:
     name: release
     namespace: openshift
@@ -46,6 +50,7 @@ resources:
     requests:
       cpu: 200m
       memory: 400Mi
+test_binary_build_commands: make build
 tests:
 - as: go-build
   commands: make
@@ -65,7 +70,8 @@ tests:
 - as: e2e-aws-parallel
   skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
   steps:
-    cluster_profile: aws
+    env:
+      OCP_VERSION: ocp/stable-4.12
     test:
     - as: test
       cli: latest
@@ -81,11 +87,12 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: stackrox-automation-flavors-ocp-4-e2e
 - as: e2e-aws-serial
   skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
   steps:
-    cluster_profile: aws
+    env:
+      OCP_VERSION: ocp/stable-4.12
     test:
     - as: test
       cli: latest
@@ -101,7 +108,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: stackrox-automation-flavors-ocp-4-e2e
 zz_generated_metadata:
   branch: master
   org: ComplianceAsCode
