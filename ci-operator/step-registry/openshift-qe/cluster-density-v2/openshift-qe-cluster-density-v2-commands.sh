@@ -30,8 +30,10 @@ ES_SERVER="" ITERATIONS=${current_worker_count} CHURN=false ./run.sh
 iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
 export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 
-export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-export EXTRA_FLAGS+=" --gc-metrics=true "
+if [[ ${INDEXING} == "true" ]]; then
+  export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+fi
+export EXTRA_FLAGS+=" --gc-metrics=true"
 
 rm -f ${SHARED_DIR}/index.json
 ./run.sh
