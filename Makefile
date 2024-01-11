@@ -175,12 +175,8 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns publishing-bot content-mirror azure metering coreos
+projects: ci-ns publishing-bot azure metering coreos
 .PHONY: projects
-
-content-mirror:
-	$(MAKE) apply WHAT=projects/content-mirror/pipeline.yaml
-.PHONY: content-mirror
 
 node-problem-detector:
 	$(MAKE) apply WHAT=projects/kubernetes/node-problem-detector.yaml
