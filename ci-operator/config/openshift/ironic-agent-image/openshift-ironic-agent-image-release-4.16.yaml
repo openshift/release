@@ -3,26 +3,28 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-9-base-openshift-4.15:
+  ocp_builder_rhel-9-base-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-base-openshift-4.15
+    tag: rhel-9-base-openshift-4.16
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.ocp
-  from: base
+  from: ironic-agent-base
   to: ironic-agent
 promotion:
-  name: "4.16"
-  namespace: ocp
+  to:
+  - disabled: true
+    name: "4.16"
+    namespace: ocp
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
       #NOTE(elfosardo): use ironic repos, cause we're special
-      curl http://base-4-15-rhel-9-server-ironic.ocp.svc > /etc/yum.repos.d/base-4-15-rhel-9-server-ironic.repo
-    from: ocp_builder_rhel-9-base-openshift-4.15
-    to: base
+      curl http://base-4-16-rhel-9-server-ironic.ocp.svc > /etc/yum.repos.d/base-4-16-rhel-9-server-ironic.repo
+    from: ocp_builder_rhel-9-base-openshift-4.16
+    to: ironic-agent-base
 releases:
   initial:
     integration:
@@ -46,13 +48,13 @@ tests:
     cluster_profile: equinix-ocp-metal
     env:
       CLUSTERTYPE: baremetal
-    workflow: baremetalds-e2e-ipv4
+    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-serial-ipv4
   cluster: build05
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-serial-ipv4
+    workflow: baremetalds-e2e-sdn-serial-ipv4
 - as: e2e-metal-ipi-virtualmedia
   cluster: build05
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$

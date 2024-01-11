@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: 4.16-priv
-    namespace: ocp-private
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -13,11 +9,12 @@ build_root:
 canonical_go_repository: github.com/openshift/cluster-api-provider-baremetal
 images:
 - dockerfile_path: Dockerfile.rhel
-  from: base
   to: baremetal-machine-controllers
 promotion:
-  name: 4.16-priv
-  namespace: ocp-private
+  to:
+  - disabled: true
+    name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -45,7 +42,7 @@ tests:
   skip_if_only_changed: (^docs\/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-ipv4
+    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   skip_if_only_changed: (^docs\/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
@@ -65,7 +62,7 @@ tests:
       RUN_UPGRADE_TEST: "true"
       TEST_SUITE: ""
       TEST_TYPE: upgrade
-    workflow: baremetalds-e2e-upgrade
+    workflow: baremetalds-e2e-upgrade-sdn
 - as: e2e-metal-ipi-ovn-dualstack
   cluster: build05
   optional: true

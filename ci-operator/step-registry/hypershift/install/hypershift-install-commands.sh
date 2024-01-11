@@ -17,6 +17,10 @@ if [ "${ENABLE_HYPERSHIFT_OPERATOR_VALIDATING_WEBHOOK}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-validating-webhook=true"
 fi
 
+if [ "${ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE}" = "true" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --cert-rotation-scale=20m"
+fi
+
 bin/hypershift install --hypershift-image="${OPERATOR_IMAGE}" \
 --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
 --oidc-storage-provider-s3-bucket-name=hypershift-ci-oidc \
@@ -30,5 +34,4 @@ bin/hypershift install --hypershift-image="${OPERATOR_IMAGE}" \
 --external-dns-credentials=/etc/hypershift-pool-aws-credentials/credentials \
 --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com \
 --wait-until-available \
---cert-rotation-scale=20m \
 ${EXTRA_ARGS}

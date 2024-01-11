@@ -7,18 +7,18 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: hypershift-operator
-  ocp_4.15_base-rhel9:
+  ocp_4.16_base-rhel9:
     name: "4.16"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.19-openshift-4.15:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.15
-  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    tag: rhel-8-golang-1.20-openshift-4.16
+  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.20-openshift-4.16
 build_root:
   image_stream_tag:
     name: release
@@ -27,30 +27,32 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.base
   inputs:
-    ocp_4.15_base-rhel9:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.15:base-rhel9
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
   to: ovn-kubernetes-base
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.15:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.15
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
+    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
   to: ovn-kubernetes
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
   to: ovn-kubernetes-microshift
 promotion:
-  name: "4.16"
-  namespace: ocp
+  to:
+  - disabled: true
+    name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -150,11 +152,28 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-ibmcloud-ipi-ovn-periodic
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: ibmcloud
+    workflow: openshift-e2e-ibmcloud-ovn
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
+- as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
+  cron: 0 0 */2 * *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
+  steps:
+    cluster_profile: aws
+    env:
+      GATEWAY_MODE: local
+    workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+- as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
+  cron: 0 0 */2 * *
   steps:
     cluster_profile: aws
     env:
@@ -268,6 +287,23 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
+- always_run: false
+  as: e2e-aws-ovn-network-migration
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+    test:
+    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-config-multicast
+    - ref: ovn-sdn-migration
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-validate-multicast
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-sdn
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

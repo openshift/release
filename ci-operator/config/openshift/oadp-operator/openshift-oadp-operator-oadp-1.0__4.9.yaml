@@ -1,18 +1,14 @@
-base_images:
-  ocp_builder_1.19:
+build_root:
+  image_stream_tag:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.12
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
 images:
 - dockerfile_path: Dockerfile
+  from: src
   to: oadp-operator
 - dockerfile_path: build/ci-Dockerfile
-  from: ocp_builder_1.19
+  from: src
   to: test-oadp-operator
 operator:
   bundles:
@@ -33,39 +29,9 @@ resources:
       cpu: 1000m
       memory: 512Mi
 tests:
-- as: operator-unit-test
-  steps:
-    test:
-    - as: unit
-      commands: HOME=$(pwd) make test
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: operator-unit-test-coverage
-  postsubmit: true
-  steps:
-    test:
-    - as: unit-coverage
-      commands: HOME=$(pwd) make test submit-coverage
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: operator-unit-test-periodic
-  cron: 27 6 14,26 * *
-  steps:
-    test:
-    - as: unit-periodic
-      commands: HOME=$(pwd) make test submit-coverage
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: operator-e2e
+- always_run: false
+  as: e2e-test-aws
+  run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+
   steps:
     cluster_profile: aws
     dependencies:
@@ -78,7 +44,7 @@ tests:
     test:
     - as: e2e
       cli: latest
-      commands: CLUSTER_PROFILE=aws make test-e2e
+      commands: make test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
@@ -89,7 +55,7 @@ tests:
           cpu: 1000m
           memory: 512Mi
     workflow: optional-operators-ci-aws
-- as: operator-e2e-aws-periodic-slack
+- as: e2e-test-aws-periodic
   cron: 13 19 14,28 * *
   steps:
     cluster_profile: aws
@@ -103,7 +69,7 @@ tests:
     test:
     - as: e2e
       cli: latest
-      commands: CLUSTER_PROFILE=aws make test-e2e
+      commands: make test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
@@ -114,7 +80,7 @@ tests:
           cpu: 1000m
           memory: 512Mi
     workflow: optional-operators-ci-aws
-- as: operator-e2e-gcp-periodic-slack
+- as: e2e-test-gcp-periodic
   cron: 10 7 1,28 * *
   steps:
     cluster_profile: gcp
@@ -128,7 +94,7 @@ tests:
     test:
     - as: e2e
       cli: latest
-      commands: CLUSTER_PROFILE=gcp make test-e2e
+      commands: make test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
@@ -139,7 +105,7 @@ tests:
           cpu: 1000m
           memory: 512Mi
     workflow: optional-operators-ci-gcp
-- as: operator-e2e-azure-periodic-slack
+- as: e2e-test-azure-periodic
   cron: 12 1 7,17 * *
   steps:
     cluster_profile: azure4
@@ -153,7 +119,7 @@ tests:
     test:
     - as: e2e
       cli: latest
-      commands: CLUSTER_PROFILE=azure make test-e2e
+      commands: make test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials

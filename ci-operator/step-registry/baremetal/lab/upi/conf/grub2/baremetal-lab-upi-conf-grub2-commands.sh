@@ -56,11 +56,11 @@ load_video
 menuentry 'Install ($flavor)' {
     set gfx_payload=keep
     insmod gzio
-    linux  /${CLUSTER_NAME}/vmlinuz_${arch} debug nosplash ip=${baremetal_iface}:dhcp $kargs coreos.live.rootfs_url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/rootfs-${arch}.img ignition.firstboot ignition.platform.id=metal
+    linux  /${CLUSTER_NAME}/vmlinuz_${arch} debug nosplash ip=${baremetal_iface}:dhcp $kargs coreos.live.rootfs_url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/rootfs-${arch}.img ignition.firstboot ignition.platform.id=metal panic=30
     initrd /${CLUSTER_NAME}/initramfs_${arch}.img
 }
 EOF
 done
 
 echo "Uploading the GRUB2 config to the auxiliary host..."
-scp "${SSHOPTS[@]}" "${GRUB_DIR}"/grub.cfg-01-* "root@${AUX_HOST}:/opt/tftpboot"
+scp "${SSHOPTS[@]}" "${GRUB_DIR}"/grub.cfg-01-* "root@${AUX_HOST}:/opt/dnsmasq/tftpboot"

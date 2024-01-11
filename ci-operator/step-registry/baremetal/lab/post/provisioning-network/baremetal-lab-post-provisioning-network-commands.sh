@@ -71,7 +71,7 @@ for switch_address in switches:
                     # If the port is not a trunk port, we add a default vlan tag
                     if not port.startswith("T"):
                         cu.load(
-                            f"set interfaces {port} unit 0 family ethernet-switching vlan members vlan8",
+                            f"set interfaces {port} unit 0 family ethernet-switching vlan members 1010",
                             format="set"
                         )
                 # We finally delete the vlan and commit
@@ -97,7 +97,7 @@ interfaces:
 - name: br-${CLUSTER_NAME: -12}
   type: linux-bridge
   state: absent
-- name: ${PROVISIONING_NET_DEV}.${VLAN_ID}
+- name: prov.${VLAN_ID}
   type: vlan
   state: absent
 "

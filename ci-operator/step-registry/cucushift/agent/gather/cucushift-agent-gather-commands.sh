@@ -11,6 +11,12 @@ if test -f "${SHARED_DIR}/install-status.txt"; then
     exit "${EXIT_CODE}"
   fi
 fi
+
+version=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
+if [[ $(echo -e "4.15\n$version" | sort -V | tail -n 1) == "$version" ]]; then
+  echo "Skipping the agent gather for 4.15 or greater version until this https://issues.redhat.com/browse/OCPBUGS-24428 is fixed"
+  exit 0
+fi
 # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required to be able to SSH.
 if ! whoami &>/dev/null; then
   if [[ -w /etc/passwd ]]; then

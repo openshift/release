@@ -83,7 +83,7 @@ metadata:
   name: qci-appci
   namespace: ci
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: qci-appci
@@ -93,6 +93,18 @@ spec:
       labels:
         app: qci-appci
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - qci-appci
+              topologyKey: "kubernetes.io/hostname"
       containers:
       - name: qci-appci
         image: qci-appci:latest

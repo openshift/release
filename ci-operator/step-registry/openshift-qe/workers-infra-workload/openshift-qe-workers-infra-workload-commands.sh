@@ -505,7 +505,44 @@ EOF
 #                       Add Infra and Workload Entrypoint                            #
 #                                                                                    #
 ######################################################################################
-#SET_ENV_BY_PLATFORM can be overried by SET_ENV_BY_PLATFORM=custom, it will use the same cpu/ram with worker nodes
+
+#The Following ENV variable can be override by SET_ENV_BY_PLATFORM=custom
+#If SET_ENV_BY_PLATFORM=custom, the following ENV variables can be configured, below are some examples.
+#If SET_ENV_BY_PLATFORM=custom and the following ENV variables are not configured, will use the same cpu/ram/volumesize with worker nodes.
+#If SET_ENV_BY_PLATFORM is not set to custom, the following ENV variables can not be configured, will use the default settings in the script.
+######################################################################################
+#The INSTANCE_TYPE variable can be used for aws,gcp,azure,alicloud,  openstack and ibmcloud
+#-------------------------------------------------------------------------------------
+#           OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=m6g.2xlarge
+#           OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=m6g.8xlarge
+#-------------------------------------------------------------------------------------
+
+#The VOLUME_SIZE variable can be used for aws,gcp,azure,alicloud, can not used for openstack and ibmcloud
+#-------------------------------------------------------------------------------------
+#           OPENSHIFT_INFRA_NODE_VOLUME_SIZE=500
+#           OPENSHIFT_WORKLOAD_NODE_VOLUME_SIZE=500
+#-------------------------------------------------------------------------------------
+
+#The following variable can be used for vsphere
+#-------------------------------------------------------------------------------------
+#          OPENSHIFT_INFRA_NODE_VOLUME_SIZE=120
+#          OPENSHIFT_INFRA_NODE_CPU_COUNT=48
+#          OPENSHIFT_INFRA_NODE_MEMORY_SIZE=196608
+#          OPENSHIFT_INFRA_NODE_CPU_CORE_PER_SOCKET_COUNT=2
+#          OPENSHIFT_WORKLOAD_NODE_VOLUME_SIZE=500
+#          OPENSHIFT_WORKLOAD_NODE_CPU_COUNT=32
+#          OPENSHIFT_WORKLOAD_NODE_MEMORY_SIZE=131072
+#          OPENSHIFT_WORKLOAD_NODE_CPU_CORE_PER_SOCKET_COUNT=2
+#-------------------------------------------------------------------------------------
+
+#The following variable can be used for nutanix
+#-------------------------------------------------------------------------------------
+#           OPENSHIFT_INFRA_NODE_INSTANCE_VCPU=16
+#           OPENSHIFT_INFRA_NODE_INSTANCE_MEMORYSIZE=64Gi
+#           OPENSHIFT_WORKLOAD_NODE_INSTANCE_VCPU=16
+#           OPENSHIFT_WORKLOAD_NODE_INSTANCE_MEMORYSIZE=64Gi
+#-------------------------------------------------------------------------------------
+
 #IF_INSTALL_INFRA_WORKLOAD=true/false
 if test ! -f "${KUBECONFIG}"
 then
