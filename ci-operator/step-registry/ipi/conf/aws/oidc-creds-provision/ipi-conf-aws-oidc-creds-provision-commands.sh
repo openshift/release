@@ -46,7 +46,6 @@ fi
 echo "OC Version:"
 which oc
 oc version --client
-oc adm release extract --help
 
 dir=$(mktemp -d)
 pushd "${dir}"
