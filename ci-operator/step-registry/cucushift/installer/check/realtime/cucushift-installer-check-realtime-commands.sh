@@ -9,6 +9,8 @@ if [ -z "${RT_ENABLED}" ] || [ "${RT_ENABLED}" != "true" ]; then
     exit 0
 fi
 
+sleep 3600
+
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 else
