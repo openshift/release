@@ -46,6 +46,8 @@ else
   exit 1
 fi
 
+echo "Notify the error if the cluster in the unhealthy state."
+
 # If cluster is in error state, call ocm-qe to analyze the root cause.
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 CLUSTER_STATE=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.state')
@@ -60,6 +62,7 @@ fi
 # a blocker for testing.
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
 if [[ "${API_URL}" == "null" ]]; then
+  echo "Warning: the api.url is null"
   notify_ocmqe "Warning: the api.url for the cluster ${CLUSTER_ID} is null"
   exit 0
 fi
