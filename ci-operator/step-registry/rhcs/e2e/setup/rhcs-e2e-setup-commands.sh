@@ -52,6 +52,7 @@ export RHCS_OUTPUT=${SHARED_DIR}
 # Export the manifests folder to the shared dir
 export CLUSTER_PROFILE=${CLUSTER_PROFILE}
 export QE_USAGE=${QE_USAGE}
+export WAIT_OPERATORS=${WAIT_OPERATORS}
 export CHANNEL_GROUP=${CHANNEL_GROUP}
 export RHCS_ENV=${RHCS_ENV}
 export RHCS_TOKEN=${RHCS_TOKEN}
