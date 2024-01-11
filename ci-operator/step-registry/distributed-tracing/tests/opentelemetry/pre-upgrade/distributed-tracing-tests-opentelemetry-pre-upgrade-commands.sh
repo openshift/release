@@ -12,6 +12,9 @@ if [[ -n "${DOWNSTREAM_TESTS_COMMIT}" ]]; then
   git clone https://github.com/open-telemetry/opentelemetry-operator.git /tmp/otel-tests
   cd /tmp/otel-tests
   git checkout -b downstream-release "${DOWNSTREAM_TESTS_COMMIT}"
+
+  #Enable user workload monitoring
+  oc create -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
   
   #Set parameters for running the test cases on OpenShift
   unset NAMESPACE
@@ -55,6 +58,9 @@ else
 
   #Copy the opentelemetry-operator repo files to a writable directory by kuttl
   cp -R /tmp/opentelemetry-operator /tmp/opentelemetry-tests && cd /tmp/opentelemetry-tests
+
+  #Enable user workload monitoring
+  oc create -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
 
   #Set parameters for running the test cases on OpenShift
   unset NAMESPACE
@@ -100,7 +106,9 @@ else
     tests/e2e-autoscale \
     tests/e2e-openshift \
     tests/e2e-prometheuscr \
-    tests/e2e-instrumentation
+    tests/e2e-instrumentation \
+    tests/e2e-pdb \
+    tests/e2e-opampbridge
 
   # Enable required feature gates.
   OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
