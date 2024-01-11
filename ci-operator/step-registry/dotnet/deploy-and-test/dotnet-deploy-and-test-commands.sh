@@ -14,6 +14,9 @@ cp $KUBECONFIG /tmp/kubeconfig
 export KUBECONFIG=/tmp/kubeconfig
 export EXT_TEST=$DOTNET_VERSION
 
+# Add cli to begining of PATH
+export PATH=/cli:$PATH
+
 # Run tests
 echo "Executing .net tests..."
 ansible-runner run /tmp/tests/ansible-tests -p deploy-and-test.yml

@@ -13,6 +13,9 @@ cp $KUBECONFIG /tmp/kubeconfig
 
 export KUBECONFIG=/tmp/kubeconfig
 
+# Add cli to beginning of PATH   
+export PATH=/cli:$PATH
+
 # Run tests
 echo "Executing rhscl tests..."
 ansible-runner run /tmp/tests/ansible-tests -p deploy-and-test.yml
