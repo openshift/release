@@ -203,6 +203,21 @@ ${required_permissions}
 """    
 fi
 
+if [[ "${ENABLE_MIN_PERMISSION_FOR_DES}" == "true" ]]; then
+    required_permissions="""
+\"Microsoft.Compute/diskEncryptionSets/read\",
+\"Microsoft.Compute/diskEncryptionSets/write\",
+\"Microsoft.Compute/diskEncryptionSets/delete\",
+\"Microsoft.KeyVault/vaults/read\",
+\"Microsoft.KeyVault/vaults/write\",
+\"Microsoft.KeyVault/vaults/delete\",
+\"Microsoft.KeyVault/vaults/deploy/action\",
+\"Microsoft.KeyVault/vaults/keys/read\",
+\"Microsoft.KeyVault/vaults/keys/write\",
+${required_permissions}
+"""
+fi
+
 role_description="the custom role with minimal permissions for cluster ${CLUSTER_NAME}"
 assignable_scopes="""
 \"/subscriptions/${AZURE_AUTH_SUBSCRIPTOIN_ID}\"
