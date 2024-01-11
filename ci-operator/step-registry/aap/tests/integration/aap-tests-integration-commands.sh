@@ -61,7 +61,7 @@ POD_NAME=aap-tests-pod
 CONTAINER_NAME=aap-tests-container
 
 oc create configmap inventory-cm --from-file /tmp/inventory
-oc create configmap credentials-cm --from-file /tmp/credentials.yml
+oc create secret generic credentials-secret --from-file /tmp/credentials.yml
 
 cat <<EOF | oc create -f -
 apiVersion: v1
@@ -116,7 +116,7 @@ spec:
       mountPath: /home/jenkins/agent/inventory
       subPath: inventory
       readOnly: false
-    - name: credentials-cm
+    - name: credentials-secret
       mountPath: /home/jenkins/agent/credentials.yml
       subPath: credentials.yml
       readOnly: false
@@ -127,9 +127,9 @@ spec:
   - name: inventory-cm
     configMap:
       name: inventory-cm
-  - name: credentials-cm
-    configMap:
-      name: credentials-cm
+  - name: credentials-secret
+    secret:
+      secretName: credentials-secret
   imagePullSecrets:
   - name: ${AAP_CONTAINERIZED_TEST_IMAGE_NAME}
 EOF
