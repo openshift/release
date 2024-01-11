@@ -294,7 +294,6 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   fi
 done
 
-
 EXPECTED_NODES=$(( $(get_ready_nodes_count) + ADDITIONAL_WORKERS ))
 
 echo "Wait for the day2 nodes to become ready too..."
