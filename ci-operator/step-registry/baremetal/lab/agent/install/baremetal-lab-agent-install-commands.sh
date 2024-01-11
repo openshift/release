@@ -44,6 +44,37 @@ function get_ready_nodes_count() {
     grep -c -E ",True$"
 }
 
+function approve_csrs() {
+  while [[ ! -f '/tmp/scale-out-complete' ]]; do
+    sleep 30
+    echo "approve_csrs() running..."
+    oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' \
+      | xargs --no-run-if-empty oc adm certificate approve || true
+  done
+}
+
+# wait_for_nodes_readiness loops until the number of ready nodes objects is equal to the desired one
+function wait_for_nodes_readiness()
+{
+  local expected_nodes=${1}
+  local max_retries=${2:-10}
+  local period=${3:-5}
+  for i in $(seq 1 "${max_retries}") max; do
+    if [ "${i}" == "max" ]; then
+      echo "[ERROR] Timeout reached. ${expected_nodes} ready nodes expected, found ${ready_nodes}... Failing."
+      return 1
+    fi
+    sleep "${period}m"
+    ready_nodes=$(get_ready_nodes_count)
+    if [ x"${ready_nodes}" == x"${expected_nodes}" ]; then
+        echo "[INFO] Found ${ready_nodes}/${expected_nodes} ready nodes, continuing..."
+        return 0
+    fi
+    echo "[INFO] - ${expected_nodes} ready nodes expected, found ${ready_nodes}..." \
+      "Waiting ${period}min before retrying (timeout in $(( (max_retries - i) * (period) ))min)..."
+  done
+}
+
 function update_image_registry() {
   while ! oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
                  --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'; do
@@ -270,7 +301,6 @@ done < <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.ya
 ### Create Ignition configs
 echo -e "\nCreating Ignition configs..."
 oinst create ignition-configs
-export KUBECONFIG="$INSTALL_DIR/auth/kubeconfig"
 
 echo -e "\nPreparing firstboot ignitions for sync..."
 cp "${SHARED_DIR}"/*.ign "${INSTALL_DIR}" || true
