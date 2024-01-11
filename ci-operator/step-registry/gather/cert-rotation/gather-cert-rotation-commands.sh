@@ -39,29 +39,29 @@ function run-on-all-nodes {
   for n in ${control_node_ips[@]} ${compute_node_ips[@]}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@${n} sudo 'bash -eEuxo pipefail' <<< ${1}; done
 }
 
-function copy-files-from-all-nodes {
-  for n in ${control_node_ips[@]} ${compute_node_ips[@]}; do timeout ${COMMAND_TIMEOUT} ${SCP} core@${n}:${1} "${2}"; done
-}
-
 function run-on-first-master {
   timeout ${COMMAND_TIMEOUT} ${SSH} core@${control_node_ips[0]} sudo 'bash -eEuxo pipefail' <<< ${1}
 }
 
-function copy-file-from-first-master {
-  timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_node_ips[0]}:${1}" "${2}"
+function fetch-artifacts-from-all-nodes {
+  for n in ${control_node_ips[@]} ${compute_node_ips[@]}; do
+    timeout ${COMMAND_TIMEOUT} ${SSH} core@${n} "sudo chmod a+r -R ${NODE_ARTIFACT_DIR}"
+    timeout ${COMMAND_TIMEOUT} ${SCP} -r "core@${n}:${NODE_ARTIFACT_DIR}" "${BASTION_ARTIFACT_DIR}"
+  done
 }
 
+trap fetch-artifacts-from-all-nodes EXIT
+
 run-on-all-nodes "
-  sudo mkdir ${NODE_ARTIFACT_DIR}
-  sudo chown -R core:core ${NODE_ARTIFACT_DIR}
-  sudo podman run -t --name toolbox --authfile /var/lib/kubelet/config.json --privileged --ipc=host --net=host --pid=host -e HOST=/host -e NAME=toolbox- -e IMAGE=registry.redhat.io/rhel8/support-tools:latest -v /run:/run -v /var/log:/var/log -v /etc/machine-id:/etc/machine-id -v /etc/localtime:/etc/localtime -v /:/host registry.redhat.io/rhel8/support-tools:latest \
+  mkdir ${NODE_ARTIFACT_DIR}
+  chown -R core:core ${NODE_ARTIFACT_DIR}
+  podman run -t --name toolbox --authfile /var/lib/kubelet/config.json --privileged --ipc=host --net=host --pid=host -e HOST=/host -e NAME=toolbox- -e IMAGE=registry.redhat.io/rhel8/support-tools:latest -v /run:/run -v /var/log:/var/log -v /etc/machine-id:/etc/machine-id -v /etc/localtime:/etc/localtime -v /:/host registry.redhat.io/rhel8/support-tools:latest \
         sos report --case-id "\$HOSTNAME" --batch \
           -o container_log,filesys,logs,networkmanager,podman,processor,sar \
           -k podman.all -k podman.logs \
           --tmp-dir ${NODE_ARTIFACT_DIR}
-  sudo tar -czvf ${NODE_ARTIFACT_DIR}/etc-kubernetes-\$HOSTNAME.tar.gz -C /etc/kubernetes /etc/kubernetes
+  tar -czf ${NODE_ARTIFACT_DIR}/etc-kubernetes-\$HOSTNAME.tar.gz -C /etc/kubernetes /etc/kubernetes
 "
-copy-files-from-all-nodes "${NODE_ARTIFACT_DIR}" "${BASTION_ARTIFACT_DIR}" || true
 
 # Build a new kubeconfig from control plane node kubeconfig
 run-on-first-master "
@@ -75,15 +75,10 @@ run-on-first-master "
   oc get nodes -o yaml > ${NODE_ARTIFACT_DIR}/nodes.yaml
   oc get csr -o yaml > ${NODE_ARTIFACT_DIR}/csrs.yaml
   oc get co -o yaml > ${NODE_ARTIFACT_DIR}/cos.yaml
-"
-copy-file-from-first-master "${NODE_ARTIFACT_DIR}" "${BASTION_ARTIFACT_DIR}" || true
 
-run-on-first-master "
-  export KUBECONFIG=/tmp/control-plane-kubeconfig
   oc --insecure-skip-tls-verify adm must-gather --timeout=15m --dest-dir=${NODE_ARTIFACT_DIR}/must-gather
-  tar -czC ${NODE_ARTIFACT_DIR}/must-gather -f ${NODE_ARTIFACT_DIR}/must-gather.tar.gz .
+  tar -czf ${NODE_ARTIFACT_DIR}/must-gather.tar.gz -C ${NODE_ARTIFACT_DIR}/must-gather ${NODE_ARTIFACT_DIR}/must-gather
 "
-copy-file-from-first-master "${NODE_ARTIFACT_DIR}" "${BASTION_ARTIFACT_DIR}" || true
 
 exit 0
 EOF
