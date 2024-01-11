@@ -79,6 +79,12 @@ rules:
       - secrets
     verbs:
       - '*'
+  - apiGroups:
+      - k8s.ovn.org
+    resources:
+      - egressfirewalls
+    verbs:
+      - '*'
 EOF
 
 # Bind this role with the service account
