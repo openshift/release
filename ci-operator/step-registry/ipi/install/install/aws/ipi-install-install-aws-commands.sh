@@ -235,6 +235,19 @@ if [ "${ENABLE_AWS_LOCALZONE}" == "yes" ]; then
   
 fi
 
+if [[ ${ENABLE_AWS_OUTPOST} == "yes" ]]; then
+  pushd "${dir}/openshift"
+  o_private_id=$(head -n 1 ${SHARED_DIR}/outpost_private_id)
+  for worker_node_manifest in $(grep -lr "machine.openshift.io/cluster-api-machine-role: worker" .);
+  do
+    echo "AWS Outpost: applying Outpost subnet id ${o_private_id} to machine set ${worker_node_manifest}"
+    sed -i "s/subnet-.*/${o_private_id}/" ${worker_node_manifest}
+    echo "worker nodes manifests: ${worker_node_manifest}"
+    cat ${worker_node_manifest}
+  done
+  popd
+fi
+
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
 echo "Will include manifests:"
