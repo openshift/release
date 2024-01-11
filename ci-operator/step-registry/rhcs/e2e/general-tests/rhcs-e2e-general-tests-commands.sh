@@ -22,6 +22,7 @@ cp -r /root/terraform-provider-rhcs ~/
 cd  ~/terraform-provider-rhcs
 export CLUSTER_PROFILE=${CLUSTER_PROFILE}
 export QE_USAGE=${QE_USAGE}
+export WAIT_OPERATORS=${WAIT_OPERATORS}
 export CHANNEL_GROUP=${CHANNEL_GROUP}
 export RHCS_ENV=${RHCS_ENV}
 export VERSION=${VERSION}
