@@ -44,37 +44,6 @@ function get_ready_nodes_count() {
     grep -c -E ",True$"
 }
 
-function approve_csrs() {
-  while [[ ! -f '/tmp/scale-out-complete' ]]; do
-    sleep 30
-    echo "approve_csrs() running..."
-    oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' \
-      | xargs --no-run-if-empty oc adm certificate approve || true
-  done
-}
-
-# wait_for_nodes_readiness loops until the number of ready nodes objects is equal to the desired one
-function wait_for_nodes_readiness()
-{
-  local expected_nodes=${1}
-  local max_retries=${2:-10}
-  local period=${3:-5}
-  for i in $(seq 1 "${max_retries}") max; do
-    if [ "${i}" == "max" ]; then
-      echo "[ERROR] Timeout reached. ${expected_nodes} ready nodes expected, found ${ready_nodes}... Failing."
-      return 1
-    fi
-    sleep "${period}m"
-    ready_nodes=$(get_ready_nodes_count)
-    if [ x"${ready_nodes}" == x"${expected_nodes}" ]; then
-        echo "[INFO] Found ${ready_nodes}/${expected_nodes} ready nodes, continuing..."
-        return 0
-    fi
-    echo "[INFO] - ${expected_nodes} ready nodes expected, found ${ready_nodes}..." \
-      "Waiting ${period}min before retrying (timeout in $(( (max_retries - i) * (period) ))min)..."
-  done
-}
-
 function update_image_registry() {
   while ! oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
                  --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'; do
@@ -177,7 +146,6 @@ cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
 
-
 ### TODO check if we can support the following
 ### Create manifests
 #echo "Creating manifests..."
@@ -244,16 +212,17 @@ case "${BOOT_MODE}" in
   exit 1
 esac
 
+export KUBECONFIG="$INSTALL_DIR/auth/kubeconfig"
+
+echo -e "\nPreparing files for next steps in SHARED_DIR..."
+cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
+cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
+
 proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
-    # Do not power on the additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
-    # on a single-arch payload migrated to a multi-arch cluster)
-    continue
-  fi
   echo "Power on #${host} (${name})..."
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "${BOOT_MODE}"
 done
