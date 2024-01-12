@@ -177,30 +177,6 @@ cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
 
-### Create manifests
-echo "Creating manifests..."
-oinst agent create cluster-manifests
-
-### Inject customized manifests
-echo -e "\nThe following manifests will be included at installation time:"
-find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
-while IFS= read -r -d '' item
-do
-  manifest="$(basename "${item}")"
-  cp "${item}" "${INSTALL_DIR}/cluster-manifests/${manifest##manifest_}"
-done < <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
-
-### Create Ignition configs
-echo -e "\nCreating Ignition configs..."
-oinst create ignition-configs
-
-echo -e "\nPreparing firstboot ignitions for sync..."
-cp "${SHARED_DIR}"/*.ign "${INSTALL_DIR}" || true
-
-echo -e "\nCopying ignition files into bastion host..."
-chmod 644 "${INSTALL_DIR}"/*.ign
-scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/*.ign "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/"
-
 ### TODO check if we can support the following
 ### Create manifests
 #echo "Creating manifests..."
@@ -270,7 +246,6 @@ esac
 export KUBECONFIG="$INSTALL_DIR/auth/kubeconfig"
 
 echo -e "\nPreparing files for next steps in SHARED_DIR..."
-cp "${INSTALL_DIR}/metadata.json" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
 
@@ -319,6 +294,15 @@ if [ "${ADDITIONAL_WORKERS}" == "0" ]; then
     echo "No additional workers requested"
     exit 0
 fi
+
+oc extract -n openshift-machine-api secret/worker-user-data-managed --keys=userData --to=- > worker.ign
+
+echo -e "\nCopying ignition files into bastion host..."
+chmod 644 "${INSTALL_DIR}"/*.ign
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/*.ign "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/"
+
+echo -e "\nPreparing files for next steps in SHARED_DIR..."
+cp "${INSTALL_DIR}/metadata.json" "${SHARED_DIR}/"
 
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
