@@ -4,24 +4,21 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-CONSOLE_URL=$(cat $SHARED_DIR/console.url)
-OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
+export CONSOLE_URL=$(cat $SHARED_DIR/console.url)
+export OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 
-echo "CONSOLE_URL = ${CONSOLE_URL}"
-
-# login via kubeconfig
-cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
-oc login --kubeconfig=${KUBECONFIG} --insecure-skip-tls-verify=true
-
-OCP_TOKEN="$(oc whoami -t)"
-
-export OCP_API_URL
-export OCP_TOKEN
-# Env variable needed to run maistra tests on ROSA
-export ROSA
-
-echo "Execute maistra tests"
-make test
+# for interop
+if test -f ${SHARED_DIR}/kubeadmin-password
+then
+  OCP_CRED_USR="kubeadmin"
+  OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
+  oc login ${OCP_API_URL} --username=${OCP_CRED_USR} --password=${OCP_CRED_PSW} --insecure-skip-tls-verify=true
+  echo "Execute maistra tests"
+  make test
+else #for ROSA & Hypershift platforms
+  "$(cat ${SHARED_DIR}/api.login)"
+  ROSA=true make test
+fi
 
 echo "Copying logs and xmls to ${ARTIFACT_DIR}"
 cp -r tests/result-latest/* ${ARTIFACT_DIR}
