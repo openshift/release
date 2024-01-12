@@ -11,6 +11,9 @@ die_modlist() {
     exit 1
 }
 
+# For debugging
+go version
+
 echo "Checking that all modules can be resolved offline"
 go list -mod=readonly -m all || die_modlist
 
