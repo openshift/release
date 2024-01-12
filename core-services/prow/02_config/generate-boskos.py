@@ -191,6 +191,9 @@ CONFIG = {
         'us-central1': 40,
     },
     'libvirt-s390x-quota-slice': {},
+    'libvirt-s390x-amd64-quota-slice': {
+        'libvirt-s390x-amd64-0-0': 1
+    },
     'libvirt-ppc64le-quota-slice': {},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
