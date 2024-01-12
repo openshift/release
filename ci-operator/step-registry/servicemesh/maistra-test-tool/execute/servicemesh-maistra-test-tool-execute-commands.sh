@@ -6,13 +6,21 @@ set -o pipefail
 
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
-OCP_CRED_USR="kubeadmin"
-OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
+
+echo "CONSOLE_URL = ${CONSOLE_URL}"
+
+# login via kubeconfig
+cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+oc login --kubeconfig=${KUBECONFIG} --insecure-skip-tls-verify=true
+
+OCP_TOKEN="$(oc whoami -t)"
 
 export OCP_API_URL
-export OCP_CRED_USR
-export OCP_CRED_PSW
+export OCP_TOKEN
+# Env variable needed to run maistra tests on ROSA
+export ROSA
 
+echo "Execute maistra tests"
 make test
 
 echo "Copying logs and xmls to ${ARTIFACT_DIR}"
