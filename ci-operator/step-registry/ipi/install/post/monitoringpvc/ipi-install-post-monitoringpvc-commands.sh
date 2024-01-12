@@ -3,6 +3,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # Every cluster that can should have a PV for prometheus data so that data is preserved
 # across reschedules of pods.
 
