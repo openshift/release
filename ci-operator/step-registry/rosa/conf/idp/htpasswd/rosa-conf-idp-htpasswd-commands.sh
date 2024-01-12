@@ -72,6 +72,8 @@ rosa create idp -c ${CLUSTER_ID} \
                 --username ${IDP_USER} \
                 --password ${IDP_PASSWD}
 echo "oc login ${API_URL} -u ${IDP_USER} -p ${IDP_PASSWD} --insecure-skip-tls-verify=true" > "${SHARED_DIR}/api.login"
+mkdir ${SHARED_DIR}/kubeadmin-password
+echo $IDP_PASSWD > ${SHARED_DIR}/kubeadmin-password
 
 # Grant cluster-admin access to the cluster
 rosa grant user cluster-admin --user=${IDP_USER} --cluster=${CLUSTER_ID}
