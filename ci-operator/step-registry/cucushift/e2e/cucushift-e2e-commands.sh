@@ -93,7 +93,6 @@ function filter_test_by_platform() {
 function filter_test_by_network() {
     local networktype
     networktype="$(oc get network.config/cluster -o yaml | yq '.spec.networkType')"
-    echo "networktype: $networktype"
     case "${networktype,,}" in
         openshiftsdn)
 	    networktag='@network-openshiftsdn'
@@ -161,26 +160,26 @@ function filter_test_by_capability() {
     case "$xversion.$yversion" in
         4.16)
             versioncaps="$v416"
-	    ;;
+            ;;
         4.15)
             versioncaps="$v415"
-	    ;;
+            ;;
         4.14)
             versioncaps="$v414"
-	    ;;
+            ;;
         4.13)
             versioncaps="$v413"
-	    ;;
+            ;;
         4.12)
             versioncaps="$v412"
-	    ;;
+            ;;
         4.11)
             versioncaps="$v411"
-	    ;;
+            ;;
         *)
             versioncaps=""
             echo "Got unexpected version: $xversion.$yversion"
-	    ;;
+            ;;
     esac
     for cap in ${versioncaps} ; do
         if ! (grep --ignore-case --quiet "$cap" <<< "$enabledcaps") ; then
