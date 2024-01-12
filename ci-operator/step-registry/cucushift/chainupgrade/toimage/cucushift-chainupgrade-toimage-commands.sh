@@ -558,6 +558,7 @@ unset 'TARGET_RELEASES[-1]'
 for target in "${TARGET_RELEASES[@]}"
 do
     export TARGET="${target}"
+    sleep 1h
     TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
     extract_oc
 
