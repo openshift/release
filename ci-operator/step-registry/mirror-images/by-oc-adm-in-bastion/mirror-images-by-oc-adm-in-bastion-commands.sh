@@ -65,12 +65,26 @@ SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 BASTION_IP=$(<"${SHARED_DIR}/bastion_private_address")
 BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
 
+# shellcheck disable=SC2089
+ssh_options="-o UserKnownHostsFile=/dev/null -o IdentityFile=${SSH_PRIV_KEY_PATH} -o StrictHostKeyChecking=no"
 # scp new_pull_secret credential to bastion host
-scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${new_pull_secret}" ${BASTION_SSH_USER}@${BASTION_IP}:${remote_pull_secret}
+# shellcheck disable=SC2090
+scp ${ssh_options} "${new_pull_secret}" ${BASTION_SSH_USER}@${BASTION_IP}:${remote_pull_secret}
+
+mirror_options="--insecure=true"
+# check whether the oc command supports the --keep-manifest-list and add it to the args array.
+# shellcheck disable=SC2090
+if ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "oc adm release mirror -h | grep -q -- --keep-manifest-list"; then
+    echo "Adding --keep-manifest-list to the mirror command."
+    mirror_options="${mirror_options} --keep-manifest-list=true"
+else
+    echo "This oc version does not support --keep-manifest-list, skip it."
+fi
 
 # mirror images in bastion host, which will increase mirror upload speed
-ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@${BASTION_IP} \
-"oc adm release -a ${remote_pull_secret} mirror --insecure=true \
+# shellcheck disable=SC2090
+ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} \
+"oc adm release -a ${remote_pull_secret} mirror ${mirror_options} \
  --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} \
  --to=${target_release_image_repo} \
  --to-release-image=${target_release_image}" | tee "${mirror_output}"

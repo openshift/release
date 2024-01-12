@@ -1,0 +1,28 @@
+chain:
+  as: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-provision
+  steps: 
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-credentials-mode
+    - ref: ipi-conf-gcp-xpn-network
+    - ref: ipi-conf-gcp-create-firewall-rules
+    - ref: gcp-provision-xpn-min-perm-passthrough-serviceaccount
+    - chain: ipi-install
+    - ref: enable-qe-catalogsource
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-check-gcp-credentials-mode
+  env:
+  - name: CREDENTIALS_MODE
+    default: "Passthrough"
+    documentation: CCO mode.
+  - name: COMPUTE_NODES_TAGS
+    default: "preserved-ipi-xpn-compute"
+    documentation: Additional network tags applied to compute nodes, comma separated strings, e.g. "ocp-tag01,ocp-tag02".
+  - name: CONTROL_PLANE_NODES_TAGS
+    default: "preserved-ipi-xpn-control-plane"
+    documentation: Additional network tags applied to control-plane nodes, comma separated strings, e.g. "ocp-tag01,ocp-tag02".
+  documentation: |-
+    This chain contains all of the steps to provision an OpenShift cluster 
+    into GCP shared VPC, using the service account having minimal permissions. 
+    The service account doesn't have permissions to create/delete firewall-rules 
+    in the host project, so that the pre-configured firewall-rules, rather than 
+    installer created ones, will be in use. 

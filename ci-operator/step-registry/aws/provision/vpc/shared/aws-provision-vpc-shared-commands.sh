@@ -376,6 +376,29 @@ Outputs:
         ",",
         [!Ref PrivateSubnet, !If [DoAz2, !Ref PrivateSubnet2, !Ref "AWS::NoValue"], !If [DoAz3, !Ref PrivateSubnet3, !Ref "AWS::NoValue"]]
       ]
+  PublicRouteTableId:
+    Description: Public Route table ID
+    Value: !Ref PublicRouteTable
+  PrivateRouteTableIds:
+    Description: Private Route table IDs
+    Value:
+      !Join [
+        ",",
+        [
+          !Join ["=", [
+            !Select [0, "Fn::GetAZs": !Ref "AWS::Region"],
+            !Ref PrivateRouteTable
+          ]],
+          !If [DoAz2,
+               !Join ["=", [!Select [1, "Fn::GetAZs": !Ref "AWS::Region"], !Ref PrivateRouteTable2]],
+               !Ref "AWS::NoValue"
+          ],
+          !If [DoAz3,
+               !Join ["=", [!Select [2, "Fn::GetAZs": !Ref "AWS::Region"], !Ref PrivateRouteTable3]],
+               !Ref "AWS::NoValue"
+          ]
+        ]
+      ]
 EOF
 
 MAX_ZONES_COUNT=$(aws --region "${REGION}" ec2 describe-availability-zones --filter Name=state,Values=available Name=zone-type,Values=availability-zone | jq '.AvailabilityZones | length')
@@ -452,12 +475,16 @@ AvailabilityZones=$(aws --region "${REGION}" ec2 describe-subnets --subnet-ids $
 echo "$AvailabilityZones" > "${SHARED_DIR}/availability_zones"
 echo "AvailabilityZones: ${AvailabilityZones}"
 
-# output: ['subnet-045024152d76c74fc','subnet-0107825ef27dfefa4','subnet-08b8f4f03e7f5172f','subnet-010adebbf0bf628c9','subnet-03b660891d311091f','subnet-08242f9ab76d449ef']
-# subnets="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${STACK_NAME}" | jq -c '[.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetIds")).OutputValue | split(",")[]]' | sed "s/\"/'/g")"
-# echo "Subnets : ${subnets}"
+# ***********************
+# Route table ids are generally used by Local Zone and Wavelength Zone
+# ***********************
 
-cp "${SHARED_DIR}/vpc_stack_name" "${ARTIFACT_DIR}/"
-cp "${SHARED_DIR}/vpc_id" "${ARTIFACT_DIR}/"
-cp "${SHARED_DIR}/subnet_ids" "${ARTIFACT_DIR}/"
-cp "${SHARED_DIR}/public_subnet_ids" "${ARTIFACT_DIR}/"
-cp "${SHARED_DIR}/private_subnet_ids" "${ARTIFACT_DIR}/"
+# PublicRouteTableId
+PublicRouteTableId=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="PublicRouteTableId") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")
+echo "$PublicRouteTableId" > "${SHARED_DIR}/public_route_table_id"
+echo "PublicRouteTableId: ${PublicRouteTableId}"
+
+# PrivateRouteTableId
+PrivateRouteTableId=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="PrivateRouteTableIds") | .OutputValue | split(",")[0] | split("=")[1]' "${SHARED_DIR}/vpc_stack_output")
+echo "$PrivateRouteTableId" > "${SHARED_DIR}/private_route_table_id"
+echo "PrivateRouteTableId: ${PrivateRouteTableId}"

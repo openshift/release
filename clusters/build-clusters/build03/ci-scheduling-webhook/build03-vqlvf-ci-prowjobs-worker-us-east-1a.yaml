@@ -1,0 +1,86 @@
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  annotations:
+    # if instance type is unknown, so the autoscaler must be told about capacity:  https://access.redhat.com/solutions/6640721
+    machine.openshift.io/GPU: "0"
+    machine.openshift.io/memoryMb: "32768"
+    machine.openshift.io/vCPU: "16"
+  labels:
+    machine.openshift.io/cluster-api-cluster: build03-vqlvf
+  name: build03-vqlvf-ci-prowjobs-worker-us-east-1a
+  namespace: openshift-machine-api
+spec:
+  deletePolicy: Oldest
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build03-vqlvf
+      machine.openshift.io/cluster-api-machineset: build03-vqlvf-ci-prowjobs-worker-us-east-1a
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build03-vqlvf
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build03-vqlvf-ci-prowjobs-worker-us-east-1a
+    spec:
+      metadata:
+        labels:
+          ci-workload: prowjobs
+      providerSpec:
+        value:
+          ami:
+            id: ami-0b35795bcab04ee70
+          apiVersion: awsproviderconfig.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              volumeSize: 100
+              volumeType: gp3
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: build03-vqlvf-worker-profile
+          instanceType: c6a.4xlarge
+          kind: AWSMachineProviderConfig
+          metadata: {}
+          placement:
+            availabilityZone: us-east-1a
+            region: us-east-1
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - build03-vqlvf-worker-sg
+          subnet:
+            filters:
+            - name: tag:Name
+              values:
+              - build03-vqlvf-private-us-east-1a
+          tags:
+          - name: kubernetes.io/cluster/build03-vqlvf
+            value: owned
+          - name: ci-cluster
+            value: build03
+          - name: ci-workload
+            value: prowjobs
+          userDataSecret:
+            name: worker-user-data
+      taints:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-prowjobs-worker
+        value: ci-prowjobs-worker
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: build03-vqlvf-ci-prowjobs-worker-us-east-1a
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 120
+  minReplicas: 0
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: build03-vqlvf-ci-prowjobs-worker-us-east-1a

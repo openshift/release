@@ -3,28 +3,24 @@
 set -eu -o pipefail
 
 declare -r LOGS_DIR="/$ARTIFACT_DIR/test-run-logs"
-declare -r OPERATOR_DEPLOY_NAME="kepler-operator-controller"
-declare -r OPERATORS_NS="openshift-operators"
+declare -r KEPLER_DEPLOY_NAME="kepler-exporter"
+declare -r KEPLER_NS="kepler"
 
 validate_install() {
-	echo "Validating Operator Install"
+	echo "Validating Kepler Install"
 
-	oc rollout status -n "$OPERATORS_NS" "deployment/$OPERATOR_DEPLOY_NAME"
-	oc wait --for condition=Available -n "$OPERATORS_NS" --timeout=300s deployment "$OPERATOR_DEPLOY_NAME"
-	oc logs -n "$OPERATORS_NS" "deployment/$OPERATOR_DEPLOY_NAME"
+	oc rollout status -n "$KEPLER_NS" daemonset "$KEPLER_DEPLOY_NAME" --timeout 5m || {
+		return 1
+	}
+	oc logs -n "$KEPLER_NS" "daemonset/$KEPLER_DEPLOY_NAME"
+	return 0
 }
 
 must_gather() {
 	echo "Running must gather"
-
-	echo "Gather OLM resources"
-
-	for x in $(oc api-resources --api-group=operators.coreos.com -o name); do
-		oc get "$x" -n "$OPERATORS_NS" -o yaml | tee "$LOGS_DIR/$x.yaml"
-	done
-	oc get pods -n "$OPERATORS_NS"
-	oc describe deployment "$OPERATOR_DEPLOY_NAME" -n "$OPERATORS_NS"
-	oc logs -f -n "$OPERATORS_NS" "deployment/$OPERATOR_DEPLOY_NAME"
+	oc get pods -n "$KEPLER_NS"
+	oc describe daemonset "$KEPLER_DEPLOY_NAME" -n "$KEPLER_NS"
+	oc logs -n "$KEPLER_NS" "daemonset/$KEPLER_DEPLOY_NAME"
 }
 log_events() {
 	local ns="$1"
@@ -37,29 +33,29 @@ main() {
 	mkdir -p "$LOGS_DIR"
 	validate_install || {
 		must_gather
-		echo "Operator validation failed"
+		echo "Kepler validation failed"
 		return 1
 	}
 
 	echo "Running e2e tests"
 
-	log_events "$OPERATORS_NS" &
-	log_events "openshift-kepler-operator" &
+	log_events "$KEPLER_NS" &
 
 	local ret=0
 
-	./e2e.test -test.v -test.failfast 2>&1 | tee "$LOGS_DIR/e2e.log" || ret=1
+	./integration-test.test -test.v -test.failfast 2>&1 | tee "$LOGS_DIR/e2e.log" || ret=1
 
 	# terminating both log_events
 	{ jobs -p | xargs -I {} -- pkill -TERM -P {}; } || true
 	wait
 	sleep 1
 
-	if [[ "$ret" -ne 0 ]]; then
+	[[ "$ret" -ne 0 ]] && {
 		must_gather
 		echo "e2e tests failed"
-		return 1
-	fi
+		return $ret
+	}
 	echo "e2e tests passed"
+	return $ret
 }
 main "$@"
