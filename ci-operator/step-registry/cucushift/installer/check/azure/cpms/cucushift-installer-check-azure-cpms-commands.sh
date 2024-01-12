@@ -71,7 +71,7 @@ elif (( ${#zones_setting_from_config[@]} == 0 )); then
     echo "Field zones is not set in install-config, check if instance type supports zone or only single zone in region ${REGION}"
     # Get master instance type
     master_instance_type=$(oc get machine --selector machine.openshift.io/cluster-api-machine-type=master -n openshift-machine-api -ojson | jq -r '.items[].spec.providerSpec.value.vmSize' | sort -u)
-    readarray -t zones_config < <(az vm list-skus -l "${REGION}" --zone --size "${master_instance_type}" --query '[].locationInfo[].zones[]' -otsv)
+    readarray -t zones_config < <(az vm list-skus -l "${REGION}" --size "${master_instance_type}" | jq -r ".[] | select(.name==\"${master_instance_type}\") | .locationInfo[].zones[]")
     echo "zones_config: ${zones_config[*]}"
     if (( ${#zones_config[@]} > 1 )); then
         echo "INFO: multi zones config for instance type ${master_instance_type} in region ${REGION}"
