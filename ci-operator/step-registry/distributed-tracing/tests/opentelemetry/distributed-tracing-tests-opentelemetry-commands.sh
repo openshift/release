@@ -14,7 +14,7 @@ if [[ -n "${DOWNSTREAM_TESTS_COMMIT}" ]]; then
   git checkout -b downstream-release "${DOWNSTREAM_TESTS_COMMIT}"
 
   #Enable user workload monitoring
-  oc create -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
+  oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
 
   #Set parameters for running the test cases on OpenShift
   unset NAMESPACE
@@ -82,7 +82,7 @@ else
   cp -R /tmp/opentelemetry-operator /tmp/opentelemetry-tests && cd /tmp/opentelemetry-tests
 
   #Enable user workload monitoring
-  oc create -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
+  oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
 
   #Set parameters for running the test cases on OpenShift
   unset NAMESPACE

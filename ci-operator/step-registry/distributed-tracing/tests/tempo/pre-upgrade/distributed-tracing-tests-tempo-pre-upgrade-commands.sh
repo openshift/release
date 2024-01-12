@@ -25,10 +25,10 @@ else
   cp -R /tmp/tempo-operator /tmp/tempo-tests
   cd /tmp/tempo-tests
   mkdir /tmp/kuttl-manifests && cp minio.yaml /tmp/kuttl-manifests
+  
+  #Enable user workload monitoring.
+  oc apply -f tests/e2e-openshift/monitoring/01-workload-monitoring.yaml
 fi
-
-#Enable user workload monitoring.
-oc create -f tests/e2e-openshift/monitoring/01-workload-monitoring.yaml
 
 # Remove test cases to be skipped from the test run
 IFS=' ' read -ra SKIP_TEST_ARRAY <<< "$PRE_UPG_SKIP_TESTS"
