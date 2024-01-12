@@ -67,13 +67,14 @@ EOF
         scp -o StrictHostKeyChecking=off -r "core@${_IP}:${REPORT_PATH}/*"  "${REPORT_PATH}"
       done
     fi
+echo "export HYPERSHIFT_IMAGE=${HYPERSHIFT_IMAGE}" >> /root/config
 EOFTOP
 
 scp -r "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
 
 echo "### Gathering logs..."
 # shellcheck disable=SC2087
-timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" DISCONNECTED="${DISCONNECTED:-}" bash - << "EOF"
+timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" HYPERSHIFT_IMAGE="${HYPERSHIFT_IMAGE}" DISCONNECTED="${DISCONNECTED:-}" bash - << "EOF"
 # prepending each printed line with a timestamp
 exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }') 2>&1
 
@@ -101,9 +102,7 @@ cd "${REPO_DIR}"
 
 # Get assisted logs
 export LOGS_DEST=/tmp/artifacts
-echo "export HYPERSHIFT_IMAGE=${HYPERSHIFT_IMAGE}" >> /root/config
 source /root/config
-
 deploy/operator/gather.sh
 
 EOF
