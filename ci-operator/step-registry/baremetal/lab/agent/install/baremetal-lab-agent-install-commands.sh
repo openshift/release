@@ -179,7 +179,7 @@ grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${
 
 ### Create manifests
 echo "Creating manifests..."
-oinst create agent create cluster-manifests
+oinst agent create cluster-manifests
 
 ### Inject customized manifests
 echo -e "\nThe following manifests will be included at installation time:"
@@ -187,7 +187,7 @@ find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
 while IFS= read -r -d '' item
 do
   manifest="$(basename "${item}")"
-  cp "${item}" "${INSTALL_DIR}/manifests/${manifest##manifest_}"
+  cp "${item}" "${INSTALL_DIR}/cluster-manifests/${manifest##manifest_}"
 done < <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
 
 ### Create Ignition configs
