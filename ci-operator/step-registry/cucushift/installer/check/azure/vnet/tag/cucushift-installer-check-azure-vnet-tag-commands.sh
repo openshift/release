@@ -64,8 +64,9 @@ if (( ${ocp_minor_version} < 15 )); then
 else
     echo "Checking that shared tags are added on existing vnet"
     vnet_list_file=$(mktemp)
+    vnet_name=$(yq-go r "${SHARED_DIR}/install-config.yaml" "platform.azure.virtualNetwork")
     expected_shared_tags="\"kubernetes.io_cluster.${INFRA_ID}\": \"shared\""
-    vnet_id=$(az network vnet list -g ${RESOURCE_GROUP} --query "[].id" -otsv)
+    vnet_id=$(az network vnet show -n ${vnet_name} -g ${RESOURCE_GROUP} --query "id" -otsv)
     echo "tags on vnet:"
     az tag list --resource-id "${vnet_id}" --query 'properties.tags' | tee ${vnet_list_file}
 
