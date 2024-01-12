@@ -1,4 +1,8 @@
 base_images:
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
   ocp_4.14_base:
     name: "4.14"
     namespace: ocp
@@ -105,7 +109,7 @@ releases:
   latest:
     release:
       channel: fast
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -114,13 +118,23 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-azure-continuous
+- as: e2e-osd-continuous
   cron: 0 0 * * 0
   steps:
-    cluster_profile: azure4
+    cluster_profile: osd-ephemeral
+    env:
+      CLUSTER_DURATION: "10800"
+      CLUSTER_VERSION: "4.14"
+      COMPUTE_NODES: "4"
+    post:
+    - chain: gather
+    - ref: osd-delete-delete
+    pre:
+    - ref: ipi-install-rbac
+    - ref: osd-create-create
     test:
     - as: serverless-e2e
-      commands: make install-mesh test-e2e-with-kafka
+      commands: make test-e2e-with-kafka test-upstream-e2e-no-upgrade
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -143,9 +157,8 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-azure
 zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: 413-azure
+  variant: 414-osd
