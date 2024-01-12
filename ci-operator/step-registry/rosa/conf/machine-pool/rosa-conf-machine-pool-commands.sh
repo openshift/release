@@ -86,6 +86,7 @@ if [[ "$LOCAL_ZONE" == "true" ]]; then
     exit 1
   fi
 
+  MP_MACHINE_TYPE=$(tail -n 1 "${SHARED_DIR}/instance-types.txt")
   LOCAL_ZONE_SWITCH="--subnet ${localzone_subnet_id}"
 fi
 
