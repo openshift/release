@@ -295,7 +295,7 @@ if [ "${ADDITIONAL_WORKERS}" == "0" ]; then
     exit 0
 fi
 
-oc extract -n openshift-machine-api secret/worker-user-data-managed --keys=userData --to=- > worker.ign
+oc extract -n openshift-machine-api secret/worker-user-data-managed --keys=userData --to="${INSTALL_DIR}"/worker.ign
 
 echo -e "\nCopying ignition files into bastion host..."
 chmod 644 "${INSTALL_DIR}"/*.ign
