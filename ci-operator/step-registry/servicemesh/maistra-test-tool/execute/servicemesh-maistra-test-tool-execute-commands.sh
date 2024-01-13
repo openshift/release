@@ -4,8 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export CONSOLE_URL=$(cat $SHARED_DIR/console.url)
-export OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
+CONSOLE_URL=$(cat $SHARED_DIR/console.url)
+export CONSOLE_URL
+OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
+export OCP_API_URL
 
 # for interop
 if test -f ${SHARED_DIR}/kubeadmin-password
