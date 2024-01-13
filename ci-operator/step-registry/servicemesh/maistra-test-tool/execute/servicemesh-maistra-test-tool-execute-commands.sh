@@ -18,7 +18,7 @@ then
   echo "Execute maistra tests"
   make test
 else #for ROSA & Hypershift platforms
-  $(cat ${SHARED_DIR}/api.login)
+  eval "$(cat "${SHARED_DIR}/api.login")"
   ROSA=true make test
 fi
 
