@@ -103,7 +103,7 @@ OWNER=$(echo $REPO_URL | sed 's|https://github.com/||' | sed 's|/infra-deploymen
 
 echo UPGRADE_FORK_ORGANIZATION
 echo $OWNER
-
+echo "dummy update to allow triggering of the /pj-rehearse pull-ci-redhat-appstudio-infra-deployments-main-appstudio-upgrade-tests pr command"
 export UPGRADE_FORK_ORGANIZATION=$OWNER
 
 make ci/test/upgrade
