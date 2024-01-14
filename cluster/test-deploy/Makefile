@@ -23,7 +23,7 @@ sh: check-cluster
 .PHONY: sh
 
 upgrade: check-cluster
-	cd $(PROFILE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_test_repo=$(REPO)" playbooks/$(TYPE)/openshift-cluster/upgrade.yml
+	cd $(PROFILE)/ && ../../bin/ansible.sh ansible-playbook -e "openshift_test_repo=$(REPO)" playbooks/$(TYPE)/openshift-cluster/upgrade.yml -vvv
 .PHONY: upgrade
 
 check-cluster:
