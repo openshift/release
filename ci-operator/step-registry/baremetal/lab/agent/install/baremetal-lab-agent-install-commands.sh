@@ -295,11 +295,11 @@ if [ "${ADDITIONAL_WORKERS}" == "0" ]; then
     exit 0
 fi
 
-oc extract -n openshift-machine-api secret/worker-user-data-managed --keys=userData --to=- > "${INSTALL_DIR}"/worker.ign
+oc extract -n openshift-machine-api secret/worker-user-data-managed --keys=userData --to=- > "${SHARED_DIR}"/worker.ign
 
 echo -e "\nCopying ignition files into bastion host..."
 chmod 644 "${INSTALL_DIR}"/*.ign
-scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/*.ign "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/"
+scp "${SSHOPTS[@]}" "${SHARED_DIR}"/*.ign "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/"
 
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
@@ -307,12 +307,9 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
     # Power on additional day2 worker
     echo "Power on #${host} (${name})..."
-    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe" &
+    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
   fi
 done
-
-echo -e "\nForcing 15min delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
-sleep 900
 
 EXPECTED_NODES=$(( $(get_ready_nodes_count) + ADDITIONAL_WORKERS ))
 
