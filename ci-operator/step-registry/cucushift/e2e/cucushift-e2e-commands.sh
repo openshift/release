@@ -144,7 +144,7 @@ function filter_test_by_capability() {
              [Build]=xxx
              [CloudCredential]=xxx
              [Console]=console
-             [CSISnapshot]=xxx
+             [CSISnapshot]=storage
              [DeploymentConfig]=xxx
              [ImageRegistry]=xxx
              [Insights]=xxx
