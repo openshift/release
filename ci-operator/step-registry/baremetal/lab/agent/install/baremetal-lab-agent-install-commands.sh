@@ -266,3 +266,7 @@ if [ "${ADDITIONAL_WORKERS}" == "0" ]; then
 fi
 # Extract the ignition file for additional workers if additional workers count > 0
 oc extract -n openshift-machine-api secret/worker-user-data-managed --keys=userData --to=- > "${SHARED_DIR}"/worker.ign
+
+echo -e "\nCopying ignition files into bastion host..."
+chmod 644 "${SHARED_DIR}"/*.ign
+scp "${SSHOPTS[@]}" "${SHARED_DIR}"/*.ign "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/"
