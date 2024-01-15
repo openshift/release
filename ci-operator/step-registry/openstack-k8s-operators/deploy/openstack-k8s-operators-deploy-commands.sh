@@ -146,7 +146,7 @@ patches:
               projected:
                 sources:
                 - secret:
-                    name: ceph-conf-files
+                    name: ceph-conf-files-0
             mounts:
             - name: ceph
               mountPath: "/etc/ceph"
@@ -225,7 +225,7 @@ fi)
     kind: OpenStackControlPlane
 EOF
 
-FSID=$(oc get secret ceph-conf-files -o json | jq -r '.data."ceph.conf"' | base64 -d | grep fsid | awk 'BEGIN { FS = "=" } ; { print $2 }' | xargs)
+FSID=$(oc get secret ceph-conf-files-0 -o json | jq -r '.data."ceph.conf"' | base64 -d | grep fsid | awk 'BEGIN { FS = "=" } ; { print $2 }' | xargs)
 
 sed -i ${BASE_DIR}/install_yamls/out/openstack/openstack/cr/kustomization.yaml -e s/FSID/$FSID/g
 cat ${BASE_DIR}/install_yamls/out/openstack/openstack/cr/kustomization.yaml
