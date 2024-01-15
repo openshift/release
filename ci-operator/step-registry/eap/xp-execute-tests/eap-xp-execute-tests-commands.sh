@@ -55,10 +55,5 @@ xtf.openshift.namespace=pit
 xtf.bm.namespace=pit-builds
 EOF
 
-#echo "Executing EAP 74 tests"
-#mvn clean -e test -Dmaven.repo.local=./repo -Dxtf.operator.properties.skip.installation=true -P74-openjdk11,eap-pit-74 --log-file eap-74.txt
-
-sleep 4h
-
 echo "Executing EAP XP tests"
-mvn clean test -Dmaven.repo.local=./repo -Dxtf.operator.properties.skip.installation=true -Pxp4-openjdk11,eap-pit-xp --log-file eap-xp.txt
+mvn clean test -Dmaven.repo.local=./repo -Pxp4-openjdk11,eap-pit-xp -Dxtf.version=0.30-tar-dcihak-SNAPSHOT -Dxtf.operator.properties.skip.installation=true -Dtest=HelmChartSmokeTest
