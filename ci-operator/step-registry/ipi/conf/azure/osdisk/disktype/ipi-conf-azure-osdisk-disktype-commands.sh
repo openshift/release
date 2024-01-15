@@ -44,6 +44,7 @@ platform:
 EOF
 fi
 
-yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"
-
-cat "${CONFIG_PATCH}"
+if [[ -f "${CONFIG_PATCH}" ]]; then
+    yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"
+    cat "${CONFIG_PATCH}"
+fi
