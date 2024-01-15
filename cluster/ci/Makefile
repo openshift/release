@@ -1,4 +1,4 @@
-LATEST = $(shell curl -q "https://storage.googleapis.com/origin-ci-test/branch-logs/origin/master/builds/.latest" 2>/dev/null)/artifacts/rpms
+LATEST = $(shell curl -q "https://storage.googleapis.com/test-platform-results/branch-logs/origin/master/builds/.latest" 2>/dev/null)/artifacts/rpms
 REPO ?= $(LATEST)
 INSTANCE_PREFIX ?= $(WHAT)
 export INSTANCE_PREFIX

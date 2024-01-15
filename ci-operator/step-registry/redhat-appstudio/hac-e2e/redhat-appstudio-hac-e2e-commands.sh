@@ -95,12 +95,14 @@ metadata:
     namespace: toolchain-host-operator
     labels:
         toolchain.dev.openshift.com/email-hash: 826df0a2f0f2152550b0d9ee11099d85
-    annotations:
-        toolchain.dev.openshift.com/user-email: user1@user.us
+        toolchain.dev.openshift.com/state: approved
 spec:
+    identityClaims:
+        email: user1@user.us
+        sub: user1
+        preferredUsername: user1
     username: user1
     userid: user1
-    approved: true
 EOF
 sleep 5
 oc get UserSignup -n toolchain-host-operator

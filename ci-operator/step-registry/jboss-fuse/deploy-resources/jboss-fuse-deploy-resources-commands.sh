@@ -168,7 +168,7 @@ test.docker.registry=registry.ci.openshift.org/ci
 EOF
 
   oc create configmap mvn-settings -n ${1} --from-file=/tmp/settings.xml
-  oc create configmap test-properties -n ${1} --from-file=/tmp/test.properties
+  oc create secret generic test-properties -n ${1} --from-file=/tmp/test.properties
 }
 
 function create_foo_volumes()
@@ -229,12 +229,6 @@ spec:
       application: xpaas-qe
   storageClassName: manual
   volumeMode: Filesystem
-status:
-  accessModes:
-    - ReadWriteMany
-    - ReadWriteOnce
-  capacity:
-    storage: 19Gi
 EOF
 }
 
