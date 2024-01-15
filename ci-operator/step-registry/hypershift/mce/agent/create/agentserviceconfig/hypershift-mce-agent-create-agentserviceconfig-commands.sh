@@ -61,3 +61,5 @@ export IP_STACK="${IP_STACK:-}"
 curl https://raw.githubusercontent.com/LiangquanLi930/deployhypershift/main/config_agentserviceconfig.sh | bash -x
 set -x
 EOF
+
+scp "${SSHOPTS[@]}" "root@${IP}:/root/.ssh/id_rsa.pub" "${SHARED_DIR}/id_rsa.pub"
