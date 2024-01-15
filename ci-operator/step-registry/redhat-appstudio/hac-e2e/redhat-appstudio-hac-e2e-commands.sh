@@ -62,7 +62,7 @@ curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/$REF/h
 
 chmod +x installHac.sh
 HAC_KUBECONFIG=/tmp/hac.kubeconfig
-oc login --kubeconfig=$HAC_KUBECONFIG --token=$HAC_SA_TOKEN --server=https://api.c-rh-c-eph.8p0c.p1.openshiftapps.com:6443
+oc login --kubeconfig=$HAC_KUBECONFIG --token=$HAC_SA_TOKEN --server=https://api.crc-eph.r9lp.p1.openshiftapps.com:6443
 echo "=== INSTALLING HAC ==="
 HAC_NAMESPACE=$(./installHac.sh -ehk $HAC_KUBECONFIG -sk $KUBECONFIG |grep "Eph cluster namespace: " | sed "s/Eph cluster namespace: //g")
 echo "=== HAC INSTALLED ==="
