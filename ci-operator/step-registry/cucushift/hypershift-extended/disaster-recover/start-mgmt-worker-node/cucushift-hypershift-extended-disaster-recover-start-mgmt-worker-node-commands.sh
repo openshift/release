@@ -10,6 +10,10 @@ if [[ ! -f "${SHARED_DIR}/hypershift-dr-worker-node-name" ]] ; then
   exit 0
 fi
 
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export AWS_REGION=${HYPERSHIFT_AWS_REGION}
+export AWS_PAGER=""
+
 echo "get mgmt cluster's kubeconfig"
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 if test -s "${SHARED_DIR}/mgmt_kubeconfig" ; then
@@ -25,8 +29,6 @@ if [[ "X${status}" == "X" || "${status}" == "True"  ]] ; then
   exit 0
 fi
 
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-export AWS_REGION=${HYPERSHIFT_AWS_REGION}
 echo "start worker node ${node_name} with instance ID ${instance_id}"
 aws ec2 start-instances --instance-ids ${instance_id}
 echo "wait until the worker node ${node_name} Ready"
