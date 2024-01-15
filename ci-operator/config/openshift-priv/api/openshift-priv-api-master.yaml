@@ -3,10 +3,10 @@ base_images:
     name: 4.16-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.16
+    tag: rhel-9-golang-1.21-openshift-4.16
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -17,13 +17,14 @@ images:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cluster-config-api
 promotion:
-  name: 4.16-priv
-  namespace: ocp-private
+  to:
+  - name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -84,20 +85,24 @@ tests:
   container:
     from: bin
 - as: e2e-aws-ovn
+  run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-techpreview
+  run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
     cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - as: e2e-aws-serial
+  run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-serial-techpreview
+  run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
     cluster_profile: aws
     env:
@@ -105,15 +110,18 @@ tests:
     workflow: openshift-e2e-aws-serial
 - as: e2e-gcp
   optional: true
+  run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: e2e-azure
   optional: true
+  run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-upgrade
+  run_if_changed: ^Dockerfile\.rhel8$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws

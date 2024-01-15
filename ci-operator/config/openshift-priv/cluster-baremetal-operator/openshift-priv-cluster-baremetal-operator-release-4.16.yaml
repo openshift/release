@@ -31,10 +31,10 @@ base_images:
     name: 4.16-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.16
+    tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-baremetal-operator
@@ -44,14 +44,15 @@ images:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cluster-baremetal-operator
 promotion:
-  disabled: true
-  name: 4.16-priv
-  namespace: ocp-private
+  to:
+  - disabled: true
+    name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -107,13 +108,13 @@ tests:
     cluster_profile: equinix-ocp-metal
     env:
       CLUSTERTYPE: baremetal
-    workflow: baremetalds-e2e-ipv4
+    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-sdn-serial-ipv4
   cluster: build05
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-serial-ipv4
+    workflow: baremetalds-e2e-sdn-serial-ipv4
 - as: e2e-metal-ipi-sdn-upgrade
   cluster: build05
   optional: true
@@ -129,7 +130,7 @@ tests:
       RUN_UPGRADE_TEST: "true"
       TEST_SUITE: ""
       TEST_TYPE: upgrade
-    workflow: baremetalds-e2e-upgrade
+    workflow: baremetalds-e2e-upgrade-sdn
 - as: e2e-metal-ipi-upgrade-ovn-ipv6
   cluster: build05
   optional: true
@@ -152,7 +153,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
-- as: e2e-metal-ipi-sdn-virtualmedia
+- as: e2e-metal-ipi-ovn-virtualmedia
   cluster: build05
   optional: true
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$

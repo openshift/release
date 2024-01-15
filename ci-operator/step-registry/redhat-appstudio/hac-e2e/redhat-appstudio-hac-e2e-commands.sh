@@ -62,7 +62,7 @@ curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/$REF/h
 
 chmod +x installHac.sh
 HAC_KUBECONFIG=/tmp/hac.kubeconfig
-oc login --kubeconfig=$HAC_KUBECONFIG --token=$HAC_SA_TOKEN --server=https://api.c-rh-c-eph.8p0c.p1.openshiftapps.com:6443
+oc login --kubeconfig=$HAC_KUBECONFIG --token=$HAC_SA_TOKEN --server=https://api.crc-eph.r9lp.p1.openshiftapps.com:6443
 echo "=== INSTALLING HAC ==="
 HAC_NAMESPACE=$(./installHac.sh -ehk $HAC_KUBECONFIG -sk $KUBECONFIG |grep "Eph cluster namespace: " | sed "s/Eph cluster namespace: //g")
 echo "=== HAC INSTALLED ==="
@@ -95,12 +95,14 @@ metadata:
     namespace: toolchain-host-operator
     labels:
         toolchain.dev.openshift.com/email-hash: 826df0a2f0f2152550b0d9ee11099d85
-    annotations:
-        toolchain.dev.openshift.com/user-email: user1@user.us
+        toolchain.dev.openshift.com/state: approved
 spec:
+    identityClaims:
+        email: user1@user.us
+        sub: user1
+        preferredUsername: user1
     username: user1
     userid: user1
-    approved: true
 EOF
 sleep 5
 oc get UserSignup -n toolchain-host-operator

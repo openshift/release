@@ -147,7 +147,17 @@ spec:
   - kind: monitoring
     managed: false
   - kind: horizontalpodautoscaler
-    managed: false
+    managed: true
+  - kind: quay
+    managed: true
+  - kind: mirror
+    managed: true
+  - kind: clair
+    managed: true
+  - kind: tls
+    managed: true
+  - kind: route
+    managed: true
 EOF
 
 for _ in {1..60}; do

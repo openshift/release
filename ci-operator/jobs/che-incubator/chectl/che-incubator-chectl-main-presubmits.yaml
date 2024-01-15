@@ -6,18 +6,18 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build05
-    context: ci/prow/v11-chectl
+    context: ci/prow/v14-chectl
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/variant: v11
+      ci-operator.openshift.io/cloud-cluster-profile: che-aws
+      ci-operator.openshift.io/variant: v14
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-che-incubator-chectl-main-v11-chectl
-    rerun_command: /test v11-chectl
+    name: pull-ci-che-incubator-chectl-main-v14-chectl
+    rerun_command: /test v14-chectl
     spec:
       containers:
       - args:
@@ -28,7 +28,7 @@ presubmits:
         - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/chectl-cluster-profile
         - --target=chectl
-        - --variant=v11
+        - --variant=v14
         command:
         - ci-operator
         image: ci-operator:latest
@@ -71,7 +71,7 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
-          secretName: cluster-secrets-aws
+          secretName: cluster-secrets-che-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -81,25 +81,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v11-chectl,?($|\s.*)
+    trigger: (?m)^/test( | .* )v14-chectl,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
     cluster: build05
-    context: ci/prow/v12-chectl
+    context: ci/prow/v14-chectl-devworkspace-happy-path
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/variant: v12
+      ci-operator.openshift.io/variant: v14
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-che-incubator-chectl-main-v12-chectl
-    rerun_command: /test v12-chectl
+    name: pull-ci-che-incubator-chectl-main-v14-chectl-devworkspace-happy-path
+    rerun_command: /test v14-chectl-devworkspace-happy-path
     spec:
       containers:
       - args:
@@ -108,9 +108,9 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/chectl-cluster-profile
-        - --target=chectl
-        - --variant=v12
+        - --secret-dir=/usr/local/chectl-devworkspace-happy-path-cluster-profile
+        - --target=chectl-devworkspace-happy-path
+        - --variant=v14
         command:
         - ci-operator
         image: ci-operator:latest
@@ -126,7 +126,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/chectl-cluster-profile
+        - mountPath: /usr/local/chectl-devworkspace-happy-path-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -163,4 +163,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v12-chectl,?($|\s.*)
+    trigger: (?m)^/test( | .* )v14-chectl-devworkspace-happy-path,?($|\s.*)
