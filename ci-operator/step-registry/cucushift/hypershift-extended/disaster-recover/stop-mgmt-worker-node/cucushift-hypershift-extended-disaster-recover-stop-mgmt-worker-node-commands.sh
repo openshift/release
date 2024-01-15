@@ -11,13 +11,13 @@ if test -s "${SHARED_DIR}/mgmt_kubeconfig" ; then
   export KUBECONFIG=${SHARED_DIR}/mgmt_kubeconfig
 fi
 
+sleep "3h"
+
 # get one worker node
 node_name=$(oc get no -lnode-role.kubernetes.io/worker --ignore-not-found -ojsonpath='{.items[].metadata.name}')
 if [[ -n ${node_name} ]] ; then
   instance_id=$(aws ec2 describe-instances --filters "Name=private-dns-name,Values=${node_name}" --query "Reservations[].Instances[].InstanceId" --output text)
 fi
-
-sleep "1h"
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_REGION=${HYPERSHIFT_AWS_REGION}
