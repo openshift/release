@@ -7,58 +7,62 @@ set -o pipefail
 node_role=${APPLY_NODE_ROLE:=worker}
 log_path=${LOG_PATH:="/var/crash"}
 
-echo "Creating kdump configuration"
-kdump_conf=$(cat <<EOF | base64 -w 0
-path $log_path
-core_collector makedumpfile -l --message-level 7 -d 31
-EOF
-)
+openshift_release="4.11.0"
+if [[ $(echo $RELEASE_IMAGE_LATEST | grep -o -e "4\.[0-9]\+\.") ]]; then
+  openshift_release="$(echo $RELEASE_IMAGE_LATEST | grep -o -e '4\.[0-9]\+\.').0"
+fi
 
-echo "Creating kdump sysconfig"
-kdump_sysconfig=$(cat <<EOF
-KDUMP_COMMANDLINE_REMOVE="${KDUMP_COMMANDLINE_REMOVE}"
-KDUMP_COMMANDLINE_APPEND="${KDUMP_COMMANDLINE_APPEND}"
-KEXEC_ARGS="${KDUMP_KEXEC_ARGS}"
-KDUMP_IMG="${KDUMP_IMG}"
-EOF
-)
-echo "$kdump_sysconfig"
-base64_kdump_sysconfig=$(echo "$kdump_sysconfig" | base64 -w 0)
+echo "Crash kernel set to ${CRASH_KERNEL_MEMORY}"
 
 echo "Configuring kernel dumps on $node_role nodes"
-cat >> "${SHARED_DIR}/manifest_99_kdump_machineconfig.yml" << EOF
-apiVersion: machineconfiguration.openshift.io/v1
-kind: MachineConfig
+cat >> "${SHARED_DIR}/manifest_99_${node_role}_kdump.bu" << EOF
+variant: openshift
+version: "$openshift_release"
 metadata:
-  labels:
-    machineconfiguration.openshift.io/role: $node_role
   name: 99-$node_role-kdump
-spec:
-  config:
-    ignition:
-      version: 3.2.0
-    storage:
-      files:
-        - contents:
-            source: data:text/plain;charset=utf-8;base64,${kdump_conf}
-          mode: 420
-          overwrite: true
-          path: /etc/kdump.conf
-        - contents:
-            source: data:text/plain;charset=utf-8;base64,${base64_kdump_sysconfig}
-          mode: 420
-          overwrite: true
-          path: /etc/sysconfig/kdump
-    systemd:
-      units:
-        - enabled: true
-          name: kdump.service
-EOF
-
-echo "Crash kernel to ${CRASH_KERNEL_MEMORY}"
-cat >> "${SHARED_DIR}/manifest_99_kdump_machineconfig.yml" << EOF
-  kernelArguments:
+  labels:
+    machineconfiguration.openshift.io/role: $node_role 
+openshift:
+  kernel_arguments: 
     - crashkernel="${CRASH_KERNEL_MEMORY}"
+storage:
+  files:
+    - path: /etc/kdump.conf
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          path $log_path
+          core_collector makedumpfile -l --message-level 7 -d 31
+
+    - path: /etc/sysconfig/kdump
+      mode: 0644
+      overwrite: true
+      contents:
+        inline: |
+          KDUMP_COMMANDLINE_REMOVE="${KDUMP_COMMANDLINE_REMOVE}"
+          KDUMP_COMMANDLINE_APPEND="${KDUMP_COMMANDLINE_APPEND}"
+          KEXEC_ARGS="${KDUMP_KEXEC_ARGS}"
+          KDUMP_IMG="${KDUMP_IMG}"
+
+systemd:
+  units:
+    - name: kdump.service
+      enabled: true
 EOF
 
-cat "${SHARED_DIR}/manifest_99_kdump_machineconfig.yml"
+cat "${SHARED_DIR}/manifest_99_${node_role}_kdump.bu"
+
+# Lookup butane executable
+butane_filename="butane"
+if [[ $(uname -m) == "x86_64" ]]; then
+  butane_filename="butane-amd64"
+else
+  butane_filename="butane-$(uname -m)"
+fi
+  
+curl -sSL https://mirror.openshift.com/pub/openshift-v4/clients/butane/latest/$butane_filename --output "/tmp/butane" && chmod +x "/tmp/butane"
+/tmp/butane "${SHARED_DIR}/manifest_99_${node_role}_kdump.bu" -o "${SHARED_DIR}/manifest_99_${node_role}_kdump.yml"
+
+echo "Printing final base-64 encoded config"
+cat ${SHARED_DIR}/manifest_99_${node_role}_kdump.yml
