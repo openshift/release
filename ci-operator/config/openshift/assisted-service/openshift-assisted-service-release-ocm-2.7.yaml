@@ -71,10 +71,6 @@ images:
   to: assisted-service-lint
 - dockerfile_path: ci-images/Dockerfile.subsystem
   from: assisted-service-base
-  inputs:
-    cli:
-      as:
-      - quay.io/openshift/origin-cli:latest
   to: assisted-service-subsystem
 - dockerfile_path: ci-images/Dockerfile.code-generation
   from: assisted-service-base
@@ -140,8 +136,9 @@ operator:
   - pullspec: quay.io/centos7/postgresql-12-centos7:latest
     with: postgresql-12-centos7
 promotion:
-  name: ocm-2.7
-  namespace: edge-infrastructure
+  to:
+  - name: ocm-2.7
+    namespace: edge-infrastructure
 releases:
   latest:
     candidate:
@@ -390,9 +387,10 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ALLOW_CONVERGED_FLOW: "False"
+      PACKET_PLAN: c3.medium.x86
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-periodic
-  cron: 00 00 */1 * 0,2,5
+  cron: 00 00 */1 * 2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -400,6 +398,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ALLOW_CONVERGED_FLOW: "False"
+      PACKET_PLAN: c3.medium.x86
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters
   run_if_changed: ^(deploy/operator/.*)$
@@ -415,7 +414,7 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters-periodic
-  cron: 00 00 */1 * 0,2,5
+  cron: 00 00 */1 * 2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -440,7 +439,7 @@ tests:
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected-periodic
-  cron: 00 00 */1 * 0,2,5
+  cron: 00 00 */1 * 2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -495,7 +494,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-periodic
-  cron: 05 00 */1 * 0,2,5
+  cron: 05 00 */1 * 2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -524,7 +523,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
-  cron: 25 00 */1 * 0,2,5
+  cron: 25 00 */1 * 2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -581,7 +580,7 @@ tests:
       ALLOW_CONVERGED_FLOW: "False"
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-capi-periodic
-  cron: 25 00 */1 * 0,2,5
+  cron: 25 00 */1 * 2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -605,7 +604,7 @@ tests:
       IP_STACK: v4v6
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-sno-periodic
-  cron: 05 01 */1 * 0,2,5
+  cron: 05 01 */1 * 2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -631,7 +630,7 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-3masters-periodic
-  cron: 45 01 */1 * 0,2,5
+  cron: 45 01 */1 * 2,5
   steps:
     cluster_profile: packet-assisted
     dependencies:

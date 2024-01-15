@@ -373,11 +373,11 @@ timeout -s 9 105m make ${DEVSCRIPTS_TARGET}
 
 # Add extra CI specific rules to the libvirt zone, this can't be done earlier because the zone only now exists
 # TODO: In reality the bridges should be in the public zone
+sudo firewall-cmd --add-port=8213/tcp --zone=libvirt
 if [ -e /root/bm.json ] ; then
     # Allow cluster nodes to use provising node as a ntp server (4.12 and above are more likely to use it vs. the dhcp set server)
     sudo firewall-cmd --add-service=ntp --zone libvirt
     sudo firewall-cmd --add-service=ntp --zone public
-    sudo firewall-cmd --add-port=8213/tcp --zone libvirt
 fi
 EOF
 

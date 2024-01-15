@@ -1,20 +1,8 @@
 base_images:
-  ocp_4.15_base-rhel9:
-    name: "4.16"
-    namespace: ocp
-    tag: base-rhel9
   ocp_4.16_base-rhel9:
     name: "4.16"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.15
-  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.16
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
@@ -24,49 +12,35 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.ocp
   inputs:
-    ocp_4.15_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:base-rhel9
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: prometheus-operator
 - dockerfile_path: Dockerfile.config-reloader.ocp
   inputs:
-    ocp_4.15_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:base-rhel9
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: prometheus-config-reloader
 - dockerfile_path: Dockerfile.admission-webhook.ocp
   inputs:
-    ocp_4.15_base-rhel9:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.15:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: prometheus-operator-admission-webhook
 promotion:
-  name: "4.16"
-  namespace: ocp
+  to:
+  - name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -114,6 +88,8 @@ tests:
 - as: security
   optional: true
   steps:
+    env:
+      SNYK_ENABLE_DEPS_SCAN: "true"
     workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
