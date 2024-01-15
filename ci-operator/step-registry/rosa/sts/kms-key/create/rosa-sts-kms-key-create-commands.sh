@@ -10,7 +10,6 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 REGION=${REGION:-$LEASED_RESOURCE}
 
 # get user arn
-# arn:aws:iam::301721915996:user/qe-jenkins
 user_arn=$(aws sts get-caller-identity --output json | jq -r .Arn)
 KMS_KEY_POLICY=$(echo -e '
 {

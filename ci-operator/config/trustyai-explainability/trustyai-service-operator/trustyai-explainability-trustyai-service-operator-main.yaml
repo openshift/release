@@ -4,31 +4,22 @@ base_images:
     namespace: origin
     tag: stream8
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi8/ubi
+      RUN yum install -y --nodocs make git golang
+      RUN ln -s /cli/oc /usr/bin/kubectl
 images:
 - context_dir: tests/
   dockerfile_path: Dockerfile
   from: os
   to: trustyai-service-operator-ci-tests
-promotion:
-  to:
-  - additional_images:
-      latest: trustyai-service-operator-ci-tests
-    name: trustyai-service-operator-ci-tests
-    namespace: ocp
 releases:
-  initial:
-    integration:
-      name: "4.13"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.13"
-      namespace: ocp
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.13"
 resources:
   '*':
     requests:
@@ -38,9 +29,11 @@ tests:
 - as: trustyai-service-operator-e2e
   run_if_changed: ^(tests/*|config/*|controllers/*|hack/*|Dockerfile|main.go|go.mod|go.sum|api/*|.github/*)
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws-opendatahub
     env:
-      COMPUTE_NODE_TYPE: n2-standard-8
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
     test:
     - as: e2e
       commands: $HOME/peak/installandtest.sh
@@ -49,7 +42,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
-    workflow: ipi-gcp
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: main
   org: trustyai-explainability

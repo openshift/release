@@ -1,3 +1,12 @@
+base_images:
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
@@ -25,6 +34,7 @@ tests:
 - as: control-plane-120nodes
   cron: 0 12 * * 3
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale
     env:
       CHANNEL_GROUP: nightly
@@ -40,6 +50,7 @@ tests:
 - as: control-plane-24nodes
   cron: 0 11 * * 3
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
@@ -53,9 +64,27 @@ tests:
     - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts
   timeout: 5h0m0s
+- as: data-path-9nodes
+  cron: 0 13 * * 3
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      CONFIG: config/standard-classic-rosa.yml
+      ENABLE_AUTOSCALING: "false"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.15"
+      REPLICAS: "9"
+    test:
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - chain: openshift-qe-data-path-tests
+    workflow: rosa-aws-sts
+  timeout: 6h0m0s
 - as: node-density-heavy-24nodes
   cron: 0 16 * * 4
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
@@ -72,6 +101,7 @@ tests:
 - as: node-density-cni-24nodes
   cron: 0 18 * * 5
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
@@ -88,6 +118,7 @@ tests:
 - as: conc-builds-3nodes
   cron: 0 0 1,15 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
