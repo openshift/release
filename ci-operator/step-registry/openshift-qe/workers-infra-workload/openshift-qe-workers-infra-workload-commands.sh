@@ -543,6 +543,17 @@ EOF
 #           OPENSHIFT_WORKLOAD_NODE_INSTANCE_MEMORYSIZE=64Gi
 #-------------------------------------------------------------------------------------
 
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+	# shellcheck disable=SC1090
+	source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 #IF_INSTALL_INFRA_WORKLOAD=true/false
 if test ! -f "${KUBECONFIG}"
 then
