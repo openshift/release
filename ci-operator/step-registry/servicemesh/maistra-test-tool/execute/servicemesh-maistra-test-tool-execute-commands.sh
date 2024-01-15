@@ -5,15 +5,22 @@ set -o errexit
 set -o pipefail
 
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
-API_LOGIN=$(cat $SHARED_DIR/api.login)
+export CONSOLE_URL
 OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
-OCP_CRED_USR="rosa-admin"
-OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
-export API_LOGIN
 export OCP_API_URL
-export OCP_CRED_USR
-export OCP_CRED_PSW
-sleep 1800
+
+# for interop
+if test -f ${SHARED_DIR}/kubeadmin-password
+then
+  OCP_CRED_USR="kubeadmin"
+  OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
+  oc login ${OCP_API_URL} --username=${OCP_CRED_USR} --password=${OCP_CRED_PSW} --insecure-skip-tls-verify=true
+  echo "Execute maistra tests"
+  make test
+else #for ROSA & Hypershift platforms
+  eval "$(cat "${SHARED_DIR}/api.login")"
+  ROSA=true make test
+fi
 make test
 
 echo "Copying logs and xmls to ${ARTIFACT_DIR}"
