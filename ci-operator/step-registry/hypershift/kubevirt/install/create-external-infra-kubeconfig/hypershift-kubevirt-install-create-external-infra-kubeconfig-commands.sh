@@ -64,6 +64,8 @@ rules:
       - ''
     resources:
       - services
+      - endpoints
+      - endpoints/restricted
     verbs:
       - '*'
   - apiGroups:
@@ -77,6 +79,12 @@ rules:
       - ''
     resources:
       - secrets
+    verbs:
+      - '*'
+  - apiGroups:
+      - k8s.ovn.org
+    resources:
+      - egressfirewalls
     verbs:
       - '*'
 EOF
