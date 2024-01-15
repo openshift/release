@@ -42,6 +42,7 @@ else
     export CYPRESS_USERNAME="rosa-admin"
     export CYPRESS_PASSWD=${OCP_CRED_PSW}
     export CYPRESS_AUTH_PROVIDER="kube:admin"
+fi
 
 yarn cypress:run:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
 yarn cypress:combine:reports

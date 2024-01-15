@@ -19,6 +19,7 @@ then
 else
   eval "$(cat "${SHARED_DIR}/api.login")"
   ROSA=true make test
+fi
 
 hack/istio/install-bookinfo-demo.sh -c oc -n bookinfo -tg -in ${SMCP_NAMESPACE}
 sleep 120
