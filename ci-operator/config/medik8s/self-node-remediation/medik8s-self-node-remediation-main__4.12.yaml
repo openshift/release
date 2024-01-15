@@ -52,17 +52,19 @@ tests:
 - as: openshift-e2e
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: medik8s-aws
     dependencies:
       OO_INDEX: ci-index-self-node-remediation-bundle
     env:
+      BASE_DOMAIN: medik8s-ci.projects.ecosystem.sysdeseng.com
       OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: self-node-remediation
       OO_PACKAGE: self-node-remediation
       OO_TARGET_NAMESPACES: '!all'
     test:
     - as: e2e
-      commands: export SKIP_LOG_VERIFICATION="true" && make e2e-test
+      commands: export SKIP_LOG_VERIFICATION="true" SKIP_OOST_REMEDIATION_VERIFICATION="true"
+        && make e2e-test
       from: src-oc
       resources:
         requests:

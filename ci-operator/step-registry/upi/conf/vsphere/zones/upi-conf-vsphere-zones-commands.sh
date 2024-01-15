@@ -349,7 +349,6 @@ failure_domains = [
         distributed_virtual_switch_uuid = "50 05 92 5b 73 ea fd cb-1c 02 ad e4 df fd fb 8c"
     }
 ]
-"@
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Create variables.ps1 ..."
