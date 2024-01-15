@@ -31,6 +31,24 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: cluster-density-v2-249nodes
+  cron: 0 8 * * 2
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
+      EXTRA_FLAGS: --churn-duration=20m --timeout=6h
+      MULTI_AZ: "true"
+      MUST_GATHER_TIMEOUT: 90m
+      OPENSHIFT_VERSION: "4.14"
+      REPLICAS: "249"
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
 - as: control-plane-120nodes
   cron: 0 12 * * 6
   steps:
