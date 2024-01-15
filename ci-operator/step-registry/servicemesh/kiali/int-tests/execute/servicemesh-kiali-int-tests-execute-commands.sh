@@ -29,4 +29,3 @@ echo "Copying result xml to ${ARTIFACT_DIR}"
 cp tests/integration/junit-rest-report.xml ${ARTIFACT_DIR}/junit-kiali-int.xml
 
 hack/istio/install-bookinfo-demo.sh -db true -c oc -n bookinfo -in ${SMCP_NAMESPACE}
-
