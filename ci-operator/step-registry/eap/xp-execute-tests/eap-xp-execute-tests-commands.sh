@@ -56,4 +56,6 @@ xtf.bm.namespace=pit-builds
 EOF
 
 echo "Executing EAP XP tests"
-mvn clean test -Dmaven.repo.local=./repo -Pxp4-openjdk11,eap-pit-xp -Dxtf.version=0.30-tar-dcihak-SNAPSHOT -Dxtf.operator.properties.skip.installation=true -Dtest=HelmChartSmokeTest
+# Note: When executing maven we don't want the raw output to be printed into the pod logs, due to cluster security issues.
+# Therefore we're using the tmp log file which will not be collected.
+mvn clean test -Dmaven.repo.local=./repo -Pxp4-openjdk11,eap-pit-xp -Dxtf.version=0.30-tar-dcihak-SNAPSHOT -Dxtf.operator.properties.skip.installation=true -Dtest=HelmChartSmokeTest --log-file eap-xp.txt
