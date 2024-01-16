@@ -82,7 +82,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
-  cron: 17 0 24 * *
+  cron: 13 18 6 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -97,7 +97,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-installation-nightly-4.14-azure-ipi-disktype-premium-lrs-f28
+  name: periodic-ci-openshift-verification-tests-master-installation-nightly-4.14-azure-ipi-disktype-premium-lrs-disksize-f28
   spec:
     containers:
     - args:
@@ -106,8 +106,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/azure-ipi-disktype-premium-lrs-f28-cluster-profile
-      - --target=azure-ipi-disktype-premium-lrs-f28
+      - --secret-dir=/usr/local/azure-ipi-disktype-premium-lrs-disksize-f28-cluster-profile
+      - --target=azure-ipi-disktype-premium-lrs-disksize-f28
       - --variant=installation-nightly-4.14
       command:
       - ci-operator
@@ -124,7 +124,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/azure-ipi-disktype-premium-lrs-f28-cluster-profile
+      - mountPath: /usr/local/azure-ipi-disktype-premium-lrs-disksize-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -163,7 +163,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
-  cron: 54 6 12 * *
+  cron: 9 6 15 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -178,7 +178,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-installation-nightly-4.14-azure-ipi-disktype-standardssd-lrs-f28
+  name: periodic-ci-openshift-verification-tests-master-installation-nightly-4.14-azure-ipi-disktype-standardssd-lrs-disksize-f28
   spec:
     containers:
     - args:
@@ -187,8 +187,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/azure-ipi-disktype-standardssd-lrs-f28-cluster-profile
-      - --target=azure-ipi-disktype-standardssd-lrs-f28
+      - --secret-dir=/usr/local/azure-ipi-disktype-standardssd-lrs-disksize-f28-cluster-profile
+      - --target=azure-ipi-disktype-standardssd-lrs-disksize-f28
       - --variant=installation-nightly-4.14
       command:
       - ci-operator
@@ -205,7 +205,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/azure-ipi-disktype-standardssd-lrs-f28-cluster-profile
+      - mountPath: /usr/local/azure-ipi-disktype-standardssd-lrs-disksize-f28-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -892,6 +892,87 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
+  cron: 12 5 22 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: verification-tests
+  labels:
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+    ci-operator.openshift.io/variant: installation-nightly-4.14
+    ci.openshift.io/generator: prowgen
+    job-release: "4.14"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-verification-tests-master-installation-nightly-4.14-azure-upi-disconnected-f28
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/azure-upi-disconnected-f28-cluster-profile
+      - --target=azure-upi-disconnected-f28
+      - --variant=installation-nightly-4.14
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/azure-upi-disconnected-f28-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-azure-qe
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
   cron: 22 12 26 * *
   decorate: true
   decoration_config:
@@ -1297,7 +1378,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
-  cron: 29 8 11,27 * *
+  cron: 5 16 6,22 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1312,7 +1393,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-installation-nightly-4.15-azure-ipi-disktype-premium-lrs-f14
+  name: periodic-ci-openshift-verification-tests-master-installation-nightly-4.15-azure-ipi-disktype-premium-lrs-disksize-f14
   spec:
     containers:
     - args:
@@ -1321,8 +1402,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/azure-ipi-disktype-premium-lrs-f14-cluster-profile
-      - --target=azure-ipi-disktype-premium-lrs-f14
+      - --secret-dir=/usr/local/azure-ipi-disktype-premium-lrs-disksize-f14-cluster-profile
+      - --target=azure-ipi-disktype-premium-lrs-disksize-f14
       - --variant=installation-nightly-4.15
       command:
       - ci-operator
@@ -1339,7 +1420,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/azure-ipi-disktype-premium-lrs-f14-cluster-profile
+      - mountPath: /usr/local/azure-ipi-disktype-premium-lrs-disksize-f14-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1378,7 +1459,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
-  cron: 47 5 8,22 * *
+  cron: 32 4 14,30 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1393,7 +1474,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-installation-nightly-4.15-azure-ipi-disktype-standardssd-lrs-f14
+  name: periodic-ci-openshift-verification-tests-master-installation-nightly-4.15-azure-ipi-disktype-standardssd-lrs-disksize-f14
   spec:
     containers:
     - args:
@@ -1402,8 +1483,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/azure-ipi-disktype-standardssd-lrs-f14-cluster-profile
-      - --target=azure-ipi-disktype-standardssd-lrs-f14
+      - --secret-dir=/usr/local/azure-ipi-disktype-standardssd-lrs-disksize-f14-cluster-profile
+      - --target=azure-ipi-disktype-standardssd-lrs-disksize-f14
       - --variant=installation-nightly-4.15
       command:
       - ci-operator
@@ -1420,7 +1501,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/azure-ipi-disktype-standardssd-lrs-f14-cluster-profile
+      - mountPath: /usr/local/azure-ipi-disktype-standardssd-lrs-disksize-f14-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -2107,6 +2188,87 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
+  cron: 34 8 11,25 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: verification-tests
+  labels:
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+    ci-operator.openshift.io/variant: installation-nightly-4.15
+    ci.openshift.io/generator: prowgen
+    job-release: "4.15"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-verification-tests-master-installation-nightly-4.15-azure-upi-disconnected-f14
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/azure-upi-disconnected-f14-cluster-profile
+      - --target=azure-upi-disconnected-f14
+      - --variant=installation-nightly-4.15
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/azure-upi-disconnected-f14-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-azure-qe
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
   cron: 52 5 8,24 * *
   decorate: true
   decoration_config:
@@ -2512,7 +2674,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
-  cron: 9 15 5,21 * *
+  cron: 3 16 13,29 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2527,7 +2689,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.16"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-installation-nightly-4.16-azure-ipi-disktype-premium-lrs-f14
+  name: periodic-ci-openshift-verification-tests-master-installation-nightly-4.16-azure-ipi-disktype-premium-lrs-disksize-f14
   spec:
     containers:
     - args:
@@ -2536,8 +2698,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/azure-ipi-disktype-premium-lrs-f14-cluster-profile
-      - --target=azure-ipi-disktype-premium-lrs-f14
+      - --secret-dir=/usr/local/azure-ipi-disktype-premium-lrs-disksize-f14-cluster-profile
+      - --target=azure-ipi-disktype-premium-lrs-disksize-f14
       - --variant=installation-nightly-4.16
       command:
       - ci-operator
@@ -2554,7 +2716,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/azure-ipi-disktype-premium-lrs-f14-cluster-profile
+      - mountPath: /usr/local/azure-ipi-disktype-premium-lrs-disksize-f14-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -2593,7 +2755,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
-  cron: 16 10 11,27 * *
+  cron: 36 21 1,17 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2608,7 +2770,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.16"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-installation-nightly-4.16-azure-ipi-disktype-standardssd-lrs-f14
+  name: periodic-ci-openshift-verification-tests-master-installation-nightly-4.16-azure-ipi-disktype-standardssd-lrs-disksize-f14
   spec:
     containers:
     - args:
@@ -2617,8 +2779,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/azure-ipi-disktype-standardssd-lrs-f14-cluster-profile
-      - --target=azure-ipi-disktype-standardssd-lrs-f14
+      - --secret-dir=/usr/local/azure-ipi-disktype-standardssd-lrs-disksize-f14-cluster-profile
+      - --target=azure-ipi-disktype-standardssd-lrs-disksize-f14
       - --variant=installation-nightly-4.16
       command:
       - ci-operator
@@ -2635,7 +2797,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/azure-ipi-disktype-standardssd-lrs-f14-cluster-profile
+      - mountPath: /usr/local/azure-ipi-disktype-standardssd-lrs-disksize-f14-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -3311,6 +3473,87 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-azuremag-qe
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 47 13 4,20 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: verification-tests
+  labels:
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+    ci-operator.openshift.io/variant: installation-nightly-4.16
+    ci.openshift.io/generator: prowgen
+    job-release: "4.16"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-verification-tests-master-installation-nightly-4.16-azure-upi-disconnected-f14
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/azure-upi-disconnected-f14-cluster-profile
+      - --target=azure-upi-disconnected-f14
+      - --variant=installation-nightly-4.16
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/azure-upi-disconnected-f14-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-azure-qe
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -7449,6 +7692,87 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-vsphere
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: '@yearly'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: verification-tests
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: installer-rehearse-4.15
+    ci.openshift.io/generator: prowgen
+    job-release: "4.15"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-verification-tests-master-installer-rehearse-4.15-installer-rehearse-aws
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/installer-rehearse-aws-cluster-profile
+      - --target=installer-rehearse-aws
+      - --variant=installer-rehearse-4.15
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/installer-rehearse-aws-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-qe
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

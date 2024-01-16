@@ -345,6 +345,14 @@ CONFIG = {
     'gitops-aws-quota-slice': {
         'us-west-2': 10
     },
+    'che-aws-quota-slice': {
+        # us-east-2 is reserved for the air-gapped clusters
+        'us-east-1': 10,
+        'us-west-1': 10,
+    },
+    'osl-gcp-quota-slice': {
+        'us-central1': 10,
+    },
 }
 
 for i in range(0,4):
