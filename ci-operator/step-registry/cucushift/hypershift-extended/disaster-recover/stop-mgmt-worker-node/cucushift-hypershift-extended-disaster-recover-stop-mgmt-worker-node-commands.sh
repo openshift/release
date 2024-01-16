@@ -23,6 +23,7 @@ fi
 echo "stop worker node ${node_name} with instance ID ${instance_id}"
 aws ec2 stop-instances --instance-ids ${instance_id}
 echo "wait until the worker node ${node_name} NotReady"
+sleep "3h"
 oc wait no ${node_name} --for=condition=NotReady
 
 status=$(aws ec2 describe-instances --instance-ids ${instance_id} --query "Reservations[].Instances[].State.Name" --output text)
