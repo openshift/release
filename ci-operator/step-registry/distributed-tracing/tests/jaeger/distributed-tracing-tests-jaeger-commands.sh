@@ -1,4 +1,5 @@
 #!/bin/bash
+#test
 
 set -o errexit
 set -o pipefail
