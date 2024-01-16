@@ -1,4 +1,5 @@
 presubmits:
+<<<<<<<< HEAD:ci-operator/jobs/openshift/run-once-duration-override/openshift-run-once-duration-override-release-4.17-presubmits.yaml
   openshift/run-once-duration-override:
   - agent: kubernetes
     always_run: true
@@ -76,13 +77,26 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
+========
+  openshift-power-monitoring/kepler:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-power-monitoring/kepler/openshift-power-monitoring-kepler-main-presubmits.yaml
     cluster: build03
     context: ci/prow/images
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
+<<<<<<<< HEAD:ci-operator/jobs/openshift/run-once-duration-override/openshift-run-once-duration-override-release-4.17-presubmits.yaml
     name: pull-ci-openshift-run-once-duration-override-release-4.17-images
+========
+    name: pull-ci-openshift-power-monitoring-kepler-main-images
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-power-monitoring/kepler/openshift-power-monitoring-kepler-main-presubmits.yaml
     rerun_command: /test images
     spec:
       containers:
@@ -128,24 +142,43 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
+<<<<<<<< HEAD:ci-operator/jobs/openshift/run-once-duration-override/openshift-run-once-duration-override-release-4.17-presubmits.yaml
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build03
     context: ci/prow/security
+========
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/kepler-e2e
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-power-monitoring/kepler/openshift-power-monitoring-kepler-main-presubmits.yaml
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
+<<<<<<<< HEAD:ci-operator/jobs/openshift/run-once-duration-override/openshift-run-once-duration-override-release-4.17-presubmits.yaml
     name: pull-ci-openshift-run-once-duration-override-release-4.17-security
     optional: true
     rerun_command: /test security
+========
+    name: pull-ci-openshift-power-monitoring-kepler-main-kepler-e2e
+    rerun_command: /test kepler-e2e
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-power-monitoring/kepler/openshift-power-monitoring-kepler-main-presubmits.yaml
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+<<<<<<<< HEAD:ci-operator/jobs/openshift/run-once-duration-override/openshift-run-once-duration-override-release-4.17-presubmits.yaml
         - --target=security
+========
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=kepler-e2e
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-power-monitoring/kepler/openshift-power-monitoring-kepler-main-presubmits.yaml
         command:
         - ci-operator
         image: ci-operator:latest
@@ -155,8 +188,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -169,6 +208,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -178,27 +223,49 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+<<<<<<<< HEAD:ci-operator/jobs/openshift/run-once-duration-override/openshift-run-once-duration-override-release-4.17-presubmits.yaml
     trigger: (?m)^/test( | .* )security,?($|\s.*)
+========
+    trigger: (?m)^/test( | .* )kepler-e2e,?($|\s.*)
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-power-monitoring/kepler/openshift-power-monitoring-kepler-main-presubmits.yaml
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
+<<<<<<<< HEAD:ci-operator/jobs/openshift/run-once-duration-override/openshift-run-once-duration-override-release-4.17-presubmits.yaml
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build03
     context: ci/prow/unit
+========
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/ocp4.13-periodic-images
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-power-monitoring/kepler/openshift-power-monitoring-kepler-main-presubmits.yaml
     decorate: true
     labels:
+      ci-operator.openshift.io/variant: ocp4.13-periodic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
+<<<<<<<< HEAD:ci-operator/jobs/openshift/run-once-duration-override/openshift-run-once-duration-override-release-4.17-presubmits.yaml
     name: pull-ci-openshift-run-once-duration-override-release-4.17-unit
     rerun_command: /test unit
+========
+    name: pull-ci-openshift-power-monitoring-kepler-main-ocp4.13-periodic-images
+    rerun_command: /test ocp4.13-periodic-images
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-power-monitoring/kepler/openshift-power-monitoring-kepler-main-presubmits.yaml
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+<<<<<<<< HEAD:ci-operator/jobs/openshift/run-once-duration-override/openshift-run-once-duration-override-release-4.17-presubmits.yaml
         - --target=unit
+========
+        - --target=[images]
+        - --variant=ocp4.13-periodic
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-power-monitoring/kepler/openshift-power-monitoring-kepler-main-presubmits.yaml
         command:
         - ci-operator
         image: ci-operator:latest
@@ -231,27 +298,48 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+<<<<<<<< HEAD:ci-operator/jobs/openshift/run-once-duration-override/openshift-run-once-duration-override-release-4.17-presubmits.yaml
     trigger: (?m)^/test( | .* )unit,?($|\s.*)
+========
+    trigger: (?m)^/test( | .* )ocp4.13-periodic-images,?($|\s.*)
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-power-monitoring/kepler/openshift-power-monitoring-kepler-main-presubmits.yaml
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
+<<<<<<<< HEAD:ci-operator/jobs/openshift/run-once-duration-override/openshift-run-once-duration-override-release-4.17-presubmits.yaml
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build03
     context: ci/prow/verify
+========
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/ocp4.14-periodic-images
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-power-monitoring/kepler/openshift-power-monitoring-kepler-main-presubmits.yaml
     decorate: true
     labels:
+      ci-operator.openshift.io/variant: ocp4.14-periodic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
+<<<<<<<< HEAD:ci-operator/jobs/openshift/run-once-duration-override/openshift-run-once-duration-override-release-4.17-presubmits.yaml
     name: pull-ci-openshift-run-once-duration-override-release-4.17-verify
     rerun_command: /test verify
+========
+    name: pull-ci-openshift-power-monitoring-kepler-main-ocp4.14-periodic-images
+    rerun_command: /test ocp4.14-periodic-images
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-power-monitoring/kepler/openshift-power-monitoring-kepler-main-presubmits.yaml
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+<<<<<<<< HEAD:ci-operator/jobs/openshift/run-once-duration-override/openshift-run-once-duration-override-release-4.17-presubmits.yaml
         - --target=verify
+========
+        - --target=[images]
+        - --variant=ocp4.14-periodic
         command:
         - ci-operator
         image: ci-operator:latest
@@ -284,4 +372,67 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ocp4.14-periodic-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/post-submit-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: post-submit
+      ci.openshift.io/generator: prowgen
+      job-release: "4.14"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-power-monitoring-kepler-main-post-submit-images
+    rerun_command: /test post-submit-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=post-submit
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-power-monitoring/kepler/openshift-power-monitoring-kepler-main-presubmits.yaml
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+<<<<<<<< HEAD:ci-operator/jobs/openshift/run-once-duration-override/openshift-run-once-duration-override-release-4.17-presubmits.yaml
     trigger: (?m)^/test( | .* )verify,?($|\s.*)
+========
+    trigger: (?m)^/test( | .* )post-submit-images,?($|\s.*)
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-power-monitoring/kepler/openshift-power-monitoring-kepler-main-presubmits.yaml

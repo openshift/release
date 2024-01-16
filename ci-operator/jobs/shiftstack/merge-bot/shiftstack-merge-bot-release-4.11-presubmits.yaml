@@ -1,4 +1,5 @@
 presubmits:
+<<<<<<<< HEAD:ci-operator/jobs/shiftstack/merge-bot/shiftstack-merge-bot-release-4.11-presubmits.yaml
   shiftstack/merge-bot:
   - agent: kubernetes
     always_run: true
@@ -7,20 +8,103 @@ presubmits:
     - ^release-4\.11-
     cluster: build03
     context: ci/prow/periodic-4.11-images
+========
+  openshift-priv/dpu-network-operator:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.17$
+    - ^release-4\.17-
+    cluster: build03
+    context: ci/prow/fmt
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/dpu-network-operator/openshift-priv-dpu-network-operator-release-4.17-presubmits.yaml
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
     labels:
       ci-operator.openshift.io/variant: periodic-4.11
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
+<<<<<<<< HEAD:ci-operator/jobs/shiftstack/merge-bot/shiftstack-merge-bot-release-4.11-presubmits.yaml
     name: pull-ci-shiftstack-merge-bot-release-4.11-periodic-4.11-images
     rerun_command: /test periodic-4.11-images
+========
+    name: pull-ci-openshift-priv-dpu-network-operator-release-4.17-fmt
+    path_alias: github.com/openshift/dpu-network-operator
+    rerun_command: /test fmt
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=fmt
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )fmt,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.17$
+    - ^release-4\.17-
+    cluster: build03
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-dpu-network-operator-release-4.17-images
+    path_alias: github.com/openshift/dpu-network-operator
+    rerun_command: /test images
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/dpu-network-operator/openshift-priv-dpu-network-operator-release-4.17-presubmits.yaml
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --variant=periodic-4.11
@@ -35,6 +119,9 @@ presubmits:
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -60,25 +147,43 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
+<<<<<<<< HEAD:ci-operator/jobs/shiftstack/merge-bot/shiftstack-merge-bot-release-4.11-presubmits.yaml
     - ^release-4\.11$
     - ^release-4\.11-
     cluster: build03
     context: ci/prow/periodic-4.11-lint
+========
+    - ^release-4\.17$
+    - ^release-4\.17-
+    cluster: build03
+    context: ci/prow/unit
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/dpu-network-operator/openshift-priv-dpu-network-operator-release-4.17-presubmits.yaml
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
     labels:
       ci-operator.openshift.io/variant: periodic-4.11
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
+<<<<<<<< HEAD:ci-operator/jobs/shiftstack/merge-bot/shiftstack-merge-bot-release-4.11-presubmits.yaml
     name: pull-ci-shiftstack-merge-bot-release-4.11-periodic-4.11-lint
     rerun_command: /test periodic-4.11-lint
+========
+    name: pull-ci-openshift-priv-dpu-network-operator-release-4.17-unit
+    path_alias: github.com/openshift/dpu-network-operator
+    rerun_command: /test unit
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/dpu-network-operator/openshift-priv-dpu-network-operator-release-4.17-presubmits.yaml
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+<<<<<<<< HEAD:ci-operator/jobs/shiftstack/merge-bot/shiftstack-merge-bot-release-4.11-presubmits.yaml
         - --target=lint
         - --variant=periodic-4.11
         command:
@@ -138,6 +243,9 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=unittests
         - --variant=periodic-4.11
+========
+        - --target=unit
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/dpu-network-operator/openshift-priv-dpu-network-operator-release-4.17-presubmits.yaml
         command:
         - ci-operator
         image: ci-operator:latest
@@ -149,6 +257,9 @@ presubmits:
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -170,4 +281,8 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+<<<<<<<< HEAD:ci-operator/jobs/shiftstack/merge-bot/shiftstack-merge-bot-release-4.11-presubmits.yaml
     trigger: (?m)^/test( | .* )periodic-4.11-unittests,?($|\s.*)
+========
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/dpu-network-operator/openshift-priv-dpu-network-operator-release-4.17-presubmits.yaml

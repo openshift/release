@@ -1,4 +1,5 @@
 presubmits:
+<<<<<<<< HEAD:ci-operator/jobs/openshift/machine-api-provider-powervs/openshift-machine-api-provider-powervs-release-4.17-presubmits.yaml
   openshift/machine-api-provider-powervs:
   - agent: kubernetes
     always_run: true
@@ -7,10 +8,296 @@ presubmits:
     - ^release-4\.17-
     cluster: build03
     context: ci/prow/generate
+========
+  openshift-kni/numaresources-operator:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.15$
+    - ^release-4\.15-
+    cluster: build05
+    context: ci/prow/ci-e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-telco
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-numaresources-operator-release-4.15-ci-e2e
+    rerun_command: /test ci-e2e
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ci-e2e-cluster-profile
+        - --target=ci-e2e
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/ci-e2e-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-telco
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-e2e,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.15$
+    - ^release-4\.15-
+    cluster: build03
+    context: ci/prow/ci-index
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-numaresources-operator-release-4.15-ci-index
+    rerun_command: /test ci-index
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=ci-index
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.15$
+    - ^release-4\.15-
+    cluster: build05
+    context: ci/prow/ci-install-e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-telco
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-numaresources-operator-release-4.15-ci-install-e2e
+    rerun_command: /test ci-install-e2e
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ci-install-e2e-cluster-profile
+        - --target=ci-install-e2e
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/ci-install-e2e-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-telco
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-install-e2e,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.15$
+    - ^release-4\.15-
+    cluster: build03
+    context: ci/prow/ci-unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-numaresources-operator-release-4.15-ci-unit
+    rerun_command: /test ci-unit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=ci-unit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.15$
+    - ^release-4\.15-
+    cluster: build03
+    context: ci/prow/images
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-kni/numaresources-operator/openshift-kni-numaresources-operator-release-4.15-presubmits.yaml
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.15"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
+<<<<<<<< HEAD:ci-operator/jobs/openshift/machine-api-provider-powervs/openshift-machine-api-provider-powervs-release-4.17-presubmits.yaml
     name: pull-ci-openshift-machine-api-provider-powervs-release-4.17-generate
     rerun_command: /test generate
     spec:
@@ -224,6 +511,9 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-api-provider-powervs-release-4.17-images
+========
+    name: pull-ci-openshift-kni-numaresources-operator-release-4.15-images
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-kni/numaresources-operator/openshift-kni-numaresources-operator-release-4.15-presubmits.yaml
     rerun_command: /test images
     spec:
       containers:
@@ -269,16 +559,30 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
+<<<<<<<< HEAD:ci-operator/jobs/openshift/machine-api-provider-powervs/openshift-machine-api-provider-powervs-release-4.17-presubmits.yaml
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build03
     context: ci/prow/unit
+========
+    - ^release-4\.15$
+    - ^release-4\.15-
+    cluster: build03
+    context: ci/prow/security
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-kni/numaresources-operator/openshift-kni-numaresources-operator-release-4.15-presubmits.yaml
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.15"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
+<<<<<<<< HEAD:ci-operator/jobs/openshift/machine-api-provider-powervs/openshift-machine-api-provider-powervs-release-4.17-presubmits.yaml
     name: pull-ci-openshift-machine-api-provider-powervs-release-4.17-unit
     rerun_command: /test unit
+========
+    name: pull-ci-openshift-kni-numaresources-operator-release-4.15-security
+    optional: true
+    rerun_command: /test security
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-kni/numaresources-operator/openshift-kni-numaresources-operator-release-4.15-presubmits.yaml
     spec:
       containers:
       - args:
@@ -286,7 +590,11 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+<<<<<<<< HEAD:ci-operator/jobs/openshift/machine-api-provider-powervs/openshift-machine-api-provider-powervs-release-4.17-presubmits.yaml
         - --target=unit
+========
+        - --target=security
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-kni/numaresources-operator/openshift-kni-numaresources-operator-release-4.15-presubmits.yaml
         command:
         - ci-operator
         image: ci-operator:latest
@@ -325,4 +633,8 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+<<<<<<<< HEAD:ci-operator/jobs/openshift/machine-api-provider-powervs/openshift-machine-api-provider-powervs-release-4.17-presubmits.yaml
     trigger: (?m)^/test( | .* )unit,?($|\s.*)
+========
+    trigger: (?m)^/test( | .* )security,?($|\s.*)
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-kni/numaresources-operator/openshift-kni-numaresources-operator-release-4.15-presubmits.yaml

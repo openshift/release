@@ -1,10 +1,15 @@
 presubmits:
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-gcp/openshift-cloud-provider-gcp-release-4.17-presubmits.yaml
   openshift/cloud-provider-gcp:
+========
+  openshift-priv/aws-efs-csi-driver:
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/aws-efs-csi-driver/openshift-priv-aws-efs-csi-driver-release-4.17-presubmits.yaml
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-gcp/openshift-cloud-provider-gcp-release-4.17-presubmits.yaml
     cluster: build04
     context: ci/prow/e2e-gcp-ovn
     decorate: true
@@ -233,22 +238,33 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
+========
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/aws-efs-csi-driver/openshift-priv-aws-efs-csi-driver-release-4.17-presubmits.yaml
     cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-gcp/openshift-cloud-provider-gcp-release-4.17-presubmits.yaml
     name: pull-ci-openshift-cloud-provider-gcp-release-4.17-images
     path_alias: k8s.io/cloud-provider-gcp
+========
+    name: pull-ci-openshift-priv-aws-efs-csi-driver-release-4.17-images
+    path_alias: sigs.k8s.io/aws-efs-csi-driver
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/aws-efs-csi-driver/openshift-priv-aws-efs-csi-driver-release-4.17-presubmits.yaml
     rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=[release:latest]
@@ -263,6 +279,9 @@ presubmits:
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -291,6 +310,7 @@ presubmits:
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build03
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-gcp/openshift-cloud-provider-gcp-release-4.17-presubmits.yaml
     context: ci/prow/verify-commits
     decorate: true
     decoration_config:
@@ -301,14 +321,28 @@ presubmits:
     name: pull-ci-openshift-cloud-provider-gcp-release-4.17-verify-commits
     optional: true
     path_alias: k8s.io/cloud-provider-gcp
-    rerun_command: /test verify-commits
+========
+    context: ci/prow/unit
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-aws-efs-csi-driver-release-4.17-unit
+    path_alias: sigs.k8s.io/aws-efs-csi-driver
+    rerun_command: /test unit
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=verify-commits
+        - --target=unit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -320,6 +354,9 @@ presubmits:
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -341,4 +378,210 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.17$
+    - ^release-4\.17-
+    cluster: build03
+    context: ci/prow/verify
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-aws-efs-csi-driver-release-4.17-verify
+    path_alias: sigs.k8s.io/aws-efs-csi-driver
+    rerun_command: /test verify
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=verify
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )verify,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.17$
+    - ^release-4\.17-
+    cluster: build03
+    context: ci/prow/verify-commits
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-aws-efs-csi-driver-release-4.17-verify-commits
+    path_alias: sigs.k8s.io/aws-efs-csi-driver
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/aws-efs-csi-driver/openshift-priv-aws-efs-csi-driver-release-4.17-presubmits.yaml
+    rerun_command: /test verify-commits
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-gcp/openshift-cloud-provider-gcp-release-4.17-presubmits.yaml
+========
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/aws-efs-csi-driver/openshift-priv-aws-efs-csi-driver-release-4.17-presubmits.yaml
+        - --report-credentials-file=/etc/report/credentials
+        - --target=verify-commits
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-gcp/openshift-cloud-provider-gcp-release-4.17-presubmits.yaml
+========
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/aws-efs-csi-driver/openshift-priv-aws-efs-csi-driver-release-4.17-presubmits.yaml
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
     trigger: (?m)^/test( | .* )verify-commits,?($|\s.*)
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-gcp/openshift-cloud-provider-gcp-release-4.17-presubmits.yaml
+========
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.17$
+    - ^release-4\.17-
+    cluster: build03
+    context: ci/prow/verify-deps
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-aws-efs-csi-driver-release-4.17-verify-deps
+    path_alias: sigs.k8s.io/aws-efs-csi-driver
+    rerun_command: /test verify-deps
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=verify-deps
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )verify-deps,?($|\s.*)
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/aws-efs-csi-driver/openshift-priv-aws-efs-csi-driver-release-4.17-presubmits.yaml

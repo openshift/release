@@ -1,11 +1,16 @@
 presubmits:
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-powervs/openshift-cloud-provider-powervs-release-4.17-presubmits.yaml
   openshift/cloud-provider-powervs:
+========
+  openshift-priv/federation-v2-operator:
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/federation-v2-operator/openshift-priv-federation-v2-operator-release-4.17-presubmits.yaml
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build03
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-powervs/openshift-cloud-provider-powervs-release-4.17-presubmits.yaml
     context: ci/prow/fmt
     decorate: true
     labels:
@@ -65,12 +70,25 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cloud-provider-powervs-release-4.17-images
+========
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-federation-v2-operator-release-4.17-images
+    path_alias: github.com/openshift/federation-v2-operator
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/federation-v2-operator/openshift-priv-federation-v2-operator-release-4.17-presubmits.yaml
     rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=[release:latest]
@@ -86,6 +104,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -97,6 +118,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -113,6 +137,7 @@ presubmits:
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build03
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-powervs/openshift-cloud-provider-powervs-release-4.17-presubmits.yaml
     context: ci/prow/test
     decorate: true
     labels:
@@ -120,13 +145,31 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cloud-provider-powervs-release-4.17-test
     rerun_command: /test test
+========
+    context: ci/prow/managed-e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-federation-v2-operator-release-4.17-managed-e2e
+    path_alias: github.com/openshift/federation-v2-operator
+    rerun_command: /test managed-e2e
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/federation-v2-operator/openshift-priv-federation-v2-operator-release-4.17-presubmits.yaml
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-powervs/openshift-cloud-provider-powervs-release-4.17-presubmits.yaml
         - --target=test
+========
+        - --target=managed-e2e
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/federation-v2-operator/openshift-priv-federation-v2-operator-release-4.17-presubmits.yaml
         command:
         - ci-operator
         image: ci-operator:latest
@@ -139,6 +182,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -150,6 +196,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -159,13 +208,18 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-powervs/openshift-cloud-provider-powervs-release-4.17-presubmits.yaml
     trigger: (?m)^/test( | .* )test,?($|\s.*)
+========
+    trigger: (?m)^/test( | .* )managed-e2e,?($|\s.*)
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/federation-v2-operator/openshift-priv-federation-v2-operator-release-4.17-presubmits.yaml
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build03
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-powervs/openshift-cloud-provider-powervs-release-4.17-presubmits.yaml
     context: ci/prow/verify-commits
     decorate: true
     labels:
@@ -174,13 +228,31 @@ presubmits:
     name: pull-ci-openshift-cloud-provider-powervs-release-4.17-verify-commits
     optional: true
     rerun_command: /test verify-commits
+========
+    context: ci/prow/unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-federation-v2-operator-release-4.17-unit
+    path_alias: github.com/openshift/federation-v2-operator
+    rerun_command: /test unit
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/federation-v2-operator/openshift-priv-federation-v2-operator-release-4.17-presubmits.yaml
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-powervs/openshift-cloud-provider-powervs-release-4.17-presubmits.yaml
         - --target=verify-commits
+========
+        - --target=unit
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/federation-v2-operator/openshift-priv-federation-v2-operator-release-4.17-presubmits.yaml
         command:
         - ci-operator
         image: ci-operator:latest
@@ -193,6 +265,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -204,6 +279,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-powervs/openshift-cloud-provider-powervs-release-4.17-presubmits.yaml
+========
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/federation-v2-operator/openshift-priv-federation-v2-operator-release-4.17-presubmits.yaml
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -213,7 +294,11 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-powervs/openshift-cloud-provider-powervs-release-4.17-presubmits.yaml
     trigger: (?m)^/test( | .* )verify-commits,?($|\s.*)
+========
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/federation-v2-operator/openshift-priv-federation-v2-operator-release-4.17-presubmits.yaml
   - agent: kubernetes
     always_run: true
     branches:
@@ -222,16 +307,28 @@ presubmits:
     cluster: build03
     context: ci/prow/vet
     decorate: true
+<<<<<<<< HEAD:ci-operator/jobs/openshift/cloud-provider-powervs/openshift-cloud-provider-powervs-release-4.17-presubmits.yaml
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cloud-provider-powervs-release-4.17-vet
+========
+    decoration_config:
+      skip_cloning: true
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-federation-v2-operator-release-4.17-vet
+    path_alias: github.com/openshift/federation-v2-operator
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/federation-v2-operator/openshift-priv-federation-v2-operator-release-4.17-presubmits.yaml
     rerun_command: /test vet
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=vet
         command:
@@ -246,6 +343,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -257,6 +357,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

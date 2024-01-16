@@ -1,5 +1,9 @@
 presubmits:
+<<<<<<<< HEAD:ci-operator/jobs/openshift/descheduler/openshift-descheduler-release-4.17-presubmits.yaml
   openshift/descheduler:
+========
+  openshift/alibaba-cloud-csi-driver:
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift/alibaba-cloud-csi-driver/openshift-alibaba-cloud-csi-driver-release-4.17-presubmits.yaml
   - agent: kubernetes
     always_run: true
     branches:
@@ -11,8 +15,13 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
+<<<<<<<< HEAD:ci-operator/jobs/openshift/descheduler/openshift-descheduler-release-4.17-presubmits.yaml
     name: pull-ci-openshift-descheduler-release-4.17-images
     path_alias: sigs.k8s.io/descheduler
+========
+    name: pull-ci-openshift-alibaba-cloud-csi-driver-release-4.17-images
+    path_alias: sigs.k8s.io/alibaba-cloud-csi-driver
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift/alibaba-cloud-csi-driver/openshift-alibaba-cloud-csi-driver-release-4.17-presubmits.yaml
     rerun_command: /test images
     spec:
       containers:
@@ -61,6 +70,7 @@ presubmits:
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build03
+<<<<<<<< HEAD:ci-operator/jobs/openshift/descheduler/openshift-descheduler-release-4.17-presubmits.yaml
     context: ci/prow/security
     decorate: true
     labels:
@@ -123,13 +133,20 @@ presubmits:
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build03
+========
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift/alibaba-cloud-csi-driver/openshift-alibaba-cloud-csi-driver-release-4.17-presubmits.yaml
     context: ci/prow/unit
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
+<<<<<<<< HEAD:ci-operator/jobs/openshift/descheduler/openshift-descheduler-release-4.17-presubmits.yaml
     name: pull-ci-openshift-descheduler-release-4.17-unit
     path_alias: sigs.k8s.io/descheduler
+========
+    name: pull-ci-openshift-alibaba-cloud-csi-driver-release-4.17-unit
+    path_alias: sigs.k8s.io/alibaba-cloud-csi-driver
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift/alibaba-cloud-csi-driver/openshift-alibaba-cloud-csi-driver-release-4.17-presubmits.yaml
     rerun_command: /test unit
     spec:
       containers:
@@ -171,3 +188,64 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.17$
+    - ^release-4\.17-
+    cluster: build03
+    context: ci/prow/verify-deps
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-alibaba-cloud-csi-driver-release-4.17-verify-deps
+    path_alias: sigs.k8s.io/alibaba-cloud-csi-driver
+    rerun_command: /test verify-deps
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=verify-deps
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )verify-deps,?($|\s.*)

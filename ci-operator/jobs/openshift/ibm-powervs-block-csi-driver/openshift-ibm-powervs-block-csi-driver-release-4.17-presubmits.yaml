@@ -1,5 +1,81 @@
 presubmits:
+<<<<<<<< HEAD:ci-operator/jobs/openshift/ibm-powervs-block-csi-driver/openshift-ibm-powervs-block-csi-driver-release-4.17-presubmits.yaml
   openshift/ibm-powervs-block-csi-driver:
+========
+  openshift-priv/oc-mirror:
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/oc-mirror/openshift-priv-oc-mirror-release-4.17-presubmits.yaml
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.17$
+    - ^release-4\.17-
+    cluster: build03
+<<<<<<<< HEAD:ci-operator/jobs/openshift/ibm-powervs-block-csi-driver/openshift-ibm-powervs-block-csi-driver-release-4.17-presubmits.yaml
+    context: ci/prow/images
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ibm-powervs-block-csi-driver-release-4.17-images
+    path_alias: sigs.k8s.io/ibm-powervs-block-csi-driver
+========
+    context: ci/prow/e2e
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-oc-mirror-release-4.17-e2e
+    path_alias: github.com/openshift/oc-mirror
+    rerun_command: /test e2e
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=e2e
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -8,17 +84,24 @@ presubmits:
     cluster: build03
     context: ci/prow/images
     decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ibm-powervs-block-csi-driver-release-4.17-images
-    path_alias: sigs.k8s.io/ibm-powervs-block-csi-driver
+    name: pull-ci-openshift-priv-oc-mirror-release-4.17-images
+    path_alias: github.com/openshift/oc-mirror
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/oc-mirror/openshift-priv-oc-mirror-release-4.17-presubmits.yaml
     rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=[release:latest]
@@ -33,6 +116,9 @@ presubmits:
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -61,6 +147,7 @@ presubmits:
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build03
+<<<<<<<< HEAD:ci-operator/jobs/openshift/ibm-powervs-block-csi-driver/openshift-ibm-powervs-block-csi-driver-release-4.17-presubmits.yaml
     context: ci/prow/security
     decorate: true
     labels:
@@ -70,14 +157,34 @@ presubmits:
     optional: true
     path_alias: sigs.k8s.io/ibm-powervs-block-csi-driver
     rerun_command: /test security
+========
+    context: ci/prow/sanity
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-oc-mirror-release-4.17-sanity
+    path_alias: github.com/openshift/oc-mirror
+    rerun_command: /test sanity
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/oc-mirror/openshift-priv-oc-mirror-release-4.17-presubmits.yaml
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+<<<<<<<< HEAD:ci-operator/jobs/openshift/ibm-powervs-block-csi-driver/openshift-ibm-powervs-block-csi-driver-release-4.17-presubmits.yaml
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=security
+========
+        - --target=sanity
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/oc-mirror/openshift-priv-oc-mirror-release-4.17-presubmits.yaml
         command:
         - ci-operator
         image: ci-operator:latest
@@ -92,6 +199,9 @@ presubmits:
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -116,7 +226,11 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+<<<<<<<< HEAD:ci-operator/jobs/openshift/ibm-powervs-block-csi-driver/openshift-ibm-powervs-block-csi-driver-release-4.17-presubmits.yaml
     trigger: (?m)^/test( | .* )security,?($|\s.*)
+========
+    trigger: (?m)^/test( | .* )sanity,?($|\s.*)
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/oc-mirror/openshift-priv-oc-mirror-release-4.17-presubmits.yaml
   - agent: kubernetes
     always_run: true
     branches:
@@ -125,19 +239,34 @@ presubmits:
     cluster: build03
     context: ci/prow/unit
     decorate: true
+<<<<<<<< HEAD:ci-operator/jobs/openshift/ibm-powervs-block-csi-driver/openshift-ibm-powervs-block-csi-driver-release-4.17-presubmits.yaml
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ibm-powervs-block-csi-driver-release-4.17-unit
     path_alias: sigs.k8s.io/ibm-powervs-block-csi-driver
+========
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-oc-mirror-release-4.17-unit
+    path_alias: github.com/openshift/oc-mirror
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/oc-mirror/openshift-priv-oc-mirror-release-4.17-presubmits.yaml
     rerun_command: /test unit
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=unit
+<<<<<<<< HEAD:ci-operator/jobs/openshift/ibm-powervs-block-csi-driver/openshift-ibm-powervs-block-csi-driver-release-4.17-presubmits.yaml
         command:
         - ci-operator
         image: ci-operator:latest
@@ -192,6 +321,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=verify
+========
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/oc-mirror/openshift-priv-oc-mirror-release-4.17-presubmits.yaml
         command:
         - ci-operator
         image: ci-operator:latest
@@ -203,6 +334,9 @@ presubmits:
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -224,4 +358,8 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+<<<<<<<< HEAD:ci-operator/jobs/openshift/ibm-powervs-block-csi-driver/openshift-ibm-powervs-block-csi-driver-release-4.17-presubmits.yaml
     trigger: (?m)^/test( | .* )verify,?($|\s.*)
+========
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+>>>>>>>> 16ad5e87dfb (syncup):ci-operator/jobs/openshift-priv/oc-mirror/openshift-priv-oc-mirror-release-4.17-presubmits.yaml
