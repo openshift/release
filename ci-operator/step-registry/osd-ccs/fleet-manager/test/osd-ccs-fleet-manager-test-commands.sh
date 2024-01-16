@@ -1213,8 +1213,10 @@ function test_obo_machinesets () {
       TEST_PASSED=false
     fi
     echo "Getting obo machinesets"
-    OBO_MACHINESETS_OUTPUT=$(oc get machinesets -A | grep obo) || true
-    NO_OF_OBO_MACHINESETS=$(echo -n "$OBO_MACHINESETS_OUTPUT" | grep -c '^')
+    OBO_MACHINESETS_OUTPUT=$(oc get machinesets -A | grep obo 2>&1 >/dev/null) || true
+    echo "OBO_MACHINESETS_OUTPUT: $OBO_MACHINESETS_OUTPUT"
+    NO_OF_OBO_MACHINESETS=$(echo -n "$OBO_MACHINESETS_OUTPUT" | grep -c '^' 2>&1 >/dev/null) || true
+    echo "NO_OF_OBO_MACHINESETS: $NO_OF_OBO_MACHINESETS"
     EXPECTED_NO_OF_OBO_MACHINESETS=3
     if [ "$NO_OF_OBO_MACHINESETS" -ne "$EXPECTED_NO_OF_OBO_MACHINESETS" ]; then
       echo "ERROR. Expected number of obo machinesets to be: $EXPECTED_NO_OF_OBO_MACHINESETS. Got: $NO_OF_OBO_MACHINESETS"
@@ -1453,8 +1455,6 @@ test_monitoring_disabled
 
 # temporarily disabling this test, as autoscaling work is ongoing and it won't pass
 # test_autoscaler
-
-sleep 1800
 
 test_labels
 
