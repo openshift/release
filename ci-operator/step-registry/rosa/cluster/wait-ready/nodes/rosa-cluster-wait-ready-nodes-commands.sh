@@ -188,6 +188,8 @@ ROSA_VERSION=$(rosa version)
 ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 if [[ ! -z "${ROSA_TOKEN}" ]]; then
   echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+  echo "${ROSA_TOKEN}" > "${SHARED_DIR}/rosa-token2.txt"
+  echo "${OCM_LOGIN_ENV}" > "${SHARED_DIR}/rosa-login-env2.txt"
   rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
   if [ $? -ne 0 ]; then
     echo "Login failed"
