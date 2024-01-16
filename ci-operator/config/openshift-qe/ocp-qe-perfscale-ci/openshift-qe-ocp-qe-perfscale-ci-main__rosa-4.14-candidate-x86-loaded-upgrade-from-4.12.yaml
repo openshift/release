@@ -14,24 +14,31 @@ build_root:
     tag: latest
 images:
 - dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-loaded-upgrade-412z
+  to: ocp-qe-perfscale-ci-loaded-upgrade-412to414
 promotion:
   to:
   - namespace: ci
     tag: latest
 releases:
+  intermediate:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.13.0-0
+        upper: 4.14.0-0
   latest:
     release:
       channel: candidate
-      version: "4.12"
+      version: "4.14"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: perfscale-rosa-multiaz-6nodes-stage-loaded-upgrade412
+- as: perfscale-rosa-multiaz-24nodes-stage-loaded-upgrade414
+  cron: 0 8 * * 4
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -39,24 +46,37 @@ tests:
       CHANNEL_GROUP: candidate
       CHURN: "false"
       COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
       GC: "false"
       HOSTED_CP: "false"
-      IF_INTERMEDIATE_UPGRADE: "false"
+      IF_INTERMEDIATE_UPGRADE: "true"
       ITERATION_MULTIPLIER_ENV: "6"
       MULTI_AZ: "true"
       OCM_LOGIN_ENV: staging
-      OPENSHIFT_VERSION: 4.12.27
+      OPENSHIFT_VERSION: "4.12"
+      READY_WAIT_TIMEOUT: 30m
       REGION: us-west-2
-      REPLICAS: "6"
+      REPLICAS: "24"
+      USER_COUNT: "30"
     test:
+    - as: set-intermediate-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE} ${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/perfscale-override-upgrade
+        && cat ${SHARED_DIR}/perfscale-override-upgrade
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - ref: ipi-install-rbac
     - ref: openshift-cluster-bot-rbac
     - chain: openshift-qe-cluster-density-v2
     - chain: openshift-qe-rosa-loaded-upgrade
     workflow: rosa-aws-sts
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-qe
   repo: ocp-qe-perfscale-ci
-  variant: rosa-4.12-candidate-x86-loaded-upgrade-from-4.12
+  variant: rosa-4.14-candidate-x86-loaded-upgrade-from-4.12
