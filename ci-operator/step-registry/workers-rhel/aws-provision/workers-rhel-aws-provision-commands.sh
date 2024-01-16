@@ -128,6 +128,7 @@ cat > create_machineset.yaml <<-'EOF'
     machineset: "{{ machineset_obj | combine(dict_edit, recursive=True) }}"
   vars:
     ssh_key_name: "{{ lookup('env', 'SSH_KEY_NAME') }}"
+    instance_type: "{{ lookup('env', 'RHEL_VM_TYPE') }}"
     dict_edit:
       metadata:
         name: "{{ machineset_name }}"
@@ -145,6 +146,7 @@ cat > create_machineset.yaml <<-'EOF'
               value:
                 ami:
                   id: "{{ aws_ami }}"
+                instanceType: "{{ instance_type }}"
                 keyName: "{{ ssh_key_name }}"
 
 - name: Import machineset definition
@@ -159,6 +161,21 @@ cat > create_machineset.yaml <<-'EOF'
   - ('created' in oc_apply.stdout) or
     ('configured' in oc_apply.stdout)
 
+- name: Get the RHEL machineset replicas setting
+  set_fact:
+    machineset_replicas: "{{ lookup('env', 'RHEL_WORKER_COUNT_PER_ZONE') }}"
+
+- name: Scale the RHEL machineset replicas as needed
+  command: >
+    oc scale --replicas={{ machineset_replicas }} machineset {{ machineset_name }}
+    --kubeconfig={{ kubeconfig_path }}
+    --namespace=openshift-machine-api
+    --output=json
+  register: oc_scale_machineset
+  until: oc_scale_machineset is succeeded
+  when:
+  - machineset_replicas is defined and machineset_replicas | int > 1
+ 
 - name: Get machines in the machineset
   command: >
     oc get machine
@@ -186,8 +203,8 @@ cat > create_machineset.yaml <<-'EOF'
   - new_machine.stdout != ''
   - (new_machine.stdout | from_json).status is defined
   - (new_machine.stdout | from_json).status.phase == 'Provisioned'
-  retries: 36
-  delay: 5
+  retries: 30
+  delay: 20
   changed_when: false
 
 - name: Get machines in the machineset after provisioning
