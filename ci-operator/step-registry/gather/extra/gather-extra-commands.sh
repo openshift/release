@@ -105,6 +105,7 @@ queue ${ARTIFACT_DIR}/oc_cmds/subscriptions oc --insecure-skip-tls-verify --requ
 queue ${ARTIFACT_DIR}/clusterserviceversions.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterserviceversions --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/clusterserviceversions oc --insecure-skip-tls-verify --request-timeout=5s get clusterserviceversions --all-namespaces
 queue ${ARTIFACT_DIR}/releaseinfo.json oc --insecure-skip-tls-verify --request-timeout=5s adm release info -o json
+queue ${ARTIFACT_DIR}/clusterrolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterrolebindings --all-namespaces -o json
 
 FILTER=gzip queue ${ARTIFACT_DIR}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 
