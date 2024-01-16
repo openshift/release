@@ -1,0 +1,84 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  operator-sdk:
+    name: "4.14"
+    namespace: origin
+    tag: operator-sdk
+  shellcheck:
+    name: shellcheck
+    namespace: ci
+    tag: latest
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+images:
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: amd64
+  context_dir: .
+  dockerfile_path: Dockerfile
+  to: power-monitoring-operator
+- context_dir: .
+  dockerfile_path: tests/Dockerfile
+  to: power-monitoring-operator-tests-runner
+operator:
+  bundles:
+  - as: power-monitoring-operator-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/sustainable_computing_io/kepler-operator:.*
+    with: pipeline:power-monitoring-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: shellcheck
+  commands: find . -type f -path "./hack/*" -name "*.sh" -exec shellcheck -x -S style
+    {} \;
+  container:
+    from: shellcheck
+- as: power-monitoring-operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
+      dependencies:
+      - env: OO_BUNDLE
+        name: power-monitoring-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 400Mi
+    - ref: openshift-power-monitoring-tests-power-monitoring-operator
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: tech-preview
+  org: openshift-power-monitoring
+  repo: power-monitoring-operator
