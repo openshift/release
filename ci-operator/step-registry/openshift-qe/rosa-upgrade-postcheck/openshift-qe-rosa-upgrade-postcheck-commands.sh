@@ -98,7 +98,7 @@ if [[ -s ${SHARED_DIR}/perfscale-upgrade-target-version ]];then
 	  target_version_prefix="$(< "${SHARED_DIR}/perfscale-upgrade-target-version")"
 	  echo target_version_prefix is $target_version_prefix
 	  cat ${SHARED_DIR}/perfscale-upgrade-target-version
-	  export target_version_prefix
+	  export TARGET_RELEASES=$target_version_prefix
 else
 	  echo "No target upgrade version found"
 	  exit 1
@@ -108,7 +108,7 @@ ROSA_CLUSTER_TYPE=${ROSA_CLUSTER_TYPE:="classic"}
 if [[ $ROSA_CLUSTER_TYPE == "hcp" ]];then
         SECONDS=0
         export PYTHONUNBUFFERED=1
-        python3 -c "import check_upgrade; check_upgrade.check_upgrade('$target_version_prefix',wait_num=$CHECK_MCP_RETRY_NUM)"
+        python3 -c "import check_upgrade; check_upgrade.check_upgrade('$TARGET_RELEASES',wait_num=$CHECK_MCP_RETRY_NUM)"
         duration=$SECONDS
         echo "$(($duration / 60)) minutes and $(($duration % 60)) seconds elapsed."
         sleep 120
