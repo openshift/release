@@ -122,6 +122,7 @@ done
 echo "Quay Operator is deployed successfully"
 
 #Deploy Quay, here disable monitoring component
+#https://access.redhat.com/documentation/en-us/red_hat_quay/3.8/html-single/deploying_the_red_hat_quay_operator_on_openshift_container_platform/index#creating-standalone-object-gateway
 cat <<EOF | oc apply -f -
 apiVersion: noobaa.io/v1alpha1
 kind: NooBaa
@@ -137,6 +138,7 @@ spec:
     requests:
       cpu: '0.1'
       memory: 1Gi
+  dbType: postgres
 EOF
 
 echo "Waiting for NooBaa Storage to be ready..." >&2
