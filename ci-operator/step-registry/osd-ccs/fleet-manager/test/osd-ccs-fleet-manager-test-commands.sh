@@ -1192,7 +1192,7 @@ function test_obo_machinesets () {
   echo "Getting 'obo' machinepools names"
   OBO_MACHINE_POOLS_NAMES=$(ocm get /api/clusters_mgmt/v1/clusters/"$mc_cluster_id"/machine_pools | jq '.items[]' | jq 'select(.id | startswith("obo"))' | jq -r .id)
   EXPECTED_OBO_MP_COUNT=1
-  ACTUAL_OBO_MP_COUNT=$(echo -n "$OBO_MACHINE_POOLS_NAMES" | grep -c '^')
+  ACTUAL_OBO_MP_COUNT=$(echo -n "$OBO_MACHINE_POOLS_NAMES" | grep -c '^') || true
   echo "Confirming that there is only one obo machine pool"
 
   if [[ "$OBO_MACHINE_POOLS_NAMES" != "obo"* ]] || [ "$ACTUAL_OBO_MP_COUNT" -ne "$EXPECTED_OBO_MP_COUNT" ]; then
@@ -1213,7 +1213,7 @@ function test_obo_machinesets () {
       TEST_PASSED=false
     fi
     echo "Getting obo machinesets"
-    OBO_MACHINESETS_OUTPUT=$(oc get machinesets -A | grep obo)
+    OBO_MACHINESETS_OUTPUT=$(oc get machinesets -A | grep obo) || true
     NO_OF_OBO_MACHINESETS=$(echo -n "$OBO_MACHINESETS_OUTPUT" | grep -c '^')
     EXPECTED_NO_OF_OBO_MACHINESETS=3
     if [ "$NO_OF_OBO_MACHINESETS" -ne "$EXPECTED_NO_OF_OBO_MACHINESETS" ]; then
@@ -1453,6 +1453,8 @@ test_monitoring_disabled
 
 # temporarily disabling this test, as autoscaling work is ongoing and it won't pass
 # test_autoscaler
+
+sleep 1800
 
 test_labels
 
