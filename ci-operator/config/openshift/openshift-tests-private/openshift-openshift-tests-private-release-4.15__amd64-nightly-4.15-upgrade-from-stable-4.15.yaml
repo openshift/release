@@ -76,6 +76,30 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
+- as: aws-ipi-outpost-f14
+  cron: 33 2 8,24 * *
+  steps:
+    cluster_profile: aws-outpost-qe
+    env:
+      BASE_DOMAIN: outpost-dev.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-outpost
+- as: aws-ipi-ovn-ipsec-f14
+  cron: 20 1 5,21 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @aws-ipi and @network-ovnkubernetes
+        and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @aws-ipi and @network-ovnkubernetes
+        and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 - as: aws-ipi-wavelength-fips-f14
   cron: 37 17 9,25 * *
   steps:
@@ -89,18 +113,17 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-localzone
-- as: azure-ipi-workers-rhel8-f14
-  cron: 3 11 16,30 * *
+- as: azure-mag-ipi-fullyprivate-f14
+  cron: 40 17 13,27 * *
   steps:
-    cluster_profile: azure-qe
+    cluster_profile: azuremag-qe
     env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      PLATFORM_VERSION: "8.6"
+      BASE_DOMAIN: qemag.azure.devcluster.openshift.com
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @azure-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @azure-ipi and not @fips'
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-workers-rhel8
+    workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
 - as: baremetalds-ipi-ovn-ipv6-fips-f14
   cron: 17 4 14,28 * *
   steps:
@@ -117,8 +140,8 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-- as: baremetalds-ipi-ovn-dualstack-primaryv6-f7
-  cron: 35 19 5,12,21,28 * *
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f14
+  cron: 35 7 1,17 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -127,8 +150,10 @@ tests:
         MIRROR_IMAGES=true
         INSTALLER_PROXY=true
         NETWORK_TYPE=OVNKubernetes
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @baremetal-ipi and @network-ovnkubernetes'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @baremetal-ipi and @network-ovnkubernetes'
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @baremetal-ipi and @network-ovnkubernetes
+        and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @baremetal-ipi and @network-ovnkubernetes
+        and not @fips'
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
@@ -144,18 +169,18 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
-- as: ibmcloud-ipi-ovn-ipsec-f28
-  cron: 32 12 2 * *
+- as: ibmcloud-ipi-disconnected-private-f14
+  cron: 15 19 14,28 * *
   steps:
-    cluster_profile: ibmcloud-qe
+    cluster_profile: ibmcloud-qe-2
     env:
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @ibmcloud-ipi and @network-ovnkubernetes
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @ibmcloud-ipi and @disconnected
         and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @ibmcloud-ipi and @network-ovnkubernetes
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @ibmcloud-ipi and @disconnected
         and not @fips'
     test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
 - as: nutanix-ipi-proxy-fips-f28
   cluster: build01
   cron: 38 22 7 * *
@@ -180,21 +205,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
-- as: vsphere-upi-disconnected-secureboot-fips-f28
-  cron: 44 16 27 * *
-  steps:
-    cluster_profile: vsphere-dis-2
-    env:
-      FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @vsphere-upi and @disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @vsphere-upi and @disconnected'
-    leases:
-    - env: VSPHERE_BASTION_LEASED_RESOURCE
-      resource_type: vsphere-connected-2-quota-slice
-    test:
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-secureboot
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

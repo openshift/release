@@ -191,6 +191,9 @@ CONFIG = {
         'us-central1': 40,
     },
     'libvirt-s390x-quota-slice': {},
+    'libvirt-s390x-amd64-quota-slice': {
+        'libvirt-s390x-amd64-0-0': 1
+    },
     'libvirt-ppc64le-quota-slice': {},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
@@ -342,10 +345,15 @@ CONFIG = {
     'gitops-aws-quota-slice': {
         'us-west-2': 10
     },
+    'che-aws-quota-slice': {
+        # us-east-2 is reserved for the air-gapped clusters
+        'us-east-1': 10,
+        'us-west-1': 10,
+    },
 }
 
-for i in range(3):
-    for j in range(4):
+for i in range(0,4):
+    for j in range(2):
         CONFIG['libvirt-s390x-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
 # Mihawk0 is updated with RHEL 8.8, adding the Mihawk back to the lease pool
 for i in range(3):
