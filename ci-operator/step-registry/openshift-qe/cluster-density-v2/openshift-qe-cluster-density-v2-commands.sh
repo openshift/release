@@ -2,6 +2,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+sleep 14400	# 4h
 set -x
 cat /etc/os-release
 oc config view
