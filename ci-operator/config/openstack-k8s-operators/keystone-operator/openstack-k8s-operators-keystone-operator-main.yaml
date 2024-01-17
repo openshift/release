@@ -11,9 +11,15 @@ base_images:
     name: opm-builder
     namespace: ci
     tag: latest
+  rhel-9-golang-1.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.19-openshift-4.14
 build_root:
   from_repository: true
 images:
+- dockerfile_path: Dockerfile
+  to: keystone-operator
 - dockerfile_literal: |
     FROM src
     RUN pip3 install python-openstackclient
@@ -73,6 +79,8 @@ tests:
     version: "4.14"
   optional: true
   steps:
+    dependencies:
+      OPERATOR_IMG: keystone-operator
     env:
       CEPH_HOSTNETWORK: "false"
     workflow: openstack-k8s-operators-test-build-deploy
@@ -97,6 +105,8 @@ tests:
     version: "4.14"
   optional: true
   steps:
+    dependencies:
+      OPERATOR_IMG: keystone-operator
     env:
       CEPH_HOSTNETWORK: "false"
     workflow: openstack-k8s-operators-test-build-deploy-tempest
@@ -109,6 +119,8 @@ tests:
     timeout: 1h0m0s
     version: "4.14"
   steps:
+    dependencies:
+      OPERATOR_IMG: keystone-operator
     env:
       CEPH_HOSTNETWORK: "false"
     workflow: openstack-k8s-operators-test-build-deploy-kuttl

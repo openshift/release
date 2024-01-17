@@ -10,12 +10,6 @@ unset NAMESPACE
 # Check org and project from job's spec
 REF_REPO=$(echo "${JOB_SPEC}" | jq -r '.refs.repo')
 REF_ORG=$(echo "${JOB_SPEC}" | jq -r '.refs.org')
-# Prow build id
-PROW_BUILD=$(echo ${JOB_SPEC} | jq -r '.buildid')
-# PR SHA
-PR_SHA=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].sha')
-# Build tag
-BUILD_TAG="${PR_SHA:0:20}-${PROW_BUILD}"
 
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name
@@ -37,6 +31,19 @@ if [ -f /go/src/github.com/"${DEFAULT_ORG}"/"${BASE_OP}"/.prow_ci.env ]; then
   source /go/src/github.com/"${DEFAULT_ORG}"/"${BASE_OP}"/.prow_ci.env
 fi
 
+HIVE_KUBECONFIG=${KUBECONFIG}
+
+# Getting info from jobs's namespace
+set +x
+unset KUBECONFIG
+
+OCP_API_USER=$(oc whoami | cut -d ":" -f4)
+OCP_API_TOKEN=$(oc whoami -t)
+CI_REGISTRY=$(oc get is pipeline -o json | jq -r .status.publicDockerImageRepository | cut -d "/" -f1)
+
+# Back to hive's ephemeral cluster
+export KUBECONFIG=${HIVE_KUBECONFIG}
+
 # Get one master node to run debug pod
 MASTER_NODE=$(oc get node -l node-role.kubernetes.io/master= --no-headers | grep -Ev "NotReady|SchedulingDisabled"| awk '{print $1}' | awk 'NR==1{print}')
 if [[ -z $MASTER_NODE ]]; then
@@ -44,14 +51,20 @@ if [[ -z $MASTER_NODE ]]; then
     exit 1
 fi
 
-IMAGE_TAG_BASE=${PULL_REGISTRY}/${PULL_ORGANIZATION}/${BASE_OP}
-OPERATOR_IMG=${IMAGE_TAG_BASE}:${BUILD_TAG}
-
 # Run operator scan
 REPORT_FILE="/tmp/fips-check-operator-scan.log"
-oc -n "${NS_FIPS_CHECK}" --request-timeout=300s debug node/"${MASTER_NODE}" -T -- chroot /host /usr/bin/bash -c "podman run --authfile /var/lib/kubelet/config.json --privileged -i -v /:/myroot registry.ci.openshift.org/ci/check-payload:latest scan operator --spec ${OPERATOR_IMG} &> ${REPORT_FILE}" || true
+
+# Registry login
+oc -n "${NS_FIPS_CHECK}" --request-timeout=60s debug node/"${MASTER_NODE}" -T -- chroot /host /usr/bin/bash -c "mkdir -p /tmp/auth; XDG_RUNTIME_DIR=/tmp/auth podman login ${CI_REGISTRY} -u ${OCP_API_USER} -p ${OCP_API_TOKEN}"
+# Sleep to wait previous pod destruction
+sleep 60
+# Run operator scan
+set -x
+oc -n "${NS_FIPS_CHECK}" --request-timeout=300s debug node/"${MASTER_NODE}" -T -- chroot /host /usr/bin/bash -c "podman run --authfile /var/lib/kubelet/config.json --privileged -i -v /:/myroot -v /tmp/auth:/root/auth -e XDG_RUNTIME_DIR=/root/auth registry.ci.openshift.org/ci/check-payload:latest scan operator --spec ${OPERATOR_IMG} --output-file ${REPORT_FILE}" || true
+sleep 30
 REPORT_OUT=$(oc -n "${NS_FIPS_CHECK}" --request-timeout=300s debug node/"${MASTER_NODE}" -- chroot /host bash -c "cat ${REPORT_FILE}" || true)
 REPORT_RES=$(echo "${REPORT_OUT}" | grep -E 'Failure Report|Successful run with warnings|Warning Report' || true)
+
 # Save content in artifact dir
 echo $REPORT_OUT > "${ARTIFACT_DIR}/fips-check-operator-scan.log"
 
