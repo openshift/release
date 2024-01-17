@@ -134,7 +134,8 @@ if [[ "$is_hcp_cluster" == "true" ]]; then
     checkForInfraReady "$desired_infra_count"
 
     echo "Re-balance infra components"
-    checkInfra "prometheus-k8s" "openshift-monitoring"
+    # checkInfra "prometheus-k8s" "openshift-monitoring"  # turned off validation due to OCPBUGS-27216
+    rebalanceInfra "prometheus-k8s"
     checkInfra "router" "openshift-ingress"
   fi
 else
