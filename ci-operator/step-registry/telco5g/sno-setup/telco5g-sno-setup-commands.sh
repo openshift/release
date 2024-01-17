@@ -5,8 +5,6 @@ set -o errexit
 set -o pipefail
 
 echo "************ telco cluster setup command ************"
-# Fix user IDs in a container
-~/fix_uid.sh
 
 date +%s > $SHARED_DIR/start_time
 

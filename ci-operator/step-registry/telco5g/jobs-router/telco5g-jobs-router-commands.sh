@@ -5,8 +5,6 @@ set -o errexit
 set -o pipefail
 
 echo "************ telco cluster setup command ************"
-# Fix user IDs in a container
-[ -e "$HOME/fix_uid.sh" ] && "$HOME/fix_uid.sh" || echo "$HOME/fix_uid.sh was not found" >&2
 
 export MAINENV="$SHARED_DIR/main.env"
 

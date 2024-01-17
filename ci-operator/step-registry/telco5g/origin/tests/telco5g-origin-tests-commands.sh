@@ -15,8 +15,6 @@ export CNF_BRANCH="${CNF_BRANCH:-master}"
 export TEST_PROVIDER='{"type":"baremetal"}'
 
 echo "************ telco5g origin tests commands ************"
-# Fix user IDs in a container
-[ -e "$HOME/fix_uid.sh" ] && "$HOME/fix_uid.sh" || echo "$HOME/fix_uid.sh was not found" >&2
 
 SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
