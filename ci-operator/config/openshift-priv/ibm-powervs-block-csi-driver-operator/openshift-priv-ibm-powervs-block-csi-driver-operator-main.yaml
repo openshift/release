@@ -1,36 +1,39 @@
 base_images:
-  base:
-    name: 4.15-priv
+  ocp_4.16_base:
+    name: 4.16-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-8-golang-1.21-openshift-4.16
 binary_build_commands: make
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ibm-powervs-block-csi-driver-operator
 images:
 - dockerfile_path: Dockerfile
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.16_base:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: powervs-block-csi-driver-operator
 promotion:
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':
@@ -48,6 +51,12 @@ tests:
   commands: make test-unit
   container:
     from: src
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: openshift-ibm-powervs-block-csi-driver-operator
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: openshift-priv

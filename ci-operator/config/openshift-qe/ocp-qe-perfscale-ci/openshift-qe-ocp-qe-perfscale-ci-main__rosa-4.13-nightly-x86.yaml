@@ -1,3 +1,12 @@
+base_images:
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
@@ -7,8 +16,9 @@ images:
 - dockerfile_path: prow/Dockerfile
   to: ocp-qe-perfscale-ci-rosa-4.13-nightly
 promotion:
-  namespace: ci
-  tag: latest
+  to:
+  - namespace: ci
+    tag: latest
 releases:
   latest:
     candidate:
@@ -21,9 +31,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: perfscale-rosa-multiaz-control-plane-120nodes-periodic
+- as: control-plane-120nodes
   cron: 0 12 * * 6
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale
     env:
       CHANNEL_GROUP: nightly
@@ -31,14 +42,16 @@ tests:
       ENABLE_AUTOSCALING: "false"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.13"
+      PROFILE_TYPE: reporting
       REPLICAS: "120"
     test:
     - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts
-  timeout: 6h0m0s
+  timeout: 7h0m0s
 - always_run: false
-  as: perfscale-rosa-multiaz-control-plane-3nodes
+  as: control-plane-3nodes
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
@@ -46,14 +59,16 @@ tests:
       ENABLE_AUTOSCALING: "false"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.13"
+      PROFILE_TYPE: reporting
       REPLICAS: "3"
     test:
     - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts
   timeout: 5h0m0s
-- as: perfscale-rosa-multiaz-control-plane-24nodes-periodic
+- as: control-plane-24nodes
   cron: 0 12 * * 0
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
@@ -61,6 +76,7 @@ tests:
       ENABLE_AUTOSCALING: "false"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.13"
+      PROFILE_TYPE: reporting
       READY_WAIT_TIMEOUT: 30m
       REPLICAS: "24"
     test:
@@ -68,8 +84,9 @@ tests:
     workflow: rosa-aws-sts
   timeout: 5h0m0s
 - always_run: false
-  as: perfscale-rosa-multiaz-node-density-heavy-3nodes
+  as: node-density-heavy-3nodes
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
@@ -78,14 +95,16 @@ tests:
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.13"
       PODS_PER_NODE: "100"
+      PROFILE_TYPE: reporting
       REPLICAS: "3"
     test:
     - chain: openshift-qe-node-density-heavy
     workflow: rosa-aws-sts
   timeout: 5h0m0s
-- as: perfscale-rosa-multiaz-node-density-heavy-24nodes-periodic
+- as: node-density-heavy-24nodes
   cron: 0 12 * * 4
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
@@ -94,15 +113,17 @@ tests:
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.13"
       PODS_PER_NODE: "100"
+      PROFILE_TYPE: reporting
       READY_WAIT_TIMEOUT: 30m
       REPLICAS: "24"
     test:
     - chain: openshift-qe-node-density-heavy
     workflow: rosa-aws-sts
   timeout: 5h0m0s
-- as: perfscale-rosa-multiaz-node-density-cni-24nodes-periodic
+- as: node-density-cni-24nodes
   cron: 0 15 * * 4
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
@@ -111,6 +132,7 @@ tests:
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.13"
       PODS_PER_NODE: "100"
+      PROFILE_TYPE: reporting
       READY_WAIT_TIMEOUT: 30m
       REPLICAS: "24"
     test:
@@ -118,8 +140,9 @@ tests:
     workflow: rosa-aws-sts
   timeout: 5h0m0s
 - always_run: false
-  as: perfscale-rosa-multiaz-router-perf-3nodes
+  as: router-perf-3nodes
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
@@ -132,9 +155,10 @@ tests:
     - chain: openshift-qe-router-perf
     workflow: rosa-aws-sts
   timeout: 5h0m0s
-- as: perfscale-rosa-multiaz-data-path-9nodes-periodic
+- as: data-path-9nodes
   cron: 0 9 * * 3
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-qe
     env:
       CHANNEL_GROUP: nightly

@@ -42,8 +42,9 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.13
   to: ovn-kubernetes-microshift-rhel-9
 promotion:
-  name: "4.13"
-  namespace: ocp
+  to:
+  - name: "4.13"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -144,7 +145,7 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-ibmcloud-ipi-ovn-periodic
-  cron: 0 0 * * *
+  cron: 24 3 * * 6
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud-ovn
@@ -153,7 +154,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
-  cron: 0 0 */2 * *
+  cron: 50 17 * * 6
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
@@ -164,7 +165,7 @@ tests:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
-  cron: 0 0 */2 * *
+  cron: 54 16 * * 0
   steps:
     cluster_profile: aws
     env:
@@ -250,7 +251,7 @@ tests:
     pre:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
 - always_run: false
   as: qe-perfscale-aws-ovn-small-node-density-cni
@@ -268,6 +269,13 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
+- as: security
+  optional: true
+  steps:
+    env:
+      ALL_PROJECTS: "true"
+      PROJECT_NAME: ovn-kubernetes
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.13
   org: openshift

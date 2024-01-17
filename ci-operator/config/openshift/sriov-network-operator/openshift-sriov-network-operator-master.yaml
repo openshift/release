@@ -1,14 +1,14 @@
 base_images:
-  base:
-    name: "4.15"
+  ocp_4.16_base-rhel9:
+    name: "4.16"
     namespace: ocp
-    tag: base
-  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.21-openshift-4.16
   openstack-installer:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: openstack-installer
   operator-index:
@@ -16,44 +16,50 @@ base_images:
     namespace: ci
     tag: v4.10
   sriov-cni:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: sriov-cni
   sriov-dp-admission-controller:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: sriov-dp-admission-controller
   sriov-infiniband-cni:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: sriov-infiniband-cni
   sriov-network-device-plugin:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: sriov-network-device-plugin
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.rhel7
-  from: base
   inputs:
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: sriov-network-operator
 - dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
-  from: base
   inputs:
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: sriov-network-config-daemon
 - dockerfile_path: Dockerfile.webhook.rhel7
-  from: base
   inputs:
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: sriov-network-webhook
 operator:
   bundles:
@@ -62,32 +68,33 @@ operator:
     dockerfile_path: bundleci.Dockerfile
     update_graph: replaces
   substitutions:
-  - pullspec: quay.io/openshift/origin-sriov-dp-admission-controller:4.11
+  - pullspec: quay.io/openshift/origin-sriov-dp-admission-controller:.*
     with: pipeline:sriov-dp-admission-controller
-  - pullspec: quay.io/openshift/origin-sriov-cni:4.11
+  - pullspec: quay.io/openshift/origin-sriov-cni:.*
     with: pipeline:sriov-cni
-  - pullspec: quay.io/openshift/origin-sriov-infiniband-cni:4.11
+  - pullspec: quay.io/openshift/origin-sriov-infiniband-cni:.*
     with: pipeline:sriov-infiniband-cni
-  - pullspec: quay.io/openshift/origin-sriov-network-device-plugin:4.11
+  - pullspec: quay.io/openshift/origin-sriov-network-device-plugin:.*
     with: pipeline:sriov-network-device-plugin
-  - pullspec: quay.io/openshift/origin-sriov-network-config-daemon:4.11
+  - pullspec: quay.io/openshift/origin-sriov-network-config-daemon:.*
     with: pipeline:sriov-network-config-daemon
-  - pullspec: quay.io/openshift/origin-sriov-network-webhook:4.11
+  - pullspec: quay.io/openshift/origin-sriov-network-webhook:.*
     with: pipeline:sriov-network-webhook
-  - pullspec: quay.io/openshift/origin-sriov-network-operator:4.11
+  - pullspec: quay.io/openshift/origin-sriov-network-operator:.*
     with: pipeline:sriov-network-operator
 promotion:
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':

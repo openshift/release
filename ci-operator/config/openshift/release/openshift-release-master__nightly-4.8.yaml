@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-test-infra:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -86,13 +86,13 @@ tests:
   cron: 3 21 3,27 * *
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-ipv4
+    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-serial-ipv4
   cluster: build05
   cron: 55 1 4,21 * *
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-serial-ipv4
+    workflow: baremetalds-e2e-sdn-serial-ipv4
 - as: e2e-metal-ipi-upgrade
   cluster: build05
   cron: 0 0 1 1 *
@@ -100,7 +100,7 @@ tests:
     cluster_profile: equinix-ocp-metal
     env:
       TEST_TYPE: upgrade-conformance
-    workflow: baremetalds-e2e-upgrade
+    workflow: baremetalds-e2e-upgrade-sdn
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   cron: 37 10 10,23 * *
@@ -126,7 +126,7 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-compact
   cluster: build05
-  cron: 0 0 * * 1
+  cron: 3 6 5,23 * *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -136,12 +136,12 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
   cluster: build05
-  cron: 0 0 * * 1
+  cron: 10 6 5,22 * *
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-aws-proxy
-  cron: 0 0 */2 * *
+  cron: 53 9 10,25 * *
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
@@ -203,7 +203,7 @@ tests:
 - as: e2e-gcp-libvirt-cert-rotation
   cron: 21 7 12,26 * *
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: openshift-e2e-gcp-libvirt-cert-rotation
 - as: e2e-azure-fips
   cron: 46 11 6,28 * *
@@ -245,7 +245,7 @@ tests:
 - as: e2e-gcp-csi
   cron: 17 4 5,23 * *
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     workflow: openshift-e2e-gcp-csi
 - as: e2e-azure-fips-serial
   cron: 30 13 13,27 * *
@@ -317,7 +317,7 @@ tests:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
 - as: credentials-request-freeze
-  interval: 48h
+  cron: 3 10 6,23 * *
   steps:
     dependencies:
       OPENSHIFT_FROZEN_RELEASE_IMAGE: release:oldest-supported-credentials-request
@@ -333,7 +333,7 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
-      TEST_UPGRADE_OPTIONS: abort-at=random
+      TEST_UPGRADE_OPTIONS: abort-at=100
     workflow: openshift-upgrade-aws
 - as: e2e-aws
   cron: 35 8 9,25 * *

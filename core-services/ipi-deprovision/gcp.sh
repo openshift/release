@@ -66,16 +66,26 @@ echo "deleting GCS buckets with a creationTimestamp before ${gcs_bucket_age_cuto
 BUCKET_DATA="$(gsutil -m ls -p "${GCP_PROJECT}" -L -b 'gs://ci-op-*')"
 printf "got %d characters of bucket listing output\n" "${#BUCKET_DATA}"
 buckets=()
-while read -r bucket; do
-  read -r creationTime
-  if [[ ${gcs_bucket_age_cutoff_seconds} -ge $( date --date="${creationTime}" '+%s' ) ]]; then
-    buckets+=("${bucket}")
-  fi
-done <<< $( printf '%s' "${BUCKET_DATA}" | grep -Po "(gs:[^ ]+)|(?<=Time created:).*" )
+if [[ "${#BUCKET_DATA}" -gt 0 ]]; then
+  while read -r bucket; do
+    read -r creationTime
+    if [[ ${gcs_bucket_age_cutoff_seconds} -ge $( date --date="${creationTime}" '+%s' ) ]]; then
+      buckets+=("${bucket}")
+    fi
+  done <<< $( printf '%s' "${BUCKET_DATA}" | grep -Po "(gs:[^ ]+)|(?<=Time created:).*" )
+fi
 echo "found ${#buckets[@]} old buckets"
 if [[ "${#buckets[@]}" -gt 0 ]]; then
   timeout 30m gsutil -m rm -r "${buckets[@]}"
 fi
+
+# Prune Filestore instances
+export FILESTORE_FILTER="createTime.date('%Y-%m-%dT%H:%M%z')<${gce_cluster_age_cutoff} AND name~'-ci'"
+INSTANCES=$( gcloud --project="${GCP_PROJECT}" filestore instances list --filter "${FILESTORE_FILTER}" --uri )
+for INSTANCE in $INSTANCES; do
+    echo "Deleting Filestore instance $INSTANCE"
+    gcloud filestore instances delete "$INSTANCE" --async --force --quiet
+done
 
 FAILED="$(find ${clusters} -name failure -printf '%H\n' | sort)"
 if [[ -n "${FAILED}" ]]; then

@@ -1,5 +1,5 @@
 base_images:
-  base:
+  ocp_4.15_base:
     name: "4.15"
     namespace: ocp
     tag: base
@@ -15,8 +15,10 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.openshift
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
@@ -25,9 +27,9 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: multus-cni
 promotion:
-  disabled: true
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.15"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -100,7 +102,7 @@ tests:
     pre:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
 - always_run: false
   as: qe-perfscale-aws-ovn-small-node-density-cni

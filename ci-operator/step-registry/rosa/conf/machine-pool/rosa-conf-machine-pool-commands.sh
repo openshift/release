@@ -34,8 +34,8 @@ fi
 ROSA_VERSION=$(rosa version)
 ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${ROSA_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
-  rosa login --env "${ROSA_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+  rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
   if [ $? -ne 0 ]; then
     echo "Login failed"
     exit 1
@@ -77,12 +77,16 @@ fi
 LOCAL_ZONE_SWITCH=""
 if [[ "$LOCAL_ZONE" == "true" ]]; then
   LOCAL_ZONE_SWITCH=""
-  localzone_subnet_id=$(head -n 1 "${SHARED_DIR}/localzone_subnet_id")
+  # Unify rosa localzones macnine pool config with ocp
+  LABELS="${LABELS},node-role.kubernetes.io/edge="
+  TAINTS="${TAINTS},node-role.kubernetes.io/edge=:NoSchedule"
+  localzone_subnet_id=$(head -n 1 "${SHARED_DIR}/edge_zone_subnet_id")
   if [[ -z "${localzone_subnet_id}" ]]; then
     echo -e "The localzone_subnet_id is mandatory."
     exit 1
   fi
 
+  MP_MACHINE_TYPE=$(tail -n 1 "${SHARED_DIR}/instance-types.txt")
   LOCAL_ZONE_SWITCH="--subnet ${localzone_subnet_id}"
 fi
 

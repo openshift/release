@@ -1,6 +1,62 @@
 presubmits:
   openshift/microshift:
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.14$
+    - ^release-4\.14-
+    cluster: build03
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.14-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=[release:latest]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.14$
@@ -18,7 +74,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.14-metal-periodic-test
     rerun_command: /test metal-periodic-test
-    run_if_changed: ^(test/scenarios-periodics/.*)
+    run_if_changed: (.*periodic.*|^test/bin/.*)
     spec:
       containers:
       - args:
@@ -170,88 +226,6 @@ presubmits:
     - ^release-4\.14$
     - ^release-4\.14-
     cluster: build02
-    context: ci/prow/microshift-metal-tests-arm
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/cluster: build02
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.14-microshift-metal-tests-arm
-    optional: true
-    rerun_command: /test microshift-metal-tests-arm
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/microshift-metal-tests-arm-cluster-profile
-        - --target=microshift-metal-tests-arm
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/microshift-metal-tests-arm-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )microshift-metal-tests-arm,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.14$
-    - ^release-4\.14-
-    cluster: build02
     context: ci/prow/test-rebase
     decorate: true
     decoration_config:
@@ -317,7 +291,7 @@ presubmits:
     - ^release-4\.14$
     - ^release-4\.14-
     cluster: build02
-    context: ci/prow/test-srpm
+    context: ci/prow/test-rpm
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -325,8 +299,8 @@ presubmits:
       ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.14-test-srpm
-    rerun_command: /test test-srpm
+    name: pull-ci-openshift-microshift-release-4.14-test-rpm
+    rerun_command: /test test-rpm
     run_if_changed: ^(rpm/*|packaging/.*|Makefile)
     spec:
       containers:
@@ -334,7 +308,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=test-srpm
+        - --target=test-rpm
         command:
         - ci-operator
         image: ci-operator:latest
@@ -367,7 +341,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test-srpm,?($|\s.*)
+    trigger: (?m)^/test( | .* )test-rpm,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:

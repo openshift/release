@@ -10,6 +10,29 @@ function run_command() {
     eval "${CMD}"
 }
 
+function run_cmd_with_retries_save_output()
+{
+    local cmd="$1" output="$2" retries="${3:-}"
+    local try=0 ret=0
+    [[ -z ${retries} ]] && max="20" || max=${retries}
+    echo "Trying ${max} times max to run '${cmd}', save output to ${output}"
+
+    eval "${cmd}" > "${output}" || ret=$?
+    while [ X"${ret}" != X"0" ] && [ ${try} -lt ${max} ]; do
+        echo "'${cmd}' did not return success, waiting 60 sec....."
+        sleep 60
+        try=$(( try + 1 ))
+        ret=0
+        eval "${cmd}" > "${output}" || ret=$?
+    done
+    if [ ${try} -eq ${max} ]; then
+        echo "Never succeed or Timeout"
+        return 1
+    fi
+    echo "Succeed"
+    return 0
+}
+
 function create_custom_role() {
     local role_definition="$1"
     local custom_role_name="$2"
@@ -18,17 +41,8 @@ function create_custom_role() {
     cmd="az role definition create --role-definition ${role_definition}"
     run_command "${cmd}" || return 1
 
-    # check if custom role is avaiable
-    echo "Sleep 5 min to wait for custom role created"
-    sleep 300
-
-    role=$(az role definition list --custom-role-only true --output json --query "[?roleName=='${custom_role_name}'].roleName" -otsv)
-    if [[ "${role}" != "${custom_role_name}" ]]; then
-        echo "Unable to create custom role"
-        return 1
-    else
-        echo "Custom role ${custom_role_name} created"
-    fi
+    echo "Sleep 1 min to wait for custom role created"
+    sleep 60
 }
 
 function create_sp_with_custom_role() {
@@ -38,7 +52,8 @@ function create_sp_with_custom_role() {
     local sp_output="$4"
 
     # create service principal with custom role at the scope of subscription
-    az ad sp create-for-rbac --role ${custom_role_name} --name ${sp_name} --scopes /subscriptions/${subscription_id} > "${sp_output}"
+    # sometimes, failed to create sp as role assignment creation failed, retry
+    run_cmd_with_retries_save_output "az ad sp create-for-rbac --role ${custom_role_name} --name ${sp_name} --scopes /subscriptions/${subscription_id}" "${sp_output}" "5"
 }
 
 # az should already be there
@@ -177,6 +192,32 @@ required_permissions="""
 \"Microsoft.Storage/storageAccounts/listKeys/action\"
 """
 
+if [[ "${ENABLE_MIN_PERMISSION_FOR_MARKETPLACE}" == "true" ]]; then
+    required_permissions="""
+\"Microsoft.MarketplaceOrdering/offertypes/publishers/offers/plans/agreements/read\",
+\"Microsoft.MarketplaceOrdering/offertypes/publishers/offers/plans/agreements/write\",
+\"Microsoft.Compute/images/read\",
+\"Microsoft.Compute/images/write\",
+\"Microsoft.Compute/images/delete\",
+${required_permissions}
+"""    
+fi
+
+if [[ "${ENABLE_MIN_PERMISSION_FOR_DES}" == "true" ]]; then
+    required_permissions="""
+\"Microsoft.Compute/diskEncryptionSets/read\",
+\"Microsoft.Compute/diskEncryptionSets/write\",
+\"Microsoft.Compute/diskEncryptionSets/delete\",
+\"Microsoft.KeyVault/vaults/read\",
+\"Microsoft.KeyVault/vaults/write\",
+\"Microsoft.KeyVault/vaults/delete\",
+\"Microsoft.KeyVault/vaults/deploy/action\",
+\"Microsoft.KeyVault/vaults/keys/read\",
+\"Microsoft.KeyVault/vaults/keys/write\",
+${required_permissions}
+"""
+fi
+
 role_description="the custom role with minimal permissions for cluster ${CLUSTER_NAME}"
 assignable_scopes="""
 \"/subscriptions/${AZURE_AUTH_SUBSCRIPTOIN_ID}\"
@@ -201,6 +242,8 @@ jq --null-input \
 
 echo "Creating custom role..."
 create_custom_role "${ROLE_DEFINITION}" "${CUSTOM_ROLE_NAME}"
+# for destroy
+echo "${CUSTOM_ROLE_NAME}" > "${SHARED_DIR}/azure_custom_role_name"
 
 echo "Creating sp with custom role..."
 create_sp_with_custom_role "${SP_NAME}" "${CUSTOM_ROLE_NAME}" "${AZURE_AUTH_SUBSCRIPTOIN_ID}" "${SP_OUTPUT}"
@@ -220,7 +263,6 @@ cat <<EOF > "${SHARED_DIR}/azure_minimal_permission"
 EOF
 
 # for destroy
-echo "${CUSTOM_ROLE_NAME}" > "${SHARED_DIR}/azure_custom_role_name"
 echo "${sp_id}" > "${SHARED_DIR}/azure_sp_id"
 
-rm -rf ${SP_OUTPUT}
+rm -f ${SP_OUTPUT}

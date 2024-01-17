@@ -14,9 +14,29 @@ if [[ ${ENABLE_SHARED_PHZ} == "yes" ]]; then
 fi
 
 REGION="${LEASED_RESOURCE}"
-CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
-ROUTE53_HOSTED_ZONE_NAME="${CLUSTER_NAME}.${BASE_DOMAIN}"
+
+if [[ -e ${SHARED_DIR}/rosa_dns_domain ]]; then
+  # ROSA uses:
+  #  * a seperate dnsdomain which managed by SRE
+  #  * a seperate CLUSTER_NAME as it has some extra limitation, see step rosa-cluster-provision
+  prefix="ci-rosa-s"
+  subfix=$(openssl rand -hex 2)
+  CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
+  echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+
+  rosa_dns_domain=$(head -n 1 ${SHARED_DIR}/rosa_dns_domain)
+  ROUTE53_HOSTED_ZONE_NAME="${CLUSTER_NAME}.${rosa_dns_domain}"
+else
+  # For OCP clusters
+  CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
+  if [[ ${BASE_DOMAIN} == "" ]]; then
+    echo "No base_domain provided, exit now."
+    exit 1
+  fi
+  ROUTE53_HOSTED_ZONE_NAME="${CLUSTER_NAME}.${BASE_DOMAIN}"
+fi
+
 VPC_ID=$(cat "${SHARED_DIR}/vpc_id")
 # Use a timestamp to ensure the caller reference is unique, as we've found
 # cluster name can get reused in specific situations.

@@ -1,32 +1,28 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
-  base:
-    name: "4.16"
-    namespace: ocp
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -39,6 +35,10 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: hypershift-tests
+  ocp_4.15_base:
+    name: "4.15"
+    namespace: ocp
+    tag: base
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
@@ -55,8 +55,10 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.rhel7
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
@@ -77,10 +79,12 @@ images:
   from: ocp_os
   to: custom-os-image
 promotion:
-  excluded_images:
-  - custom-os-image
-  name: "4.16"
-  namespace: ocp
+  to:
+  - disabled: true
+    excluded_images:
+    - custom-os-image
+    name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -101,11 +105,6 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: e2e-alibabacloud-ovn
-  optional: true
-  steps:
-    cluster_profile: alibabacloud
-    workflow: openshift-e2e-alibabacloud
 - always_run: false
   as: e2e-aws-ovn-fips-op
   optional: true
@@ -151,6 +150,18 @@ tests:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure-ovn
+- as: e2e-azure-ovn-upgrade-out-of-change
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: azure-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-azure-ovn
 - as: e2e-aws-serial
   optional: true
   steps:
@@ -191,7 +202,7 @@ tests:
 - as: e2e-gcp-op
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     test:
     - as: test
       cli: latest
@@ -210,6 +221,8 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: test
       cli: latest
@@ -224,6 +237,15 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-ovn-upgrade-out-of-change
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     workflow: openshift-upgrade-aws
 - as: e2e-aws-workers-rhel8
   optional: true
@@ -278,7 +300,7 @@ tests:
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-ipv4
+    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   optional: true
@@ -410,7 +432,7 @@ tests:
     cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
 - always_run: false
-  as: e2e-openstack-dualstack-techpreview
+  as: e2e-openstack-dualstack
   optional: true
   steps:
     cluster_profile: openstack-hwoffload

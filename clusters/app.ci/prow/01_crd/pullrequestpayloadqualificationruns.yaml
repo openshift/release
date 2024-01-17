@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.6.3-0.20210827222652-7b3a8699fa04
+    controller-gen.kubebuilder.io/version: v0.9.2
   creationTimestamp: null
   name: pullrequestpayloadqualificationruns.ci.openshift.io
 spec:
@@ -115,51 +115,15 @@ spec:
                 - releaseControllerConfig
                 - releaseJobSpec
                 type: object
-              pullRequest:
-                description: PullRequest specifies the code to be tested. Immutable
-                  and required.
-                properties:
-                  baseRef:
-                    description: BaseRef identifies the target branch for the PR
-                    type: string
-                  baseSHA:
-                    description: BaseSHA identifies the HEAD of BaseRef at the time
-                    type: string
-                  org:
-                    description: Org is something like "openshift" in github.com/openshift/kubernetes
-                    type: string
-                  pr:
-                    description: PullRequest identifies a pull request in a repository
-                    properties:
-                      author:
-                        type: string
-                      number:
-                        type: integer
-                      sha:
-                        type: string
-                      title:
-                        type: string
-                    required:
-                    - author
-                    - number
-                    - sha
-                    - title
-                    type: object
-                  repo:
-                    description: Repo is something like "kubernetes" in github.com/openshift/kubernetes
-                    type: string
-                required:
-                - baseRef
-                - baseSHA
-                - org
-                - pr
-                - repo
-                type: object
               pullRequests:
+                description: PullRequests specifies the code to be tested. Immutable
+                  and required.
                 items:
-                  description: PullRequests specify the code to be tested.
-                    Multiple can be passed, but they must be from distinct repos.
-                    Immutable and required.
+                  description: PullRequestUnderTest describes the state of the repo
+                    that will be under test This is a combination of the PR revision
+                    and base ref revision. Tested code is the specific revision of
+                    the PR merged into the base branch with a specific branch as a
+                    HEAD
                   properties:
                     baseRef:
                       description: BaseRef identifies the target branch for the PR
@@ -200,7 +164,7 @@ spec:
                 type: array
             required:
             - jobs
-            - pullRequest
+            - pullRequests
             type: object
           status:
             description: PullRequestPayloadTestStatus provides runtime data, such
@@ -212,13 +176,12 @@ spec:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
                     use as an array at the field path .status.conditions.  For example,
-                    type FooStatus struct{     // Represents the observations of a
-                    foo's current state.     // Known .status.conditions.type are:
-                    \"Available\", \"Progressing\", and \"Degraded\"     // +patchMergeKey=type
-                    \    // +patchStrategy=merge     // +listType=map     // +listMapKey=type
-                    \    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`
-                    \n     // other fields }"
+                    \n type FooStatus struct{ // Represents the observations of a
+                    foo's current state. // Known .status.conditions.type are: \"Available\",
+                    \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge
+                    // +listType=map // +listMapKey=type Conditions []metav1.Condition
+                    `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\"
+                    protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }"
                   properties:
                     lastTransitionTime:
                       description: lastTransitionTime is the last time the condition
@@ -363,9 +326,3 @@ spec:
         type: object
     served: true
     storage: true
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

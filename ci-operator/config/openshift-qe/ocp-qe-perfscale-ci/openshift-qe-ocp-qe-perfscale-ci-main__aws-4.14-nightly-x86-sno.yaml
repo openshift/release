@@ -7,8 +7,9 @@ images:
 - dockerfile_path: prow/Dockerfile
   to: ocp-qe-perfscale-ci-aws-414-sno
 promotion:
-  namespace: ci
-  tag: latest
+  to:
+  - namespace: ci
+    tag: latest
 releases:
   latest:
     candidate:
@@ -21,13 +22,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: perfscale-aws-control-plane-sno-periodic
+- as: control-plane
   cron: 0 3 */21 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       ITERATION_MULTIPLIER_ENV: "15"
+      PROFILE_TYPE: reporting
     test:
     - chain: openshift-qe-cluster-density-v2
     workflow: openshift-e2e-aws-single-node

@@ -3,10 +3,6 @@ base_images:
     name: 4.16-priv
     namespace: ocp-private
     tag: csi-external-attacher
-  base:
-    name: 4.16-priv
-    namespace: ocp-private
-    tag: base
   driver-operand:
     name: 4.16-priv
     namespace: ocp-private
@@ -15,10 +11,14 @@ base_images:
     name: 4.16-priv
     namespace: ocp-private
     tag: csi-livenessprobe
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+  ocp_4.16_base:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-8-golang-1.21-openshift-4.16
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -46,18 +46,20 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.14"
+    tag: "4.16"
 binary_build_commands: make
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/gcp-filestore-csi-driver-operator
 images:
 - dockerfile_path: Dockerfile.openshift
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.16_base:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: gcp-filestore-csi-driver-operator
 operator:
   bundles:
@@ -86,8 +88,10 @@ operator:
   - pullspec: quay.io/openshift/origin-kube-rbac-proxy:latest
     with: pipeline:proxy-operand
 promotion:
-  name: 4.16-priv
-  namespace: ocp-private
+  to:
+  - disabled: true
+    name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -116,7 +120,6 @@ tests:
   container:
     from: src
 - as: operator-e2e
-  optional: true
   steps:
     cluster_profile: gcp
     dependencies:

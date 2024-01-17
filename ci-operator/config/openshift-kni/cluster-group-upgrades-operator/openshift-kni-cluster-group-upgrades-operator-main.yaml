@@ -24,8 +24,9 @@ operator:
   - pullspec: quay.io/openshift-kni/cluster-group-upgrades-operator:.*
     with: pipeline:cluster-group-upgrades-operator
 promotion:
-  name: "4.15"
-  namespace: ocp-kni
+  to:
+  - name: "4.15"
+    namespace: ocp-kni
 releases:
   initial:
     integration:
@@ -52,8 +53,9 @@ tests:
     from: src
 - as: integration
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
     env:
+      BASE_DOMAIN: sysdeseng.devcluster.openshift.com
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-cluster-group-upgrades
       OO_PACKAGE: cluster-group-upgrades-operator
@@ -72,6 +74,13 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: cluster-group-upgrades-operator
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: openshift-kni

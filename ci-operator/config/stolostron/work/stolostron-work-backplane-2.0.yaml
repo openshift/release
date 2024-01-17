@@ -14,8 +14,9 @@ images:
   from: base
   to: work
 promotion:
-  name: "2.0"
-  namespace: stolostron
+  to:
+  - name: "2.0"
+    namespace: stolostron
 releases:
   initial:
     integration:
@@ -60,24 +61,6 @@ tests:
   commands: HOME=/tmp make test-integration
   container:
     from: test-bin
-- as: e2e
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        KUBECTL=oc
-        export KUBECTL
-        make test-e2e
-      dependencies:
-      - env: IMAGE_NAME
-        name: work
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 - as: publish
   postsubmit: true
   steps:

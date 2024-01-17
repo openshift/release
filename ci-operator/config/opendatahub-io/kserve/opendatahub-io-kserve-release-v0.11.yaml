@@ -45,19 +45,20 @@ images:
   dockerfile_path: sklearn.Dockerfile
   to: sklearn-serving-runtime
 promotion:
-  excluded_images:
-  - kserve-controller
-  - kserve-agent
-  - kserve-storage-initializer
-  - sklearn-serving-runtime
-  namespace: opendatahub-io
-  tag: release-v0.11
+  to:
+  - excluded_images:
+    - kserve-controller
+    - kserve-agent
+    - kserve-storage-initializer
+    - sklearn-serving-runtime
+    namespace: opendatahub-io
+    tag: release-v0.11
 releases:
   latest:
     release:
       architecture: amd64
       channel: stable
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -68,7 +69,12 @@ resources:
 tests:
 - as: e2e-fast
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
     test:
     - as: e2e-fast
       cli: latest
@@ -86,10 +92,15 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: hypershift-hostedcluster-workflow
 - as: e2e-slow
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
     test:
     - as: e2e-slow
       cli: latest
@@ -107,7 +118,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: release-v0.11
   org: opendatahub-io

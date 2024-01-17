@@ -1,0 +1,47 @@
+base_images:
+  base:
+    name: "4.10"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_literal: |
+    FROM base
+    COPY . .
+  from: base
+  to: azure-installer-aro
+promotion:
+  to:
+  - additional_images:
+      azure-installer-aro-src: src
+    name: "4.10"
+    namespace: ocp
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- as: unit
+  commands: go test ./pkg/...
+  container:
+    from: src
+  optional: true
+zz_generated_metadata:
+  branch: release-4.10-azure
+  org: openshift
+  repo: installer-aro

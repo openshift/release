@@ -8,8 +8,8 @@ export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
 
 export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN QUAY_OAUTH_TOKEN_RELEASE_SOURCE QUAY_OAUTH_TOKEN_RELEASE_DESTINATION OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
-    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT BYOC_KUBECONFIG GITHUB_TOKENS_LIST OAUTH_REDIRECT_PROXY_URL CYPRESS_GH_USER CYPRESS_GH_PASSWORD CYPRESS_GH_2FA_CODE SPI_GITHUB_CLIENT_ID SPI_GITHUB_CLIENT_SECRET \
-    QE_SPRAYPROXY_HOST QE_SPRAYPROXY_TOKEN E2E_PAC_GITHUB_APP_ID E2E_PAC_GITHUB_APP_PRIVATE_KEY PAC_GITHUB_APP_WEBHOOK_SECRET SLACK_BOT_TOKEN
+    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT OFFLINE_TOKEN TOOLCHAIN_API_URL KEYLOAK_URL REL_IMAGE_CONTROLLER_QUAY_ORG REL_IMAGE_CONTROLLER_QUAY_TOKEN BYOC_KUBECONFIG GITHUB_TOKENS_LIST OAUTH_REDIRECT_PROXY_URL CYPRESS_GH_USER CYPRESS_GH_PASSWORD CYPRESS_GH_2FA_CODE SPI_GITHUB_CLIENT_ID SPI_GITHUB_CLIENT_SECRET \
+    QE_SPRAYPROXY_HOST QE_SPRAYPROXY_TOKEN E2E_PAC_GITHUB_APP_ID E2E_PAC_GITHUB_APP_PRIVATE_KEY PAC_GITHUB_APP_WEBHOOK_SECRET SLACK_BOT_TOKEN MULTI_PLATFORM_AWS_ACCESS_KEY MULTI_PLATFORM_AWS_SECRET_ACCESS_KEY MULTI_PLATFORM_AWS_SSH_KEY
 
 DEFAULT_QUAY_ORG=redhat-appstudio-qe
 DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/default-quay-org-token)
@@ -23,6 +23,11 @@ QUAY_OAUTH_TOKEN_RELEASE_SOURCE=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/
 QUAY_OAUTH_TOKEN_RELEASE_DESTINATION=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-destination)
 PYXIS_STAGE_KEY=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pyxis-stage-key)
 PYXIS_STAGE_CERT=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pyxis-stage-cert)
+OFFLINE_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/stage_offline_token)
+TOOLCHAIN_API_URL=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/stage_toolchain_api_url)
+KEYLOAK_URL=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/stage_keyloak_url)
+REL_IMAGE_CONTROLLER_QUAY_ORG=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/release_image_controller_quay_org)
+REL_IMAGE_CONTROLLER_QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/release_image_controller_quay_token)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 PREVIOUS_RATE_REMAINING=0
@@ -38,6 +43,9 @@ E2E_PAC_GITHUB_APP_ID=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pac-github
 E2E_PAC_GITHUB_APP_PRIVATE_KEY=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pac-github-app-private-key)
 PAC_GITHUB_APP_WEBHOOK_SECRET=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pac-github-app-webhook-secret)
 SLACK_BOT_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/slack-bot-token)
+MULTI_PLATFORM_AWS_ACCESS_KEY=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/multi-platform-aws-access-key)
+MULTI_PLATFORM_AWS_SECRET_ACCESS_KEY=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/multi-platform-aws-secret-access-key)
+MULTI_PLATFORM_AWS_SSH_KEY=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/multi-platform-aws-ssh-key)
 
 # user stored: username:token,username:token
 IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<< "$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github_accounts)"

@@ -1,43 +1,41 @@
 base_images:
-  base:
-    name: "4.15"
-    namespace: ocp
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
   metallb:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: metallb
   metallb-frr:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: metallb-frr
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+  ocp_builder_rhel-9-base-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-9-base-openshift-4.16
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.16
   operator-sdk:
-    name: "4.15"
+    name: "4.16"
     namespace: origin
     tag: operator-sdk
 build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile.openshift
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_builder_rhel-9-base-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.16
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: metallb-operator
 - dockerfile_path: bundleci.Dockerfile
-  from: base
   to: metallb-operator-bundle
 operator:
   bundles:
@@ -52,17 +50,18 @@ operator:
   - pullspec: quay.io/openshift/origin-metallb-frr:4.14
     with: pipeline:metallb-frr
 promotion:
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':

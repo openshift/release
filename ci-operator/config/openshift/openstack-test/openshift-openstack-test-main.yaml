@@ -3,21 +3,22 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.20-openshift-4.14
+    tag: rhel-9-release-golang-1.20-openshift-4.16
 images:
 - dockerfile_literal: FROM bin
   from: bin
   to: openstack-tests
 promotion:
-  additional_images:
-    openstack-tests: bin
-  name: "4.15"
-  namespace: ocp
+  to:
+  - additional_images:
+      openstack-tests: bin
+    name: "4.16"
+    namespace: ocp
 releases:
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -68,6 +69,9 @@ tests:
   optional: true
   steps:
     cluster_profile: openstack-vh-mecha-az0
+    env:
+      ETCD_ON_LOCAL_DISK: "true"
+      USE_RAMFS: "false"
     test:
     - as: openstack-test-cpms
       commands: |

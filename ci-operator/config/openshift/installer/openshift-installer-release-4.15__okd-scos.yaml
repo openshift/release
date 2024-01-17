@@ -85,9 +85,10 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: baremetal-installer
 promotion:
-  disabled: true
-  name: scos-4.15
-  namespace: origin
+  to:
+  - disabled: true
+    name: scos-4.15
+    namespace: origin
 releases:
   initial:
     integration:
@@ -172,7 +173,7 @@ tests:
   as: e2e-gcp-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: openshift-upgrade-gcp
 - always_run: false
   as: e2e-vsphere
@@ -186,6 +187,9 @@ tests:
   run_if_changed: /agent/
   steps:
     cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
     workflow: agent-e2e-compact-ipv4
 - as: e2e-agent-sno-ipv6
   cluster: build05

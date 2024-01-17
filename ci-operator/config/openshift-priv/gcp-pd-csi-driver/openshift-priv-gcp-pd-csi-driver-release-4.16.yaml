@@ -1,34 +1,38 @@
 base_images:
-  base:
-    name: 4.16-priv
-    namespace: ocp-private
-    tag: base
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.14"
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    tag: "4.15"
+  ocp_4.16_base-rhel9:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.21-openshift-4.16
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.14"
+    tag: "4.16"
 build_root:
   from_repository: true
 canonical_go_repository: sigs.k8s.io/gcp-compute-persistent-disk-csi-driver
 images:
 - dockerfile_path: Dockerfile.openshift
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: gcp-pd-csi-driver
 promotion:
-  name: 4.16-priv
-  namespace: ocp-private
+  to:
+  - disabled: true
+    name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -56,7 +60,7 @@ tests:
   optional: true
 - as: e2e-gcp
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: openshift-e2e-gcp
 - as: e2e-gcp-csi
   steps:

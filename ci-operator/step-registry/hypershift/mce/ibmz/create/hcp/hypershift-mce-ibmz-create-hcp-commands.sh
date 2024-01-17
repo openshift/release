@@ -143,15 +143,20 @@ echo "$(date) Creating agent hosted cluster manifests"
 oc create ns ${hcp_ns}
 mkdir /tmp/hc-manifests
 
-${HYPERSHIFT_CLI_NAME} create cluster agent \
+ICSP_COMMAND=""
+if [[ $ENABLE_ICSP == "true" ]]; then
+  ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_iscp.yaml")
+fi
+
+${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --name=${HC_NAME} \
     --pull-secret="${PULL_SECRET_FILE}" \
     --agent-namespace=${hcp_ns} \
     --base-domain=${HYPERSHIFT_BASEDOMAIN} \
     --api-server-address=api.${HC_NAME}.${HYPERSHIFT_BASEDOMAIN} \
     --ssh-key=${ssh_key_file} \
-    --control-plane-availability-policy "SingleReplica" \
-    --infra-availability-policy "SingleReplica" \
+    --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
+    --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
     --namespace $HC_NS \
     --release-image=${OCP_IMAGE_MULTI} --render > /tmp/hc-manifests/cluster-agent.yaml
 
@@ -215,4 +220,4 @@ echo "$(date) ISO Download url is ready"
 
 # Download hosted cluster kubeconfig
 echo "$(date) Create hosted cluster kubeconfig"
-${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${HC_NS} --name=${HC_NAME} >${SHARED_DIR}/${HC_NAME}_kubeconfig
+${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${HC_NS} --name=${HC_NAME} >${SHARED_DIR}/nested_kubeconfig

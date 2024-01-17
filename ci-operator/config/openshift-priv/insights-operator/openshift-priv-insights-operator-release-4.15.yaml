@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -10,25 +6,31 @@ base_images:
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
-    tag: latest
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    tag: "4.15"
+  ocp_4.15_base-rhel9:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/insights-operator
 images:
-- from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+- inputs:
+    ocp_4.15_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: insights-operator
 promotion:
-  disabled: true
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - name: 4.15-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -62,7 +64,7 @@ tests:
 - as: e2e
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     workflow: openshift-e2e-gcp
 - as: e2e-agnostic-upgrade
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
@@ -80,7 +82,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "not tp_only" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks
+        pytest.sh -k "not tp_only and not UI" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -97,6 +99,12 @@ tests:
       - mount_path: /secret/aws/aws-secret-access-key
         name: aws-secret-access-key
         namespace: test-credentials
+      - mount_path: /secret/slack-bot-token
+        name: slack-bot-token
+        namespace: test-credentials
+      - mount_path: /secret/slack-webhook-url
+        name: slack-webhook-url
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -106,6 +114,10 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
+      - default: /secret/slack-bot-token/slack-bot-token
+        name: SLACK_BOT_TOKEN
+      - default: /secret/slack-webhook-url/slack-webhook-url
+        name: SLACK_WEBHOOK_URL
       from: insights-operator-tests
       resources:
         requests:
@@ -113,7 +125,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-gcp-ovn-techpreview
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     pre:
@@ -122,7 +134,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -m "not ui and techpreview" --junitxml=$(pwd)/test-report.xml
+      commands: pytest.sh -m "not UI and techpreview" --junitxml=$(pwd)/test-report.xml
         --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview
       credentials:
       - mount_path: /secrets
@@ -140,6 +152,12 @@ tests:
       - mount_path: /secret/aws/aws-secret-access-key
         name: aws-secret-access-key
         namespace: test-credentials
+      - mount_path: /secret/slack-bot-token
+        name: slack-bot-token
+        namespace: test-credentials
+      - mount_path: /secret/slack-webhook-url
+        name: slack-webhook-url
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -149,6 +167,10 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
+      - default: /secret/slack-bot-token/slack-bot-token
+        name: SLACK_BOT_TOKEN
+      - default: /secret/slack-webhook-url/slack-webhook-url
+        name: SLACK_WEBHOOK_URL
       from: insights-operator-tests
       resources:
         requests:

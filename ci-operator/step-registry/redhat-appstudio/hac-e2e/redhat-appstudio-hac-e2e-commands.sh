@@ -16,7 +16,7 @@ PATH=$PATH:/tmp/go/bin
 #  Setup env variables
 
 export  OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD QONTRACT_BASE_URL \
-     QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN CYPRESS_HAC_BASE_URL CYPRESS_GH_TOKEN
+     QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN CYPRESS_HAC_BASE_URL CYPRESS_GH_TOKEN CYPRESS_SSO_URL
 
 QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_password)
 QONTRACT_USERNAME=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_username)
@@ -62,13 +62,14 @@ curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/$REF/h
 
 chmod +x installHac.sh
 HAC_KUBECONFIG=/tmp/hac.kubeconfig
-oc login --kubeconfig=$HAC_KUBECONFIG --token=$HAC_SA_TOKEN --server=https://api.c-rh-c-eph.8p0c.p1.openshiftapps.com:6443
+oc login --kubeconfig=$HAC_KUBECONFIG --token=$HAC_SA_TOKEN --server=https://api.crc-eph.r9lp.p1.openshiftapps.com:6443
 echo "=== INSTALLING HAC ==="
 HAC_NAMESPACE=$(./installHac.sh -ehk $HAC_KUBECONFIG -sk $KUBECONFIG |grep "Eph cluster namespace: " | sed "s/Eph cluster namespace: //g")
 echo "=== HAC INSTALLED ==="
 echo "HAC NAMESPACE: $HAC_NAMESPACE"
-CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.hostname}")/application-pipeline"
+CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.hostname}")/preview/application-pipeline"
 echo "Cypress Base url: $CYPRESS_HAC_BASE_URL"
+CYPRESS_SSO_URL="$(oc get feenv env-$HAC_NAMESPACE --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.sso}")"
 
 echo "Deploying proxy plugin for tekton-results"
 oc apply --kubeconfig=$KUBECONFIG -f - <<EOF
@@ -94,12 +95,14 @@ metadata:
     namespace: toolchain-host-operator
     labels:
         toolchain.dev.openshift.com/email-hash: 826df0a2f0f2152550b0d9ee11099d85
-    annotations:
-        toolchain.dev.openshift.com/user-email: user1@user.us
+        toolchain.dev.openshift.com/state: approved
 spec:
+    identityClaims:
+        email: user1@user.us
+        sub: user1
+        preferredUsername: user1
     username: user1
     userid: user1
-    approved: true
 EOF
 sleep 5
 oc get UserSignup -n toolchain-host-operator

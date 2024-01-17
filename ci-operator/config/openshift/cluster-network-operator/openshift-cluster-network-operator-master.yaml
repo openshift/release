@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: "4.15"
-    namespace: ocp
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -12,13 +8,17 @@ base_images:
     namespace: ci
     tag: v1.53.1
   hypershift-operator:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: hypershift-operator
   hypershift-tests:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: hypershift-tests
+  ocp_4.15_base:
+    name: "4.15"
+    namespace: ocp
+    tag: base
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
@@ -28,24 +28,27 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: cluster-network-operator
 promotion:
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -63,10 +66,11 @@ tests:
     from: src
 - as: e2e-gcp-sdn
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-gcp-sdn
 - as: e2e-gcp-ovn-upgrade
-  optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp-ovn
@@ -74,10 +78,14 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-upgrade-aws-sdn
 - as: e2e-aws-sdn-multi
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-ovn-step-registry
   optional: true
@@ -154,7 +162,8 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ovn
-- as: e2e-azure-ovn-dualstack
+- always_run: false
+  as: e2e-azure-ovn-dualstack
   optional: true
   steps:
     cluster_profile: azure4
@@ -183,6 +192,7 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
       NETWORK_TYPE: OpenShiftSDN
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-ovn
@@ -198,6 +208,8 @@ tests:
 - as: e2e-aws-ovn-network-migration
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-egress-ip
@@ -211,6 +223,8 @@ tests:
 - as: e2e-aws-sdn-network-migration-rollback
   steps:
     cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-egress-ip
@@ -265,7 +279,7 @@ tests:
 - as: e2e-network-mtu-migration-ovn-ipv4
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-3
     env:
       MTU_DECREASE: "400"
       MTU_INCREASE: "200"
@@ -296,6 +310,7 @@ tests:
     env:
       MTU_DECREASE: "400"
       MTU_INCREASE: "200"
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     test:
     - chain: network-mtu-migration-decrease
     - chain: network-mtu-migration-increase
@@ -367,7 +382,7 @@ tests:
     pre:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
 - always_run: false
   as: qe-perfscale-aws-ovn-small-node-density-cni

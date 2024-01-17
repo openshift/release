@@ -233,7 +233,6 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
 
-    # In disconnected install, marketplace often get into False state, so it is better to remove it from cluster from flexy post-action
     echo "Make sure every operator's AVAILABLE column is True"
     if unavailable_operator=$(${OC} get clusteroperator | awk '$3 == "False"' | grep "False"); then
         echo >&2 "Some operator's AVAILABLE is False"
@@ -245,6 +244,18 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
 
+    echo "Make sure every operator's PROGRESSING column is False"
+    if progressing_operator=$(${OC} get clusteroperator | awk '$4 == "True"' | grep "True"); then
+        echo >&2 "Some operator's PROGRESSING is True"
+        echo >&2 "$progressing_operator"
+        (( tmp_ret += 1 ))
+    fi
+    if ${OC} get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Progressing") | .status' | grep -iv "False"; then
+        echo >&2 "Some operators are Progressing, pls run 'oc get clusteroperator -o json' to check"
+        (( tmp_ret += 1 ))
+    fi
+
+    echo "Make sure every operator's DEGRADED column is False"
     # In disconnected install, openshift-sample often get into Degrade state, so it is better to remove them from cluster from flexy post-action
     #degraded_operator=$(${OC} get clusteroperator | grep -v "openshift-sample" | awk '$5 == "True"')
     if degraded_operator=$(${OC} get clusteroperator | awk '$5 == "True"' | grep "True"); then
@@ -286,62 +297,82 @@ function wait_clusteroperators_continous_success() {
     fi
 }
 
-function check_latest_machineconfig_applied() {
-    local role="$1" cmd latest_machineconfig applied_machineconfig_machines ready_machines
+function check_mcp() {
+    local updating_mcp unhealthy_mcp tmp_output
 
-    cmd="oc get machineconfig"
-    echo "Command: $cmd"
-    eval "$cmd"
-
-    echo "Checking $role machines are applied with latest $role machineconfig..."
-    latest_machineconfig=$(oc get mcp/$role -o json | jq -r '.spec.configuration.name')
-    if [[ ${latest_machineconfig} == "" ]]; then
-        echo >&2 "Did not found ${role} render machineconfig"
-        return 1
+    tmp_output=$(mktemp)
+    oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status --no-headers > "${tmp_output}" || true
+    # using the size of output to determinate if oc command is executed successfully
+    if [[ -s "${tmp_output}" ]]; then
+        updating_mcp=$(cat "${tmp_output}" | grep -v "False")
+        if [[ -n "${updating_mcp}" ]]; then
+            echo "Some mcp is updating..."
+            echo "${updating_mcp}"
+            return 1
+        fi
     else
-        echo "latest ${role} machineconfig: ${latest_machineconfig}"
-    fi
-
-    applied_machineconfig_machines=$(oc get node -l "node-role.kubernetes.io/${role}" -o json | jq -r --arg mc_name "${latest_machineconfig}" '.items[] | select(.metadata.annotations."machineconfiguration.openshift.io/state" == "Done" and .metadata.annotations."machineconfiguration.openshift.io/currentConfig" == $mc_name) | .metadata.name' | sort)
-    ready_machines=$(oc get node -l "node-role.kubernetes.io/${role}" -o json | jq -r '.items[].metadata.name' | sort)
-    if [[ ${applied_machineconfig_machines} == "${ready_machines}" ]]; then
-        echo "latest machineconfig - ${latest_machineconfig} is already applied to ${ready_machines}"
-        return 0
-    else
-        echo "latest machineconfig - ${latest_machineconfig} is applied to ${applied_machineconfig_machines}, but expected ready node lists: ${ready_machines}"
+        echo "Did not run "oc get mcp" successfully!"
         return 1
     fi
+
+    # Do not check UPDATED on purpose, beause some paused mcp would not update itself until unpaused
+    oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount --no-headers > "${tmp_output}" || true
+    # using the size of output to determinate if oc command is executed successfully
+    if [[ -s "${tmp_output}" ]]; then
+        unhealthy_mcp=$(cat "${tmp_output}" | grep -v "False.*False.*0")
+        if [[ -n "${unhealthy_mcp}" ]]; then
+            echo "Detected unhealthy mcp:"
+            echo "${unhealthy_mcp}"
+            echo "Real-time detected unhealthy mcp:"
+            oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount | grep -v "False.*False.*0"
+            echo "Real-time full mcp output:"
+            oc get mcp
+            echo ""
+            unhealthy_mcp_names=$(echo "${unhealthy_mcp}" | awk '{print $1}')
+            echo "Using oc describe to check status of unhealthy mcp ..."
+            for mcp_name in ${unhealthy_mcp_names}; do
+              echo "Name: $mcp_name"
+              oc describe mcp $mcp_name || echo "oc describe mcp $mcp_name failed"
+            done
+            return 2
+        fi
+    else
+        echo "Did not run "oc get mcp" successfully!"
+        return 1
+    fi
+    return 0
 }
 
-function wait_machineconfig_applied() {
-    local role="${1}" try=0 interval=30
-    num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l)
-    local max_retries; max_retries=$(expr $num \* 10 \* 60 \/ $interval) # Wait 10 minutes for each node, try 60/interval times per minutes
-
-    local mcp_try=0 mcp_status=''
-    local max_try_between_updated_and_updating; max_try_between_updated_and_updating=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
-    while [ $mcp_try -lt $max_try_between_updated_and_updating ] && [ $try -lt $max_retries ]
-    do
-        sleep ${interval}
+function wait_mcp_continous_success() {
+    local try=0 continous_successful_check=0 passed_criteria max_retries ret=0 interval=30
+    num=$(oc get node --no-headers | wc -l)
+    max_retries=$(expr $num \* 20 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
+    passed_criteria=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
+    while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
-        mcp_status=$(oc get mcp/$role -o json | jq -r '.status.conditions[] | select(.type == "Updated") | .status')
-        if [[ X"$mcp_status" != X"True" ]]; then
-            mcp_try=0
+        ret=0
+        check_mcp || ret=$?
+        if [[ "$ret" == "0" ]]; then
+            echo "Passed #${continous_successful_check}"
+            (( continous_successful_check += 1 ))
+        elif [[ "$ret" == "1" ]]; then
+            echo "Some machines are updating..."
+            continous_successful_check=0
+        else
+            echo "Some machines are degraded..."
+            break
         fi
-        (( mcp_try += 1 ))
+        echo "wait and retry..."
+        sleep ${interval}
         (( try += 1 ))
     done
-    echo "MCP ${role} status is ${mcp_status}"
-    if [[ X"$mcp_status" != X"True" ]]; then
-        echo "Timeout waiting for mcp updated"
-        return 1
-    fi
-    
-    if ! check_latest_machineconfig_applied "${role}"; then
-        echo >&2 "Timeout waiting for all $role machineconfigs are applied"
+    if (( continous_successful_check != passed_criteria )); then
+        echo >&2 "Some mcp does not get ready or not stable"
+        echo "Debug: current mcp output is:"
+        oc get mcp
         return 1
     else
-        echo "All ${role} machineconfigs check PASSED"
+        echo "All mcp status check PASSED"
         return 0
     fi
 }
@@ -370,20 +401,15 @@ function check_pod() {
 }
 
 function health_check() {
-    #1. Make sure all machines are applied with latest machineconfig
-    echo "Step #1: Make sure all machines are applied with latest machineconfig"
-    wait_machineconfig_applied "master"
-    wait_machineconfig_applied "worker"
+    echo "Step #1: Make sure no degrated or updating mcp"
+    wait_mcp_continous_success
 
-    #2. Check all cluster operators get stable and ready
     echo "Step #2: check all cluster operators get stable and ready"
     wait_clusteroperators_continous_success
 
-    #3. Make sure every machine is in 'Ready' status
     echo "Step #3: Make sure every machine is in 'Ready' status"
     check_node
 
-    #4. All pods are in status running or complete
     echo "Step #4: check all pods are in status running or complete"
     check_pod
 }
@@ -391,10 +417,18 @@ function health_check() {
 # Check if a build is signed
 function check_signed() {
     local digest algorithm hash_value response
-    digest="$(echo "${TARGET}" | cut -f2 -d@)"
+    if [[ "${TARGET}" =~ "@sha256:" ]]; then
+        digest="$(echo "${TARGET}" | cut -f2 -d@)"
+        echo "The target image is using digest pullspec, its digest is ${digest}"
+    else
+        digest="$(oc image info "${TARGET}" -o json | jq -r ".digest")"
+        echo "The target image is using tagname pullspec, its digest is ${digest}"
+    fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+    set -x
+    response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+    set +x
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -420,11 +454,10 @@ function admin_ack() {
     for ack in ${ack_data};
     do
         # e.g.: ack-4.12-kube-1.26-api-removals-in-4.13
-        if [[ "${ack}" == *"ack-4.${SOURCE_MINOR_VERSION}"* ]] 
+        if [[ "${ack}" == *"ack-4.${SOURCE_MINOR_VERSION}"* ]]
         then
             echo "Admin ack patch data is: ${ack}"
             oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
-            break
         fi
     done
 
@@ -449,29 +482,33 @@ function admin_ack() {
 
 # Upgrade the cluster to target release
 function upgrade() {
-    oc adm upgrade --to-image="${TARGET}" --allow-explicit-upgrade --force="${FORCE_UPDATE}"
+    run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
 # Monitor the upgrade status
 function check_upgrade_status() {
     local wait_upgrade="${TIMEOUT}" out avail progress
+    echo "Starting the upgrade checking on $(date "+%F %T")"
     while (( wait_upgrade > 0 )); do
         sleep 5m
-        (( wait_upgrade -= 5 ))
-        if ! ( echo "oc get clusterversion" && oc get clusterversion ); then
+        wait_upgrade=$(( wait_upgrade - 5 ))
+        if ! ( run_command "oc get clusterversion" ); then
             continue
         fi
-        if ! out="$(oc get clusterversion --no-headers)"; then continue; fi
+        if ! out="$(oc get clusterversion --no-headers || false)"; then
+            echo "Error occurred when getting clusterversion"
+            continue
+        fi
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${TARGET_VERSION}" ]]; then
-            echo -e "Upgrade succeed\n\n"
+            echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
             return 0
         fi
     done
-    if (( wait_upgrade <= 0 )); then
-        echo >&2 "Upgrade timeout, exiting" && return 1
+    if [[ ${wait_upgrade} -le 0 ]]; then
+        echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
     fi
 }
 
@@ -539,6 +576,8 @@ do
     if ! check_signed; then
         echo "You're updating to an unsigned images, you must override the verification using --force flag"
         FORCE_UPDATE="true"
+    else
+        echo "You're updating to a signed images, so run the upgrade command without --force flag"
     fi
     if [[ "${FORCE_UPDATE}" == "false" ]]; then
         admin_ack

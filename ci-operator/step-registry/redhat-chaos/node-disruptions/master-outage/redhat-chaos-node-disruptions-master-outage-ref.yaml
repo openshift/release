@@ -1,0 +1,66 @@
+ref:
+  as: redhat-chaos-node-disruptions-master-outage
+  from_image:
+    namespace: chaos
+    name: krkn
+    tag: latest
+  commands: redhat-chaos-node-disruptions-master-outage-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aws-chaos
+    mount_path: /secret/telemetry
+  env:
+    - name: ACTION
+      default: "node_stop_start_scenario"
+    - name: LABEL_SELECTOR
+      default: "node-role.kubernetes.io/master="
+    - name: NODE_NAME
+      default: ""
+    - name: INSTANCE_COUNT
+      default: ""
+    - name: RUNS
+      default: "1"
+    - name: CLOUD_TYPE
+      default: "aws"
+    - name: TIMEOUT
+      default: "180" 
+    - name: ENABLE_ALERTS
+      default: "True"
+    - name: ALERTS_PATH
+      default: "/tmp/krkn-hub/prow/node-disruptions/slos" 
+    - name: CHECK_CRITICAL_ALERTS
+      default: "True"
+    - name: WAIT_DURATION
+      default: "600"
+    - name: TELEMETRY_ENABLED
+      default: "True"
+    - name: TELEMETRY_API_URL
+      default: "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production"
+    - name: TELEMETRY_USERNAME
+      default: "redhat-chaos"
+    - name: TELEMETRY_RUN_TAG
+      default: "prow-cpu-hog"
+    - name: TELEMETRY_PROMETHEUS_BACKUP
+      default: "True"
+    - name: TELEMETRY_FULL_PROMETHEUS_BACKUP
+      default: "True"
+    - name: TELEMTRY_BACKUP_THREADS
+      default: "5"
+    - name: TELEMETRY_ARCHIVE_PATH
+      default: "/tmp"
+    - name: TELEMETRY_MAX_RETRIES
+      default: "0"
+    - name: TELEMETRY_ARCHIVE_SIZE
+      default: "1000000"
+    - name: TELEMETRY_LOGS_BACKUP
+      default: "True"
+    - name: TELEMTRY_CLI_PATH
+      default: "/usr/local/bin/oc"
+    - name: TELEMETRY_EVENTS_BACKUP
+      default: "True"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the krkn-hub config workload in the deployed cluster to cause master node outage to understand the impact on stability and performance.

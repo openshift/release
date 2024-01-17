@@ -75,12 +75,13 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
-- as: aws-ipi-byo-route53-f28
+- as: aws-ipi-byo-route53-compact-f28
   cron: 22 1 16 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      SIZE_VARIANT: compact
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi and not @fips'
     test:
@@ -374,16 +375,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
-- as: gcp-ipi-workload-identity-f28
-  cron: 16 0 30 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @gcp-ipi and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @gcp-ipi and not @fips'
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
 - as: gcp-ipi-workload-identity-rt-fips-f14
   cron: 38 18 1,16 * *
   steps:
@@ -446,6 +437,9 @@ tests:
     env:
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @vsphere-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @vsphere-ipi and not @fips'
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
@@ -457,6 +451,9 @@ tests:
       PLATFORM_VERSION: "8.6"
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @vsphere-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @vsphere-ipi and not @fips'
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy-workers-rhel8

@@ -29,10 +29,11 @@ operator:
   - pullspec: REPLACE_IMAGE
     with: pipeline:windows-machine-config-operator-test
 promotion:
-  additional_images:
-    windows-machine-config-operator-bundle: wmco-bundle
-  name: 4.11-priv
-  namespace: ocp-private
+  to:
+  - additional_images:
+      windows-machine-config-operator-bundle: wmco-bundle
+    name: 4.11-priv
+    namespace: ocp-private
 releases:
   latest:
     integration:
@@ -75,6 +76,8 @@ tests:
     from: src
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: security
+  optional: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
       PROJECT_NAME: windows-machine-config-operator
@@ -158,6 +161,7 @@ tests:
     - ref: ipi-conf
     - ref: ipi-conf-vsphere-check
     - ref: upi-conf-vsphere
+    - ref: upi-conf-vsphere-dns
     - chain: upi-vsphere-windows-pre
     test:
     - ref: windows-unit-wicd

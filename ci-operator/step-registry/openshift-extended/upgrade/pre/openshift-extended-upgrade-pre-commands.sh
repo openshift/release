@@ -83,6 +83,11 @@ then
     TEST_ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token") || true
     export TEST_ROSA_TOKEN
 fi
+if test -f "${SHARED_DIR}/cluster-id"
+then
+    CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id") || true
+    export CLUSTER_ID
+fi
 
 # configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
@@ -136,10 +141,13 @@ vsphere)
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/govc.sh"
     export VSPHERE_CONF_FILE="${SHARED_DIR}/vsphere.conf"
-    oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE"
-    # The test suite requires a vSphere config file with explicit user and password fields.
-    sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
-    sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+    error_code=0
+    oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE" || error_code=$?
+    if [ "W${error_code}W" == "W0W" ]; then
+        # The test suite requires a vSphere config file with explicit user and password fields.
+        sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
+        sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+    fi
     export TEST_PROVIDER=vsphere;;
 openstack*)
     # shellcheck disable=SC1090

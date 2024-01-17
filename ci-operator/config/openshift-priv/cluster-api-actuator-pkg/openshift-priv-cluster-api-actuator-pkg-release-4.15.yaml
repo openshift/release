@@ -7,11 +7,11 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-api-actuator-pkg
 promotion:
-  additional_images:
-    cluster-api-actuator-pkg: src
-  disabled: true
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - additional_images:
+      cluster-api-actuator-pkg: src
+    name: 4.15-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -22,6 +22,12 @@ releases:
       include_built_images: true
       name: 4.15-priv
       namespace: ocp-private
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -95,6 +101,8 @@ tests:
   skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openstack-vexxhost
+    env:
+      USE_RAMFS: "false"
     test:
     - as: test
       cli: latest
@@ -118,6 +126,20 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- always_run: false
+  as: e2e-gcp-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

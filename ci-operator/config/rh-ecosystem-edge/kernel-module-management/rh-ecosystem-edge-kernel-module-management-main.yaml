@@ -2,7 +2,7 @@ base_images:
   go-builder:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.19-openshift-4.14
+    tag: rhel-9-golang-1.20-openshift-4.14
   golangci-lint:
     name: golangci-lint
     namespace: ci
@@ -16,7 +16,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.20
 images:
 - build_args:
   - name: TARGET
@@ -32,7 +32,7 @@ images:
   inputs:
     ubi9-minimal-entitled:
       as:
-      - registry.access.redhat.com/ubi9/ubi-minimal:9.2
+      - registry.access.redhat.com/ubi9/ubi-minimal:9.3
   to: kernel-module-management-signimage
 - dockerfile_path: Dockerfile.must-gather
   to: kernel-module-management-must-gather
@@ -67,12 +67,13 @@ operator:
   - pullspec: quay.io/edge-infrastructure/kernel-module-management-worker:latest
     with: pipeline:kernel-module-management-worker
 promotion:
-  excluded_images:
-  - ubi9-minimal-entitled
-  - e2e-hub-yq
-  namespace: edge-infrastructure
-  tag: latest
-  tag_by_commit: true
+  to:
+  - excluded_images:
+    - ubi9-minimal-entitled
+    - e2e-hub-yq
+    namespace: edge-infrastructure
+    tag: latest
+    tag_by_commit: true
 releases:
   latest:
     release:
@@ -165,7 +166,7 @@ tests:
       commands: |
         oc create namespace openshift-kmm
         operator-sdk run bundle -n openshift-kmm "$OO_BUNDLE"
-        oc wait --for=condition=Available -n openshift-kmm --timeout=1m deployment/kmm-operator-controller-manager
+        oc wait --for=condition=Available -n openshift-kmm --timeout=1m deployment/kmm-operator-controller
       dependencies:
       - env: OO_BUNDLE
         name: operator-bundle
@@ -212,6 +213,12 @@ tests:
           cpu: 1000m
           memory: 500Mi
     workflow: generic-claim
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: kmm
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge

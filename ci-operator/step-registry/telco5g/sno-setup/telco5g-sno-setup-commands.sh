@@ -15,6 +15,7 @@ SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
+BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
@@ -48,7 +49,7 @@ fi
 
 cat << EOF > $SHARED_DIR/bastion_inventory
 [bastion]
-${BASTION_IP} ansible_ssh_user=centos ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
+${BASTION_IP} ansible_ssh_user=${BASTION_USER} ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
 
 ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]} --topology sno "
@@ -106,7 +107,7 @@ if $BASTION_ENV; then
 # Run on upstream lab with bastion
 cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
-${HYPERV_IP} ansible_host=${HYPERV_IP} ansible_user=kni ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_common_args='${COMMON_SSH_ARGS} -o ProxyCommand="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -p 22 -W %h:%p -q centos@${BASTION_IP}"'
+${HYPERV_IP} ansible_host=${HYPERV_IP} ansible_user=kni ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_common_args='${COMMON_SSH_ARGS} -o ProxyCommand="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -p 22 -W %h:%p -q ${BASTION_USER}@${BASTION_IP}"'
 EOF
 
 else
@@ -143,7 +144,7 @@ cat << EOF > ~/ocp-install.yml
   - name: Run deployment
     shell: >-
         ./scripts/sno_ag.py $SNO_PARAM --host ${CLUSTER_NAME} --debug --wait
-        --host-ip ${HYPERV_IP} --registry
+        --host-ip ${HYPERV_IP} --registry --reset-bmc
         -L /tmp/${CLUSTER_NAME}_sno_ci.log 2>&1 > /tmp/${CLUSTER_NAME}_sno_ag.log
     args:
       chdir: /home/kni/telco5g-lab-deployment
@@ -226,6 +227,10 @@ cat << EOF > ~/fetch-kubeconfig.yml
       replace: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
     delegate_to: localhost
 
+  - name: Add docker auth to enable pulling containers from CI registry
+    shell: >-
+      oc --kubeconfig=${WORK_DIR}/auth/kubeconfig set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/home/kni/pull-secret.txt
+
 EOF
 
 cat << EOF > ~/fetch-information.yml
@@ -256,10 +261,14 @@ cat << EOF > ~/check-cluster.yml
     shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'
     register: ready_check
 
+  - name: Check for errors in cluster deployment
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion
+    register: error_check
+
   - name: Fail if deployment failed
     fail:
       msg: Installation has failed
-    when: "'True' not in ready_check.stdout"
+    when: "'True' not in ready_check.stdout or 'Error while reconciling' in error_check.stdout"
 
 EOF
 

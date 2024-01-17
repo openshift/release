@@ -1,11 +1,11 @@
 base_images:
-  base:
-    name: "4.15"
-    namespace: origin
-    tag: base
-  ocp_4.15_installer:
+  ocp_4.15_base:
     name: "4.15"
     namespace: ocp
+    tag: base
+  origin_4.15_installer:
+    name: "4.15"
+    namespace: origin
     tag: installer
 build_root:
   from_repository: true
@@ -14,16 +14,18 @@ images:
   - name: DIRECT_DOWNLOAD
     value: "true"
   dockerfile_path: Dockerfile
-  from: base
   inputs:
-    ocp_4.15_installer:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
+    origin_4.15_installer:
       as:
       - registry.ci.openshift.org/ocp/4.15:installer
   to: machine-os-images
 promotion:
-  disabled: true
-  name: "4.15"
-  namespace: origin
+  to:
+  - name: "4.15"
+    namespace: origin
 releases:
   initial:
     integration:

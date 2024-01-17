@@ -23,17 +23,18 @@ images:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: agent-preinstall-image-builder
 promotion:
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -77,6 +78,7 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_BOOT_MODE=DISKIMAGE
         AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        NETWORK_TYPE=OVNKubernetes
         INSTALLER_PROXY=true
     workflow: agent-e2e-generic
   timeout: 6h0m0s
@@ -86,6 +88,20 @@ tests:
   run_if_changed: ^(cmd/.*|data/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
   steps:
     allow_skip_on_success: true
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      APPLIANCE_IMAGE: agent-preinstall-image-builder
+    env:
+      AGENT_E2E_TEST_BOOT_MODE: DISKIMAGE
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_BOOT_MODE=DISKIMAGE
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV4V6_DHCP
+        INSTALLER_PROXY=true
+    workflow: agent-e2e-generic
+  timeout: 6h0m0s
+- as: e2e-sno-dualstack-dhcp-periodic
+  cron: 00 00 */1 * 5
+  steps:
     cluster_profile: equinix-ocp-metal
     dependencies:
       APPLIANCE_IMAGE: agent-preinstall-image-builder

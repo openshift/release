@@ -25,6 +25,9 @@ else
   cp -R /tmp/tempo-operator /tmp/tempo-tests
   cd /tmp/tempo-tests
   mkdir /tmp/kuttl-manifests && cp minio.yaml /tmp/kuttl-manifests
+
+  #Enable user workload monitoring.
+  oc apply -f tests/e2e-openshift/monitoring/01-workload-monitoring.yaml
 fi
 
 # Remove test cases to be skipped from the test run
@@ -46,6 +49,9 @@ fi
 if [[ -n "$SKIP_TESTS_TO_REMOVE" ]]; then
   rm -rf $SKIP_TESTS_TO_REMOVE
 fi
+
+# Unset environment variables which conflict with kuttl
+unset NAMESPACE
 
 # Execute Tempo e2e tests
 KUBECONFIG=$KUBECONFIG kuttl test \

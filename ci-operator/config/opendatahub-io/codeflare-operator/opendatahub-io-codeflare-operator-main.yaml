@@ -4,6 +4,9 @@ build_root:
       FROM registry.access.redhat.com/ubi8/ubi
       RUN yum install -y --nodocs make git golang
       RUN ln -s /cli/oc /usr/bin/kubectl
+images:
+- dockerfile_path: Dockerfile
+  to: codeflare-operator
 releases:
   latest:
     release:
@@ -20,20 +23,11 @@ resources:
 tests:
 - as: e2e-odh-cfo
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-opendatahub
     env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
       HYPERSHIFT_NODE_COUNT: "3"
-    post:
-    - as: gather-codeflare-operator-log
-      cli: latest
-      commands: |
-        oc logs -n openshift-operators deployment/codeflare-operator-manager > ${ARTIFACT_DIR}/codeflare-operator.log
-        oc logs -n opendatahub deployment/kuberay-operator > ${ARTIFACT_DIR}/kuberay-operator.log
-        oc logs -n openshift-operators deployment/opendatahub-operator-controller-manager > ${ARTIFACT_DIR}/odh-operator.log
-      from: src
-      resources:
-        requests:
-          cpu: 100m
     test:
     - as: e2e-odh-cfo
       cli: latest
@@ -43,30 +37,38 @@ tests:
         export CODEFLARE_TEST_OUTPUT_DIR=${ARTIFACT_DIR}
         export CODEFLARE_TEST_TIMEOUT_SHORT=1m
         export CODEFLARE_TEST_TIMEOUT_MEDIUM=5m
-        export CODEFLARE_TEST_TIMEOUT_LONG=10m
-        # Temporary solution until https://github.com/opendatahub-io/distributed-workloads/ is closed and content migrated
-        git clone https://github.com/opendatahub-io/distributed-workloads.git
-        cd distributed-workloads
-        make install-opendatahub-operator
-        # To be removed once https://github.com/opendatahub-io/opendatahub-operator/issues/600 is implemented and new ODH version is released
-        make install-codeflare-operator
+        # TODO: return CODEFLARE_TEST_TIMEOUT_LONG to 10m once the SDK test "https://github.com/project-codeflare/codeflare-sdk/pull/306" is merged, and test removed from odh/cfo.
+        export CODEFLARE_TEST_TIMEOUT_LONG=15m
+        export NOTEBOOK_IMAGE_STREAM_NAME=jupyter-datascience-notebook
+        echo "Using image ${ODH_CODEFLARE_OPERATOR_CONTROLLER_IMAGE}"
+        sed -i "s|odh-codeflare-operator-controller-image=.*|odh-codeflare-operator-controller-image=$ODH_CODEFLARE_OPERATOR_CONTROLLER_IMAGE|" ./config/manifests/bases/params.env
+        make install-odh-operator
         if [[ "${REPO_OWNER}" == "openshift" ]]; then
           echo -e "Running in openshift repo, it means that this is PJ rehearsal, using latest main for CodeFlare manifest \n"
-          sed -i "s|<DW PR tarball URI>|https://api.github.com/repos/opendatahub-io/distributed-workloads/tarball/main|" ./contrib/configuration/basic-dsc.yaml
+          sed -i "s|<CFO PR tarball URI>|https://api.github.com/repos/opendatahub-io/codeflare-operator/tarball/main|" ./contrib/configuration/basic-dsc.yaml
         else
           echo -e "Running PR ${PULL_NUMBER} \n"
-          sed -i "s|<DW PR tarball URI>|https://api.github.com/repos/opendatahub-io/distributed-workloads/tarball/pull/${PULL_NUMBER}/head|" ./contrib/configuration/basic-dsc.yaml
+          sed -i "s|<CFO PR tarball URI>|https://api.github.com/repos/opendatahub-io/codeflare-operator/tarball/pull/${PULL_NUMBER}/head|" ./contrib/configuration/basic-dsc.yaml
         fi
         oc apply -f ./contrib/configuration/basic-dsc.yaml -n opendatahub
         cat ./contrib/configuration/basic-dsc.yaml
         sleep 60
-        cd tests && go test -timeout 60m -v ./integration
+        make test-e2e test-odh store-odh-logs --keep-going
+      dependencies:
+      - env: ODH_CODEFLARE_OPERATOR_CONTROLLER_IMAGE
+        name: codeflare-operator
       from: src
       resources:
         requests:
           cpu: 8000m
           memory: 16Gi
     workflow: hypershift-hostedcluster-workflow
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: opendatahub-io/codeflare-operator
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: opendatahub-io

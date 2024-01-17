@@ -1,20 +1,18 @@
 workflow:
   as: hypershift-mce-agent-conformance
   documentation: |-
-    The HyperShift agent conformance workflow executes tests against a new ephemeral
+    The HyperShift mce agent conformance (connected) workflow executes tests against a new ephemeral
+    The current workflow supports both IPv4 and dual-stack
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
     post:
     - chain: hypershift-mce-agent-destroy
-    - ref: baremetalds-packet-gather-metadata
-    - chain: baremetalds-ipi-post
+    - chain: baremetalds-ofcir-post
     test:
     - chain: hypershift-conformance
     pre:
-    - ref: assisted-baremetal-conf-devscripts
-    - ref: assisted-baremetal-conf-user-data
-    - chain: baremetalds-ipi-pre
+    - chain: baremetalds-ofcir-pre
     - ref: enable-qe-catalogsource
     - chain: hypershift-mce-agent-lvm
     - ref: hypershift-mce-install
@@ -22,17 +20,14 @@ workflow:
     env:
       LVM_OPERATOR_SUB_SOURCE: qe-app-registry
       METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
-      PACKET_PLAN: "m3.large.x86"
-      USER_DATA_FILENAME: "user-data"
-      NUM_EXTRA_WORKERS: "3"
+      IP_STACK: v4
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         NETWORK_TYPE=OVNKubernetes
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST=vda
         VM_EXTRADISKS_SIZE=1024G
+        NUM_EXTRA_WORKERS=3
         EXTRA_WORKER_VCPU=8
         EXTRA_WORKER_MEMORY=16384
         EXTRA_WORKER_DISK=100
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True

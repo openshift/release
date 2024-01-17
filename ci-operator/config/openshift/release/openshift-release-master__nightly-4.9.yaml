@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-test-infra:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -31,10 +31,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  driver-toolkit-tests:
-    name: "4.9"
-    namespace: ocp
-    tag: driver-toolkit-tests
   gcp-pd-csi-driver-operator-test:
     name: "4.9"
     namespace: ocp
@@ -106,7 +102,7 @@ tests:
   cron: 32 8 9,21 * *
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-ipv4
+    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-ovn-dualstack-local-gateway
   cluster: build05
   cron: 44 2 11,22 * *
@@ -123,7 +119,7 @@ tests:
   cron: 52 19 10,27 * *
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-serial-ipv4
+    workflow: baremetalds-e2e-sdn-serial-ipv4
 - as: e2e-metal-ipi-upgrade
   cluster: build05
   cron: 0 0 1 1 *
@@ -131,7 +127,7 @@ tests:
     cluster_profile: equinix-ocp-metal
     env:
       TEST_TYPE: upgrade-conformance
-    workflow: baremetalds-e2e-upgrade
+    workflow: baremetalds-e2e-upgrade-sdn
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   cron: 43 14 2,20 * *
@@ -146,7 +142,7 @@ tests:
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-metal-ipi-compact
   cluster: build05
-  cron: 0 0 * * 1
+  cron: 30 1 7,24 * *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -156,12 +152,12 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
   cluster: build05
-  cron: 0 0 * * 1
+  cron: 33 3 5,23 * *
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-aws-proxy
-  cron: 0 0 */2 * *
+  cron: 23 8 9,24 * *
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
@@ -269,7 +265,7 @@ tests:
 - as: e2e-gcp-fips
   cron: 1 16 3,16 * *
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     env:
       FIPS_ENABLED: "true"
     pre:
@@ -279,7 +275,7 @@ tests:
 - as: e2e-gcp-csi
   cron: 20 22 4,14 * *
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: gcp-3
     workflow: openshift-e2e-gcp-csi
 - as: e2e-gcp-csi-migration
   cron: 58 19 7,22 * *
@@ -340,7 +336,7 @@ tests:
           memory: 200Mi
     workflow: ipi-aws
 - as: e2e-gcp-rt
-  cron: 16 10 */14 * *
+  cron: 35 6 10,25 * *
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     env:
@@ -365,10 +361,10 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
-      TEST_UPGRADE_OPTIONS: abort-at=random
+      TEST_UPGRADE_OPTIONS: abort-at=100
     workflow: openshift-upgrade-aws
 - as: credentials-request-freeze
-  interval: 48h
+  cron: 44 6 7,24 * *
   steps:
     dependencies:
       OPENSHIFT_FROZEN_RELEASE_IMAGE: release:oldest-supported-credentials-request
@@ -522,19 +518,6 @@ tests:
           cpu: 100m
           memory: 600Mi
     workflow: ipi-azure
-- as: e2e-aws-driver-toolkit
-  cron: 56 0 2,19 * *
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: make test-e2e
-      from: driver-toolkit-tests
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 - as: e2e-aws-upi
   cron: 32 1 8,25 * *
   steps:

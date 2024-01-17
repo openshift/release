@@ -1,22 +1,22 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
@@ -24,7 +24,7 @@ base_images:
     namespace: edge-infrastructure
     tag: latest
   assisted-service-scripts:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   dev-scripts:
@@ -54,6 +54,12 @@ releases:
     candidate:
       product: ocp
       stream: ci
+      version: "4.15"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
       version: "4.15"
 resources:
   '*':
@@ -85,6 +91,11 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance-proxy
+- as: e2e-powervs
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: hypershift-powervs
+    workflow: hypershift-powervs-e2e
 - as: e2e-ibmcloud-iks
   cron: 0 4 * * *
   steps:
@@ -109,6 +120,8 @@ tests:
   cron: 0 4 * * *
   steps:
     cluster_profile: aws
+    env:
+      MCE_VERSION: "2.5"
     workflow: hypershift-mce-aws-conformance
 - as: e2e-agent-ovn-conformance
   cron: 0 4 * * *
@@ -117,13 +130,14 @@ tests:
     dependencies:
       INDEX_IMAGE: assisted-service-index
     workflow: hypershift-agent-conformance
-- as: e2e-kubevirt-conformance
+- as: e2e-kubevirt-baremetalds-conformance
   cron: 0 4 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: equinix-ocp-metal
     env:
-      CNV_PRERELEASE_VERSION: "4.15"
-    workflow: hypershift-kubevirt-conformance
+      HYPERSHIFT_NODE_COUNT: "2"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.14
+    workflow: hypershift-kubevirt-baremetalds-conformance
 - as: e2e-kubevirt-csi-conformance
   cron: 0 4 * * *
   steps:

@@ -1,32 +1,36 @@
 base_images:
-  base:
+  ocp_4.16_base-rhel9:
     name: 4.16-priv
     namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    tag: base-rhel9
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-8-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ptp-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: ptp-operator
 operator:
   bundles:
   - dockerfile_path: bundleci.Dockerfile
   substitutions:
-  - pullspec: quay.io/openshift/origin-ptp-operator:4.10
+  - pullspec: quay.io/openshift/origin-ptp-operator:4.15
     with: pipeline:ptp-operator
 promotion:
-  name: 4.16-priv
-  namespace: ocp-private
+  to:
+  - disabled: true
+    name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -74,6 +78,12 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: ptp-operator
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

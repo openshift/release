@@ -1,16 +1,17 @@
 binary_build_commands: ./build.sh
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: tectonic-console-builder-v23
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/rh-cloud-services/releaser:latest
+      RUN dnf install g++ jq wget libxcrypt-compat -y
 images:
 - context_dir: integration-tests
   dockerfile_path: Dockerfile
   to: e2e-runner
 promotion:
-  name: hac-dev
-  namespace: ci
+  to:
+  - name: hac-dev
+    namespace: ci
 releases:
   latest:
     release:
@@ -50,7 +51,7 @@ tests:
     mount_path: /tmp/secret
     name: hac-dev-codecov-token
 - as: periodic-tests
-  cron: 0 0 * * *
+  cron: 52 4 * * *
   steps:
     test:
     - ref: openshift-hac-dev-e2e

@@ -1,25 +1,32 @@
 base_images:
   base:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: base
 build_root:
   from_repository: true
 promotion:
-  additional_images:
-    cluster-api-actuator-pkg: src
-  name: "4.15"
-  namespace: ocp
+  to:
+  - additional_images:
+      cluster-api-actuator-pkg: src
+    name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -93,6 +100,9 @@ tests:
   skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openstack-vexxhost
+    env:
+      USE_RAMFS: "false"
+      WORKER_REPLICAS: "0"
     test:
     - as: test
       cli: latest
@@ -168,10 +178,46 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-openstack-operator-periodic
+- as: e2e-gcp-multi-operator-periodic
   interval: 72h
   steps:
+    cluster_profile: gcp
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+    test:
+    - ref: ipi-install-heterogeneous
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-openstack-operator-periodic
+  minimum_interval: 72h
+  steps:
     cluster_profile: openstack-vexxhost
+    env:
+      USE_RAMFS: "false"
     test:
     - as: test
       cli: latest

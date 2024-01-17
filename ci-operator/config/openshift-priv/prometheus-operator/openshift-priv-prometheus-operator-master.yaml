@@ -1,49 +1,56 @@
 base_images:
-  base:
-    name: 4.15-priv
+  ocp_4.16_base-rhel9:
+    name: 4.16-priv
     namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
-canonical_go_repository: github.com/coreos/prometheus-operator
+canonical_go_repository: github.com/openshift/prometheus-operator
 images:
 - dockerfile_path: Dockerfile.ocp
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: prometheus-operator
 - dockerfile_path: Dockerfile.config-reloader.ocp
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: prometheus-config-reloader
 - dockerfile_path: Dockerfile.admission-webhook.ocp
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: prometheus-operator-admission-webhook
 promotion:
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':
@@ -79,6 +86,12 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+- as: security
+  optional: true
+  steps:
+    env:
+      SNYK_ENABLE_DEPS_SCAN: "true"
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift-priv

@@ -1,12 +1,12 @@
 base_images:
-  base:
-    name: "4.15"
-    namespace: origin
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ocp_4.15_base:
+    name: "4.15"
+    namespace: ocp
+    tag: base
   ocp_4.15_cli:
     name: "4.15"
     namespace: ocp
@@ -26,8 +26,10 @@ images:
   - name: TAGS
     value: fcos
   dockerfile_path: images/installer/Dockerfile.ci
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -39,8 +41,10 @@ images:
   - name: TAGS
     value: fcos
   dockerfile_path: images/installer-artifacts/Dockerfile.rhel
-  from: installer
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -52,7 +56,6 @@ images:
   - name: TAGS
     value: libvirt fcos
   dockerfile_path: images/libvirt/Dockerfile.ci
-  from: base
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
@@ -62,7 +65,6 @@ images:
   - name: TAGS
     value: fcos
   dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
-  from: base
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
@@ -72,8 +74,10 @@ images:
   - name: TAGS
     value: fcos
   dockerfile_path: images/openstack/Dockerfile.ci
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_4.15_cli:
       as:
       - registry.ci.openshift.org/ocp/4.15:cli
@@ -85,8 +89,10 @@ images:
   - name: TAGS
     value: baremetal libvirt fcos
   dockerfile_path: images/baremetal/Dockerfile.ci
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -98,8 +104,10 @@ images:
   - name: TAGS
     value: fcos
   dockerfile_path: images/installer/Dockerfile.ci
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -108,9 +116,9 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: ovirt-installer
 promotion:
-  disabled: true
-  name: "4.15"
-  namespace: origin
+  to:
+  - name: "4.15"
+    namespace: origin
 releases:
   initial:
     integration:
@@ -174,7 +182,7 @@ tests:
     from: src
 - as: e2e-aws-ovn
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: (fcos|okd)
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
@@ -184,7 +192,8 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-aws-ovn-upgrade
+- always_run: false
+  as: e2e-aws-ovn-upgrade
   optional: true
   steps:
     cluster_profile: aws
@@ -201,13 +210,33 @@ tests:
   steps:
     cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
+- as: e2e-aws-ovn-testing-stream
+  cron: 30 0 * * *
+  steps:
+    cluster_profile: aws
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-aws-fcos-ami
+    - chain: ipi-install
+    workflow: openshift-e2e-aws
 - as: e2e-agent-compact-ipv4
   cluster: build05
   optional: true
   run_if_changed: /agent/
   steps:
     cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        NETWORK_TYPE=OVNKubernetes
     workflow: agent-e2e-compact-ipv4
+- as: e2e-agent-ha-dualstack
+  cluster: build05
+  optional: true
+  run_if_changed: /agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-ha-dualstack
 - as: e2e-agent-sno-ipv6
   cluster: build05
   optional: true

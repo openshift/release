@@ -17,17 +17,18 @@ images:
         source_path: /go/src/github.com/openshift-kni/scheduler-plugins/bin/noderesourcetopology-plugin
   to: scheduler-plugins
 promotion:
-  name: scheduler-plugins
-  namespace: ocp-kni
+  to:
+  - name: scheduler-plugins
+    namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -39,6 +40,12 @@ tests:
   commands: make -f Makefile.kni unit-test-quick
   container:
     from: src
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: noderesourcetopology-scheduler
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift-kni

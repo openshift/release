@@ -1,0 +1,69 @@
+ref:
+  as: redhat-performance-backstage-performance-scalability
+  best_effort: true
+  grace_period: 300s
+  cli: latest
+  timeout: 8h0m0s
+  commands: redhat-performance-backstage-performance-scalability-commands.sh
+  credentials:
+    - mount_path: /usr/local/ci-secrets/backstage-performance
+      name: backstage-performance
+      namespace: test-credentials
+  env:
+    - name: SCENARIO
+      default: "search-catalog"
+      documentation: Load test scenario to execute
+    - name: DURATION
+      default: "5m"
+      documentation: Stop each load test iteration after the specified amount of time, e.g. (300s, 20m, 3h, 1h30m, etc.)
+    - name: USE_PR_BRANCH
+      default: "false"
+      documentation: Use PR branch instead of 'main'
+    - name: PRE_LOAD_DB
+      default: "true"
+      documentation: Pre-load RHDH with users and data
+    - name: WAIT_FOR_SEARCH_INDEX
+      default: "false"
+      documentation: Wait for search indexing to finish after setup and each pre-load of DB
+    - name: SCALE_WORKERS
+      default: "5"
+      documentation: |-
+        Scale values of number of Locust workers.
+        (List of integers separated by space character)
+        Example: '1 5 10 50 100'
+    - name: SCALE_ACTIVE_USERS_SPAWN_RATES
+      default: "1:1 200:40"
+      documentation: |-
+        Scale values of concurrent active users and their spawn rates.
+        (List of integer tuples ('active_users:spawn_rate') separated by space character)
+        Example: '100:5 500:10'
+    - name: SCALE_BS_USERS_GROUPS
+      default: "1:1 15000:5000"
+      documentation: |-
+        Scale values of pasive users and number of user groups.
+        (List of integer tuples ('users:groups') separated by space character)
+        Example: '1:1 500:250'
+    - name: SCALE_CATALOG_SIZES
+      default: "1 5000 25000"
+      documentation: |-
+        Scale values of catalog size (number of each component and api entities).
+        (List of integers separated by space)
+        NOTE: the given number of components and api entities is created os overall number of entities is double that number.
+        Example: '1 5000 25000'
+    - name: SCALE_REPLICAS
+      default: "5"
+      documentation: |-
+        Scale values of the number of RHDH replicas.
+        (List of integers separated by space)
+        Example: '1 3 5'
+    - name: SCALE_DB_STORAGES
+      default: "1Gi 2Gi"
+      documentation: |-
+        Scale values of the RHDH DB storage size.
+        (List of values separated by space)
+        Example: '1Gi 2Gi'
+  from: backstage-performance-runner
+  resources:
+    requests:
+      cpu: 3000m
+      memory: 4Gi

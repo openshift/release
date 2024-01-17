@@ -20,7 +20,7 @@ In case you want to know what individual step does, search for them in https://g
 ## Logs and how to get to them:
 If there is a problem with olm deployment in cvp product jenkins pipeline, specifically in the *bundle-image-validation* job, such an issue will be recorded to corresponding prow job.
 Whose link is going to look like this: 
-https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/periodic-ci-redhat-openshift-ecosystem-cvp-ocp-4.7-cvp-common-aws/"unique-number".
+https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-redhat-openshift-ecosystem-cvp-ocp-4.7-cvp-common-aws/"unique-number".
 
 In this prow job you can inspect what exactly went wrong, which part of the workflow failed, etc.
 

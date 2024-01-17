@@ -1,20 +1,16 @@
 base_images:
-  base:
-    name: "4.15"
-    namespace: ocp
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.15_cli:
+  ocp_4.15_base:
     name: "4.15"
     namespace: ocp
-    tag: cli
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-    name: builder
+    tag: base
+  ocp_4.15_cli:
+    name: "4.16"
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: cli
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
@@ -23,33 +19,35 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: ./Dockerfile.assisted-installer.ocp
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_4.15_base:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/4.15:base
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: agent-installer-orchestrator
 - dockerfile_path: ./Dockerfile.assisted-installer-controller.ocp
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_4.15_cli:
       as:
       - registry.ci.openshift.org/ocp/4.15:cli
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: agent-installer-csr-approver
 promotion:
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.16"
+    namespace: ocp
 releases:
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -70,11 +68,7 @@ tests:
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=SNO_IPV6
-        AGENT_USE_ZTP_MANIFESTS=true
-    workflow: agent-e2e-generic
+    workflow: agent-e2e-sno-ipv6
   timeout: 6h0m0s
 - always_run: false
   as: e2e-agent-ha-dualstack

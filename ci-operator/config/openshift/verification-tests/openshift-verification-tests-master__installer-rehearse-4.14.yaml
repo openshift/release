@@ -40,30 +40,33 @@ tests:
 - as: installer-rehearse-debug
   cron: '@yearly'
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: gcp-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      SLEEP_DURATION: 2h
+      SLEEP_DURATION: 1h
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-aws-ipi-provision
+    - chain: cucushift-installer-rehearse-gcp-ipi-private-provision
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
     cluster_profile: aws-1-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-    workflow: cucushift-installer-rehearse-aws-ipi-localzone-byo-subnet-ovn-day2
+      SLEEP_DURATION: 3h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-provision
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      ENABLE_DES_DEFAULT_MACHINE: "true"
-    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
+    workflow: cucushift-installer-rehearse-azure-ipi-private
 - as: installer-rehearse-azure-stack
   cluster: build01
   cron: '@yearly'
@@ -75,23 +78,22 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      FIPS_ENABLED: "true"
-      RT_ENABLED: "true"
-    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
+      SIZE_VARIANT: compact
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe
-    env:
-      RT_ENABLED: "true"
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-minimal-permission
 - as: installer-rehearse-vsphere-dis
   cron: '@yearly'
   steps:
     cluster_profile: vsphere-dis-2
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnected
-- as: installer-rehearse-vsphere-ipi-template
+- as: installer-rehearse-vsphere
   cron: '@yearly'
   steps:
     cluster_profile: vsphere-connected-2

@@ -3,6 +3,10 @@ base_images:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.20-openshift-4.14
+  cli:
+    name: "4.14"
+    namespace: origin
+    tag: cli
   elasticsearch-operator:
     name: "5.8"
     namespace: logging
@@ -32,7 +36,7 @@ base_images:
     namespace: logging
     tag: logging-eventrouter
   logging-fluentd:
-    name: ruby31-v1.14.x
+    name: v1.16.x
     namespace: logging
     tag: logging-fluentd
   logging-kibana6:
@@ -40,7 +44,7 @@ base_images:
     namespace: logging
     tag: logging-kibana6
   logging-vector:
-    name: "5.8"
+    name: "5.9"
     namespace: logging
     tag: vector
   logging-view-plugin:
@@ -48,7 +52,7 @@ base_images:
     namespace: logging
     tag: logging-view-plugin
   oauth-proxy:
-    name: "4.11"
+    name: "4.14"
     namespace: ocp
     tag: oauth-proxy
   ubi9-minimal:
@@ -66,6 +70,9 @@ images:
     base:
       as:
       - registry.redhat.io/ubi9/go-toolset:latest
+    cli:
+      as:
+      - quay.io/openshift/origin-cli:4.13
   to: cluster-logging-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: base
@@ -89,8 +96,9 @@ operator:
   - pullspec: quay.io/openshift-logging/logging-view-plugin:latest
     with: pipeline:logging-view-plugin
 promotion:
-  name: "5.8"
-  namespace: logging
+  to:
+  - name: "5.9"
+    namespace: logging
 releases:
   initial:
     integration:
@@ -143,6 +151,8 @@ tests:
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_CONSOLE_PLUGIN
         name: pipeline:logging-view-plugin
+      - env: RELATED_IMAGE_LOGGING_CONSOLE_PLUGIN
+        name: pipeline:logging-view-plugin
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
       - env: IMAGE_LOGGING_VECTOR
@@ -193,6 +203,8 @@ tests:
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_CONSOLE_PLUGIN
         name: pipeline:logging-view-plugin
+      - env: RELATED_IMAGE_LOGGING_CONSOLE_PLUGIN
+        name: pipeline:logging-view-plugin
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
       - env: IMAGE_LOGGING_VECTOR
@@ -242,6 +254,8 @@ tests:
       - env: IMAGE_OAUTH_PROXY
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_CONSOLE_PLUGIN
+        name: pipeline:logging-view-plugin
+      - env: RELATED_IMAGE_LOGGING_CONSOLE_PLUGIN
         name: pipeline:logging-view-plugin
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd

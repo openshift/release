@@ -18,8 +18,9 @@ operator:
   - pullspec: quay.io/openshift-kni/lifecycle-agent-operator:.*
     with: pipeline:lifecycle-agent-operator
 promotion:
-  name: "4.14"
-  namespace: ocp-kni
+  to:
+  - name: "4.14"
+    namespace: ocp-kni
 releases:
   initial:
     integration:
@@ -44,6 +45,26 @@ tests:
     make ci-job
   container:
     from: src
+- as: integration
+  steps:
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: sysdeseng.devcluster.openshift.com
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-lifecycle-agent
+      OO_PACKAGE: lifecycle-agent
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: integration
+      cli: latest
+      commands: |
+        make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: main
   org: openshift-kni

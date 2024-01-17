@@ -27,14 +27,6 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-jupyter-minimal-ubi8-python-3.8
   to: cuda-jupyter-datascience-ubi8-python-3.8
-- context_dir: jupyter/tensorflow/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: cuda-jupyter-datascience-ubi8-python-3.8
-  to: cuda-jupyter-tensorflow-ubi8-python-3.8
-- context_dir: jupyter/pytorch/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: cuda-jupyter-datascience-ubi8-python-3.8
-  to: jupyter-pytorch-ubi8-python-3.8
 - context_dir: jupyter/trustyai/ubi8-python-3.8
   dockerfile_path: Dockerfile
   from: jupyter-datascience-ubi8-python-3.8
@@ -121,10 +113,10 @@ images:
 - context_dir: base/c9s-python-3.9
   dockerfile_path: Dockerfile
   to: base-c9s-python-3.9
-- context_dir: codeserver/c9s-python-3.9
+- context_dir: codeserver/ubi9-python-3.9
   dockerfile_path: Dockerfile
-  from: base-c9s-python-3.9
-  to: codeserver-c9s-python-3.9
+  from: base-ubi9-python-3.9
+  to: codeserver-ubi9-python-3.9
 - context_dir: rstudio/c9s-python-3.9
   dockerfile_path: Dockerfile
   from: base-c9s-python-3.9
@@ -138,8 +130,9 @@ images:
   from: cuda-c9s-python-3.9
   to: cuda-rstudio-c9s-python-3.9
 promotion:
-  namespace: opendatahub-io
-  tag: latest
+  to:
+  - namespace: opendatahub-io
+    tag: latest
 releases:
   latest:
     release:
@@ -212,26 +205,6 @@ tests:
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: jupyter-datascience-ubi8-python-3.8
     workflow: opendatahub-io-ci-image-mirror
-- as: notebook-jupyter-pytorch-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: jupyter-pytorch-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: jupyter-pytorch-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-jupyter-pytorch-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datacience\/ubi8-python-3.8\/*)|(jupyter\/pytorch\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: jupyter-pytorch-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: jupyter-pytorch-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
 - as: notebook-cuda-ubi8-python-3-8-image-mirror
   postsubmit: true
   steps:
@@ -291,26 +264,6 @@ tests:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: cuda-jupyter-datascience-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-cuda-jupyter-tf-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: cuda-jupyter-tensorflow-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: cuda-jupyter-tensorflow-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-cuda-jupyter-tf-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (cuda\/ubi8-python-3.8\/*)|(base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(jupyter\/tensorflow\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: cuda-jupyter-tensorflow-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: cuda-jupyter-tensorflow-ubi8-python-3.8
     workflow: opendatahub-io-ci-image-mirror
 - as: notebook-jupyter-trustyai-ubi8-python-3-8-image-mirror
   postsubmit: true
@@ -735,25 +688,25 @@ tests:
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: base-c9s-python-3.9
     workflow: opendatahub-io-ci-image-mirror
-- as: notebook-codeserver-c9s-python-3-9-image-mirror
+- as: notebook-codeserver-ubi9-python-3-9-image-mirror
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: codeserver-c9s-python-3.9
+      SOURCE_IMAGE_REF: codeserver-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
-      RELEASE_VERSION: codeserver-c9s-python-3.9
+      RELEASE_VERSION: codeserver-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
-- as: notebook-codeserver-c9s-python-3-9-pr-image-mirror
-  run_if_changed: (base\/c9s-python-3.9\/*)|(codeserver\/c9s-python-3.9\/*)
+- as: notebook-codeserver-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (base\/ubi9-python-3.9\/*)|(codeserver\/ubi9-python-3.9\/*)
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: codeserver-c9s-python-3.9
+      SOURCE_IMAGE_REF: codeserver-ubi9-python-3.9
     env:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
-      RELEASE_VERSION: codeserver-c9s-python-3.9
+      RELEASE_VERSION: codeserver-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: notebook-rstudio-c9s-python-3-9-image-mirror
   postsubmit: true
@@ -818,7 +771,7 @@ tests:
 - as: notebooks-e2e-tests
   skip_if_only_changed: ^docs\/|.github\/workflows\/*|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-opendatahub
     test:
     - as: jupyter-minimal-ubi8-python-3.8-test-e2e
       cli: latest
@@ -1126,18 +1079,18 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: codeserver-c9s-python-3.9-test-e2e
+    - as: codeserver-ubi9-python-3.9-test-e2e
       cli: latest
       commands: |
-        oc new-project codeserver-c9s-python-3-9
+        oc new-project codeserver-ubi9-python-3-9
         IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${CODE_SERVER_IMAGE}"
-        make deploy-c9s-codeserver-c9s-python-3.9 \
+        make deploy9-codeserver-ubi9-python-3.9 \
             -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make validate-codeserver-image image=codeserver-c9s-python-3.9
-        make undeploy-c9s-codeserver-c9s-python-3.9
+        make validate-codeserver-image image=codeserver-ubi9-python-3.9
+        make undeploy9-codeserver-ubi9-python-3.9
       dependencies:
       - env: CODE_SERVER_IMAGE
-        name: codeserver-c9s-python-3.9
+        name: codeserver-ubi9-python-3.9
       from: src
       resources:
         requests:
@@ -1164,7 +1117,7 @@ tests:
 - as: habana-notebooks-e2e-tests
   run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(habana\/*)
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-opendatahub
     test:
     - as: habana-jupyter-1.9.0-ubi8-python-3.8-test-e2e
       cli: latest

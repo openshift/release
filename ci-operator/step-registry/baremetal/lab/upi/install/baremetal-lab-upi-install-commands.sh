@@ -61,9 +61,9 @@ function destroy_bootstrap() {
   BUILD_ID="$1"
   mac="$2"
   echo "Destroying bootstrap: removing the DHCP/PXE config..."
-  sed -i "/^dhcp-host=$mac/d" /opt/dhcpd/root/etc/dnsmasq.conf
+  sed -i "/^dhcp-host=$mac/d" /opt/dnsmasq/etc/dnsmasq.conf
   echo "Destroying bootstrap: removing the grub config..."
-  rm -f "/opt/tftpboot/grub.cfg-01-${mac//:/-}" || echo "no grub.cfg for $mac."
+  rm -f "/opt/dnsmasq/tftpboot/grub.cfg-01-${mac//:/-}" || echo "no grub.cfg for $mac."
   echo "Destroying bootstrap: removing dns entries..."
   sed -i "/bootstrap.*${BUILD_ID:-glob-protected-from-empty-var}/d" /opt/bind9_zones/{zone,internal_zone.rev}
   echo "Destroying bootstrap: removing the bootstrap node ip in the backup pool of haproxy"
@@ -77,14 +77,15 @@ function destroy_bootstrap() {
   sed '/server bootstrap-/d' "${F}" > "${F}.tmp"
   cat "${F}.tmp" > "${F}"
   rm -rf "${F}.tmp"
-  docker kill -s HUP "haproxy-${BUILD_ID}"
-  docker exec bind9 rndc reload
-  docker exec bind9 rndc flush
-  docker restart dhcpd
+  podman kill -s HUP "haproxy-${BUILD_ID}"
+  podman exec bind9 rndc reload
+  podman exec bind9 rndc flush
+  systemctl restart dhcp
 EOF
   # do not fail if unable to wipe the bootstrap disk and do not release it, to retry later in post steps
-  reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}"
-  if ! wait_for_power_down "${bmc_address}" "${bmc_user}" "${bmc_pass}"; then
+  # shellcheck disable=SC2154
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
+  if ! wait_for_power_down "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${vendor}" "${ipxe_via_vmedia}"; then
     echo "The bootstrap node didn't power off and it will not be released to retry in the deprovisioning steps..."
     return 0
   fi
@@ -105,7 +106,7 @@ EOF
 olReboot $pdu_socket
 quit
 EOF
-    if ! wait_for_power_down "${bmc_address}" "${bmc_user}" "${bmc_pass}"; then
+    if ! wait_for_power_down "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${ipxe_via_vmedia}" "${vendor}"; then
       echo "The bootstrap node PDU reset was not successful... it will not be released to retry in the deprovisioning steps..."
       return 0
     fi
@@ -146,58 +147,38 @@ EOF
 
 function wait_for_power_down() {
   local bmc_address="${1}"
-  local bmc_user="${2}"
-  local bmc_pass="${3}"
+  local bmc_forwarded_port="${2}"
+  local bmc_user="${3}"
+  local bmc_pass="${4}"
+  local vendor="${5}"
+  local ipxe_via_vmedia="${6}"
+  local host="${bmc_forwarded_port##1[0-9]}"
+  host="${host##0}"
   sleep 90
   local retry_max=40 # 15*40=600 (10 min)
-  while [ $retry_max -gt 0 ] && ! ipmitool -I lanplus -H "$bmc_address" \
+  while [ $retry_max -gt 0 ] && ! ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
     -U "$bmc_user" -P "$bmc_pass" power status | grep -q "Power is off"; do
-    echo "$bmc_address is not powered off yet... waiting"
+    echo "${host} is not powered off yet... waiting"
     sleep 30
     retry_max=$(( retry_max - 1 ))
   done
   if [ $retry_max -le 0 ]; then
-    echo -n "$bmc_address didn't power off successfully..."
-    if [ -f "/tmp/$bmc_address" ]; then
-      echo "$bmc_address kept powered on and needs further manual investigation..."
+    echo -n "${host} didn't power off successfully..."
+    if [ -f "/tmp/${host}" ]; then
+      echo "${host} kept powered on and needs further manual investigation..."
       return 1
     else
       # We perform the reboot at most twice to overcome some known BMC hardware failures
       # that sometimes keep the hosts frozen before POST.
-      echo "retrying $bmc_address again to reboot..."
-      touch "/tmp/$bmc_address"
-      reset_host "$bmc_address" "$bmc_user" "$bmc_pass"
-      wait_for_power_down "$bmc_address" "$bmc_user" "$bmc_pass"
+      echo "retrying $ again to reboot..."
+      touch "/tmp/$host"
+      timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
+      wait_for_power_down "$bmc_address" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"
       return $?
     fi
   fi
-  echo "$bmc_address is now powered off"
+  echo "#$host is now powered off"
   return 0
-}
-
-function reset_host() {
-  local bmc_address="${1}"
-  local bmc_user="${2}"
-  local bmc_pass="${3}"
-  ipmitool -I lanplus -H "$bmc_address" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    chassis bootparam set bootflag force_pxe options=PEF,watchdog,reset,power
-  ipmitool -I lanplus -H "$bmc_address" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power off || echo "Already off"
-  # If the host is not already powered off, the power on command can fail while the host is still powering off.
-  # Let's retry the power on command multiple times to make sure the command is received in the correct state.
-  for i in {1..10} max; do
-    if [ "$i" == "max" ]; then
-      echo "Failed to reset $bmc_address"
-      return 1
-    fi
-    ipmitool -I lanplus -H "$bmc_address" \
-      -U "$bmc_user" -P "$bmc_pass" \
-      power on && break
-    echo "Failed to power on $bmc_address, retrying..."
-    sleep 5
-  done
 }
 
 function approve_csrs() {
@@ -303,7 +284,7 @@ echo -e "\nPower on the hosts..."
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  if [ ${#bmc_address} -eq 0 ] || [ ${#bmc_user} -eq 0 ] || [ ${#bmc_pass} -eq 0 ]; then
+  if [ ${#bmc_forwarded_port} -eq 0 ] || [ ${#bmc_user} -eq 0 ] || [ ${#bmc_pass} -eq 0 ]; then
     echo "Error while unmarshalling hosts entries"
     exit 1
   fi
@@ -312,8 +293,8 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     # on a single-arch payload migrated to a multi-arch cluster)
     continue
   fi
-  echo "Power on ${bmc_address//.*/} (${name})..."
-  reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}"
+  echo "Power on #${host} (${name})..."
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
 done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"

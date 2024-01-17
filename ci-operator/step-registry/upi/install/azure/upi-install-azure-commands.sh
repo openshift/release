@@ -3,6 +3,7 @@ set -euo pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 #Save exit code for must-gather to generate junit
 trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
+trap 'cp "${ARTIFACT_DIR}/installer/metadata.json" "${SHARED_DIR}"' EXIT TERM
 
 # The oc binary is placed in the shared-tmp by the test container and we want to use
 # that oc for all actions.
@@ -190,7 +191,7 @@ if [[ "$status" != "success" ]]; then
 fi
 
 echo "Uploading bootstrap.ign"
-az storage container create --name files --account-name $ACCOUNT_NAME --public-access blob
+az storage container create --name files --account-name $ACCOUNT_NAME
 az storage blob upload --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -f "${ARTIFACT_DIR}/installer/bootstrap.ign" -n "bootstrap.ign"
 
 echo "Creating private DNS zone"
@@ -253,7 +254,9 @@ echo "Creating 'api' record in public zone for IP ${PUBLIC_IP}"
 az network dns record-set a add-record -g $BASE_DOMAIN_RESOURCE_GROUP -z ${BASE_DOMAIN} -n api.${CLUSTER_NAME} -a $PUBLIC_IP --ttl 60
 
 echo "Deploying 04_bootstrap"
-BOOTSTRAP_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv)
+BOOTSTRAP_URL_EXPIRY=$(date -u -d "10 hours" '+%Y-%m-%dT%H:%MZ')
+BOOTSTRAP_URL=$(az storage blob generate-sas -c 'files' -n 'bootstrap.ign' --https-only --full-uri --permissions r --expiry ${BOOTSTRAP_URL_EXPIRY} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY} -o tsv)
+#BOOTSTRAP_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv)
 IGNITION_VERSION=$(jq -r .ignition.version ${ARTIFACT_DIR}/installer/bootstrap.ign)
 BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "${IGNITION_VERSION}" --arg url $BOOTSTRAP_URL '{ignition:{version:$v,config:{replace:{source:$url}}}}' | base64 -w0)
 # shellcheck disable=SC2046
@@ -352,6 +355,6 @@ wait "$!"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 # Password for the cluster gets leaked in the installer logs and hence removing them.
 sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
-cp "${ARTIFACT_DIR}/installer/metadata.json" "${SHARED_DIR}"
+#cp "${ARTIFACT_DIR}/installer/metadata.json" "${SHARED_DIR}"
 cp "${ARTIFACT_DIR}/installer/auth/kubeconfig" "${SHARED_DIR}"
 touch /tmp/install-complete

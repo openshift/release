@@ -12,7 +12,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-opendatahub
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-notebooks-main-habana-notebooks-e2e-tests
@@ -69,12 +69,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+        secret:
+          secretName: cluster-secrets-gcp-opendatahub
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -90,7 +86,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -145,7 +141,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-base-c9s-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -208,7 +204,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-base-ubi8-python-3-8-pr-image-mirror
     decorate: true
     decoration_config:
@@ -271,7 +267,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-base-ubi9-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -334,17 +330,17 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
-    context: ci/prow/notebook-codeserver-c9s-python-3-9-pr-image-mirror
+    cluster: build04
+    context: ci/prow/notebook-codeserver-ubi9-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-notebooks-main-notebook-codeserver-c9s-python-3-9-pr-image-mirror
-    rerun_command: /test notebook-codeserver-c9s-python-3-9-pr-image-mirror
-    run_if_changed: (base\/c9s-python-3.9\/*)|(codeserver\/c9s-python-3.9\/*)
+    name: pull-ci-opendatahub-io-notebooks-main-notebook-codeserver-ubi9-python-3-9-pr-image-mirror
+    rerun_command: /test notebook-codeserver-ubi9-python-3-9-pr-image-mirror
+    run_if_changed: (base\/ubi9-python-3.9\/*)|(codeserver\/ubi9-python-3.9\/*)
     spec:
       containers:
       - args:
@@ -352,7 +348,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=notebook-codeserver-c9s-python-3-9-pr-image-mirror
+        - --target=notebook-codeserver-ubi9-python-3-9-pr-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -391,13 +387,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )notebook-codeserver-c9s-python-3-9-pr-image-mirror,?($|\s.*)
+    trigger: (?m)^/test( | .* )notebook-codeserver-ubi9-python-3-9-pr-image-mirror,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-cuda-c9s-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -460,7 +456,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-cuda-jupyter-ds-ubi8-python-3-8-pr-image-mirror
     decorate: true
     decoration_config:
@@ -523,7 +519,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-cuda-jupyter-ds-ubi9-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -586,7 +582,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-cuda-jupyter-minimal-ubi8-python-3-8-pr-image-mirror
     decorate: true
     decoration_config:
@@ -649,7 +645,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-cuda-jupyter-minimal-ubi9-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -712,70 +708,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
-    context: ci/prow/notebook-cuda-jupyter-tf-ubi8-python-3-8-pr-image-mirror
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-notebooks-main-notebook-cuda-jupyter-tf-ubi8-python-3-8-pr-image-mirror
-    rerun_command: /test notebook-cuda-jupyter-tf-ubi8-python-3-8-pr-image-mirror
-    run_if_changed: (cuda\/ubi8-python-3.8\/*)|(base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(jupyter\/tensorflow\/ubi8-python-3.8\/*)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=notebook-cuda-jupyter-tf-ubi8-python-3-8-pr-image-mirror
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )notebook-cuda-jupyter-tf-ubi8-python-3-8-pr-image-mirror,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-cuda-jupyter-tf-ubi9-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -838,7 +771,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-cuda-rstudio-c9s-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -901,7 +834,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-cuda-ubi8-python-3-8-pr-image-mirror
     decorate: true
     decoration_config:
@@ -964,7 +897,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-cuda-ubi9-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -1027,7 +960,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-habana-1-10-0-ubi8-python-3-8-pr-image-mirror
     decorate: true
     decoration_config:
@@ -1090,7 +1023,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-habana-1-11-0-ubi8-python-3-8-pr-image-mirror
     decorate: true
     decoration_config:
@@ -1153,7 +1086,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-habana-1-9-0-ubi8-python-3-8-pr-image-mirror
     decorate: true
     decoration_config:
@@ -1216,7 +1149,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-jupyter-datascience-ubi8-python-3-8-pr-image-mirror
     decorate: true
     decoration_config:
@@ -1279,7 +1212,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-jupyter-datascience-ubi9-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -1342,7 +1275,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-jupyter-minimal-ubi8-python-3-8-pr-image-mirror
     decorate: true
     decoration_config:
@@ -1405,7 +1338,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-jupyter-minimal-ubi9-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -1468,70 +1401,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
-    context: ci/prow/notebook-jupyter-pytorch-ubi8-python-3-8-pr-image-mirror
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-notebooks-main-notebook-jupyter-pytorch-ubi8-python-3-8-pr-image-mirror
-    rerun_command: /test notebook-jupyter-pytorch-ubi8-python-3-8-pr-image-mirror
-    run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datacience\/ubi8-python-3.8\/*)|(jupyter\/pytorch\/ubi8-python-3.8\/*)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=notebook-jupyter-pytorch-ubi8-python-3-8-pr-image-mirror
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )notebook-jupyter-pytorch-ubi8-python-3-8-pr-image-mirror,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-jupyter-pytorch-ubi9-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -1594,7 +1464,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-jupyter-trustyai-ubi8-python-3-8-pr-image-mirror
     decorate: true
     decoration_config:
@@ -1657,7 +1527,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-jupyter-trustyai-ubi9-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -1720,7 +1590,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/notebook-rstudio-c9s-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -1790,7 +1660,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-opendatahub
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-notebooks-main-notebooks-e2e-tests
@@ -1847,12 +1717,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+        secret:
+          secretName: cluster-secrets-gcp-opendatahub
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1868,7 +1734,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/runtime-cuda-tensorflow-ubi8-python-3-8-pr-image-mirror
     decorate: true
     decoration_config:
@@ -1931,7 +1797,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/runtime-cuda-tensorflow-ubi9-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -1994,7 +1860,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/runtime-datascience-ubi8-python-3-8-pr-image-mirror
     decorate: true
     decoration_config:
@@ -2057,7 +1923,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/runtime-datascience-ubi9-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -2120,7 +1986,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/runtime-minimal-ubi8-python-3-8-pr-image-mirror
     decorate: true
     decoration_config:
@@ -2183,7 +2049,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/runtime-minimal-ubi9-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
@@ -2246,7 +2112,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/runtime-pytorch-ubi8-python-3-8-pr-image-mirror
     decorate: true
     decoration_config:
@@ -2309,7 +2175,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/runtime-pytorch-ubi9-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:

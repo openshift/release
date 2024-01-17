@@ -35,24 +35,24 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_golang-1.18:
+  openshift_release_golang-1.20:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.20
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.assisted_installer_agent
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-installer-agent
 - dockerfile_path: Dockerfile.assisted_installer_agent-build
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-installer-agent-build
 - dockerfile_literal: |
     FROM base
@@ -60,14 +60,15 @@ images:
   from: src
   to: assisted-installer-agent-src
 promotion:
-  name: ocm-2.10
-  namespace: edge-infrastructure
+  to:
+  - name: ocm-2.10
+    namespace: edge-infrastructure
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -79,6 +80,16 @@ test_binary_build_commands: |
 tests:
 - as: publish-multi-arch-images
   postsubmit: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      DOCKERFILE_IMAGE_PAIRS: |
+        Dockerfile.assisted_installer_agent , quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
+      DRY_RUN: "false"
+    workflow: assisted-tools-multi-arch
+- always_run: false
+  as: publish-multi-arch-images-dry-run
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
@@ -173,7 +184,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
         MASTER_MEMORY=17408
         MASTER_CPU=8
         WORKER_MEMORY=9216
@@ -197,7 +209,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
@@ -225,12 +238,33 @@ tests:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       INDEX_IMAGE: assisted-service-index
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      PACKET_PLAN: c3.medium.x86
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-oci-assisted
   optional: true
   steps:
     cluster_profile: oci-assisted
     workflow: assisted-oci
+- always_run: false
+  as: e2e-oci-assisted-4-14
+  optional: true
+  steps:
+    cluster_profile: oci-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.14
+      PLATFORM: assisted-oci
+    workflow: assisted-oci
+- always_run: false
+  as: e2e-metal-assisted-external
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        PLATFORM=external
+    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master
   org: openshift

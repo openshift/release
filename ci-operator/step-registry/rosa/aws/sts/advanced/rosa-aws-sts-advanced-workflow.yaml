@@ -3,10 +3,11 @@ workflow:
   steps:
     env:
       STS: "true"
+      PERMISSIONS_BOUNDARY: "arn:aws:iam::aws:policy/AdministratorAccess"
       COMPUTE_MACHINE_TYPE: "m5.xlarge"
-      ENABLE_AUTOSCALING: "true"
-      MIN_REPLICAS: "3"
-      MAX_REPLICAS: "6"
+      WORKER_DISK_SIZE: "128GiB"
+      ENABLE_AUTOSCALING: "false"
+      REPLICAS: "3"
       MULTI_AZ: "true"
       FIPS: "true"
       ENABLE_BYOVPC: "true"
@@ -18,21 +19,23 @@ workflow:
       DISABLE_WORKLOAD_MONITORING: "true"
       DISABLE_SCP_CHECKS: "false"
       EC2_METADATA_HTTP_TOKENS: "required"
-      DEFAULT_MACHINE_POOL_LABELS: "prowci=true"
-      MP_MACHINE_TYPE: "g4dn.2xlarge"
+      DEFAULT_MACHINE_POOL_LABELS: "k8s.ovn.org/egress-assignable="
       MP_REPLICAS: "1"
       LOCAL_ZONE: "true"
       LOCALZONE_WORKER_ASSIGN_PUBLIC_IP: "no"
+      ADDITIONAL_SECURITY_GROUP: "false"
     pre:
     - ref: aws-provision-vpc-shared
+    - ref: aws-provision-security-group
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
     - chain: aws-provision-bastionhost
     - chain: rosa-sts-oidc-config-create
     - ref: rosa-sts-kms-key-create
     - chain: rosa-cluster-provision
     - ref: aws-provision-tags-for-byo-vpc
-    - ref: aws-provision-localzone-subnet
+    - chain: aws-provision-localzone-subnet
     - ref: rosa-conf-tags-for-localzone-subnet
+    - ref: osd-ccs-cluster-instance-types
     - ref: rosa-conf-machine-pool
     - ref: osd-ccs-conf-idp-htpasswd-multi-users
     - ref: rosa-cluster-wait-ready-nodes
@@ -40,6 +43,7 @@ workflow:
     - chain: rosa-cluster-deprovision
     - ref: rosa-sts-kms-key-delete
     - chain: rosa-sts-oidc-config-delete
+    - ref: aws-deprovision-security-group
     - ref: aws-deprovision-s3buckets
     - ref: aws-deprovision-stacks
   documentation: |-

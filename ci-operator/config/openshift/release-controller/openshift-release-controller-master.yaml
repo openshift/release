@@ -1,4 +1,8 @@
 base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
   govulncheck:
     name: govulncheck
     namespace: ci
@@ -35,9 +39,18 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/release-controller/release-payload-controller
   to: release-payload-controller
+- dockerfile_path: images/release-reimport-controller/Dockerfile
+  from: cli
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/release-controller/release-reimport-controller
+  to: release-reimport-controller
 promotion:
-  namespace: ci
-  tag: latest
+  to:
+  - namespace: ci
+    tag: latest
 resources:
   '*':
     requests:

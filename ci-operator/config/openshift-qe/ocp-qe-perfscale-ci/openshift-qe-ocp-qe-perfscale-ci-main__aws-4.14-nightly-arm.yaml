@@ -7,8 +7,9 @@ images:
 - dockerfile_path: prow/Dockerfile
   to: ocp-qe-perfscale-ci-aws-414-arm
 promotion:
-  namespace: ci
-  tag: latest
+  to:
+  - namespace: ci
+    tag: latest
 releases:
   arm64-latest:
     candidate:
@@ -27,9 +28,69 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: perfscale-aws-data-path-9nodes-arm-periodic
-  cron: 0 9 * * 1
+- as: control-plane-24nodes
+  cron: 0 3 7,21 * *
   steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      PROFILE_TYPE: reporting
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+- as: node-density-cni-24nodes
+  cron: 0 3 7,21 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      PODS_PER_NODE: "200"
+      PROFILE_TYPE: reporting
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+- as: node-density-heavy-24nodes
+  cron: 0 6 7,21 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      PODS_PER_NODE: "200"
+      PROFILE_TYPE: reporting
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+- as: data-path-9nodes
+  cron: 0 6 7,21 * *
+  steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
@@ -38,14 +99,11 @@ tests:
       COMPUTE_NODE_REPLICAS: "9"
       LOKI_USE_SERVICEMONITOR: "false"
       OCP_ARCH: arm64
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
+      ZONES_COUNT: "3"
     test:
     - ref: openshift-qe-perfscale-aws-data-path-sg
     - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: main

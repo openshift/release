@@ -4,21 +4,21 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: hypershift-operator
-  ocp_4.15_base-rhel9:
-    name: "4.15"
+  ocp_4.16_base-rhel9:
+    name: "4.16"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.19-openshift-4.15:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.15
-  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    tag: rhel-8-golang-1.20-openshift-4.16
+  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.20-openshift-4.16
 build_root:
   image_stream_tag:
     name: release
@@ -27,39 +27,40 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.base
   inputs:
-    ocp_4.15_base-rhel9:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.15:base-rhel9
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
   to: ovn-kubernetes-base
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.15:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.15
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
+    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
   to: ovn-kubernetes
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
   to: ovn-kubernetes-microshift
 promotion:
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -212,6 +213,96 @@ tests:
   steps:
     cluster_profile: aws
     workflow: hypershift-kubevirt-conformance
+- as: security
+  optional: true
+  steps:
+    env:
+      ALL_PROJECTS: "true"
+      PROJECT_NAME: ovn-kubernetes
+    workflow: openshift-ci-security
+- always_run: false
+  as: qe-perfscale-aws-ovn-medium-cluster-density
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SIZE_VARIANT: large
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-cluster-density-v2
+  timeout: 5h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-small-cluster-density
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-cluster-density-v2
+  timeout: 5h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-medium-node-density-cni
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SIZE_VARIANT: large
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-node-density-cni
+  timeout: 5h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-small-node-density-cni
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-node-density-cni
+  timeout: 5h0m0s
+- always_run: false
+  as: e2e-aws-ovn-network-migration
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+    test:
+    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-config-multicast
+    - ref: ovn-sdn-migration
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-validate-multicast
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-sdn
 zz_generated_metadata:
   branch: master
   org: openshift

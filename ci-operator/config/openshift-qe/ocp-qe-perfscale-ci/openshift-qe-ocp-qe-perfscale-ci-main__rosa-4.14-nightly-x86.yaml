@@ -1,3 +1,12 @@
+base_images:
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
@@ -7,8 +16,9 @@ images:
 - dockerfile_path: prow/Dockerfile
   to: ocp-qe-perfscale-ci-rosa-4.14-nightly
 promotion:
-  namespace: ci
-  tag: latest
+  to:
+  - namespace: ci
+    tag: latest
 releases:
   latest:
     candidate:
@@ -21,9 +31,28 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: perfscale-rosa-multiaz-control-plane-120nodes-periodic
+- as: cluster-density-v2-249nodes
+  cron: 0 8 * * 2
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
+      EXTRA_FLAGS: --churn-duration=20m --timeout=6h
+      MULTI_AZ: "true"
+      MUST_GATHER_TIMEOUT: 90m
+      OPENSHIFT_VERSION: "4.14"
+      REPLICAS: "249"
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
+- as: control-plane-120nodes
   cron: 0 12 * * 6
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale
     env:
       CHANNEL_GROUP: nightly
@@ -31,48 +60,18 @@ tests:
       ENABLE_AUTOSCALING: "false"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.14"
+      PROFILE_TYPE: reporting
       REPLICAS: "120"
     test:
     - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts
   timeout: 6h0m0s
-- always_run: false
-  as: perfscale-rosa-hcp-multiaz-control-plane-120nodes
-  steps:
-    cluster_profile: aws-perfscale
-    env:
-      CHANNEL_GROUP: nightly
-      COMPUTE_MACHINE_TYPE: m5.xlarge
-      DISABLE_WORKLOAD_MONITORING: "false"
-      ENABLE_AUTOSCALING: "false"
-      HOSTED_CP: "true"
-      MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.14"
-      REPLICAS: "120"
-      ZONES_COUNT: "3"
-    test:
-    - chain: openshift-qe-control-plane
-    workflow: rosa-aws-sts-hypershift
-- always_run: false
-  as: perfscale-rosa-hcp-multiaz-control-plane-252nodes
-  steps:
-    cluster_profile: aws-perfscale
-    env:
-      CHANNEL_GROUP: nightly
-      COMPUTE_MACHINE_TYPE: m5.xlarge
-      DISABLE_WORKLOAD_MONITORING: "false"
-      ENABLE_AUTOSCALING: "false"
-      HOSTED_CP: "true"
-      MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.14"
-      REPLICAS: "252"
-      ZONES_COUNT: "3"
-    test:
-    - chain: openshift-qe-control-plane
-    workflow: rosa-aws-sts-hypershift
 - as: perfscale-rosa-multiaz-control-plane-24nodes-periodic
+  timeout: 7h0m0s
+- as: control-plane-24nodes
   cron: 0 15 * * 6
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
@@ -80,15 +79,35 @@ tests:
       ENABLE_AUTOSCALING: "false"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.14"
+      PROFILE_TYPE: reporting
       READY_WAIT_TIMEOUT: 30m
       REPLICAS: "24"
     test:
     - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts
   timeout: 5h0m0s
-- as: perfscale-rosa-multiaz-node-density-heavy-24nodes-periodic
+- as: data-path-9nodes
+  cron: 0 13 * * 6
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      CONFIG: config/standard-classic-rosa.yml
+      ENABLE_AUTOSCALING: "false"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.14"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "9"
+    test:
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - chain: openshift-qe-data-path-tests
+    workflow: rosa-aws-sts
+  timeout: 6h0m0s
+- as: node-density-heavy-24nodes
   cron: 0 18 * * 6
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
@@ -97,15 +116,17 @@ tests:
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.14"
       PODS_PER_NODE: "100"
+      PROFILE_TYPE: reporting
       READY_WAIT_TIMEOUT: 30m
       REPLICAS: "24"
     test:
     - chain: openshift-qe-node-density-heavy
     workflow: rosa-aws-sts
   timeout: 5h0m0s
-- as: perfscale-rosa-multiaz-node-density-cni-24nodes-periodic
+- as: node-density-cni-24nodes
   cron: 0 15 * * 4
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
@@ -114,10 +135,33 @@ tests:
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.14"
       PODS_PER_NODE: "100"
+      PROFILE_TYPE: reporting
       READY_WAIT_TIMEOUT: 30m
       REPLICAS: "24"
     test:
     - chain: openshift-qe-node-density-cni
+    workflow: rosa-aws-sts
+  timeout: 5h0m0s
+- as: conc-builds-3nodes
+  cron: 0 0 8,22 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
+      MP_LABELS: concurrent-builds=enabled
+      MP_MACHINE_TYPE: m5.xlarge
+      MP_REPLICAS: "3"
+      MP_TAINTS: test=test:PreferNoSchedule
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.14"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "3"
+    test:
+    - ref: rosa-conf-machine-pool
+    - chain: openshift-qe-conc-builds
     workflow: rosa-aws-sts
   timeout: 5h0m0s
 zz_generated_metadata:

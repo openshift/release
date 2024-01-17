@@ -20,11 +20,27 @@ function set_proxy_env(){
 
 # Check if a build is signed
 function check_signed() {
-    local digest algorithm hash_value response
-    digest="$(echo "${TARGET}" | cut -f2 -d@)"
+    local digest algorithm hash_value response try max_retries
+    if [[ "${TARGET}" =~ "@sha256:" ]]; then
+        digest="$(echo "${TARGET}" | cut -f2 -d@)"
+        echo "The target image is using digest pullspec, its digest is ${digest}"
+    else
+        digest="$(oc image info "${TARGET}" -o json | jq -r ".digest")"
+        echo "The target image is using tagname pullspec, its digest is ${digest}"
+    fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+    set -x
+    try=0
+    max_retries=2
+    response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+    while (( try < max_retries && response != 200 )); do
+        echo "Trying #${try}"
+        response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+        (( try += 1 ))
+        sleep 60
+    done
+    set +x
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -33,19 +49,29 @@ function check_signed() {
 }
 
 function mirror_image(){
-    local mirror_release_image target_version cmd
-    mirror_release_image="${MIRROR_REGISTRY_HOST}/${TARGET#*/}"
-    MIRROR_RELEASE_IMAGE_REPO="${mirror_release_image%:*}"
-    MIRROR_RELEASE_IMAGE_REPO="${MIRROR_RELEASE_IMAGE_REPO%@sha256*}"
-    export MIRROR_RELEASE_IMAGE_REPO
+    local target_version cmd mirror_options
+    local apply_sig_together="$1"
 
     target_version=$(oc adm release info "${TARGET}" --output=json | jq .metadata.version)
    
     echo "Mirroring ${target_version} (${TARGET}) to ${MIRROR_RELEASE_IMAGE_REPO}"
 
-    cmd="oc adm release mirror -a ${PULL_SECRET} --insecure=true --from=${TARGET} --to=${MIRROR_RELEASE_IMAGE_REPO}"
+    mirror_options="--insecure=true"
+    # check whether the oc command supports the --keep-manifest-list and add it to the args array.
+    if oc adm release mirror -h | grep -q -- --keep-manifest-list; then
+        echo "Adding --keep-manifest-list to the mirror command."
+        mirror_options="${mirror_options} --keep-manifest-list=true"
+    else
+        echo "This oc version does not support --keep-manifest-list, skip it."
+    fi
+
+    cmd="oc adm release mirror -a ${PULL_SECRET} ${mirror_options} --from=${TARGET} --to=${MIRROR_RELEASE_IMAGE_REPO}"
     if [[ "${APPLY_SIG}" == "true" ]]; then
         cmd="${cmd} --release-image-signature-to-dir=${SAVE_SIG_TO_DIR}"
+        if [[ "${apply_sig_together=}" == "true" ]]; then
+            set_proxy_env
+            cmd="${cmd} --apply-release-image-signature --overwrite"
+        fi
     fi
     run_command "${cmd} | tee ${MIRROR_OUT_FILE}"
 }
@@ -90,6 +116,20 @@ function extract_oc(){
     which oc
     oc version --client
     return 0
+}
+
+# check if any of cases is enabled via ENABLE_OTA_TEST
+function check_ota_case_enabled() {
+    local case_id
+    local cases_array=("$@")
+    for case_id in "${cases_array[@]}"; do
+        # shellcheck disable=SC2076
+        if [[ " ${ENABLE_OTA_TEST} " =~ " ${case_id} " ]]; then
+            echo "${case_id} is enabled via ENABLE_OTA_TEST on this job."
+            return 0
+        fi
+    done
+    return 1
 }
 
 if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
@@ -142,7 +182,12 @@ do
         echo "You're mirroring an unsigned images, don't apply signature"
         APPLY_SIG="false"
         SAVE_SIG_TO_DIR=""
+        if check_ota_case_enabled "OCP-30832" "OCP-27986"; then
+            echo "The case need to run against a signed target image!"
+            exit 1
+        fi
     else
+        echo "You're mirroring a signed images, will apply signature"
         APPLY_SIG="true"
         SAVE_SIG_TO_DIR=$(mktemp -d)
     fi
@@ -151,9 +196,22 @@ do
 
     extract_oc
 
-    mirror_image
+    if check_ota_case_enabled "OCP-30832"; then
+        MIRROR_RELEASE_IMAGE_REPO="${MIRROR_REGISTRY_HOST}/ota_auto/ocp"
+        mirror_apply_sig_together="true"
+    else
+        mirror_release_image="${MIRROR_REGISTRY_HOST}/${TARGET#*/}"
+        MIRROR_RELEASE_IMAGE_REPO="${mirror_release_image%:*}"
+        MIRROR_RELEASE_IMAGE_REPO="${MIRROR_RELEASE_IMAGE_REPO%@sha256*}"
+        mirror_apply_sig_together="false"
+    fi
+    export MIRROR_RELEASE_IMAGE_REPO
+    mirror_image "${mirror_apply_sig_together}"
     set_proxy_env
-    apply_signature
+    # OCP-27986
+    if [[ "${mirror_apply_sig_together}" == "false" ]]; then
+        apply_signature
+    fi
     update_icsp
     rm -f "${MIRROR_OUT_FILE}" "${ICSP_FILE}"
 done

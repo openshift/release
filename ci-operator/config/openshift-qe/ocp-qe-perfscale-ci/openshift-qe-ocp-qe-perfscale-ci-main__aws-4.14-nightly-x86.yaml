@@ -7,8 +7,9 @@ images:
 - dockerfile_path: prow/Dockerfile
   to: ocp-qe-perfscale-ci-aws-414
 promotion:
-  namespace: ci
-  tag: latest
+  to:
+  - namespace: ci
+    tag: latest
 releases:
   latest:
     candidate:
@@ -21,81 +22,98 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: perfscale-aws-control-plane-120nodes-periodic
-  cron: 0 12 * * 2
+- as: control-plane-120nodes
+  cron: 0 12 7 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale
     env:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "120"
       COMPUTE_NODE_TYPE: m5.xlarge
+      PROFILE_TYPE: reporting
       SIZE_VARIANT: large
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-control-plane
-  timeout: 5h0m0s
-- as: perfscale-aws-control-plane-24nodes-periodic
-  cron: 0 9 * * 2
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+  timeout: 7h0m0s
+- as: control-plane-24nodes
+  cron: 0 0 7,21 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-control-plane
-- as: perfscale-aws-conc-builds-3nodes-periodic
-  cron: 0 0 8,22 * *
+      PROFILE_TYPE: reporting
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: conc-builds-3nodes
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "3"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-conc-builds
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-conc-builds
+    workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
 - always_run: false
-  as: perfscale-aws-router-perf-24nodes
+  as: router-perf-24nodes
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-router-perf
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-router-perf
+    workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
-- as: perfscale-aws-node-density-heavy-24nodes-periodic
-  cron: 0 18 * * 2
+- as: node-density-cni-24nodes
+  cron: 0 0 7,21 * *
   steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m6a.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.xlarge
+      PODS_PER_NODE: "200"
+      PROFILE_TYPE: reporting
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+- as: node-density-heavy-24nodes
+  cron: 0 6 7,21 * *
+  steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
       PODS_PER_NODE: "200"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-node-density-heavy
+      PROFILE_TYPE: reporting
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
-- as: perfscale-aws-data-path-9nodes-periodic
-  cron: 0 9 * * 1
+- as: data-path-9nodes
+  cron: 0 6 7,21 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-perfscale
     env:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
@@ -104,15 +122,90 @@ tests:
       LOKI_USE_SERVICEMONITOR: "false"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
       SET_ENV_BY_PLATFORM: custom
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
+      ZONES_COUNT: "3"
     test:
     - ref: openshift-qe-perfscale-aws-data-path-sg
     - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
+- as: cilium-data-path-9nodes
+  cron: 0 1 2 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CILIUM_VERSION: 1.14.4
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HUBBLE: "true"
+      LOKI_USE_SERVICEMONITOR: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
+      SET_ENV_BY_PLATFORM: custom
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-aws-cilium
+  timeout: 5h0m0s
+- as: cilium-node-density-cni-24nodes
+  cron: 0 1 2 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CILIUM_VERSION: 1.14.4
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m6a.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.xlarge
+      HUBBLE: "true"
+      KUBE_BURNER_VERSION: 1.8.0
+      PODS_PER_NODE: "200"
+      PROFILE_TYPE: reporting
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-aws-cilium
+  timeout: 5h0m0s
+- as: cilium-control-plane-24nodes
+  cron: 0 1 2 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CILIUM_VERSION: 1.14.4
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.xlarge
+      HUBBLE: "true"
+      KUBE_BURNER_VERSION: 1.8.0
+      PROFILE_TYPE: reporting
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws-cilium
+  timeout: 6h0m0s
+- as: cilium-control-plane-120nodes
+  cron: 0 1 2 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CILIUM_VERSION: 1.14.4
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.4xlarge
+      HUBBLE: "true"
+      KUBE_BURNER_VERSION: 1.8.0
+      PROFILE_TYPE: reporting
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws-cilium
+  timeout: 7h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-qe

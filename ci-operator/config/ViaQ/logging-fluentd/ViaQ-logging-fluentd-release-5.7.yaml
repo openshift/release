@@ -61,8 +61,9 @@ images:
   from: ubi8-ruby27
   to: logging-fluentd
 promotion:
-  name: "5.7"
-  namespace: logging
+  to:
+  - name: "5.7"
+    namespace: logging
 releases:
   latest:
     release:
@@ -138,7 +139,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+      commands: export GINKGO_OPTS="-ginkgo.skip vector -ginkgo.slowSpecThreshold=90";
+        FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
         make test-functional
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY

@@ -83,14 +83,11 @@ function getExtraVal(){
 # For baremetal clusters ofcir has returned details about the hardware in the cluster
 # prepare those details into a format the devscripts understands
 function prepare_bmcluster() {
+    # Get Extra data from CIR
     jq -r .extra < $CIRFILE > $EXTRAFILE
 
-    if ! jq .nodes < $EXTRAFILE > $NODESFILE ; then
-        # Backwards compat for nodes where extra data is just a list of nodes
-        # TODO: remove when all nodes have {"nodes":[{},{}...], "key":"value"}
-        cp $EXTRAFILE $NODESFILE
-        echo "{\"nodes\":$(cat $NODESFILE)}" > $EXTRAFILE
-    fi
+    # Get BM nodes list from extra data
+    jq .nodes < $EXTRAFILE > $NODESFILE
 
     # dev-scripts can be used to provision baremetal (in place of the VM's it usually creates)
     # build the details of the bm nodes into a $NODES_FILE for consumption by dev-scripts
@@ -289,7 +286,7 @@ EOF2
 # about the Packet provisioner, remove the file if it's present.
 test -f /usr/config && rm -f /usr/config || true
 
-yum install -y git sysstat sos make podman python3-virtualenv python39 jq net-tools
+yum install -y git sysstat sos make podman python3-virtualenv python39 jq net-tools gcc
 
 systemctl start sysstat
 
@@ -367,7 +364,7 @@ if [ -e /root/bm.json ] ; then
     manage_baremetal_instances
 fi
 
-echo 'export KUBECONFIG=$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root/.bashrc
+echo 'export KUBECONFIG=\$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root/.bashrc
 
 # squid needs to be restarted after network changes
 podman restart --time 1 external-squid || true
@@ -376,11 +373,11 @@ timeout -s 9 105m make ${DEVSCRIPTS_TARGET}
 
 # Add extra CI specific rules to the libvirt zone, this can't be done earlier because the zone only now exists
 # TODO: In reality the bridges should be in the public zone
+sudo firewall-cmd --add-port=8213/tcp --zone=libvirt
 if [ -e /root/bm.json ] ; then
     # Allow cluster nodes to use provising node as a ntp server (4.12 and above are more likely to use it vs. the dhcp set server)
     sudo firewall-cmd --add-service=ntp --zone libvirt
     sudo firewall-cmd --add-service=ntp --zone public
-    sudo firewall-cmd --add-port=8213/tcp --zone libvirt
 fi
 EOF
 
