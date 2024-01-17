@@ -10,9 +10,12 @@ unset NAMESPACE
 # Check org and project from job's spec
 REF_REPO=$(echo "${JOB_SPEC}" | jq -r '.refs.repo')
 REF_ORG=$(echo "${JOB_SPEC}" | jq -r '.refs.org')
-
+# Prow build id
+PROW_BUILD=$(echo ${JOB_SPEC} | jq -r '.buildid')
 # PR SHA
 PR_SHA=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].sha')
+# Build tag
+BUILD_TAG="${PR_SHA:0:20}-${PROW_BUILD}"
 
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name
@@ -42,7 +45,7 @@ if [[ -z $MASTER_NODE ]]; then
 fi
 
 IMAGE_TAG_BASE=${PULL_REGISTRY}/${PULL_ORGANIZATION}/${BASE_OP}
-OPERATOR_IMG=${IMAGE_TAG_BASE}:${PR_SHA}
+OPERATOR_IMG=${IMAGE_TAG_BASE}:${BUILD_TAG}
 
 # Run operator scan
 REPORT_FILE="/tmp/fips-check-operator-scan.log"
