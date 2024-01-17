@@ -5,6 +5,7 @@ set -o errexit
 set -o pipefail
 
 cd "$(mktemp -d)"
-git clone --branch main https://github.com/redhat-appstudio/qe-tools .
+git clone --branch send-webhook https://github.com/tnevrlka/qe-tools .
 make build
-./qe-tools prowjob create-report
+./qe-tools prowjob create-report --report-portal-format
+./qe-tools webhook report-portal
