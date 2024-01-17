@@ -32,7 +32,7 @@ export TELEMETRY_PASSWORD=$telemetry_password
 export AWS_DEFAULT_REGION=us-west-2
 
 chmod +x ./prow/power-outage/prow_run.sh
-./prow/power-outage/prow_run.sh
+./power-outage/prow_run.sh
 rc=$?
 echo "Finished running power outages"
 echo "Return code: $rc"

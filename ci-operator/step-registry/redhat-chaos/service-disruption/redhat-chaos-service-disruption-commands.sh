@@ -28,7 +28,7 @@ export TELEMETRY_PASSWORD=$telemetry_password
 oc get nodes --kubeconfig $KRKN_KUBE_CONFIG
 
 echo $ENABLE_ALERTS
-./prow/namespace-scenarios/prow_run.sh
+./namespace-scenarios/prow_run.sh
 rc=$?
 echo "Done running the test!" 
 echo "Return code: $rc"

@@ -53,7 +53,7 @@ export ENABLE_ALERTS=False
 
 
 
-./prow/pvc-scenario/prow_run.sh
+./pvc-scenario/prow_run.sh
 rc=$?
 echo "Finished running pvc scenario"
 echo "Return code: $rc"

@@ -30,7 +30,7 @@ export ENABLE_ALERTS=False
 
 
 
-./prow/time-scenarios/prow_run.sh
+./time-scenarios/prow_run.sh
 rc=$?
 echo "Finished running time scenario"
 echo "Return code: $rc"

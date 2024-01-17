@@ -32,7 +32,7 @@ export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 
-./prow/pvc-scenario/prow_run.sh
+./pvc-scenario/prow_run.sh
 rc=$?
 echo "Finished running pvc scenario"
 echo "Return code: $rc"

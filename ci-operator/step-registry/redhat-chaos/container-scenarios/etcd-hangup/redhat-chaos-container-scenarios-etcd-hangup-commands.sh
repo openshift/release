@@ -26,7 +26,7 @@ export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 
-./prow/container-scenarios/prow_run.sh
+./container-scenarios/prow_run.sh
 rc=$?
 echo "Finished running container scenarios"
 echo "Return code: $rc"

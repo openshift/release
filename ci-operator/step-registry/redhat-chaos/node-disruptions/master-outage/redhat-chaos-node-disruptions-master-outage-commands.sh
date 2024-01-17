@@ -34,8 +34,8 @@ export AWS_DEFAULT_REGION=us-west-2
 #export AWS_ACCESS_KEY_ID=$aws_access_key_id
 #export AWS_SECRET_ACCESS_KEY=$aws_secret_access_key
 
-chmod +x ./prow/node-disruptions/prow_run.sh
-./prow/node-disruptions/prow_run.sh
+chmod +x ./node-disruptions/prow_run.sh
+./node-disruptions/prow_run.sh
 rc=$?
 echo "Finished running node disruptions"
 echo "Return code: $rc"
