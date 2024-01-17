@@ -70,28 +70,32 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-preserve-bootstrap-ign
-- as: azure-ipi-disktype-premium-lrs-f14
-  cron: 9 15 5,21 * *
+- as: azure-ipi-disktype-premium-lrs-disksize-f14
+  cron: 3 16 13,29 * *
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_CONTROL_PLANE_DISK_SIZE: "512"
+      AZURE_DEFAULT_MACHINE_DISK_SIZE: "256"
       AZURE_DEFAULT_MACHINE_DISK_TYPE: Premium_LRS
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-azure-ipi-disktype
-- as: azure-ipi-disktype-standardssd-lrs-f14
-  cron: 16 10 11,27 * *
+    workflow: cucushift-installer-rehearse-azure-ipi-disktype-disksize
+- as: azure-ipi-disktype-standardssd-lrs-disksize-f14
+  cron: 36 21 1,17 * *
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_COMPUTE_DISK_SIZE: "256"
       AZURE_COMPUTE_DISK_TYPE: StandardSSD_LRS
       AZURE_CONTROL_PLANE_DISK_TYPE: StandardSSD_LRS
+      AZURE_DEFAULT_MACHINE_DISK_SIZE: "512"
       AZURE_DEFAULT_MACHINE_DISK_TYPE: Premium_LRS
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-azure-ipi-disktype
+    workflow: cucushift-installer-rehearse-azure-ipi-disktype-disksize
 - as: azure-ipi-disktype-worker-standard-lrs-f14
   cron: 18 0 11,25 * *
   steps:
@@ -102,6 +106,15 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-disktype
+- as: azure-ipi-fullyprivate-firewall-f14
+  cron: 0 14 4,20 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-firewall
 - as: azure-ipi-marketplace-image-gen1-vm-type-gen1-f14
   cron: 30 19 9,23 * *
   steps:
@@ -128,6 +141,30 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace-generation
+- as: azure-ipi-private-network-type-basic-f14
+  cron: 13 16 6,22 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_DS4
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_DS4
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-private
+- as: azure-ipi-private-network-type-m-accelarated-w-basic-f14
+  cron: 24 16 8,24 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_COMPUTE_NETWORKING_TYPE: Basic
+      AZURE_DEFAULT_MACHINE_NETWORKING_TYPE: Accelerated
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D8s_v3
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8s_v3
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-private-networking-type
 - as: azure-ipi-vmgenv2-f14
   cron: 30 2 4,18 * *
   steps:
@@ -150,6 +187,15 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
+- as: azure-upi-disconnected-f14
+  cron: 47 13 4,20 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-upi-disconnected
 - as: azure-upi-proxy-reboot-nodes-f14
   cron: 31 22 5,19 * *
   steps:

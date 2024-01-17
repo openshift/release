@@ -6,6 +6,12 @@ set -o pipefail
 python3 --version 
 export CLOUDSDK_PYTHON=python3
 
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+        # shellcheck disable=SC1090
+        source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 CLUSTER_ID="$(oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster)"
 export CLUSTER_ID
 

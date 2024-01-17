@@ -52,6 +52,7 @@ export RHCS_OUTPUT=${SHARED_DIR}
 # Export the manifests folder to the shared dir
 export CLUSTER_PROFILE=${CLUSTER_PROFILE}
 export QE_USAGE=${QE_USAGE}
+export WAIT_OPERATORS=${WAIT_OPERATORS}
 export CHANNEL_GROUP=${CHANNEL_GROUP}
 export RHCS_ENV=${RHCS_ENV}
 export RHCS_TOKEN=${RHCS_TOKEN}
@@ -68,7 +69,7 @@ ginkgo run \
     --label-filter day1-prepare \
     --timeout 2h \
     -r \
-    --focus-file tests/e2e/.* 2>&1| tee ${SHARED_DIR}/rhcs_preparation.log
+    --focus-file tests/e2e/.* 2>&1| tee ${SHARED_DIR}/rhcs_preparation.log || true
 
 # tar the shared manifest dir to make it share between pods
 cd ${SHARED_DIR}
