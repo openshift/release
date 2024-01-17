@@ -7,7 +7,7 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
-if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
+if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4, use HyperShift command"
   arch=$(arch)
   if [ "$arch" == "x86_64" ]; then
