@@ -12,7 +12,6 @@ REGION="${LEASED_RESOURCE}"
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 # get user arn
-# arn:aws:iam::301721915996:user/qe-jenkins
 user_arn=$(aws sts get-caller-identity --output json | jq -r .Arn)
 key_policy=${ARTIFACT_DIR}/key_policy.json
 

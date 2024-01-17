@@ -81,11 +81,11 @@ spec:
             - key: settings.xml
               path: custom.settings.xml
         - name: test-properties
-          configMap:
-            name: test-properties
+          secret:
+            secretName: test-properties
             items:
-            - key: test.properties
-              path: test.properties
+              - key: test.properties
+                path: test.properties
         - name: xpaas-qe-volume
           persistentVolumeClaim:
             claimName: persistent-xpaas-qe
@@ -123,6 +123,7 @@ spec:
               mountPath: /tmp/
             - name: test-properties
               mountPath: /mnt/
+              readOnly: true
             - name: xpaas-qe-volume
               mountPath: /tmp/xtf-oc-cache/
               subPath: xtf-oc-cache

@@ -27,9 +27,10 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: insights-operator
 promotion:
-  disabled: true
-  name: "4.16"
-  namespace: ocp
+  to:
+  - disabled: true
+    name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -53,6 +54,7 @@ tests:
     from: src
 - as: unit
   commands: |
+    export COVER_PROFILE=./unit_coverage.out
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make unit
   container:
@@ -62,6 +64,7 @@ tests:
     name: insights-operator-codecov-token
 - as: publish-coverage
   commands: |
+    export COVER_PROFILE=./unit_coverage.out
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make coverage
   container:

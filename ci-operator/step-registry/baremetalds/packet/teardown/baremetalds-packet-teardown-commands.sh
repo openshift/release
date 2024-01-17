@@ -49,7 +49,7 @@ cat > packet-teardown.yaml <<-EOF
     - name: Send notification message via Slack in case of failure
       slack:
         token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path) }}"
-        msg: "<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Packet failure>: *Teardown*\nHostname: *{{ packet_hostname }}*\nError msg: {{ ansible_failed_result.msg }}\n"
+        msg: "<https://prow.ci.openshift.org/view/gs/test-platform-results/logs/$JOB_NAME/$BUILD_ID|Packet failure>: *Teardown*\nHostname: *{{ packet_hostname }}*\nError msg: {{ ansible_failed_result.msg }}\n"
         username: "OpenShift CI Packet"
         color: warning
         icon_emoji: ":failed:"

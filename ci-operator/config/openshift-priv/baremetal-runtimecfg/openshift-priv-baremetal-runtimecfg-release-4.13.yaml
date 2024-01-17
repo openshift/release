@@ -23,8 +23,9 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: baremetal-runtimecfg
 promotion:
-  name: 4.13-priv
-  namespace: ocp-private
+  to:
+  - name: 4.13-priv
+    namespace: ocp-private
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -48,6 +49,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: security
+  optional: true
+  skip_if_only_changed: ^test/data/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+      SNYK_ENABLE_DEPS_SCAN: "true"
+    workflow: openshift-ci-security
 - as: gofmt
   commands: make fmt
   container:
@@ -65,7 +74,7 @@ tests:
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-ipv4
+    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   steps:

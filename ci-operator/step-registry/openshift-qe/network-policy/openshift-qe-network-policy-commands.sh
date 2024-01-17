@@ -15,7 +15,10 @@ ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
 
 
-git clone https://github.com/cloud-bulldozer/e2e-benchmarking --depth=1
+REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
+LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
+git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner
 
 export JOB_TIMEOUT=${JOB_TIMEOUT:=21600}

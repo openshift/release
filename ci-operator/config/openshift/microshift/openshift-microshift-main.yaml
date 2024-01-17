@@ -19,12 +19,14 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/microshift
+  optional: true
   to: microshift-test-rpm
 promotion:
-  excluded_images:
-  - microshift-test-rpm
-  name: "4.16"
-  namespace: ocp
+  to:
+  - excluded_images:
+    - microshift-test-rpm
+    name: "4.16"
+    namespace: ocp
 releases:
   nightly-amd64:
     candidate:
@@ -201,6 +203,15 @@ tests:
     env:
       EC2_INSTANCE_TYPE: t4g.2xlarge
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
+- as: clusterbot
+  cluster: build02
+  cron: 0 1 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_ARCH: arm64
+      MICROSHIFT_OS: rhel-9.3
+    workflow: openshift-microshift-clusterbot
 zz_generated_metadata:
   branch: main
   org: openshift

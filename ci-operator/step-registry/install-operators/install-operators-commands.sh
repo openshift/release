@@ -4,6 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Set the cluster proxy configuration, if its present.
+if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
+    echo "setting the proxy"
+    echo "source ${SHARED_DIR}/proxy-conf.sh"
+    source "${SHARED_DIR}/proxy-conf.sh"
+else
+    echo "no proxy setting."
+fi
+
 # Read each operator in the JSON provided to an item in a BASH array.
 readarray -t OPERATOR_ARRAY < <(jq --compact-output '.[]' <<< "$OPERATORS")
 
@@ -58,6 +67,8 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     apiVersion: v1
     kind: Namespace
     metadata:
+        labels:
+          openshift.io/cluster-monitoring: "true"
         name: "${operator_install_namespace}"
 EOF
 
