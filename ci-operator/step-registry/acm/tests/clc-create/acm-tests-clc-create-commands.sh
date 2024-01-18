@@ -28,10 +28,10 @@ export CYPRESS_HUB_API_URL
 CYPRESS_OPTIONS_HUB_PASSWORD=$(cat $SHARED_DIR/kubeadmin-password)
 export CYPRESS_OPTIONS_HUB_PASSWORD
 # Version of spoke cluster to be provisioned.
-CYPRESS_CLC_OCP_IMAGE_VERSION=${SECRETS_DIR}/clc/ocp_image_version
+CYPRESS_CLC_OCP_IMAGE_VERSION=$(cat $SECRETS_DIR/clc/ocp_image_version)
 export CYPRESS_CLC_OCP_IMAGE_VERSION
 
-CLOUD_PROVIDERS=${SECRETS_DIR}/clc/ocp_cloud_providers
+CLOUD_PROVIDERS=$(cat $SECRETS_DIR/clc/ocp_cloud_providers)
 export CLOUD_PROVIDERS
 
 # run the test execution script
