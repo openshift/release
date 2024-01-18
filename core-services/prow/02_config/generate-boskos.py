@@ -272,6 +272,9 @@ CONFIG = {
     'powervs-4-quota-slice': {
         'wdc06': 1,
     },
+    'powervs-multi-1-quota-slice': {
+        'wdc06': 2,
+    },
     'ibmcloud-cspi-qe-quota-slice': {
         'us-east': 10,
     },
