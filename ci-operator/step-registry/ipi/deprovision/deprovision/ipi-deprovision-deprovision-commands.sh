@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "Deprovisioning cluster ..."
+if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then
+  echo "Skipping: ${SHARED_DIR}/metadata.json not found."
+  exit
+fi
+
 function save_logs() {
     echo "Copying the Installer logs and metadata to the artifacts directory..."
     cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}"
@@ -47,12 +53,6 @@ fi
 if [[ "${CLUSTER_TYPE}" == "vsphere"* ]]; then
     # all vcenter certificates are in the file below
     export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
-fi
-
-echo "Deprovisioning cluster ..."
-if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then
-  echo "Skipping: ${SHARED_DIR}/metadata.json not found."
-  exit
 fi
 
 echo ${SHARED_DIR}/metadata.json
