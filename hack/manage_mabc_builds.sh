@@ -25,6 +25,6 @@ for mabc in "${!mabcs[@]}"; do
   oc -n ci apply --wait=true -f "$mabc_path"
   echo "mabc/$mabc_name created"
 
-  oc -n ci wait --for=jsonpath='{.status.state}'=success --timeout=5m "mabc/$mabc_name"
+  oc -n ci wait --for=jsonpath='{.status.state}'=success --timeout=15m "mabc/$mabc_name"
   echo "waiting for mabc/$mabc_name to complete"
 done
