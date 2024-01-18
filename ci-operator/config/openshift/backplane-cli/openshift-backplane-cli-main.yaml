@@ -54,20 +54,15 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: backplane-cli-codecov-token
-- as: trigger-release
+- as: combined-release
   commands: |
     bash ci-release.sh
-  container:
-    from: src
-  postsubmit: true
-  run_if_changed: ^VERSION.md$
-- as: release
-  commands: |
     export GITHUB_TOKEN=$(cat /tmp/secret/GITHUB_TOKEN)
     make release
   container:
     from: src
   postsubmit: true
+  run_if_changed: ^VERSION.md$
   secret:
     mount_path: /tmp/secret
     name: backplane-cli-release-token
