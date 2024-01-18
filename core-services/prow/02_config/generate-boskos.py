@@ -354,6 +354,11 @@ CONFIG = {
     'osl-gcp-quota-slice': {
         'us-central1': 10,
     },
+    'devsandboxci-aws-quota-slice': {
+        # Wild guesses.
+        'us-east-1': 20,
+        'us-east-2': 20,
+    },
 }
 
 for i in range(0,4):
