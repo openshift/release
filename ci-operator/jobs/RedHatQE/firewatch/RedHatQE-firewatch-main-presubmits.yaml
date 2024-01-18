@@ -1,26 +1,26 @@
-postsubmits:
-  CSPI-QE/firewatch:
+presubmits:
+  RedHatQE/firewatch:
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
-    cluster: build05
+    - ^main-
+    cluster: build03
+    context: ci/prow/image-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/variant: image
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-CSPI-QE-firewatch-main-image-images
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-RedHatQE-firewatch-main-image-images
+    rerun_command: /test image-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --variant=image
@@ -42,9 +42,6 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -56,9 +53,7 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )image-images,?($|\s.*)
