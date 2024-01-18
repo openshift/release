@@ -745,6 +745,12 @@ function test_machine_health_check_config () {
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 
+  echo "Running: MC srep-worker-healthcheck MHC check (OCPQE-17157) test"
+
+  echo "Checking status of MC cluster"
+
+  oc status
+
   echo "Checking MC MHC match expressions operator"
   EXPECTED_MHC_MATCH_EXPRESSIONS_OPERATOR="NotIn"
   ACTUAL_MHC_MATCH_EXPRESSIONS_OPERATOR=""
@@ -1047,6 +1053,18 @@ function test_fetching_cluster_details_from_api () {
 function test_machineset_tains_and_labels () {
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+
+  echo "Create machine pools for request serving HCP components tests (OCPQE-17866) test"
+
+  echo "Checking status of MC cluster"
+
+  oc status
+
+  echo "Getting all machinesets output"
+
+  oc get machinesets -A
+
+  echo "Done getting all machinesets output"
 
   echo "Getting a name of serving machineset"
   SERVING_MACHINE_SET_NAME=""
