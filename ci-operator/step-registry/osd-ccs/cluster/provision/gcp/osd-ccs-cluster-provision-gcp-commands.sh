@@ -7,33 +7,16 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 suffix=$(head /dev/urandom | tr -dc a-z0-9 | head -c 4)
-CLUSTER_NAME=${CLUSTER_NAME:-"ci-osd-aws-$suffix"}
-COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
-OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
-CHANNEL_GROUP=${CHANNEL_GROUP}
+CLUSTER_NAME=${CLUSTER_NAME:-"ci-osd-gcp-$suffix"}
+COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"custom-4-16384"}
 MULTI_AZ=${MULTI_AZ:-false}
+OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
+CHANNEL_GROUP=${CHANNEL_GROUP:-"stable"}
 ETCD_ENCRYPTION=${ETCD_ENCRYPTION:-false}
 DISABLE_WORKLOAD_MONITORING=${DISABLE_WORKLOAD_MONITORING:-false}
-FIPS=${FIPS:-false}
+SUBSCRIPTION_TYPE=${SUBSCRIPTION_TYPE:-"standard"}
 REGION=${REGION:-"${LEASED_RESOURCE}"}
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
-
-default_compute_nodes=2
-if [[ "$MULTI_AZ" == "true" ]]; then
-  default_compute_nodes=3
-fi
-COMPUTE_NODES=${COMPUTE_NODES:-$default_compute_nodes}
-
-# Obtain aws credentials
-AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
-if [[ -f "${AWSCRED}" ]]; then
-  AWS_ACCOUNT_ID=$(cat "${AWSCRED}" | grep aws_account_id | tr -d ' ' | cut -d '=' -f 2)
-  AWS_ACCESS_KEY_ID=$(cat "${AWSCRED}" | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f 2)
-  AWS_SECRET_ACCESS_KEY=$(cat "${AWSCRED}" | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f 2)
-else
-  echo "Did not find compatible cloud provider cluster_profile"
-  exit 1
-fi
 
 # Log in
 OCM_VERSION=$(ocm version)
@@ -49,7 +32,9 @@ if [[ "$OLD_CLUSTER_ID" != ID* ]]; then
   exit 1
 fi
 
-# Get the openshift version
+# Required
+GCP_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json"
+
 versionList=$(ocm list versions --channel-group ${CHANNEL_GROUP})
 echo -e "Available cluster versions:\n${versionList}"
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
@@ -60,18 +45,40 @@ else
   # Match the whole line
   OPENSHIFT_VERSION=$(echo "$versionList" | { grep -x "${OPENSHIFT_VERSION}" || true; })
 fi
-
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
   echo "Requested cluster version not available!"
   exit 1
 fi
-# OPENSHIFT_VERSION="openshift-v${OPENSHIFT_VERSION}"
-echo "Select openshift version ${OPENSHIFT_VERSION}"
+
+default_compute_nodes=2
+if [[ "$MULTI_AZ" == "true" ]]; then
+  default_compute_nodes=3
+fi
+COMPUTE_NODES=${COMPUTE_NODES:-$default_compute_nodes}
+
+
+
+# Switches
+MARKETPLACE_GCP_TERMS_SWITCH=""
+if [[ ! -z "$SUBSCRIPTION_TYPE" ]]; then
+  MARKETPLACE_GCP_TERMS_SWITCH="--marketplace-gcp-terms"
+fi
+
+DISABLE_WORKLOAD_MONITORING_SWITCH=""
+if [[ "$DISABLE_WORKLOAD_MONITORING" == "true" ]]; then
+  DISABLE_WORKLOAD_MONITORING_SWITCH="--disable-workload-monitoring"
+fi
+
+ETCD_ENCRYPTION_SWITCH=""
+if [[ "$ETCD_ENCRYPTION" == "true" ]]; then
+  ETCD_ENCRYPTION_SWITCH="--etcd-encryption"
+fi
+
 
 # Cluster parameters
 echo "Parameters for cluster request:"
 echo "  Cluster name: ${CLUSTER_NAME}"
-echo "  Cloud provider region: aws"
+echo "  Cloud provider: gcp"
 echo "  Cloud provider region: ${REGION}"
 echo "  Compute machine type: ${COMPUTE_MACHINE_TYPE}"
 echo "  Compute nodes: ${COMPUTE_NODES}"
@@ -80,58 +87,41 @@ echo "  Openshift version: ${OPENSHIFT_VERSION}"
 echo "  Channel group: ${CHANNEL_GROUP}"
 echo "  Etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
-echo "  Fips: ${FIPS}"
+echo "  Subscription type: ${SUBSCRIPTION_TYPE}"
 
-# Cluster payload
-# Using the default aws credentials but not the user osdCcsAdmin's credentials to provision cluster
-CLUSTER_PAYLOAD=$(echo -e '{
-  "name": "'${CLUSTER_NAME}'",
-  "region": {
-    "id": "'${REGION}'"
-  },
-  "nodes": {
-    "compute_machine_type": {
-      "id": "'${COMPUTE_MACHINE_TYPE}'"
-    },
-    "compute": '${COMPUTE_NODES}'
-  },
-  "managed": true,
-  "product": {
-    "id": "osd"
-  },
-  "cloud_provider": {
-    "id": "aws"
-  },
-  "multi_az": '${MULTI_AZ}',
-  "etcd_encryption": '${ETCD_ENCRYPTION}',
-  "disable_user_workload_monitoring": '${DISABLE_WORKLOAD_MONITORING}',
-  "version": {
-    "id": "openshift-v'${OPENSHIFT_VERSION}'",
-    "channel_group": "'${CHANNEL_GROUP}'"
-  },
-  "properties": {
-    "use_local_credentials": "true"
-  },
-  "ccs": {
-    "enabled": true,
-    "disable_scp_checks": false
-  },
-  "aws": {
-    "access_key_id": "'${AWS_ACCESS_KEY_ID}'",
-    "account_id": "'${AWS_ACCOUNT_ID}'",
-    "secret_access_key": "'${AWS_SECRET_ACCESS_KEY}'"
-  }
-}')
+echo -e "
+ocm create cluster ${CLUSTER_NAME} \
+--ccs \
+--provider=gcp \
+--region ${REGION} \
+--service-account-file ${GCP_CREDENTIALS_FILE} \
+--version ${OPENSHIFT_VERSION} \
+--channel-group ${CHANNEL_GROUP} \
+--compute-machine-type ${COMPUTE_MACHINE_TYPE} \
+--subscription-type ${SUBSCRIPTION_TYPE} \
+${MARKETPLACE_GCP_TERMS_SWITCH} \
+${DISABLE_WORKLOAD_MONITORING_SWITCH} \
+${ETCD_ENCRYPTION_SWITCH}
+"
 
-if [[ "$FIPS" == "true" ]]; then
-  CLUSTER_PAYLOAD=$(echo "${CLUSTER_PAYLOAD}" | jq '. +={"fips":true}')
-fi
-
-echo "${CLUSTER_PAYLOAD}" | jq -c | ocm post /api/clusters_mgmt/v1/clusters > "${ARTIFACT_DIR}/cluster.txt"
+# Create GCP cluster
+ocm create cluster ${CLUSTER_NAME} \
+                    --ccs \
+                    --provider=gcp \
+                    --region "${REGION}" \
+                    --service-account-file "${GCP_CREDENTIALS_FILE}" \
+                    --version "${OPENSHIFT_VERSION}" \
+                    --channel-group "${CHANNEL_GROUP}" \
+                    --compute-machine-type "${COMPUTE_MACHINE_TYPE}" \
+                    --subscription-type "${SUBSCRIPTION_TYPE}" \
+                    ${MARKETPLACE_GCP_TERMS_SWITCH} \
+                    ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
+                    ${ETCD_ENCRYPTION_SWITCH} \
+                    > "${ARTIFACT_DIR}/cluster.txt"
 
 # Store the cluster ID for the post steps and the cluster deprovision
 mkdir -p "${SHARED_DIR}"
-CLUSTER_ID=$(cat "${ARTIFACT_DIR}/cluster.txt" | jq '.id' | tr -d '"')
+CLUSTER_ID=$(cat "${ARTIFACT_DIR}/cluster.txt" | grep '^ID:' | tr -d '[:space:]' | cut -d ':' -f 2)
 echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
 echo -n "${CLUSTER_ID}" > "${SHARED_DIR}/cluster-id"
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
@@ -157,7 +147,6 @@ while true; do
   fi
 done
 ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/logs/install" > "${ARTIFACT_DIR}/.cluster_install.log"
-ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}"
 
 # Print console.url
 CONSOLE_URL=$(ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID} | jq -r '.console.url')
