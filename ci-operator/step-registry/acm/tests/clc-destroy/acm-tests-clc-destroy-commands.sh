@@ -31,7 +31,7 @@ export CYPRESS_HUB_API_URL
 CYPRESS_OPTIONS_HUB_PASSWORD=$(cat $SHARED_DIR/kubeadmin-password)
 export CYPRESS_OPTIONS_HUB_PASSWORD
 
-CLOUD_PROVIDERS=$(cat $SECRETS_DIR}/clc/ocp_cloud_providers)
+CLOUD_PROVIDERS=$(cat $SECRETS_DIR/clc/ocp_cloud_providers)
 export CLOUD_PROVIDERS
 
 # run the test execution script
