@@ -39,7 +39,7 @@ oc patch Network.operator.openshift.io cluster --type='merge' --patch "{\"spec\"
 mco_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-300s}
 oc wait mcp --all --for='condition=UPDATING=True' --timeout="$mco_timeout"
 
-# Wait until MCO finishes its work or it reachs the 20mins timeout
+# Wait until MCO finishes its work or it reaches the 45min timeout
 mcp_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-2700s}
 timeout "$mcp_timeout" bash <<EOT
 until
@@ -53,7 +53,7 @@ done
 EOT
 
 
-# Trigger ovn-kubenetes deployment
+# Trigger ovn-kubernetes deployment
 oc patch Network.config.openshift.io cluster --type='merge' --patch "{\"spec\":{\"networkType\":\"${TARGET}\"}}"
 ovn_co_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-60s}
 oc wait co network --for='condition=PROGRESSING=True' --timeout="$ovn_co_timeout"
@@ -103,10 +103,9 @@ EOT
 # Check all cluster operators back to normal. requires the main check on clusteroperator
 # status to succeed 3 times in a row with 30s pause in between checks
 all_co_timeout=${OVN_SDN_MIGRATION_TIMEOUT:-2700s}
-# shellcheck disable=SC2034
-success_count=0
 
 timeout "$all_co_timeout" bash <<EOT
+success_count=0
 until [ \$success_count -eq 3 ]; do
   if oc wait co --all --for='condition=Available=True' --timeout=10s &&
      oc wait co --all --for='condition=Progressing=False' --timeout=10s &&
