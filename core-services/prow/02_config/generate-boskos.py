@@ -362,6 +362,10 @@ CONFIG = {
         'us-east-1': 20,
         'us-east-2': 20,
     },
+    'quay-aws-quota-slice': {
+        'us-east-1': 10,
+        'us-west-1': 10,
+    },
 }
 
 for i in range(0,4):
