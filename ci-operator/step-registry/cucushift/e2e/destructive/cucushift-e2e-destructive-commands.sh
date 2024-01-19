@@ -74,10 +74,10 @@ function filter_test_by_platform() {
             alibabacloud)
                 export E2E_RUN_TAGS="@alicloud-${ipixupi} and ${E2E_RUN_TAGS}"
                 ;;
-            aws|azure|gcp|ibmcloud|nutanix)
+            aws|azure|baremetal|gcp|ibmcloud|nutanix)
                 export E2E_RUN_TAGS="@${platform}-${ipixupi} and ${E2E_RUN_TAGS}"
                 ;;
-            baremetal|vsphere)
+            vsphere)
                 echo "TO_BE_DONE, need extra tests, got platform as '$platform'"
                 ;;
             *)
