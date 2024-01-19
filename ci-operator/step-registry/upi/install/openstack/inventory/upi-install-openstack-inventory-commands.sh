@@ -42,6 +42,8 @@ if [[ "$OS_NETWORKING_TYPE" == 'null' ]]; then
 	errexit=1
 fi
 
+# Enable IPv6 part of the config by uncommenting os_subnet6
+sed -re 's/^(\s*)#(os_subnet6:.*)/\1\2/' '/var/lib/openshift-install/upi/inventory.yaml' | \
 yq --yaml-output "$(cat <<-EOF
 	.
 	| .all.hosts.localhost.os_subnet_range="${OS_SUBNET_RANGE}"
@@ -56,9 +58,10 @@ yq --yaml-output "$(cat <<-EOF
 	| .all.hosts.localhost.os_external_network="$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")"
 	| .all.hosts.localhost.os_api_fip="$(<"${SHARED_DIR}/API_IP")"
 	| .all.hosts.localhost.os_ingress_fip="$(<"${SHARED_DIR}/INGRESS_IP")"
+    | .all.hosts.localhost.os_subnet6_range="2001:db8:2222:5555::/64"
 	| del(.all.hosts.localhost.os_bootstrap_fip)
 	EOF
-	)" '/var/lib/openshift-install/upi/inventory.yaml' > "${SHARED_DIR}/inventory.yaml"
+	)" > "${SHARED_DIR}/inventory.yaml"
 
 cp "${SHARED_DIR}/inventory.yaml" "${ARTIFACT_DIR}/"
 

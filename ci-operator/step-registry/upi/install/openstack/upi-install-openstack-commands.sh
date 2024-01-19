@@ -26,7 +26,7 @@ function populate_artifact_dir() {
 		' ".openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
 
 	cp inventory.yaml "${ARTIFACT_DIR}/inventory.yaml"
-	
+
 	# Make install-config.yaml available for debugging purposes
 	openshift-install create install-config
 	python - 'install-config.yaml' <<-EOF > "${ARTIFACT_DIR}/install-config.yaml"
