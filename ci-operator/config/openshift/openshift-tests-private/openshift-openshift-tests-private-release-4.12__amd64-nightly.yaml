@@ -68,7 +68,6 @@ tests:
   steps:
     cluster_profile: alibabacloud-qe
     env:
-      E2E_RUN_TAGS: '@alicloud-ipi'
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe
@@ -78,7 +77,6 @@ tests:
   steps:
     cluster_profile: alibabacloud-qe
     env:
-      E2E_RUN_TAGS: '@alicloud-ipi'
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -88,7 +86,7 @@ tests:
   steps:
     cluster_profile: alibabacloud-qe
     env:
-      E2E_RUN_TAGS: '@alicloud-ipi and @console'
+      E2E_RUN_TAGS: '@console'
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe-ui
@@ -457,6 +455,33 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: osd-ccs-aws
+- as: gcp-ocm-osd-ccs-f28
+  cron: 59 9 22 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@osd_ccs'
+      OPENSHIFT_VERSION: "4.12"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
+      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: osd-ccs-gcp
+- as: gcp-ocm-osd-ccs-marketplace-f28
+  cron: 15 22 5 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@osd_ccs'
+      OPENSHIFT_VERSION: "4.12"
+      SUBSCRIPTION_TYPE: marketplace-gcp
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
+      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: osd-ccs-gcp
 - as: aws-rosa-sts-f28
   cron: 36 16 10 * *
   steps:
@@ -883,7 +908,6 @@ tests:
         FIPS_MODE=true
         IP_STACK=v4
         NETWORK_TYPE=OVNKubernetes
-      E2E_RUN_TAGS: '@baremetal-ipi'
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
@@ -896,7 +920,6 @@ tests:
         FIPS_MODE=true
         IP_STACK=v4
         NETWORK_TYPE=OVNKubernetes
-      E2E_RUN_TAGS: '@baremetal-ipi'
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -912,7 +935,6 @@ tests:
         MIRROR_IMAGES=true
         INSTALLER_PROXY=true
         NETWORK_TYPE=OVNKubernetes
-      E2E_RUN_TAGS: '@baremetal-ipi'
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
@@ -927,7 +949,6 @@ tests:
         MIRROR_IMAGES=true
         INSTALLER_PROXY=true
         NETWORK_TYPE=OVNKubernetes
-      E2E_RUN_TAGS: '@baremetal-ipi'
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -941,7 +962,6 @@ tests:
         FIPS_MODE=true
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
-      E2E_RUN_TAGS: '@baremetal-ipi'
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
@@ -954,7 +974,6 @@ tests:
         FIPS_MODE=true
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
-      E2E_RUN_TAGS: '@baremetal-ipi'
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -1333,8 +1352,6 @@ tests:
   cron: 33 6 24 * *
   steps:
     cluster_profile: ibmcloud-qe
-    env:
-      E2E_RUN_TAGS: '@ibmcloud-ipi'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-dynamic
@@ -1344,7 +1361,6 @@ tests:
     cluster_profile: ibmcloud-qe
     env:
       DEDICATEDHOST_ZONE: "2"
-      E2E_RUN_TAGS: '@ibmcloud-ipi'
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-static
@@ -1352,8 +1368,6 @@ tests:
   cron: 31 10 21 * *
   steps:
     cluster_profile: ibmcloud-qe
-    env:
-      E2E_RUN_TAGS: '@ibmcloud-ipi'
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-minimal-permission
@@ -1361,8 +1375,6 @@ tests:
   cron: 42 22 24 * *
   steps:
     cluster_profile: ibmcloud-qe
-    env:
-      E2E_RUN_TAGS: '@ibmcloud-ipi'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-minimal-permission
@@ -1371,7 +1383,6 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe
     env:
-      E2E_RUN_TAGS: '@ibmcloud-ipi'
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe
@@ -1381,7 +1392,6 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe
     env:
-      E2E_RUN_TAGS: '@ibmcloud-ipi'
       RT_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe
@@ -1391,7 +1401,6 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe
     env:
-      E2E_RUN_TAGS: '@ibmcloud-ipi'
       RT_ENABLED: "true"
       TEST_ADDITIONAL: Network_Observability
     test:
