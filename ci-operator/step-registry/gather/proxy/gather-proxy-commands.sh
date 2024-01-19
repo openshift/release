@@ -22,4 +22,5 @@ if [ -f "${SHARED_DIR}/proxyip" ]; then
   eval "$(ssh-agent)"
   ssh-add "${CLUSTER_PROFILE_DIR}/ssh-privatekey"
   ssh -A -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null "${ssh_user}@${proxy_ip}" 'journalctl -u squid' > "${ARTIFACT_DIR}/squid.service"
+  ssh -A -o PreferredAuthentications=publickey -o StrictHostKeyChecking=false -o UserKnownHostsFile=/dev/null "${ssh_user}@${proxy_ip}" 'test -f /srv/squid/log/access.log && sudo cat /srv/squid/log/access.log || echo "/srv/squid/log/access.log not found"' > "${ARTIFACT_DIR}/squid_access.log"
 fi
