@@ -259,9 +259,6 @@ if ! wait "$!"; then
   exit 1
 fi
 
-echo -e "\n try get ready nodes count....."
-get_ready_nodes_count
-
 # Exit normally if there is no day2 jobs
 if [ "${ADDITIONAL_WORKERS}" == "0" ]; then
     echo "No additional workers requested"
@@ -274,4 +271,3 @@ echo -e "\nCopying ignition files into bastion host..."
 chmod 644 "${SHARED_DIR}"/*.ign
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/*.ign "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/"
 
-sleep 300
