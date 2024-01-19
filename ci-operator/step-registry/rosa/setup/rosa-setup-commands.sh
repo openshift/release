@@ -82,3 +82,6 @@ rosatest --ginkgo.v --ginkgo.no-color \
 # CLUSER_ID=$(cat "${SHARED_DIR}/cluster-id")
 # CLUSER_NAME=$(rosa describe cluster -c ${CLUSER_ID} -o json | jq -r '.name')
 # echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
+
+echo "Sleep 5h"
+sleep 18000

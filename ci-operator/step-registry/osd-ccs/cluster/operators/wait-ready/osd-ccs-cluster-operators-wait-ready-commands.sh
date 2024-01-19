@@ -17,3 +17,7 @@ fi
 echo "Wait for cluster operators' progressing ready..."
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=30m
 echo "All cluster operators are done progressing."
+
+# Sleep 5h for debugging
+echo "Pause deleting. Sleep ~5h for personal usage"
+sleep 18000
