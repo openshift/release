@@ -133,8 +133,8 @@ tests:
     - ref: ipi-install-rbac
     - ref: osd-create-create
     test:
-    - as: serverless-e2e
-      commands: make test-e2e-with-kafka test-upstream-e2e-no-upgrade
+    - as: operator-e2e
+      commands: make test-e2e-with-kafka
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -157,6 +157,31 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - as: knative-serving-eventing-e2e
+      commands: make test-upstream-e2e-no-upgrade
+      dependencies:
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-knative
