@@ -51,6 +51,9 @@ if [ -f /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/.prow_ci.env ]; then
   source /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/.prow_ci.env
 fi
 
+PULL_REGISTRY=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
+PULL_ORGANIZATION=openstack
+
 if [[ "$SERVICE_NAME" == "INSTALL_YAMLS" ]]; then
   # when testing install_yamls patch, we can skip build process and
   #  validate using latest openstack-operator tag

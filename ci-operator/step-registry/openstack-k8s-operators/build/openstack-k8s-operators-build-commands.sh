@@ -5,6 +5,7 @@ set -ex
 DEFAULT_ORG="openstack-k8s-operators"
 META_OPERATOR="openstack-operator"
 BASE_DIR=${HOME:-"/alabama"}
+HOME=${HOME:-"/alabama"}
 
 # We don't want to use OpenShift-CI build cluster namespace
 unset NAMESPACE
@@ -134,10 +135,13 @@ function build_push_operator_images {
     source .prow_ci.env
   fi
 
+  # operator-sdk can't skip tls veirfy
+  export USE_IMAGE_DIGESTS=false
+
   GOWORK='' make build
 
   # Build and push operator image
-  oc new-build --binary --strategy=docker --name ${OPERATOR} --to=${IMAGE_TAG_BASE}:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
+  oc new-build --binary --strategy=docker --name ${OPERATOR} --to=${IMAGE_TAG_BASE}:${IMAGE_TAG} --to-docker=true
   oc set build-secret --pull bc/${OPERATOR} ${DOCKER_REGISTRY_SECRET}
   oc start-build ${OPERATOR} --from-dir . -F
   check_build_result ${OPERATOR}
@@ -145,7 +149,7 @@ function build_push_operator_images {
   GOWORK='' make bundle
 
   # Build and push bundle image
-  oc new-build --binary --strategy=docker --name ${OPERATOR}-bundle --to=${IMAGE_TAG_BASE}-bundle:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
+  oc new-build --binary --strategy=docker --name ${OPERATOR}-bundle --to=${IMAGE_TAG_BASE}-bundle:${IMAGE_TAG} --to-docker=true
 
   # this sets defaults but allows BUNDLE_DOCKERFILE to be overridden via .prow_ci.env
   if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
@@ -168,12 +172,12 @@ function build_push_operator_images {
   if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
     local OPENSTACK_BUNDLES
     OPENSTACK_BUNDLES=$(/bin/bash hack/pin-bundle-images.sh)
-    opm index add --bundles "${BASE_BUNDLE}${OPENSTACK_BUNDLES}" --out-dockerfile "${INDEX_DOCKERFILE}" --generate
+    opm index add --bundles "${BASE_BUNDLE}${OPENSTACK_BUNDLES}" --out-dockerfile "${INDEX_DOCKERFILE}" --skip-tls --generate --permissive
   else
-    opm index add --bundles "${BASE_BUNDLE}" --out-dockerfile "${INDEX_DOCKERFILE}" --generate
+    opm index add --bundles "${BASE_BUNDLE}" --out-dockerfile "${INDEX_DOCKERFILE}" --skip-tls --generate --permissive
   fi
 
-  oc new-build --binary --strategy=docker --name ${OPERATOR}-index --to=${IMAGE_TAG_BASE}-index:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
+  oc new-build --binary --strategy=docker --name ${OPERATOR}-index --to=${IMAGE_TAG_BASE}-index:${IMAGE_TAG} --to-docker=true
   oc patch bc ${OPERATOR}-index -p "${DOCKERFILE_PATH_PATCH[@]}"
   oc start-build ${OPERATOR}-index --from-dir . -F
   check_build_result ${OPERATOR}-index
@@ -198,8 +202,34 @@ mkdir -p ${BASE_DIR}/containers
 ln -ns /secrets/internal/config.json ${BASE_DIR}/containers/auth.json
 
 # Secret for pushing containers - openstack namespace
-PUSH_REGISTRY_SECRET=push-quay-secret
-oc create secret generic ${PUSH_REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/rdoquay/config.json --type=kubernetes.io/dockerconfigjson
+# PUSH_REGISTRY_SECRET=push-quay-secret
+# oc create secret generic ${PUSH_REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/rdoquay/config.json --type=kubernetes.io/dockerconfigjson
+
+# OCP internal registry
+oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge
+sleep 5
+PUSH_REGISTRY=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
+PUSH_ORGANIZATION=openstack
+
+AUTH_POD=$(oc get po -n openshift-authentication --no-headers | awk '{print $1}' | awk 'NR==1{print}')
+oc rsh -n openshift-authentication "${AUTH_POD}" cat /run/secrets/kubernetes.io/serviceaccount/ca.crt > "${BASE_DIR}"/ingress-ca.crt
+
+cp "${KUBEADMIN_PASSWORD_FILE}" "${BASE_DIR}/password"
+cp "${KUBECONFIG}" "${BASE_DIR}"/kubeconfig
+
+OCP_API_SERVER=$(cat "${BASE_DIR}/kubeconfig" | grep server | awk '{print $2}' | awk 'NR==1{print}')
+oc login -u kubeadmin -p `cat ${BASE_DIR}/password` --server="${OCP_API_SERVER}" --certificate-authority="${BASE_DIR}"/ingress-ca.crt
+oc project openstack
+# save credential to auth.json
+oc registry login
+
+mkdir -p $HOME/.config/containers
+cat > $HOME/.config/containers/registries.conf <<EOF
+# insecure registry list
+[[registry]]
+prefix = "*.oooci.ccitredhat.com"
+insecure = true
+EOF
 
 # Build operator
 IMAGE_TAG_BASE=${PUSH_REGISTRY}/${PUSH_ORGANIZATION}/${BASE_OP}
@@ -214,6 +244,9 @@ if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
     clone_openstack_operator
   fi
   pushd openstack-operator
+
+  # TODO create a patch in openstack-operator
+  sed -i 's/tmp;/tmp --src-cert-dir \/alabama;/g' hack/bundle-cache-data.sh
 
   # If is rehearsal job, we need to point to $DEFAULT_ORG repo and commit
   if [[ "$IS_REHEARSAL" == true ]]; then
