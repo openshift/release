@@ -79,5 +79,5 @@ echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 cd "$(mktemp -d)"
 
 git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
-./mage -v ci:prepareE2Ebranch
-./mage -v bootstrapCluster
+make ci/prepare/e2e-branch
+make ci/bootstrap
