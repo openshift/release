@@ -62,6 +62,26 @@ tests:
     env:
       PROJECT_NAME: analytics-operator
     workflow: openshift-ci-security
+- as: operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.14"
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: sh ./tests/run-e2e.sh --no-build --image-base registry.ci.openshift.org/osa
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 400Mi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
