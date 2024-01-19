@@ -539,6 +539,17 @@ if [ ! -d /tmp/bin ];then
   chmod ug+x /tmp/bin/jq
 fi
 
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+	# shellcheck disable=SC1090
+	source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 #Get Basic Infrastructue Architecture Info
 node_arch=$(oc get nodes -ojsonpath='{.items[*].status.nodeInfo.architecture}')
 platform_type=$(oc get infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
