@@ -48,6 +48,8 @@ oc wait clusteroperators --all --for=condition=Progressing=false --timeout=60m >
 end_time=$(date +"%s")
 cat "${CO_STATUS_LOG}"
 
+sleep 18000
+
 ## If waiting operators timeout, call ocm-qe to analyze the root cause.
 costatus=$(cat "${CO_STATUS_LOG}")
 if [[ "${costatus}" =~ "timed out" ]]; then
