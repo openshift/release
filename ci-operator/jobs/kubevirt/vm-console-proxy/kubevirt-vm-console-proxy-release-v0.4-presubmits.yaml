@@ -1,28 +1,33 @@
 presubmits:
-  openshift/cluster-relocation-service:
+  kubevirt/vm-console-proxy:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^main$
-    - ^main-
-    cluster: build05
-    context: ci/prow/build
+    - ^release-v0\.4$
+    - ^release-v0\.4-
+    cluster: build02
+    context: ci/prow/e2e-functests
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-virtualization
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-relocation-service-main-build
-    rerun_command: /test build
-    skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
+    name: pull-ci-kubevirt-vm-console-proxy-release-v0.4-e2e-functests
+    rerun_command: /test e2e-functests
+    skip_if_only_changed: ^\.github/|^docs/|^example-client/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^LICENSE$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --target=build
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-functests-cluster-profile
+        - --target=e2e-functests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -32,6 +37,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-functests-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -46,6 +59,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-gcp-virtualization
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -55,13 +80,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )build,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-functests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^main$
-    - ^main-
-    cluster: build05
+    - ^release-v0\.4$
+    - ^release-v0\.4-
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -69,7 +94,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-relocation-service-main-images
+    name: pull-ci-kubevirt-vm-console-proxy-release-v0.4-images
     rerun_command: /test images
     spec:
       containers:
@@ -112,27 +137,33 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^main$
-    - ^main-
-    cluster: build05
-    context: ci/prow/unit-test
+    - ^release-v0\.4$
+    - ^release-v0\.4-
+    cluster: build02
+    context: ci/prow/unittests
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-virtualization
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-relocation-service-main-unit-test
-    rerun_command: /test unit-test
+    name: pull-ci-kubevirt-vm-console-proxy-release-v0.4-unittests
+    rerun_command: /test unittests
+    skip_if_only_changed: ^\.github/|^docs/|^example-client/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^LICENSE$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit-test
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/unittests-cluster-profile
+        - --target=unittests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -142,6 +173,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/unittests-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -156,6 +195,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-gcp-virtualization
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -165,4 +216,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit-test,?($|\s.*)
+    trigger: (?m)^/test( | .* )unittests,?($|\s.*)

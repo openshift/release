@@ -272,6 +272,9 @@ CONFIG = {
     'powervs-4-quota-slice': {
         'wdc06': 1,
     },
+    'powervs-multi-1-quota-slice': {
+        'wdc06': 2,
+    },
     'ibmcloud-cspi-qe-quota-slice': {
         'us-east': 10,
     },
@@ -353,6 +356,15 @@ CONFIG = {
     },
     'osl-gcp-quota-slice': {
         'us-central1': 10,
+    },
+    'devsandboxci-aws-quota-slice': {
+        # Wild guesses.
+        'us-east-1': 20,
+        'us-east-2': 20,
+    },
+    'quay-aws-quota-slice': {
+        'us-east-1': 10,
+        'us-west-1': 10,
     },
 }
 
