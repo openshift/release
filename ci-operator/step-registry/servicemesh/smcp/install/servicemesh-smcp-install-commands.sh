@@ -30,6 +30,14 @@ fi
 
 smcp_name="basic-smcp"
 
+# set security identity type
+if [ "$ROSA" == "true" ]
+then
+  sec_id_type="ThirdParty"
+else
+  sec_id_type="Kubernetes"
+fi
+
 if ! oc get namespace ${SMCP_NAMESPACE}
 then
   oc new-project ${SMCP_NAMESPACE}
@@ -67,6 +75,8 @@ spec:
       automtls: true
     controlPlane:
       mtls: true
+    identity:
+      type: ${sec_id_type}
   tracing:
     type: Jaeger
   addons:
