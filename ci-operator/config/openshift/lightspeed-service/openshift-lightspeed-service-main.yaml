@@ -4,10 +4,10 @@ base_images:
     namespace: ocp
     tag: "9"
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+      USER 0
 images:
 - dockerfile_path: Containerfile
   to: lightspeed-service-api
@@ -36,31 +36,51 @@ tests:
 - as: verify
   commands: pip install black ruff && make verify
   container:
-    from: ubi9-python311
+    from: src
 - as: unit
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make install-deps && make install-deps-test && make test-unit
   container:
-    from: ubi9-python311
+    from: src
 - as: integration
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make install-deps && make install-deps-test && make test-integration
   container:
-    from: ubi9-python311
-- as: e2e
+    from: src
+- as: e2e-ols
   steps:
-    cluster_profile: aws
     test:
-    - as: e2e
-      cli: latest
-      commands: make test-e2e
+    - as: invoke-llm
+      commands: |
+        # will need to be replaced with logic to generate a config.yaml
+        export OPENAI_API_KEY=$(cat /var/run/openai/token)
+        export DEFAULT_PROVIDER=openai
+        export DEFAULT_MODEL=gpt-3.5-turbo-1106
+        cat /var/run/openai/token | cut -c1-5
+        make install-deps && make install-deps-test
+        echo Starting OLS server
+        make run >& ${ARTIFACT_DIR}/ols.log &
+        function finish {
+          echo Exit trap: killing OLS server
+          kill %1
+        }
+        trap finish EXIT
+        # TODO replace this w/ logic that checks for the ols server to be running
+        sleep 30
+        echo Done waiting for OLS server start
+        make test-e2e
+        echo Done running e2e
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
       from: src
+      grace_period: 5ns
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
