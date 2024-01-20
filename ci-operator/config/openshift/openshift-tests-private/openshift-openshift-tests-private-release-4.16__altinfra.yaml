@@ -1,0 +1,64 @@
+base_images:
+  installer:
+    name: "4.16"
+    namespace: ocp
+    tag: installer-altinfra
+  ocp_4.10_cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  ocp_4.16_base:
+    name: "4.16"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.20-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.16
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: installer-altinfra
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- as: aws-ipi-ovn-f14
+  cron: 46 23 10,24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
+- as: aws-ipi-disc-priv-f14
+  cron: 17 11 3,19 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: openshift-tests-private
+  variant: altinfra
