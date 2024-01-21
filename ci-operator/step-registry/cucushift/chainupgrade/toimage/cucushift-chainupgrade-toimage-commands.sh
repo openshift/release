@@ -6,6 +6,16 @@ set -o pipefail
 
 trap 'FRC=$?; createUpgradeJunit; debug' EXIT TERM
 
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
+# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
+# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
+# so that the credentials of the build farm registry can be saved in docker client config file.
+# A direct connection is required while communicating with build-farm, instead of through proxy
+KUBECONFIG="" oc --loglevel=8 registry login
+
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
     if (( FRC != 0 )); then

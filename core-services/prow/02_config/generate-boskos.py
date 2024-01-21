@@ -202,6 +202,7 @@ CONFIG = {
     'nutanix-quota-slice': {},
     'nutanix-qe-quota-slice': {},
     'nutanix-qe-dis-quota-slice': {},
+    'nutanix-qe-zone-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-quota-slice': {
         'default': 7,
@@ -271,6 +272,9 @@ CONFIG = {
     'powervs-4-quota-slice': {
         'wdc06': 1,
     },
+    'powervs-multi-1-quota-slice': {
+        'wdc06': 2,
+    },
     'ibmcloud-cspi-qe-quota-slice': {
         'us-east': 10,
     },
@@ -338,12 +342,29 @@ CONFIG = {
         'us-west-2': 50,
     },
     'medik8s-aws-quota-slice': {
-        'us-east-1': 4,
-        'us-east-2': 4,
-        'us-west-2': 4,
+        'us-east-1': 15,
+        'us-east-2': 15,
+        'us-west-2': 15,
     },
     'gitops-aws-quota-slice': {
         'us-west-2': 10
+    },
+    'che-aws-quota-slice': {
+        # us-east-2 is reserved for the air-gapped clusters
+        'us-east-1': 10,
+        'us-west-1': 10,
+    },
+    'osl-gcp-quota-slice': {
+        'us-central1': 10,
+    },
+    'devsandboxci-aws-quota-slice': {
+        # Wild guesses.
+        'us-east-1': 20,
+        'us-east-2': 20,
+    },
+    'quay-aws-quota-slice': {
+        'us-east-1': 10,
+        'us-west-1': 10,
     },
 }
 
@@ -365,6 +386,9 @@ for i in range(3):
 
 for i in range(3):
     CONFIG['nutanix-qe-dis-quota-slice']['nutanix-qe-dis-segment-{0:0>2}'.format(i)] = 1
+
+for i in range(3):
+    CONFIG['nutanix-qe-zone-quota-slice']['nutanix-qe-zone-segment-{0:0>2}'.format(i)] = 1
 
 for i in range(2):
     CONFIG['openstack-osuosl-quota-slice']['openstack-osuosl-{0:0>2}'.format(i)] = 1
