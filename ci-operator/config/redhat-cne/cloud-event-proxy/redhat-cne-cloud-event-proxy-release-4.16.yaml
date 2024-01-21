@@ -2,11 +2,11 @@ base_images:
   base:
     name: "4.16"
     namespace: ocp
-    tag: base
-  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.16
+    tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   image_stream_tag:
     name: release
@@ -16,9 +16,9 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cloud-event-proxy
 promotion:
   to:
@@ -46,7 +46,9 @@ tests:
 - as: e2e-aws
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: sysdeseng.devcluster.openshift.com
     test:
     - as: functests
       cli: latest

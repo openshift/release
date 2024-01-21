@@ -265,9 +265,11 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=lvm
-        MASTERS_COUNT=1
+        NUM_MASTERS=3
+        NUM_WORKERS=0
         MASTER_MEMORY=18000
         MASTER_CPU=9
+        MASTER_DISK_COUNT=2
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm-periodic
   cron: 20 02 */1 * 0-5
@@ -276,9 +278,11 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=lvm
-        MASTERS_COUNT=1
+        NUM_MASTERS=3
+        NUM_WORKERS=0
         MASTER_MEMORY=18000
         MASTER_CPU=9
+        MASTER_DISK_COUNT=2
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf
@@ -589,7 +593,6 @@ tests:
     env:
       ASSISTED_CONFIG: |
         STATIC_IPS=true
-        TEST_FUNC=test_networking
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-bond
@@ -600,8 +603,6 @@ tests:
     env:
       ASSISTED_CONFIG: |
         IS_BONDED=true
-        TEST_FUNC=test_networking
-      PACKET_PLAN: m3.large.x86
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-static-ip-suite-periodic
@@ -611,8 +612,6 @@ tests:
     env:
       ASSISTED_CONFIG: |
         STATIC_IPS=true
-        TEST_FUNC=test_networking
-      PACKET_PLAN: m3.large.x86
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-bond-periodic
@@ -622,7 +621,53 @@ tests:
     env:
       ASSISTED_CONFIG: |
         IS_BONDED=true
+      TEST_SUITE: full
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-static-ip-suite-4-14-periodic
+  cron: 30 04 */1 * 0
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        STATIC_IPS=true
         TEST_FUNC=test_networking
+        OPENSHIFT_VERSION=4.14
+      PACKET_PLAN: m3.large.x86
+      TEST_SUITE: full
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-bond-4-14-periodic
+  cron: 45 03 */1 * 0
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        IS_BONDED=true
+        TEST_FUNC=test_networking
+        OPENSHIFT_VERSION=4.14
+      PACKET_PLAN: m3.large.x86
+      TEST_SUITE: full
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-static-ip-suite-4-14
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        STATIC_IPS=true
+        TEST_FUNC=test_networking
+        OPENSHIFT_VERSION=4.14
+      PACKET_PLAN: m3.large.x86
+      TEST_SUITE: full
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-bond-4-14
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        IS_BONDED=true
+        TEST_FUNC=test_networking
+        OPENSHIFT_VERSION=4.14
       PACKET_PLAN: m3.large.x86
       TEST_SUITE: full
     workflow: assisted-baremetal
@@ -641,6 +686,16 @@ tests:
     workflow: baremetalds-sno
 - as: e2e-vsphere-assisted
   optional: true
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-periodic
+  cron: 00 05 */1 * 0-5
   steps:
     cluster_profile: vsphere-2
     env:
