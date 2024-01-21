@@ -53,7 +53,7 @@ function createEndpointGateway() {
 
 function waitingStatus() {
     local endpoint=$1 status counter=0
-    while [ $counter -lt 20 ]
+    while [ $counter -lt 30 ]
     do 
         sleep 10
         counter=$(expr $counter + 1)
