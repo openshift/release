@@ -38,3 +38,6 @@ ansible-playbook /mtc-interop/config_mtc.yml \
     -e controller_kubeconfig=${TARGET_KUBECONFIG} \
     -e cluster_kubeconfig=${SOURCE_KUBECONFIG} \
     -e exposed_registry_path=${EXPOSED_REGISTRY_PATH}
+
+# Prepare Target cluster to match static kubeconfig path for the next step 'cucushift-installer-check-cluster-health':
+cp $TARGET_KUBECONFIG ${SHARED_DIR}/kubeconfig
