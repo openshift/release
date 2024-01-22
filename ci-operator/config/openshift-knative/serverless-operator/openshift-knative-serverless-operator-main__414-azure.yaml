@@ -19,10 +19,10 @@ base_images:
     name: knative-serving-src
     namespace: openshift
     tag: knative-v1.11
-  openshift_release_golang-1.19:
+  openshift_release_golang-1.21:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.21
   origin_4.14_operator-registry:
     name: "4.14"
     namespace: origin
@@ -33,9 +33,9 @@ build_root:
 images:
 - dockerfile_path: knative-operator/Dockerfile
   inputs:
-    openshift_release_golang-1.19:
+    openshift_release_golang-1.21:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
+      - registry.ci.openshift.org/openshift/release:golang-1.21
   to: serverless-knative-operator
 - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
   to: serverless-bundle
@@ -47,9 +47,9 @@ images:
   to: serverless-index
 - dockerfile_path: openshift-knative-operator/Dockerfile
   inputs:
-    openshift_release_golang-1.19:
+    openshift_release_golang-1.21:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
+      - registry.ci.openshift.org/openshift/release:golang-1.21
   to: serverless-openshift-knative-operator
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
@@ -72,15 +72,15 @@ images:
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
   inputs:
-    openshift_release_golang-1.19:
+    openshift_release_golang-1.21:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
+      - registry.ci.openshift.org/openshift/release:golang-1.21
   to: serverless-ingress
 - dockerfile_path: serving/metadata-webhook/Dockerfile
   inputs:
-    openshift_release_golang-1.19:
+    openshift_release_golang-1.21:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
+      - registry.ci.openshift.org/openshift/release:golang-1.21
   to: serverless-metadata-webhook
 releases:
   latest:
@@ -100,8 +100,56 @@ tests:
   steps:
     cluster_profile: azure4
     test:
-    - as: serverless-e2e
-      commands: make install-mesh test-e2e-with-kafka
+    - as: operator-e2e
+      commands: make test-e2e-with-kafka
+      dependencies:
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: knative-serving-eventing-e2e
+      commands: make test-upstream-e2e-no-upgrade
+      dependencies:
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: knative-eventing-kafka-broker-e2e
+      commands: make test-upstream-e2e-kafka-no-upgrade
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -125,6 +173,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-azure
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-knative
