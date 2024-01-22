@@ -63,22 +63,29 @@ function filter_test_by_platform() {
         ipixupi='ipi'
     fi
     platform="$(oc get infrastructure cluster -o yaml | yq '.status.platform' | tr 'A-Z' 'a-z')"
+    extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            aws|azure|gcp|nutanix)
-                export E2E_RUN_TAGS="@${platform}-${ipixupi} and ${E2E_RUN_TAGS}"
-                ;;
-            alicloud|baremetal|ibmcloud|vsphere)
-                echo "TO_BE_DONE, need extra tests, got platform as '$platform'"
-                ;;
             none)
                 export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
+                eval "$extrainfoCmd"
                 ;;
             external)
                 echo "Expected, got platform as '$platform'"
+                eval "$extrainfoCmd"
+                ;;
+            alibabacloud)
+                export E2E_RUN_TAGS="@alicloud-${ipixupi} and ${E2E_RUN_TAGS}"
+                ;;
+            aws|azure|baremetal|gcp|ibmcloud|nutanix)
+                export E2E_RUN_TAGS="@${platform}-${ipixupi} and ${E2E_RUN_TAGS}"
+                ;;
+            vsphere)
+                echo "TO_BE_DONE, need extra tests, got platform as '$platform'"
                 ;;
             *)
                 echo "Unexpected, got platform as '$platform'"
+                eval "$extrainfoCmd"
                 ;;
         esac
     fi

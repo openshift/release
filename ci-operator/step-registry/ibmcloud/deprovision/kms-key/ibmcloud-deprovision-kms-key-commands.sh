@@ -62,10 +62,19 @@ RESOURCE_GROUP=$(jq -r .resource_group ${key_file})
 echo "ResourceGroup: ${RESOURCE_GROUP}"
 ibmcloud_login ${RESOURCE_GROUP}
 
-id=$(jq -r .id ${key_file})
-keyid=$(jq -r .keyID ${key_file})    
-run_command "ibmcloud kp key delete ${keyid} -i ${id} -f" || true
-run_command "ibmcloud resource service-instance-delete ${id} -f" || true
+keyTypes=("master" "worker" "default")
+for keyType in "${keyTypes[@]}"; do
+    echo "delete the keys for ${keyType}..."
+    keyInfo=$(jq -r .${keyType} ${key_file})
+    echo $keyInfo
+    if [[ -n "${keyInfo}" ]] && [[ "${keyInfo}" != "null" ]]; then
+        id=$(echo $keyInfo | jq -r .id)
+        keyid=$(echo $keyInfo | jq -r .keyID)
+        run_command "ibmcloud kp key delete ${keyid} -i ${id} -f" || true
+        run_command "ibmcloud resource service-instance-delete ${id} -f" || true
+    fi
+done
+
 delCmd="${IBMCLOUD_CLI} resource group-delete -f ${RESOURCE_GROUP}"
 echo ${delCmd}
 run_command_with_retries "${delCmd}" 20 20
