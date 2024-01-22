@@ -69,13 +69,16 @@ function filter_test_by_platform() {
         ipixupi='ipi'
     fi
     platform="$(oc get infrastructure cluster -o yaml | yq '.status.platform' | tr 'A-Z' 'a-z')"
+    extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
             none)
                 export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
+                eval "$extrainfoCmd"
                 ;;
             external)
                 echo "Expected, got platform as '$platform'"
+                eval "$extrainfoCmd"
                 ;;
             alibabacloud)
                 export E2E_RUN_TAGS="@alicloud-${ipixupi} and ${E2E_RUN_TAGS}"
@@ -88,6 +91,7 @@ function filter_test_by_platform() {
                 ;;
             *)
                 echo "Unexpected, got platform as '$platform'"
+                eval "$extrainfoCmd"
                 ;;
         esac
     fi
