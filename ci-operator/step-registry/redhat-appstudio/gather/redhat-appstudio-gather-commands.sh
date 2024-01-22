@@ -42,6 +42,7 @@ queue ${ARTIFACT_DIR}/spiaccesstokenbindings.json  oc --insecure-skip-tls-verify
 queue ${ARTIFACT_DIR}/spiaccesstokendataupdates.json  oc --insecure-skip-tls-verify --request-timeout=5s get spiaccesstokendataupdates.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/spiaccesstokens.json  oc --insecure-skip-tls-verify --request-timeout=5s get spiaccesstokens.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/spifilecontentrequests.json  oc --insecure-skip-tls-verify --request-timeout=5s get spifilecontentrequests.appstudio.redhat.com --all-namespaces -o json
+queue ${ARTIFACT_DIR}/remotesecrets.json oc --insecure-skip-tls-verify --request-timeout=5s get remotesecrets.appstudio.redhat.com --all-namespaces -o json
 
 # JBS resources (jvm-build-service)
 queue ${ARTIFACT_DIR}/artifactbuilds.json  oc --insecure-skip-tls-verify --request-timeout=5s get artifactbuilds.jvmbuildservice.io --all-namespaces -o json
