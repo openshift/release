@@ -56,5 +56,6 @@ xtf.bm.namespace=pit-builds
 EOF
 
 echo "Executing EAP 74 tests"
+# Note: When executing maven we don't want the raw output to be printed into the pod logs, due to cluster security issues.
+# Therefore we're using the tmp log file which will not be collected.
 mvn clean -e test -Dmaven.repo.local=./repo -Dxtf.operator.properties.skip.installation=true -P74-openjdk11,eap-pit-74 --log-file eap-74.txt
-
