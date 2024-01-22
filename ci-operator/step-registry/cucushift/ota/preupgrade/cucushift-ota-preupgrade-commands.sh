@@ -46,6 +46,10 @@ function check_tp_operator_notfound(){
         ["platform-operators-aggregated"]="openshift-platform-operators"
         ["olm"]="openshift-cluster-olm-operator"
     )
+    if [ -z "${tp_resourece[$1]}" ] ; then
+        echo "No expected ns configured for $1!"
+        return 1
+    fi
     tmp_log=$(mktemp)
     while (( try < max_retries )); do
         oc get co $1 2>&1 | tee "${tmp_log}"
@@ -54,7 +58,6 @@ function check_tp_operator_notfound(){
             if grep -q 'NotFound' "${tmp_log}"; then
                 (( try += 1 ))
                 sleep 60
-                break
             else
                 echo "Unexpected ns found for $1!"
                 return 1
@@ -71,14 +74,13 @@ function check_tp_operator_notfound(){
 }
 
 function check_manifest_annotations(){
-    local manifest="/tmp/manifest"
+    tmp_manifest=$(mktemp -d)
     IFS=" " read -r -a tp_operator <<< "$*"
-    mkdir "${manifest}"
-    if ! oc adm release extract --to "${manifest}" "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"; then
+    if ! oc adm release extract --to "${tmp_manifest}" "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"; then
         echo "Failed to extract manifest!"
         return 1
     fi
-    tp_op_filepath=$(grep -rl 'release.openshift.io/feature-set: .*TechPreviewNoUpgrade.*' ${manifest}|grep -E 'clusteroperator|cluster_operator')
+    tp_op_filepath=$(grep -rl 'release.openshift.io/feature-set: .*TechPreviewNoUpgrade.*' ${tmp_manifest}|grep -E 'clusteroperator|cluster_operator')
     mapfile -t tp_op_filepaths <<< "$tp_op_filepath"
     if (( ${#tp_operator[*]} != ${#tp_op_filepaths[*]} )); then
         echo "Unexpected number of cluster operator manifest files with correct annotation found!"

@@ -46,6 +46,10 @@ function check_tp_operator_notfound(){
         ["platform-operators-aggregated"]="openshift-platform-operators"
         ["olm"]="openshift-cluster-olm-operator"
     )
+    if [ -z "${tp_resourece[$1]}" ] ; then
+        echo "No expected ns configured for $1!"
+        return 1
+    fi
     tmp_log=$(mktemp)
     while (( try < max_retries )); do
         oc get co $1 2>&1 | tee "${tmp_log}"
@@ -54,7 +58,6 @@ function check_tp_operator_notfound(){
             if grep -q 'NotFound' "${tmp_log}"; then
                 (( try += 1 ))
                 sleep 60
-                break
             else
                 echo "Unexpected ns found for $1!"
                 return 1
