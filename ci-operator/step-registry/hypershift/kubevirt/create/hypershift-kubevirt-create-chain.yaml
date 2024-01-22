@@ -29,6 +29,13 @@ chain:
         The storage class that will be used for etcd on the hosted control plane.
     commands: |-
       set -exuo pipefail
+      set -x
+
+      node_name=$(oc get node  --no-headers | awk '{print $1}' | head -n 1)
+      oc label node/${node_name} OCPBUGS-25696=true
+      oc get node -lnode-role.kubernetes.io/worker="" --no-headers | grep -v "control-plane" | awk '{print $1}' | head -n 3 | while read -r node; do
+        oc label node/${node} OCPBUGS-25696=true
+      done
 
       HCP_CLI="/usr/bin/hcp"
       if [[ ! -f $HCP_CLI ]]; then
@@ -73,6 +80,7 @@ chain:
         --root-volume-size 64 \
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
         --release-image ${RELEASE_IMAGE_LATEST} \
+        --node-selector "OCPBUGS-25696=true" \
         ${EXTRA_ARGS}
 
       echo "Waiting for cluster to become available"
@@ -110,6 +118,8 @@ chain:
         done
         oc annotate --overwrite sc ${KUBEVIRT_CSI_INFRA} storageclass.kubernetes.io/is-default-class='true'
       fi
+      
+      oc get pod -n clusters-${CLUSTER_NAME} -o wide
     from: hypershift-operator
     grace_period: 5m0s
     resources:
