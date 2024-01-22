@@ -24,6 +24,32 @@ function create_resource_group() {
     "${IBMCLOUD_CLI}" target -g ${rg} || return 1
 }
 
+function createKey() {
+    local instance_name=$1
+    local region=$2
+    local keyInfoFile=$3
+    local id key_name key_meterial tmpFile keyCRN keyID
+    #echo -n "" > ${keyInfoFile}
+    ibmcloud resource service-instance-create ${instance_name} kms tiered-pricing ${region}
+    id=$(ibmcloud resource service-instance ${instance_name} --id -q | awk '{print $2}')
+   
+    key_name="${instance_name}-key"
+    key_meterial=$(openssl rand -base64 32)
+    tmpFile=$(mktemp)
+    ibmcloud kp key create ${key_name} -k ${key_meterial} -i ${id} -o json > ${tmpFile}
+
+    keyCRN=$(jq -r .crn $tmpFile)
+    keyID=$(jq -r .id $tmpFile)
+
+    jq -n \
+      --arg id "$id" \
+      --arg keyID "$keyID" \
+      --arg keyCRN "$keyCRN" \
+      '$ARGS.named' > "${keyInfoFile}"
+
+    cat ${keyInfoFile} | jq
+}
+
 ibmcloud_login
 
 ## Create the instances for BYOK
@@ -42,31 +68,30 @@ cat >${key_file} <<EOF
 }
 EOF
 
-instance_name="${CLUSTER_NAME}-kp"
-ibmcloud resource service-instance-create ${instance_name} kms tiered-pricing ${region}
+echo "ControlPlane EncryptionKey: ${IBMCLOUD_CONTROL_PLANE_ENCRYPTION_KEY}"
+echo "Compute EncryptionKey: ${IBMCLOUD_COMPUTE_ENCRYPTION_KEY}"
+echo "DefaultMachinePlatform EncryptionKey: ${IBMCLOUD_DEFAULT_MACHINE_ENCRYPTION_KEY}"
 
-id=$(ibmcloud resource service-instance ${instance_name} --id -q | awk '{print $2}')
-echo "$(jq --arg idarg "$id" '. += {"id": $idarg}' $key_file)" > $key_file
+dataFile=$(mktemp)
+bakFile=$(mktemp)
+if [[ "${IBMCLOUD_CONTROL_PLANE_ENCRYPTION_KEY}" == "true" ]]; then
+  createKey "${CLUSTER_NAME}-kp-master" ${region} ${dataFile}
+  jq --argjson idarg "$(< $dataFile)" '. += {"master": $idarg}' $key_file > ${bakFile}
+  mv ${bakFile} ${key_file}
+fi
 
-export KP_INSTANCE_ID=${id}
+if [[ "${IBMCLOUD_COMPUTE_ENCRYPTION_KEY}" == "true" ]]; then
+  createKey "${CLUSTER_NAME}-kp-worker" ${region} ${dataFile}
+  jq --argjson idarg "$(< $dataFile)" '. += {"worker": $idarg}' $key_file > ${bakFile}
+  mv ${bakFile} ${key_file}
+fi
 
-key_meterial=$(openssl rand -base64 32)
-key_name="${instance_name}-key"
-tmpFile=$(mktemp)
-ibmcloud kp key create ${key_name} -k ${key_meterial} -o json > ${tmpFile}
+if [[ "${IBMCLOUD_DEFAULT_MACHINE_ENCRYPTION_KEY}" == "true" ]]; then
+  createKey "${CLUSTER_NAME}-kp-default" ${region} ${dataFile}
+  jq --argjson idarg "$(< $dataFile)" '. += {"default": $idarg}' $key_file > ${bakFile}
+  mv ${bakFile} ${key_file}
+fi
 
-keyCRN=$(jq -r .crn $tmpFile)
-
-keyID=$(jq -r .id $tmpFile)
-echo "$(jq --arg idarg "$keyID" '. += {"keyID": $idarg}' $key_file)" > $key_file
+echo "dump ${key_file}..."
 
 cat ${key_file}
-
-cat > "${SHARED_DIR}/ibm_kpKey.yaml" << EOF
-platform:
-  ibmcloud:
-    defaultMachinePlatform:
-      bootVolume:
-        encryptionKey: "${keyCRN}"
-    resourceGroupName: ${resource_group}
-EOF
