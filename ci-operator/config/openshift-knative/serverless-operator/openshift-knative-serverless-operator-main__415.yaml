@@ -82,17 +82,12 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.21
   to: serverless-metadata-webhook
-promotion:
-  to:
-  - additional_images:
-      serverless-operator-src: src
-    namespace: knative
-    tag: main
 releases:
   latest:
-    release:
-      channel: fast
-      version: "4.14"
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -101,18 +96,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: kitchensink-e2e-aws-ocp-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
+- as: kitchensink-e2e-aws-ocp-415
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -172,91 +161,13 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
-- as: kitchensink-e2e-aws-ocp-414-continuous
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  cron: 0 4 * * *
-  steps:
-    allow_best_effort_post_steps: true
-    allow_skip_on_success: true
-    post:
-    - as: knative-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
-        "${ARTIFACT_DIR}/gather-knative"
-      from: serverless-source-image
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: serverless-source-image
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-gather-extra
-      best_effort: true
-      cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
-        | /bin/bash -s
-      from: serverless-source-image
-      grace_period: 1m0s
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 300m
-          memory: 300Mi
-      timeout: 20m0s
-    test:
-    - as: test
-      cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make kitchensink-e2e
-      dependencies:
-      - env: SERVERLESS_KNATIVE_OPERATOR
-        name: serverless-knative-operator
-      - env: SERVERLESS_BUNDLE
-        name: serverless-bundle
-      - env: SERVERLESS_INDEX
-        name: serverless-index
-      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
-        name: serverless-openshift-knative-operator
-      - env: SERVERLESS_SOURCE_IMAGE
-        name: serverless-source-image
-      - env: SERVERLESS_INGRESS
-        name: serverless-ingress
-      - env: SERVERLESS_METADATA_WEBHOOK
-        name: serverless-metadata-webhook
-      from: serverless-source-image
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: generic-claim
-- as: kitchensink-upgrade-aws-ocp-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
+    workflow: ipi-aws
+- as: kitchensink-upgrade-aws-ocp-415
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -316,91 +227,13 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
-- as: kitchensink-upgrade-aws-ocp-414-continuous
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  cron: 0 4 * * *
-  steps:
-    allow_best_effort_post_steps: true
-    allow_skip_on_success: true
-    post:
-    - as: knative-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
-        "${ARTIFACT_DIR}/gather-knative"
-      from: serverless-source-image
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: serverless-source-image
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-gather-extra
-      best_effort: true
-      cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
-        | /bin/bash -s
-      from: serverless-source-image
-      grace_period: 1m0s
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 300m
-          memory: 300Mi
-      timeout: 20m0s
-    test:
-    - as: test
-      cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make kitchensink-upgrade
-      dependencies:
-      - env: SERVERLESS_KNATIVE_OPERATOR
-        name: serverless-knative-operator
-      - env: SERVERLESS_BUNDLE
-        name: serverless-bundle
-      - env: SERVERLESS_INDEX
-        name: serverless-index
-      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
-        name: serverless-openshift-knative-operator
-      - env: SERVERLESS_SOURCE_IMAGE
-        name: serverless-source-image
-      - env: SERVERLESS_INGRESS
-        name: serverless-ingress
-      - env: SERVERLESS_METADATA_WEBHOOK
-        name: serverless-metadata-webhook
-      from: serverless-source-image
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: generic-claim
-- as: mesh-e2e-aws-ocp-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
+    workflow: ipi-aws
+- as: mesh-e2e-aws-ocp-415
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -460,93 +293,14 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
+    workflow: ipi-aws
   timeout: 5h0m0s
-- as: mesh-e2e-aws-ocp-414-continuous
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  cron: 0 4 * * *
-  steps:
-    allow_best_effort_post_steps: true
-    allow_skip_on_success: true
-    post:
-    - as: knative-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
-        "${ARTIFACT_DIR}/gather-knative"
-      from: serverless-source-image
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: serverless-source-image
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-gather-extra
-      best_effort: true
-      cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
-        | /bin/bash -s
-      from: serverless-source-image
-      grace_period: 1m0s
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 300m
-          memory: 300Mi
-      timeout: 20m0s
-    test:
-    - as: test
-      cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make mesh-e2e
-      dependencies:
-      - env: SERVERLESS_KNATIVE_OPERATOR
-        name: serverless-knative-operator
-      - env: SERVERLESS_BUNDLE
-        name: serverless-bundle
-      - env: SERVERLESS_INDEX
-        name: serverless-index
-      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
-        name: serverless-openshift-knative-operator
-      - env: SERVERLESS_SOURCE_IMAGE
-        name: serverless-source-image
-      - env: SERVERLESS_INGRESS
-        name: serverless-ingress
-      - env: SERVERLESS_METADATA_WEBHOOK
-        name: serverless-metadata-webhook
-      from: serverless-source-image
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: generic-claim
-  timeout: 5h0m0s
-- as: mesh-upgrade-aws-ocp-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
+- as: mesh-upgrade-aws-ocp-415
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -606,18 +360,12 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
-- as: operator-e2e-aws-ocp-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
+    workflow: ipi-aws
+- as: operator-e2e-aws-ocp-415
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -677,90 +425,12 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
-- as: operator-e2e-aws-ocp-414-continuous
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  cron: 0 4 * * *
+    workflow: ipi-aws
+- as: test-upgrade-aws-ocp-415
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    post:
-    - as: knative-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
-        "${ARTIFACT_DIR}/gather-knative"
-      from: serverless-source-image
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: serverless-source-image
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-gather-extra
-      best_effort: true
-      cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
-        | /bin/bash -s
-      from: serverless-source-image
-      grace_period: 1m0s
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 300m
-          memory: 300Mi
-      timeout: 20m0s
-    test:
-    - as: test
-      cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make operator-e2e
-      dependencies:
-      - env: SERVERLESS_KNATIVE_OPERATOR
-        name: serverless-knative-operator
-      - env: SERVERLESS_BUNDLE
-        name: serverless-bundle
-      - env: SERVERLESS_INDEX
-        name: serverless-index
-      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
-        name: serverless-openshift-knative-operator
-      - env: SERVERLESS_SOURCE_IMAGE
-        name: serverless-source-image
-      - env: SERVERLESS_INGRESS
-        name: serverless-ingress
-      - env: SERVERLESS_METADATA_WEBHOOK
-        name: serverless-metadata-webhook
-      from: serverless-source-image
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: generic-claim
-- as: test-upgrade-aws-ocp-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  steps:
-    allow_best_effort_post_steps: true
-    allow_skip_on_success: true
+    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -820,92 +490,14 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
-- as: test-upgrade-aws-ocp-414-continuous
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  cron: 0 4 * * *
-  steps:
-    allow_best_effort_post_steps: true
-    allow_skip_on_success: true
-    post:
-    - as: knative-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
-        "${ARTIFACT_DIR}/gather-knative"
-      from: serverless-source-image
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: serverless-source-image
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-gather-extra
-      best_effort: true
-      cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
-        | /bin/bash -s
-      from: serverless-source-image
-      grace_period: 1m0s
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 300m
-          memory: 300Mi
-      timeout: 20m0s
-    test:
-    - as: test
-      cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-upgrade
-      dependencies:
-      - env: SERVERLESS_KNATIVE_OPERATOR
-        name: serverless-knative-operator
-      - env: SERVERLESS_BUNDLE
-        name: serverless-bundle
-      - env: SERVERLESS_INDEX
-        name: serverless-index
-      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
-        name: serverless-openshift-knative-operator
-      - env: SERVERLESS_SOURCE_IMAGE
-        name: serverless-source-image
-      - env: SERVERLESS_INGRESS
-        name: serverless-ingress
-      - env: SERVERLESS_METADATA_WEBHOOK
-        name: serverless-metadata-webhook
-      from: serverless-source-image
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: generic-claim
-- as: ui-e2e-aws-ocp-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
+    workflow: ipi-aws
+- as: ui-e2e-aws-ocp-415
   optional: true
   run_if_changed: test/ui
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -965,91 +557,13 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
-- as: ui-e2e-aws-ocp-414-continuous
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  cron: 0 4 * * *
-  steps:
-    allow_best_effort_post_steps: true
-    allow_skip_on_success: true
-    post:
-    - as: knative-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
-        "${ARTIFACT_DIR}/gather-knative"
-      from: serverless-source-image
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: serverless-source-image
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-gather-extra
-      best_effort: true
-      cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
-        | /bin/bash -s
-      from: serverless-source-image
-      grace_period: 1m0s
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 300m
-          memory: 300Mi
-      timeout: 20m0s
-    test:
-    - as: test
-      cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make ui-e2e
-      dependencies:
-      - env: SERVERLESS_KNATIVE_OPERATOR
-        name: serverless-knative-operator
-      - env: SERVERLESS_BUNDLE
-        name: serverless-bundle
-      - env: SERVERLESS_INDEX
-        name: serverless-index
-      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
-        name: serverless-openshift-knative-operator
-      - env: SERVERLESS_SOURCE_IMAGE
-        name: serverless-source-image
-      - env: SERVERLESS_INGRESS
-        name: serverless-ingress
-      - env: SERVERLESS_METADATA_WEBHOOK
-        name: serverless-metadata-webhook
-      from: serverless-source-image
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: generic-claim
-- as: upstream-e2e-aws-ocp-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
+    workflow: ipi-aws
+- as: upstream-e2e-aws-ocp-415
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -1109,19 +623,13 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
-- as: upstream-e2e-kafka-aws-ocp-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
+    workflow: ipi-aws
+- as: upstream-e2e-kafka-aws-ocp-415
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -1181,81 +689,9 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
-- as: upstream-e2e-kafka-aws-ocp-414-continuous
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  cron: 0 4 * * *
-  steps:
-    allow_best_effort_post_steps: true
-    allow_skip_on_success: true
-    post:
-    - as: knative-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
-        "${ARTIFACT_DIR}/gather-knative"
-      from: serverless-source-image
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: serverless-source-image
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-gather-extra
-      best_effort: true
-      cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
-        | /bin/bash -s
-      from: serverless-source-image
-      grace_period: 1m0s
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 300m
-          memory: 300Mi
-      timeout: 20m0s
-    test:
-    - as: test
-      cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make upstream-e2e-kafka
-      dependencies:
-      - env: SERVERLESS_KNATIVE_OPERATOR
-        name: serverless-knative-operator
-      - env: SERVERLESS_BUNDLE
-        name: serverless-bundle
-      - env: SERVERLESS_INDEX
-        name: serverless-index
-      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
-        name: serverless-openshift-knative-operator
-      - env: SERVERLESS_SOURCE_IMAGE
-        name: serverless-source-image
-      - env: SERVERLESS_INGRESS
-        name: serverless-ingress
-      - env: SERVERLESS_METADATA_WEBHOOK
-        name: serverless-metadata-webhook
-      from: serverless-source-image
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: generic-claim
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: "414"
+  variant: "415"
