@@ -142,7 +142,7 @@ function copy_kubeconfig_minimal() {
   echo 'api available'
 
   echo 'waiting for bootstrap to complete'
-  openshift-install --dir="${dir}" wait-for bootstrap-complete &
+  ${OPENSHIFT_INSTALL} --dir="${dir}" wait-for bootstrap-complete &
   wait "$!"
   ret=$?
   if [ $ret -eq 0 ]; then
@@ -464,6 +464,28 @@ echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
 export HOME=/tmp
+OPENSHIFT_INSTALL=$(which openshift-install)
+export OPENSHIFT_INSTALL
+
+if [ "${OPENSHIFT_INSTALL_INITIAL_BINARY_OVERRIDE:-}" == "true" ]; then
+    echo "-------------------"
+    echo "OVERRIDE openshift-install BINARY"
+    export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
+    echo "Extracting openshift-install from initial release image: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+    oc adm release extract -a "${PULL_SECRET_PATH}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --command=openshift-install --to=/tmp
+   if [ ! -f "/tmp/openshift-install" ]; then
+    echo "Error extracting openshift-install from OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
+    exit 1
+   fi
+
+    OPENSHIFT_INSTALL="/tmp/openshift-install"
+fi
+
+echo "-------------------"
+echo "Using this openshift-install: $OPENSHIFT_INSTALL"
+echo "openshift-install version:"
+${OPENSHIFT_INSTALL} version
+echo "-------------------"
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -550,7 +572,7 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
-openshift-install --dir="${dir}" create manifests &
+${OPENSHIFT_INSTALL} --dir="${dir}" create manifests &
 wait "$!"
 
 # Platform specific manifests adjustments
@@ -588,7 +610,7 @@ done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -p
 
 if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
   # Inject promtail in bootstrap.ign
-  openshift-install --dir="${dir}" create ignition-configs &
+  ${OPENSHIFT_INSTALL} --dir="${dir}" create ignition-configs &
   wait "$!"
   inject_promtail_service
 fi
@@ -623,7 +645,7 @@ do
   if [ $tries -gt 1 ]; then
     write_install_status
     cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
-    openshift-install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+    ${OPENSHIFT_INSTALL} --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
     wait "$!"
     ret="$?"
     if test "${ret}" -ne 0 ; then
@@ -642,7 +664,7 @@ do
 
   copy_kubeconfig_minimal "${dir}" &
   copy_kubeconfig_pid=$!
-  openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+  ${OPENSHIFT_INSTALL} --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
   wait "$!"
   ret="$?"
   echo "Installer exit with code $ret"
