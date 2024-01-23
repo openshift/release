@@ -338,8 +338,8 @@ CONFIG = {
     'ossm-aws-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'us-east-1': 50,
-        'us-east-2': 50,
-        'us-west-2': 50,
+        'us-west-2': 100,
+        'eu-west-2': 50,
     },
     'medik8s-aws-quota-slice': {
         'us-east-1': 15,
