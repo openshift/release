@@ -5,7 +5,7 @@ set -o pipefail
 set -o errexit
 
 
-RESOURCE_DUMP_DIR="${ARTIFACT_DIR}/ibmcloud-gather-resources"
+RESOURCE_DUMP_DIR="${ARTIFACT_DIR}"
 CLUSTER_FILTER="${NAMESPACE}-${UNIQUE_HASH}"
 declare -a MAIN_RESOURCES=(floating-ip image instance lb public-gateway sg subnet volume vpc)
 
@@ -60,8 +60,13 @@ function ibmcloud_login {
   export IBMCLOUD_HOME=/output
   region="${LEASED_RESOURCE}"
   export region
+  "${IBMCLOUD_CLI}" config --check-version=false
   echo "Try to login..."
-  "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+  if [ -f "${SHARED_DIR}/ibmcloud-min-permission-api-key" ]; then
+      "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${SHARED_DIR}/ibmcloud-min-permission-api-key"
+  else
+      "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+  fi
 }
 
 
