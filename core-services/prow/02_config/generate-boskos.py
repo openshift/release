@@ -366,6 +366,12 @@ CONFIG = {
         'us-east-1': 10,
         'us-west-1': 10,
     },
+    'aws-edge-infra-quota-slice': {
+        'us-east-1': 5,
+        'us-east-2': 5,
+        'us-west-1': 5,
+        'us-west-2': 5,
+    }
 }
 
 for i in range(0,4):
