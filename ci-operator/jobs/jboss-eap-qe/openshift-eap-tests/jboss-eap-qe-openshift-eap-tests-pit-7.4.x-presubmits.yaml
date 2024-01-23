@@ -1,27 +1,31 @@
 presubmits:
-  red-hat-data-services/openvino_model_server:
+  jboss-eap-qe/openshift-eap-tests:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^v2022\.3-release$
-    - ^v2022\.3-release-
+    - ^pit-7\.4\.x$
+    - ^pit-7\.4\.x-
     cluster: build03
-    context: ci/prow/images
+    context: ci/prow/eap-ocp4.15-lp-interop-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: eap-ocp4.15-lp-interop
       ci.openshift.io/generator: prowgen
+      job-release: "4.15"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-red-hat-data-services-openvino_model_server-v2022.3-release-images
-    rerun_command: /test images
+    name: pull-ci-jboss-eap-qe-openshift-eap-tests-pit-7.4.x-eap-ocp4.15-lp-interop-images
+    rerun_command: /test eap-ocp4.15-lp-interop-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --variant=eap-ocp4.15-lp-interop
         command:
         - ci-operator
         image: ci-operator:latest
@@ -34,6 +38,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -45,6 +52,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -54,4 +64,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )eap-ocp4.15-lp-interop-images,?($|\s.*)
