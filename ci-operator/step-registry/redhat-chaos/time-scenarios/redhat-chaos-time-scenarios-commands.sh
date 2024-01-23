@@ -31,7 +31,11 @@ export ENABLE_ALERTS=False
 ls
 pwd 
 
-./krkn-hub/time-scenarios/prow_run.sh
+cd time-scenarios
+ls
+cd ..
+
+./time-scenarios/prow_run.sh
 rc=$?
 echo "Finished running time scenario"
 echo "Return code: $rc"
