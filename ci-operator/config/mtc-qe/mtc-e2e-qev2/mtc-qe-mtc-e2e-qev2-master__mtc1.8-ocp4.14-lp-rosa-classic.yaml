@@ -3,6 +3,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
   mtc-apps-deployer:
     name: mtc-apps-deployer
     namespace: mtc-qe
@@ -13,6 +17,10 @@ base_images:
     tag: master
   openshift-cli-installer:
     name: openshift-cli-installer
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
     namespace: ci
     tag: latest
 build_root:
@@ -70,6 +78,7 @@ tests:
         }
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.14-lp","rosa-lp","mtc-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       MTC_VERSION: "1.8"
       PULL_SECRET_NAME: pull-secret
       S3_BUCKET_NAME: openshift-cli-installer-cspi-interop
@@ -78,10 +87,14 @@ tests:
       TARGET_CLUSTER_NAME: mtc-rosa-target
       TEST_PLATFORM: rosa
     test:
+    - ref: rosa-sts-account-roles-create
+    - ref: cluster-install
     - ref: mtc-prepare-clusters
     - ref: cucushift-installer-check-cluster-health
     - ref: mtc-execute-tests
-    workflow: firewatch-cluster
+    - ref: rosa-sts-account-roles-delete
+    - ref: cluster-uninstall
+    - ref: firewatch-report-issues
 zz_generated_metadata:
   branch: master
   org: mtc-qe
