@@ -270,6 +270,26 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
+- always_run: false
+  as: e2e-aws-ovn-network-migration
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
+        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
+        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
+    test:
+    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-config-multicast
+    - ref: ovn-sdn-migration
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-validate-multicast
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-sdn
 - as: e2e-aws-live-migration-sdn-ovn
   steps:
     cluster_profile: aws
@@ -303,26 +323,6 @@ tests:
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
     workflow: openshift-e2e-aws-sdn
   timeout: 4h0m0s
-- always_run: false
-  as: e2e-aws-ovn-network-migration
-  optional: true
-  steps:
-    cluster_profile: aws
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
-        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
-        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
-    test:
-    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-config-multicast
-    - ref: ovn-sdn-migration
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-validate-multicast
-    - ref: openshift-e2e-test
-    workflow: openshift-e2e-aws-sdn
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv
