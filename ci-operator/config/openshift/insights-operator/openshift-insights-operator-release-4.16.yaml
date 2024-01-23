@@ -54,7 +54,7 @@ tests:
     from: src
 - as: unit
   commands: |
-    export COVER_PROFILE=/tmp/reports/unit_coverage.out
+    export COVER_PROFILE=./unit_coverage.out
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make unit
   container:
@@ -64,7 +64,7 @@ tests:
     name: insights-operator-codecov-token
 - as: publish-coverage
   commands: |
-    export COVER_PROFILE=/tmp/reports/unit_coverage.out
+    export COVER_PROFILE=./unit_coverage.out
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make coverage
   container:
@@ -94,7 +94,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "not tp_only and not UI" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks
+        pytest.sh -k "not tp_only and not UI and not slow" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks
       credentials:
       - mount_path: /secrets
         name: insights-qa

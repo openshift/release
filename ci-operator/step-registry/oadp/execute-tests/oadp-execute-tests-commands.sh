@@ -54,8 +54,11 @@ function archive-results() {
         echo "Copying ${RESULTS_FILE} to ${ARTIFACT_DIR}/junit_oadp_interop_results.xml..."
         cp "${RESULTS_FILE}" "${ARTIFACT_DIR}/junit_oadp_interop_results.xml"
 
-        echo "Copying ${LOGS_FOLDER} to ${ARTIFACT_DIR}..."
-        cp -r "${LOGS_FOLDER}" "${ARTIFACT_DIR}/logs"
+        
+        if [ -d "${LOGS_FOLDER}" ]; then
+            echo "Copying ${LOGS_FOLDER} to ${ARTIFACT_DIR}..."
+            cp -r "${LOGS_FOLDER}" "${ARTIFACT_DIR}/logs"
+        fi
     fi
 }
 

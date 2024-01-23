@@ -31,7 +31,7 @@ releases:
     release:
       architecture: amd64
       channel: fast
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -50,7 +50,7 @@ tests:
 - as: fvt
   run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|go\.mod|go\.sum)
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-opendatahub
     env:
       COMPUTE_NODE_TYPE: n2-standard-8
     test:
@@ -73,9 +73,12 @@ tests:
 - as: fvt-odh-manifests
   run_if_changed: ^(opendatahub/odh-manifests)
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-opendatahub
     env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
     test:
     - as: fvt-odh-manifests
       commands: |
@@ -89,7 +92,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
-    workflow: ipi-aws
+    workflow: hypershift-hostedcluster-workflow
 - as: pr-image-mirror
   run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|version|go\.mod|go\.sum)
   steps:

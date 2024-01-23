@@ -43,6 +43,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: cli
+  ocp_4.15_installer-terraform-providers:
+    name: "4.15"
+    namespace: ocp
+    tag: installer-terraform-providers
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -60,6 +64,9 @@ images:
     ocp_4.15_base:
       as:
       - registry.ci.openshift.org/ocp/4.15:base
+    ocp_4.15_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -72,6 +79,9 @@ images:
     ocp_4.15_base:
       as:
       - registry.ci.openshift.org/ocp/4.15:base
+    ocp_4.15_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -81,6 +91,9 @@ images:
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   inputs:
+    ocp_4.15_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -99,6 +112,9 @@ images:
     ocp_4.15_cli:
       as:
       - registry.ci.openshift.org/ocp/4.15:cli
+    ocp_4.15_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -108,6 +124,9 @@ images:
     ocp_4.15_base:
       as:
       - registry.ci.openshift.org/ocp/4.15:base
+    ocp_4.15_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -120,6 +139,9 @@ images:
     ocp_4.15_base:
       as:
       - registry.ci.openshift.org/ocp/4.15:base
+    ocp_4.15_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -482,7 +504,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
   timeout: 6h0m0s
-- as: e2e-metal-ipi-sdn-virtualmedia
+- as: e2e-metal-ipi-ovn-virtualmedia
   cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
@@ -601,6 +623,8 @@ tests:
   optional: true
   steps:
     cluster_profile: vsphere-8-vpn
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
 - as: e2e-vsphere-upi
@@ -740,6 +764,11 @@ tests:
   run_if_changed: /agent/
   steps:
     cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        FIPS_MODE=true
+        NETWORK_TYPE=OVNKubernetes
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
 - as: e2e-agent-compact-ipv4-none-platform
@@ -752,6 +781,7 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
         AGENT_PLATFORM_TYPE=none
+        NETWORK_TYPE=OVNKubernetes
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
 - as: e2e-agent-compact-ipv4-appliance
@@ -764,6 +794,7 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
         AGENT_USE_APPLIANCE_MODEL=true
+        NETWORK_TYPE=OVNKubernetes
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
 - as: e2e-agent-sno-ipv6

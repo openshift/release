@@ -21,16 +21,16 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 function wait_for_power_down() {
   local bmc_host="${1}"
-  local bmc_port="${2}"
+  local bmc_forwarded_port="${2}"
   local bmc_user="${3}"
   local bmc_pass="${4}"
-  local ipxe_via_vmedia="${5}"
-  local vendor="${6}"
+  local vendor="${5}"
+  local ipxe_via_vmedia="${6}"
   local host_str
-  host_str="#${bmc_port##1[0-9]}"
+  host_str="#${bmc_forwarded_port##1[0-9]}"
   sleep 90
   local retry_max=40 # 15*40=600 (10 min)
-  while [ $retry_max -gt 0 ] && ! ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_port}" \
+  while [ $retry_max -gt 0 ] && ! ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
     -U "$bmc_user" -P "$bmc_pass" power status | grep -q "Power is off"; do
     echo "$host_str is not powered off yet... waiting"
     sleep 30
@@ -38,15 +38,15 @@ function wait_for_power_down() {
   done
   if [ $retry_max -le 0 ]; then
     echo -n "$host_str didn't power off successfully..."
-    if [ -f "/tmp/$bmc_host.$bmc_port" ]; then
+    if [ -f "/tmp/$bmc_host.$bmc_forwarded_port" ]; then
       echo "$host_str kept powered on and needs further manual investigation..."
       return 1
     else
       # We perform the reboot at most twice to overcome some known BMC hardware failures
       # that sometimes keep the hosts frozen before POST.
       echo "retrying $host_str again to reboot..."
-      touch "/tmp/$bmc_host.$bmc_port"
-      reset_host "$bmc_host" "$bmc_port" "$bmc_user" "$bmc_pass" "${ipxe_via_vmedia}" "${vendor}"
+      touch "/tmp/$bmc_host.$bmc_forwarded_port"
+      reset_host "$bmc_host" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"
       return $?
     fi
   fi
@@ -56,42 +56,17 @@ function wait_for_power_down() {
 
 function reset_host() {
   local bmc_address="${1}"
-  local bmc_port="${2}"
+  local bmc_forwarded_port="${2}"
   local bmc_user="${3}"
   local bmc_pass="${4}"
-  local ipxe_via_vmedia="${5}"
-  local vendor="${6}"
+  local vendor="${5}"
+  local ipxe_via_vmedia="${6}"
   local pdu_uri="${7:-}"
-  local host="${bmc_port##1[0-9]}"
+  local host="${bmc_forwarded_port##1[0-9]}"
   host="${host##0}"
-  echo "$host"
-  echo "Rebooting host #${host}"
-  ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_port}" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power off || echo "Already off"
-  ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_port}" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    chassis bootparam set bootflag force_pxe options=PEF,watchdog,reset,power
-  if [ "$ipxe_via_vmedia" == "true" ]; then
-    echo "Resetting host #${host} (via ipxe on vmedia)..."
-    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" mount.vmedia.ipxe "${host}"
-  fi
-  # If the host is not already powered off, the power on command can fail while the host is still powering off.
-  # Let's retry the power on command multiple times to make sure the command is received in the correct state.
-  for i in {1..10} max; do
-    if [ "$i" == "max" ]; then
-      echo "Failed to reset #$host"
-      return 1
-    fi
-    ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_port}" \
-      -U "$bmc_user" -P "$bmc_pass" \
-      power on && break
-    echo "Failed to power on #$host, retrying..."
-    sleep 5
-  done
-
-  if ! wait_for_power_down "$bmc_address" "$bmc_port" "$bmc_user" "$bmc_pass" "$ipxe_via_vmedia" "$vendor"; then
-    echo "$bmc_host:$bmc_port" >> /tmp/failed
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
+  if ! wait_for_power_down "$bmc_address" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"; then
+    echo "$bmc_host:$bmc_forwarded_port" >> /tmp/failed
   fi
   [ -z "${pdu_uri}" ] && return 0
   pdu_host=${pdu_uri%%/*}
@@ -107,8 +82,8 @@ function reset_host() {
 olReboot $pdu_socket
 quit
 EOF
-  if ! wait_for_power_down "$bmc_host" "$bmc_port" "$bmc_user" "$bmc_pass" "$ipxe_via_vmedia" "$vendor"; then
-    echo "$bmc_host:$bmc_port" >> /tmp/failed
+  if ! wait_for_power_down "$bmc_host" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"; then
+    echo "$bmc_host:$bmc_forwarded_port" >> /tmp/failed
   fi
 }
 
@@ -132,8 +107,8 @@ else
       echo "Error while unmarshalling hosts entries"
       exit 1
     fi
-    reset_host "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${ipxe_via_vmedia}" \
-      "${vendor}" "${pdu_uri:-}" &
+    reset_host "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${vendor}" "${ipxe_via_vmedia}" \
+      "${pdu_uri:-}" &
   done
 fi
 wait

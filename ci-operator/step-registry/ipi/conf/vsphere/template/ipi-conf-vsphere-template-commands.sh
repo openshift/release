@@ -24,9 +24,13 @@ if [ -z "${RHCOS_VM_TEMPLATE}" ]; then
 
   # select a hardware version for testing
   vsphere_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $1}')
+  vsphere_minor_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $3}')
   hw_versions=(15 17 18 19)
   if [[ ${vsphere_version} -eq 8 ]]; then
     hw_versions=(20)
+    if [[ ${vsphere_minor_version} -ge 2 ]]; then
+      hw_versions=(20 21)
+    fi
   fi
   hw_available_versions=${#hw_versions[@]}
   selected_hw_version_index=$((RANDOM % ${hw_available_versions}))

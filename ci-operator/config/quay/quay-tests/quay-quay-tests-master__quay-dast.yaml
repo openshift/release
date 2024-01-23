@@ -1,0 +1,82 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+images:
+- dockerfile_literal: |
+    FROM ubi_minimal
+    RUN microdnf install -y java-11-openjdk tar jq git openssl python3.11 python3-pip && \
+        ln -sf /usr/bin/python3.11 /usr/bin/python3
+    RUN curl -L https://github.com/zaproxy/zaproxy/releases/download/v2.13.0/ZAP_2.13.0_Linux.tar.gz > /tmp/ZAP_2.13.0_Linux.tar.gz
+    RUN python3 -m ensurepip --upgrade
+    RUN pip3 install python-dotenv pyyaml requests
+    RUN mkdir -p /usr/local/zap \
+      && tar xzvf /tmp/ZAP_2.13.0_Linux.tar.gz -C /usr/local/zap \
+      && rm -f /tmp/ZAP_2.13.0_Linux.tar.gz \
+      && chmod -R 777 ${HOME}
+    ENV PATH $PATH:/usr/local/zap/ZAP_2.13.0
+    ENV HOME="/tmp"
+  from: ubi_minimal
+  to: quay-test-dast
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: quay-dast-test-stage-quay-io
+  cron: 0 10 * * 5
+  steps:
+    env:
+      QUAY_ENV: STAGE_QUAY_IO
+    test:
+    - ref: quay-tests-test-quay-dast
+- as: quay-dast-test-prod-quay-io
+  cron: 0 11 * * 5
+  steps:
+    env:
+      QUAY_ENV: QUAY_IO
+    test:
+    - ref: quay-tests-test-quay-dast
+- as: quay-dast-test-quay310
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.14
+      QUAY_ENV: QUAY
+      QUAY_OPERATOR_CHANNEL: stable-3.10
+    test:
+    - ref: quay-tests-deploy-quay-odf
+    - ref: quay-tests-test-quay-dast
+    workflow: cucushift-installer-rehearse-aws-ipi
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay-tests
+  variant: quay-dast

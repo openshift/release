@@ -5,12 +5,27 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-./scripts/get-updated-distros.sh | while read -r FILENAME; do
-    if [ "${FILENAME}" == "_topic_maps/${TOPIC_MAP}" ]; then 
-        python3 ${BUILD}.py --distro ${DISTRO} --product "OpenShift Container Platform" --version ${VERSION} --no-upstream-fetch
-    else
-        echo "No modified AsciiDoc files in ${DISTRO} distro 🥳"
+IFS=' ' read -r -a DISTROS <<< "${DISTROS}"
+
+for DISTRO in "${DISTROS[@]}"; do
+
+    if [ "${DISTRO}" == "openshift-enterprise" ]; then
+        TOPICMAP="_topic_maps/_topic_map.yml"
+    elif [ "${DISTRO}" == "openshift-rosa" ]; then
+        TOPICMAP="_topic_maps/_topic_map_rosa.yml"
+    elif [ "${DISTRO}" == "openshift-osd" ]; then
+        TOPICMAP="_topic_maps/_topic_map_osd.yml"
+    elif [ "${DISTRO}" == "openshift-ms" ]; then
+        TOPICMAP="_topic_maps/_topic_map_ms.yml"
     fi
+
+    ./scripts/get-updated-distros.sh | while read -r FILENAME; do
+        if [ "${FILENAME}" == "${TOPICMAP}" ]; then
+            python3 "${BUILD}" --distro "${DISTRO}" --product "OpenShift Container Platform" --version "${VERSION}" --no-upstream-fetch
+        elif [ "${FILENAME}" == "_distro_map.yml" ]; then
+            python3 "${BUILD}" --distro "openshift-enterprise" --product "OpenShift Container Platform" --version "${VERSION}" --no-upstream-fetch
+        fi
+    done
 done
 
 if [ -d "drupal-build" ]; then

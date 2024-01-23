@@ -3,10 +3,6 @@ base_images:
     name: 4.16-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.16
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
@@ -20,18 +16,15 @@ images:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: csi-driver-manila
 - dockerfile_path: images/cinder-csi-plugin/Dockerfile
   inputs:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
@@ -100,6 +93,10 @@ tests:
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-csi-manila
+- as: security
+  optional: true
+  steps:
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift-priv
