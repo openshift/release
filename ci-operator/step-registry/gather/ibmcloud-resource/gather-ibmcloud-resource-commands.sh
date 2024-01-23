@@ -5,7 +5,7 @@ set -o pipefail
 set -o errexit
 
 
-RESOURCE_DUMP_DIR="${ARTIFACT_DIR}/ibmcloud-gather-resources"
+RESOURCE_DUMP_DIR="${ARTIFACT_DIR}"
 CLUSTER_FILTER="${NAMESPACE}-${UNIQUE_HASH}"
 declare -a MAIN_RESOURCES=(floating-ip image instance lb public-gateway sg subnet volume vpc)
 
