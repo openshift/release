@@ -37,6 +37,19 @@ releases:
       include_built_images: true
       name: "4.15"
       namespace: ocp
+  s390x-initial:
+    candidate:
+      architecture: s390x
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.15"
+  s390x-latest:
+    candidate:
+      architecture: s390x
+      product: ocp
+      stream: nightly
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -83,6 +96,13 @@ tests:
         AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
         MIRROR_IMAGES=true
     workflow: agent-e2e-generic
+  timeout: 6h0m0s
+- as: e2e-agent-ibmz-sno
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  steps:
+    workflow: agent-ibmz-sno-e2e
   timeout: 6h0m0s
 - as: gofmt
   commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
