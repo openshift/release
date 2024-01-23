@@ -469,3 +469,4 @@ function check_case_selected {
     fi
 }
 run
+sleep 3600
