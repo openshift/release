@@ -8,11 +8,19 @@ set -o pipefail
 # SMCP_VERSION and SMCP_NAMESPACE env variables are required
 
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
+export CONSOLE_URL
 OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
-OCP_CRED_USR="kubeadmin"
-OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
+export OCP_API_URL
 
-oc login ${OCP_API_URL} --username=${OCP_CRED_USR} --password=${OCP_CRED_PSW} --insecure-skip-tls-verify=true
+# login for interop
+if test -f ${SHARED_DIR}/kubeadmin-password
+then
+  OCP_CRED_USR="kubeadmin"
+  OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
+  oc login ${OCP_API_URL} --username=${OCP_CRED_USR} --password=${OCP_CRED_PSW} --insecure-skip-tls-verify=true
+else #login for ROSA & Hypershift platforms
+  eval "$(cat "${SHARED_DIR}/api.login")"
+fi
 
 if [ ${GATEWAY_API_ENABLED} = "true" ]
 then
@@ -21,6 +29,14 @@ then
 fi
 
 smcp_name="basic-smcp"
+
+# set security identity type
+if [ "$ROSA" == "true" ]
+then
+  sec_id_type="ThirdParty"
+else
+  sec_id_type="Kubernetes"
+fi
 
 if ! oc get namespace ${SMCP_NAMESPACE}
 then
@@ -59,6 +75,8 @@ spec:
       automtls: true
     controlPlane:
       mtls: true
+    identity:
+      type: ${sec_id_type}
   tracing:
     type: Jaeger
   addons:
