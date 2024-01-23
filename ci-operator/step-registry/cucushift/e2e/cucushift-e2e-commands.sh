@@ -69,22 +69,29 @@ function filter_test_by_platform() {
         ipixupi='ipi'
     fi
     platform="$(oc get infrastructure cluster -o yaml | yq '.status.platform' | tr 'A-Z' 'a-z')"
+    extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            aws|azure|gcp|nutanix)
-                export E2E_RUN_TAGS="@${platform}-${ipixupi} and ${E2E_RUN_TAGS}"
-                ;;
-            alicloud|baremetal|ibmcloud|vsphere)
-                echo "TO_BE_DONE, need extra tests, got platform as '$platform'"
-                ;;
             none)
                 export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
+                eval "$extrainfoCmd"
                 ;;
             external)
                 echo "Expected, got platform as '$platform'"
+                eval "$extrainfoCmd"
+                ;;
+            alibabacloud)
+                export E2E_RUN_TAGS="@alicloud-${ipixupi} and ${E2E_RUN_TAGS}"
+                ;;
+            aws|azure|baremetal|gcp|ibmcloud|nutanix)
+                export E2E_RUN_TAGS="@${platform}-${ipixupi} and ${E2E_RUN_TAGS}"
+                ;;
+            vsphere)
+                echo "TO_BE_DONE, need extra tests, got platform as '$platform'"
                 ;;
             *)
                 echo "Unexpected, got platform as '$platform'"
+                eval "$extrainfoCmd"
                 ;;
         esac
     fi
@@ -93,7 +100,6 @@ function filter_test_by_platform() {
 function filter_test_by_network() {
     local networktype
     networktype="$(oc get network.config/cluster -o yaml | yq '.spec.networkType')"
-    echo "networktype: $networktype"
     case "${networktype,,}" in
         openshiftsdn)
 	    networktag='@network-openshiftsdn'
@@ -145,7 +151,7 @@ function filter_test_by_capability() {
              [Build]=xxx
              [CloudCredential]=xxx
              [Console]=console
-             [CSISnapshot]=xxx
+             [CSISnapshot]=storage
              [DeploymentConfig]=xxx
              [ImageRegistry]=xxx
              [Insights]=xxx
@@ -161,26 +167,26 @@ function filter_test_by_capability() {
     case "$xversion.$yversion" in
         4.16)
             versioncaps="$v416"
-	    ;;
+            ;;
         4.15)
             versioncaps="$v415"
-	    ;;
+            ;;
         4.14)
             versioncaps="$v414"
-	    ;;
+            ;;
         4.13)
             versioncaps="$v413"
-	    ;;
+            ;;
         4.12)
             versioncaps="$v412"
-	    ;;
+            ;;
         4.11)
             versioncaps="$v411"
-	    ;;
+            ;;
         *)
             versioncaps=""
             echo "Got unexpected version: $xversion.$yversion"
-	    ;;
+            ;;
     esac
     for cap in ${versioncaps} ; do
         if ! (grep --ignore-case --quiet "$cap" <<< "$enabledcaps") ; then

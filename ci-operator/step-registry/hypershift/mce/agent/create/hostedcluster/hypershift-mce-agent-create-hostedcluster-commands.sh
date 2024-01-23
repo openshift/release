@@ -8,7 +8,7 @@ fi
 
 MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
 HYPERSHIFT_NAME=hcp
-if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
+if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4"
   HYPERSHIFT_NAME=hypershift
 fi
@@ -47,7 +47,7 @@ fi
   --image-content-sources "${SHARED_DIR}/mgmt_iscp.yaml" \
   --release-image ${RELEASE_IMAGE}
 
-if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
+if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4"
   oc annotate hostedclusters -n local-cluster ${CLUSTER_NAME} "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
   oc apply -f - <<EOF

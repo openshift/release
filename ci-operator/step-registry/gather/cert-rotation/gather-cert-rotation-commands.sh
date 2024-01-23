@@ -11,9 +11,11 @@ echo "************ openshift cert rotation gather command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+export BASTION_ARTIFACT_DIR="/run/artifacts"
+
 function getlogs() {
   echo "### Downloading logs..."
-  scp -r "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
+  scp -r "${SSHOPTS[@]}" "root@${IP}:${BASTION_ARTIFACT_DIR}/*" "${ARTIFACT_DIR}"
 }
 
 # Gather logs regardless of what happens after this
@@ -27,7 +29,8 @@ INTERNAL_SSH_OPTS=${INTERNAL_SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectT
 SSH=${SSH:-ssh ${INTERNAL_SSH_OPTS}}
 SCP=${SCP:-scp ${INTERNAL_SSH_OPTS}}
 COMMAND_TIMEOUT=15m
-ARTIFACT_DIR=/run/artifacts
+BASTION_ARTIFACT_DIR=/run/artifacts
+NODE_ARTIFACT_DIR=/run/artifacts
 
 mapfile -d ' ' -t control_node_ips < /srv/control_node_ips
 mapfile -d ' ' -t compute_node_ips < /srv/compute_node_ips
@@ -36,29 +39,29 @@ function run-on-all-nodes {
   for n in ${control_node_ips[@]} ${compute_node_ips[@]}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@${n} sudo 'bash -eEuxo pipefail' <<< ${1}; done
 }
 
-function copy-files-from-all-nodes {
-  for n in ${control_node_ips[@]} ${compute_node_ips[@]}; do timeout ${COMMAND_TIMEOUT} ${SCP} core@${n}:${1} "${2}"; done
-}
-
 function run-on-first-master {
   timeout ${COMMAND_TIMEOUT} ${SSH} core@${control_node_ips[0]} sudo 'bash -eEuxo pipefail' <<< ${1}
 }
 
-function copy-file-from-first-master {
-  timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_node_ips[0]}:${1}" "${2}"
+function fetch-artifacts-from-all-nodes {
+  for n in ${control_node_ips[@]} ${compute_node_ips[@]}; do
+    timeout ${COMMAND_TIMEOUT} ${SSH} core@${n} "sudo chmod a+r -R ${NODE_ARTIFACT_DIR}"
+    timeout ${COMMAND_TIMEOUT} ${SCP} -r "core@${n}:${NODE_ARTIFACT_DIR}" "${BASTION_ARTIFACT_DIR}"
+  done
 }
 
+trap fetch-artifacts-from-all-nodes EXIT
+
 run-on-all-nodes "
-  sudo mkdir ${ARTIFACT_DIR}
-  sudo podman run -t --name toolbox --authfile /var/lib/kubelet/config.json --privileged --ipc=host --net=host --pid=host -e HOST=/host -e NAME=toolbox- -e IMAGE=registry.redhat.io/rhel8/support-tools:latest -v /run:/run -v /var/log:/var/log -v /etc/machine-id:/etc/machine-id -v /etc/localtime:/etc/localtime -v /:/host registry.redhat.io/rhel8/support-tools:latest \
+  mkdir ${NODE_ARTIFACT_DIR}
+  chown -R core:core ${NODE_ARTIFACT_DIR}
+  podman run -t --name toolbox --authfile /var/lib/kubelet/config.json --privileged --ipc=host --net=host --pid=host -e HOST=/host -e NAME=toolbox- -e IMAGE=registry.redhat.io/rhel8/support-tools:latest -v /run:/run -v /var/log:/var/log -v /etc/machine-id:/etc/machine-id -v /etc/localtime:/etc/localtime -v /:/host registry.redhat.io/rhel8/support-tools:latest \
         sos report --case-id "\$HOSTNAME" --batch \
           -o container_log,filesys,logs,networkmanager,podman,processor,sar \
           -k podman.all -k podman.logs \
-          --tmp-dir ${ARTIFACT_DIR}
-  sudo tar -czvf ${ARTIFACT_DIR}/etc-kubernetes-\$HOSTNAME.tar.gz -C /etc/kubernetes /etc/kubernetes
-  sudo chown -R core:core ${ARTIFACT_DIR}
+          --tmp-dir ${NODE_ARTIFACT_DIR}
+  tar -czf ${NODE_ARTIFACT_DIR}/etc-kubernetes-\$HOSTNAME.tar.gz -C /etc/kubernetes /etc/kubernetes
 "
-copy-files-from-all-nodes '${ARTIFACT_DIR}/*.tar*' /tmp/artifacts/ || true
 
 # Build a new kubeconfig from control plane node kubeconfig
 run-on-first-master "
@@ -69,15 +72,13 @@ run-on-first-master "
   sed -i 's;/etc/kubernetes/static-pod-resources/configmaps/kube-apiserver-server-ca/ca-bundle.crt;/tmp/ca-bundle.crt;g' /tmp/control-plane-kubeconfig
 
   export KUBECONFIG=/tmp/control-plane-kubeconfig
-  oc get nodes -o yaml > ${ARTIFACT_DIR}/nodes.yaml
-  oc get csr -o yaml > ${ARTIFACT_DIR}/csrs.yaml
-  oc get co -o yaml > ${ARTIFACT_DIR}/cos.yaml
-  chown -R core:core ${ARTIFACT_DIR}
-  oc --insecure-skip-tls-verify adm must-gather --timeout=15m --dest-dir=${ARTIFACT_DIR}/must-gather
-  tar -czC ${ARTIFACT_DIR}/must-gather -f ${ARTIFACT_DIR}/must-gather.tar.gz .
-  chown -R core:core ${ARTIFACT_DIR}
+  oc get nodes -o yaml > ${NODE_ARTIFACT_DIR}/nodes.yaml
+  oc get csr -o yaml > ${NODE_ARTIFACT_DIR}/csrs.yaml
+  oc get co -o yaml > ${NODE_ARTIFACT_DIR}/cos.yaml
+
+  oc --insecure-skip-tls-verify adm must-gather --timeout=15m --dest-dir=${NODE_ARTIFACT_DIR}/must-gather
+  tar -czf ${NODE_ARTIFACT_DIR}/must-gather.tar.gz -C ${NODE_ARTIFACT_DIR}/must-gather ${NODE_ARTIFACT_DIR}/must-gather
 "
-copy-file-from-first-master "${ARTIFACT_DIR}/*" /tmp/artifacts/ || true
 
 exit 0
 EOF

@@ -62,12 +62,24 @@ if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
 else
     ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]}"
 fi
+
 # Choose topology for different job types:
-# Run periodic cnftests job with 2 baremetal nodes (with all CNF tests)
+# Run cnftests job with either 1 baremetal and 1 virtual node or 2 baremetal nodes.
+# Periodic cnftests job will use 2b(as we hardcoded to cnfdu1 and cnfdu3)
+# PR against release repo will i.e use i.e of 1b1v or 2b whichever is available
+# Any Pr against openshift-kni repo or rehersal job for openshift-kni repo to use 1b1v
 # Run nightly periodic jobs with 1 baremetal and 1 virtual node (with origin tests)
 # Run sno job with SNO topology
+
+
+if [ "$REPO_OWNER" == "openshift-kni" ]; then
+  TOPOLOGY_SELECTION="--topology 1b1v"
+else
+  TOPOLOGY_SELECTION="--topology 1b1v --topology 2b"
+fi
+
 if [[ "$T5CI_JOB_TYPE"  == "cnftests" ]]; then
-    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 2b"
+    ADDITIONAL_ARG="$ADDITIONAL_ARG $TOPOLOGY_SELECTION"
 elif [[ "$T5CI_JOB_TYPE"  == "origintests" ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v"
 elif [[ "$T5CI_JOB_TYPE"  == "sno" ]]; then

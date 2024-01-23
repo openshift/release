@@ -64,6 +64,8 @@ rules:
       - ''
     resources:
       - services
+      - endpoints
+      - endpoints/restricted
     verbs:
       - '*'
   - apiGroups:
