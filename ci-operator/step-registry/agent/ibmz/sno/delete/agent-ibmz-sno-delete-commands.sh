@@ -68,7 +68,7 @@ else
 fi
 
 # Deleting the Floating IP
-echo "Triggering the $infra_name-compute-$i-ip Floating IP in the $infra_name-rg resource group."
+echo "Triggering the $infra_name-sno-ip Floating IP in the $infra_name-rg resource group."
 fip_delete_status=$(ibmcloud is ipd $infra_name-sno-ip --output JSON -f | jq -r '.[]|.result')
 if [ "$fip_delete_status" = 'false' ]; then
     echo "Deletion of $infra_name-sno-ip floating IP is not successful."

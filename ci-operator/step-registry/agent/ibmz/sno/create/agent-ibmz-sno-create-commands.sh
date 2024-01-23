@@ -115,7 +115,6 @@ if [ "$zvsi_state" != "running" ]; then
 else 
   echo "Instance $infra_name-sno is created successfully in the $infra_name-vpc VPC."
   zvsi_rip=$(ibmcloud is instance $infra_name-sno --output json | jq -r '.primary_network_interface.primary_ip.address')
-  export $zvsi_rip
 fi
 sg_name=$(ibmcloud is instance $infra_name-sno --output JSON | jq -r '.network_interfaces|.[].security_groups|.[].name')
 echo "Adding an inbound rule in the $infra_name-sno instance security group for ssh and scp."

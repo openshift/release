@@ -1,3 +1,5 @@
+#!/bin/bash
+
 set -ex
 export KUBECONFIG=${SHARED_DIR}/abi-kubeconfig
 
