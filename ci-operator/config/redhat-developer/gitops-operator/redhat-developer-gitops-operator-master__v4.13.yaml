@@ -49,29 +49,22 @@ resources:
       memory: 6Gi
 tests:
 - as: kuttl-sequential
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.13"
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
+    cluster_profile: gitops-aws
     env:
-      INSTALL_NAMESPACE: openshift-gitops-operator
+      BASE_DOMAIN: ocp-gitops-qe.com
     test:
     - as: install
       cli: latest
       commands: |
-        oc create namespace "$INSTALL_NAMESPACE"
-        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
-        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment openshift-gitops-operator-controller-manager
+        oc create namespace openshift-gitops-operator
+        oc get ns openshift-gitops-operator -o yaml
+        operator-sdk run bundle --security-context-config restricted -n openshift-gitops-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-gitops-operator deployment openshift-gitops-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: gitops-operator-bundle
-      env:
-      - name: INSTALL_NAMESPACE
       from: operator-sdk
       resources:
         requests:
@@ -86,31 +79,24 @@ tests:
         requests:
           cpu: "2"
           memory: 6Gi
-    workflow: generic-claim
+    workflow: ipi-aws
 - as: kuttl-parallel
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.13"
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
+    cluster_profile: gitops-aws
     env:
-      INSTALL_NAMESPACE: openshift-gitops-operator
+      BASE_DOMAIN: ocp-gitops-qe.com
     test:
     - as: install
       cli: latest
       commands: |
-        oc create namespace "$INSTALL_NAMESPACE"
-        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
-        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment openshift-gitops-operator-controller-manager
+        oc create namespace openshift-gitops-operator
+        oc get ns openshift-gitops-operator -o yaml
+        operator-sdk run bundle --security-context-config restricted -n openshift-gitops-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-gitops-operator deployment openshift-gitops-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: gitops-operator-bundle
-      env:
-      - name: INSTALL_NAMESPACE
       from: operator-sdk
       resources:
         requests:
@@ -125,11 +111,13 @@ tests:
         requests:
           cpu: "2"
           memory: 6Gi
-    workflow: generic-claim
+    workflow: ipi-aws
 - as: e2e
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
-    cluster_profile: aws
+    cluster_profile: gitops-aws
+    env:
+      BASE_DOMAIN: ocp-gitops-qe.com
     test:
     - as: e2e-steps
       commands: scripts/openshiftci-presubmit-all-tests.sh
