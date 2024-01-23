@@ -28,9 +28,10 @@ export LABEL_SELECTOR=$LABEL_SELECTOR
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export ENABLE_ALERTS=False
 
+ls
+pwd 
 
-
-./time-scenarios/prow_run.sh
+./krkn-hub/time-scenarios/prow_run.sh
 rc=$?
 echo "Finished running time scenario"
 echo "Return code: $rc"
