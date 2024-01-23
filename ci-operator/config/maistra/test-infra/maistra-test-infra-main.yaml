@@ -522,6 +522,105 @@ tests:
           memory: 2Gi
       timeout: 1h0m0s
     workflow: servicemesh-istio-e2e-claim
+- as: test-infra-build-containers-2-6
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  run_if_changed: ^docker/maistra-builder_2\.6\.Dockerfile|^docker/scripts
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: build-containers-2-6
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          make build-containers-2.6
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-claim
+- as: test-infra-push-containers-2-6
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  postsubmit: true
+  run_if_changed: ^docker/maistra-builder_2\.6\.Dockerfile|^docker/scripts
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: push-containers-2-6
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /maistra-secrets/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+        entrypoint \
+        sh -c \
+        "docker login -u='maistra-dev+prow' \
+        -p=${QUAY_PASS} quay.io; \
+        make maistra-builder_2.6.push"
+      credentials:
+      - mount_path: /maistra-secrets
+        name: maistra-dev-prow
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-claim
 - as: test-infra-build-containers-3-0
   cluster_claim:
     architecture: amd64
