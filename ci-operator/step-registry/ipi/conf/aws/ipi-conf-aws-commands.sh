@@ -207,6 +207,7 @@ platform:
     region: ${REGION}
     userTags:
       expirationDate: ${expiration_date}
+      jobsource: prowci
 controlPlane:
   architecture: ${architecture}
   name: master

@@ -237,6 +237,8 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
+TAGS="${TAGS},Key=ci-build_id,Value=${BUILD_ID}"
+TAGS="${TAGS},Key=ci-job-name,Value=${JOB_NAME}"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 

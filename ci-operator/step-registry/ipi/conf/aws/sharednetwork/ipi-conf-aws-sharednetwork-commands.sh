@@ -20,6 +20,8 @@ CLUSTER_NAME="$(yq-go r "${CONFIG}" 'metadata.name')"
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 TAGS=( "Key=expirationDate,Value=${EXPIRATION_DATE}" )
 TAGS+=( "Key=ci-build-info,Value=${BUILD_ID}_${JOB_NAME}" )
+TAGS+=( "Key=ci-build_id,Value=${BUILD_ID}" )
+TAGS+=( "Key=ci-job-name,Value=${JOB_NAME}" )
 
 declare -x VPC_ID
 declare -x STACK_NAME_VPC

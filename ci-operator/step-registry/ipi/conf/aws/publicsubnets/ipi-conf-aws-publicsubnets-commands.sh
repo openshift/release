@@ -10,6 +10,8 @@ function join_by { local IFS="$1"; shift; echo "$*"; }
 
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
+TAGS="${TAGS},Key=ci-build_id,Value=${BUILD_ID}"
+TAGS="${TAGS},Key=ci-job-name,Value=${JOB_NAME}"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH=/tmp/install-config-publicsubnets.yaml.patch
