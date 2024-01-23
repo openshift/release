@@ -75,8 +75,15 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: GOFLAGS="" sh ./tests/run-e2e.sh --no-build --image-base registry.ci.openshift.org/osa
-        --version latest
+      commands: |
+        oc version
+        # Make kubectl available by creating a symlink to oc.
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then
+            ln -s oc kubectl
+        fi
+        popd
+        GOFLAGS="" sh ./tests/run-e2e.sh --no-build --image-base registry.ci.openshift.org/osa --version latest
       from: src
       resources:
         requests:
