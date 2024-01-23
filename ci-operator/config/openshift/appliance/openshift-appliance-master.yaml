@@ -7,20 +7,12 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_golang-1.19:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
 build_root:
   project_image:
     dockerfile_path: Dockerfile.openshift-appliance-build
 images:
 - dockerfile_path: Dockerfile.openshift-appliance
   from: coreos-centos-stream8
-  inputs:
-    openshift_release_golang-1.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: agent-preinstall-image-builder
 promotion:
   to:
@@ -78,6 +70,7 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_BOOT_MODE=DISKIMAGE
         AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        NETWORK_TYPE=OVNKubernetes
         INSTALLER_PROXY=true
     workflow: agent-e2e-generic
   timeout: 6h0m0s

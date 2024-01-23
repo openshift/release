@@ -112,9 +112,6 @@ spec:
     - mountPath: /lib/modules
       name: modules
       readOnly: true
-    - mountPath: /sys/fs/cgroup
-      name: cgroup
-      readOnly: true
     - mountPath: /var/lib/docker
       name: varlibdocker
       readOnly: false
@@ -123,10 +120,6 @@ spec:
       path: /lib/modules
       type: Directory
     name: modules
-  - hostPath:
-      path: /sys/fs/cgroup
-      type: Directory
-    name: cgroup
   - emptyDir: {}
     name: varlibdocker
 EOF
