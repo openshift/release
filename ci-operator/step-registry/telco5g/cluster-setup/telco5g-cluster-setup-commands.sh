@@ -28,8 +28,9 @@ echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
 # Set environment for jobs to run
 INTERNAL=true
 INTERNAL_ONLY=true
-# Run cnftests periodic and nightly job on Upstream cluster
-if [[ "$T5_JOB_TRIGGER" == "periodic" ]] || [[ "$T5_JOB_TRIGGER" == "nightly" ]]; then
+# If the job trigger is "periodic" or "nightly" or the repository owner is "openshift-kni",
+# use the upstream cluster to run the job.
+if [[ "$T5_JOB_TRIGGER" == "periodic" ]] || [[ "$T5_JOB_TRIGGER" == "nightly" ]] || [[ "$REPO_OWNER" == "openshift-kni" ]]; then
     INTERNAL=false
     INTERNAL_ONLY=false
 else
