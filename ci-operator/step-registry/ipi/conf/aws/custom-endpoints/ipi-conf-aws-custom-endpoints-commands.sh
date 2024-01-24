@@ -6,19 +6,21 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 function patch_endpoint()
 {
   local service_name=$1
-  local service_endpoint=$2
+  local custom_service_endpoint=$2
   local config_patch="${SHARED_DIR}/install-config-${service_name}.yaml.patch"
-  if [ "$service_endpoint" == "DEFAULT_ENDPOINT" ]; then
-    service_endpoint="https://${service_name}.${REGION}.amazonaws.com"
+  if [ "$custom_service_endpoint" == "DEFAULT_ENDPOINT" ]; then
+    ep="https://${service_name}.${REGION}.amazonaws.com"
+  else
+    ep="https://${custom_service_endpoint}.${REGION}.amazonaws.com"
   fi
   cat > "${config_patch}" << EOF
 platform:
   aws:
     serviceEndpoints:
     - name: ${service_name}
-      url: ${service_endpoint}
+      url: ${ep}
 EOF
-  echo "Adding custom endpoint $service_name $service_endpoint"
+  echo "Adding custom endpoint ${service_name} ${ep}"
   yq-go m -a -x -i "${CONFIG}" "${config_patch}"
 }
 
