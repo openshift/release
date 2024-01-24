@@ -112,11 +112,11 @@ sleep 60
 
 # Deleting the resource group
 set -e
-echo "Verifying if any resource reclamations are present in the $infra_name-rg resource group"
 rg_id=$(ibmcloud resource groups -q | awk -v rg="$infra_name-rg" '$1 == rg {print $2}')
 echo "Resource Group ID: $rg_id"
-instance_ids=$(ibmcloud resource reclamations --output json | jq -r --arg rid "$rg_id" '.[]|select(.resource_group_id == $rid)|.id' | tr '\n' ' ')
-IFS=' ' read -ra instance_id_list <<< "$instance_ids"
+
+echo "Verifying if any resource reclamations are present in the $infra_name-rg resource group"
+instance_ids=($(ibmcloud resource reclamations --output json | jq -r --arg rid "$rg_id" '.[]|select(.resource_group_id == $rid)|.id' | tr '\n' ' '))
 if [ ${#instance_id_list[@]} -gt 0 ]; then
     echo "Reclamation Instance IDs :" "${instance_id_list[@]}"
     for instance_id in "${instance_id_list[@]}"; do
@@ -124,7 +124,19 @@ if [ ${#instance_id_list[@]} -gt 0 ]; then
         ibmcloud resource reclamation-delete $instance_id -f 
     done
 else
-    echo "No resource reclamations present in $infra_name-rg"
+    echo "No resource reclamations are present in $infra_name-rg"
+fi
+
+echo "Verifying if any service instances are present in the $infra_name-rg resource group"
+si_list=($(ibmcloud resource service-instances --type all -g $infra_name-rg --output JSON | jq -r '.[]|.name' | tr '\n' ' '))
+if [ ${#si_list[@]} -gt 0 ]; then
+    echo "Service Instance Names :" "${si_list[@]}"
+    for si in "${si_list[@]}"; do
+        echo "Deleting the service instance $si"
+        ibmcloud resource service-instance-delete $si -g $infra_name-rg --recursive -f
+    done
+else
+    echo "No service instances are present in $infra_name-rg"
 fi
 
 echo "Triggering the $infra_name-rg resource group deletion in the $IC_REGION region."
