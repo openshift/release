@@ -7,10 +7,9 @@ cat /etc/os-release
 oc config view
 oc projects
 python3 --version
-pushd /tmp
+ls
 
 ls -la /root/kraken
-pushd /krkn-hub
 
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
