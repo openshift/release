@@ -196,6 +196,9 @@ patches:
             rbd_store_user=openstack
             rbd_store_pool=images
             store_description=ceph_glance_store
+    - op: replace
+      path: /spec/glance/template/glanceAPIs/default/type
+      value: split
 $(if [[ "${SERVICE_NAME}" == "IRONIC" ]]; then
   cat <<IRONIC_EOF
     - op: add
