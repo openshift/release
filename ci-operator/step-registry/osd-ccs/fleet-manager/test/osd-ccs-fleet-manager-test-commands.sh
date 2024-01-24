@@ -636,7 +636,12 @@ function test_machinesets_naming () {
   TEST_PASSED=true
 
   ## get first name of found machineset
-  echo "Getting the name of a first available machineset to confirm that its valid"
+  echo "Getting kubeconfig output and the name of a first available machineset to confirm that its valid"
+  
+  cat "$MC_KUBECONFIG"
+  UNFILTERED_MS_OUTPUT=$(oc --kubeconfig="$MC_KUBECONFIG" get machinesets -A) || true
+  echo "UNFILTERED_MS_OUTPUT"
+  echo "$UNFILTERED_MS_OUTPUT"
   MACHINE_SETS_OUTPUT=""
   ## if no machinesets are found, the statement below will not assign anything to the MACHINE_SETS_OUTPUT
   MACHINE_SETS_OUTPUT=$(oc --kubeconfig="$MC_KUBECONFIG" get machinesets -A | grep "serving" | grep -v "non-serving" |  awk '{print $2}' | head -1) || true
@@ -745,10 +750,6 @@ function test_machine_health_check_config () {
   TEST_PASSED=true
 
   echo "Running: MC srep-worker-healthcheck MHC check (OCPQE-17157) test"
-
-  echo "Checking status of MC cluster"
-
-  oc --kubeconfig="$MC_KUBECONFIG" status
 
   echo "Checking MC MHC match expressions operator"
   EXPECTED_MHC_MATCH_EXPRESSIONS_OPERATOR="NotIn"
@@ -1050,8 +1051,6 @@ function test_machineset_tains_and_labels () {
   echo "Create machine pools for request serving HCP components tests (OCPQE-17866) test"
 
   echo "Checking status of MC cluster"
-
-  oc --kubeconfig="$MC_KUBECONFIG" status
 
   echo "Getting all machinesets output"
 
