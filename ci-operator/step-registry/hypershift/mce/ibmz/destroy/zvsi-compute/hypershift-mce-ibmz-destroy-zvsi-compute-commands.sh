@@ -38,9 +38,9 @@ else
 fi 
 
 # Login to the IBM Cloud
-echo "Logging into IBM Cloud in the $IC_REGION region and $IC_INFRA_NAME-rg resource group."
+echo "Logging into IBM Cloud in the $IC_REGION region and $infra_name-rg resource group."
 ibmcloud config --check-version=false                               # To avoid manual prompt for updating CLI version
-ibmcloud login --apikey $IC_API_KEY -r $IC_REGION -g $IC_INFRA_NAME-rg
+ibmcloud login --apikey $IC_API_KEY -r $IC_REGION -g $infra_name-rg
 echo "Installing the required ibmcloud plugins if not present."
 for plugin in "${plugins_list[@]}"; do  
   ibmcloud plugin list -q | grep $plugin
@@ -54,7 +54,7 @@ for plugin in "${plugins_list[@]}"; do
 done
 
 # Deleting the DNS Service
-echo "Triggering the $infra_name-dns DNS instance deletion in the resource group $IC_INFRA_NAME-rg."
+echo "Triggering the $infra_name-dns DNS instance deletion in the resource group $infra_name-rg."
 dns_zone_id=$(ibmcloud dns zones -i $infra_name-dns | grep $HC_NAME.$hcp_domain | awk '{print $1}')
 glb_id=$(ibmcloud dns glbs $dns_zone_id -i $infra_name-dns --output json | jq -r '.[]|.id')
 glb_pool_id=$(ibmcloud dns glb-pools -i $infra_name-dns --output json | jq -r '.[]|.id')
@@ -63,7 +63,7 @@ ibmcloud dns glb-delete $dns_zone_id $glb_id -i $infra_name-dns -f
 ibmcloud dns glb-pool-delete $glb_pool_id -i $infra_name-dns -f
 ibmcloud dns permitted-network-remove $dns_zone_id $network_id -i $infra_name-dns -f 
 ibmcloud dns instance-delete $infra_name-dns -f
-echo "Successfully deleted the DNS instance $infra_name-dns from the resource group $IC_INFRA_NAME-rg."
+echo "Successfully deleted the DNS instance $infra_name-dns from the resource group $infra_name-rg."
 set +e
 
 # Deleting the zVSIs and Floating IPs
@@ -71,7 +71,7 @@ for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
     echo "Triggering the $infra_name-compute-$i instance deletion in the $infra_name-vpc VPC."
     vsi_status=$(ibmcloud is instance-delete $infra_name-compute-$i --output JSON -f | jq -r '.[]|.result')
     vsi_delete_status+=("$vsi_status")
-    echo "Triggering the $infra_name-compute-$i-ip Floating IP in the $IC_INFRA_NAME-rg resource group."
+    echo "Triggering the $infra_name-compute-$i-ip Floating IP in the $infra_name-rg resource group."
     fip_status=$(ibmcloud is ipd $infra_name-compute-$i-ip --output JSON -f | jq -r '.[]|.result')
     fip_delete_status+=("$fip_status")
 done
@@ -87,10 +87,10 @@ done
 
 for status in "${fip_delete_status[@]}"; do
     if [ "$status" = 'false' ]; then
-        echo "$infra_name-compute-ip floating IPs are not deleted successfully in the $IC_INFRA_NAME-rg resource group."
+        echo "$infra_name-compute-ip floating IPs are not deleted successfully in the $infra_name-rg resource group."
         exit 1
     else 
-        echo "Successfully deleted the $infra_name-compute-ip floating IPs in the $IC_INFRA_NAME-rg resource group."
+        echo "Successfully deleted the $infra_name-compute-ip floating IPs in the $infra_name-rg resource group."
     fi
 done
 
@@ -107,12 +107,12 @@ else
 fi
 
 # Deleting the VPC
-echo "Triggering the $infra_name-vpc VPC deletion in the $IC_INFRA_NAME-rg resource group."
+echo "Triggering the $infra_name-vpc VPC deletion in the $infra_name-rg resource group."
 vpc_delete_status=$(ibmcloud is vpc-delete $infra_name-vpc --output JSON -f | jq -r '.[]|.result')
 if [ $vpc_delete_status == "true" ]; then
-    echo "Successfully deleted the VPC $infra_name-vpc in the $IC_INFRA_NAME-rg resource group."
+    echo "Successfully deleted the VPC $infra_name-vpc in the $infra_name-rg resource group."
 else 
-    echo "Error: Failed to delete the $infra_name-vpc VPC in the $IC_INFRA_NAME-rg resource group."
+    echo "Error: Failed to delete the $infra_name-vpc VPC in the $infra_name-rg resource group."
     exit 1
 fi
 
