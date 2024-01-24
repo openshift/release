@@ -1,17 +1,9 @@
-base_images:
-  openshift-docs:
-    name: openshift-docs-asciidoc
-    namespace: ocp
-    tag: latest
 build_root:
   image_stream_tag:
     name: openshift-docs-asciidoc
     namespace: ocp
     tag: latest
   use_build_cache: true
-images:
-- from: openshift-docs
-  to: openshift-docs-builder
 resources:
   '*':
     limits:
@@ -28,68 +20,16 @@ tests:
     test:
     - ref: openshift-docs-build-docs
     - ref: openshift-docs-preview-comment
-- as: asciidoctor
+- as: validate-asciidoc
   steps:
+    env:
+      BUILD: build.py
+      DISTROS: openshift-enterprise openshift-rosa openshift-dedicated microshift
+      VERSION: "4.15"
     test:
     - ref: openshift-docs-asciidoctor
-- as: portal-build-enterprise-build-for-portal
-  steps:
-    env:
-      BUILD: build_for_portal
-      DISTRO: openshift-enterprise
-      TOPIC_MAP: _topic_map.yml
-      VERSION: "4.15"
-    test:
-    - ref: openshift-docs-portal
-- as: portal-build-enterprise-build
-  steps:
-    env:
-      BUILD: build
-      DISTRO: openshift-enterprise
-      TOPIC_MAP: _topic_map.yml
-      VERSION: "4.15"
-    test:
-    - ref: openshift-docs-portal
-- as: portal-build-distros
-  steps:
-    env:
-      BUILD: build
-      DISTRO: openshift-enterprise
-      TOPIC_MAP: _distro_map.yml
-      VERSION: "4.15"
-    test:
-    - ref: openshift-docs-portal
-- as: portal-build-dedicated
-  steps:
-    env:
-      BUILD: build
-      DISTRO: openshift-dedicated
-      TOPIC_MAP: _topic_map_osd.yml
-      VERSION: "4.15"
-    test:
-    - ref: openshift-docs-portal
-- as: portal-build-rosa
-  steps:
-    env:
-      BUILD: build
-      DISTRO: openshift-rosa
-      TOPIC_MAP: _topic_map_rosa.yml
-      VERSION: "4.15"
-    test:
-    - ref: openshift-docs-portal
-- as: portal-build-microshift
-  steps:
-    env:
-      BUILD: build
-      DISTRO: microshift
-      TOPIC_MAP: _topic_map_ms.yml
-      VERSION: "4.11"
-    test:
-    - ref: openshift-docs-portal
-- as: topic-maps
-  steps:
-    test:
     - ref: openshift-docs-lint-topicmaps
+    - ref: openshift-docs-portal
 zz_generated_metadata:
   branch: prow-test
   org: openshift

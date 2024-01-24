@@ -16,7 +16,11 @@ OMR_AWS_SECRET_KEY=$(cat /var/run/quay-qe-omr-secret/secret_key)
 #Retrieve the Credentials of image registry "brew.registry.redhat.io"
 OMR_BREW_USERNAME=$(cat /var/run/quay-qe-brew-secret/username)
 OMR_BREW_PASSWORD=$(cat /var/run/quay-qe-brew-secret/password)
-OMR_IMAGE_TAG="brew.registry.redhat.io/rh-osbs/${OMR_IMAGE}"
+if [ -z "${OMR_IMAGE_ENV+x}" ]; then
+    OMR_IMAGE_TAG="brew.registry.redhat.io/rh-osbs/${OMR_IMAGE}"
+else
+   OMR_IMAGE_TAG="brew.registry.redhat.io/rh-osbs/${OMR_IMAGE_ENV}"
+fi
 OMR_RELEASED_TEST="${OMR_RELEASE}"
 OMR_CI_NAME="omrprowci$RANDOM"
 

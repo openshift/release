@@ -34,6 +34,10 @@ cat <<'EOF' >/tmp/install.sh
 set -xeuo pipefail
 export PS4='+ $(date "+%T.%N") ${BASH_SOURCE#$HOME/}:$LINENO \011'
 
+DNF_RETRY=$(mktemp /tmp/dnf_retry.XXXXXXXX.sh)
+curl -s https://raw.githubusercontent.com/openshift/microshift/main/scripts/dnf_retry.sh -o "${DNF_RETRY}"
+chmod 755 "${DNF_RETRY}"
+
 source /tmp/microshift-clusterbot-settings
 
 if ! sudo subscription-manager status >&/dev/null; then
@@ -42,8 +46,7 @@ if ! sudo subscription-manager status >&/dev/null; then
 		--activationkey="$(cat /tmp/subscription-manager-act-key)"
 fi
 
-sudo dnf clean all
-hash git || sudo dnf install -y git-core
+hash git || "${DNF_RETRY}" "install" "git-core"
 
 sudo mkdir -p /etc/microshift
 sudo cp /tmp/config.yaml /etc/microshift/config.yaml
@@ -58,7 +61,7 @@ if [[ -n "${MICROSHIFT_PR}" ]]; then
 	git switch "${branch}"
 
 	configure_args=""
-	if ~/microshift/scripts/devenv-builder/configure-vm.sh --help | grep -q -- "--skip-dnf-update"; then
+	if grep -qw -- "--skip-dnf-update" ~/microshift/scripts/devenv-builder/configure-vm.sh; then
 		configure_args="--skip-dnf-update"
 	fi
 	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
@@ -69,7 +72,7 @@ elif [[ -n "${MICROSHIFT_GIT}" ]]; then
 	git clone https://github.com/openshift/microshift -b "${MICROSHIFT_GIT}" ~/microshift
 
 	configure_args=""
-	if ~/microshift/scripts/devenv-builder/configure-vm.sh --help | grep -q -- "--skip-dnf-update"; then
+	if grep -qw -- "--skip-dnf-update" ~/microshift/scripts/devenv-builder/configure-vm.sh; then
 		configure_args="--skip-dnf-update"
 	fi
 	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
@@ -80,7 +83,7 @@ else
 	git clone https://github.com/openshift/microshift -b "release-${OCP_VERSION}" ~/microshift
 
 	configure_args=""
-	if ~/microshift/scripts/devenv-builder/configure-vm.sh --help | grep -q -- "--skip-dnf-update"; then
+	if grep -qw -- "--skip-dnf-update" ~/microshift/scripts/devenv-builder/configure-vm.sh; then
 		configure_args="--skip-dnf-update"
 	fi
 
@@ -113,7 +116,7 @@ skip_if_unavailable=0
 2EOF2
     fi
 
-	sudo dnf install -y "microshift-${version}"
+	"${DNF_RETRY}" "install" "microshift-${version}"
 	sudo systemctl enable --now microshift
 fi
 EOF

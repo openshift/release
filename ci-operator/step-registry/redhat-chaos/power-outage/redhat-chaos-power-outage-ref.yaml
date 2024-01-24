@@ -1,0 +1,58 @@
+ref:
+  as: redhat-chaos-power-outage
+  from_image:
+    namespace: chaos
+    name: krkn
+    tag: latest
+  commands: redhat-chaos-power-outage-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aws-chaos
+    mount_path: /secret/telemetry
+  env:
+    - name: SHUTDOWN_DURATION
+      default: "900"
+    - name: CLOUD_TYPE
+      default: "aws"
+    - name: TIMEOUT
+      default: "600" 
+    - name: ENABLE_ALERTS
+      default: "True"
+    - name: ALERTS_PATH
+      default: "/tmp/krkn-hub/prow/node-disruptions/slos" 
+    - name: CHECK_CRITICAL_ALERTS
+      default: "True"
+    - name: WAIT_DURATION
+      default: "100"
+    - name: TELEMETRY_ENABLED
+      default: "True"
+    - name: TELEMETRY_API_URL
+      default: "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production"
+    - name: TELEMETRY_USERNAME
+      default: "redhat-chaos"
+    - name: TELEMETRY_RUN_TAG
+      default: "prow-power-outages"
+    - name: TELEMETRY_PROMETHEUS_BACKUP
+      default: "True"
+    - name: TELEMETRY_FULL_PROMETHEUS_BACKUP
+      default: "True"
+    - name: TELEMTRY_BACKUP_THREADS
+      default: "5"
+    - name: TELEMETRY_ARCHIVE_PATH
+      default: "/tmp"
+    - name: TELEMETRY_MAX_RETRIES
+      default: "0"
+    - name: TELEMETRY_ARCHIVE_SIZE
+      default: "1000000"
+    - name: TELEMETRY_LOGS_BACKUP
+      default: "True"
+    - name: TELEMTRY_CLI_PATH
+      default: "/usr/local/bin/oc"
+    - name: TELEMETRY_EVENTS_BACKUP
+      default: "True"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the krkn-hub config workload in the deployed cluster to mimic power outages or cluster shutdown to understand the recovery timing and performance impact once the cluster is back on - users turn on and off the clusters depending on the load.

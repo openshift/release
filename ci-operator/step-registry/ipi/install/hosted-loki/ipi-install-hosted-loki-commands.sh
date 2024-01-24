@@ -9,18 +9,24 @@ then
   exit 0
 fi
 
-# Some kinds of jobs need to skip installing loki by default
-if [[ "$JOB_NAME" =~ .*ipv6.* ]]
-then
-  echo "IPv6 clusters are disconnected and won't be able to reach Loki."
-  exit 0
-fi
 
-# Some kinds of jobs need to skip installing loki by default; but to make
-# sure we rightfully skip them, we have two different conditions.
-if [[ "$JOB_NAME" =~ .*proxy.* ]] || test -f "${SHARED_DIR}/proxy-conf.sh"
+PROXYCFGLINE=
+PROXYLINE=
+if test -f "${SHARED_DIR}/proxy-conf.sh" && [[ "$JOB_NAME" =~ .*ipv6.* ]]
+then
+    # proxy-conf.sh holds the IPv4 address, we can't use it here
+    PROXYCFGLINE="        proxy_url: http://[fd00:1101::1]:8213"
+    PROXYLINE="          - name: https_proxy
+            value: http://[fd00:1101::1]:8213"
+# Some kinds of jobs need to skip installing loki by default
+elif [[ "$JOB_NAME" =~ .*proxy.* ]]
 then
   echo "Clusters using a proxy are not yet supported for loki"
+  exit 0
+# Some kinds of jobs need to skip installing loki by default
+elif [[ "$JOB_NAME" =~ .*ipv6.* ]]
+then
+  echo "IPv6 clusters are disconnected and won't be able to reach Loki."
   exit 0
 fi
 
@@ -109,6 +115,7 @@ data:
         batchsize: 102400
         batchwait: 10s
         bearer_token_file: /tmp/shared/prod_bearer_token
+$PROXYCFGLINE
         timeout: 10s
         url: ${LOKI_ENDPOINT}/push
     positions:
@@ -411,6 +418,7 @@ spec:
               secretKeyRef:
                 name: promtail-prod-creds
                 key: audience
+$PROXYLINE
         volumeMounts:
         - mountPath: "/tmp/shared"
           name: shared-data
