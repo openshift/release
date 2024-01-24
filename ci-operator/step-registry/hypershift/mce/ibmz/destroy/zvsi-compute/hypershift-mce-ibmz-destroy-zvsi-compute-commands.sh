@@ -148,7 +148,7 @@ else
 fi
 
 echo "Verifying if any service instances are present in the $infra_name-rg resource group"
-si_names=($(ibmcloud resource service-instances --type all -g $infra_name-rg --output JSON | jq -r '.[]|.name' | tr '\n' ' '))
+si_names=$(ibmcloud resource service-instances --type all -g $infra_name-rg --output JSON | jq -r '.[]|.name' | tr '\n' ' ')
 IFS=' ' read -ra si_list <<< "$si_names"
 if [ ${#si_list[@]} -gt 0 ]; then
     echo "Service Instance Names :" "${si_list[@]}"
