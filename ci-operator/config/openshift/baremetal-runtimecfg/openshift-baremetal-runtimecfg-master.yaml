@@ -3,23 +3,23 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
-  ubi8:
+    tag: rhel-9-golang-1.20-openshift-4.16
+  ubi9:
     name: ubi
     namespace: ocp
-    tag: "8"
+    tag: "9"
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.openshift
   from: base-os
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
   to: baremetal-runtimecfg
 promotion:
   to:
@@ -29,8 +29,8 @@ raw_steps:
 - pipeline_image_cache_step:
     commands: |
       rm -rf /etc/yum.repos.d/*
-      curl http://base-4-6-rhel8.ocp.svc > /etc/yum.repos.d/base-4-6-rhel8.repo
-    from: ubi8
+      curl http://base-4-16-rhel9.ocp.svc > /etc/yum.repos.d/base-4-16-rhel9.repo
+    from: ubi9
     to: base-os
 releases:
   initial:
