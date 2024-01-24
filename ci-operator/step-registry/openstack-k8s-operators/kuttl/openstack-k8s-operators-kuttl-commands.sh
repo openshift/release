@@ -22,7 +22,7 @@ PROW_BUILD=$(echo ${JOB_SPEC} | jq -r '.buildid')
 # PR SHA
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
 # Build tag
-BUILD_TAG="${PR_SHA}-${PROW_BUILD}"
+BUILD_TAG="${PR_SHA:0:20}-${PROW_BUILD}"
 
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name

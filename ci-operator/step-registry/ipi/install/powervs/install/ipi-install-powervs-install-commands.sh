@@ -240,7 +240,7 @@ function install_required_tools() {
       exit 1
     fi
 
-    for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns; do
+    for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns tg-cli; do
       ibmcloud plugin install ${I}
     done
     ibmcloud plugin list
@@ -253,6 +253,17 @@ function install_required_tools() {
         exit 1
       fi
     done
+
+    # Handle the following:
+    #   $ ibmcloud tg
+    #   FAILED
+    #   Not logged in. Use 'ibmcloud login' to log in.
+    if [ ! -d ${HOME}/.bluemix/plugins/tg-cli ]; then
+      echo "Error: ibmcloud's tg-cli plugin dir is not installed?"
+      ls -la ${HOME}/.bluemix/
+      ls -la ${HOME}/.bluemix/plugins/
+      exit 1
+    fi
   fi
 
   if [ ! -f /tmp/jq ]; then
@@ -436,45 +447,6 @@ function delete_network() {
 
 function destroy_resources() {
   #
-  # TODO: Remove after infra bugs are fixed
-  # TO confirm resources are cleared properly
-  #
-
-  #
-  # Clean up DHCP networks via curl.
-  # At the moment, this is the only api and 4.11 version of destroy cluster
-  # only cleans up DHCP networks in use by VMs, which is not always the case.
-  #
-  [ -z "${CLOUD_INSTANCE_ID}" ] && exit 1
-  echo "CLOUD_INSTANCE_ID=${CLOUD_INSTANCE_ID}"
-  set +x
-  BEARER_TOKEN=$(curl --silent -X POST "https://iam.cloud.ibm.com/identity/token" -H "content-type: application/x-www-form-urlencoded" -H "accept: application/json" -d "grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey&apikey=${IBMCLOUD_API_KEY}" | jq -r .access_token)
-  export BEARER_TOKEN
-  [ -z "${BEARER_TOKEN}" ] && exit 1
-  [ "${BEARER_TOKEN}" == "null" ] && exit 1
-  DHCP_NETWORKS_RESULT="$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")"
-  echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | "\(.id) - \(.network.name)"'
-  for i in {1..3}; do
-    while read UUID
-    do
-      echo ${UUID}
-      GET_RESULT=$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp/${UUID}" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")
-      echo "GET_RESULT=${GET_RESULT}"
-      if [ "${GET_RESULT}" == "{}" ]
-      then
-        continue
-      fi
-      if [ "$(echo "${GET_RESULT}" | jq -r '.error')" == "dhcp server not found" ]
-      then
-        continue
-      fi
-      DELETE_RESULT=$(curl --silent --location --request DELETE "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp/${UUID}" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")
-      echo "DELETE_RESULT=${DELETE_RESULT}"
-      sleep 2m
-    done < <(echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | .id')
-  done
-
-  #
   # Create a fake cluster metadata file
   #
   mkdir /tmp/ocp-test
@@ -499,22 +471,6 @@ EOF
       break
     fi
   done
-
-  #
-  # Clean up leftover networks from a previous OpenShift cluster
-  #
-  if ! delete_network "rdr-multiarch-${POWERVS_ZONE}"
-  then
-      DESTROY_SUCCEEDED=false
-  fi
-
-  #
-  # Clean up the public-192_168_XXX_XX-XX-VLAN_XXXX network
-  #
-  if ! delete_network "public-192_168"
-  then
-      DESTROY_SUCCEEDED=false
-  fi
 
   if ! ${DESTROY_SUCCEEDED}
   then
@@ -548,27 +504,22 @@ function dump_resources() {
   echo "INFRA_ID=${INFRA_ID}"
   export INFRA_ID
 
-  echo "8<--------8<--------8<--------8<-------- Cloud Connection 8<--------8<--------8<--------8<--------"
+# "8<--------8<--------8<--------8<-------- Transit Gateways 8<--------8<--------8<--------8<--------"
 
-  CLOUD_UUID=$(ibmcloud pi connections --json | jq -r '.cloudConnections[] | select (.name|test("'${INFRA_ID}'")) | .cloudConnectionID')
+(
+  echo "8<--------8<--------8<--------8<-------- Transit Gateways 8<--------8<--------8<--------8<--------"
 
-  if [ -z "${CLOUD_UUID}" ]
+  ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | "\(.name) - \(.id)"'
+
+  GATEWAY_ID=$(ibmcloud tg gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
+  if [ -z "${GATEWAY_ID}" ]
   then
-    echo "Error: Could not find a Cloud Connection with the name ${INFRA_ID}"
-  else
-    ibmcloud pi connection ${CLOUD_UUID}
+    echo "Error: GATEWAY_ID is empty"
+    exit
   fi
 
-  echo "8<--------8<--------8<--------8<-------- Direct Link 8<--------8<--------8<--------8<--------"
-
-  DL_UUID=$(ibmcloud dl gateways --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
-
-  if [ -z "${DL_UUID}" ]
-  then
-    echo "Error: Could not find a Direct Link with the name ${INFRA_ID}"
-  else
-    ibmcloud dl gateway ${DL_UUID}
-  fi
+  ibmcloud tg connections ${GATEWAY_ID}
+)
 
 # "8<--------8<--------8<--------8<-------- Load Balancers 8<--------8<--------8<--------8<--------"
 

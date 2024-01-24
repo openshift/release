@@ -203,7 +203,8 @@ oc create secret generic ${PUSH_REGISTRY_SECRET} --from-file=.dockerconfigjson=/
 
 # Build operator
 IMAGE_TAG_BASE=${PUSH_REGISTRY}/${PUSH_ORGANIZATION}/${BASE_OP}
-BUILD_TAG="${PR_SHA}-${PROW_BUILD}"
+BUILD_TAG="${PR_SHA:0:20}-${PROW_BUILD}"
+
 build_push_operator_images "${BASE_OP}" "${BASE_DIR}/${BASE_OP}" "${IMAGE_TAG_BASE}" "${BUILD_TAG}"
 
 # If operator being tested is not meta-operator, we need to build openstack-operator
@@ -223,12 +224,6 @@ if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
   else
     API_SHA=${PR_SHA}
     REPO_NAME=${PR_REPO_NAME}
-    # NOTE(dviroel): We need to replace registry in bundle only when testing
-    #  a PR against operator's repo. When testing rehearsal jobs, we consume
-    #  from latest commit.
-    export IMAGENAMESPACE=${PUSH_ORGANIZATION}
-    export IMAGEREGISTRY=${PUSH_REGISTRY}
-    export IMAGEBASE=${SERVICE_NAME}
   fi
 
   # mod can be either /api or /apis
@@ -247,9 +242,14 @@ if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
     popd
   fi
 
+  # Variables needed to pull service operator built in this job
+  export IMAGENAMESPACE=${PUSH_ORGANIZATION}
+  export IMAGEREGISTRY=${PUSH_REGISTRY}
+  export IMAGEBASE=${SERVICE_NAME}
+  export IMAGECUSTOMTAG=${BUILD_TAG}
+
   # Build openstack-operator bundle and index
   IMAGE_TAG_BASE=${PUSH_REGISTRY}/${PUSH_ORGANIZATION}/${META_OPERATOR}
-  BUILD_TAG="${PR_SHA}-${PROW_BUILD}"
   build_push_operator_images "${META_OPERATOR}" "${BASE_DIR}/${META_OPERATOR}" "${IMAGE_TAG_BASE}" "${BUILD_TAG}"
 
   popd

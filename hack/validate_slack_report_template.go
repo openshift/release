@@ -51,7 +51,7 @@ spec:
   decoration_config:
     censor_secrets: true
     gcs_configuration:
-      bucket: origin-ci-test
+      bucket: test-platform-results
       default_org: openshift
       default_repo: origin
       mediaTypes:
@@ -184,7 +184,7 @@ status:
     gcsreporter: failure
   startTime: "2021-08-26T01:41:15Z"
   state: failure
-  url: https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/periodic-ci-openshift-release-master-nightly-4.9-e2e-metal-assisted-ipv6/1430706875984252928
+  url: https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-openshift-release-master-nightly-4.9-e2e-metal-assisted-ipv6/1430706875984252928
 `
 
 	prowJob := &prowapi.ProwJob{}

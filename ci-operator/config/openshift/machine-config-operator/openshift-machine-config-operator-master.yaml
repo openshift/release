@@ -35,18 +35,18 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: hypershift-tests
-  ocp_4.15_base:
-    name: "4.15"
+  ocp_4.16_base:
+    name: "4.16"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
-  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    tag: rhel-8-golang-1.21-openshift-4.16
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.21-openshift-4.16
   ocp_os:
     name: "4.16"
     namespace: ocp
@@ -56,15 +56,15 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.rhel7
   inputs:
-    ocp_4.15_base:
+    ocp_4.16_base:
       as:
-      - registry.ci.openshift.org/ocp/4.15:base
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      - registry.ci.openshift.org/ocp/4.16:base
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: machine-config-operator
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
@@ -104,11 +104,6 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: e2e-alibabacloud-ovn
-  optional: true
-  steps:
-    cluster_profile: alibabacloud
-    workflow: openshift-e2e-alibabacloud
 - always_run: false
   as: e2e-aws-ovn-fips-op
   optional: true
@@ -150,6 +145,18 @@ tests:
   optional: true
   steps:
     cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-azure-ovn
+- as: e2e-azure-ovn-upgrade-out-of-change
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: azure-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       TEST_TYPE: upgrade-conformance
@@ -230,6 +237,15 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
+- as: e2e-aws-ovn-upgrade-out-of-change
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    workflow: openshift-upgrade-aws
 - as: e2e-aws-workers-rhel8
   optional: true
   steps:
@@ -283,7 +299,7 @@ tests:
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-ipv4
+    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   optional: true

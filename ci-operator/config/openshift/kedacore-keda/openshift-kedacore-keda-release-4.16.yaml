@@ -21,18 +21,7 @@ images:
     value: dummy-ci-commit-value
   dockerfile_path: Dockerfile.adapter
   to: custom-metrics-autoscaler-adapter
-- dockerfile_literal: |
-    FROM ghcr.io/kedacore/keda-tools:1.20.5
-    COPY . /src
-    RUN chmod 777 -R /src
-    WORKDIR /src
-    RUN mkdir -p /go && chmod 777 -R /go
-    RUN mkdir -p /bin && chmod 777 -R /bin
-    ENV GOCACHE=/src/.cache
-    ENV USE_SUDO=false
-    ENV PATH=/src/helm:/src/:$PATH
-    ENV HELM_INSTALL_DIR=/src
-    RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh
+- dockerfile_path: Dockerfile.tests
   to: custom-metrics-autoscaler-tests
 promotion:
   to:
@@ -81,7 +70,7 @@ tests:
     test:
     - as: test-setup
       cli: latest
-      commands: cd tests; go test -v -timeout 15m -tags e2e ./utils/setup_test.go
+      commands: make e2e-test-openshift-setup
       dependencies:
       - env: IMAGE_CONTROLLER
         name: custom-metrics-autoscaler
@@ -93,32 +82,16 @@ tests:
       resources:
         requests:
           cpu: 100m
-    - as: test-internals
+    - as: test-run
       cli: latest
-      commands: cd tests; go test -p 1 -v -timeout 60m -tags e2e $(go list -tags e2e
-        ./internals/... | grep -v internals/global_custom_ca)
+      commands: make e2e-test-openshift
       from: custom-metrics-autoscaler-tests
       resources:
         requests:
           cpu: 100m
-    - as: test-scalers
+    - as: test-clean
       cli: latest
-      commands: cd tests; go test -p 1 -v -timeout 60m -tags e2e ./scalers/prometheus/...
-        ./scalers/kafka/...  ./scalers/memory/...
-      from: custom-metrics-autoscaler-tests
-      resources:
-        requests:
-          cpu: 100m
-    - as: test-sequential
-      cli: latest
-      commands: cd tests;  go test -p 1 -v -timeout 60m -tags e2e ./sequential/...
-      from: custom-metrics-autoscaler-tests
-      resources:
-        requests:
-          cpu: 100m
-    - as: test-teardown
-      cli: latest
-      commands: cd tests; go test -v -timeout 60m -tags e2e ./utils/cleanup_test.go
+      commands: make e2e-test-openshift-clean
       from: custom-metrics-autoscaler-tests
       resources:
         requests:
