@@ -302,7 +302,7 @@ openshift-image-mirror-mappings:
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/promoted-image-governor:latest --ci-operator-config-path /release/ci-operator/config --release-controller-mirror-config-dir /release/core-services/release-controller/_releases --openshift-mapping-dir /release/core-services/image-mirroring/openshift --openshift-mapping-config /release/core-services/image-mirroring/openshift/_config.yaml
 .PHONY: openshift-image-mirror-mappings
 
-config_updater_vault_secret:
+config_updater_vault_secret: build_farm_credentials_folder
 	@[[ $$cluster ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/applyconfig:latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) \
@@ -314,9 +314,17 @@ config_updater_vault_secret:
 		--context=$(cluster) \
 		--confirm \
 		--kubeconfig=/_kubeconfig
-	mkdir -p $(build_farm_credentials_folder)
-	oc --context "$(cluster)" sa create-kubeconfig -n ci config-updater > "$(build_farm_credentials_folder)/sa.config-updater.$(cluster).config"
+
+	./clusters/psi/create_kubeconfig.sh "$(build_farm_credentials_folder)/sa.config-updater.${cluster}.config" ${cluster} config-updater ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
+
+	ls $(build_farm_credentials_folder)
+
+	oc --context app.ci -n ci create secret generic config-updater \
+		--from-file=$(build_farm_credentials_folder) \
+		--dry-run=client -o json | oc --context app.ci apply --dry-run=${DRY_RUN} --as system:admin --server-side -f -
+
 	make dry_run=false ci-secret-generator
+
 .PHONY: config_updater_vault_secret
 
 ### one-off configuration on a build farm cluster
@@ -402,7 +410,7 @@ list-token-secrets:
 .PHONY: list-token-secrets
 
 config-updater-kubeconfig:
-	$(timeout_cmd) 60 ./clusters/psi/create_kubeconfig.sh "$(TMPDIR)/sa.config-updater.${CLUSTER}.config" ${CLUSTER} $@ ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
+	$(timeout_cmd) 60 ./clusters/psi/create_kubeconfig.sh "$(TMPDIR)/sa.config-updater.${CLUSTER}.config" ${CLUSTER} config-updater ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
 	cat "$(TMPDIR)/sa.config-updater.${CLUSTER}.config"
 .PHONY: config-updater-kubeconfig
 
