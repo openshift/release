@@ -30,7 +30,7 @@ ls
 pwd 
 
 cd time-scenarios
-ls
+ls -la
 cd ..
 
 ./time-scenarios/prow_run.sh

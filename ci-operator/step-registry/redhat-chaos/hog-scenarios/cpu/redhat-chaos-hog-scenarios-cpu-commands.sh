@@ -27,7 +27,7 @@ export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 
-chmod +x ./prow/cpu-hog/prow_run.sh
+chmod +x ./cpu-hog/prow_run.sh
 ./cpu-hog/prow_run.sh
 rc=$?
 echo "Finished running memory hog scenario"
