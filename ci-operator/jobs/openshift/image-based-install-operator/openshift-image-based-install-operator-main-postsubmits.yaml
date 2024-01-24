@@ -1,10 +1,10 @@
 postsubmits:
-  red-hat-data-services/openvino_model_server:
+  openshift/image-based-install-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^v2022\.3-release$
-    cluster: build04
+    - ^main$
+    cluster: build03
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -12,7 +12,7 @@ postsubmits:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-red-hat-data-services-openvino_model_server-v2022.3-release-images
+    name: branch-ci-openshift-image-based-install-operator-main-images
     spec:
       containers:
       - args:
@@ -57,6 +57,57 @@ postsubmits:
       - name: push-secret
         secret:
           secretName: registry-push-credentials-ci-central
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build03
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-openshift-image-based-install-operator-main-publish
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=publish
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

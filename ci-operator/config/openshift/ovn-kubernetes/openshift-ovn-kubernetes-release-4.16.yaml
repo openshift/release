@@ -290,6 +290,39 @@ tests:
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-sdn
+- as: e2e-aws-live-migration-sdn-ovn
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+      TEST_SDN_LIVE_MIGRATION_OPTIONS: target-cni=OVNKubernetes
+      TEST_SUITE: openshift/network/live-migration
+    test:
+    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-config-multicast
+    - ref: openshift-e2e-test
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-validate-multicast
+    workflow: openshift-e2e-aws-sdn
+  timeout: 3h0m0s
+- as: e2e-aws-live-migration-sdn-ovn-rollback
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+      TEST_SDN_LIVE_MIGRATION_OPTIONS: target-cni=OVNKubernetes,rollback=true
+      TEST_SUITE: openshift/network/live-migration
+    test:
+    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-config-multicast
+    - ref: openshift-e2e-test
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-validate-multicast
+    workflow: openshift-e2e-aws-sdn
+  timeout: 4h0m0s
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

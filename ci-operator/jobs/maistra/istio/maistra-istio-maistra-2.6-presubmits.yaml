@@ -1,24 +1,508 @@
-postsubmits:
-  stackrox/scanner:
+presubmits:
+  maistra/istio:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.26$
-    cluster: build01
+    - ^maistra-2\.6$
+    - ^maistra-2\.6-
+    cluster: build05
+    context: ci/prow/integ-helm-2-6
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-scanner-release-2.26-merge-db-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-maistra-istio-maistra-2.6-integ-helm-2-6
+    rerun_command: /test integ-helm-2-6
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/integ-helm-2-6-cluster-profile
+        - --target=integ-helm-2-6
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/integ-helm-2-6-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-ossm-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )integ-helm-2-6,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^maistra-2\.6$
+    - ^maistra-2\.6-
+    cluster: build05
+    context: ci/prow/integ-pilot-2-6
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-maistra-istio-maistra-2.6-integ-pilot-2-6
+    rerun_command: /test integ-pilot-2-6
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/integ-pilot-2-6-cluster-profile
+        - --target=integ-pilot-2-6
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/integ-pilot-2-6-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-ossm-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )integ-pilot-2-6,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^maistra-2\.6$
+    - ^maistra-2\.6-
+    cluster: build05
+    context: ci/prow/integ-security-2-6
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-maistra-istio-maistra-2.6-integ-security-2-6
+    rerun_command: /test integ-security-2-6
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/integ-security-2-6-cluster-profile
+        - --target=integ-security-2-6
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/integ-security-2-6-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-ossm-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )integ-security-2-6,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^maistra-2\.6$
+    - ^maistra-2\.6-
+    cluster: build05
+    context: ci/prow/integ-servicemesh-2-6
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-maistra-istio-maistra-2.6-integ-servicemesh-2-6
+    rerun_command: /test integ-servicemesh-2-6
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/integ-servicemesh-2-6-cluster-profile
+        - --target=integ-servicemesh-2-6
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/integ-servicemesh-2-6-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-ossm-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )integ-servicemesh-2-6,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^maistra-2\.6$
+    - ^maistra-2\.6-
+    cluster: build05
+    context: ci/prow/integ-servicemesh-multicluster-2-6
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-maistra-istio-maistra-2.6-integ-servicemesh-multicluster-2-6
+    rerun_command: /test integ-servicemesh-multicluster-2-6
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/integ-servicemesh-multicluster-2-6-cluster-profile
+        - --target=integ-servicemesh-multicluster-2-6
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/integ-servicemesh-multicluster-2-6-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-ossm-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )integ-servicemesh-multicluster-2-6,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^maistra-2\.6$
+    - ^maistra-2\.6-
+    cluster: build05
+    context: ci/prow/integ-telemetry-2-6
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-maistra-istio-maistra-2.6-integ-telemetry-2-6
+    rerun_command: /test integ-telemetry-2-6
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/integ-telemetry-2-6-cluster-profile
+        - --target=integ-telemetry-2-6
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/integ-telemetry-2-6-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-ossm-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )integ-telemetry-2-6,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^maistra-2\.6$
+    - ^maistra-2\.6-
+    cluster: build03
+    context: ci/prow/maistra-istio-gencheck-2-6
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 1h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-maistra-istio-maistra-2.6-maistra-istio-gencheck-2-6
+    rerun_command: /test maistra-istio-gencheck-2-6
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-db-integration-tests
+        - --target=maistra-istio-gencheck-2-6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -51,26 +535,30 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )maistra-istio-gencheck-2-6,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.26$
-    cluster: build01
+    - ^maistra-2\.6$
+    - ^maistra-2\.6-
+    cluster: build03
+    context: ci/prow/maistra-istio-lint-2-6
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 3h0m0s
+      timeout: 1h0m0s
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-scanner-release-2.26-merge-e2e-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-maistra-istio-maistra-2.6-maistra-istio-lint-2-6
+    rerun_command: /test maistra-istio-lint-2-6
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-e2e-tests
+        - --target=maistra-istio-lint-2-6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -103,25 +591,30 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )maistra-istio-lint-2-6,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.26$
-    cluster: build01
+    - ^maistra-2\.6$
+    - ^maistra-2\.6-
+    cluster: build03
+    context: ci/prow/maistra-istio-unit-2-6
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 1h0m0s
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-scanner-release-2.26-merge-push-images
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-maistra-istio-maistra-2.6-maistra-istio-unit-2-6
+    rerun_command: /test maistra-istio-unit-2-6
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-push-images
+        - --target=maistra-istio-unit-2-6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -154,26 +647,34 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )maistra-istio-unit-2-6,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.26$
-    cluster: build01
+    - ^maistra-2\.6$
+    - ^maistra-2\.6-
+    cluster: build05
+    context: ci/prow/push-images
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 3h0m0s
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-scanner-release-2.26-merge-slim-e2e-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-maistra-istio-maistra-2.6-push-images
+    rerun_command: /test push-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-slim-e2e-tests
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/push-images-cluster-profile
+        - --target=push-images
         command:
         - ci-operator
         image: ci-operator:latest
@@ -183,6 +684,14 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/push-images-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -197,6 +706,18 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-ossm-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -206,258 +727,4 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-2\.26$
-    cluster: build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-scanner-release-2.26-merge-store-db-dump
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-store-db-dump
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-2\.26$
-    cluster: build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-scanner-release-2.26-merge-store-genesis-dump
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-store-genesis-dump
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-2\.26$
-    cluster: build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-scanner-release-2.26-merge-style-checks
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-style-checks
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-2\.26$
-    cluster: build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-scanner-release-2.26-merge-unit-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-unit-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-2\.26$
-    cluster: build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-scanner-release-2.26-merge-upload-dumps-for-downstream
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-upload-dumps-for-downstream
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )push-images,?($|\s.*)
