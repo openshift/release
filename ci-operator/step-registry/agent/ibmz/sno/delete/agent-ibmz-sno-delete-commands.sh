@@ -116,7 +116,8 @@ rg_id=$(ibmcloud resource groups -q | awk -v rg="$infra_name-rg" '$1 == rg {prin
 echo "Resource Group ID: $rg_id"
 
 echo "Verifying if any resource reclamations are present in the $infra_name-rg resource group"
-instance_ids=($(ibmcloud resource reclamations --output json | jq -r --arg rid "$rg_id" '.[]|select(.resource_group_id == $rid)|.id' | tr '\n' ' '))
+instance_ids=$(ibmcloud resource reclamations --output json | jq -r --arg rid "$rg_id" '.[]|select(.resource_group_id == $rid)|.id' | tr '\n' ' ')
+IFS=' ' read -ra instance_id_list <<< "$instance_ids"
 if [ ${#instance_id_list[@]} -gt 0 ]; then
     echo "Reclamation Instance IDs :" "${instance_id_list[@]}"
     for instance_id in "${instance_id_list[@]}"; do
@@ -128,7 +129,8 @@ else
 fi
 
 echo "Verifying if any service instances are present in the $infra_name-rg resource group"
-si_list=($(ibmcloud resource service-instances --type all -g $infra_name-rg --output JSON | jq -r '.[]|.name' | tr '\n' ' '))
+si_names=($(ibmcloud resource service-instances --type all -g $infra_name-rg --output JSON | jq -r '.[]|.name' | tr '\n' ' '))
+IFS=' ' read -ra si_list <<< "$si_names"
 if [ ${#si_list[@]} -gt 0 ]; then
     echo "Service Instance Names :" "${si_list[@]}"
     for si in "${si_list[@]}"; do
