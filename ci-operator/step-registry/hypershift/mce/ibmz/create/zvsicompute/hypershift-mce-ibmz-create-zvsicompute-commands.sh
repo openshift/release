@@ -59,29 +59,27 @@ for plugin in "${plugins_list[@]}"; do
   fi
 done
 
-# Checking if the ibmcloud resoource group and ssh key are active
-rg_status=$(ibmcloud resource groups | grep -i "$IC_INFRA_NAME-rg" | awk '{print $4}')
-if [ "$rg_status" == "ACTIVE" ]; then
-  echo "Resource group $IC_INFRA_NAME-rg is in ACTIVE state in the $IC_REGION region."
+# Create resource group
+set -e
+echo "Creating a resource group in the region $IC_REGION"
+ibmcloud resource group-create $infra_name-rg
+rg_state=$(ibmcloud resource group $infra_name-rg | awk '/State/{print $2}')
+set +e
+if [ "$rg_state" != "ACTIVE" ]; then
+  echo "Error: Resource Group $infra_name-rg is not created properly."
+  exit 1
 else 
-  echo "Error: Resource group $IC_INFRA_NAME-rg is not found in ACTIVE state."
-  echo "Creating resource group $IC_INFRA_NAME-rg in the region $IC_REGION"
-  ibmcloud resource group-create $infra_name-rg
+  echo "Resource Group $infra_name-rg is created successfully and is in active state in the $IC_REGION region."
 fi
 
-ssh_key_status=$(ibmcloud is keys --resource-group-name $IC_INFRA_NAME-rg | grep -i $IC_INFRA_NAME-key | wc -l)
-if [ $ssh_key_status -eq 1 ]; then
-  echo "$IC_INFRA_NAME-key exists in the $IC_INFRA_NAME-rg resource group."
-else 
-  echo "$IC_INFRA_NAME-key does not exists in the $IC_INFRA_NAME-rg resource group."
-  echo "Creating the $IC_INFRA_NAME-key ssh key in the $IC_INFRA_NAME-rg resource group."
-  ibmcloud is key-create $infra_name-key @$httpd_vsi_pub_key --resource-group-name $infra_name-rg
-fi
+# Create SSH key
+echo "Creating an SSH key in the resource group $infra_name-rg"
+ibmcloud is key-create $infra_name-key @$HOME/.ssh/id_rsa.pub --resource-group-name $infra_name-rg
+ibmcloud is keys --resource-group-name $infra_name-rg | grep -i $infra_name-key
 
 # Create VPC
-set -e
-echo "Creating a VPC in the resource group $IC_INFRA_NAME-rg"
-ibmcloud is vpc-create $infra_name-vpc --resource-group-name $IC_INFRA_NAME-rg
+echo "Creating a VPC in the resource group $infra_name-rg"
+ibmcloud is vpc-create $infra_name-vpc --resource-group-name $infra_name-rg
 set +e
 vpc_status=$(ibmcloud is vpc $infra_name-vpc | awk '/Status/{print $2}')
 if [ "$vpc_status" != "available" ]; then
@@ -95,7 +93,7 @@ vpc_crn=$(ibmcloud is vpc $infra_name-vpc | awk '/CRN/{print $2}')
 # Create subnet
 set -e
 echo "Creating a subnet in the VPC $infra_name-vpc"
-ibmcloud is subnet-create $infra_name-sn $infra_name-vpc --ipv4-address-count 16 --zone "$IC_REGION-1" --resource-group-name $IC_INFRA_NAME-rg
+ibmcloud is subnet-create $infra_name-sn $infra_name-vpc --ipv4-address-count 16 --zone "$IC_REGION-1" --resource-group-name $infra_name-rg
 sn_status=$(ibmcloud is subnet $infra_name-sn | awk '/Status/{print $2}')
 set +e
 if [ "$sn_status" != "available" ]; then
@@ -112,7 +110,7 @@ zvsi_fip_list=()
 for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
   echo "Triggering the $infra_name-compute-$i zVSI creation on IBM Cloud in the VPC $infra_name-vpc"
   vol_json=$(jq -n -c --arg volume "$infra_name-compute-$i-volume" '{"name": $volume, "volume": {"name": $volume, "capacity": 250, "profile": {"name": "general-purpose"}}}')
-  ibmcloud is instance-create $infra_name-compute-$i $infra_name-vpc $IC_REGION-1 $ZVSI_PROFILE $infra_name-sn --image $ZVSI_IMAGE --keys $IC_INFRA_NAME-key --resource-group-name $IC_INFRA_NAME-rg --boot-volume $vol_json
+  ibmcloud is instance-create $infra_name-compute-$i $infra_name-vpc $IC_REGION-1 $ZVSI_PROFILE $infra_name-sn --image $ZVSI_IMAGE --keys $infra_name-key,hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg --boot-volume $vol_json
   set +e
   sleep 60
   zvsi_state=$(ibmcloud is instance $infra_name-compute-$i | awk '/Status/{print $2}')
@@ -135,7 +133,7 @@ for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
   fi  
   nic_name=$(ibmcloud is in-nics $infra_name-compute-$i -q | grep -v ID | awk '{print $2}')
   echo "Creating a Floating IP for zVSI"
-  zvsi_fip=$(ibmcloud is ipc $infra_name-compute-$i-ip --zone $IC_REGION-1 --resource-group-name $IC_INFRA_NAME-rg | awk '/Address/{print $2}')
+  zvsi_fip=$(ibmcloud is ipc $infra_name-compute-$i-ip --zone $IC_REGION-1 --resource-group-name $infra_name-rg | awk '/Address/{print $2}')
   echo "Assigning the Floating IP for zVSI"
   zvsi_fip_status=$(ibmcloud is in-nic-ipc $infra_name-compute-$i $nic_name $infra_name-compute-$i-ip | awk '/Status/{print $2}')
   if [ "$zvsi_fip_status" != "available" ]; then
@@ -148,8 +146,8 @@ for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
 done
 
 # Creating DNS service
-echo "Triggering the DNS Service creation on IBM Cloud in the resource group $IC_INFRA_NAME-rg"
-dns_state=$(ibmcloud dns instance-create $infra_name-dns standard-dns -g $IC_INFRA_NAME-rg --output JSON | jq -r '.state')
+echo "Triggering the DNS Service creation on IBM Cloud in the resource group $infra_name-rg"
+dns_state=$(ibmcloud dns instance-create $infra_name-dns standard-dns -g $infra_name-rg --output JSON | jq -r '.state')
 if [ "$dns_state" == "active" ]; then
   echo "$infra_name-dns DNS instance is created successfully and in active state."
 else 
