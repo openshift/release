@@ -41,6 +41,25 @@ tests:
     make commits/check
   container:
     from: src
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make codecov
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: rosa-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make codecov
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: rosa-codecov-token
 zz_generated_metadata:
   branch: master
   org: openshift
