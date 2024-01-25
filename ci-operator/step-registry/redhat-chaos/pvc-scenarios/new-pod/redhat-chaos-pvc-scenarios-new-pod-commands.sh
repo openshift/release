@@ -7,11 +7,8 @@ cat /etc/os-release
 oc config view
 oc projects
 python3 --version
-pushd /tmp
-
 ls -la /root/kraken
-git clone https://github.com/redhat-chaos/krkn-hub.git
-pushd krkn-hub/
+
 
 wget -O volume_scenario.yaml https://raw.githubusercontent.com/redhat-chaos/krkn/main/CI/scenarios/volume_scenario.yaml
 

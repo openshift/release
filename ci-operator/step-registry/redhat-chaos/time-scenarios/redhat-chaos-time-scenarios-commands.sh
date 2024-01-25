@@ -29,11 +29,6 @@ export ENABLE_ALERTS=False
 ls
 pwd 
 
-cd time-scenarios
-ls -la
-cat prow_run.sh
-cd ..
-
 ./time-scenarios/prow_run.sh
 rc=$?
 echo "Finished running time scenario"

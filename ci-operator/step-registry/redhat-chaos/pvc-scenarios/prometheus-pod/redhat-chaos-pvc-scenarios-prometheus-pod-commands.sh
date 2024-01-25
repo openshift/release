@@ -7,8 +7,6 @@ cat /etc/os-release
 oc config view
 oc projects
 python3 --version
-pushd /tmp
-
 
 function cluster_monitoring_config(){
 
@@ -31,9 +29,6 @@ EOF
 }
 
 ls -la /root/kraken
-git clone https://github.com/redhat-chaos/krkn-hub.git
-pushd krkn-hub/
-
 
 #Create PV and PVC for prometheus
 cluster_monitoring_config
@@ -50,8 +45,6 @@ export DURATION=$DURATION
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export NAMESPACE=$TARGET_NAMESPACE
 export ENABLE_ALERTS=False
-
-
 
 ./pvc-scenario/prow_run.sh
 rc=$?
