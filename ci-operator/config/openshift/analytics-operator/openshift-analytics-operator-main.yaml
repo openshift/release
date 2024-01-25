@@ -82,10 +82,11 @@ tests:
         \"---------\"\ndeclare IMG_BASE='registry.ci.openshift.org/osa'\ndeclare NO_DEPLOY=false\ndeclare
         NO_BUILD=true\ndeclare VERSION=latest\ndeclare BATCH_SIZE=30\necho \"print7\"\nmake
         deploy IMG_BASE=\"$IMG_BASE\" VERSION=\"$VERSION\" \necho \"print8\"\ntries=30\nwhile
-        [[ $tries -gt 0 ]] &&\n  ! kubectl -n \"$ns\" rollout status deploy/analytics-operator-controller-manager;
-        do\n  sleep 10\n  ((tries--))\ndone\necho \"print9\"\nkubectl wait -n \"$ns\"
-        --for=condition=Available deploy/analytics-operator-controller-manager --timeout=300s\necho
-        \"print11\"\necho \"ls ./config/samples/\"\nls ./config/samples/\necho \"----------\"\nkubectl
+        [[ $tries -gt 0 ]] &&\n  ! kubectl -n \"analytics-operator-system\" rollout
+        status deploy/analytics-operator-controller-manager; do\n  sleep 10\n  ((tries--))\ndone\necho
+        \"print9\"\nkubectl wait -n \"analytics-operator-system\" --for=condition=Available
+        deploy/analytics-operator-controller-manager --timeout=300s\necho \"print11\"\necho
+        \"ls ./config/samples/\"\nls ./config/samples/\necho \"----------\"\nkubectl
         apply -f ./config/samples/observability-analytics_v1alpha1_anomalyengine.yaml\necho
         \"print12\"\nif ! kubectl -n \"osa-anomaly-detection\" get cronjob | grep
         \"osa-anomaly-detection\"; then\n  echo \"Cronjob not present to detect Anomaly\"\n
