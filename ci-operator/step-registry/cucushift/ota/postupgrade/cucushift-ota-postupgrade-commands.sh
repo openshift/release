@@ -20,6 +20,59 @@ function extract_oc(){
     oc version --client
 }
 
+function get_tp_operator(){
+    local short_version=$1
+    case ${short_version} in
+    "4.14")
+    tp_operator=("cluster-api" "platform-operators-aggregated")
+    ;;
+    "4.15")
+    tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
+    ;;
+    "4.16")
+    tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
+    ;;
+    *)
+    tp_operator=()
+    ;;
+    esac
+    echo ${tp_operator[*]}
+}
+
+function check_tp_operator_notfound(){
+    local try=0 max_retries=2
+    declare -A tp_resourece=(
+        ["cluster-api"]="openshift-cluster-api"
+        ["platform-operators-aggregated"]="openshift-platform-operators"
+        ["olm"]="openshift-cluster-olm-operator"
+    )
+    if [ -z "${tp_resourece[$1]}" ] ; then
+        echo "No expected ns configured for $1!"
+        return 1
+    fi
+    tmp_log=$(mktemp)
+    while (( try < max_retries )); do
+        oc get co $1 2>&1 | tee "${tmp_log}"
+        if grep -q 'NotFound' "${tmp_log}"; then
+            oc get ns ${tp_resourece[$1]} 2>&1 | tee "${tmp_log}"
+            if grep -q 'NotFound' "${tmp_log}"; then
+                (( try += 1 ))
+                sleep 60
+            else
+                echo "Unexpected ns found for $1!"
+                return 1
+            fi
+        else
+            echo "Unexpected operator found $1!"
+            return 1
+        fi
+    done
+    if (( ${try} >= ${max_retries} )); then
+        echo "Not found the tp operator $1"
+        return 0
+    fi
+}
+
 # Define the checkpoints/steps needed for the specific case
 function post-OCP-66839(){
     if [[ "${BASELINE_CAPABILITY_SET}" != "None" ]]; then
@@ -80,11 +133,50 @@ function post-OCP-21588(){
     return $ret
 }
 
+function post-OCP-47197(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    local version 
+    version="$(oc get clusterversion --no-headers | awk '{print $2}')"
+    if [ -z "${version}" ] ; then
+        echo "Fail to get cluster version!"
+        return 1
+    fi
+    x_ver=$( echo "${version}" | cut -f1 -d. )
+    y_ver=$( echo "${version}" | cut -f2 -d. )
+    ver="${x_ver}.${y_ver}"
+
+    tp_op=$(get_tp_operator ${ver})
+    if [ -z "${tp_op}" ] ; then
+        echo "Fail to get tp operator list on ${ver}!"
+        return 1
+    fi
+    for tp_op in ${tp_op[*]}; do
+        if ! check_tp_operator_notfound ${tp_op}; then
+            return 1
+        fi
+    done
+    echo "Test Passed: ${FUNCNAME[0]}"
+    return 0
+}
+
 # This func run all test cases with with checkpoints which will not break other cases,
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be ran or not
 function run_ota_multi_test(){
-    echo "placeholder"
+    caseset=(OCP-47197)
+    for case in ${caseset[*]}; do
+        if ! type post-"${case}" &>/dev/null; then
+            echo "WARN: no post-${case} function found" >> "${report_file}"
+        else
+            echo "------> ${case}"
+            post-"${case}"
+            if [[ $? == 0 ]]; then
+                echo "PASS: post-${case}" >> "${report_file}"
+            else
+                echo "FAIL: post-${case}" >> "${report_file}"
+            fi
+        fi
+    done
 }
 
 # Run single case through case ID
