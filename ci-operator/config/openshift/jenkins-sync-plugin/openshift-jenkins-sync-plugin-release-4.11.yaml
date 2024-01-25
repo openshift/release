@@ -1,17 +1,38 @@
+base_images:
+  origin_4.11_jenkins:
+    name: "4.11"
+    namespace: origin
+    tag: jenkins
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.16
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
+  inputs:
+    origin_4.11_jenkins:
+      as:
+      - registry.ci.openshift.org/origin/4.11:jenkins
   to: jenkins
+- dockerfile_literal: |
+    FROM quay.io/openshift/origin-jenkins-agent-maven:4.11.0 AS builder
+    WORKDIR /home/jenkins
+    COPY . .
+    USER 0
+    # We need a newer maven version as the RHEL package is still on 3.6.2
+    RUN curl -L -o maven.tar.gz https://dlcdn.apache.org/maven/maven-3/3.8.8/binaries/apache-maven-3.8.8-bin.tar.gz && \
+    mkdir maven && \
+    tar -xvzf maven.tar.gz -C maven --strip-component 1 && \
+    cp -R maven /opt && \
+    ln -sf /opt/maven/bin/mvn /usr/bin/mvn && \
+    chmod -R 777 $HOME && \
+    mvn --version
+  to: jenkins-maven-builder
 promotion:
   to:
   - additional_images:
       jenkins-sync-plugin-e2e: src
     excluded_images:
     - jenkins
+    - jenkins-maven-builder
     name: "4.11"
     namespace: ocp
 releases:
@@ -30,6 +51,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: maven-verify
+  commands: mvn clean package verify
+  container:
+    from: jenkins-maven-builder
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e-aws-jenkins-sync-plugin
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -47,7 +73,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-jenkins-sync-plugin-continuous
-  cron: 14 8 9,24 * *
+  cron: 0 */12 * * *
   steps:
     cluster_profile: aws
     test:
