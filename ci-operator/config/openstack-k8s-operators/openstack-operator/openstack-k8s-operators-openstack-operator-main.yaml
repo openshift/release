@@ -114,6 +114,23 @@ tests:
     env:
       CEPH_HOSTNETWORK: "false"
     workflow: openstack-k8s-operators-test-build-deploy-tempest
+- as: openstack-operator-deploy-fips
+  cluster_claim:
+    architecture: amd64
+    cloud: vexxhost-fips
+    owner: openstack-k8s-operators
+    product: ocp
+    timeout: 1h20m0s
+    version: "4.14"
+  optional: true
+  steps:
+    env:
+      CEPH_HOSTNETWORK: "false"
+      FIPS_ENABLED: "true"
+      OPENSTACK_OPERATOR_INDEX: quay.io/openstack-k8s-operators/openstack-operator-index:latest
+    pre:
+    - ref: fips-check
+    workflow: openstack-k8s-operators-test-deploy
 zz_generated_metadata:
   branch: main
   org: openstack-k8s-operators

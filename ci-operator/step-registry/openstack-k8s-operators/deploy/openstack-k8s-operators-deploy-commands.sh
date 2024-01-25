@@ -51,14 +51,17 @@ if [ -f /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/.prow_ci.env ]; then
   source /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/.prow_ci.env
 fi
 
-if [[ "$SERVICE_NAME" == "INSTALL_YAMLS" ]]; then
-  # when testing install_yamls patch, we can skip build process and
-  #  validate using latest openstack-operator tag
-  export IMAGE_TAG_BASE=${DEFAULT_REGISTRY}/${DEFAULT_ORG}/${OPENSTACK_OPERATOR}
-  export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:latest
-else
-  export IMAGE_TAG_BASE=${PULL_REGISTRY}/${PULL_ORGANIZATION}/${OPENSTACK_OPERATOR}
-  export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${BUILD_TAG}
+# If not provided, get image url from PR info
+if [[ -z "$OPENSTACK_OPERATOR_INDEX" ]]; then
+  if [[ "$SERVICE_NAME" == "INSTALL_YAMLS" ]]; then
+    # when testing install_yamls patch, we can skip build process and
+    #  validate using latest openstack-operator tag
+    export IMAGE_TAG_BASE=${DEFAULT_REGISTRY}/${DEFAULT_ORG}/${OPENSTACK_OPERATOR}
+    export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:latest
+  else
+    export IMAGE_TAG_BASE=${PULL_REGISTRY}/${PULL_ORGANIZATION}/${OPENSTACK_OPERATOR}
+    export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${BUILD_TAG}
+  fi
 fi
 
 if [ ! -d "${BASE_DIR}/install_yamls" ]; then
@@ -91,7 +94,7 @@ OPENSTACK_CTLPLANE=$(make --eval $'var:\n\t@echo $(OPENSTACK_CTLPLANE)' NETWORK_
 OPENSTACK_CTLPLANE_FILE=$(basename $OPENSTACK_CTLPLANE)
 
 # Deploy openstack operator
-make openstack OPENSTACK_IMG=${OPENSTACK_OPERATOR_INDEX} NETWORK_ISOLATION=false
+make openstack OPENSTACK_IMG=${OPENSTACK_OPERATOR_INDEX} NETWORK_ISOLATION=false BMO_SETUP=false
 # Wait before start checking all deployment status
 # Not expecting to fail here, only in next deployment checks
 n=0
@@ -117,7 +120,7 @@ make ceph
 sleep 30
 
 # Deploy openstack services with the sample from the PR under test
-make openstack_deploy_prep NETWORK_ISOLATION=false
+make openstack_deploy_prep NETWORK_ISOLATION=false BMO_SETUP=false
 
 cat <<EOF >${BASE_DIR}/install_yamls/out/openstack/openstack/cr/kustomization.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
