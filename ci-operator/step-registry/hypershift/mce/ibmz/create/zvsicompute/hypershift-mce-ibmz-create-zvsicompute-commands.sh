@@ -14,8 +14,6 @@ hcp_domain="$job_id-$HYPERSHIFT_BASEDOMAIN"
 export hcp_domain
 IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
-httpd_vsi_pub_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key"
-export httpd_vsi_pub_key
 httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
 
@@ -72,11 +70,6 @@ else
   echo "Resource Group $infra_name-rg is created successfully and is in active state in the $IC_REGION region."
 fi
 
-# Create SSH key
-echo "Creating an SSH key in the resource group $infra_name-rg"
-ibmcloud is key-create $infra_name-key @$HOME/.ssh/id_rsa.pub --resource-group-name $infra_name-rg
-ibmcloud is keys --resource-group-name $infra_name-rg | grep -i $infra_name-key
-
 # Create VPC
 echo "Creating a VPC in the resource group $infra_name-rg"
 ibmcloud is vpc-create $infra_name-vpc --resource-group-name $infra_name-rg
@@ -110,7 +103,7 @@ zvsi_fip_list=()
 for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
   echo "Triggering the $infra_name-compute-$i zVSI creation on IBM Cloud in the VPC $infra_name-vpc"
   vol_json=$(jq -n -c --arg volume "$infra_name-compute-$i-volume" '{"name": $volume, "volume": {"name": $volume, "capacity": 250, "profile": {"name": "general-purpose"}}}')
-  ibmcloud is instance-create $infra_name-compute-$i $infra_name-vpc $IC_REGION-1 $ZVSI_PROFILE $infra_name-sn --image $ZVSI_IMAGE --keys $infra_name-key,hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg --boot-volume $vol_json
+  ibmcloud is instance-create $infra_name-compute-$i $infra_name-vpc $IC_REGION-1 $ZVSI_PROFILE $infra_name-sn --image $ZVSI_IMAGE --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg --boot-volume $vol_json
   set +e
   sleep 60
   zvsi_state=$(ibmcloud is instance $infra_name-compute-$i | awk '/Status/{print $2}')
