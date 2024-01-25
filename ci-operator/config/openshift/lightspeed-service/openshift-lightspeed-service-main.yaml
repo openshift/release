@@ -44,29 +44,15 @@ tests:
     make install-deps && make install-deps-test && make test-integration
   container:
     from: src
-- as: e2e-ols
+- as: e2e-ols-openai-gpt35
   steps:
     test:
-    - as: invoke-llm
+    - as: e2e
       commands: |
-        # will need to be replaced with logic to generate a config.yaml
-        export OPENAI_API_KEY=$(cat /var/run/openai/token)
-        export DEFAULT_PROVIDER=openai
-        export DEFAULT_MODEL=gpt-3.5-turbo-1106
-        cat /var/run/openai/token | cut -c1-5
-        make install-deps && make install-deps-test
-        echo Starting OLS server
-        make run >& ${ARTIFACT_DIR}/ols.log &
-        function finish {
-          echo Exit trap: killing OLS server
-          kill %1
-        }
-        trap finish EXIT
-        # TODO replace this w/ logic that checks for the ols server to be running
-        sleep 30
-        echo Done waiting for OLS server start
-        make test-e2e
-        echo Done running e2e
+        export OPENAI_API_KEY_PATH=/var/run/openai/token
+        export PROVIDER=openai
+        export MODEL=gpt-3.5-turbo-1106
+        scripts/test-e2e-standalone.sh
       credentials:
       - mount_path: /var/run/openai
         name: openai-apitoken
