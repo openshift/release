@@ -173,6 +173,16 @@ fi
 # Fetch the zVSI mac address
 set -e
 echo "Fetching the mac address of zVSI $zvsi_fip"
+ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
+export ssh_key_string
+tmp_ssh_key="/tmp/httpd-vsi-key"
+envsubst <<"EOF" >${tmp_ssh_key}
+-----BEGIN OPENSSH PRIVATE KEY-----
+${ssh_key_string}
+
+-----END OPENSSH PRIVATE KEY-----
+EOF
+chmod 0600 ${tmp_ssh_key}
 ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "${tmp_ssh_key}")
 zvsi_mac=$(ssh "${ssh_options[@]}" core@$zvsi_fip "ip link show | awk '/ether/ {print \$2}'")
 
@@ -249,16 +259,6 @@ openshift-install create pxe-files --dir $HOME/abi-sno-ibmz/ --log-level debug
 
 # Generating script for agent boot execution on zVSI
 echo "Uploading the pxe-boot artifacts to HTTPD server"
-ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
-export ssh_key_string
-tmp_ssh_key="/tmp/httpd-vsi-key"
-envsubst <<"EOF" >${tmp_ssh_key}
------BEGIN OPENSSH PRIVATE KEY-----
-${ssh_key_string}
-
------END OPENSSH PRIVATE KEY-----
-EOF
-chmod 0600 ${tmp_ssh_key}
 scp -r "${ssh_options[@]}" $HOME/abi-sno-ibmz/boot-artifacts/ root@$httpd_vsi_ip:/var/www/html/
 ssh "${ssh_options[@]}" root@$httpd_vsi_ip "mv /var/www/html/boot-artifacts/* /var/www/html/; chmod 644 /var/www/html/*; rm -rf /var/www/html/boot-artifacts/"
 echo "Downloading the setup script for pxeboot of SNO"
