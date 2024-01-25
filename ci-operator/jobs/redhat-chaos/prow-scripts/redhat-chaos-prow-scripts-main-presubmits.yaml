@@ -1,20 +1,20 @@
 presubmits:
-  stackrox/scanner:
+  redhat-chaos/prow-scripts:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.26$
-    - ^release-2\.26-
-    cluster: build01
-    context: ci/prow/images
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/4.16-nightly-images
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: 4.16-nightly
       ci.openshift.io/generator: prowgen
+      job-release: "4.16"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-scanner-release-2.26-images
-    rerun_command: /test images
+    name: pull-ci-redhat-chaos-prow-scripts-main-4.16-nightly-images
+    rerun_command: /test 4.16-nightly-images
     spec:
       containers:
       - args:
@@ -22,6 +22,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --variant=4.16-nightly
         command:
         - ci-operator
         image: ci-operator:latest
@@ -54,4 +55,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.16-nightly-images,?($|\s.*)
