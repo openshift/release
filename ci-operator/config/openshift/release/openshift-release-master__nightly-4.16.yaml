@@ -919,12 +919,17 @@ tests:
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-shared-vpc-phz
-- as: e2e-agent-compact-ipv4
+- as: e2e-agent-compact-ipv4-conformance
   cluster: build05
   cron: 0 */12 * * *
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: agent-e2e-compact-ipv4
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        FIPS_MODE=true
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: agent-e2e-generic-conformance
   timeout: 5h0m0s
 - as: e2e-agent-sno-ipv6
   cluster: build05
@@ -933,12 +938,16 @@ tests:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-sno-ipv6
   timeout: 5h0m0s
-- as: e2e-agent-ha-dualstack
+- as: e2e-agent-ha-dualstack-conformance
   cluster: build05
   cron: 0 */12 * * *
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: agent-e2e-ha-dualstack
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: agent-e2e-generic-conformance
   timeout: 5h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-suspend-30d
   cron: '@weekly'
