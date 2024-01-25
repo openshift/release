@@ -97,16 +97,6 @@ else
     exit 1
 fi
 
-# Deleting the SSH key
-echo "Triggering the $infra_name-key SSH key deletion in the resource group $infra_name-rg resource group."
-ssh_key_delete_status=$(ibmcloud is key-delete $infra_name-key --output JSON -f | jq -r '.[]|.result')
-if [ $ssh_key_delete_status == "true" ]; then
-    echo "Successfully deleted the SSH key $infra_name-key in the $infra_name-rg resource group."
-else 
-    echo "Error: Failed to delete the $infra_name-key SSH key in the $infra_name-rg resource group."
-    exit 1
-fi
-
 echo "Waiting for resources to get deleted completely before deleting the resource group"
 sleep 60
 

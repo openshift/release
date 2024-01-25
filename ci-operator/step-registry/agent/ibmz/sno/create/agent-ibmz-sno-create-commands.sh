@@ -67,13 +67,6 @@ else
   echo "Resource Group $infra_name-rg is created successfully and is in active state in the $IC_REGION region."
 fi
 
-# Create SSH key
-set -e
-echo "Creating an SSH key in the resource group $infra_name-rg"
-ibmcloud is key-create $infra_name-key @$HOME/.ssh/id_rsa.pub --resource-group-name $infra_name-rg
-ibmcloud is keys --resource-group-name $infra_name-rg | grep -i $infra_name-key
-set +e
-
 # Create VPC
 set -e
 echo "Creating a VPC in the resource group $infra_name-rg"
@@ -105,7 +98,7 @@ fi
 set -e
 zvsi_rip=""
 echo "Triggering the $infra_name-sno zVSI creation on IBM Cloud in the VPC $infra_name-vpc"
-ibmcloud is instance-create $infra_name-sno $infra_name-vpc $IC_REGION-1 $ZVSI_PROFILE $infra_name-sn --image $ZVSI_IMAGE --keys $infra_name-key,hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg
+ibmcloud is instance-create $infra_name-sno $infra_name-vpc $IC_REGION-1 $ZVSI_PROFILE $infra_name-sn --image $ZVSI_IMAGE --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg
 sleep 60
 set +e
 zvsi_state=$(ibmcloud is instance $infra_name-sno | awk '/Status/{print $2}')
@@ -180,6 +173,7 @@ fi
 # Fetch the zVSI mac address
 set -e
 echo "Fetching the mac address of zVSI $zvsi_fip"
+ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "${tmp_ssh_key}")
 zvsi_mac=$(ssh "${ssh_options[@]}" core@$zvsi_fip "ip link show | awk '/ether/ {print \$2}'")
 
 # Building openshift-install binary
@@ -265,7 +259,6 @@ ${ssh_key_string}
 -----END OPENSSH PRIVATE KEY-----
 EOF
 chmod 0600 ${tmp_ssh_key}
-ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "${tmp_ssh_key}")
 scp -r "${ssh_options[@]}" $HOME/abi-sno-ibmz/boot-artifacts/ root@$httpd_vsi_ip:/var/www/html/
 ssh "${ssh_options[@]}" root@$httpd_vsi_ip "mv /var/www/html/boot-artifacts/* /var/www/html/; chmod 644 /var/www/html/*; rm -rf /var/www/html/boot-artifacts/"
 echo "Downloading the setup script for pxeboot of SNO"
