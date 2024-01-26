@@ -427,7 +427,7 @@ EOF
 function enable_efa_pg_instance_config() {
   local dir=${1}
   #sed -i 's/          instanceType: .*/          networkInterfaceType: EFA\n          placementGroupName: pgcluster\n          instanceType: c5n.9xlarge/' "$dir/openshift/99_openshift-cluster-api_worker-machineset-0.yaml"
-  pip3 install pyyaml --user
+  pip3 install pyyaml==6.0  --user
   pushd "${dir}/openshift"
   python -c '
 import os
@@ -513,7 +513,12 @@ gcp)
     fi
     ;;
 ibmcloud*)
-    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    if [ -f "${SHARED_DIR}/ibmcloud-min-permission-api-key" ]; then
+      IC_API_KEY="$(< "${SHARED_DIR}/ibmcloud-min-permission-api-key")"
+      echo "using the specified key for minimal permission!!"
+    else
+      IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    fi
     export IC_API_KEY
     ;;
 alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini;;

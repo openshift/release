@@ -2,7 +2,7 @@ base_images:
   base:
     name: "4.16"
     namespace: ocp
-    tag: base
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
@@ -46,7 +46,16 @@ tests:
 - as: e2e-aws
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: sysdeseng.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname redhat-cne-cloud-event-proxy-main
+        ci-job-type e2e-aws
+        ci-repo-name cloud-event-proxy
+        ci-org-name redhat-cne
     test:
     - as: functests
       cli: latest

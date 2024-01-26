@@ -15,7 +15,7 @@ SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
-BASTION_USER="cloud-user"
+BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
@@ -28,8 +28,9 @@ echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
 # Set environment for jobs to run
 INTERNAL=true
 INTERNAL_ONLY=true
-# Run cnftests periodic and nightly job on Upstream cluster
-if [[ "$T5_JOB_TRIGGER" == "periodic" ]] || [[ "$T5_JOB_TRIGGER" == "nightly" ]]; then
+# If the job trigger is "periodic" or "nightly" or the repository owner is "openshift-kni",
+# use the upstream cluster to run the job.
+if [[ "$T5_JOB_TRIGGER" == "periodic" ]] || [[ "$T5_JOB_TRIGGER" == "nightly" ]] || [[ "$REPO_OWNER" == "openshift-kni" ]]; then
     INTERNAL=false
     INTERNAL_ONLY=false
 else
@@ -53,21 +54,33 @@ ${BASTION_IP} ansible_ssh_user=${BASTION_USER} ansible_ssh_common_args="$COMMON_
 EOF
 
 ADDITIONAL_ARG=""
-# default to the first cluster in the array, unless 4.16
+# default to the first cluster in the array, unless 4.17
 if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
     ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force"
-    if [[ "$T5CI_VERSION" == "4.16" ]]; then
+    if [[ "$T5CI_VERSION" == "4.17" ]]; then
         ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[1]} --force"
     fi
 else
     ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]}"
 fi
+
 # Choose topology for different job types:
-# Run periodic cnftests job with 2 baremetal nodes (with all CNF tests)
+# Run cnftests job with either 1 baremetal and 1 virtual node or 2 baremetal nodes.
+# Periodic cnftests job will use 2b(as we hardcoded to cnfdu1 and cnfdu3)
+# PR against release repo will i.e use i.e of 1b1v or 2b whichever is available
+# Any Pr against openshift-kni repo or rehersal job for openshift-kni repo to use 1b1v
 # Run nightly periodic jobs with 1 baremetal and 1 virtual node (with origin tests)
 # Run sno job with SNO topology
+
+
+if [ "$REPO_OWNER" == "openshift-kni" ]; then
+  TOPOLOGY_SELECTION="--topology 1b1v"
+else
+  TOPOLOGY_SELECTION="--topology 1b1v --topology 2b"
+fi
+
 if [[ "$T5CI_JOB_TYPE"  == "cnftests" ]]; then
-    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 2b"
+    ADDITIONAL_ARG="$ADDITIONAL_ARG $TOPOLOGY_SELECTION"
 elif [[ "$T5CI_JOB_TYPE"  == "origintests" ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v"
 elif [[ "$T5CI_JOB_TYPE"  == "sno" ]]; then

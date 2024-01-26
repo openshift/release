@@ -40,6 +40,14 @@ function hasCPMS() {
         # 4.14+
         REQUIRED_OCP_VERSION="4.14"
         ;;
+    vsphere*)
+        # 4.15+
+        if [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
+            REQUIRED_OCP_VERSION="4.15"
+        else
+            REQUIRED_OCP_VERSION="4.99999"
+        fi
+        ;;
     *)
         return ${ret}
         ;;

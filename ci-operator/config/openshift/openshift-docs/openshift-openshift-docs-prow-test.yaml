@@ -1,17 +1,9 @@
-base_images:
-  openshift-docs:
-    name: openshift-docs-asciidoc
-    namespace: ocp
-    tag: latest
 build_root:
   image_stream_tag:
     name: openshift-docs-asciidoc
     namespace: ocp
     tag: latest
   use_build_cache: true
-images:
-- from: openshift-docs
-  to: openshift-docs-builder
 resources:
   '*':
     limits:
@@ -30,22 +22,13 @@ tests:
     - ref: openshift-docs-preview-comment
 - as: validate-asciidoc
   steps:
+    env:
+      BUILD: build.py
+      DISTROS: openshift-enterprise openshift-rosa openshift-dedicated microshift
+      VERSION: "4.15"
     test:
     - ref: openshift-docs-asciidoctor
     - ref: openshift-docs-lint-topicmaps
-- as: portal-build
-  steps:
-    env:
-      BUILD: build.py
-      VERSION: "4.15"
-    test:
-    - ref: openshift-docs-portal
-- as: portal-build-for-portal
-  steps:
-    env:
-      BUILD: build_for_portal.py
-      VERSION: "4.15"
-    test:
     - ref: openshift-docs-portal
 zz_generated_metadata:
   branch: prow-test

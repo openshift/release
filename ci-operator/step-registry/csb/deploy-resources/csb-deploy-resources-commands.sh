@@ -399,7 +399,7 @@ EOF
 $CREDENTIALS
 EOF
 
-  oc create configmap credentials -n "${1}" --from-file=/tmp/credentials.yaml
+  oc create secret generic credentials -n "${1}" --from-file=/tmp/credentials.yaml
   oc create configmap mvn-settings -n "${1}" --from-file=/tmp/settings.xml
 }
 

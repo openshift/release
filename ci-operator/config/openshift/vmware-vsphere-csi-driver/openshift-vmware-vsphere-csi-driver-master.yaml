@@ -7,10 +7,6 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.16
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
@@ -18,7 +14,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.15"
+    tag: "4.16"
 build_root:
   from_repository: true
 canonical_go_repository: sigs.k8s.io/vsphere-csi-driver
@@ -37,9 +33,9 @@ images:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: vsphere-csi-driver-syncer
 promotion:
   to:
@@ -96,6 +92,12 @@ tests:
   steps:
     test:
     - ref: go-verify-deps
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: vmware-vsphere-csi-driver
+    workflow: openshift-ci-security
 - as: e2e-vsphere-zones
   optional: true
   steps:

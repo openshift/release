@@ -90,3 +90,16 @@ networking:
   - 172.30.0.0/16
 $MACHINE_POOL_OVERRIDES
 EOF
+
+if [ "${RT_ENABLED}" = "true" ]; then
+	cat > "${SHARED_DIR}/manifest_mc-kernel-rt.yml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: realtime-worker
+spec:
+  kernelType: realtime
+EOF
+fi
