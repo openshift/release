@@ -8,7 +8,7 @@ set -o verbose
 AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 AWS_ACCOUNT_ID=$(grep "aws_account_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
-OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
+OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 DOCKER_CONFIG_JSON_PATH="${CLUSTER_PROFILE_DIR}/config.json"
 CLUSTER_DATA_DIR="/tmp/clusters-data"
 
