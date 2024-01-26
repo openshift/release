@@ -427,7 +427,7 @@ EOF
 function enable_efa_pg_instance_config() {
   local dir=${1}
   #sed -i 's/          instanceType: .*/          networkInterfaceType: EFA\n          placementGroupName: pgcluster\n          instanceType: c5n.9xlarge/' "$dir/openshift/99_openshift-cluster-api_worker-machineset-0.yaml"
-  pip3 install pyyaml --user
+  pip3 install pyyaml==6.0  --user
   pushd "${dir}/openshift"
   python -c '
 import os
