@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.15"
+    name: "4.13"
     namespace: ocp
     tag: cli
   kiali-cypress-tests-runner:
@@ -22,10 +22,12 @@ images:
   to: maistra-runner
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.15"
+      version_bounds:
+        lower: 4.13.0-0
+        stream: 4-stable
+        upper: 4.14.0-0
 resources:
   '*':
     limits:
@@ -35,7 +37,7 @@ resources:
       memory: 200Mi
 tests:
 - as: servicemesh-interop-aws
-  cron: 0 6 25 10 *
+  cron: 0 6 25 12 *
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -49,16 +51,16 @@ tests:
               {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other"},
               {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
               {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
-              {"step": "servicemesh-smcp-install", "failure_type": "all", "classification": "Infrastructure Provisioning - SMCP Install", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 2}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Cypress Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "test_failure", "classification": "Kiali Cypress Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Integration Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "test_failure", "classification": "Kiali Integration Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "servicemesh-maistra-test-tool-execute", "failure_type": "pod_failure", "classification": "Maistra Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "servicemesh-maistra-test-tool-execute", "failure_type": "test_failure", "classification": "Maistra Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
+              {"step": "servicemesh-smcp-install", "failure_type": "all", "classification": "Infrastructure Provisioning - SMCP Install", "jira_project": "OSSM", "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Cypress Test Execution", "jira_project": "OSSM", "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "test_failure", "classification": "Kiali Cypress Test Failure", "jira_project": "OSSM", "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Integration Test Execution", "jira_project": "OSSM", "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "test_failure", "classification": "Kiali Integration Test Failure", "jira_project": "OSSM", "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-maistra-test-tool-execute", "failure_type": "pod_failure", "classification": "Maistra Test Execution", "jira_project": "OSSM", "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-maistra-test-tool-execute", "failure_type": "test_failure", "classification": "Maistra Test Failure", "jira_project": "OSSM", "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","servicemesh-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.13-lp","self-managed-lp","servicemesh-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: rcernich@redhat.com
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Customer Impact"]'
       FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
@@ -74,8 +76,6 @@ tests:
         ]
       SMCP_VERSION: "2.4"
       TEST_GROUP: interop
-      USER_TAGS: |
-        scenario servicemesh
     test:
     - ref: install-operators
     - ref: servicemesh-maistra-test-tool-execute
@@ -87,4 +87,4 @@ zz_generated_metadata:
   branch: main
   org: maistra
   repo: maistra-test-tool
-  variant: servicemesh-ocp4.15-lp-interop
+  variant: servicemesh-ocp4.14-lp-interop
