@@ -4,40 +4,42 @@
 import json
 import sys
 
-def apply_changes(input_file_name, target_file_name):
-    with open(input_file_name, 'r') as file:
+
+def apply_changes(source_file_name, destination_file_name):
+    with open(source_file_name, 'r', encoding='utf-8') as file:
         data = json.load(file)
 
-    with open(target_file_name, 'r') as file:
+    with open(destination_file_name, 'r', encoding='utf-8') as file:
         ci_data = json.load(file)
 
     new_verify = {}
     for key, value in data.get('verify', {}).items():
         new_key = f"nightly-failover-{key}"
         if key in ci_data['verify']:
-            print(f"Skipping '{new_key}' as it conflicts with existing key without prefix.")
+            print(
+                f"Skipping '{new_key}' as it conflicts with existing key without prefix.")
             continue
 
-        new_value = value
         if 'upgradeFromRelease' in value and value['upgradeFromRelease'].get('candidate', {}).get('stream') == 'nightly':
-            new_value['upgradeFromRelease']['candidate']['stream'] = 'ci'
-        new_verify[new_key] = new_value
+            value['upgradeFromRelease']['candidate']['stream'] = 'ci'
+        new_verify[new_key] = value
 
     ci_data['verify'].update(new_verify)
 
-    with open(target_file_name, 'w') as file:
+    with open(destination_file_name, 'w', encoding='utf-8') as file:
         json.dump(ci_data, file, indent=2)
         file.write('\n')
 
-def undo_changes(target_file_name):
-    with open(target_file_name, 'r') as file:
+def undo_changes(destination_file_name):
+    with open(destination_file_name, 'r', encoding='utf-8') as file:
         ci_data = json.load(file)
 
-    ci_data['verify'] = {k: v for k, v in ci_data['verify'].items() if not k.startswith('nightly-failover-')}
+    ci_data['verify'] = {k: v for k, v in ci_data['verify'].items(
+    ) if not k.startswith('nightly-failover-')}
 
-    with open(target_file_name, 'w') as file:
+    with open(destination_file_name, 'w', encoding='utf-8') as file:
         json.dump(ci_data, file, indent=2)
-        file.write('\n')  # Adding a newline at the end of the file
+        file.write('\n')
 
 def print_usage():
     print("Usage:")
@@ -58,4 +60,3 @@ if __name__ == "__main__":
             undo_changes(target_file_name)
         else:
             print("Invalid action. Use 'apply' or 'undo'.")
-
