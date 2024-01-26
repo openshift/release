@@ -13,7 +13,7 @@ images:
     FROM src
     RUN curl --silent --location https://rpm.nodesource.com/setup_16.x | bash - && \
         curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo podman" && \
+        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo podman " && \
         yum install --setopt=tsflags=nodocs -y $PACKAGES && \
         yum install -y yum-utils && yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
         yum -y install terraform \
@@ -25,6 +25,11 @@ images:
         aws --version
     RUN curl -Lk -o /usr/bin/yq https://github.com/mikefarah/yq/releases/download/v4.18.1/yq_linux_amd64 && chmod +x /usr/bin/yq && \
         yq --version
+    RUN curl -LK -o firefox-122.0.tar.bz2 https://download-installer.cdn.mozilla.net/pub/firefox/releases/122.0/linux-x86_64/en-US/firefox-122.0.tar.bz2 && \
+        tar xjf firefox-*.tar.bz2 && \
+        mv firefox /opt && \
+        ln -s /opt/firefox/firefox /usr/local/bin/firefox && \
+        firefox -v
   from: src
   to: quay-test-omr
 promotion:
