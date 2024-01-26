@@ -25,24 +25,25 @@ resources:
       cpu: "2"
       memory: 2Gi
 tests:
-- as: pr-image-mirror
-  run_if_changed: ^(Dockerfile|pyproject.toml|poetry.lock)
+- as: test
   steps:
-    dependencies:
-      SOURCE_IMAGE_REF: caikit-tgis-serving
+    cluster_profile: aws-opendatahub
     env:
-      IMAGE_REPO: caikit-tgis-serving
-    workflow: opendatahub-io-ci-image-mirror
-- as: fast-image-mirror
-  postsubmit: true
-  run_if_changed: ^(Dockerfile|pyproject.toml|poetry.lock)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: caikit-tgis-serving
-    env:
-      IMAGE_REPO: caikit-tgis-serving
-      RELEASE_VERSION: fast
-    workflow: opendatahub-io-ci-image-mirror
+      FOO: BAR
+    test:
+    - as: test
+      cli: latest
+      commands: |-
+        oc run -i -t hello-world --image=hello-world --restart=Never
+        oc get all
+      # dependencies:
+      # - env: CAIKIT_TGI_SERVING_IMAGE
+      #   name: caikit-tgis-serving
+      from: src
+      resources:
+        requests:
+          cpu: "1"
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: main
   org: opendatahub-io

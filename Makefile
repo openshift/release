@@ -4,7 +4,7 @@ SHELL=/usr/bin/env bash -o errexit
 
 export CONTAINER_ENGINE ?= docker
 export CONTAINER_ENGINE_OPTS ?= --platform linux/amd64
-export SKIP_PULL ?= false
+export SKIP_PULL ?= true
 
 VOLUME_MOUNT_FLAGS = :z
 ifeq ($(CONTAINER_ENGINE), docker)
