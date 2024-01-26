@@ -328,6 +328,7 @@ fi
 # Additional check to wait all the nodes to be ready. Especially important for multi-arch compute nodes clusters with
 # mixed arch nodes.
 echo -e "\nWaiting for all the nodes to be ready..."
+echo -e "\nWaiting for all the nodes to be ready..."
 wait_for_nodes_readiness ${EXPECTED_NODES}
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
