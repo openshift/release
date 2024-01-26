@@ -40,7 +40,7 @@ tests:
       DEPLOYMENT_VERSION: stable
       MUST_GATHER_TIMEOUT: 35m
       TEST_CONCURRENT: "100"
-      TEST_RUN: ./run.yaml
+      TEST_SCENARIO: math
       TEST_TOTAL: "1000"
     workflow: openshift-pipelines-scaling-pipelines
   timeout: 8h0m0s
@@ -53,7 +53,7 @@ tests:
       DEPLOYMENT_VERSION: nightly
       MUST_GATHER_TIMEOUT: 35m
       TEST_CONCURRENT: "100"
-      TEST_RUN: ./run.yaml
+      TEST_SCENARIO: math
       TEST_TOTAL: "1000"
     workflow: openshift-pipelines-scaling-pipelines
   timeout: 8h0m0s
@@ -669,20 +669,32 @@ tests:
     env:
       DEPLOYMENT_VERSION: "1.13"
       MUST_GATHER_TIMEOUT: 35m
-      TEST_RUN: ./run-build-image.yaml
+      TEST_SCENARIO: build
       TEST_SCENARIOS: 100/10 100/20 100/30 100/40 100/50
     workflow: openshift-pipelines-max-concurrency
   timeout: 8h0m0s
 - always_run: false
-  as: max-concurrency-downstream-1-13-1000-x-images
+  as: max-concurrency-downstream-1-13-1000-50-signing-bigbang
   optional: true
   steps:
     cluster_profile: aws-pipelines-performance
     env:
       DEPLOYMENT_VERSION: "1.13"
       MUST_GATHER_TIMEOUT: 35m
-      TEST_RUN: ./run-image-signing.yaml
-      TEST_SCENARIOS: 1000/20 1000/40 1000/60 1000/80 1000/100
+      TEST_SCENARIO: signing-bigbang
+      TEST_SCENARIOS: 1000/50
+    workflow: openshift-pipelines-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-downstream-1-13-1000-x-signing-ongoing
+  optional: true
+  steps:
+    cluster_profile: aws-pipelines-performance
+    env:
+      DEPLOYMENT_VERSION: "1.13"
+      MUST_GATHER_TIMEOUT: 35m
+      TEST_SCENARIO: signing-ongoing
+      TEST_SCENARIOS: 1000/10 1000/20 1000/40 1000/60 1000/80 1000/100
     workflow: openshift-pipelines-max-concurrency
   timeout: 8h0m0s
 zz_generated_metadata:
