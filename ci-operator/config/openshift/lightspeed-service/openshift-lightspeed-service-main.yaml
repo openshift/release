@@ -44,7 +44,27 @@ tests:
     make install-deps && make install-deps-test && make test-integration
   container:
     from: src
-- as: e2e-ols-openai-gpt35
+- always_run: false
+  as: e2e-ols-openai-gpt35
+  steps:
+    test:
+    - as: e2e
+      commands: |
+        export PROVIDER_KEY_PATH=/var/run/openai/token
+        export PROVIDER=openai
+        export MODEL=gpt-3.5-turbo-1106
+        scripts/test-e2e-standalone.sh
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      from: src
+      grace_period: 5ns
+      resources:
+        requests:
+          cpu: 100m
+- as: e2e-ols-openai-gpt35-periodic
+  cron: '@daily'
   steps:
     test:
     - as: e2e
