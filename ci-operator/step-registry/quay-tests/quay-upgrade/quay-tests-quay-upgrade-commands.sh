@@ -12,11 +12,11 @@ terraform version
 podman -v
 
 #Get the credentials and Email of new Quay User
-QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
+#QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
+#QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
 QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
 
-echo "QUAY_USERNAME \"$QUAY_USERNAME\" exists fffound"
+echo "$QUAY_EMAIL \" $QUAY_EMAIL \" exists fffound"
 
 #Deploy ODF Operator to OCP namespace 'openshift-storage'
 OO_INSTALL_NAMESPACE=openshift-storage
