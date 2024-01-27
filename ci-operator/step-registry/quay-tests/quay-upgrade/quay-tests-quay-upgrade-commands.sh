@@ -4,129 +4,110 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo ".......quay-tests-quay-upgrade-commands....."
 
-#Create AWS S3 Storage Bucket
+echo "Quay upgrade test..."
+skopeo -v
+oc version
+terraform version
+podman -v
+
+#Get the credentials and Email of new Quay User
+QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
+QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
+QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
+
+echo "QUAY_USERNAME \"$QUAY_USERNAME\" exists fffound"
+
+#Deploy ODF Operator to OCP namespace 'openshift-storage'
+OO_INSTALL_NAMESPACE=openshift-storage
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
 QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
+ODF_OPERATOR_CHANNEL="$ODF_OPERATOR_CHANNEL"
+ODF_SUBSCRIPTION_NAME="$ODF_SUBSCRIPTION_NAME"
 
-QUAY_IBMCOS_ACCESS_KEY=$(cat /var/run/quay-qe-ibmcos-secret/access_key)
-QUAY_IBMCOS_SECRET_KEY=$(cat /var/run/quay-qe-ibmcos-secret/secret_key)
-QUAY_IBMCOS_HOST_NAME=$(cat /var/run/quay-qe-ibmcos-secret/hostname)
-QUAY_IBMCOS_BUCKET_NAME=$(cat /var/run/quay-qe-ibmcos-secret/bucket_name)
-
-#Deploy Quay Operator to OCP namespace 'quay-enterprise'
 cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: quay-enterprise
+  name: openshift-storage
 EOF
 
-cat <<EOF | oc apply -f -
+OPERATORGROUP=$(oc -n "$OO_INSTALL_NAMESPACE" get operatorgroup -o jsonpath="{.items[*].metadata.name}" || true)
+if [[ -n "$OPERATORGROUP" ]]; then
+  echo "OperatorGroup \"$OPERATORGROUP\" exists: modifying it"
+  OG_OPERATION=apply
+  OG_NAMESTANZA="name: $OPERATORGROUP"
+else
+  echo "OperatorGroup does not exist: creating it"
+  OG_OPERATION=create
+  OG_NAMESTANZA="generateName: oo-"
+fi
+
+OPERATORGROUP=$(
+  oc $OG_OPERATION -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  name: quay
-  namespace: quay-enterprise
+  $OG_NAMESTANZA
+  namespace: $OO_INSTALL_NAMESPACE
 spec:
-  targetNamespaces:
-  - quay-enterprise
+  targetNamespaces: [$OO_INSTALL_NAMESPACE]
 EOF
+)
 
 SUB=$(
   cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  name: quay-operator
-  namespace: quay-enterprise
+  name: $ODF_SUBSCRIPTION_NAME
+  namespace: $OO_INSTALL_NAMESPACE
 spec:
+  channel: $ODF_OPERATOR_CHANNEL
   installPlanApproval: Automatic
-  name: quay-operator
-  channel: $QUAY_OPERATOR_CHANNEL
-  source: $QUAY_OPERATOR_SOURCE
+  name: $ODF_SUBSCRIPTION_NAME
+  source: redhat-operators
   sourceNamespace: openshift-marketplace
 EOF
 )
 
-echo "The Quay Operator subscription is $SUB"
-
 for _ in {1..60}; do
-  CSV=$(oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status.installedCSV}' || true)
+  CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
   if [[ -n "$CSV" ]]; then
-    if [[ "$(oc -n quay-enterprise get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+    if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
       echo "ClusterServiceVersion \"$CSV\" ready"
       break
     fi
   fi
   sleep 10
 done
-echo "Quay Operator is deployed successfully"
+echo "ODF/OCS Operator is deployed successfully"
 
-#Deploy Quay, here disable monitoring component
-cat >>config.yaml <<EOF
-CREATE_PRIVATE_REPO_ON_PUSH: true
-CREATE_NAMESPACE_ON_PUSH: true
-FEATURE_EXTENDED_REPOSITORY_NAMES: true
-FEATURE_QUOTA_MANAGEMENT: true
-FEATURE_PROXY_CACHE: true
-FEATURE_USER_INITIALIZE: true
-SUPER_USERS:
-  - quay
-USERFILES_LOCATION: default
-USERFILES_PATH: userfiles/
-DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
-  - default
-DISTRIBUTED_STORAGE_PREFERENCE:
-  - default
-DISTRIBUTED_STORAGE_CONFIG:
-  default:
-    - IBMCloudStorage
-    - bucket_name: $QUAY_IBMCOS_BUCKET_NAME
-      storage_path: /quay310
-      is_secure: true
-      access_key: $QUAY_IBMCOS_ACCESS_KEY
-      secret_key: $QUAY_IBMCOS_SECRET_KEY
-      hostname: $QUAY_IBMCOS_HOST_NAME
-EOF
-
-oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
-
-echo "Creating Quay registry..." >&2
 cat <<EOF | oc apply -f -
-apiVersion: quay.redhat.com/v1
-kind: QuayRegistry
+apiVersion: noobaa.io/v1alpha1
+kind: NooBaa
 metadata:
-  name: quay
-  namespace: quay-enterprise
+  name: noobaa
+  namespace: openshift-storage
 spec:
-  configBundleSecret: config-bundle-secret
-  components:
-  - kind: objectstorage
-    managed: false
-  - kind: monitoring
-    managed: false
-  - kind: horizontalpodautoscaler
-    managed: true
-  - kind: quay
-    managed: true
-  - kind: mirror
-    managed: true
-  - kind: clair
-    managed: true
-  - kind: tls
-    managed: true
-  - kind: route
-    managed: true
+  dbResources:
+    requests:
+      cpu: '0.1'
+      memory: 1Gi
+  coreResources:
+    requests:
+      cpu: '0.1'
+      memory: 1Gi
+  dbType: postgres
 EOF
 
-for _ in {1..60}; do
-  if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
-    echo "Quay is in ready status" >&2
-    exit 0
-  fi
-  sleep 15
-done
-echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
-oc -n quay-enterprise get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
+echo "Waiting for NooBaa Storage to be ready..." >&2
+oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=180s
+
+
+cd quay-frontend-tests
+ls -l
+cd ..
+cd quay-operator-tests
+make build
+
