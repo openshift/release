@@ -11,13 +11,13 @@ AWS_ACCOUNT_ID=$(grep "aws_account_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 DOCKER_CONFIG_JSON_PATH="${CLUSTER_PROFILE_DIR}/config.json"
 CLUSTER_DATA_DIR="/tmp/clusters-data"
-sleep 7200
+
 export AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY
 export AWS_ACCOUNT_ID
 export OCM_TOKEN
 export DOCKER_CONFIG=${CLUSTER_PROFILE_DIR}
-
+sleep 7200
 RUN_COMMAND="poetry run python openshift_cli_installer/cli.py \
             --action create \
             --clusters-install-data-directory $CLUSTER_DATA_DIR \
