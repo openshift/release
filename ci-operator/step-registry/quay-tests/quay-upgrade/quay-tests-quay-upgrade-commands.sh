@@ -111,3 +111,4 @@ cd ..
 cd quay-operator-tests
 make build
 
+sleep 10
