@@ -11,7 +11,7 @@ AWS_ACCOUNT_ID=$(grep "aws_account_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 DOCKER_CONFIG_JSON_PATH="${CLUSTER_PROFILE_DIR}/config.json"
 CLUSTER_DATA_DIR="/tmp/clusters-data"
-
+sleep 7200
 export AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY
 export AWS_ACCOUNT_ID
