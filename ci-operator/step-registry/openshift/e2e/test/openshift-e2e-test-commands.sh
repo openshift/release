@@ -160,6 +160,7 @@ ibmcloud*)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
+    echo $IC_API_KEY >/${SHARED_DIR}/ic-key.txt
     ;;
 powervs*)
     #export TEST_PROVIDER='{"type":"powervs"}' # TODO In the future, powervs will be a supprted test type
