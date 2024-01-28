@@ -9,6 +9,7 @@ echo "Quay upgrade test..."
 skopeo -v
 oc version
 terraform version
+go version
 podman -v
 
 #Get the credentials and Email of new Quay User
