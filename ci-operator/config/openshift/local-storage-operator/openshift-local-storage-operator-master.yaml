@@ -7,14 +7,14 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.16
+    tag: rhel-9-golang-1.21-openshift-4.16
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.15"
+    tag: "4.16"
 build_root:
   from_repository: true
 images:
@@ -23,18 +23,18 @@ images:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: local-storage-operator
 - dockerfile_path: Dockerfile.diskmaker.rhel7
   inputs:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: local-storage-diskmaker
 - dockerfile_path: Dockerfile.mustgather
   from: ocp_4.14_cli
@@ -50,8 +50,9 @@ operator:
   - pullspec: quay.io/openshift/origin-local-storage-diskmaker:latest
     with: pipeline:local-storage-diskmaker
 promotion:
-  name: "4.16"
-  namespace: ocp
+  to:
+  - name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -117,6 +118,12 @@ tests:
   steps:
     test:
     - ref: go-verify-deps
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: local-storage-operator
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift

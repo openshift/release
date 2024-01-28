@@ -69,18 +69,58 @@ if [ X"$ret" != X"0" ]; then
 fi
 
 # create disk encryption set
-echo "Creating keyvault and disk encryption set in ${RESOURCE_GROUP}"
 # We must randomize the name of the keyvault as they do not get fully deleted for 90 days.
-keyvault="${NAMESPACE}-${UNIQUE_HASH}-kv"
-keyvault_key="${NAMESPACE}-${UNIQUE_HASH}-kvkey"
-des="${NAMESPACE}-${UNIQUE_HASH}-des"
-create_disk_encryption_set ${RESOURCE_GROUP} ${keyvault} ${keyvault_key} ${des}
-
-echo "Granting service principal reader permissions to the DiskEncryptionSet: ${des}"
-des_id=$(az disk-encryption-set show -n ${des} -g ${RESOURCE_GROUP} --query "[id]" -o tsv)
+# A vault's name must be between 3-24 alphanumeric characters
 cluster_sp_id=$(cat "${AZURE_AUTH_LOCATION}" | jq -r ".clientId")
-run_command "az role assignment create --assignee ${cluster_sp_id} --role Owner --scope ${des_id} -o jsonc"
+azure_des_json="{}"
+kv_prefix="${NAMESPACE%-*}-${UNIQUE_HASH}"
+if [[ "${ENABLE_DES_DEFAULT_MACHINE}" == "true" ]]; then
+    echo "Creating keyvault and disk encryption set in ${RESOURCE_GROUP} for defaultMachinePlatform"
+    keyvault_default="${kv_prefix}-kv-default"
+    keyvault_key_default="${kv_prefix}-kvkey-default" 
+    des_default="${kv_prefix}-des-default"
+    create_disk_encryption_set "${RESOURCE_GROUP}" "${keyvault_default}" "${keyvault_key_default}" "${des_default}"
+    
+    echo "Granting service principal reader permissions to the DiskEncryptionSet: ${des_default}"
+    des_default_id=$(az disk-encryption-set show -n "${des_default}" -g "${RESOURCE_GROUP}" --query "[id]" -o tsv)
+    run_command "az role assignment create --assignee ${cluster_sp_id} --role Owner --scope ${des_default_id} -o jsonc"
 
+    #save default des information to ${SHARED_DIR} for reference
+    azure_des_json=$(echo "${azure_des_json}" | jq -c -S ". +={\"default\":\"${des_default}\"}")
+fi
 
-# save resource group information to ${SHARED_DIR} for reference and deprovision step
-echo "${des}" > "${SHARED_DIR}/azure_des"
+if [[ "${ENABLE_DES_CONTROL_PLANE}" == "true" ]]; then
+    echo "Creating keyvault and disk encryption set in ${RESOURCE_GROUP} for ControlPlane"
+    keyvault_master="${kv_prefix}-kv-master"
+    keyvault_key_master="${kv_prefix}-kvkey-master"
+    des_master="${kv_prefix}-des-master"
+    create_disk_encryption_set "${RESOURCE_GROUP}" "${keyvault_master}" "${keyvault_key_master}" "${des_master}"
+
+    echo "Granting service principal reader permissions to the DiskEncryptionSet: ${des_master}"
+    des_master_id=$(az disk-encryption-set show -n "${des_master}" -g "${RESOURCE_GROUP}" --query "[id]" -o tsv)
+    run_command "az role assignment create --assignee ${cluster_sp_id} --role Owner --scope ${des_master_id} -o jsonc"
+
+    #save control plane des information to ${SHARED_DIR} for reference
+    azure_des_json=$(echo "${azure_des_json}" | jq -c -S ". +={\"master\":\"${des_master}\"}")
+fi
+
+if [[ "${ENABLE_DES_COMPUTE}" == "true" ]]; then
+    echo "Creating keyvault and disk encryption set in ${RESOURCE_GROUP} for compute"
+    keyvault_worker="${kv_prefix}-kv-worker"
+    keyvault_key_worker="${kv_prefix}-kvkey-worker"
+    des_worker="${kv_prefix}-des-worker"
+    create_disk_encryption_set "${RESOURCE_GROUP}" "${keyvault_worker}" "${keyvault_key_worker}" "${des_worker}"
+
+    echo "Granting service principal reader permissions to the DiskEncryptionSet: ${des_worker}"
+    des_worker_id=$(az disk-encryption-set show -n "${des_worker}" -g "${RESOURCE_GROUP}" --query "[id]" -o tsv)
+    run_command "az role assignment create --assignee ${cluster_sp_id} --role Owner --scope ${des_worker_id} -o jsonc"
+
+    #save compute des information to ${SHARED_DIR} for reference
+    azure_des_json=$(echo "${azure_des_json}" | jq -c -S ". +={\"worker\":\"${des_worker}\"}")
+fi
+
+# save disk encryption set information to ${SHARED_DIR} for reference
+echo "${azure_des_json}" > "${SHARED_DIR}/azure_des.json"
+
+#for debug
+cat "${SHARED_DIR}/azure_des.json"

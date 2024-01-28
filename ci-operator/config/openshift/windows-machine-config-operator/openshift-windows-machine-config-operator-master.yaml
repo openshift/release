@@ -1,18 +1,18 @@
 base_images:
-  openshift_release_rhel-9-release-golang-1.20-openshift-4.15:
+  openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.20-openshift-4.15
+    tag: rhel-9-release-golang-1.21-openshift-4.16
   operator-sdk:
     name: "4.16"
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: windows-machine-config-operator-bundle
   previous-wmco:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: windows-machine-config-operator-test
 binary_build_commands: make build
@@ -22,9 +22,9 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile.ci
   inputs:
-    openshift_release_rhel-9-release-golang-1.20-openshift-4.15:
+    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
   to: windows-machine-config-operator-test
 operator:
   bundles:
@@ -36,10 +36,11 @@ operator:
   - pullspec: REPLACE_IMAGE
     with: pipeline:windows-machine-config-operator-test
 promotion:
-  additional_images:
-    windows-machine-config-operator-bundle: wmco-bundle
-  name: "4.16"
-  namespace: ocp
+  to:
+  - additional_images:
+      windows-machine-config-operator-bundle: wmco-bundle
+    name: "4.16"
+    namespace: ocp
 releases:
   latest:
     integration:
@@ -82,7 +83,6 @@ tests:
     from: src
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: security
-  optional: true
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
@@ -258,20 +258,9 @@ tests:
   as: vsphere-proxy-e2e-operator
   steps:
     cluster_profile: vsphere-2
-    post:
-    - chain: gather-network
-    - ref: gather-proxy
-    - chain: ipi-vsphere-post
-    - ref: vsphere-deprovision-bastionhost
-    pre:
-    - chain: ipi-conf-vsphere
-    - chain: vsphere-provision-bastionhost
-    - ref: ipi-conf-proxy
-    - ref: ovn-conf
-    - ref: ovn-conf-hybrid-manifest-with-custom-vxlan-port
-    - chain: ipi-install-vsphere
     test:
     - ref: windows-e2e-operator-test-with-custom-vxlan-port
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
 - always_run: false
   as: wicd-unit-vsphere
   steps:
@@ -291,7 +280,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: community-4.15
+      DESTINATION_BRANCH: community-4.16
       SOURCE_BRANCH: master
     workflow: windows-ci-fastforward
 - always_run: false

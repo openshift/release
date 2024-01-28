@@ -1,28 +1,29 @@
 base_images:
-  ocp_4.15_base-rhel9:
-    name: 4.15-priv
+  ocp_4.16_base-rhel9:
+    name: 4.16-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-control-plane-machine-set-operator
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.15_base-rhel9:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.15:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cluster-control-plane-machine-set-operator
 promotion:
-  name: 4.16-priv
-  namespace: ocp-private
+  to:
+  - name: 4.16-priv
+    namespace: ocp-private
 releases:
   arm64-latest:
     candidate:
@@ -44,8 +45,8 @@ resources:
     limits:
       memory: 4Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: 200m
+      memory: 400Mi
 tests:
 - as: lint
   commands: make lint
@@ -151,8 +152,6 @@ tests:
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
     cluster_profile: vsphere-2
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: test
       commands: |
@@ -167,8 +166,6 @@ tests:
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
     cluster_profile: vsphere-multizone-2
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: test
       commands: |

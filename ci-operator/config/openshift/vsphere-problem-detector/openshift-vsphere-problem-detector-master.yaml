@@ -10,7 +10,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.15"
+    tag: "4.16"
 binary_build_commands: make
 build_root:
   from_repository: true
@@ -25,8 +25,9 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: vsphere-problem-detector
 promotion:
-  name: "4.16"
-  namespace: ocp
+  to:
+  - name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -73,6 +74,12 @@ tests:
   steps:
     test:
     - ref: go-verify-deps
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: vsphere-problem-detector
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift

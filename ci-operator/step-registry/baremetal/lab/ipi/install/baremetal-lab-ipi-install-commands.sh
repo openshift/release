@@ -26,18 +26,6 @@ function oinst() {
    --line-buffered -v 'password\|X-Auth-Token\|UserData:'
 }
 
-function prepare_bmc() {
-  local bmc_address="${1}"
-  local bmc_user="${2}"
-  local bmc_pass="${3}"
-  ipmitool -I lanplus -H "$bmc_address" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    chassis bootparam set bootflag force_pxe options=PEF,watchdog,reset,power
-  ipmitool -I lanplus -H "$bmc_address" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power off || echo "Already off"
-}
-
 function update_image_registry() {
   while ! oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
                  --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'; do
@@ -149,8 +137,8 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # Patch the install-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
   yq --inplace eval-all 'select(fileIndex == 0).platform.baremetal.hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
     "$SHARED_DIR/install-config.yaml" - <<< "$ADAPTED_YAML"
-  echo "Power off ${bmc_address//.*/} (${name}) and prepare host bmc conf for installation..."
-  prepare_bmc "${bmc_address}" "${bmc_user}" "${bmc_pass}"
+  echo "Power off #${host} (${name}) and prepare host bmc conf for installation..."
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe" "no_power_on"
 done
 
 mkdir -p "${INSTALL_DIR}"

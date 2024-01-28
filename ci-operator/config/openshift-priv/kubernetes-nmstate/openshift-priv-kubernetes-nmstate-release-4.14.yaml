@@ -49,12 +49,13 @@ images:
         source_path: /usr/bin/oc
   to: src-with-oc-and-kubectl
 promotion:
-  excluded_images:
-  - kubernetes-nmstate-handler
-  - kubernetes-nmstate-operator
-  - src-with-oc-and-kubectl
-  name: 4.14-priv
-  namespace: ocp-private
+  to:
+  - excluded_images:
+    - kubernetes-nmstate-handler
+    - kubernetes-nmstate-operator
+    - src-with-oc-and-kubectl
+    name: 4.14-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -82,6 +83,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: security
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+      SNYK_ENABLE_DEPS_SCAN: "true"
+    workflow: openshift-ci-security
 - as: unit
   commands: make test/unit
   container:

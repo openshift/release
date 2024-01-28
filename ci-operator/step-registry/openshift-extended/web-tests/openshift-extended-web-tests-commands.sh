@@ -58,7 +58,7 @@ EOF
 if [ $((failures)) != 0 ] ; then
     echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
     readarray -t failingscenarios < <(find "${ARTIFACT_DIR}" -name 'cypress_report*.json' -exec yq '.results[].suites[].tests[] | select(.fail == true) | .fullTitle' {} \; | sort --unique)
-    for (( i=0; i<failures; i++ )) ; do
+    for (( i=0; i<${#failingscenarios[@]}; i++ )) ; do
         echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
     done
 fi

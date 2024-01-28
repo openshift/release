@@ -427,7 +427,7 @@ EOF
 function enable_efa_pg_instance_config() {
   local dir=${1}
   #sed -i 's/          instanceType: .*/          networkInterfaceType: EFA\n          placementGroupName: pgcluster\n          instanceType: c5n.9xlarge/' "$dir/openshift/99_openshift-cluster-api_worker-machineset-0.yaml"
-  pip3 install pyyaml --user
+  pip3 install pyyaml==6.0  --user
   pushd "${dir}/openshift"
   python -c '
 import os
@@ -507,10 +507,18 @@ gcp)
     elif [ -f "${SHARED_DIR}/user_tags_sa.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the userTags testing on GCP..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/user_tags_sa.json"
+    elif [ -f "${SHARED_DIR}/xpn_min_perm_passthrough.json" ]; then
+      echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC..."
+      export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_min_perm_passthrough.json"
     fi
     ;;
 ibmcloud*)
-    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    if [ -f "${SHARED_DIR}/ibmcloud-min-permission-api-key" ]; then
+      IC_API_KEY="$(< "${SHARED_DIR}/ibmcloud-min-permission-api-key")"
+      echo "using the specified key for minimal permission!!"
+    else
+      IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    fi
     export IC_API_KEY
     ;;
 alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini;;

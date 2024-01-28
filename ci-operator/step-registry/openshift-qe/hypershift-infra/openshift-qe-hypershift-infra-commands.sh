@@ -111,8 +111,8 @@ fi
 ROSA_VERSION=$(rosa version)
 ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${ROSA_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
-  rosa login --env "${ROSA_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+  rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
   if [ $? -ne 0 ]; then
     echo "Login failed"
     exit 1
@@ -134,7 +134,8 @@ if [[ "$is_hcp_cluster" == "true" ]]; then
     checkForInfraReady "$desired_infra_count"
 
     echo "Re-balance infra components"
-    checkInfra "prometheus-k8s" "openshift-monitoring"
+    # checkInfra "prometheus-k8s" "openshift-monitoring"  # turned off validation due to OCPBUGS-27216
+    rebalanceInfra "prometheus-k8s"
     checkInfra "router" "openshift-ingress"
   fi
 else

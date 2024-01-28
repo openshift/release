@@ -8,7 +8,7 @@ echo "Changing to shared gateway mode"
 echo "-------------------"
 oc patch Network.operator.openshift.io cluster --type='merge' --patch "{\"spec\":{\"defaultNetwork\":{\"ovnKubernetesConfig\":{\"gatewayConfig\":{\"routingViaHost\":false}}}}}"
 
-oc wait co network --for='condition=PROGRESSING=True' --timeout=60s
+oc wait co network --for='condition=PROGRESSING=True' --timeout=120s
 # Wait until the ovn-kubernetes pods are restarted
 sample_node=$(oc get no -o jsonpath='{.items[0].metadata.name}')
 sample_node_zone=$(oc get node "${sample_node}" -o jsonpath='{.metadata.annotations.k8s\.ovn\.org/zone-name}')

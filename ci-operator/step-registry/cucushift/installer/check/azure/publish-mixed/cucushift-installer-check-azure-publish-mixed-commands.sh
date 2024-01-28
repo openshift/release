@@ -82,10 +82,18 @@ if [[ "${API_PUBLISH_STRATEGY}" == "Internal" ]]; then
     fi
 
     echo "(*) check that LB rule on port ${API_SERVER_PORT} is created in internal LB..."
-    api_internal_lb_rule=$(cat ${internal_lb_rules} | jq -r ".[] | select(.backendPort==${API_SERVER_PORT})")
-    if [[ -z "${api_internal_lb_rule}" ]]; then
+    api_internal_lb_rule_id=$(cat ${internal_lb_rules} | jq -r ".[] | select(.backendPort==${API_SERVER_PORT}) | .id")
+    if [[ -z "${api_internal_lb_rule_id}" ]]; then
         echo "ERROR: not found lb rule on port ${API_SERVER_PORT} in internal LB!"
         check_result=1
+    else
+        echo "(*) check private ip address is configured as frontendIP for lb rule on port ${API_SERVER_PORT} in internal lb ${INTERNAL_LB_NAME}"
+        lb_private_ip=""
+        lb_private_ip=$(az network lb show -g ${RESOURCE_GROUP} -n ${INTERNAL_LB_NAME} | jq -r ".frontendIPConfigurations[] | select(.loadBalancingRules) | select(.loadBalancingRules[].id==\"${api_internal_lb_rule_id}\") | .privateIPAddress")
+        if [[ -z ${lb_private_ip} ]] || [[ "${lb_private_ip}" == "null" ]]; then
+            echo "ERROR: not found private ip address for load balancer rule ${api_internal_lb_rule_id} in internal lb ${INTERNAL_LB_NAME}"
+            check_result=1
+        fi
     fi
 
     echo "(*) check that outbound rule is created in public lb..."
@@ -124,7 +132,7 @@ else
         echo "ERROR: not found lb rule on port ${API_SERVER_PORT} in public LB!"
         check_result=1
     else
-        echo "(*) check public ip address is configured in public lb..."
+        echo "(*) check public ip address is configured as frontendIP for lb rule on port ${API_SERVER_PORT} in public lb ${PUBLIC_LB_NAME}"
         lb_public_ip=""
         lb_public_ip=$(az network lb show -g ${RESOURCE_GROUP} -n ${PUBLIC_LB_NAME} | jq -r ".frontendIPConfigurations[] | select(.loadBalancingRules) | select(.loadBalancingRules[].id==\"${api_pubilc_lb_rule_id}\") | .publicIPAddress.id")
         if [[ -z ${lb_public_ip} ]] || [[ "${lb_public_ip}" == "null" ]]; then
@@ -161,6 +169,14 @@ if [[ "${INGRESS_PUBLISH_STRATEGY}" == "Internal" ]]; then
         if [[ -z "${ingress_lb_rule_id}" ]]; then
             echo "ERROR: not found lb rule on port ${port} in internal LB!"
             check_result=1
+        else
+            echo "---- check private ip is configured as frontendIP for lb rules on port ${port} in internal LB ${INTERNAL_LB_NAME}"
+            lb_private_ip=""
+            lb_private_ip=$(az network lb show -g ${RESOURCE_GROUP} -n ${INTERNAL_LB_NAME} | jq -r ".frontendIPConfigurations[] | select(.loadBalancingRules) | select(.loadBalancingRules[].id==\"${ingress_lb_rule_id}\") | .privateIPAddress")
+            if [[ -z "${lb_private_ip}" ]] || [[ "${lb_private_ip}" == "null" ]]; then
+                echo "ERROR: not found priavte ip address for load balancer rule ${ingress_lb_rule_id} in internal lb ${INTERNAL_LB_NAME}"
+                check_result=1
+            fi
         fi
     done
 

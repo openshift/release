@@ -306,11 +306,13 @@ for instance in "${INSTANCE_NAMES[@]}"; do
 done
 MAC_ADDRESSES=()
 IP_ADDRESSES=()
+origins=""
 for instance in "${INSTANCE_ID[@]}"; do
     for ((i=1; i<=20; i++)); do
         instance_info=$(ibmcloud pi instance $instance --json)
         mac_address=$(echo "$instance_info" | jq -r '.networks[].macAddress')
         ip_address=$(echo "$instance_info" | jq -r '.networks[].ipAddress')
+        instance_name=$(echo "$instance_info" | jq -r '.serverName')
 
         if [ -z "$mac_address" ] || [ -z "$ip_address" ]; then
             echo "$(date) Waiting for mac and ip to be populated in $instance"
@@ -320,6 +322,7 @@ for instance in "${INSTANCE_ID[@]}"; do
 
         MAC_ADDRESSES+=("$mac_address")
         IP_ADDRESSES+=("$ip_address")
+        origins+="{\"name\": \"${instance_name}\", \"address\": \"${ip_address}\", \"enabled\": true},"
         break
     done
 done
@@ -330,10 +333,19 @@ if [ ${#MAC_ADDRESSES[@]} -ne ${HYPERSHIFT_NODE_COUNT} ] || [ ${#IP_ADDRESSES[@]
   exit 1
 fi
 
+origins="${origins%,}"
+origin_pools_json="{\"name\": \"${HOSTED_CLUSTER_NAME}\", \"origins\": [${origins}]}"
+
+pool_id=$(ibmcloud cis glb-pool-create -i ${CIS_INSTANCE} --json "${origin_pools_json}" --output json | jq -r '.id')
+
+lb_name="${HOSTED_CLUSTER_NAME}.${HYPERSHIFT_BASE_DOMAIN}"
+lb_payload="{\"name\": \"${lb_name}\",\"fallback_pool\": \"${pool_id}\",\"default_pools\": [\"${pool_id}\"]}"
+
+ibmcloud cis glb-create ${CIS_DOMAIN_ID} -i ${CIS_INSTANCE} --json "${lb_payload}"
+
 # Creating dns record for ingress
-# Assigning first node's ip to ingress dns record
 echo "$(date) Creating dns record for ingress"
-ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "*.apps.${HOSTED_CLUSTER_NAME}" --content "${IP_ADDRESSES[0]}"
+ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type CNAME --name "*.apps.${HOSTED_CLUSTER_NAME}" --content "${lb_name}"
 
 # Waiting for discovery iso file to ready
 oc wait --timeout=10m --for=condition=ImageCreated --namespace=${HOSTED_CONTROL_PLANE_NAMESPACE} infraenv/${HOSTED_CLUSTER_NAME}
@@ -414,10 +426,6 @@ oc wait --all=true agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --for=jsonpath='{.
 # Download guest cluster kubeconfig
 echo "$(date) Setup nested_kubeconfig"
 ${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --name=${HOSTED_CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
-
-# Setting nodeSelector on ingresscontroller  to first agent to make sure router pod spawns on first agent,
-# since *.apps DNS record is pointing to first agent's IP.
-oc patch ingresscontroller default -n openshift-ingress-operator -p '{"spec": {"nodePlacement": {"nodeSelector": { "matchLabels": { "kubernetes.io/hostname": "'"${INSTANCE_NAMES[0]}"'"}}, "tolerations": [{ "effect": "NoSchedule", "key": "kubernetes.io/hostname", "operator": "Exists"}]}}}' --type=merge --kubeconfig=${SHARED_DIR}/nested_kubeconfig
 
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=http://${BASTION}:2005/

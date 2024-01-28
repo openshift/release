@@ -62,7 +62,7 @@ snyk_code() {
     fi
 
     if [ -z "${TARGET_REFERENCE}" ]; then
-        TARGET_REFERENCE=$(echo $CLONE_REFS | jq -r .base_ref)
+        TARGET_REFERENCE=$(echo $CLONE_REFS | jq -r .base_ref | tr '.' '-')
     fi
     PARAMS+=(--target-reference="${TARGET_REFERENCE}")
 

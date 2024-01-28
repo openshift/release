@@ -32,39 +32,63 @@ MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
 cat <<'EOF' >/tmp/install.sh
 #!/bin/bash
 set -xeuo pipefail
-export PS4='+ $(date "+%T.%N") \011'
+export PS4='+ $(date "+%T.%N") ${BASH_SOURCE#$HOME/}:$LINENO \011'
+
+DNF_RETRY=$(mktemp /tmp/dnf_retry.XXXXXXXX.sh)
+curl -s https://raw.githubusercontent.com/openshift/microshift/main/scripts/dnf_retry.sh -o "${DNF_RETRY}"
+chmod 755 "${DNF_RETRY}"
 
 source /tmp/microshift-clusterbot-settings
-
-sudo dnf clean all
 
 if ! sudo subscription-manager status >&/dev/null; then
 	sudo subscription-manager register \
 		--org="$(cat /tmp/subscription-manager-org)" \
 		--activationkey="$(cat /tmp/subscription-manager-act-key)"
 fi
-hash git || sudo dnf install -y git-core
+
+hash git || "${DNF_RETRY}" "install" "git-core"
 
 sudo mkdir -p /etc/microshift
 sudo cp /tmp/config.yaml /etc/microshift/config.yaml
 
-if [[ -z "${MICROSHIFT_GIT+x}" ]] || [[ "${MICROSHIFT_GIT}" == "" ]]; then
-	: MICROSHIFT_GIT unset or empty - use release-OCP_VERSION to checkout right scripts and install MicroShift from repositories
+if [[ -n "${MICROSHIFT_PR}" ]]; then
+	git init ~/microshift
+	cd ~/microshift
+	git remote add origin https://github.com/openshift/microshift
+
+	branch="pr-${MICROSHIFT_PR}"
+	git fetch --no-tags origin "pull/${MICROSHIFT_PR}/head:${branch}"
+	git switch "${branch}"
+
+	configure_args=""
+	if grep -qw -- "--skip-dnf-update" ~/microshift/scripts/devenv-builder/configure-vm.sh; then
+		configure_args="--skip-dnf-update"
+	fi
+	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
+
+elif [[ -n "${MICROSHIFT_GIT}" ]]; then
+	: MICROSHIFT_GIT is set - clone it, build it, run it
+
+	git clone https://github.com/openshift/microshift -b "${MICROSHIFT_GIT}" ~/microshift
+
+	configure_args=""
+	if grep -qw -- "--skip-dnf-update" ~/microshift/scripts/devenv-builder/configure-vm.sh; then
+		configure_args="--skip-dnf-update"
+	fi
+	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
+
+else
+	: Neither MICROSHIFT_PR nor MICROSHIFT_GIT are set - use release-OCP_VERSION to checkout right scripts and install MicroShift from repositories
 
 	git clone https://github.com/openshift/microshift -b "release-${OCP_VERSION}" ~/microshift
 
-	if [[ "${OCP_VERSION}" != "${CURRENT_RELEASE}" ]]; then
-		: Enabling right version of RHOCP repositories as the one from configure-vm.sh lags one behind
-        : But only for released versions
-		sudo subscription-manager config --rhsm.manage_repos=1
-		OS_VERSION=$(awk -F: '{print $5}' /etc/system-release-cpe)
-		sudo subscription-manager repos \
-			--enable "rhocp-${OCP_VERSION}-for-rhel-${OS_VERSION}-$(uname -m)-rpms" \
-			--enable "fast-datapath-for-rhel-${OS_VERSION}-$(uname -m)-rpms"
+	configure_args=""
+	if grep -qw -- "--skip-dnf-update" ~/microshift/scripts/devenv-builder/configure-vm.sh; then
+		configure_args="--skip-dnf-update"
 	fi
 
     : Install oc, set up firewall, etc.
-	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall --no-build --no-build-deps /tmp/pull-secret
+	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall --no-build --no-build-deps ${configure_args} /tmp/pull-secret
 
     : Fetch get_rel_version_repo.sh from o/microshift main so it is up to date - some release-4.Y might not have it
     curl https://raw.githubusercontent.com/openshift/microshift/main/test/bin/get_rel_version_repo.sh -o /tmp/get_rel_version_repo.sh
@@ -76,11 +100,11 @@ if [[ -z "${MICROSHIFT_GIT+x}" ]] || [[ "${MICROSHIFT_GIT}" == "" ]]; then
 
     if [[ -z "${version+x}" ]] || [[ "${version}" == "" ]]; then
         : version is empty - no RPMs for the release yet - build from source
-        bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall /tmp/pull-secret
+        bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
         exit 0
     fi
 
-    if [[ ! -z "${repo}" ]]; then
+    if [[ -n "${repo}" ]]; then
         : Repo with EC or RC was found - enable
         sudo tee "/etc/yum.repos.d/microshift-mirror.repo" >/dev/null <<2EOF2
 [microshift-mirror]
@@ -92,14 +116,8 @@ skip_if_unavailable=0
 2EOF2
     fi
 
-	sudo dnf install -y "microshift-${version}"
+	"${DNF_RETRY}" "install" "microshift-${version}"
 	sudo systemctl enable --now microshift
-
-else
-	: MICROSHIFT_GIT is set - clone it, build it, run it
-
-	git clone https://github.com/openshift/microshift -b "${MICROSHIFT_GIT}" ~/microshift
-	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall /tmp/pull-secret
 fi
 EOF
 chmod +x /tmp/install.sh

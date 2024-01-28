@@ -5,17 +5,29 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-./scripts/get-updated-distros.sh | while read -r filename; do
-    if [ "$filename" == "_topic_maps/_topic_map.yml" ]; then python3 ${BUILD}.py --distro openshift-enterprise --product "OpenShift Container Platform" --version 4.15 --no-upstream-fetch
+IFS=' ' read -r -a DISTROS <<< "${DISTROS}"
 
-    elif [ "$filename" == "_topic_maps/_topic_map_osd.yml" ]; then python3 ${BUILD}.py --distro openshift-dedicated --product "OpenShift Dedicated" --version 4 --no-upstream-fetch
+for DISTRO in "${DISTROS[@]}"; do
 
-    elif [ "$filename" == "_topic_maps/_topic_map_ms.yml" ]; then python3 ${BUILD}.py --distro microshift --product "Microshift" --version 4 --no-upstream-fetch
-
-    elif [ "$filename" == "_topic_maps/_topic_map_rosa.yml" ]; then python3 ${BUILD}.py --distro openshift-rosa --product "Red Hat OpenShift Service on AWS" --version 4 --no-upstream-fetch
-
-    elif [ "$filename" == "_distro_map.yml" ]; then python3 ${BUILD}.py --distro openshift-enterprise --product "OpenShift Container Platform" --version 4.15 --no-upstream-fetch
+    if [ "${DISTRO}" == "openshift-enterprise" ]; then
+        TOPICMAP="_topic_maps/_topic_map.yml"
+    elif [ "${DISTRO}" == "openshift-rosa" ]; then
+        TOPICMAP="_topic_maps/_topic_map_rosa.yml"
+    elif [ "${DISTRO}" == "openshift-osd" ]; then
+        TOPICMAP="_topic_maps/_topic_map_osd.yml"
+    elif [ "${DISTRO}" == "openshift-ms" ]; then
+        TOPICMAP="_topic_maps/_topic_map_ms.yml"
     fi
-    done
 
-if [ -d "drupal-build" ]; then python3 makeBuild.py; fi
+    ./scripts/get-updated-distros.sh | while read -r FILENAME; do
+        if [ "${FILENAME}" == "${TOPICMAP}" ]; then
+            python3 "${BUILD}" --distro "${DISTRO}" --product "OpenShift Container Platform" --version "${VERSION}" --no-upstream-fetch
+        elif [ "${FILENAME}" == "_distro_map.yml" ]; then
+            python3 "${BUILD}" --distro "openshift-enterprise" --product "OpenShift Container Platform" --version "${VERSION}" --no-upstream-fetch
+        fi
+    done
+done
+
+if [ -d "drupal-build" ]; then
+    python3 makeBuild.py
+fi
