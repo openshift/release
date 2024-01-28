@@ -9,7 +9,7 @@ echo "Quay upgrade test..."
 skopeo -v
 oc version
 terraform version
-#podman -v
+podman -v
 
 #Get the credentials and Email of new Quay User
 #QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
@@ -104,12 +104,10 @@ EOF
 echo "Waiting for NooBaa Storage to be ready..." >&2
 oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=180s
 
-
-cd quay-frontend-tests
-ls -l
-cd ..
 cd quay-operator-tests
 ls -al
 make build
+echo "files in quay-operator-tests:"
 ls -al
+./bin/extended-platform-tests run all --dry-run | grep "Quay" | ./bin/extended-platform-tests run -f -
 sleep 10
