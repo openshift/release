@@ -9,7 +9,7 @@ echo "Quay upgrade test..."
 skopeo -v
 oc version
 terraform version
-podman -v
+# podman -v
 
 #Get the credentials and Email of new Quay User
 #QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
