@@ -17,7 +17,7 @@ export AWS_SECRET_ACCESS_KEY
 export AWS_ACCOUNT_ID
 export OCM_TOKEN
 export DOCKER_CONFIG=${CLUSTER_PROFILE_DIR}
-sleep 7200
+#sleep 7200
 RUN_COMMAND="poetry run python openshift_cli_installer/cli.py \
             --action create \
             --clusters-install-data-directory $CLUSTER_DATA_DIR \
