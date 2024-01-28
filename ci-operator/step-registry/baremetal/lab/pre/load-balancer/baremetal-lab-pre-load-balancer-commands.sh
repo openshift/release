@@ -130,17 +130,13 @@ echo -e "${HAPROXY}" >> "$HAPROXY_DIR/haproxy.cfg"
 echo -e "${DHCLIENT}" >> "$HAPROXY_DIR/dhclient.conf"
 
 echo "Create and start HAProxy container..."
-docker run --name "haproxy-$CLUSTER_NAME" -d --restart=on-failure \
-  -v "$HAPROXY_DIR/haproxy.cfg:/etc/haproxy.cfg" \
-  -v "$HAPROXY_DIR/dhclient.conf:/etc/dhcp/dhclient.conf" \
+podman run --name "haproxy-$CLUSTER_NAME" -d --restart=on-failure \
+  -v "$HAPROXY_DIR/haproxy.cfg:/etc/haproxy.cfg:Z" \
+  -v "$HAPROXY_DIR/dhclient.conf:/etc/dhcp/dhclient.conf:Z" \
   --network none \
   quay.io/openshifttest/haproxy:armbm
 
 echo "Setting the network interfaces in the HAProxy container"
-
-# Unmount resolv.conf to let the custom network configuration able to modify it
-nsenter -m -u -n -i -p -t "$(docker inspect -f '{{.State.Pid}}' "haproxy-${CLUSTER_NAME}")" \
-  /bin/umount /etc/resolv.conf
 
 # For the given dhclient.conf, eth1 will also get default route, dns and other options usual for the main interfaces.
 # eth2 will only get local routes configuration
@@ -155,17 +151,17 @@ for dev in "${devices[@]}"; do
   bridge=${dev##*.}
   # for the given dhclient.conf, eth1 will also get default route, dns and other options usual for the main interface
   # eth2 will only get local routes configuration
-  /usr/local/bin/ovs-docker add-port "$bridge" "$interface" "haproxy-$CLUSTER_NAME"
-  nsenter -m -u -n -i -p -t "$(docker inspect -f '{{ .State.Pid }}' "haproxy-$CLUSTER_NAME")" \
+  ovs-docker.sh add-port "$bridge" "$interface" "haproxy-$CLUSTER_NAME"
+  nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-$CLUSTER_NAME")" \
     /sbin/dhclient -v \
     -pf "/var/run/dhclient.$interface.pid" \
     -lf "/var/lib/dhcp/dhclient.$interface.lease" "$interface"
 done
 echo "Sending HUP to HAProxy to trigger the configuration reload..."
-docker kill --signal HUP "haproxy-$CLUSTER_NAME"
+podman kill --signal HUP "haproxy-$CLUSTER_NAME"
 
 echo "Gather the IP Address for the new interface"
-api_ip=$(nsenter -m -u -n -i -p -t "$(docker inspect -f '{{ .State.Pid }}' "haproxy-${CLUSTER_NAME}")" -n  \
+api_ip=$(nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-${CLUSTER_NAME}")" -n  \
   /sbin/ip -o -4 a list eth1 | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/')
 if [ "${#api_ip}" -eq 0 ]; then
   echo "No IP Address has been set for the external API VIP, failing"

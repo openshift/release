@@ -3,8 +3,8 @@ chain:
   steps:
   - ref: openshift-cluster-bot-rbac
   - ref: aws-provision-vpc-disconnected
-  - ref: aws-provision-localzone-subnet
-  - ref: ipi-conf-aws-localzone-machineset-manifests
+  - chain: aws-provision-localzone-subnet
+  - ref: edge-nodes-machineset-manifests
   - chain: aws-provision-bastionhost
   - chain: mirror-images-by-oc-adm
   - ref: ipi-conf
@@ -26,6 +26,7 @@ chain:
   - ref: mirror-images-tag-images
   - ref: set-sample-operator-disconnected
   - ref: storage-conf-storageclass-set-default-storageclass
+  - ref: cucushift-installer-check-aws-localzone
   - chain: cucushift-installer-check
   env:
   - name: CONTROL_PLANE_INSTANCE_TYPE
@@ -36,10 +37,12 @@ chain:
     documentation: "Instance type for compute nodes"
   - name: ENABLE_AWS_LOCALZONE
     default: "yes"
+  - name: EDGE_ZONE_TYPE
+    default: "local-zone"
   - name: LOCALZONE_WORKER_NUMBER
     default: "1"
   - name: LOCALZONE_INSTANCE_TYPE
-    default: "c5d.2xlarge"
+    default: ""
   - name: LOCALZONE_WORKER_SCHEDULABLE
     default: "no"
   - name: LOCALZONE_WORKER_ASSIGN_PUBLIC_IP

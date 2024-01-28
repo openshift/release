@@ -24,9 +24,10 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
   to: aws-efs-csi-driver
 promotion:
-  disabled: true
-  name: 4.16-priv
-  namespace: ocp-private
+  to:
+  - disabled: true
+    name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -57,6 +58,12 @@ tests:
   steps:
     test:
     - ref: go-verify-deps
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: aws-efs-csi-driver
+    workflow: openshift-ci-security
 - as: verify-commits
   commands: |
     commitchecker --start ${PULL_BASE_SHA:-master}

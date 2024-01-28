@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.19-openshift-4.13
+    tag: rhel-9-golang-1.20-openshift-4.14
 images:
 - dockerfile_literal: |-
     FROM src
@@ -22,14 +22,15 @@ images:
   from: src
   to: e2e-test-runner
 promotion:
-  name: redhat-appstudio
-  namespace: ci
+  to:
+  - name: redhat-appstudio
+    namespace: ci
 releases:
   latest:
     release:
       architecture: amd64
       channel: fast
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -47,7 +48,7 @@ tests:
     owner: rhtap
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.13"
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^tests/release/pipelines/|^tests/load-tests/|^cmd/loadTests.go$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     test:
@@ -130,7 +131,7 @@ tests:
     workflow: redhat-appstudio-load-test
   timeout: 8h0m0s
 - as: load-test-ci-daily-10u-10t
-  cron: 0 4,16 * * *
+  cron: 0 4 * * *
   steps:
     cluster_profile: aws-rhtap-performance
     env:

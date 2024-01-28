@@ -6,6 +6,10 @@ set -e -u -o pipefail
 
 declare -r TEST_RESULT_DIR="${ARTIFACT_DIR}/obo-test-run-results"
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 main() {
 
 	set -x

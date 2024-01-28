@@ -134,14 +134,16 @@ fi
 arch_instance_type=$(echo -n "${CONTROL_PLANE_INSTANCE_TYPE}" | cut -d . -f 1)
 BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
 
-workers=${COMPUTE_NODE_REPLICAS:-3}
+worker_replicas=${COMPUTE_NODE_REPLICAS:-3}
 if [[ "${COMPUTE_NODE_REPLICAS}" -le 0 ]]; then
-    workers=0
+    worker_replicas=0
 fi
 
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
-  workers=0
+  worker_replicas=0
 fi
+
+master_replicas=${CONTROL_PLANE_REPLICAS:-3}
 
 # Generate working availability zones from the region
 mapfile -t AVAILABILITY_ZONES < <(aws --region "${aws_source_region}" ec2 describe-availability-zones --filter Name=state,Values=available Name=zone-type,Values=availability-zone | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
@@ -194,7 +196,8 @@ fi
 
 echo "Using control plane instance type: ${CONTROL_PLANE_INSTANCE_TYPE}"
 echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
-echo "Using compute node replicas: ${workers}"
+echo "Using compute node replicas: ${worker_replicas}"
+echo "Using controlPlane node replicas: ${master_replicas}"
 
 PATCH="${SHARED_DIR}/install-config-common.yaml.patch"
 cat > "${PATCH}" << EOF
@@ -207,13 +210,14 @@ platform:
 controlPlane:
   architecture: ${architecture}
   name: master
+  replicas: ${master_replicas}
   platform:
     aws:
       type: ${CONTROL_PLANE_INSTANCE_TYPE}
 compute:
 - architecture: ${architecture}
   name: worker
-  replicas: ${workers}
+  replicas: ${worker_replicas}
   platform:
     aws:
       type: ${COMPUTE_NODE_TYPE}

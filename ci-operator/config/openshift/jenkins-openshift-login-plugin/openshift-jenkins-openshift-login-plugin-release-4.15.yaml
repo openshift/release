@@ -1,7 +1,16 @@
+base_images:
+  origin_4.15_jenkins:
+    name: "4.15"
+    namespace: origin
+    tag: jenkins
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
+  inputs:
+    origin_4.15_jenkins:
+      as:
+      - registry.ci.openshift.org/origin/4.15:jenkins
   to: jenkins
 - dockerfile_literal: |
     FROM quay.io/openshift/origin-jenkins-agent-maven:4.11.0 AS builder
@@ -18,11 +27,12 @@ images:
     mvn --version
   to: jenkins-maven-builder
 promotion:
-  excluded_images:
-  - jenkins
-  - jenkins-maven-builder
-  name: "4.15"
-  namespace: ocp
+  to:
+  - excluded_images:
+    - jenkins
+    - jenkins-maven-builder
+    name: "4.15"
+    namespace: ocp
 releases:
   initial:
     integration:

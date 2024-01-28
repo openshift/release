@@ -444,6 +444,7 @@ platform_type=$(oc get infrastructure cluster -o=jsonpath='{.status.platformStat
 platform_type=$(echo $platform_type | tr -s 'A-Z' 'a-z')
 
 default_sc=$(oc get sc -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}')
+
 if [[ -n $default_sc ]]; then
     set_storage_class
     apply_monitoring_configmap_withpvc
@@ -530,6 +531,16 @@ then
 	exit 0
 fi
 
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+	# shellcheck disable=SC1090
+	source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 # Download jq
 if [ ! -d /tmp/bin ];then
@@ -557,47 +568,50 @@ export OPENSHIFT_ALERTMANAGER_STORAGE_SIZE=2Gi
 
 case ${platform_type} in
 	aws)
-           #Both Architectures also need:
-           OPENSHIFT_PROMETHEUS_STORAGE_CLASS=gp3-csi
-           OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=gp3-csi
-             ;;
+    #Both Architectures also need:
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=gp3-csi
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=gp3-csi
+    ;;
 	gcp)
-           OPENSHIFT_PROMETHEUS_STORAGE_CLASS=ssd-csi
-	   OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=ssd-csi
-             ;;
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=ssd-csi
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=ssd-csi
+    ;;
 	ibmcloud)
-	   OPENSHIFT_PROMETHEUS_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
-	   OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
-           OPENSHIFT_PROMETHEUS_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
-	   OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
-             ;;
-    	openstack)
-           OPENSHIFT_PROMETHEUS_STORAGE_CLASS=standard-csi
-           OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=standard-csi
-             ;;
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
+    ;;
+    openstack)
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=standard-csi
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=standard-csi
+    ;;
 	alibabacloud)
-	   OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=alicloud-disk
-	   OPENSHIFT_PROMETHEUS_STORAGE_CLASS=alicloud-disk
-           OPENSHIFT_PROMETHEUS_STORAGE_CLASS=alicloud-disk
-           OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=alicloud-disk
-             ;;
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=alicloud-disk
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=alicloud-disk
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=alicloud-disk
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=alicloud-disk
+    ;;
 
 	azure)
-	   #Azure use VM_SIZE as instance type, to unify variable, define all to INSTANCE_TYPE
-	   OPENSHIFT_PROMETHEUS_STORAGE_CLASS=managed-csi
-	   OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=managed-csi
-             ;;
-        nutanix)
-	   #nutanix use VM_SIZE as instance type, to uniform variable, define all to INSTANCE_TYPE
-           OPENSHIFT_PROMETHEUS_STORAGE_CLASS=nutanix-volume
-           OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=nutanix-volume
-	   ;;
-        vsphere|default)
+    #Azure use VM_SIZE as instance type, to unify variable, define all to INSTANCE_TYPE
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=managed-csi
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=managed-csi
+    ;;
+  nutanix)
+    #nutanix use VM_SIZE as instance type, to uniform variable, define all to INSTANCE_TYPE
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=nutanix-volume
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=nutanix-volume
+    ;;
+  vsphere)
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=thin-csi
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=thin-csi
+    ;;
+  default)
 	  ;;
-	    
-	 *)
-	   echo "Un-supported infrastructure cluster detected."
-	   exit 1
+	*)
+    echo "Un-supported infrastructure cluster detected."
+    exit 1
 esac
 
 

@@ -15,8 +15,8 @@ chain:
         # shellcheck disable=SC2087
         ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
       oc image mirror -f /tmp/mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json
-      oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/amd64.*" registry.k8s.io/pause:3.8  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-28-registry-k8s-io-pause-3-8-aP7uYsw5XCmoDy5W
-      oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/amd64.*" registry.k8s.io/pause:3.9  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-27-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
+      oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.8  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-28-registry-k8s-io-pause-3-8-aP7uYsw5XCmoDy5W
+      oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.9  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-27-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
       EOF
         TEST_ARGS+=$(echo " --from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} ")
       }
@@ -71,16 +71,11 @@ chain:
           ;;
       ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
       none)
-          if [ -f "${SHARED_DIR}/ds-vars.conf" ] ; then
-            if [[ "${DS_IP_STACK}" != "v6" ]];
-            then
-              export TEST_PROVIDER='{"type":"baremetal"}'
-            else
-              mirror_test_images
-              export TEST_PROVIDER='{"type":"baremetal","disconnected":true}'
-            fi
-          else
+          if [[ "${DISCONNECTED}" == "true" ]]; then
+            mirror_test_images
             export TEST_PROVIDER='{"type":"baremetal","disconnected":true}'
+          else
+            export TEST_PROVIDER='{"type":"baremetal"}'
           fi
           ;;
       ibmcloud)
@@ -169,6 +164,12 @@ chain:
       documentation: |-
         if non-empty, ignores job failure which is as a result of a failure of the MonitorTest suite.
         All conformance test cases need to pass for the job to pass, though.
+    - name: DISCONNECTED
+      default: "false"
+      documentation: Should we work on top of a disconnected environment
+    - name: ARCHITECTURE
+      default: "amd64"
+      documentation: Set the architecture for disconnected conformance (amd64, arm64, ppc64le, s390x)
     resources:
       requests:
         cpu: "3"

@@ -302,10 +302,14 @@ then
   ROOT_DISK=\$(lsblk -o pkname --noheadings --path | grep -E "^\S+" | sort | uniq)
 
   # Use the largest disk available for dev-scripts
-  DATA_DISK=\$(lsblk -o name --noheadings --sort size --path | grep -v "\${ROOT_DISK}" | tail -n1)
-  mkfs.xfs -f "\${DATA_DISK}"
-  mkdir /opt/dev-scripts
-  mount "\${DATA_DISK}" /opt/dev-scripts
+  DATA_DISK=\$(lsblk -o name --noheadings --sort size --path | grep -v "\${ROOT_DISK}" | tail -n1) || true
+
+  # There may have only been one disk
+  if [ -n "\$DATA_DISK" ] ; then
+    mkfs.xfs -f "\${DATA_DISK}"
+    mkdir /opt/dev-scripts
+    mount "\${DATA_DISK}" /opt/dev-scripts
+  fi
 elif [ ! -z "${NVME_DEVICE}" ] && [ -e "${NVME_DEVICE}" ] && [[ "\$(mount | grep ${NVME_DEVICE})" == "" ]];
 then
   mkfs.xfs -f "${NVME_DEVICE}"
@@ -373,11 +377,11 @@ timeout -s 9 105m make ${DEVSCRIPTS_TARGET}
 
 # Add extra CI specific rules to the libvirt zone, this can't be done earlier because the zone only now exists
 # TODO: In reality the bridges should be in the public zone
+sudo firewall-cmd --add-port=8213/tcp --zone=libvirt
 if [ -e /root/bm.json ] ; then
     # Allow cluster nodes to use provising node as a ntp server (4.12 and above are more likely to use it vs. the dhcp set server)
     sudo firewall-cmd --add-service=ntp --zone libvirt
     sudo firewall-cmd --add-service=ntp --zone public
-    sudo firewall-cmd --add-port=8213/tcp --zone libvirt
 fi
 EOF
 

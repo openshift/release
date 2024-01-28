@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.12"
+    name: "4.14"
     namespace: ocp
     tag: cli
 build_root:
@@ -25,7 +25,7 @@ releases:
   latest:
     release:
       channel: stable
-      version: "4.12"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -94,14 +94,15 @@ tests:
     name: github-token
 - as: push-images
   steps:
-    cluster_profile: aws-2
+    cluster_profile: ossm-aws
     dependencies:
       RELEASE_IMAGE_LATEST: release:latest
     env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
       GOBIN: /gobin
       GOCACHE: /tmp/cache
       GOMODCACHE: /tmp/cache
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.13.14-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.14.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -155,9 +156,10 @@ tests:
     workflow: servicemesh-istio-e2e-hypershift
 - as: integration-ocp-4-14
   steps:
-    cluster_profile: aws-2
+    cluster_profile: ossm-aws
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.14.4-multi
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.14.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -176,8 +178,8 @@ tests:
       from: src
       resources:
         requests:
-          cpu: 100m
-          memory: 100Mi
+          cpu: 200m
+          memory: 200Mi
       timeout: 10m0s
     - as: integration-ocp-4-14
       cli: latest
@@ -199,16 +201,17 @@ tests:
       from: src-test
       resources:
         requests:
-          cpu: 100m
-          memory: 100Mi
+          cpu: 200m
+          memory: 200Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-hypershift
 - as: integration-ocp-4-15
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: ossm-aws
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.15.0-ec.2-multi
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.15.0-rc.2-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -256,11 +259,12 @@ tests:
     workflow: servicemesh-istio-e2e-hypershift
 - as: integration-kind
   steps:
-    cluster_profile: aws-2
+    cluster_profile: ossm-aws
     dependencies:
       RELEASE_IMAGE_LATEST: release:latest
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.13.14-multi
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.14.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -310,9 +314,10 @@ tests:
     workflow: servicemesh-istio-e2e-hypershift
 - as: scorecard
   steps:
-    cluster_profile: aws-2
+    cluster_profile: ossm-aws
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.13.14-multi
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.14.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -359,11 +364,12 @@ tests:
 - as: nightly-images
   cron: 00 03 * * *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: ossm-aws
     dependencies:
       RELEASE_IMAGE_LATEST: release:latest
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.13.14-multi
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.14.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-nightly-images
       MAISTRA_SC_POD: maistra-nightly-images-pod
@@ -400,7 +406,7 @@ tests:
            git config --global user.name 'Jonh Wendell'; \
            cd /work && \
            export BUILD_WITH_CONTAINER="0" && \
-           make -e GITHUB_TOKEN=${GITHUB_TOKEN} docker-push-nightly bundle-publish-nightly"
+           make -e GITHUB_TOKEN=${GITHUB_TOKEN} -e NIGHTLY=true docker-buildx bundle-publish-nightly"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
       - mount_path: /maistra-secrets

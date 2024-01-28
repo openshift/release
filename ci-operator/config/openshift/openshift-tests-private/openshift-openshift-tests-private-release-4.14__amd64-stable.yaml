@@ -11,6 +11,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -23,6 +27,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: openstack-installer
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
   tests-private:
     name: tests-private
     namespace: ci
@@ -128,8 +136,7 @@ tests:
       RELEASE_IMAGE_LATEST: release:multi-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and @hypershift-hosted
-        and not @fips'
+      E2E_RUN_TAGS: '@hypershift-hosted'
       EXTRA_ARGS: --arch=arm64
       HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
@@ -208,6 +215,27 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: osd-ccs-aws
+- as: gcp-ocm-osd-ccs-marketplace-f14
+  cron: 13 19 1,16 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      CHANNEL_GROUP: candidate
+      OPENSHIFT_VERSION: "4.14"
+      SUBSCRIPTION_TYPE: marketplace-gcp
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: osd-ccs-gcp
+- as: aws-rosa-non-sts-advanced-f14
+  cron: 38 14 14,29 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: candidate
+      OPENSHIFT_VERSION: "4.14"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: rosa-aws-non-sts-advanced
 - as: aws-rosa-sts-f14
   cron: 18 13 3,18 * *
   steps:
@@ -218,106 +246,121 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: rosa-aws-sts
-- as: aws-rosa-sts-hypershift-sector-guest-prod-critical-f2
-  cron: 53 9 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
+- as: aws-rosa-sts-advanced-f14
+  cron: 45 15 8,23 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_SECURITY_GROUP: "true"
+      CHANNEL_GROUP: candidate
+      OPENSHIFT_VERSION: "4.14"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: rosa-aws-sts-advanced
+- as: aws-rosa-sts-private-link-f14
+  cron: 12 10 5,20 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: candidate
+      OPENSHIFT_VERSION: "4.14"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: rosa-aws-sts-private-link
+- as: aws-rosa-sts-shared-vpc-f14
+  cron: 5 0 2,17 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: candidate
+      OPENSHIFT_VERSION: "4.14"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: rosa-aws-sts-shared-vpc
+- as: aws-rosa-sts-hcp-advanced-stage-critical-f14
+  cron: 17 22 14,28 * *
   steps:
     cluster_profile: aws-sd-qe
     env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@rosa and @hypershift-hosted and @critical'
+      OPENSHIFT_VERSION: "4.14"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hypershift-advanced
+- as: aws-rosa-sts-hcp-private-link-stage-critical-f14
+  cron: 15 1 14,28 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@rosa and @hypershift-hosted and @critical'
+      OPENSHIFT_VERSION: "4.14"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hypershift-private-link
+- as: aws-rosa-sts-hcp-stage-critical-f14
+  cron: 23 8 10,24 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@rosa and @hypershift-hosted and @critical'
+      OPENSHIFT_VERSION: "4.14"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hypershift
+- as: aws-rosa-sts-hcp-sector-prod-critical-f7
+  cron: 29 10 5,14,21,28 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
       CLUSTER_SECTOR: canary
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @network-ovnkubernetes and
-        @hypershift-hosted and @critical and not @fips'
+      E2E_RUN_TAGS: '@rosa and @hypershift-hosted and @critical'
       OCM_LOGIN_ENV: production
       OPENSHIFT_VERSION: "4.14"
       REGION: us-east-1
-      ROSA_LOGIN_ENV: production
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
       TEST_IMPORTANCE: Critical
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-aws-sts-hypershift-sector
-- as: aws-rosa-sts-hypershift-sector-guest-prod-full-f2
-  cron: 33 7 1,3,5,7,9,11,13,15,17,19,20,23,25,27,29 * *
+- as: aws-rosa-sts-hcp-sector-advanced-prod-critical-f7
+  cron: 33 15 4,11,18,27 * *
   steps:
     cluster_profile: aws-sd-qe
     env:
+      CHANNEL_GROUP: candidate
       CLUSTER_SECTOR: canary
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @network-ovnkubernetes and
-        @hypershift-hosted and not @fips'
+      E2E_RUN_TAGS: '@rosa and @hypershift-hosted and @critical'
       OCM_LOGIN_ENV: production
       OPENSHIFT_VERSION: "4.14"
       REGION: us-east-1
-      ROSA_LOGIN_ENV: production
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hypershift-sector
-- as: aws-rosa-sts-hypershift-sector-guest-prod-advanced-crit-f2
-  cron: 51 13 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CLUSTER_SECTOR: canary
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @network-ovnkubernetes and
-        @hypershift-hosted and @critical and not @fips'
-      ENABLE_AUTOSCALING: "false"
-      OCM_LOGIN_ENV: production
-      OPENSHIFT_VERSION: "4.14"
-      REGION: us-east-1
-      REPLICAS: "3"
-      ROSA_LOGIN_ENV: production
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
       TEST_IMPORTANCE: Critical
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-aws-sts-hypershift-sector-advanced
-- as: aws-rosa-sts-hypershift-sector-guest-prod-advanced-full-f2
-  cron: 12 3 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
+- as: aws-rosa-sts-hcp-sector-private-link-prod-critical-f7
+  cron: 10 8 7,14,23,30 * *
   steps:
     cluster_profile: aws-sd-qe
     env:
+      CHANNEL_GROUP: candidate
       CLUSTER_SECTOR: canary
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @network-ovnkubernetes and
-        @hypershift-hosted and not @fips'
-      ENABLE_AUTOSCALING: "false"
+      E2E_RUN_TAGS: '@rosa and @hypershift-hosted and @critical'
       OCM_LOGIN_ENV: production
       OPENSHIFT_VERSION: "4.14"
       REGION: us-east-1
-      REPLICAS: "3"
-      ROSA_LOGIN_ENV: production
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hypershift-sector-advanced
-- as: aws-rosa-sts-hypershift-sec-guest-prod-private-link-crit-f2
-  cron: 20 7 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CLUSTER_SECTOR: canary
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @network-ovnkubernetes and
-        @hypershift-hosted and @critical and not @fips'
-      OCM_LOGIN_ENV: production
-      OPENSHIFT_VERSION: "4.14"
-      REGION: us-east-1
-      ROSA_LOGIN_ENV: production
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
       TEST_IMPORTANCE: Critical
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hypershift-sector-private-link
-- as: aws-rosa-sts-hypershift-sec-guest-prod-private-link-full-f2
-  cron: 53 16 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CLUSTER_SECTOR: canary
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @network-ovnkubernetes and
-        @hypershift-hosted and not @fips'
-      OCM_LOGIN_ENV: production
-      OPENSHIFT_VERSION: "4.14"
-      REGION: us-east-1
-      ROSA_LOGIN_ENV: production
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-aws-sts-hypershift-sector-private-link
@@ -393,7 +436,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
-      AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       RESERVE_BOOTSTRAP: "false"
       architecture: amd64
       ipv4_enabled: "true"
@@ -409,7 +452,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
-      AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       RESERVE_BOOTSTRAP: "false"
       architecture: amd64
       ipv4_enabled: "true"
@@ -425,7 +468,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
-      AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       RESERVE_BOOTSTRAP: "false"
       architecture: amd64
       ipv4_enabled: "true"
@@ -446,7 +489,7 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
-- as: gcp-ipi-disconnected-private-workload-identity-f14
+- as: gcp-ipi-disconnected-private-oidc-f14
   cron: 53 10 8,23 * *
   steps:
     cluster_profile: gcp-qe
@@ -531,8 +574,7 @@ tests:
     cluster_profile: fleet-manager-qe
     env:
       CHANNEL_GROUP: candidate
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @network-ovnkubernetes and
-        @hypershift-hosted and not @fips'
+      E2E_RUN_TAGS: '@rosa and @hypershift-hosted'
       OPENSHIFT_VERSION: "4.14"
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
     test:
