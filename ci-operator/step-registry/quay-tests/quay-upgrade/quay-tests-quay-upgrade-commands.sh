@@ -22,7 +22,7 @@ echo "$QUAY_EMAIL \" $QUAY_EMAIL \" exists fffound"
 #Retrieve the Credentials of image registry "brew.registry.redhat.io"
 OMR_BREW_USERNAME=$(cat /var/run/quay-qe-brew-secret/username)
 OMR_BREW_PASSWORD=$(cat /var/run/quay-qe-brew-secret/password)
-podman login brew.registry.redhat.io -u '${OMR_BREW_USERNAME}' -p ${OMR_BREW_PASSWORD}"
+podman login brew.registry.redhat.io -u "${OMR_BREW_USERNAME}" -p "${OMR_BREW_PASSWORD}"
 
 #Deploy ODF Operator to OCP namespace 'openshift-storage'
 
