@@ -3,7 +3,7 @@
 set -x
 
 # Session variables
-infra_name="abi-ci-$(echo -n $PROW_JOB_ID|cut -c-8)"
+infra_name="$CLUSTER_NAME-$(echo -n $PROW_JOB_ID|cut -c-8)"
 plugins_list=("vpc-infrastructure" "cloud-dns-services")
 IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
@@ -195,9 +195,9 @@ echo "Checking the openshift-install version"
 openshift-install version
 
 echo "Creating agent-config and install-config files"
-mkdir $HOME/abi-sno-ibmz
+mkdir $HOME/$CLUSTER_NAME
 # Agent Config 
-cat <<EOF > $HOME/abi-sno-ibmz/agent-config.yaml
+cat <<EOF > $HOME/$CLUSTER_NAME/agent-config.yaml
 apiVersion: v1alpha1
 kind: AgentConfig
 metadata:
@@ -223,7 +223,7 @@ hosts:
             dhcp: true
 EOF
 # Install Config
-cat <<EOF > $HOME/abi-sno-ibmz/install-config.yaml
+cat <<EOF > $HOME/$CLUSTER_NAME/install-config.yaml
 apiVersion: v1
 baseDomain: $BASEDOMAIN
 controlPlane:
@@ -255,11 +255,11 @@ sshKey: >
   @$httpd_vsi_pub_key
 EOF
 echo "Generating pxe-boot artifacts for SNO cluster"
-openshift-install create pxe-files --dir $HOME/abi-sno-ibmz/ --log-level debug
+openshift-install create pxe-files --dir $HOME/$CLUSTER_NAME/ --log-level debug
 
 # Generating script for agent boot execution on zVSI
 echo "Uploading the pxe-boot artifacts to HTTPD server"
-scp -r "${ssh_options[@]}" $HOME/abi-sno-ibmz/boot-artifacts/ root@$httpd_vsi_ip:/var/www/html/
+scp -r "${ssh_options[@]}" $HOME/$CLUSTER_NAME/boot-artifacts/ root@$httpd_vsi_ip:/var/www/html/
 ssh "${ssh_options[@]}" root@$httpd_vsi_ip "mv /var/www/html/boot-artifacts/* /var/www/html/; chmod 644 /var/www/html/*; rm -rf /var/www/html/boot-artifacts/"
 echo "Downloading the setup script for pxeboot of SNO"
 curl -k -L --output $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot.sh"
@@ -284,9 +284,9 @@ rm -f $HOME/setup_pxeboot.sh
 
 # Wait for bootstrapping to complete
 echo "$(date) Waiting for the bootstrapping to complete"
-openshift-install wait-for bootstrap-complete --dir $HOME/abi-sno-ibmz/
+openshift-install wait-for bootstrap-complete --dir $HOME/$CLUSTER_NAME/
 
 # Wait for installation to complete
 echo "$(date) Waiting for the installation to complete"
-openshift-install wait-for install-complete --dir $HOME/abi-sno-ibmz/
-cp $HOME/abi-sno-ibmz/auth/kubeconfig ${SHARED_DIR}/abi-kubeconfig
+openshift-install wait-for install-complete --dir $HOME/$CLUSTER_NAME/
+cp $HOME/$CLUSTER_NAME/auth/kubeconfig ${SHARED_DIR}/$CLUSTER_NAME-kubeconfig

@@ -3,7 +3,7 @@
 set -x
 
 # session variables
-infra_name="abi-ci-$(echo -n $PROW_JOB_ID|cut -c-8)"
+infra_name="$CLUSTER_NAME-$(echo -n $PROW_JOB_ID|cut -c-8)"
 plugins_list=("vpc-infrastructure" "cloud-dns-services")
 IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY

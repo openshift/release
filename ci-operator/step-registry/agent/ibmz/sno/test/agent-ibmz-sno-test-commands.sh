@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -ex
-export KUBECONFIG=${SHARED_DIR}/abi-kubeconfig
+export KUBECONFIG=${SHARED_DIR}/$CLUSTER_NAME-kubeconfig
 
 echo "$(date) Checking the SNO status" 
 oc wait no --all --for=condition=Ready=true --timeout=30m
