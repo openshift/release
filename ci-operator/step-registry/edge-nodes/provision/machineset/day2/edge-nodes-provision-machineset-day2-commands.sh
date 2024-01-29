@@ -7,7 +7,7 @@ set -o pipefail
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
-localzone_machineset=${SHARED_DIR}/manifest_localzone_machineset.yaml
+edge_node_machineset=${SHARED_DIR}/manifest_edge_node_machineset.yaml
 
 function print_debug_info()
 {
@@ -26,17 +26,20 @@ name=$(oc get machineset -n openshift-machine-api  --no-headers | grep "\-worker
 ami_id=$(oc get machineset -n openshift-machine-api $name -o "jsonpath={.spec.template.spec.providerSpec.value.ami.id}")
 infra_id=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
 
-sed -i "s/PLACEHOLDER_INFRA_ID/$infra_id/g" ${localzone_machineset}
-sed -i "s/PLACEHOLDER_AMI_ID/$ami_id/g" ${localzone_machineset}
+sed -i "s/PLACEHOLDER_INFRA_ID/$infra_id/g" ${edge_node_machineset}
+sed -i "s/PLACEHOLDER_AMI_ID/$ami_id/g" ${edge_node_machineset}
 
 echo "Creating Edge node:"
-cat ${localzone_machineset}
+cat ${edge_node_machineset}
 
-oc create -f ${localzone_machineset}
+oc create -f ${edge_node_machineset}
 
 echo "Waiting for new nodes get ready"
-machineset_name=$(yq-go r ${localzone_machineset} 'metadata.name')
-count=$(yq-go r ${localzone_machineset} 'spec.replicas')
+machineset_name=$(yq-go r ${edge_node_machineset} 'metadata.name')
+
+echo "${machineset_name}" > ${SHARED_DIR}/edge_node_day2_machineset_name
+
+count=$(yq-go r ${edge_node_machineset} 'spec.replicas')
 
 echo "machineset_name: ${machineset_name}, expect count: ${count}"
 
