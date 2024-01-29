@@ -1,4 +1,8 @@
 base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
   cli-ocm:
     name: cli-ocm
     namespace: ci
@@ -16,11 +20,15 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.21
+images:
+- context_dir: .
+  dockerfile_path: tests/Dockerfile
+  to: jaeger-tests-runner
 releases:
   latest:
     candidate:
       product: ocp
-      stream: ci
+      stream: nightly
       version: "4.14"
 resources:
   '*':
@@ -35,6 +43,8 @@ tests:
   steps:
     cluster_profile: aws-cspi-qe
     env:
+      EO_SUB_CHANNEL: stable-5.8
+      EO_SUB_SOURCE: redhat-operators
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -44,7 +54,6 @@ tests:
               {"step": "cucushift-hypershift-*", "failure_type": "all", "classification": "Health Check - Cluster", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "gather-*", "failure_type": "pod_failure", "classification": "Must Gather - Cluster", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["!default"]},
               {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
-              {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default"]},
               {"step": "osd-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["!default"]},
               {"step": "rosa-cluster-deprovision", "failure_type": "all", "classification": "Infrastructure Deprovisioning - Cluster", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "rosa-cluster-provision", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
@@ -58,14 +67,14 @@ tests:
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.14"
-      OPERATORS: |
-        [
-            {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"}
-        ]
       REGION: us-west-2
     test:
-    - ref: install-operators
+    - ref: operatorhub-subscribe-elasticsearch-operator
+    - ref: operatorhub-subscribe-amq-streams
+    - ref: distributed-tracing-install-jaeger-product
+    - ref: distributed-tracing-install-opentelemetry-product
     - ref: cucushift-hypershift-extended-health-check
+    - ref: distributed-tracing-tests-jaeger
     workflow: firewatch-rosa-aws-sts-hypershift
 zz_generated_metadata:
   branch: main
