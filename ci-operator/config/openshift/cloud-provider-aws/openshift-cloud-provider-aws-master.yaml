@@ -61,6 +61,22 @@ promotion:
   - name: "4.16"
     namespace: ocp
 raw_steps:
+- move_rpm_to_srv_step:
+  dockerfile_literal: |
+     FROM rpms AS rpms
+     COPY --from=rpms /*.rpm /srv/repo/
+  inputs:
+    base-machine-with-rpms:
+      as:
+        - rpms
+  to: artifacts
+- output_rpm_to_artifacts_step:
+    from: artifacts
+    optional: true
+    to:
+      name: stable
+      namespace: ""
+      tag: artifacts
 - rpm_image_injection_step:
     from: base-machine
     to: base-machine-with-rpms
