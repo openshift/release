@@ -92,4 +92,3 @@ if [[ -z "${mc_ocm_cluster_id}" ]]; then
   echo "No ready MC, Exit..."
   exit 1
 fi
-ocm get /api/clusters_mgmt/v1/clusters/${mc_ocm_cluster_id}/credentials | jq -r .kubeconfig > "${SHARED_DIR}/hs-mc.kubeconfig"

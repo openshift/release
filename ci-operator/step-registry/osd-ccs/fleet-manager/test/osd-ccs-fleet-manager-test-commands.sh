@@ -117,7 +117,9 @@ function test_autoscaler ()
 {
   TEST_PASSED=true
 
-  export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+  mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
+  ocm get /api/clusters_mgmt/v1/clusters/"${mc_cluster_id}"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/ocm-mc.kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/ocm-mc.kubeconfig"
 
   # get overprovisioning configmap json
   OVERPROVISIONING_CM=$(oc get configmap overprovisioning -n cluster-proportional-autoscaler -o json)
@@ -270,12 +272,16 @@ function test_monitoring_disabled ()
 
   ## check workload monitoring disabled on a service cluster
 
-  export KUBECONFIG="${SHARED_DIR}/hs-sc.kubeconfig"
+  sc_cluster_id=$(cat "${SHARED_DIR}/ocm-sc-id")
+  ocm get /api/clusters_mgmt/v1/clusters/"${sc_cluster_id}"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/ocm-sc.kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/ocm-sc.kubeconfig"
   check_monitoring_disabled "service cluster"
 
   ## check workload monitoring disabled on a management cluster
 
-  export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+  mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
+  ocm get /api/clusters_mgmt/v1/clusters/"${mc_cluster_id}"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/ocm-mc.kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/ocm-mc.kubeconfig"
   check_monitoring_disabled "management cluster"
   update_results "OCP-60338" $TEST_PASSED
 }
@@ -634,7 +640,9 @@ TEST_PASSED=true
 function test_machinesets_naming () {
   TEST_PASSED=true
 
-  export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+  mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
+  ocm get /api/clusters_mgmt/v1/clusters/"${mc_cluster_id}"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/ocm-mc.kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/ocm-mc.kubeconfig"
   ## get first name of found machineset
   echo "Getting the name of a first available machineset to confirm that its valid"
   MACHINE_SETS_OUTPUT=""
@@ -743,7 +751,9 @@ function test_obo_machine_pool () {
 
 function test_machine_health_check_config () {
   TEST_PASSED=true
-  export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+  mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
+  ocm get /api/clusters_mgmt/v1/clusters/"${mc_cluster_id}"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/ocm-mc.kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/ocm-mc.kubeconfig"
 
   echo "Checking MC MHC match expressions operator"
   EXPECTED_MHC_MATCH_EXPRESSIONS_OPERATOR="NotIn"
@@ -795,7 +805,9 @@ function test_machine_health_check_config () {
 
 function test_compliance_monkey_descheduler () {
   TEST_PASSED=true
-  export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+  mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
+  ocm get /api/clusters_mgmt/v1/clusters/"${mc_cluster_id}"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/ocm-mc.kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/ocm-mc.kubeconfig"
 
   echo "Checking that compliance-monkey deployment is present and contains descheduler container"
   EXPECTED_COMPLIANCE_MONKEY_DEPLOYMENT_CONTAINING_DESCHEDULER_COUNT=1
@@ -818,7 +830,9 @@ function test_compliance_monkey_descheduler () {
 
 function test_hypershift_crds_not_installed_on_sc () {
   TEST_PASSED=true
-  export KUBECONFIG="${SHARED_DIR}/hs-sc.kubeconfig"
+  sc_cluster_id=$(cat "${SHARED_DIR}/ocm-sc-id")
+  ocm get /api/clusters_mgmt/v1/clusters/"${sc_cluster_id}"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/ocm-sc.kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/ocm-sc.kubeconfig"
   
   echo "Confirming that hostedcluster and nodepool CRDs are not installed on service cluster"
   EXPECTED_HOSTED_CL_NODEPOOL_CRD_OUTPUT=""
@@ -890,7 +904,9 @@ function test_add_labels_to_sc_after_installing () {
 
 function test_ready_mc_acm_placement_decision () {
   TEST_PASSED=true
-  export KUBECONFIG="${SHARED_DIR}/hs-sc.kubeconfig"
+  sc_cluster_id=$(cat "${SHARED_DIR}/ocm-sc-id")
+  ocm get /api/clusters_mgmt/v1/clusters/"${sc_cluster_id}"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/ocm-sc.kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/ocm-sc.kubeconfig"
 
   echo "Confirming that api.openshift.com/osdfm-cluster-status is ready in the ManagedCluster resource on SC"
   EXPECTED_OSD_FM_CLUSTER_READY_STATUS_LABEL_COUNT=1
@@ -1046,7 +1062,9 @@ function test_fetching_cluster_details_from_api () {
 
 function test_machineset_tains_and_labels () {
   TEST_PASSED=true
-  export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+  mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
+  ocm get /api/clusters_mgmt/v1/clusters/"${mc_cluster_id}"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/ocm-mc.kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/ocm-mc.kubeconfig"
 
   echo "Getting a name of serving machineset"
   SERVING_MACHINE_SET_NAME=""
@@ -1128,7 +1146,9 @@ function test_sts_mc_sc () {
 
 function test_backups_created_only_once () {
   TEST_PASSED=true
-  export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+  mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
+  ocm get /api/clusters_mgmt/v1/clusters/"${mc_cluster_id}"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/ocm-mc.kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/ocm-mc.kubeconfig"
 
   echo "Getting schedule configuration"
   SCHEDULE_OUTPUT=$(oc get schedule -n openshift-adp-operator | tail -3)
@@ -1186,8 +1206,9 @@ function test_backups_created_only_once () {
 
 function test_obo_machinesets () {
   TEST_PASSED=true
-  export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
   mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
+  ocm get /api/clusters_mgmt/v1/clusters/"${mc_cluster_id}"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/ocm-mc.kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/ocm-mc.kubeconfig"
 
   echo "Getting 'obo' machinepools names"
   OBO_MACHINE_POOLS_NAMES=$(ocm get /api/clusters_mgmt/v1/clusters/"$mc_cluster_id"/machine_pools | jq '.items[]' | jq 'select(.id | startswith("obo"))' | jq -r .id)
@@ -1265,7 +1286,9 @@ function test_obo_machinesets () {
 
 function test_awsendpointservices_status_output_populated () {
   TEST_PASSED=true
-  export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+  mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
+  ocm get /api/clusters_mgmt/v1/clusters/"${mc_cluster_id}"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/ocm-mc.kubeconfig"
+  export KUBECONFIG="${SHARED_DIR}/ocm-mc.kubeconfig"
 
   echo "Getting list of awsendpointservices items"
 
