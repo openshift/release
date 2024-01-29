@@ -8,10 +8,8 @@ base_images:
     namespace: origin
     tag: stream8
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+  from_repository: true
+  use_build_cache: true
 images:
 - context_dir: .
   dockerfile_path: Dockerfile
@@ -40,6 +38,7 @@ resources:
       memory: 200Mi
 tests:
 - as: opendatahub-operator-pr-image-mirror
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     dependencies:
       SOURCE_IMAGE_REF: opendatahub-operator
@@ -48,6 +47,7 @@ tests:
     workflow: opendatahub-io-ci-image-mirror
 - as: opendatahub-operator-image-mirror
   postsubmit: true
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     dependencies:
       SOURCE_IMAGE_REF: opendatahub-operator
@@ -65,6 +65,7 @@ tests:
       IMAGE_TAG: latest
     workflow: opendatahub-io-ci-image-mirror
 - as: opendatahub-operator-e2e
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     env:
