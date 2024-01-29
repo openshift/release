@@ -568,7 +568,7 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   aws_add_param_to_json "ResourceSharePrincipals" ${CLUSTER_CREATOR_AWS_ACCOUNT_NO} "$vpc_params"
 fi
 
-if [[ ${ENABLE_AWS_OUTPOST} == "yes" ]]; then
+if [[ ${CREATE_AWS_OUTPOST_SUBNETS} == "yes" ]]; then
   outpost_arn=$(jq -r '.OutpostArn' ${CLUSTER_PROFILE_DIR}/aws_outpost_info.json)
   outpost_zone=$(jq -r '.AvailabilityZone' ${CLUSTER_PROFILE_DIR}/aws_outpost_info.json)
   aws_add_param_to_json "CidrCount" "8" "$vpc_params"
@@ -642,7 +642,7 @@ echo "$PrivateRouteTableId" > "${SHARED_DIR}/private_route_table_id"
 echo "PrivateRouteTableId: ${PrivateRouteTableId}"
 
 # AWS Outpost
-if [[ ${ENABLE_AWS_OUTPOST} == "yes" ]]; then
+if [[ ${CREATE_AWS_OUTPOST_SUBNETS} == "yes" ]]; then
   o_pub_id=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="OutpostPublicSubnetId") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")
   o_priv_id=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="OutpostPrivateSubnetId") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")
   echo $o_pub_id > "${SHARED_DIR}/outpost_public_id"

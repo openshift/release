@@ -106,7 +106,7 @@ done
 
 for node in $NODES;
 do
-  schedulable_effect=$(oc get node $node -o json | jq -r '.spec.taints[] | select(.key=="node-role.kubernetes.io/edge") | .effect')
+  schedulable_effect=$(oc get node $node -o json | jq -r '.spec | select(.taints != null) | .taints[] | select(.key=="node-role.kubernetes.io/edge") | .effect')
   echo "NODE: ${node}: schedulable_effect:[${schedulable_effect}]"
 
 

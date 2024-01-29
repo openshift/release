@@ -1,0 +1,46 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-outpost-day2-provision
+  steps:
+  - ref: ipi-install-rbac
+  - ref: openshift-cluster-bot-rbac
+  - ref: aws-provision-vpc-shared
+  - ref: ipi-conf
+  - ref: ipi-conf-telemetry
+  - ref: ipi-conf-aws-custom-vpc
+  - ref: ipi-conf-aws
+  - ref: ipi-install-hosted-loki
+  - ref: ipi-install-monitoringpvc
+  - ref: ipi-install-install-aws
+  - ref: ipi-install-times-collection
+  - ref: enable-qe-catalogsource
+  - ref: storage-conf-storageclass-set-default-storageclass
+  - chain: network-mtu-migration-decrease
+  - ref: edge-nodes-machineset-manifests-outpost
+  - ref: edge-nodes-provision-machineset-day2
+  - ref: aws-provision-tags-for-byo-vpc
+  - ref: health-check-node-count
+  - ref: cucushift-installer-check-aws-outpost
+  - chain: cucushift-installer-check
+  env:
+  - name: CREATE_AWS_OUTPOST_SUBNETS
+    default: "yes"
+  - name: MTU_DECREASE
+    default: "7701"
+    documentation: |-
+      OVN: 9001 - 1300
+  - name: EXPECTED_MTU_OVN
+    default: "1200"
+  - name: REQUIRED_DEFAULT_STORAGECLASS
+    default: "gp2-csi"
+  - name: EDGE_NODE_INSTANCE_TYPE
+    default: "m5.xlarge"
+  - name: EDGE_NODE_WORKER_NUMBER
+    default: "1"
+  - name: EXPECTED_COMPUTE_NODE_COUNT
+    default: "4"
+  - name: EXPECTED_OUTPOST_NODE
+    default: "1"
+  - name: EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP
+    default: "no"
+  documentation: |-
+    Create an IPI cluster, extent additional worker nodes on AWS Outposts.
