@@ -9,4 +9,6 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 echo $PWD
 ls -la
 
+printenv|sort
+
 sleep 300
