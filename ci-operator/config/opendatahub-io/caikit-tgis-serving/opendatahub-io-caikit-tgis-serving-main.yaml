@@ -25,17 +25,27 @@ resources:
       cpu: "2"
       memory: 2Gi
 tests:
-- as: test
+- as: testname
   steps:
     cluster_profile: aws-opendatahub
     env:
-      FOO: BAR
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
     test:
-    - as: test
+    - as: testname
       cli: latest
       commands: |-
         oc run -i -t hello-world --image=hello-world --restart=Never
         oc get all
+
+
+        # 1. install kserve
+        # 2. apply the caikit manifests:
+        #   oc apply -f caikit-tgis-isvc.yaml -f caikit-tgis-servingruntime.tyaml
+        # 3. oc wait --for=condition=Ready -f caikit-tgis-isvc.tyaml
+        # 4. bash tests/smoke-test.yaml
       from: src
       resources:
         requests:
