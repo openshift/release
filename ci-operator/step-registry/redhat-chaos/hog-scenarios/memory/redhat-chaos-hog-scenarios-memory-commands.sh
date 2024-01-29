@@ -9,10 +9,6 @@ oc projects
 python3 --version
 
 ls -la /root/kraken
-python3.9 -m virtualenv ./chaos
-source ./chaos/bin/activate
-pip3.9 install -r /root/kraken/requirements.txt
-
 
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
