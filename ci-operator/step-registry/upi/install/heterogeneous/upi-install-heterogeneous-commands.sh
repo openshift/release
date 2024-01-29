@@ -28,6 +28,10 @@ if [[ "${CLUSTER_TYPE}" == *ocp-metal* ]]; then
   AUX_HOST="$(<"${CLUSTER_PROFILE_DIR}"/aux-host)"
 fi
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 function approve_csrs() {
   while [[ ! -f '/tmp/scale-out-complete' ]]; do
     sleep 30

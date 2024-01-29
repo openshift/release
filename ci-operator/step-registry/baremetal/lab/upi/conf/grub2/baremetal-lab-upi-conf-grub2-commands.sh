@@ -37,7 +37,6 @@ function join_by_semicolon() {
     echo -n "${prefix}${array_string}${postfix} "
   fi
 }
-
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
