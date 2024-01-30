@@ -162,6 +162,11 @@ do
   cp "${item}" "${INSTALL_DIR}/manifests/${manifest##manifest_}"
 done < <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
 
+## HW RAID configuration
+# if [ "${HW_RAID}" == "true" ]; then
+#   yq -i '.spec |= . + {"raid": {"hardwareRAIDVolumes": [{"name": "test-vol5", "level": "5", "controller": "RAID.Integrated.1-1", "physicalDisks": ["Disk.Bay.5:Enclosure.Internal.0-1:RAID.Integrated.1-1", "Disk.Bay.6:Enclosure.Internal.0-1:RAID.Integrated.1-1", "Disk.Bay.7:Enclosure.Internal.0-1:RAID.Integrated.1-1"]}]}}' "${INSTALL_DIR}/openshift/99_openshift-cluster-api_hosts-4.yaml"
+# fi
+
 ### Create Ignition configs
 echo -e "\n[INFO] Creating Ignition configs..."
 oinst create ignition-configs
