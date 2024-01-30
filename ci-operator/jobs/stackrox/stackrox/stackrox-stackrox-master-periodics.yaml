@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 0 4 * * 1-5
   decorate: true
   decoration_config:
@@ -14,6 +14,17 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-stackrox-stackrox-master-daily-ibmcloudz-4-13-ebpf-qa-e2e-tests
+  reporter_config:
+    slack:
+      channel: '#acs-interops-testing'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -61,7 +72,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 0 5 * * 1-5
   decorate: true
   decoration_config:
@@ -122,7 +133,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   cron: 30 00 * * *
   decorate: true
   decoration_config:
