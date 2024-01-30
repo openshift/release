@@ -57,7 +57,7 @@ echo | ibmcloud login --apikey @"${AGENT_POWER_CREDENTIALS}/ibmcloud-apikey"
 
 # Installing required ibmcloud plugins
 echo "$(date) Installing required ibmcloud plugins"
-ibmcloud plugin install power-iaas
+ibmcloud plugin install power-iaas -v 0.7.0
 ibmcloud plugin install cis
 
 # Set target powervs and cis service instance

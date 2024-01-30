@@ -22,7 +22,7 @@ export PATH=$PATH:/tmp/bin
 echo  | ibmcloud login --apikey @"${AGENT_POWER_CREDENTIALS}/ibmcloud-apikey"
 
 # Installing ibmcloud required plugins
-ibmcloud plugin install power-iaas
+ibmcloud plugin install power-iaas -v 0.7.0
 ibmcloud plugin install cis
 
 # Set target powervs and cis service instance
