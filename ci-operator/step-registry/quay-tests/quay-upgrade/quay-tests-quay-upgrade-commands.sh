@@ -17,7 +17,7 @@ podman -v
 #QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
 QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
 
-echo "$QUAY_EMAIL \" $QUAY_EMAIL \" exists fffound"
+echo "$QUAY_EMAIL \" $QUAY_EMAIL \" exists found"
 
 #Retrieve the Credentials of image registry "brew.registry.redhat.io"
 OMR_BREW_USERNAME=$(cat /var/run/quay-qe-brew-secret/username)
