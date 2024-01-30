@@ -14,7 +14,10 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/installer-altinfra/Dockerfile.ci
+- build_args:
+  - name: OPENSHIFT_INSTALL_CLUSTER_API
+    value: "true"
+  dockerfile_path: images/installer-altinfra/Dockerfile.ci
   inputs:
     ocp_4.16_base:
       as:
@@ -155,6 +158,81 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-capi-ovn
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-capi-ovn
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-azure
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-gcp-capi-ovn
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-gcp
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-ibmcloud-capi-ovn
+  optional: true
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-ibmcloud
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-nutanix-capi-ovn
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: nutanix
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-nutanix-ovn
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-capi-ovn
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      FEATURE_GATES: ClusterAPIInstall=true
+      FEATURE_SET: CustomNoUpgrade
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-ipi
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-capi-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
