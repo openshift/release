@@ -14,6 +14,12 @@ export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
 
 export OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
 
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+	# shellcheck disable=SC1090
+	source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 function populate_artifact_dir() {
 	set +e
 	echo "Copying log bundle..."
