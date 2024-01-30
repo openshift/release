@@ -12,29 +12,6 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.21
-images:
-- dockerfile_literal: |
-    FROM src
-    RUN curl --silent --location https://rpm.nodesource.com/setup_16.x | bash - && \
-        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo podman" && \
-        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
-        yum install -y yum-utils && yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
-        yum -y install terraform \
-        yum clean all && rm -rf /var/cache/yum/*
-    RUN curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
-        unzip -q awscliv2.zip && \
-        ./aws/install && \
-        rm -rf awscliv2.zip aws &&\
-        aws --version
-    RUN curl -Lk -o /usr/bin/yq https://github.com/mikefarah/yq/releases/download/v4.18.1/yq_linux_amd64 && chmod +x /usr/bin/yq && \
-        yq --version
-  from: src
-  to: quay-test-upgrade
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
 releases:
   latest:
     candidate:
