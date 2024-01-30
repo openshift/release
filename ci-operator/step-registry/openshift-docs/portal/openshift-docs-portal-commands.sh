@@ -9,15 +9,23 @@ IFS=' ' read -r -a DISTROS <<< "${DISTROS}"
 
 for DISTRO in "${DISTROS[@]}"; do
 
-    if [ "${DISTRO}" == "openshift-enterprise" ]; then
-        TOPICMAP="_topic_maps/_topic_map.yml"
-    elif [ "${DISTRO}" == "openshift-rosa" ]; then
-        TOPICMAP="_topic_maps/_topic_map_rosa.yml"
-    elif [ "${DISTRO}" == "openshift-osd" ]; then
-        TOPICMAP="_topic_maps/_topic_map_osd.yml"
-    elif [ "${DISTRO}" == "openshift-ms" ]; then
-        TOPICMAP="_topic_maps/_topic_map_ms.yml"
-    fi
+    case "${DISTRO}" in
+        "openshift-enterprise"|"openshift-acs"|"openshift-pipelines"|"openshift-serverless"|"openshift-gitops")
+            TOPICMAP="_topic_maps/_topic_map.yml"
+            ;;
+        "openshift-rosa")
+            TOPICMAP="_topic_maps/_topic_map_rosa.yml"
+            ;;
+        "openshift-dedicated")
+            TOPICMAP="_topic_maps/_topic_map_osd.yml"
+            ;;
+        "microshift")
+            TOPICMAP="_topic_maps/_topic_map_ms.yml"
+            ;;
+        "openshift-opp")
+            TOPICMAP="_topic_map.yml"
+            ;;
+    esac
 
     ./scripts/get-updated-distros.sh | while read -r FILENAME; do
         if [ "${FILENAME}" == "${TOPICMAP}" ]; then
