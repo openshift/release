@@ -223,6 +223,15 @@ function get_time_left {
 
 [[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
 
+# Set go version
+if [[ "$T5CI_VERSION" == "4.12" ]] || [[ "$T5CI_VERSION" == "4.13" ]]; then
+    source $HOME/golang-1.19
+else
+    source $HOME/golang-1.20
+fi
+
+echo "Go version: $(go version)"
+
 # if set - to run tests and/or validations
 export RUN_TESTS="${RUN_TESTS:-true}"
 export RUN_VALIDATIONS="${RUN_VALIDATIONS:-true}"

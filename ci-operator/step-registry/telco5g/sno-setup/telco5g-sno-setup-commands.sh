@@ -274,6 +274,8 @@ EOF
 
 #Set status and run playbooks
 status=0
+# Install posix collection so that we can use debug callback
+ansible-galaxy collection install ansible.posix
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
 sleep 300  # Wait for cluster to be ready after a reboot
