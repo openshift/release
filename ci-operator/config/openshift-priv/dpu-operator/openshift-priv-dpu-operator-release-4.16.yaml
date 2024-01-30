@@ -3,24 +3,23 @@ base_images:
     name: 4.16-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.16
-binary_build_commands: make build
+    tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
-canonical_go_repository: github.com/ovirt/csi-driver
+canonical_go_repository: github.com/openshift/dpu-operator
 images:
-- dockerfile_path: Dockerfile.openshift
+- dockerfile_path: Dockerfile.rhel
   inputs:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
-  to: ovirt-csi-driver
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: dpu-operator
 promotion:
   to:
   - disabled: true
@@ -38,15 +37,17 @@ releases:
       namespace: ocp-private
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
 - as: unit
-  commands: go test ./...
+  commands: HOME=/tmp make test
   container:
     from: src
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv
-  repo: ovirt-csi-driver
+  repo: dpu-operator
