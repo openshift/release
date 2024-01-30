@@ -77,6 +77,11 @@ KUBECONFIG_REMOTE="/tmp/lb-ext.kubeconfig"
 run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:core ${KUBECONFIG_REMOTE}"
 copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
+# Set kubelet node IP hint. Nodes are created with two interfaces - provisioning and external,
+# and we want to make sure kubelet uses external address as main, instead of DHCP racing to use 
+# a random one as primary
+run-on-all-nodes "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/default/nodeip-configuration"
+
 # Set date for host
 sudo timedatectl status
 sudo timedatectl set-time ${SKEW}
@@ -128,6 +133,7 @@ if
   ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=10m; then
     oc get nodes
     oc get co | grep -v "True\s\+False\s\+False"
+    sleep infinity
     exit 1
 else
   oc get nodes
