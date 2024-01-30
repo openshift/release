@@ -326,8 +326,16 @@ EOF
 fi
 
 if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
-  edge_zone=$(< "${SHARED_DIR}"/edge-zone-name.txt)
-  edge_zones_str="[ $edge_zone ]"
+  edge_zones=""
+  while IFS= read -r line; do
+    if [[ -z "${edge_zones}" ]]; then
+      edge_zones="$line";
+    else
+      edge_zones+=",$line";
+    fi
+  done < <(grep -v '^$' < "${SHARED_DIR}"/edge-zone-names.txt)
+
+  edge_zones_str="[ $edge_zones ]"
   patch_edge="${SHARED_DIR}/install-config-edge.yaml.patch"
   cat > "${patch_edge}" << EOF
 compute:

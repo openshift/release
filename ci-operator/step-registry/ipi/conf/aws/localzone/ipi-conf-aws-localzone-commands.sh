@@ -8,11 +8,18 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 
 PATCH="${ARTIFACT_DIR}/install-config-edge-zone.yaml.patch"
 
-edge_zone=$(< "${SHARED_DIR}"/edge-zone-name.txt)
-edge_zones_str="[ $edge_zone ]"
+edge_zones=""
+while IFS= read -r line; do
+  if [[ -z "${edge_zones}" ]]; then
+    edge_zones="$line";
+  else
+    edge_zones+=",$line";
+  fi
+done < <(grep -v '^$' < "${SHARED_DIR}"/edge-zone-names.txt)
 
-echo "Selected Local Zone: ${edge_zone}"
-echo "edge_zones_str: ${edge_zones_str}"
+edge_zones_str="[ $edge_zones ]"
+echo "Selected Local Zone: ${edge_zones_str}"
+
 cat <<EOF > "${PATCH}"
 compute:
 - name: edge

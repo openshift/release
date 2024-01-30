@@ -1,17 +1,20 @@
 workflow:
-  as: openshift-e2e-aws-local-zones
+  as: openshift-e2e-aws-edge-zones
   steps:
+    leases:
+    - resource_type: aws-local-zones-quota-slice
+      env: LEASED_RESOURCE
     pre:
-    - ref: ipi-aws-pre-local-zones-opt-in
+    - ref: ipi-aws-pre-edge-zones-opt-in
     - chain: ipi-aws-pre
-    - ref: ipi-aws-pre-local-zones-csi-default
+    - ref: ipi-aws-pre-edge-zones-csi-default
     test:
     - ref: openshift-e2e-test
     post:
     - chain: ipi-aws-post
     env:
       AWS_EDGE_POOL_ENABLED: "yes"
-      EDGE_ZONE_TYPE: local-zone
+      EDGE_ZONE_TYPES: "local-zone,wavelength-zone"
       # skip storage tests due the bug on upstream on parsing the region's endpoint URL:
       # https://issues.redhat.com/browse/OCPBUGS-11609
       TEST_SKIPS: >-

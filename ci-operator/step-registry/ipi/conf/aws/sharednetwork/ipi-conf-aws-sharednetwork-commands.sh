@@ -10,6 +10,7 @@ set -o errexit
 set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export AWS_DEFAULT_REGION="${LEASED_RESOURCE}"
 
 REGION="${LEASED_RESOURCE}"
 CONFIG="${SHARED_DIR}/install-config.yaml"
@@ -33,7 +34,6 @@ TEMPLATE_SRC_REPO=https://raw.githubusercontent.com/openshift/installer/master/u
 TEMPLATE_STACK_VPC="01_vpc.yaml"
 TEMPLATE_STACK_CAGW="01_vpc_01_carrier_gateway.yaml"
 TEMPLATE_STACK_SUBNET="01_vpc_99_subnet.yaml"
-TEMPLATE_STACK_LOCALZONE="01.99_net_local-zone.yaml"
 
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
@@ -68,16 +68,16 @@ function wait_for_stack() {
   stack_name=$1
 
   echo_date "Waiting to create stack complete: ${stack_name}"
-  aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}"
+  aws cloudformation wait stack-create-complete --stack-name "${stack_name}"
 
   echo_date "Stack ${stack_name} completed"
 
-  stack_status=$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" | jq -r '.Stacks[0].StackStatus // null')
+  stack_status=$(aws cloudformation describe-stacks --stack-name "${stack_name}" | jq -r '.Stacks[0].StackStatus // null')
   if [[ "$stack_status" != "CREATE_COMPLETE" ]]; then
     echo_date "Detected Failed Stack deployment with status: [${stack_status}]"
 
     echo_date "Collecting stack events before failing:"
-    aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json \
+    aws cloudformation describe-stack-events --stack-name "${stack_name}" --output json \
       | tee "${ARTIFACT_DIR}/events_cfn_stack_${stack_name}.json"
     exit 1
   fi
@@ -101,7 +101,7 @@ EOF
 
   echo_date "Creating CloudFormation stack ${stack_name} with template $template_name"
   set +e
-  if aws --region "${REGION}" cloudformation create-stack \
+  if aws cloudformation create-stack \
     --stack-name "${stack_name}" \
     --template-body file://"${template_path}" \
     --tags ${TAGS[*]} \
@@ -137,39 +137,12 @@ function create_stack_vpc() {
   add_param_to_json AvailabilityZoneCount "${ZONES_COUNT}" "${STACK_PARAMS_VPC}"
   deploy_stack "${STACK_NAME_VPC}" "${TEMPLATE_STACK_VPC}"
 
-  SUBNETS_STR="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -c '[.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetIds")).OutputValue | split(",")[]]')"
+  SUBNETS_STR="$(aws cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" \
+    | jq -c '[.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetIds")).OutputValue | split(",")[]]')"
   echo "Subnets : ${SUBNETS_STR}"
 
-  VPC_ID=$(aws --region "$REGION" cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -r '.Stacks[].Outputs[] | select(.OutputKey=="VpcId").OutputValue')
-}
-
-# create_stack_vpc trigger the CloudFormation Stack creaion for LOcal Zone subnets.
-function create_stack_localzone() {
-  echo_date "Initializing CloudFormation Stack creation for Local Zone"
-
-  # Randomly select the Local Zone in the Region (to increase coverage of tested zones added automatically)
-  localzone_name=$(< "${SHARED_DIR}"/edge-zone-name.txt)
-  echo_date "Local Zone selected: ${localzone_name}"
-
-  vpc_rtb_pub=$(aws --region "$REGION" cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" \
-    | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="PublicRouteTableId").OutputValue')
-  echo_date "VPC info: ${VPC_ID} [public route table=${vpc_rtb_pub}]"
-
-  STACK_PARAMS_LOCALZONE="${TEMPLATE_DEST}/${TEMPLATE_STACK_LOCALZONE}.parameters.json"
-  STACK_NAME_LOCALZONE="${CLUSTER_NAME}-${localzone_name}"
-
-  add_param_to_json VpcId "${VPC_ID}" "${STACK_PARAMS_LOCALZONE}"
-  add_param_to_json PublicRouteTableId "${vpc_rtb_pub}" "${STACK_PARAMS_LOCALZONE}"
-  add_param_to_json SubnetName "${CLUSTER_NAME}-public-${localzone_name}" "${STACK_PARAMS_LOCALZONE}"
-  add_param_to_json ZoneName "${localzone_name}" "${STACK_PARAMS_LOCALZONE}"
-  add_param_to_json PublicSubnetCidr "10.0.128.0/20" "${STACK_PARAMS_LOCALZONE}"
-  deploy_stack "${STACK_NAME_LOCALZONE}" "${TEMPLATE_STACK_LOCALZONE}"
-
-  echo_date "Extracting and appending subnet ID from CloudFormation stack: ${STACK_NAME_LOCALZONE}"
-  subnet_edge=$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${STACK_NAME_LOCALZONE}" | jq -r '.Stacks[].Outputs[] | select(.OutputKey=="PublicSubnetIds").OutputValue')
-
-  SUBNETS_STR=$(jq -c ". + [\"$subnet_edge\"]" <(echo "$SUBNETS_STR"))
-  echo_date "Subnets: ${SUBNETS_STR}"
+  VPC_ID=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" \
+    | jq -r '.Stacks[].Outputs[] | select(.OutputKey=="VpcId").OutputValue')
 }
 
 function create_stack_carrier_gateway() {
@@ -186,27 +159,37 @@ function create_stack_carrier_gateway() {
 # create_stack_wavelength_subnets creates the CloudFormation stack to provision public
 # and private subnets in Wavelength zone, discovering the private subnet ID to be
 # used in the install-config.yaml.
-function create_stack_wavelength_subnets() {
+function create_stack_edge_subnet() {
   echo_date "Initializing CloudFormation Stack creation for VPC Subnets"
 
-  edge_zone_name=$(< "${SHARED_DIR}"/edge-zone-name.txt)
+  edge_zone_name="$1"; shift
+  subnet_cidr_priv="$1"; shift
+  subnet_cidr_pub="$1";
   echo_date "Edge Zone selected: ${edge_zone_name}"
 
-  echo_date "Discovering Public Route Table from Stack: ${STACK_NAME_CAGW}"
-  vpc_rtb_pub=$(aws --region "$REGION" cloudformation describe-stacks \
-    --stack-name "${STACK_NAME_CAGW}" \
-    | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="PublicRouteTableId").OutputValue' )
+  zone_type=$(aws ec2 describe-availability-zones --zone-names "${edge_zone_name}" \
+    --query 'AvailabilityZones[].ZoneType' --output text)
+  echo_date "Discovering Public Route Table for zone type ${zone_type}"
+  case $zone_type in
+  "local-zone")
+    vpc_rtb_pub=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" \
+      | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="PublicRouteTableId").OutputValue' )
+  ;;
+  "wavelength-zone")
+    vpc_rtb_pub=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME_CAGW-}" \
+      | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="PublicRouteTableId").OutputValue' )
+  ;;
+  *) echo "unknow zone type for zone ${edge_zone_name}"; exit 1 ;;
+  esac
+  echo_date "Found Public Route Table: ${vpc_rtb_pub}"
 
   echo_date "Discovering Private Route Table from Stack: ${STACK_NAME_VPC}"
   #> Select the first route table from the list.
-  vpc_rtb_priv=$(aws --region "$REGION" cloudformation describe-stacks \
+  vpc_rtb_priv=$(aws cloudformation describe-stacks \
     --stack-name "${STACK_NAME_VPC}" \
     | jq -r '.Stacks[0].Outputs[]
       | select(.OutputKey=="PrivateRouteTableIds").OutputValue
       | split(",")[0] | split("=")[1]')
-
-  subnet_cidr_pub="10.0.128.0/24"
-  subnet_cidr_priv="10.0.129.0/24"
 
   cat <<EOF
 REGION=$REGION
@@ -218,8 +201,8 @@ subnet_cidr_pub=$subnet_cidr_pub
 subnet_cidr_priv=$subnet_cidr_priv
 EOF
 
-  STACK_PARAMS_SUBNET="${TEMPLATE_DEST}/${TEMPLATE_STACK_SUBNET}.parameters.json"
   STACK_NAME_SUBNET=${CLUSTER_NAME}-subnets-${edge_zone_name/${REGION}-/}
+  STACK_PARAMS_SUBNET="${TEMPLATE_DEST}/${TEMPLATE_STACK_SUBNET}.parameters.${edge_zone_name/${REGION}-/}.json"
 
   add_param_to_json VpcId "${VPC_ID}" "${STACK_PARAMS_SUBNET}"
   add_param_to_json ClusterName "${CLUSTER_NAME}" "${STACK_PARAMS_SUBNET}"
@@ -228,13 +211,35 @@ EOF
   add_param_to_json PublicSubnetCidr "${subnet_cidr_pub}" "${STACK_PARAMS_SUBNET}"
   add_param_to_json PrivateRouteTableId "${vpc_rtb_priv}" "${STACK_PARAMS_SUBNET}"
   add_param_to_json PrivateSubnetCidr "${subnet_cidr_priv}" "${STACK_PARAMS_SUBNET}"
+
+  cp -rvf "${STACK_PARAMS_SUBNET}" "${TEMPLATE_DEST}/${TEMPLATE_STACK_SUBNET}.parameters.json"
   deploy_stack "${STACK_NAME_SUBNET}" "${TEMPLATE_STACK_SUBNET}"
 
   echo_date "Extracting and appending subnet ID from CloudFormation stack: ${STACK_NAME_SUBNET}"
-  subnet_edge=$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${STACK_NAME_SUBNET}" --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnetId'].OutputValue" --output text | tr ',' '\n')
-
+  if [[ "${EDGE_PUBLIC_SUBNET-}" == "yes" ]]; then
+    subnet_edge=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME_SUBNET}" \
+      --query "Stacks[0].Outputs[?OutputKey=='PublicSubnetId'].OutputValue" \
+      --output text)
+  else
+    subnet_edge=$(aws cloudformation describe-stacks --stack-name "${STACK_NAME_SUBNET}" \
+      --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnetId'].OutputValue" \
+      --output text)
+  fi
   SUBNETS_STR=$(jq -c ". + [\"$subnet_edge\"]" <(echo "$SUBNETS_STR"))
   echo_date "Subnets (with edge zones): ${SUBNETS_STR}"
+}
+
+function create_edge_subnets() {
+  base_net=192
+  while IFS= read -r line; do
+    echo_date "Setting up subnet creation for zone ${line}"
+    cidr_private="10.0.${base_net}.0/24"
+    base_net=$(( $base_net + 1 ))
+    cidr_public="10.0.${base_net}.0/24"
+    base_net=$(( $base_net + 1 ))
+
+    create_stack_edge_subnet "${line}" "${cidr_private}" "${cidr_public}"
+  done < <(grep -v '^$' < "${SHARED_DIR}"/edge-zone-names.txt)
 }
 
 #
@@ -243,14 +248,22 @@ EOF
 
 create_stack_vpc
 
-# Create network requirements for edge zones.
+# Create network requirements for edge zones (Local Zone and Wavelength infrastructure).
+# Those zones requires special deployment, such as:
+# - Wavelength and Local Zones does not globally support NAT Gateways, all the private subnets in
+#   those zone types will be associated with a private route table in the Region.
+# - Resources in public subnets in Wavelength requires Public IP from a Carrier
+#   Gateway, this resource must be created prior subnet creation, and public subnets into
+#   those zones must be associated with the public route table with Carrier Gateway as default gateway.
 if [[ "${AWS_EDGE_POOL_ENABLED-}" == "yes" ]]; then
-  if [[ "${EDGE_ZONE_TYPE-}" == "wavelength-zone" ]]; then
+
+  echo "EDGE_ZONE_TYPE=[${EDGE_ZONE_TYPE-}] EDGE_ZONE_TYPES=[${EDGE_ZONE_TYPES-}]"
+  if [[ "${EDGE_ZONE_TYPE-}" == *"wavelength-zone"* ]] ||
+    [[ "${EDGE_ZONE_TYPES-}" == *"wavelength-zone"* ]]; then
     create_stack_carrier_gateway
-    create_stack_wavelength_subnets
-  else
-    create_stack_localzone
   fi
+
+  create_edge_subnets
 fi
 
 # Converting for a valid format to install-config.yaml
@@ -259,7 +272,9 @@ SUBNETS_CONFIG=${SUBNETS_STR//\"/\'}
 echo_date "Subnets config: ${SUBNETS_CONFIG}"
 
 # Generate availability zones from the region
-mapfile -t AVAILABILITY_ZONES < <(aws --region "${REGION}" ec2 describe-availability-zones --filters Name=state,Values=available Name=zone-type,Values=availability-zone | jq -r '.AvailabilityZones[].ZoneName' | sort -u)
+mapfile -t AVAILABILITY_ZONES < <(aws ec2 describe-availability-zones \
+  --filters Name=state,Values=available Name=zone-type,Values=availability-zone \
+  | jq -r '.AvailabilityZones[].ZoneName' | sort -u)
 ZONES=("${AVAILABILITY_ZONES[@]:0:${ZONES_COUNT}}")
 ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
 echo_date "AWS region: ${REGION} (zones: ${ZONES_STR})"
