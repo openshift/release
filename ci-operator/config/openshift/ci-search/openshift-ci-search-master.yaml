@@ -7,18 +7,33 @@ base_images:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.21-openshift-4.16
+binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- from: base
+- dockerfile_path: images/Dockerfile.search
+  from: base
   inputs:
     openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
   to: ci-search
+- dockerfile_path: images/Dockerfile.jira-watcher-controller
+  from: base
+  inputs:
+    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
+  to: jira-watcher-controller
 promotion:
   to:
-  - namespace: ci
+  - excluded_images:
+    - jira-watcher-controller
+    namespace: ci
+    tag: latest
+  - excluded_images:
+    - ci-search
+    namespace: continuous-release-jobs
     tag: latest
 resources:
   '*':
