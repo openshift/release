@@ -1,0 +1,98 @@
+base_images:
+  aks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aks-0.9.1
+  aro:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aro-0.9.1
+  eks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: eks-0.9.1
+  ibmcloudz:
+    name: automation-flavors
+    namespace: stackrox
+    tag: ibmcloudz-0.9.1
+  osd:
+    name: automation-flavors
+    namespace: stackrox
+    tag: osd-0.9.1
+  rosa:
+    name: automation-flavors
+    namespace: stackrox
+    tag: rosa-0.9.1
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-test-0.3.61
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
+tests:
+- always_run: false
+  as: powervs-qa-e2e-tests
+  optional: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+    workflow: stackrox-automation-flavors-powervs-e2e
+  timeout: 6h0m0s
+- always_run: false
+  as: powervs-4-13-qa-e2e-tests
+  optional: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      OCP_CLUSTER_VERSION: "4.13"
+      TEST_SUITE: powervs-qa-e2e-tests
+    workflow: stackrox-automation-flavors-powervs-e2e
+  timeout: 6h0m0s
+- always_run: false
+  as: powervs-4-12-qa-e2e-tests
+  optional: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      OCP_CLUSTER_VERSION: "4.12"
+      TEST_SUITE: powervs-qa-e2e-tests
+    workflow: stackrox-automation-flavors-powervs-e2e
+  timeout: 6h0m0s
+- always_run: false
+  as: ibmcloudz-4-13-qa-e2e-tests
+  optional: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      IBM_CLOUD_OPENSHIFT_CHANNEL: stable-4.13
+      TEST_SUITE: ibmcloudz-qa-e2e-tests
+    workflow: stackrox-automation-flavors-ibmcloudz-e2e
+  timeout: 5h0m0s
+- always_run: false
+  as: ibmcloudz-4-14-qa-e2e-tests
+  optional: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      IBM_CLOUD_OPENSHIFT_CHANNEL: stable-4.14
+      TEST_SUITE: ibmcloudz-qa-e2e-tests
+    workflow: stackrox-automation-flavors-ibmcloudz-e2e
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: jv-investigate-missing-clusterid
+  org: stackrox
+  repo: stackrox
