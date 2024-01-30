@@ -69,6 +69,68 @@ tests:
     workflow: redhat-performance-backstage-performance
   timeout: 8h0m0s
 - always_run: false
+  as: mvp
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      API_COUNT: "10000"
+      BACKSTAGE_USER_COUNT: "1000"
+      COMPONENT_COUNT: "5000"
+      DURATION: 10m
+      GROUP_COUNT: "250"
+      PRE_LOAD_DB: "true"
+      RHDH_DB_REPLICAS: "5"
+      RHDH_DB_STORAGE: 2Gi
+      RHDH_DEPLOYMENT_REPLICAS: "5"
+      RHDH_KEYCLOAK_REPLICAS: "5"
+      SCENARIO: mvp
+      SPAWN_RATE: "40"
+      USE_PR_BRANCH: "true"
+      USERS: "200"
+      WORKERS: "40"
+    workflow: redhat-performance-backstage-performance
+  timeout: 8h0m0s
+- always_run: false
+  as: mvp-scalability
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 5m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: 1:1 200:40
+      SCALE_BS_USERS_GROUPS: 1:1 10000:2500
+      SCALE_CATALOG_SIZES: 1:1 10000:5000
+      SCALE_CPU_REQUESTS_LIMITS: ':'
+      SCALE_DB_STORAGES: 2Gi
+      SCALE_MEMORY_REQUESTS_LIMITS: ':'
+      SCALE_REPLICAS: "5"
+      SCALE_WORKERS: "40"
+      SCENARIO: mvp
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "false"
+    workflow: redhat-performance-backstage-performance-scalability
+  timeout: 8h0m0s
+- always_run: false
+  as: mvp-resources-scalability
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 5m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: "200:40"
+      SCALE_BS_USERS_GROUPS: 1000:250
+      SCALE_CATALOG_SIZES: 10000:5000
+      SCALE_CPU_REQUESTS_LIMITS: '256m:256m 1:1 :'
+      SCALE_DB_STORAGES: 2Gi
+      SCALE_MEMORY_REQUESTS_LIMITS: '512Mi:512Mi 1Gi:1Gi :'
+      SCALE_REPLICAS: "5"
+      SCALE_WORKERS: "40"
+      SCENARIO: mvp
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "false"
+    workflow: redhat-performance-backstage-performance-scalability
+  timeout: 8h0m0s
+- always_run: false
   as: search-catalog-scalability
   steps:
     cluster_profile: aws-rhdh-performance

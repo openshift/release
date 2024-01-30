@@ -39,7 +39,7 @@ git clone --branch main https://github.com/redhat-performance/backstage-performa
 
 set -x
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]] && [ "$USE_PR_BRANCH" == "true" ]; then
-    # if this is executed as PR check of github.com/redhat-appstudio/e2e-tests.git repo, switch to PR branch.
+    # if this is executed as PR check of github.com/redhat-performance/backstage-performance.git repo, switch to PR branch.
     git fetch origin "pull/${PULL_NUMBER}/head"
     git checkout -b "pr-${PULL_NUMBER}" FETCH_HEAD
 fi
