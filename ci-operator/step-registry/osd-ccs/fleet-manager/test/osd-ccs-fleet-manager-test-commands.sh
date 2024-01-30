@@ -45,6 +45,22 @@ SC_KUBECONFIG_PATH="${SHARED_DIR}/ocm-sc.kubeconfig"
 sc_cluster_id=$(cat "${SHARED_DIR}/ocm-sc-id")
 ocm get /api/clusters_mgmt/v1/clusters/"${sc_cluster_id}"/credentials | jq -r .kubeconfig > "$SC_KUBECONFIG_PATH"
 
+echo "Getting MC kubeconfig"
+
+cat "$MC_KUBECONFIG_PATH"
+
+echo "Getting SC kubeconfig"
+
+cat "$SC_KUBECONFIG_PATH"
+
+echo "trying to get MC oc status"
+
+oc --kubeconfig "$MC_KUBECONFIG_PATH" status || true
+
+echo "trying to get SC oc status"
+
+oc --kubeconfig "$SC_KUBECONFIG_PATH" status || true
+
 # add label with specified key/ value to a cluster of specified type and id
 function add_label () {
   local key=$1
@@ -126,7 +142,7 @@ function test_autoscaler ()
   TEST_PASSED=true
 
   # get overprovisioning configmap json
-  OVERPROVISIONING_CM=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get configmap overprovisioning -n cluster-proportional-autoscaler -o json)
+  OVERPROVISIONING_CM=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get configmap overprovisioning -n cluster-proportional-autoscaler -o json) || true
 
   # get coresToReplicas config"
   CORES_TO_REPLICA=$(jq -n "$OVERPROVISIONING_CM" | jq -r '.data.ladder' | jq -r '.coresToReplicas' | jq -c | jq -r .[] | tr '\n' ' ' )
@@ -141,10 +157,10 @@ function test_autoscaler ()
 
   # get address of first worker node
   echo "Checking address of first available worker node"
-  NODE_ADDRESS=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get nodes | grep -v -e "," -e "NAME" | head -n 1 | awk '{print $1}')
+  NODE_ADDRESS=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get nodes | grep -v -e "," -e "NAME" | head -n 1 | awk '{print $1}') || true
 
   # get number of CPUs of a worker node
-  NUMBER_OF_WORKER_NDOE_CPUS=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get node "$NODE_ADDRESS" -o json | jq -r .status.capacity.cpu)
+  NUMBER_OF_WORKER_NDOE_CPUS=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get node "$NODE_ADDRESS" -o json | jq -r .status.capacity.cpu) || true
   echo "Number of CPUs in the worker node: $NUMBER_OF_WORKER_NDOE_CPUS"
 
   # determine number of desired overprovisioning replicas based on worker node CPU count
@@ -159,11 +175,11 @@ function test_autoscaler ()
   echo "Desired number of overprovisioning replicas given worker node CPU count is: $DESIRED_OVERPROV_REPLICAS"
 
   # get number of available replicas of overprovisioning deployment
-  NO_OF_AVAILABLE_OVERPROVISIONING_DEPL=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get Deployment -A | grep overprovisioning | grep -v 'overprovisioning-autoscaler' | awk '{print $5}')
+  NO_OF_AVAILABLE_OVERPROVISIONING_DEPL=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get Deployment -A | grep overprovisioning | grep -v 'overprovisioning-autoscaler' | awk '{print $5}') || true
   echo "Number of available overprovisioning replicas: $NO_OF_AVAILABLE_OVERPROVISIONING_DEPL"
 
   # get number of overprovisioning replicas from deployment spec
-  NO_OF_AVAILABLE_OVERPROVISIONING_DEPL_CONFIG=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get Deployment overprovisioning -n cluster-proportional-autoscaler -o json | jq -r .spec.replicas)
+  NO_OF_AVAILABLE_OVERPROVISIONING_DEPL_CONFIG=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get Deployment overprovisioning -n cluster-proportional-autoscaler -o json | jq -r .spec.replicas) || true
   echo "Number of overprovisioning replicas from overprovisioning deployment spec: $NO_OF_AVAILABLE_OVERPROVISIONING_DEPL_CONFIG"
 
   echo "Confirming that autoscaler config and available overprovisioning replicas match"
@@ -174,11 +190,11 @@ function test_autoscaler ()
   fi
 
   # get number of available replicas of overprovisioning-autoscaler deployment
-  NO_OF_AVAILABLE_OVERPROVISIONING_AUTOSCALER_DEPL=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get Deployment -A | grep 'overprovisioning-autoscaler' | awk '{print $5}')
+  NO_OF_AVAILABLE_OVERPROVISIONING_AUTOSCALER_DEPL=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get Deployment -A | grep 'overprovisioning-autoscaler' | awk '{print $5}') || true
   echo "Number of available overprovisioning-autoscaler replicas: $NO_OF_AVAILABLE_OVERPROVISIONING_AUTOSCALER_DEPL"
 
   # get number of overprovisioning-autoscaler replicas from deployment spec
-  NO_OF_AVAILABLE_OVERPROVISIONING_AUTOSCALER_DEPL_CONFIG=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get Deployment overprovisioning-autoscaler -n cluster-proportional-autoscaler -o json | jq -r .spec.replicas)
+  NO_OF_AVAILABLE_OVERPROVISIONING_AUTOSCALER_DEPL_CONFIG=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get Deployment overprovisioning-autoscaler -n cluster-proportional-autoscaler -o json | jq -r .spec.replicas) || true
   echo "Number of overprovisioning-autoscaler replicas from overprovisioning deployment spec: $NO_OF_AVAILABLE_OVERPROVISIONING_AUTOSCALER_DEPL_CONFIG"
 
   echo "Confirming that autoscaler config and available overprovisioning-autoscaler replicas match"
@@ -189,7 +205,7 @@ function test_autoscaler ()
   fi
 
   # get number of running pods for overprovisioning deployment
-  NO_OF_RUNNING_OVERPROVISIONING_PODS=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get pods -n cluster-proportional-autoscaler | grep -v "autoscaler" | grep -c "Running")
+  NO_OF_RUNNING_OVERPROVISIONING_PODS=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get pods -n cluster-proportional-autoscaler | grep -v "autoscaler" | grep -c "Running") || true
   echo "Number of running overprovisioning pods is: $NO_OF_RUNNING_OVERPROVISIONING_PODS"
 
   echo "Confirming that autoscaler config and available overprovisioning pods count match"
@@ -200,7 +216,7 @@ function test_autoscaler ()
   fi
 
   # get number of running pods for overprovisioning-autoscaler deployment
-  NO_OF_RUNNING_OVERPROVISIONING_AUTOSCALER_PODS=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get pods -n cluster-proportional-autoscaler | grep "overprovisioning-autoscaler" | grep -c "Running")
+  NO_OF_RUNNING_OVERPROVISIONING_AUTOSCALER_PODS=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get pods -n cluster-proportional-autoscaler | grep "overprovisioning-autoscaler" | grep -c "Running") || true
   echo "Number of running overprovisioning-autoscaler pods is: $NO_OF_RUNNING_OVERPROVISIONING_AUTOSCALER_PODS"
 
   echo "Confirming that autoscaler config and available overprovisioning-autoscaler pods count match"
@@ -212,7 +228,7 @@ function test_autoscaler ()
 
   # check that cluster-proportional-autoscaler ClusterRoleBinding was created
   echo "Confirming that ClusterRoleBinding for cluster-proportional-autoscaler was created"
-  CL_PROP_AUTOSCALER_CRB=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get ClusterRoleBinding -A | grep -c cluster-proportional-autoscaler)
+  CL_PROP_AUTOSCALER_CRB=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get ClusterRoleBinding -A | grep -c cluster-proportional-autoscaler) || true
   if [ "$CL_PROP_AUTOSCALER_CRB" -ne 1 ]; then
     echo "ERROR. cluster-proportional-autoscaler ClusterRoleBinding not found"
     TEST_PASSED=false
@@ -220,7 +236,7 @@ function test_autoscaler ()
 
   echo "Confirming that ClusterRole for cluster-proportional-autoscaler was created"
   # check that cluster-proportional-autoscaler ClusterRole was created
-  CL_PROP_AUTOSCALER_CR=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get ClusterRole -A | grep -c cluster-proportional-autoscaler)
+  CL_PROP_AUTOSCALER_CR=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get ClusterRole -A | grep -c cluster-proportional-autoscaler) || true
   if [ "$CL_PROP_AUTOSCALER_CR" -ne 1 ]; then
     echo "ERROR. cluster-proportional-autoscaler ClusterRole not found"
     TEST_PASSED=false
@@ -228,14 +244,14 @@ function test_autoscaler ()
 
   echo "Confirming that ServiceAccount for cluster-proportional-autoscaler was created"
   # check that cluster-proportional-autoscaler ServiceAccount was created
-  CL_PROP_AUTOSCALER_SA=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get ServiceAccount -A | grep -c cluster-proportional-autoscaler)
+  CL_PROP_AUTOSCALER_SA=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get ServiceAccount -A | grep -c cluster-proportional-autoscaler) || true
   if [ "$CL_PROP_AUTOSCALER_SA" -lt 1 ]; then
     echo "ERROR. cluster-proportional-autoscaler Service Accounts not found"
     TEST_PASSED=false
   fi
 
   # confirm that the default PriorityClass has GLOBAL-DEFAULT flag set to true and VALUE = 0
-  DEFAULT_PRIORITY_CLASS=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get PriorityClass -A | grep default | awk '{print $2,$3}')
+  DEFAULT_PRIORITY_CLASS=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get PriorityClass -A | grep default | awk '{print $2,$3}') || true
 
   echo "Confirming that 'default' PriorityClass has GLOBAL-DEFAULT set to true and value = 0"
   if [[ "$DEFAULT_PRIORITY_CLASS" != *"true"* ]] || [[ "$DEFAULT_PRIORITY_CLASS" != *"0"* ]];then
@@ -244,7 +260,7 @@ function test_autoscaler ()
   fi
 
   # confirm that the default PriorityClass has GLOBAL-DEFAULT flag set to true and VALUE = 0
-  OVERPROVISIONING_PRIORITY_CLASS=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get PriorityClass -A | grep overprovisioning | awk '{print $2,$3}')
+  OVERPROVISIONING_PRIORITY_CLASS=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get PriorityClass -A | grep overprovisioning | awk '{print $2,$3}') || true
 
   echo "Confirming that 'overprovisioning' PriorityClass has GLOBAL-DEFAULT set to false and value = -1"
   if [[ "$OVERPROVISIONING_PRIORITY_CLASS" != *"false"* ]] || [[ "$OVERPROVISIONING_PRIORITY_CLASS" != *"-1"* ]];then
@@ -267,7 +283,7 @@ function test_monitoring_disabled ()
   {
     echo "Checking workload monitoring disabled for $1"
     # should be more than 0
-    DISABLED_MONITORING_CONFIG_COUNT=$(oc --kubeconfig "$2" get configmap cluster-monitoring-config -n openshift-monitoring -o yaml | grep -c "enableUserWorkload: false")
+    DISABLED_MONITORING_CONFIG_COUNT=$(oc --kubeconfig "$2" get configmap cluster-monitoring-config -n openshift-monitoring -o yaml | grep -c "enableUserWorkload: false") || true
     if [ "$DISABLED_MONITORING_CONFIG_COUNT" -lt 1 ]; then
       echo "ERROR. Workload monitoring should be disabled by default"
       TEST_PASSED=false
@@ -894,7 +910,7 @@ function test_ready_mc_acm_placement_decision () {
   echo "Confirming that api.openshift.com/osdfm-cluster-status is ready in the ManagedCluster resource on SC"
   EXPECTED_OSD_FM_CLUSTER_READY_STATUS_LABEL_COUNT=1
   ACTUAL_OSD_FM_CLUSTER_READY_STATUS_LABEL_COUNT=0
-  ACTUAL_OSD_FM_CLUSTER_READY_STATUS_LABEL_COUNT=$(oc --kubeconfig "$SC_KUBECONFIG_PATH" get ManagedCluster -o json | grep "\"api.openshift.com/osdfm-cluster-status"\" | grep -c "ready")
+  ACTUAL_OSD_FM_CLUSTER_READY_STATUS_LABEL_COUNT=$(oc --kubeconfig "$SC_KUBECONFIG_PATH" get ManagedCluster -o json | grep "\"api.openshift.com/osdfm-cluster-status"\" | grep -c "ready") || true
   if [ "$EXPECTED_OSD_FM_CLUSTER_READY_STATUS_LABEL_COUNT" != "$ACTUAL_OSD_FM_CLUSTER_READY_STATUS_LABEL_COUNT" ]; then
     printf "\nERROR. Expected count of 'api.openshift.com/osdfm-cluster-status: ready' in ManagedCluster resource SC to be 1. Got:\n%d" "$ACTUAL_OSD_FM_CLUSTER_READY_STATUS_LABEL_COUNT"
     TEST_PASSED=false
@@ -903,7 +919,7 @@ function test_ready_mc_acm_placement_decision () {
   echo "Confirming that Placement resource uses 'api.openshift.com/hypershift: true' label"
   EXPECTED_PLACEMENT_HYPERSHIFT_LABEL_COUNT=1
   ACTUAL_PLACEMENT_HYPERSHIFT_LABEL_COUNT=0
-  ACTUAL_PLACEMENT_HYPERSHIFT_LABEL_COUNT=$(oc --kubeconfig "$SC_KUBECONFIG_PATH" get Placement -n ocm -o json | jq -r .items[].spec | grep "api.openshift.com/hypershift" | grep -c true)
+  ACTUAL_PLACEMENT_HYPERSHIFT_LABEL_COUNT=$(oc --kubeconfig "$SC_KUBECONFIG_PATH" get Placement -n ocm -o json | jq -r .items[].spec | grep "api.openshift.com/hypershift" | grep -c true) || true
   if [ "$EXPECTED_PLACEMENT_HYPERSHIFT_LABEL_COUNT" != "$ACTUAL_PLACEMENT_HYPERSHIFT_LABEL_COUNT" ]; then
     printf "\nERROR. Expected count of 'api.openshift.com/hypershift: true' labels in Placement resource for SC to be 1. Got:\n%d" "$ACTUAL_PLACEMENT_HYPERSHIFT_LABEL_COUNT"
     TEST_PASSED=false
@@ -912,7 +928,7 @@ function test_ready_mc_acm_placement_decision () {
   echo "Confirming that Placement resource uses 'api.openshift.com/osdfm-cluster-status: ready' label"
   EXPECTED_PLACEMENT_CLUSTER_STATUS_LABEL_COUNT=1
   ACTUAL_PLACEMENT_CLUSTER_STATUS_LABEL_COUNT=0
-  ACTUAL_PLACEMENT_CLUSTER_STATUS_LABEL_COUNT=$(oc --kubeconfig "$SC_KUBECONFIG_PATH" get Placement -n ocm -o json | jq -r .items[].spec | grep "api.openshift.com/hypershift" | grep -c true)
+  ACTUAL_PLACEMENT_CLUSTER_STATUS_LABEL_COUNT=$(oc --kubeconfig "$SC_KUBECONFIG_PATH" get Placement -n ocm -o json | jq -r .items[].spec | grep "api.openshift.com/hypershift" | grep -c true) || true
   if [ "$EXPECTED_PLACEMENT_CLUSTER_STATUS_LABEL_COUNT" != "$ACTUAL_PLACEMENT_CLUSTER_STATUS_LABEL_COUNT" ]; then
     printf "\nERROR. Expected count of 'api.openshift.com/osdfm-cluster-status: ready' labels in Placement resource for SC to be 1. Got:\n%d" "$ACTUAL_PLACEMENT_CLUSTER_STATUS_LABEL_COUNT"
     TEST_PASSED=false
@@ -1055,14 +1071,14 @@ function test_machineset_tains_and_labels () {
   else
     echo "Getting labels of of serving machineset: $SERVING_MACHINE_SET_NAME and confirming that 'hypershift.openshift.io/request-serving-component' is set to true"
     SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE=""
-    SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get machineset "$SERVING_MACHINE_SET_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.metadata.labels | jq  '."hypershift.openshift.io/request-serving-component"')
+    SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get machineset "$SERVING_MACHINE_SET_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.metadata.labels | jq  '."hypershift.openshift.io/request-serving-component"')  || true
     if [ "$SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE" == "" ] || [ "$SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE" = false ]; then
       echo "ERROR. 'hypershift.openshift.io/request-serving-component' should be present in machineset labels and set to true. Unable to get the key value pair from labels"
       TEST_PASSED=false
     fi
     echo "Getting tains of of serving machineset: $SERVING_MACHINE_SET_NAME and confirming that 'hypershift.openshift.io/request-serving-component' is set to true"
     SERVING_MACHINE_SET_REQUEST_SERVING_TAINT_VALUE=false
-    SERVING_MACHINE_SET_REQUEST_SERVING_TAINT_VALUE=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get machineset "$SERVING_MACHINE_SET_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.taints[] | jq 'select(.key == "hypershift.openshift.io/request-serving-component")' | jq -r .value)
+    SERVING_MACHINE_SET_REQUEST_SERVING_TAINT_VALUE=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get machineset "$SERVING_MACHINE_SET_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.taints[] | jq 'select(.key == "hypershift.openshift.io/request-serving-component")' | jq -r .value)  || true
     if [ "$SERVING_MACHINE_SET_REQUEST_SERVING_TAINT_VALUE" = false ]; then
       echo "ERROR. 'hypershift.openshift.io/request-serving-component' should be present in machineset taints and set to true. Unable to get the key value pair from taints"
       TEST_PASSED=false
@@ -1128,7 +1144,7 @@ function test_backups_created_only_once () {
   TEST_PASSED=true
 
   echo "Getting schedule configuration"
-  SCHEDULE_OUTPUT=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get schedule -n openshift-adp-operator | tail -3)
+  SCHEDULE_OUTPUT=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get schedule -n openshift-adp-operator | tail -3)  || true
   echo "Confirming that hourly, daily and weekly backups are available, enabled and with correct cron expression"
   echo "$SCHEDULE_OUTPUT" | while read -r line; do
     SCHEDULE_NAME=$(echo "$line" | awk '{print $1}')
@@ -1208,7 +1224,7 @@ function test_obo_machinesets () {
       TEST_PASSED=false
     fi
     echo "Getting obo machinesets"
-    OBO_MACHINESETS_OUTPUT=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get machinesets -A | grep obo)
+    OBO_MACHINESETS_OUTPUT=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get machinesets -A | grep obo) || true
     NO_OF_OBO_MACHINESETS=$(echo -n "$OBO_MACHINESETS_OUTPUT" | grep -c '^')
     EXPECTED_NO_OF_OBO_MACHINESETS=3
     if [ "$NO_OF_OBO_MACHINESETS" -ne "$EXPECTED_NO_OF_OBO_MACHINESETS" ]; then
@@ -1263,7 +1279,7 @@ function test_awsendpointservices_status_output_populated () {
 
   echo "Getting list of awsendpointservices items"
 
-  AWS_ENDPOINT_SERVICES_OUTPUT=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get awsendpointservices.hypershift.openshift.io -A -o json | jq -r)
+  AWS_ENDPOINT_SERVICES_OUTPUT=$(oc --kubeconfig "$MC_KUBECONFIG_PATH" get awsendpointservices.hypershift.openshift.io -A -o json | jq -r) || true
   ITEMS_LENGTH=$(jq -n "$AWS_ENDPOINT_SERVICES_OUTPUT" | jq -r '.items | length')
 
   if [ "$ITEMS_LENGTH" -eq 0 ]; then
