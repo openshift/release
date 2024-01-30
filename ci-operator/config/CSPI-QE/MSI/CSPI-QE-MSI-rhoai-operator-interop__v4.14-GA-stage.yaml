@@ -29,11 +29,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: smoke-rosa-rhoai-addon-baseline-fips
+- as: smoke-rosa-rhoai-baseline-fips
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
-      ADDON1_CONFIG: name=managed-odh;notification-email=interop-qe-ms@redhat.com;ocm-env=stage
       ADDONS_OPERATORS_RUN_IN_PARALLEL: "false"
       CLUSTER_NAME_PREFIX: rhoai
       CLUSTER1_CONFIG: platform=rosa;region=us-east-2;version=4.14;channel-group=stable;compute-machine-type=g4dn.2xlarge;timeout=2h;replicas=2;fips=true;ocm-env=stage
@@ -42,7 +41,6 @@ tests:
           "failure_rules":
             [
               {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_epic": "!default"},
-              {"step": "addon-install", "failure_type": "all", "classification": "Provisioning - Addons", "jira_epic": "!default"},
               {"step": "rhoai-tests", "failure_type": "all", "classification": "RHOAI tests", "jira_project": "RHODS", "jira_epic": "RHODS-10718"},
               {"step": "cluster-install", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_epic": "!default", "group": {"name": "cluster-provision", "priority": 1}},
               {"step": "cluster-uninstall", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_epic": "!default", "group": {"name": "cluster-provision", "priority": 2}}
@@ -57,17 +55,17 @@ tests:
       OPERATOR3_CONFIG: name=serverless-operator;namespace=openshift-serverless
       OPERATOR4_CONFIG: name=openshift-pipelines-operator-rh;namespace=openshift-pipelines;channel=latest
       OPERATOR5_CONFIG: name=nfd;namespace=openshift-nfd;target-namespaces=openshift-nfd,
+      OPERATOR6_CONFIG: name=rhods-operator;namespace=redhat-ods-operator
       PULL_SECRET_NAME: pull-secret
       S3_BUCKET_NAME: openshift-cli-installer
       S3_BUCKET_PATH: openshift-ci
     test:
     - ref: rhoai-tests
-    workflow: addons-and-operators
-- as: smoke-osd-gcp-rhoai-addon-baseline-fips
+    workflow: operator
+- as: smoke-osd-gcp-rhoai-baseline-fips
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
-      ADDON1_CONFIG: name=managed-odh;notification-email=interop-qe-ms@redhat.com;ocm-env=stage
       ADDONS_OPERATORS_RUN_IN_PARALLEL: "false"
       CLUSTER_NAME_PREFIX: rhoai
       CLUSTER1_CONFIG: platform=gcp-osd;region=us-west1;version=4.14;channel-group=stable;compute-machine-type=custom-8-32768;timeout=2h;replicas=2;fips=true;ocm-env=stage
@@ -92,12 +90,13 @@ tests:
       OPERATOR3_CONFIG: name=serverless-operator;namespace=openshift-serverless
       OPERATOR4_CONFIG: name=openshift-pipelines-operator-rh;namespace=openshift-pipelines;channel=latest
       OPERATOR5_CONFIG: name=nfd;namespace=openshift-nfd;target-namespaces=openshift-nfd,
+      OPERATOR6_CONFIG: name=rhods-operator;namespace=redhat-ods-operator
       PULL_SECRET_NAME: pull-secret
       S3_BUCKET_NAME: openshift-cli-installer
       S3_BUCKET_PATH: openshift-ci
     test:
     - ref: rhoai-tests
-    workflow: addons-and-operators
+    workflow: operator
 - as: smoke-osd-aws-rhoai-baseline-fips
   steps:
     cluster_profile: aws-managed-cspi-qe
