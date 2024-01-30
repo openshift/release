@@ -114,31 +114,33 @@ if [[ ! -z "$OLD_CLUSTER" ]]; then
 fi
 
 # Get the openshift version
+version_cmd="rosa list versions --channel-group ${CHANNEL_GROUP} -o json"
+if [[ "$HOSTED_CP" == "true" ]]; then
+  version_cmd="$version_cmd --hosted-cp"
+fi
 if [[ ${AVAILABLE_UPGRADE} == "yes" ]] ; then
-  OPENSHIFT_VERSION=$(head -n 1 "${SHARED_DIR}/available_upgrade_version.txt")
+  version_cmd="$version_cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id'"
 else
-  versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq -r '.[].raw_id')
-  if [[ "$HOSTED_CP" == "true" ]]; then
-    versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} --hosted-cp -o json | jq -r '.[].raw_id')
-  fi
-  echo -e "Available cluster versions:\n${versionList}"
+  version_cmd="$version_cmd | jq -r '.[].raw_id'"
+fi
+versionList=$(eval $version_cmd)
+echo -e "Available cluster versions:\n${versionList}"
 
-  if [[ -z "$OPENSHIFT_VERSION" ]]; then
-    if [[ "$EC_BUILD" == "true" ]]; then
-      OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
-    else
-      OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
-    fi
-  elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
-    if [[ "$EC_BUILD" == "true" ]]; then
-      OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
-    else
-      OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
-    fi
+if [[ -z "$OPENSHIFT_VERSION" ]]; then
+  if [[ "$EC_BUILD" == "true" ]]; then
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
   else
-    # Match the whole line
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
+    OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
   fi
+elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
+  if [[ "$EC_BUILD" == "true" ]]; then
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
+  else
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
+  fi
+else
+  # Match the whole line
+  OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
 fi
 
 if [[ -z "$OPENSHIFT_VERSION" ]]; then

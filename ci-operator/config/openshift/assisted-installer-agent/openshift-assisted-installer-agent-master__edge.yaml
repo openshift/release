@@ -136,6 +136,8 @@ tests:
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test-postsubmit
   commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
@@ -198,9 +200,11 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=lvm
-        MASTERS_COUNT=1
+        NUM_MASTERS=3
+        NUM_WORKERS=0
         MASTER_MEMORY=18000
         MASTER_CPU=9
+        MASTER_DISK_COUNT=2
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf
   optional: true

@@ -4,8 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-CUCUSHIFT_FORCE_SKIP_TAGS="customer security"
-
 function set_cluster_access() {
     if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
@@ -29,20 +27,19 @@ function preparation_for_test() {
 function echo_e2e_tags() {
     echo "In function: ${FUNCNAME[1]}"
     echo "E2E_RUN_TAGS: '${E2E_RUN_TAGS}'"
-    echo "E2E_SKIP_TAGS: '${E2E_SKIP_TAGS}'"
 }
 function filter_test_by_version() {
     local xversion yversion
     IFS='.' read xversion yversion _ < <(oc version -o yaml | yq '.openshiftVersion')
     if [[ -n $xversion ]] && [[ $xversion -eq 4 ]] && [[ -n $yversion ]] && [[ $yversion =~ [12][0-9] ]] ; then
-        export E2E_RUN_TAGS="${E2E_RUN_TAGS} and @${xversion}.${yversion}"
+        export E2E_RUN_TAGS="@${xversion}.${yversion} and ${E2E_RUN_TAGS}"
     fi
     echo_e2e_tags
 }
 function filter_test_by_arch() {
     local node_archs arch_tags
-    mapfile -t node_archs < <(oc get nodes -o yaml | yq '.items[].status.nodeInfo.architecture' | sort -u)
-    arch_tags="${node_archs[*]/#/ and @}"
+    mapfile -t node_archs < <(oc get nodes -o yaml | yq '.items[].status.nodeInfo.architecture' | sort -u | sed 's/^/@/g')
+    arch_tags="${node_archs[*]/%/ and}"
     case "${#node_archs[@]}" in
         0)
             echo "=========================="
@@ -51,12 +48,44 @@ function filter_test_by_arch() {
             echo "=========================="
             ;;
         1)
-            export E2E_RUN_TAGS="${E2E_RUN_TAGS} ${arch_tags[*]}"
+            export E2E_RUN_TAGS="${arch_tags[*]} ${E2E_RUN_TAGS}"
             ;;
         *)
-            export E2E_RUN_TAGS="${E2E_RUN_TAGS} ${arch_tags[*]} and @heterogeneous"
+            export E2E_RUN_TAGS="@heterogeneous and ${arch_tags[*]} ${E2E_RUN_TAGS}"
             ;;
     esac
+    echo_e2e_tags
+}
+function filter_test_by_platform() {
+    local platform ipixupi
+    ipixupi='upi'
+    if (oc get configmap openshift-install -n openshift-config &>/dev/null) ; then
+        ipixupi='ipi'
+    fi
+    platform="$(oc get infrastructure cluster -o yaml | yq '.status.platform' | tr 'A-Z' 'a-z')"
+    extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
+    if [[ -n "$platform" ]] ; then
+        case "$platform" in
+            none)
+                export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
+                eval "$extrainfoCmd"
+                ;;
+            external)
+                echo "Expected, got platform as '$platform'"
+                eval "$extrainfoCmd"
+                ;;
+            alibabacloud)
+                export E2E_RUN_TAGS="@alicloud-${ipixupi} and ${E2E_RUN_TAGS}"
+                ;;
+            aws|azure|baremetal|gcp|ibmcloud|nutanix|openstack|vsphere)
+                export E2E_RUN_TAGS="@${platform}-${ipixupi} and ${E2E_RUN_TAGS}"
+                ;;
+            *)
+                echo "Unexpected, got platform as '$platform'"
+                eval "$extrainfoCmd"
+                ;;
+        esac
+    fi
     echo_e2e_tags
 }
 function filter_test_by_network() {
@@ -74,7 +103,7 @@ function filter_test_by_network() {
 	    ;;
     esac
     if [[ -n $networktag ]] ; then
-        export E2E_RUN_TAGS="${E2E_RUN_TAGS} and ${networktag}"
+        export E2E_RUN_TAGS="${networktag} and ${E2E_RUN_TAGS}"
     fi
     echo_e2e_tags
 }
@@ -82,7 +111,15 @@ function filter_test_by_sno() {
     local nodeno
     nodeno="$(oc get nodes --no-headers | wc -l)"
     if [[ $nodeno -eq 1 ]] ; then
-        export E2E_RUN_TAGS="${E2E_RUN_TAGS} and @singlenode"
+        export E2E_RUN_TAGS="@singlenode and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags
+}
+function filter_test_by_proxy() {
+    local proxy
+    proxy="$(oc get proxies.config.openshift.io cluster -o yaml | yq '.spec|(.httpProxy,.httpsProxy)' | uniq)"
+    if [[ -n "$proxy" ]] && [[ "$proxy" != 'null' ]] ; then
+        export E2E_RUN_TAGS="@proxy and ${E2E_RUN_TAGS}"
     fi
     echo_e2e_tags
 }
@@ -90,7 +127,7 @@ function filter_test_by_fips() {
     local data
     data="$(oc get configmap cluster-config-v1 -n kube-system -o yaml | yq '.data')"
     if ! (grep --ignore-case --quiet 'fips' <<< "$data") ; then
-        export E2E_RUN_TAGS="${E2E_RUN_TAGS} and not @fips"
+        export E2E_RUN_TAGS="not @fips and ${E2E_RUN_TAGS}"
     fi
     echo_e2e_tags
 }
@@ -113,7 +150,7 @@ function filter_test_by_capability() {
              [Build]=xxx
              [CloudCredential]=xxx
              [Console]=console
-             [CSISnapshot]=xxx
+             [CSISnapshot]=storage
              [DeploymentConfig]=xxx
              [ImageRegistry]=xxx
              [Insights]=xxx
@@ -153,7 +190,7 @@ function filter_test_by_capability() {
     for cap in ${versioncaps} ; do
         if ! (grep --ignore-case --quiet "$cap" <<< "$enabledcaps") ; then
             if [[ "${tagmaps[$cap]}" != 'xxx' ]] ; then
-                export E2E_RUN_TAGS="${E2E_RUN_TAGS} and not @${tagmaps[$cap]}"
+                export E2E_RUN_TAGS="not @${tagmaps[$cap]} and ${E2E_RUN_TAGS}"
             else
                 echo "TO_BE_DONE: find tag map for '$cap'"
             fi
@@ -162,18 +199,15 @@ function filter_test_by_capability() {
     echo_e2e_tags
 }
 function filter_tests() {
-    filter_test_by_version
-    filter_test_by_arch
-    filter_test_by_network
-    filter_test_by_sno
-    filter_test_by_fips
     filter_test_by_capability
-    # the following check should be the last one in filter_tests
-    for tag in ${CUCUSHIFT_FORCE_SKIP_TAGS} ; do
-        if ! [[ "${E2E_SKIP_TAGS}" =~ $tag ]] ; then
-            export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not $tag"
-        fi
-    done
+    filter_test_by_fips
+    filter_test_by_proxy
+    filter_test_by_sno
+    filter_test_by_network
+    filter_test_by_platform
+    filter_test_by_arch
+    filter_test_by_version
+
     echo_e2e_tags
 }
 function test_execution() {
@@ -182,8 +216,8 @@ function test_execution() {
     export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/ui"
     export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
     set -x
-    cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and @console and not @destructive" -p junit || true
-    cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and @console and @destructive" -p junit || true
+    cucumber --tags "${E2E_RUN_TAGS} and @console and not @destructive" -p junit || true
+    cucumber --tags "${E2E_RUN_TAGS} and @console and @destructive" -p junit || true
     set +x
     popd
 }
@@ -216,8 +250,22 @@ EOF
 }
 
 
-E2E_RUN_TAGS="${E2E_RUN_TAGS:?'Wrong test filter for E2E_RUN_TAGS'}"
-E2E_SKIP_TAGS="${E2E_SKIP_TAGS:='not @default-skip-tag-not-used'}"
+CUCUSHIFT_FORCE_SKIP_TAGS="not @customer
+        and not @flaky
+        and not @inactive
+        and not @long-duration
+        and not @prod-only
+        and not @qeci
+        and not @security
+        and not @stage-only
+        and not @upgrade-check
+        and not @upgrade-prepare
+"
+if [[ -z "$E2E_RUN_TAGS" ]] ; then
+    export E2E_RUN_TAGS="$CUCUSHIFT_FORCE_SKIP_TAGS"
+else
+    export E2E_RUN_TAGS="$E2E_RUN_TAGS and $CUCUSHIFT_FORCE_SKIP_TAGS"
+fi
 set_cluster_access
 preparation_for_test
 filter_tests

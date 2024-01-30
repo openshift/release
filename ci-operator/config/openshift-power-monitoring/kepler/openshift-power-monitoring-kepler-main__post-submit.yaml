@@ -31,13 +31,18 @@ tests:
   postsubmit: true
   steps:
     cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
     test:
     - as: deploy-kepler
       cli: latest
       commands: |
         GOFLAGS="" make tools
-        make build-manifest OPTS="OPENSHIFT_DEPLOY"
+        GOFLAGS="" make build-manifest OPTS="OPENSHIFT_DEPLOY"
         oc apply -f _output/generated-manifest/deployment.yaml
+      dependencies:
+      - env: EXPORTER_IMG
+        name: kepler
       from: src
       resources:
         requests:
@@ -54,7 +59,7 @@ tests:
       cli: latest
       commands: |
         GOFLAGS="" make tools
-        make build-manifest OPTS="OPENSHIFT_DEPLOY"
+        GOFLAGS="" make build-manifest OPTS="OPENSHIFT_DEPLOY"
         oc apply -f _output/generated-manifest/deployment.yaml
       from: src
       resources:
