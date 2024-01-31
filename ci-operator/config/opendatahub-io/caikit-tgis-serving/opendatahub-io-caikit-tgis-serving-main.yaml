@@ -25,32 +25,26 @@ resources:
       cpu: "2"
       memory: 2Gi
 tests:
-- as: testname
+- as: testing
   steps:
-    cluster_profile: aws-opendatahub
-    env:
-      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
-      COMPUTE_NODE_TYPE: m5.2xlarge
-      HYPERSHIFT_AWS_REGION: us-west-2
-      HYPERSHIFT_NODE_COUNT: "3"
+    cluster_profile: gcp-opendatahub
     test:
-    - as: testname
+    - as: jupyter-minimal-ubi8-python-3.8-test-e2e
       cli: latest
-      commands: |-
-        oc run -i -t hello-world --image=hello-world --restart=Never
-        oc get all
-
-
-        # 1. install kserve
-        # 2. apply the caikit manifests:
-        #   oc apply -f caikit-tgis-isvc.yaml -f caikit-tgis-servingruntime.tyaml
-        # 3. oc wait --for=condition=Ready -f caikit-tgis-isvc.tyaml
-        # 4. bash tests/smoke-test.yaml
+      commands: |
+        oc new-project caikit-tgis-serving-ci-tests
+        oc run -i -t pythonwebserver --image=python:3.12-slim  --restart=Never --command "python" -- -m http.server
+        oc wait --for=condition=Ready pod/pythonwebserver
+        oc port-forward pod/pythonwebserver 8000:8000 &
+        curl http://localhost:8000
+      # dependencies:
+      # - env: CAIKIT_TGIS_SERVING_IMAGE
+      #   name: caikit-tgis-serving:latest
       from: src
       resources:
         requests:
-          cpu: "1"
-    workflow: hypershift-hostedcluster-workflow
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: opendatahub-io
