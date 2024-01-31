@@ -18,7 +18,8 @@ job_definitions_paths = [
     'ci-operator/jobs/openshift/hypershift',
     'ci-operator/jobs/openshift/microshift',
     'ci-operator/jobs/openshift/cluster-control-plane-machine-set-operator',
-    'ci-operator/jobs/openshift/osde2e'
+    'ci-operator/jobs/openshift/osde2e',
+    'ci-operator/jobs/openshift-qe/ocp-qe-perfscale-ci'
 ]
 
 
