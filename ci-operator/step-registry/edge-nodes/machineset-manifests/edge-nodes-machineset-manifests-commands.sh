@@ -8,8 +8,10 @@ REGION="${LEASED_RESOURCE}"
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 edge_zone_subnet_id=$(head -n 1 "${SHARED_DIR}/edge_zone_subnet_id")
-edge_zone_name=$(head -n 1 "${SHARED_DIR}/edge-zone-name.txt")
-edge_zone_group_name=$(head -n 1 "${SHARED_DIR}"/edge-zone-group-name.txt)
+edge_zone_name=$(head -n 1 "${SHARED_DIR}/edge-zone-names.txt")
+source "${SHARED_DIR}/edge-zone-groups.env"
+# shellcheck disable=SC2154
+edge_zone_group_name="${edge_zone_groups[$edge_zone_name]}"
 
 # keeping manifest_ prefix as this step can be used in manifest injection before installation 
 localzone_machineset="${SHARED_DIR}/manifest_localzone_machineset.yaml"

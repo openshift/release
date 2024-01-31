@@ -179,7 +179,7 @@ output = yaml.safe_dump(cfg, default_flow_style=False)
 print('  '.join(('\n'+output).splitlines(True))[1:].rstrip())
 ___EOF___
 
-pip3 install pyyaml --user
+pip3 install pyyaml==6.0 --user
 echo "PLATFORM_ARGS_COMPUTE=${PLATFORM_ARGS_COMPUTE[*]}"
 echo "PLATFORM_ARGS_WORKER=${PLATFORM_ARGS_WORKER[*]}"
 CONFIG_PLATFORM_COMPUTE=$(python3 ${FILE} "${PLATFORM_ARGS_COMPUTE[@]}")

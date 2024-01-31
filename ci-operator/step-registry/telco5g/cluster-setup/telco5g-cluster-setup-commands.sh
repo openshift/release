@@ -28,8 +28,9 @@ echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
 # Set environment for jobs to run
 INTERNAL=true
 INTERNAL_ONLY=true
-# Run cnftests periodic and nightly job on Upstream cluster
-if [[ "$T5_JOB_TRIGGER" == "periodic" ]] || [[ "$T5_JOB_TRIGGER" == "nightly" ]]; then
+# If the job trigger is "periodic" or "nightly" or the repository owner is "openshift-kni",
+# use the upstream cluster to run the job.
+if [[ "$T5_JOB_TRIGGER" == "periodic" ]] || [[ "$T5_JOB_TRIGGER" == "nightly" ]] || [[ "$REPO_OWNER" == "openshift-kni" ]]; then
     INTERNAL=false
     INTERNAL_ONLY=false
 else
@@ -73,7 +74,9 @@ fi
 
 
 if [ "$REPO_OWNER" == "openshift-kni" ]; then
-  TOPOLOGY_SELECTION="--topology 1b1v"
+  # Run PR job on openshift-kni repo with 1b1v topology and exclude cnfdu5, cnfdu6, cnfdu7, cnfdu8
+  # as they are used for nightly jobs
+  TOPOLOGY_SELECTION="--topology 1b1v --exclude cnfdu5 --exclude cnfdu6 --exclude cnfdu7 --exclude cnfdu8"
 else
   TOPOLOGY_SELECTION="--topology 1b1v --topology 2b"
 fi
@@ -302,6 +305,8 @@ status=0
 if [[ "$T5_JOB_DESC" != "periodic-cnftests" ]]; then
     PROCEED_AFTER_FAILURES="true"
 fi
+# Install posix collection so that we can use debug callback
+ansible-galaxy collection install ansible.posix
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || eval $PROCEED_AFTER_FAILURES
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
