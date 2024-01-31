@@ -113,7 +113,7 @@ oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available -
 cd new-quay-operator-tests
 ls -al
 make build
-echo "files in quay-operator-tests:"
+echo "files in new-quay-operator-tests:"
 ls -al
 ./bin/extended-platform-tests run all --dry-run | grep "20934"|./bin/extended-platform-tests run --timeout 150m --junit-dir=./ -f - 
 sleep 10
