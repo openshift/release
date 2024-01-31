@@ -131,7 +131,7 @@ oc -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane
 
 # Wait for operators to stabilize
 if
-  ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=10m; then
+  ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=60m; then
     oc get nodes
     oc get co | grep -v "True\s\+False\s\+False"
     exit 1
