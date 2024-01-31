@@ -32,10 +32,6 @@ tests:
     test:
     - as: scale-gpu-nodes
       commands: make scale_aws_gpu_nodes
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
@@ -43,10 +39,6 @@ tests:
           memory: 2Gi
     - as: gpu-operator-e2e
       commands: make e2e_gpu_test CHANNEL=v23.9
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
@@ -58,13 +50,16 @@ tests:
     cluster_profile: aws-edge-infra
     env:
       BASE_DOMAIN: edge-sro.rhecoeng.com
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: single-node-conf-aws
+    - ref: single-node-conf-e2e
+    - chain: ipi-install
     test:
     - as: scale-gpu-nodes
       commands: make scale_aws_gpu_nodes
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
@@ -72,29 +67,27 @@ tests:
           memory: 2Gi
     - as: gpu-operator-e2e
       commands: make master_e2e_gpu_test
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: ipi-aws
 - as: nvidia-gpu-operator-e2e-23-6-x
   cron: 0 03 * * 2
   steps:
     cluster_profile: aws-edge-infra
     env:
       BASE_DOMAIN: edge-sro.rhecoeng.com
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: single-node-conf-aws
+    - ref: single-node-conf-e2e
+    - chain: ipi-install
     test:
     - as: scale-gpu-nodes
       commands: make scale_aws_gpu_nodes
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
@@ -102,29 +95,27 @@ tests:
           memory: 2Gi
     - as: gpu-operator-e2e
       commands: make e2e_gpu_test CHANNEL=v23.6
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: ipi-aws
 - as: nvidia-gpu-operator-e2e-23-9-x
   cron: 0 05 * * 2
   steps:
     cluster_profile: aws-edge-infra
     env:
       BASE_DOMAIN: edge-sro.rhecoeng.com
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: single-node-conf-aws
+    - ref: single-node-conf-e2e
+    - chain: ipi-install
     test:
     - as: scale-gpu-nodes
       commands: make scale_aws_gpu_nodes
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
@@ -132,16 +123,11 @@ tests:
           memory: 2Gi
     - as: gpu-operator-e2e
       commands: make e2e_gpu_test CHANNEL=v23.9
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
