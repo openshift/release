@@ -3,8 +3,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-TARGET_KUBEADMIN_PASSWORD_FILE="/tmp/clusters-data/aws/mtc-aws-ipi-target/auth/kubeadmin-password"
-TARGET_KUBECONFIG="/tmp/clusters-data/aws/mtc-aws-ipi-target/auth/kubeconfig"
+TARGET_KUBEADMIN_PASSWORD_FILE="/tmp/clusters-data/${TEST_PLATFORM}/${TARGET_CLUSTER_NAME}/auth/kubeadmin-password"
+TARGET_KUBECONFIG="/tmp/clusters-data/${TEST_PLATFORM}/${TARGET_CLUSTER_NAME}/auth/kubeconfig"
 RESULTS_FILE="${TEST_REPOSITORY_DIR}/junit-report.xml"
 
 # Move the oc binary
