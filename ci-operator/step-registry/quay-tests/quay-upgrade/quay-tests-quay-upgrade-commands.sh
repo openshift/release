@@ -110,10 +110,10 @@ EOF
 echo "Waiting for NooBaa Storage to be ready..." >&2
 oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=180s
 
-cd quay-operator-tests
+cd new-quay-operator-tests
 ls -al
 make build
 echo "files in quay-operator-tests:"
 ls -al
-./bin/extended-platform-tests run all --dry-run | grep "Quay" | ./bin/extended-platform-tests run -f -
+./bin/extended-platform-tests run all --dry-run | grep "20934"|./bin/extended-platform-tests run --timeout 150m --junit-dir=./ -f - 
 sleep 10
