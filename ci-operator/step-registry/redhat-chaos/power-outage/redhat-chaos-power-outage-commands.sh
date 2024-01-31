@@ -8,10 +8,6 @@ cat /etc/os-release
 oc config view
 oc projects
 python3 --version
-pushd /tmp
-
-git clone https://github.com/redhat-chaos/krkn-hub.git
-pushd krkn-hub/
 
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
@@ -31,8 +27,8 @@ telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 export AWS_DEFAULT_REGION=us-west-2
 
-chmod +x ./prow/power-outage/prow_run.sh
-./prow/power-outage/prow_run.sh
+chmod +x ./power-outage/prow_run.sh
+./power-outage/prow_run.sh
 rc=$?
 echo "Finished running power outages"
 echo "Return code: $rc"
