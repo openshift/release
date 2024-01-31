@@ -86,9 +86,6 @@ sudo timedatectl status
 # TODO: Suspend, resume and make it resync time from host instead?
 run-on-all-nodes "timedatectl set-time ${SKEW} && timedatectl status"
 
-# Restart kubelet
-run-on-all-nodes "systemctl restart kubelet"
-
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
 run-on-first-master "
 export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
