@@ -1,8 +1,3 @@
-base_images:
-  upi-installer:
-    name: "4.15"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
@@ -10,7 +5,7 @@ build_root:
     tag: latest
 images:
 - dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-vsphere-415
+  to: ocp-qe-perfscale-ci-ibmcloud-416
 promotion:
   to:
   - namespace: ci
@@ -21,12 +16,12 @@ releases:
       product: ocp
       relative: 1
       stream: nightly
-      version: "4.15"
+      version: "4.16"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.16"
 resources:
   '*':
     requests:
@@ -34,66 +29,60 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: ingress-perf-24nodes
+  as: ingress-perf-40nodes
   steps:
     allow_skip_on_success: true
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: ibmcloud-qe
     env:
       IF_MOVE_INGRESS: "false"
       IF_MOVE_MONITORING: "false"
       IF_MOVE_REGISTRY: "false"
-      OPENSHIFT_INFRA_NODE_CPU_CORE_PER_SOCKET_COUNT: "2"
-      OPENSHIFT_INFRA_NODE_CPU_COUNT: "16"
-      OPENSHIFT_INFRA_NODE_MEMORY_SIZE: "65536"
-      OPENSHIFT_INFRA_NODE_VOLUME_SIZE: "120"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: bx2d-16x64
       SET_ENV_BY_PLATFORM: custom
-      WORKER_REPLICA_COUNT: "24"
+      SIZE_VARIANT: large
+      WORKERS: "40"
     test:
-    - chain: workers-scale
     - chain: openshift-qe-ingress-perf
-    workflow: openshift-qe-installer-vsphere-ipi-ovn
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
   timeout: 5h0m0s
 - always_run: false
   as: ingress-perf-3nodes
   steps:
     allow_skip_on_success: true
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: ibmcloud-qe
     env:
       IF_MOVE_INGRESS: "false"
       IF_MOVE_MONITORING: "false"
       IF_MOVE_REGISTRY: "false"
-      OPENSHIFT_INFRA_NODE_CPU_CORE_PER_SOCKET_COUNT: "2"
-      OPENSHIFT_INFRA_NODE_CPU_COUNT: "16"
-      OPENSHIFT_INFRA_NODE_MEMORY_SIZE: "65536"
-      OPENSHIFT_INFRA_NODE_VOLUME_SIZE: "120"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: bx2d-16x64
       SET_ENV_BY_PLATFORM: custom
     test:
     - chain: openshift-qe-ingress-perf
-    workflow: openshift-qe-installer-vsphere-ipi-ovn
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
   timeout: 5h0m0s
 - always_run: false
-  as: control-plane-24nodes
+  as: control-plane-40nodes
   steps:
     allow_skip_on_success: true
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: ibmcloud-qe
     env:
-      WORKER_REPLICA_COUNT: "24"
+      SIZE_VARIANT: large
+      WORKERS: "40"
     test:
-    - chain: workers-scale
     - chain: openshift-qe-control-plane
-    workflow: openshift-qe-installer-vsphere-ipi-ovn
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
   timeout: 5h0m0s
 - always_run: false
   as: control-plane-3nodes
   steps:
     allow_skip_on_success: true
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: ibmcloud-qe
     test:
     - chain: openshift-qe-control-plane
-    workflow: openshift-qe-installer-vsphere-ipi-ovn
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-qe
   repo: ocp-qe-perfscale-ci
-  variant: vsphere-4.15-nightly-x86
+  variant: ibmcloud-4.16-nightly-x86
