@@ -66,11 +66,6 @@ tests:
     make verify-latest-csv
   container:
     from: src
-- as: ocs-operator-ci
-  commands: |
-    export GOFLAGS=''; make ocs-operator-ci
-  container:
-    from: src
 - as: ocs-operator-bundle-e2e-aws
   steps:
     cluster_profile: aws
@@ -112,23 +107,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
-- as: red-hat-storage-ocs-ci-e2e-aws
-  optional: true
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export REDHAT_OCS_CI_FORCE_TOOL_POD_INSTALL="true" && make cluster-deploy && make red-hat-storage-ocs-ci
-      dependencies:
-      - env: CATALOG_FULL_IMAGE_NAME
-        name: ci-index-ocs-operator-bundle
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.13
   org: red-hat-storage
