@@ -21,7 +21,8 @@ echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSI
 ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 
 # Get the openshift version
-if [[ -z "$OPENSHIFT_VERSION" ]] || [[ -z "$UPGRADED_TO_VERSION" ]]; then
+# if [[ -z "$OPENSHIFT_VERSION" ]] || [[ -z "$UPGRADED_TO_VERSION" ]]; then
+if [[ -z "$OPENSHIFT_VERSION" ]]; then
   echo "The initiate/upgraded openshift versions must be set!"
   exit 1
 fi
