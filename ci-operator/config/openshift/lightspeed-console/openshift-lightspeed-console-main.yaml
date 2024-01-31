@@ -1,0 +1,46 @@
+base_images:
+  nodejs-16:
+    name: nodejs-16
+    namespace: openshift
+    tag: latest
+  ubi-9-nginx-120:
+    name: nginx
+    namespace: openshift
+    tag: 1.20-ubi9
+build_root:
+  image_stream_tag:
+    name: nodejs-16
+    namespace: openshift
+    tag: latest
+images:
+- dockerfile_path: Dockerfile
+  from: ubi-9-nginx-120
+  inputs:
+    nodejs-16:
+      as:
+      - build
+  to: lightspeed-console-plugin
+promotion:
+  to:
+  - namespace: ols
+    tag: latest
+releases:
+  initial:
+    integration:
+      name: "4.15"
+      namespace: ocp
+  latest:
+    integration:
+      name: "4.15"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: lightspeed-console
