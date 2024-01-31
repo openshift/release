@@ -234,16 +234,6 @@ echo "wait for mce to Available"
 oc wait --timeout=20m --for=condition=Available MultiClusterEngine/multiclusterengine-sample
 
 oc apply -f - <<END
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: hypershift-operator-install-flags
-  namespace: local-cluster
-data:
-  installFlagsToAdd: ""
-  installFlagsToRemove: "--enable-uwm-telemetry-remote-write"
-END
-oc apply -f - <<END
 apiVersion: cluster.open-cluster-management.io/v1
 kind: ManagedCluster
 metadata:
