@@ -24,7 +24,7 @@ else
   ## determine if running against managed service or smoke scenarios
   if [[ $E2E_RUN_TAGS =~ @osd_ccs|@rosa ]] ; then
     echo "Testing against online cluster"
-    ./console-test-osd.sh || true
+    ./console-test-managed-service.sh || true
   # if the TAGS contains @console, then it's a job specific for UI, run full tests
   # or else, we run smoke tests to balance coverage and cost
   elif [[ $E2E_RUN_TAGS =~ @console ]]; then
