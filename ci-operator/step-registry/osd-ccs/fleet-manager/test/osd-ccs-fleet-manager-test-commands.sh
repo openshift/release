@@ -1369,7 +1369,7 @@ function test_mc_request_serving_pool_autoscaling () {
   confirm_labels "management_clusters" "$fm_mc_cluster_id" 0 "" ""
 
   # # add a label with correct key and value, mps should be scaled up to maximum count (64)
-  add_label "$SERVING_MP_MINIMUM_WARMUP_KEY" "100" "$MGMT_CLUSTER_TYPE" "$fm_mc_cluster_id" false 120
+  add_label "$SERVING_MP_MINIMUM_WARMUP_KEY" "100" "$MGMT_CLUSTER_TYPE" "$fm_mc_cluster_id" false 240
 
   confirm_labels "management_clusters" "$fm_mc_cluster_id" 1 "$SERVING_MP_MINIMUM_WARMUP_KEY" "100"
 
