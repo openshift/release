@@ -60,18 +60,18 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
-    context: ci/prow/testname
+    cluster: build04
+    context: ci/prow/testing
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-opendatahub
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-opendatahub
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-caikit-tgis-serving-main-testname
-    rerun_command: /test testname
+    name: pull-ci-opendatahub-io-caikit-tgis-serving-main-testing
+    rerun_command: /test testing
     spec:
       containers:
       - args:
@@ -80,8 +80,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/testname-cluster-profile
-        - --target=testname
+        - --secret-dir=/usr/local/testing-cluster-profile
+        - --target=testing
         command:
         - ci-operator
         image: ci-operator:latest
@@ -97,7 +97,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/testname-cluster-profile
+        - mountPath: /usr/local/testing-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -124,7 +124,7 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
-          secretName: cluster-secrets-aws-opendatahub
+          secretName: cluster-secrets-gcp-opendatahub
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -134,4 +134,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )testname,?($|\s.*)
+    trigger: (?m)^/test( | .* )testing,?($|\s.*)
