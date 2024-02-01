@@ -18,14 +18,24 @@ resources:
       memory: 200Mi
 tests:
 - as: rhtap-installer-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^tests/release/pipelines/|^tests/load-tests/|^cmd/loadTests.go$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     test:
-    - as: rhtap-installer-e2e
-      commands: ls;echo "onboarding rhtap installer repo"
-      from: src
-      resources:
-        requests:
-          cpu: 200m
+    - ref: redhat-appstudio-rhtap-installer-e2e-test
+    workflow: redhat-appstudio-claim
+- as: rhtap-installer-static-checks
+  steps:
+    test:
+    - chain: redhat-appstudio-rhtap-installer-static-checks
 zz_generated_metadata:
   branch: master
   org: redhat-appstudio
