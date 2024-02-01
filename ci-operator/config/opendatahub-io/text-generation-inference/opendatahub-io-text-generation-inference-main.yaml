@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.15
 images:
 - build_args:
   - name: DOCKER_BUILDKIT
@@ -25,12 +25,53 @@ releases:
 resources:
   '*':
     limits:
-      cpu: "20"
-      memory: 24Gi
+      cpu: "16"
+      memory: 64Gi
     requests:
-      cpu: "10"
-      memory: 16Gi
+      cpu: "8"
+      memory: 32Gi
 tests:
+- as: python-tests
+  run_if_changed: ^(deployment/.*|integration_tests/.*|launcher/.*|proto/.*|router/.*|server/.*|Makefile|Dockerfile)
+  steps:
+    test:
+    - as: tests
+      commands: |
+        python -m venv /tmp/.venv
+        source /tmp/.venv/bin/activate
+        pip install --upgrade pip
+        # Dockerfile's test-base stage
+        pip install --upgrade pytest pytest-asyncio
+        # Dockerfile's cpu-tests stage
+        pip install --index-url=https://download.pytorch.org/whl/cpu torch
+
+        cd /app/server
+        pip install ".[accelerate]"
+        # Patch codegen model changes into transformers 4.35
+        cp transformers_patch/modeling_codegen.py $VIRTUAL_ENV/lib/python3.11/site-packages/transformers/models/codegen/modeling_codegen.py
+        export CI=true
+
+        # cd /app/integration_tests # FIXME: these are not copied into the final image, so we cannot run these
+        # make install
+
+        # Setup done, run tests
+        export HUGGINGFACE_HUB_CACHE=/tmp/hf_hub_cache
+        export TRANSFORMERS_CACHE=/tmp/transformers_cache
+
+        # python tests
+        cd /app
+        pytest -sv --ignore=server/tests/test_utils.py server/tests
+        # integration_tests
+        # cd /app/integration_tests # FIXME: these are not copied into the final image, so we cannot run these (see )
+        # make test
+      from: text-generation-inference
+      resources:
+        limits:
+          cpu: "16"
+          memory: 64Gi
+        requests:
+          cpu: "8"
+          memory: 32Gi
 - as: pr-image-mirror
   run_if_changed: ^(deployment/.*|integration_tests/.*|launcher/.*|proto/.*|router/.*|server/.*|Makefile|Dockerfile)
   steps:
