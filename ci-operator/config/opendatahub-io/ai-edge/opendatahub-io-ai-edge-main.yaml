@@ -46,6 +46,36 @@ tests:
         requests:
           cpu: 500m
     workflow: hypershift-hostedcluster-workflow
+- as: test-ai-edge-periodic
+  cron: 0 * * * *
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      OPERATORS: |
+        [
+            {"name": "openshift-pipelines-operator-rh", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators"}
+        ]
+    test:
+    - ref: install-operators
+    - as: test-ai-edge
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        make test
+      credentials:
+      - mount_path: /secrets/ai-edge-aws
+        name: ai-edge-aws
+        namespace: test-credentials
+      - mount_path: /secrets/ai-edge-quay
+        name: ai-edge-quay
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: main
   org: opendatahub-io
