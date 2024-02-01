@@ -22,9 +22,9 @@ curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /t
 PATH=$PATH:/tmp/bin
 export PATH
 echo "Installing terraform"
-sudo yum install -y yum-utils
-sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
-sudo yum -y install terraform
+yum install -y yum-utils
+yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+yum -y install terraform
 echo "Checking if ibmcloud CLI is installed."
 ibmcloud -v
 set +e
