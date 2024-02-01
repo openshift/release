@@ -73,12 +73,12 @@ fi
 # A vault's name must be between 3-24 alphanumeric characters
 cluster_sp_id=$(cat "${AZURE_AUTH_LOCATION}" | jq -r ".clientId")
 azure_des_json="{}"
-kv_prefix="${NAMESPACE%-*}-${UNIQUE_HASH}"
+kv_prefix="${NAMESPACE#ci-op-}-${UNIQUE_HASH}"
 if [[ "${ENABLE_DES_DEFAULT_MACHINE}" == "true" ]]; then
     echo "Creating keyvault and disk encryption set in ${RESOURCE_GROUP} for defaultMachinePlatform"
-    keyvault_default="${kv_prefix}-kv-default"
-    keyvault_key_default="${kv_prefix}-kvkey-default" 
-    des_default="${kv_prefix}-des-default"
+    keyvault_default="${kv_prefix}-kv-d"
+    keyvault_key_default="${kv_prefix}-kvkey-d"
+    des_default="${kv_prefix}-des-d"
     create_disk_encryption_set "${RESOURCE_GROUP}" "${keyvault_default}" "${keyvault_key_default}" "${des_default}"
     
     echo "Granting service principal reader permissions to the DiskEncryptionSet: ${des_default}"
@@ -91,9 +91,9 @@ fi
 
 if [[ "${ENABLE_DES_CONTROL_PLANE}" == "true" ]]; then
     echo "Creating keyvault and disk encryption set in ${RESOURCE_GROUP} for ControlPlane"
-    keyvault_master="${kv_prefix}-kv-master"
-    keyvault_key_master="${kv_prefix}-kvkey-master"
-    des_master="${kv_prefix}-des-master"
+    keyvault_master="${kv_prefix}-kv-m"
+    keyvault_key_master="${kv_prefix}-kvkey-m"
+    des_master="${kv_prefix}-des-m"
     create_disk_encryption_set "${RESOURCE_GROUP}" "${keyvault_master}" "${keyvault_key_master}" "${des_master}"
 
     echo "Granting service principal reader permissions to the DiskEncryptionSet: ${des_master}"
@@ -106,9 +106,9 @@ fi
 
 if [[ "${ENABLE_DES_COMPUTE}" == "true" ]]; then
     echo "Creating keyvault and disk encryption set in ${RESOURCE_GROUP} for compute"
-    keyvault_worker="${kv_prefix}-kv-worker"
-    keyvault_key_worker="${kv_prefix}-kvkey-worker"
-    des_worker="${kv_prefix}-des-worker"
+    keyvault_worker="${kv_prefix}-kv-w"
+    keyvault_key_worker="${kv_prefix}-kvkey-w"
+    des_worker="${kv_prefix}-des-w"
     create_disk_encryption_set "${RESOURCE_GROUP}" "${keyvault_worker}" "${keyvault_key_worker}" "${des_worker}"
 
     echo "Granting service principal reader permissions to the DiskEncryptionSet: ${des_worker}"
