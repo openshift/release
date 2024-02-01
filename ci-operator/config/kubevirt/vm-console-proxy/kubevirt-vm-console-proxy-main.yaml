@@ -1,20 +1,37 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.19-openshift-4.12
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.16
 images:
 - dockerfile_path: Dockerfile
   to: vm-console-proxy-container
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN dnf install -y jq git make findutils which gcc gettext && dnf clean all
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: test-src-base
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -31,7 +48,7 @@ tests:
     test:
     - as: unittests
       commands: export GOFLAGS= && make test
-      from: src
+      from: test-src-base
       resources:
         requests:
           cpu: 100m
@@ -51,7 +68,7 @@ tests:
       dependencies:
       - env: CI_IMG
         name: vm-console-proxy-container
-      from: src
+      from: test-src-base
       resources:
         requests:
           cpu: 100m
