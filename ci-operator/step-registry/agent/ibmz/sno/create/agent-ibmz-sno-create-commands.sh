@@ -21,9 +21,13 @@ mkdir /tmp/bin
 curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/bin/jq && chmod +x /tmp/bin/jq
 PATH=$PATH:/tmp/bin
 export PATH
-set +e
+echo "Installing terraform"
+sudo yum install -y yum-utils
+sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+sudo yum -y install terraform
 echo "Checking if ibmcloud CLI is installed."
 ibmcloud -v
+set +e
 if [ $? -eq 0 ]; then
   echo "ibmcloud CLI is already installed."
 else
@@ -188,9 +192,10 @@ zvsi_mac=$(ssh "${ssh_options[@]}" core@$zvsi_fip "ip link show | awk '/ether/ {
 
 # Building openshift-install binary
 echo "Building the openshift-install binary from source"
-git clone https://github.com/openshift/installer.git
-export DEFAULT_ARCH='amd64'; export TAGS='libvirt baremetal'; installer/hack/build.sh --loglevel debug
-cp $HOME/installer/bin/openshift-install /usr/bin/
+release_branch=$(echo $JOB_SPEC | grep -oP 'extra_refs:\[\{[^}]+\}\]' | cut -d ':' -f 5 | cut -d ',' -f 1)
+git clone -b $release_branch https://github.com/openshift/installer.git
+export DEFAULT_ARCH='amd64'; export TAGS='libvirt baremetal'; installer/hack/build.sh
+cp installer/bin/openshift-install /usr/bin/
 echo "Checking the openshift-install version"
 openshift-install version
 
