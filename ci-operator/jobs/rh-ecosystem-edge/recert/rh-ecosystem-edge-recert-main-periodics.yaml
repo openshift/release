@@ -1,95 +1,5 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
-  cron: '@weekly'
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-    timeout: 8h0m0s
-  extra_refs:
-  - base_ref: main
-    org: rh-ecosystem-edge
-    repo: recert
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-    ci-operator.openshift.io/variant: "4.14"
-    ci.openshift.io/generator: prowgen
-    job-release: "4.14"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-rh-ecosystem-edge-recert-main-4.14-aws-sno-fips-recert
-  reporter_config:
-    slack:
-      channel: '#recert-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: ':warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-sno-fips-recert-cluster-profile
-      - --target=aws-sno-fips-recert
-      - --variant=4.14
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/aws-sno-fips-recert-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-qe
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
   cluster: build02
   cron: 45 1 * * *
   decorate: true
@@ -169,6 +79,87 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-packet-sno
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: '@weekly'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rh-ecosystem-edge
+    repo: recert
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: "4.14"
+    ci.openshift.io/generator: prowgen
+    job-release: "4.14"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rh-ecosystem-edge-recert-main-4.14-e2e-aws-ipi-sno-fips-recert
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-ipi-sno-fips-recert-cluster-profile
+      - --target=e2e-aws-ipi-sno-fips-recert
+      - --variant=4.14
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-ipi-sno-fips-recert-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-qe
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -447,96 +438,6 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
-  cron: '@weekly'
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-    timeout: 8h0m0s
-  extra_refs:
-  - base_ref: main
-    org: rh-ecosystem-edge
-    repo: recert
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-    ci-operator.openshift.io/variant: "4.15"
-    ci.openshift.io/generator: prowgen
-    job-release: "4.15"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-rh-ecosystem-edge-recert-main-4.15-aws-sno-fips-recert
-  reporter_config:
-    slack:
-      channel: '#recert-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: ':warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-sno-fips-recert-cluster-profile
-      - --target=aws-sno-fips-recert
-      - --variant=4.15
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/aws-sno-fips-recert-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-qe
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
   cluster: build02
   cron: '@weekly'
   decorate: true
@@ -616,6 +517,87 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-packet-sno
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: '@weekly'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rh-ecosystem-edge
+    repo: recert
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: "4.15"
+    ci.openshift.io/generator: prowgen
+    job-release: "4.15"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rh-ecosystem-edge-recert-main-4.15-e2e-aws-ipi-sno-fips-recert
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-ipi-sno-fips-recert-cluster-profile
+      - --target=e2e-aws-ipi-sno-fips-recert
+      - --variant=4.15
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-ipi-sno-fips-recert-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-qe
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -894,96 +876,6 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
-  cron: '@weekly'
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-    timeout: 8h0m0s
-  extra_refs:
-  - base_ref: main
-    org: rh-ecosystem-edge
-    repo: recert
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-    ci-operator.openshift.io/variant: "4.16"
-    ci.openshift.io/generator: prowgen
-    job-release: "4.16"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-rh-ecosystem-edge-recert-main-4.16-aws-sno-fips-recert
-  reporter_config:
-    slack:
-      channel: '#recert-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: ':warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-sno-fips-recert-cluster-profile
-      - --target=aws-sno-fips-recert
-      - --variant=4.16
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/aws-sno-fips-recert-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-qe
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
   cluster: build02
   cron: '@weekly'
   decorate: true
@@ -1063,6 +955,87 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-packet-sno
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: '@weekly'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rh-ecosystem-edge
+    repo: recert
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: "4.16"
+    ci.openshift.io/generator: prowgen
+    job-release: "4.16"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rh-ecosystem-edge-recert-main-4.16-e2e-aws-ipi-sno-fips-recert
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-ipi-sno-fips-recert-cluster-profile
+      - --target=e2e-aws-ipi-sno-fips-recert
+      - --variant=4.16
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-ipi-sno-fips-recert-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-qe
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -1346,7 +1319,6 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: main
     org: rh-ecosystem-edge
@@ -1356,15 +1328,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-qe
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-rh-ecosystem-edge-recert-main-aws-sno-fips-recert
-  reporter_config:
-    slack:
-      channel: '#recert-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: ':warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
+  name: periodic-ci-rh-ecosystem-edge-recert-main-e2e-aws-ipi-sno-fips-recert
   spec:
     containers:
     - args:
@@ -1373,8 +1337,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/aws-sno-fips-recert-cluster-profile
-      - --target=aws-sno-fips-recert
+      - --secret-dir=/usr/local/e2e-aws-ipi-sno-fips-recert-cluster-profile
+      - --target=e2e-aws-ipi-sno-fips-recert
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1390,7 +1354,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/aws-sno-fips-recert-cluster-profile
+      - mountPath: /usr/local/e2e-aws-ipi-sno-fips-recert-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
