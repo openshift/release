@@ -33,6 +33,7 @@ tests:
   container:
     from: src
 - as: rosa-sts-advanced-critical-high-f3
+  cluster: build05
   cron: 38 11 3,6,9,12,15,18,21,23,27,30 * *
   steps:
     cluster_profile: aws-terraform-qe
@@ -48,6 +49,7 @@ tests:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
 - as: rosa-sts-private-critical-high-f3
+  cluster: build05
   cron: 08 21 1,4,7,10,13,16,19,22,25,28 * *
   steps:
     cluster_profile: aws-terraform-qe
@@ -55,14 +57,31 @@ tests:
       CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
+      POLARION_PROPERTIES: |
+        targets:
+          polarion:
+            config:
+              project: OSE
+            processing:
+              testsuite_properties:
+                polarion-testrun-id: 20240201-1140
+                polarion-custom-subteam: kni
+                polarion-custom-casecomponent: terraform-provider
+                polarion-custom-pillar: acceleration
+                polarion-custom-version: '4.14'
+                polarion-custom-products: ocp
+                polarion-custom-plannedin: OCP_4_14_Z
+      POLARION_STEP_RESULTS: rhcs-e2e-tests/artifacts/
       QE_USAGE: rosa-sts-private-critical-high-f3
       REGION: us-east-1
       RHCS_ENV: staging
       WAIT_OPERATORS: "false"
     test:
     - ref: rhcs-e2e-tests
+    - ref: rhcs-e2e-upload-polarion
     workflow: rhcs-aws-sts
 - as: rosa-sts-advanced-medium-low-f7
+  cluster: build05
   cron: 38 17 2,9,16,23,30 * *
   steps:
     cluster_profile: aws-terraform-qe
@@ -78,6 +97,7 @@ tests:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
 - as: rosa-sts-private-medium-low-f7
+  cluster: build05
   cron: 38 2 2,9,16,23,30 * *
   steps:
     cluster_profile: aws-terraform-qe
@@ -93,6 +113,7 @@ tests:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
 - as: rosa-sts-advanced-day1-negative-f7
+  cluster: build05
   cron: 38 6 1,8,15,22,29 * *
   steps:
     cluster_profile: aws-terraform-qe
@@ -107,6 +128,7 @@ tests:
     test:
     - ref: rhcs-e2e-general-tests
 - as: rosa-sts-private-day1-negative-f7
+  cluster: build05
   cron: 38 2 2,9,16,23,30 * *
   steps:
     cluster_profile: aws-terraform-qe
