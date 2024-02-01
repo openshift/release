@@ -1,12 +1,16 @@
 base_images:
   cli:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: cli
   observability-operator-test-harness:
     name: observability-operator-test-harness
     namespace: ci
     tag: latest
+  upi-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -17,7 +21,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -27,11 +31,10 @@ resources:
       memory: 200Mi
 tests:
 - as: qeindex
-  cron: 0 8 * * 4
+  cron: 0 8 * * 3
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: gcp-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "cluster-observability-operator", "source": "qe-app-registry", "channel": "development", "install_namespace": "openshift-coo-production", "target_namespaces": "", "operator_group":"openshift-coo-production-og"}
@@ -39,13 +42,12 @@ tests:
     test:
     - ref: install-operators
     - ref: rhobs-obo-test-harness
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+    workflow: cucushift-installer-rehearse-gcp-upi-xpn
 - as: stage
-  cron: 0 6 1 11 *
+  cron: 0 6 1 10 *
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: gcp-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "cluster-observability-operator", "source": "dt-catalogsource", "channel": "development", "install_namespace": "openshift-coo", "target_namespaces": "", "operator_group":"openshift-coo-og"}
@@ -54,9 +56,9 @@ tests:
     - ref: enable-stage-catalogsource
     - ref: install-operators
     - ref: rhobs-obo-test-harness
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+    workflow: cucushift-installer-rehearse-gcp-upi-xpn
 zz_generated_metadata:
   branch: main
   org: rhobs
   repo: observability-operator
-  variant: ocp412-coo
+  variant: ocp-4.13-coo
