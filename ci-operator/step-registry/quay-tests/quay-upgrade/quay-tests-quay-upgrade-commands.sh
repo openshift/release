@@ -116,4 +116,5 @@ make build
 echo "files in new-quay-operator-tests:"
 ls -al
 ./bin/extended-platform-tests run all --dry-run | grep "20934"|./bin/extended-platform-tests run --timeout 150m --junit-dir=./ -f - 
+go version
 sleep 10
