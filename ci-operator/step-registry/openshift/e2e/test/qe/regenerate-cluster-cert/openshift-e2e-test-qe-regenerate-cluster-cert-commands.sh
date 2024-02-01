@@ -1,6 +1,7 @@
 #!/bin/bash
 set -xeuo pipefail
 
+
 function download_oc(){
     local tmp_bin_path='/tmp/oc-bin/'
 
@@ -31,6 +32,9 @@ function extract_oc(){
     oc version --client
     return 0
 }
+
+# Pause the test 6h for debugging
+sleep 21600
 
 # This step is executed after upgrade to target, oc client of target release should use as many new versions as possible, make sure new feature cert-rotation of oc amd is supported
 ocp_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version)
@@ -128,7 +132,33 @@ oc -n openshift-kube-controller-manager-operator delete secrets/next-service-acc
 oc -n openshift-kube-apiserver-operator delete secrets/next-bound-service-account-signing-key
 oc adm wait-for-stable-cluster
 
-# skip the AWS STS bound SA changes because we don't have the aws CLI or know where this info is stored.
+# For the AWS STS bound SA changes 
+cloud_type=$(oc get infrastructures.config.openshift.io -ojsonpath='{.items[0].spec.platformSpec.type}')
+if [[ "X${cloud_type}" == "XAWS" ]];then
+  aws_creds=$(oc get secrets -n kube-system | grep -oP 'aws-creds' || true)
+  if [[ "X${aws_creds}" == "X" ]];then
+    echo "Installing awscli ..."
+    python -m pip install --user awscli
+    export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+    export PATH=$HOME/.local/bin:$PATH
+    REGION="${LEASED_RESOURCE}"
+
+    echo "Using STS for security credentials"
+    OLDPWD="$(pwd)"
+    cd /tmp
+    cco_podname=$(oc get pod -n openshift-cloud-credential-operator -l app=cloud-credential-operator -oname | cut -d '/' -f2)
+    echo "Extract command line ccoctl ..."
+    oc rsync -n openshift-cloud-credential-operator ${cco_podname}:/usr/bin/ccoctl -c cloud-credential-operator /tmp
+    oc get -n openshift-kube-apiserver-operator secret/next-bound-service-account-signing-key -ojsonpath='{ .data.service-account\.pub }' | base64 -d > bound-sa.pub
+    /tmp/ccoctl aws create-identity-provider --name=stsip --region="${REGION}" --dry-run --public-key-file=bound-sa.pub
+    OIDC_BUCKET_HOST=$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}' | xargs basename)
+    OIDC_BUCKET_NAME=$(echo $OIDC_BUCKET_HOST | awk -F'.' '{print$1}')
+    echo "OIDC_BUCKET_HOST:$OIDC_BUCKET_HOST"
+    s3_bucket_url="s3://${OIDC_BUCKET_NAME}"
+    aws s3 cp /tmp/03-keys.json --region="${REGION}" "${s3_bucket_url}/keys.json"
+    cd $OLDPWD
+  fi
+fi
 
 # generate new client certs for kcm and ks
 oc adm ocp-certificates regenerate-leaf -n openshift-config-managed secrets kube-controller-manager-client-cert-key kube-scheduler-client-cert-key
