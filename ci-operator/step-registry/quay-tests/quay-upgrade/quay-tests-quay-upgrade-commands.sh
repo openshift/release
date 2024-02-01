@@ -11,7 +11,7 @@ oc version
 # terraform version
 go version
 podman -v
-
+echo "*******"
 #Get the credentials and Email of new Quay User
 #QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
 #QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
