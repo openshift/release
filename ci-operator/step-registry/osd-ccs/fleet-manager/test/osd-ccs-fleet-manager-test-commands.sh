@@ -639,7 +639,7 @@ function test_machinesets_naming () {
   echo "Getting the name of a first available machineset to confirm that its valid"
   MACHINE_SETS_OUTPUT=""
   ## if no machinesets are found, the statement below will not assign anything to the MACHINE_SETS_OUTPUT
-  MACHINE_SETS_OUTPUT=$(oc get machinesets -A | grep "serving" | grep -v "non-serving" |  awk '{print $2}' | head -1) || true
+  MACHINE_SETS_OUTPUT=$(oc get machinesets.machine.openshift.io -A | grep "serving" | grep -v "non-serving" |  awk '{print $2}' | head -1) || true
   if [[ "$MACHINE_SETS_OUTPUT" != "" ]]; then
     # get suffix of the machineset name (e.g. for 'hs-mc-20bivna6g-wh8nq-serving-9-us-east-1b', the suffix will be 'us-east-1b')
     # it is obtained by trimming everything up to (including) 6th occurence of the '-' symbol
@@ -748,7 +748,7 @@ function test_machine_health_check_config () {
   echo "Checking MC MHC match expressions operator"
   EXPECTED_MHC_MATCH_EXPRESSIONS_OPERATOR="NotIn"
   ACTUAL_MHC_MATCH_EXPRESSIONS_OPERATOR=""
-  ACTUAL_MHC_MATCH_EXPRESSIONS_OPERATOR=$(oc get machinehealthcheck srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .operator) || true
+  ACTUAL_MHC_MATCH_EXPRESSIONS_OPERATOR=$(oc get machinehealthchecks.machine.openshift.io srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .operator) || true
 
   if [[ "$EXPECTED_MHC_MATCH_EXPRESSIONS_OPERATOR" != "$ACTUAL_MHC_MATCH_EXPRESSIONS_OPERATOR" ]]; then
     echo "ERROR: Expected the matching expressions operator to be '$EXPECTED_MHC_MATCH_EXPRESSIONS_OPERATOR'. Found: '$ACTUAL_MHC_MATCH_EXPRESSIONS_OPERATOR'"
@@ -760,9 +760,9 @@ function test_machine_health_check_config () {
   MASTER_MACHINES_EXCLUDED=0
   INFRA_MACHINES_EXCLUDED=0
   WORKER_MACHINES_EXCLUDED=-1
-  MASTER_MACHINES_EXCLUDED=$(oc get machinehealthcheck srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .values | grep -c master) || true
-  INFRA_MACHINES_EXCLUDED=$(oc get machinehealthcheck srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .values | grep -c infra) || true
-  WORKER_MACHINES_EXCLUDED=$(oc get machinehealthcheck srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .values | grep -c worker) || true
+  MASTER_MACHINES_EXCLUDED=$(oc get machinehealthchecks.machine.openshift.io srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .values | grep -c master) || true
+  INFRA_MACHINES_EXCLUDED=$(oc get machinehealthchecks.machine.openshift.io srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .values | grep -c infra) || true
+  WORKER_MACHINES_EXCLUDED=$(oc get machinehealthchecks.machine.openshift.io srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .values | grep -c worker) || true
 
   # 1 expecred - master machines should be included in the 'NotIn' mhc operator check
   if [ "$MASTER_MACHINES_EXCLUDED" -ne "$EXPECTED_EXCLUDED_IN_MHC" ]; then
@@ -1050,21 +1050,21 @@ function test_machineset_tains_and_labels () {
 
   echo "Getting a name of serving machineset"
   SERVING_MACHINE_SET_NAME=""
-  SERVING_MACHINE_SET_NAME=$(oc get machineset -A | grep -e "serving" | grep -v "non-serving" | awk '{print $2}' | head -1) || true
+  SERVING_MACHINE_SET_NAME=$(oc get machinesets.machine.openshift.io -A | grep -e "serving" | grep -v "non-serving" | awk '{print $2}' | head -1) || true
   if [ "$SERVING_MACHINE_SET_NAME" == "" ]; then
     echo "ERROR. Failed to get a name of a serving machineset"
     TEST_PASSED=false
   else
     echo "Getting labels of of serving machineset: $SERVING_MACHINE_SET_NAME and confirming that 'hypershift.openshift.io/request-serving-component' is set to true"
     SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE=""
-    SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE=$(oc get machineset "$SERVING_MACHINE_SET_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.metadata.labels | jq  '."hypershift.openshift.io/request-serving-component"')
+    SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE=$(oc get machinesets.machine.openshift.io "$SERVING_MACHINE_SET_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.metadata.labels | jq  '."hypershift.openshift.io/request-serving-component"')
     if [ "$SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE" == "" ] || [ "$SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE" = false ]; then
       echo "ERROR. 'hypershift.openshift.io/request-serving-component' should be present in machineset labels and set to true. Unable to get the key value pair from labels"
       TEST_PASSED=false
     fi
     echo "Getting tains of of serving machineset: $SERVING_MACHINE_SET_NAME and confirming that 'hypershift.openshift.io/request-serving-component' is set to true"
     SERVING_MACHINE_SET_REQUEST_SERVING_TAINT_VALUE=false
-    SERVING_MACHINE_SET_REQUEST_SERVING_TAINT_VALUE=$(oc get machineset "$SERVING_MACHINE_SET_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.taints[] | jq 'select(.key == "hypershift.openshift.io/request-serving-component")' | jq -r .value)
+    SERVING_MACHINE_SET_REQUEST_SERVING_TAINT_VALUE=$(oc get machinesets.machine.openshift.io "$SERVING_MACHINE_SET_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.taints[] | jq 'select(.key == "hypershift.openshift.io/request-serving-component")' | jq -r .value)
     if [ "$SERVING_MACHINE_SET_REQUEST_SERVING_TAINT_VALUE" = false ]; then
       echo "ERROR. 'hypershift.openshift.io/request-serving-component' should be present in machineset taints and set to true. Unable to get the key value pair from taints"
       TEST_PASSED=false
@@ -1213,7 +1213,7 @@ function test_obo_machinesets () {
       TEST_PASSED=false
     fi
     echo "Getting obo machinesets"
-    OBO_MACHINESETS_OUTPUT=$(oc get machinesets -A | grep obo)
+    OBO_MACHINESETS_OUTPUT=$(oc get machinesets.machine.openshift.io -A | grep obo)
     NO_OF_OBO_MACHINESETS=$(echo -n "$OBO_MACHINESETS_OUTPUT" | grep -c '^')
     EXPECTED_NO_OF_OBO_MACHINESETS=3
     if [ "$NO_OF_OBO_MACHINESETS" -ne "$EXPECTED_NO_OF_OBO_MACHINESETS" ]; then
@@ -1232,8 +1232,8 @@ function test_obo_machinesets () {
           TEST_PASSED=false
           break
         fi
-        REGION=$(oc get machineset "$MS_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.providerSpec.value.placement.region) || true
-        AZ=$(oc get machineset "$MS_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.providerSpec.value.placement.availabilityZone) || true
+        REGION=$(oc get machinesets.machine.openshift.io "$MS_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.providerSpec.value.placement.region) || true
+        AZ=$(oc get machinesets.machine.openshift.io "$MS_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.providerSpec.value.placement.availabilityZone) || true
         if [ "$PREVIOUS_MS_REGION" == "" ]; then
           if [ "$REGION" == "" ]; then
             echo "ERROR. Expected machineset: $MS_NAME spec to contain non-empty region. Unable to get this property"
@@ -1369,7 +1369,7 @@ function test_mc_request_serving_pool_autoscaling () {
   confirm_labels "management_clusters" "$fm_mc_cluster_id" 0 "" ""
 
   # # add a label with correct key and value, mps should be scaled up to maximum count (64)
-  add_label "$SERVING_MP_MINIMUM_WARMUP_KEY" "100" "$MGMT_CLUSTER_TYPE" "$fm_mc_cluster_id" false 120
+  add_label "$SERVING_MP_MINIMUM_WARMUP_KEY" "100" "$MGMT_CLUSTER_TYPE" "$fm_mc_cluster_id" false 240
 
   confirm_labels "management_clusters" "$fm_mc_cluster_id" 1 "$SERVING_MP_MINIMUM_WARMUP_KEY" "100"
 
