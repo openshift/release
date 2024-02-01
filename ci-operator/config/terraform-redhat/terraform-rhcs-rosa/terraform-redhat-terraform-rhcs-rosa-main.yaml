@@ -6,6 +6,16 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   to: terraform-rhcs-rosa-clients
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+    tag_by_commit: true
+releases:
+  latest:
+    integration:
+      name: "4.14"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -18,10 +28,54 @@ tests:
   commands: make verify
   container:
     from: terraform-rhcs-rosa-clients
-- as: tests
-  commands: make tests
-  container:
-    from: terraform-rhcs-rosa-clients
+- always_run: true
+  as: rosa-classic-public
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-public
+    test:
+    - ref: rhcs-module-run-example
+- always_run: false
+  as: rosa-classic-public-with-unmanaged-oidc
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-public-with-unmanaged-oidc
+    test:
+    - ref: rhcs-module-run-example
+- always_run: true
+  as: rosa-classic-public-with-shared-vpc
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-public-with-shared-vpc
+    test:
+    - ref: rhcs-module-run-example
+- always_run: false
+  as: rosa-classic-public-with-idp-machine-pools
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-public-with-idp-machine-pools
+    test:
+    - ref: rhcs-module-run-example
+- always_run: false
+  as: rosa-classic-public-with-byo-vpc
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-public-with-byo-vpc
+    test:
+    - ref: rhcs-module-run-example
+- always_run: false
+  as: rosa-classic-public-with-byo-vpc-byo-iam-byo-oidc
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-public-with-byo-vpc-byo-iam-byo-oidc
+    test:
+    - ref: rhcs-module-run-example
 zz_generated_metadata:
   branch: main
   org: terraform-redhat
