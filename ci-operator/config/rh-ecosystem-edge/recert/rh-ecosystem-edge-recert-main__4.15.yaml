@@ -78,17 +78,18 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: openshift-e2e-aws-single-node-recert
   timeout: 8h0m0s
-- as: aws-sno-fips-recert
+- as: e2e-aws-ipi-sno-fips-recert
   cron: '@weekly'
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Disruptive&;~Serial&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-aws-ipi-sno-recert
-  timeout: 8h0m0s
+    - ref: single-node-recert
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-sno
 - as: baremetalds-sno-recert-cluster-rename
   cron: '@weekly'
   steps:
