@@ -23,6 +23,11 @@ wait_for_pipeline() {
   fi
 }
 
+pwd
+ls -l
+
+sleep 300
+
 echo "Generate private-values.yaml file ..."
 ./bin/make.sh values
 
