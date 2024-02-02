@@ -3,39 +3,24 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: cli
-  hypershift-operator-initial:
-    name: "4.16"
-    namespace: ocp
-    tag: hypershift-operator
-  ocp_4.16_base:
-    name: "4.16"
-    namespace: ocp
-    tag: base
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
-  openshift_release_golang-1.21:
+  openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: rhel-9-release-golang-1.21-openshift-4.16
 binary_build_commands: make build
 build_root:
   from_repository: true
 images:
 - inputs:
-    openshift_release_golang-1.21:
+    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.21
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
   to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   inputs:
-    ocp_4.16_base:
+    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
   to: hypershift
 promotion:
   to:
@@ -71,7 +56,7 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.15"
+      version: "4.16"
   latest:
     integration:
       include_built_images: true

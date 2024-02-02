@@ -51,6 +51,7 @@ rules:
       - kubevirt.io
     resources:
       - virtualmachines
+      - virtualmachines/finalizers
       - virtualmachineinstances
     verbs:
       - '*'
@@ -64,6 +65,13 @@ rules:
       - ''
     resources:
       - services
+    verbs:
+      - '*'
+  - apiGroups:
+      - discovery.k8s.io
+    resources:
+      - endpointslices
+      - endpointslices/restricted
     verbs:
       - '*'
   - apiGroups:
