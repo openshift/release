@@ -49,6 +49,14 @@ function run-on-first-master {
   timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
 }
 
+function run-on-first-master-in-background {
+  while true; do
+    timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuo pipefail' <<< $
+    {1} || true
+    sleep 30
+  done
+}
+
 function copy-file-from-first-master {
   timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_nodes[0]}:${1}" "${2}"
 }
@@ -114,20 +122,22 @@ done
 # Check that time on nodes has been updated
 until run-on-all-nodes "timedatectl status"; do sleep 30; done
 
-# Wait for nodes to become unready and approve CSRs until nodes are ready again
+# Wait for nodes to become unready and approve CSRs in the background
 run-on-first-master "
   export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
-  until oc get nodes; do sleep 30; done
-  sleep 5m
+  until oc get nodes; do sleep 10; done
+"
+run-on-first-master-in-background "
+  export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
+  oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
+" &
+
+run-on-first-master "
+  export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
   until oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready --timeout=30s; do
     oc get nodes
-    if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
-      oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
-    fi
-    sleep 30
   done
-  oc get nodes
-  "
+"
 
 # Wait for kube-apiserver operator to generate new localhost-recovery kubeconfig
 run-on-first-master "while diff -q ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE}; do sleep 30; done"
@@ -135,18 +145,6 @@ run-on-first-master "while diff -q ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE}; do
 # Copy system:admin's lb-ext kubeconfig locally and use it to access the cluster
 run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:core ${KUBECONFIG_REMOTE}"
 copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
-
-# Approve certificates for workers, so that all operators would complete
-run-on-first-master "
-  export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
-  until oc wait node --selector='node-role.kubernetes.io/worker' --for condition=Ready --timeout=30s; do
-    oc get nodes
-    if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
-      oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
-    fi
-    sleep 30
-  done
-"
 
 # Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
 # Restart OVN / Multus before proceeding

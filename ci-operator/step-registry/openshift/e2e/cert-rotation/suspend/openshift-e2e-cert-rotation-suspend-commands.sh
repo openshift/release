@@ -50,6 +50,14 @@ function run-on-first-master {
   timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
 }
 
+function run-on-first-master-in-background {
+  while true; do
+    timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuo pipefail' <<< $
+    {1} || true
+    sleep 30
+  done
+}
+
 function copy-file-from-first-master {
   timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_nodes[0]}:${1}" "${2}"
 }
@@ -91,18 +99,14 @@ run-on-all-nodes "systemctl restart kubelet"
 
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
 run-on-first-master "
-export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
-until oc get nodes; do sleep 30; done
-sleep 5m
-until oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready --timeout=30s; do
-  oc get nodes
-  if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
-    oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
-  fi
-  sleep 30
-done
-oc get nodes
+  export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
+  until oc get nodes; do sleep 30; done
+  sleep 5m
 "
+run-on-first-master-in-background "
+  export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
+  oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve
+" &
 
 # Wait for kube-apiserver operator to generate new localhost-recovery kubeconfig
 run-on-first-master "while diff -q ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE}; do sleep 30; done"
@@ -111,15 +115,11 @@ run-on-first-master "while diff -q ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE}; do
 run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:core ${KUBECONFIG_REMOTE}"
 copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
-# Approve certificates for workers, so that all operators would complete
+# Wait for master nodes to become Ready
 run-on-first-master "
   export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
-  until oc wait node --selector='node-role.kubernetes.io/worker' --for condition=Ready --timeout=30s; do
+  until oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready --timeout=30s; do
     oc get nodes
-    if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
-      oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
-    fi
-    sleep 30
   done
 "
 
