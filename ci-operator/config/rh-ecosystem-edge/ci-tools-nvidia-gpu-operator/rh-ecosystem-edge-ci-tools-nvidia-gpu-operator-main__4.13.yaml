@@ -21,14 +21,17 @@ resources:
       memory: 2Gi
 tests:
 - as: nvidia-gpu-operator-e2e
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.13"
   steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: single-node-conf-aws
+    - ref: single-node-conf-e2e
+    - chain: ipi-install
     test:
     - as: scale-gpu-nodes
       commands: make scale_aws_gpu_nodes
