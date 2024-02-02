@@ -4,7 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-
+ls -al
+pwd
 echo "Quay upgrade test..."
 skopeo -v
 oc version
@@ -110,8 +111,8 @@ EOF
 echo "Waiting for NooBaa Storage to be ready..." >&2
 oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=180s
 
-cd new-quay-operator-tests
-# ls -al
+# cd new-quay-operator-tests
+
 # make build
 echo "files in new-quay-operator-tests:"
 ls -al
