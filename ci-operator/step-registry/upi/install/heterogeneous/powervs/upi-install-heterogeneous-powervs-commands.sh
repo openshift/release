@@ -57,28 +57,28 @@ function cleanup_ibmcloud_powervs() {
   ic tg gws --output json | jq -r '.[] | select(.resource_group.id == "'$RESOURCE_GROUP_ID'" and .location == "'$region'")'
 
   echo "Cleaning up workspaces for ${workspace_name}"
-  for CRN in $(ic pi sl 2> /dev/null | grep "${workspace_name}" | awk '{print $1}' || true)
+  for CRN in $(ic pi workspace ls 2> /dev/null | grep "${workspace_name}" | awk '{print $1}' || true)
   do
     echo "Targetting power cloud instance"
-    ic pi st "${CRN}"
+    ic pi workspace target "${CRN}"
 
     echo "Deleting the PVM Instances"
-    for INSTANCE_ID in $(ic pi ins --json | jq -r '.pvmInstances[].pvmInstanceID')
+    for INSTANCE_ID in $(ic pi instance ls --json | jq -r '.pvmInstances[].pvmInstanceID')
     do
       echo "Deleting PVM Instance ${INSTANCE_ID}"
-      ic pi ind "${INSTANCE_ID}" --delete-data-volumes
+      ic pi instance delete "${INSTANCE_ID}" --delete-data-volumes
       sleep 60
     done
 
     echo "Deleting the Images"
-    for IMAGE_ID in $(ic pi imgs --json | jq -r '.images[].imageID')
+    for IMAGE_ID in $(ic pi image ls --json | jq -r '.images[].imageID')
     do
       echo "Deleting Images ${IMAGE_ID}"
-      ic pi image-delete "${IMAGE_ID}"
+      ic pi image delete "${IMAGE_ID}"
       sleep 60
     done
 
-    if [ -n "$(ic pi nets 2> /dev/null | grep DHCP || true)" ]
+    if [ -n "$(ic pi network ls 2> /dev/null | grep DHCP || true)" ]
     then
        curl -L -o /tmp/pvsadm "https://github.com/ppc64le-cloud/pvsadm/releases/download/v0.1.12/pvsadm-linux-amd64"
        chmod +x /tmp/pvsadm
@@ -91,10 +91,10 @@ function cleanup_ibmcloud_powervs() {
     fi
 
     echo "Deleting the Network"
-    for NETWORK_ID in $(ic pi nets 2> /dev/null | awk '{print $1}')
+    for NETWORK_ID in $(ic pi network ls 2> /dev/null | awk '{print $1}')
     do
       echo "Deleting network ${NETWORK_ID}"
-      ic pi network-delete "${NETWORK_ID}" || true
+      ic pi network delete "${NETWORK_ID}" || true
       sleep 60
     done
 
@@ -105,7 +105,7 @@ function cleanup_ibmcloud_powervs() {
     ic resource service-instance-delete "${CRN}" --force --recursive || true
     for COUNT in $(seq 0 5)
     do
-      FIND=$(ic pi sl 2> /dev/null| grep "${CRN}" || true)
+      FIND=$(ic pi workspace ls 2> /dev/null| grep "${CRN}" || true)
       echo "FIND: ${FIND}"
       if [ -z "${FIND}" ]
       then
@@ -315,9 +315,9 @@ case "$CLUSTER_TYPE" in
       # The VMs created using this image are used in support of ignition on PowerVS.
       echo "Creating the Centos Stream Image"
       echo "PowerVS Target CRN is: ${CRN}"
-      ic pi st "${CRN}"
-      ic pi images
-      ic pi image-create CentOS-Stream-8 --json
+      ic pi workspace target "${CRN}"
+      ic pi image ls
+      ic pi image create CentOS-Stream-8 --json
       echo "Import image status is: $?"
 
       # Set the values to be used for generating var.tfvars
