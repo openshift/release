@@ -244,9 +244,36 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      TEST_SCENARIOS: MCO|Cluster_Infrastructure
+      TEST_SCENARIOS: Cluster_Infrastructure
     test:
     - chain: openshift-e2e-test-qe-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-f28-longduration-mco-critical
+  cron: 32 22 2 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
+      TEST_IMPORTANCE: Critical
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "100"
+    test:
+    - chain: openshift-e2e-test-mco-qe
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-f28-longduration-mco-all
+  cron: 32 22 2 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "100"
+    test:
+    - chain: openshift-e2e-test-mco-qe
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-f7-longduration-workload
   cron: 54 5 1,8,17,24 * *
