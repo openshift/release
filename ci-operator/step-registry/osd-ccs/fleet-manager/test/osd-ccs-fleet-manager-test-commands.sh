@@ -115,6 +115,7 @@ cleanup_labels ()
 
 function test_autoscaler ()
 {
+  echo "[OCP-63511] - proportional autoscaler"
   TEST_PASSED=true
 
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
@@ -256,6 +257,7 @@ function test_autoscaler ()
 
 function test_monitoring_disabled ()
 {
+  echo "[OCP-60338] - disable workload monitoring"
   TEST_PASSED=true
   function check_monitoring_disabled () 
   {
@@ -288,6 +290,7 @@ function test_monitoring_disabled ()
 
 function test_labels() 
 {
+  echo "[OCP-63998] - Sector predicates to support multiple sectors by labels"
   TEST_PASSED=true
   sc_cluster_id=$(cat "${SHARED_DIR}"/osd-fm-sc-id)
   mc_cluster_id=$(cat "${SHARED_DIR}"/osd-fm-mc-id)
@@ -405,6 +408,7 @@ function test_labels()
 ###### endpoints tests (OCPQE-16843) ######
 
 function test_endpoints () {
+  echo "[OCP-63998] - endpoints tests"
   TEST_PASSED=true
   echo "Querying '/errors' endpoint"
   ERRORS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/errors)
@@ -502,7 +506,8 @@ function test_endpoints () {
 ###### /audit endpoint tests (OCP-67823) ######
 
 function test_audit_endpooint () {
-TEST_PASSED=true
+  echo "[OCP-67823] - /audit endpoint"
+  TEST_PASSED=true
   ## confirm /audit endpoints works
   echo "Querying '/audit' endpoint"
   AUDIT_ENDPOINT_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/audit)
@@ -632,6 +637,7 @@ TEST_PASSED=true
 ###### machinesets naming test (OCP-68154) ######
 
 function test_machinesets_naming () {
+  echo "[OCP-68154] - machinesets naming"
   TEST_PASSED=true
 
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
@@ -664,6 +670,7 @@ function test_machinesets_naming () {
 ###### host_prefix (podisolation) validation test (OCPQE-17288) ######
 
 function test_host_prefix_podisolation () {
+  echo "[OCPQE-17288] - machinesets naming"
   TEST_PASSED=true
   echo "Getting list of management clusters in podisolation sector"
   CLUSTERS=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters --parameter search="sector='podisolation'")
@@ -698,6 +705,7 @@ function test_host_prefix_podisolation () {
 ###### podisolation obo machine pool test (OCPQE-17367) ######
 
 function test_obo_machine_pool () {
+  echo "[OCPQE-17367] - podisolation obo machine pool"
   TEST_PASSED=true
   echo "Getting list of management clusters in podisolation sector"
   CLUSTERS=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters --parameter search="sector='podisolation'")
@@ -742,6 +750,7 @@ function test_obo_machine_pool () {
 ###### MC srep-worker-healthcheck MHC check (OCPQE-17157) ######
 
 function test_machine_health_check_config () {
+  echo "[OCPQE-17157] - MC srep-worker-healthcheck MHC check"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 
@@ -794,6 +803,7 @@ function test_machine_health_check_config () {
 ###### test fix for 'Pods can be created on MC request serving nodes before taints are applied' (OCPQE-17578) ######
 
 function test_compliance_monkey_descheduler () {
+  echo "[OCPQE-17578] - fix for 'Pods can be created on MC request serving nodes before taints are applied'"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 
@@ -817,6 +827,7 @@ function test_compliance_monkey_descheduler () {
 ###### Stop installing Hypershift CRDs to service clusters tests (OCPQE-17815) ######
 
 function test_hypershift_crds_not_installed_on_sc () {
+  echo "[OCPQE-17815] - Stop installing Hypershift CRDs to service clusters"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-sc.kubeconfig"
   
@@ -857,6 +868,7 @@ function test_hypershift_crds_not_installed_on_sc () {
 ###### Add labels to MC&SC after provision tests (OCPQE-17816) ######
 
 function test_add_labels_to_sc_after_installing () {
+  echo "[OCPQE-17816] - Add labels to MC&SC after provision"
   TEST_PASSED=true
   sc_cluster_id=$(cat "${SHARED_DIR}/ocm-sc-id")
   mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
@@ -889,6 +901,7 @@ function test_add_labels_to_sc_after_installing () {
 ###### Ensure only ready management clusters are considered in ACM's placement decision test (OCPQE-17818) ######
 
 function test_ready_mc_acm_placement_decision () {
+  echo "[OCPQE-17818] - Ensure only ready management clusters are considered in ACM's placement decision"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-sc.kubeconfig"
 
@@ -929,6 +942,7 @@ function test_ready_mc_acm_placement_decision () {
 ###### Fix: Unable to fetch cluster details via the API test (OCPQE-17819) ######
 
 function test_fetching_cluster_details_from_api () {
+  echo "[OCPQE-17819] - Fix: Unable to fetch cluster details via the API"
   TEST_PASSED=true
 
   function compare_jq_filter_values () {
@@ -1045,6 +1059,7 @@ function test_fetching_cluster_details_from_api () {
 ###### Create machine pools for request serving HCP components tests (OCPQE-17866) ######
 
 function test_machineset_tains_and_labels () {
+  echo "[OCPQE-17866] - Create machine pools for request serving HCP components"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 
@@ -1081,6 +1096,7 @@ function test_machineset_tains_and_labels () {
 ###### MCs/SCs are created as OSD or ROSA STS clusters tests (OCPQE-17867) ######
 
 function test_sts_mc_sc () {
+  echo "[OCPQE-17867] - MCs/SCs are created as OSD or ROSA STS clusters"
   TEST_PASSED=true
   mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
   sc_cluster_id=$(cat "${SHARED_DIR}/ocm-sc-id")
@@ -1127,6 +1143,7 @@ function test_sts_mc_sc () {
 ###### fix: Backups created only once tests (OCPQE-17901) ######
 
 function test_backups_created_only_once () {
+  echo "[OCPQE-17901] - fix: Backups created only once"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 
@@ -1185,6 +1202,7 @@ function test_backups_created_only_once () {
 ###### fix: Hypershift OBO machineset set to 3 nodes in the same AZ tests (OCPQE-17964) ######
 
 function test_obo_machinesets () {
+  echo "[OCPQE-17964] - fix: Hypershift OBO machineset set to 3 nodes in the same AZ"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
   mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
@@ -1264,6 +1282,7 @@ function test_obo_machinesets () {
 ###### sts enable MC not able to create awsendpointservice correctly (OCPQE-17965) ######
 
 function test_awsendpointservices_status_output_populated () {
+  echo "[OCPQE-17965] - sts enable MC not able to create awsendpointservice correctly"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 
@@ -1320,6 +1339,7 @@ function test_awsendpointservices_status_output_populated () {
 ###### HCP: Management cluster request-serving pool autoscaling (OCPQE-18303) ######
 
 function test_mc_request_serving_pool_autoscaling () {
+  echo "[OCPQE-18303] - HCP: Management cluster request-serving pool autoscaling"
   TEST_PASSED=true
   MP_COUNT=0
   mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
@@ -1401,6 +1421,7 @@ function test_mc_request_serving_pool_autoscaling () {
 ###### test serving machine_pools verification (OCPQE-18337) ######
 
 function test_serving_machine_pools () {
+  echo "[OCPQE-18337] - serving machine_pools verification"
   TEST_PASSED=true
   mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
   echo "Getting machine pools names for MC with clusters mgmt API ID: $mc_cluster_id"
