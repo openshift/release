@@ -38,6 +38,8 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: |
+  ./hack/install-markdownlint.sh
 tests:
 - as: ci-job
   commands: |
@@ -45,7 +47,9 @@ tests:
     make ci-job
   container:
     from: src
-- as: integration
+- always_run: false
+  as: integration
+  skip_if_only_changed: (\.md|^hack)$
   steps:
     cluster_profile: aws-telco
     env:
@@ -72,6 +76,13 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
+- always_run: false
+  as: markdownlint
+  commands: |
+    hack/markdownlint.sh
+  container:
+    from: test-bin
+  run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^.markdown.*)$
 zz_generated_metadata:
   branch: main
   org: openshift-kni
