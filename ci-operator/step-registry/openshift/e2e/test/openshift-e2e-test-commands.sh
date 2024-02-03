@@ -50,10 +50,12 @@ trap cleanup EXIT
 
 mkdir -p "${HOME}"
 
-# if the cluster profile included an insights secret, install it to the cluster to
+# if the cluster profile dir exists and includes an insights secret, install it to the cluster to
 # report support data from the support-operator
-if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
+if [[ -n "${CLUSTER_PROFILE_DIR}" ]]; then
+    if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
     oc create -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" || true
+    fi
 fi
 
 # if this test requires an SSH bastion and one is not installed, configure it
@@ -114,7 +116,9 @@ gcp|gcp-arm64)
     ;;
 aws|aws-arm64)
     mkdir -p ~/.ssh
-    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
+    if [[ -n "${CLUSTER_PROFILE_DIR}" ]]; then
+      cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
+    fi
     export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
     # TODO: make openshift-tests auto-discover this from cluster config
     REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
