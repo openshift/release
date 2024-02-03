@@ -9,6 +9,8 @@ IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
 httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
+httpd_vsi_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
+export httpd_vsi_key
 
 # Installing CLI tools
 set -e
@@ -136,15 +138,5 @@ ibmcloud resource group-delete $infra_name-rg -f
 echo "Successfully completed the deletion of all the resources that are created during the CI."
 
 # Deleting the pxe artifacts from the HTTPD server
-ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
-export ssh_key_string
-tmp_ssh_key="/tmp/httpd-vsi-key"
-envsubst <<"EOF" >${tmp_ssh_key}
------BEGIN OPENSSH PRIVATE KEY-----
-${ssh_key_string}
-
------END OPENSSH PRIVATE KEY-----
-EOF
-chmod 0600 ${tmp_ssh_key}
-ssh -o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "${tmp_ssh_key}" root@$httpd_vsi_ip "rm -rf /var/www/html/agent.s390x-*.img"
+ssh -o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "$httpd_vsi_key" root@$httpd_vsi_ip "rm -rf /var/www/html/agent.s390x-*.img"
 echo "$(date) Successfully completed the e2e deletion chain"

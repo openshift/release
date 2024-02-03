@@ -11,6 +11,8 @@ httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
 httpd_vsi_pub_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key"
 export httpd_vsi_pub_key
+httpd_vsi_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
+export httpd_vsi_key
 pull_secret="${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret"
 export pull_secret
 
@@ -173,17 +175,8 @@ fi
 # Fetch the zVSI mac address
 set -e
 echo "Fetching the mac address of zVSI $zvsi_fip"
-ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
-export ssh_key_string
-tmp_ssh_key="/tmp/httpd-vsi-key"
-envsubst <<"EOF" >${tmp_ssh_key}
------BEGIN OPENSSH PRIVATE KEY-----
-${ssh_key_string}
-
------END OPENSSH PRIVATE KEY-----
-EOF
 chmod 0600 ${tmp_ssh_key}
-ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "${tmp_ssh_key}")
+ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "$httpd_vsi_key")
 zvsi_mac=$(ssh "${ssh_options[@]}" core@$zvsi_fip "ip link show | awk '/ether/ {print \$2}'")
 
 # Building openshift-install binary
