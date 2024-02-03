@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-ols-openai-gpt35
     decorate: true
     decoration_config:
@@ -61,13 +61,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ols-openai-gpt35,?($|\s.*)
+    trigger: (?m)^/test( | .* )(e2e-ols-openai-gpt35|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -122,7 +122,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build02
     context: ci/prow/integration
     decorate: true
     decoration_config:
@@ -138,6 +138,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ols-codecov-token
         - --target=integration
         command:
         - ci-operator
@@ -154,6 +155,9 @@ presubmits:
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
+        - mountPath: /secrets/ols-codecov-token
+          name: ols-codecov-token
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -165,6 +169,9 @@ presubmits:
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
+      - name: ols-codecov-token
+        secret:
+          secretName: ols-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -177,7 +184,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -193,6 +200,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ols-codecov-token
         - --target=unit
         command:
         - ci-operator
@@ -209,6 +217,9 @@ presubmits:
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
+        - mountPath: /secrets/ols-codecov-token
+          name: ols-codecov-token
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -220,6 +231,9 @@ presubmits:
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
+      - name: ols-codecov-token
+        secret:
+          secretName: ols-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -232,7 +246,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build02
     context: ci/prow/verify
     decorate: true
     decoration_config:

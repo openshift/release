@@ -237,6 +237,8 @@ cat << EOF > run-openshift-tests.yml
       ignore_errors: true
 EOF
 
+# Install posix collection so that we can use debug callback
+ansible-galaxy collection install ansible.posix
 # Run OpenShift's conformance test suite
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i "$SHARED_DIR/inventory" run-openshift-tests.yml -vv
 

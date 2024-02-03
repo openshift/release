@@ -74,7 +74,9 @@ fi
 
 
 if [ "$REPO_OWNER" == "openshift-kni" ]; then
-  TOPOLOGY_SELECTION="--topology 1b1v"
+  # Run PR job on openshift-kni repo with 1b1v topology and exclude cnfdu5, cnfdu6, cnfdu7, cnfdu8
+  # as they are used for nightly jobs
+  TOPOLOGY_SELECTION="--topology 1b1v --exclude cnfdu5 --exclude cnfdu6 --exclude cnfdu7 --exclude cnfdu8"
 else
   TOPOLOGY_SELECTION="--topology 1b1v --topology 2b"
 fi
@@ -303,6 +305,8 @@ status=0
 if [[ "$T5_JOB_DESC" != "periodic-cnftests" ]]; then
     PROCEED_AFTER_FAILURES="true"
 fi
+# Install posix collection so that we can use debug callback
+ansible-galaxy collection install ansible.posix
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || eval $PROCEED_AFTER_FAILURES
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
