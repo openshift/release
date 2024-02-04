@@ -61,7 +61,7 @@ ibmcloud plugin install power-iaas
 ibmcloud plugin install cis
 
 # Set target powervs and cis service instance
-ibmcloud pi st ${POWERVS_INSTANCE_CRN}
+ibmcloud pi ws tg ${POWERVS_INSTANCE_CRN}
 ibmcloud cis instance-set ${CIS_INSTANCE}
 
 # Setting IBMCLOUD_TRACE to true to enable debug logs for pi and cis operations
@@ -69,7 +69,7 @@ export IBMCLOUD_TRACE=true
 
 # Creating VM as first operation as it would take some time to alive to retrieve the network interface details like ip and mac
 echo "$(date) Creating VSI in PowerVS instance"
-ibmcloud pi instance-create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --network ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE} --replicants ${HYPERSHIFT_NODE_COUNT} --replicant-scheme suffix
+ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --subnets ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE} --replicants ${HYPERSHIFT_NODE_COUNT} --replicant-scheme suffix --replicant-affinity-policy affinity
 
 # Applying mirror config
 echo "$(date) Applying mirror config"
@@ -298,7 +298,7 @@ else
 fi
 INSTANCE_ID=()
 for instance in "${INSTANCE_NAMES[@]}"; do
-    instance_id=$(ibmcloud pi instances --json | jq -r --arg serverName $instance '.pvmInstances[] | select (.serverName == $serverName ) | .pvmInstanceID')
+    instance_id=$(ibmcloud pi ins ls --json | jq -r --arg serverName $instance '.pvmInstances[] | select (.name == $serverName ) | .id')
     if [ -z "$instance_id" ]; then
         continue
     fi
@@ -309,7 +309,7 @@ IP_ADDRESSES=()
 origins=""
 for instance in "${INSTANCE_ID[@]}"; do
     for ((i=1; i<=20; i++)); do
-        instance_info=$(ibmcloud pi instance $instance --json)
+        instance_info=$(ibmcloud pi ins get $instance --json)
         mac_address=$(echo "$instance_info" | jq -r '.networks[].macAddress')
         ip_address=$(echo "$instance_info" | jq -r '.networks[].ipAddress')
         instance_name=$(echo "$instance_info" | jq -r '.serverName')
@@ -380,7 +380,7 @@ ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR} && ./setup
 # Rebooting vm to boot from the network
 for instance in "${INSTANCE_ID[@]}"; do
     sleep 120
-    ibmcloud pi instance-soft-reboot $instance
+    ibmcloud pi ins act $instance -o soft-reboot
 done
 
 # Wait and approve the agents as they appear
