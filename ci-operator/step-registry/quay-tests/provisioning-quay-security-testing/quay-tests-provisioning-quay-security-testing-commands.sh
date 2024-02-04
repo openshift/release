@@ -91,7 +91,7 @@ resource "aws_instance" "quaybuilder" {
   instance_type = "m4.xlarge"
 
   associate_public_ip_address = true
-  vpc_security_group_ids      = ["${aws_security_group.quaybuilder.id}"]
+  vpc_security_group_ids      = [aws_security_group.quaybuilder.id]
   subnet_id                   = aws_subnet.quaybuilder.id
 
   ebs_block_device {
