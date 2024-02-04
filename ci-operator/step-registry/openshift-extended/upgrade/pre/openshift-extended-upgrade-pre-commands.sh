@@ -401,10 +401,10 @@ function handle_or_filter {
 }
 
 function handle_module_filter {
-    local moudle_filter="$1"
+    local module_filter="$1"
     declare -a module_filter_keys
     declare -a module_filter_values
-    valid_and_get_module_filter "$moudle_filter"
+    valid_and_get_module_filter "$module_filter"
 
 
     for i in "${!module_filter_keys[@]}"; do
