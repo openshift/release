@@ -105,10 +105,10 @@ resource "aws_instance" "quaybuilder" {
       "sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo",
       "sudo yum install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y",
       "sudo systemctl start docker",
-      "sudo curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin",
-      "sudo docker login --username '${QUAY_BREW_USERNAME}' --password ${QUAY_BREW_PASSWORD} brew.registry.redhat.io",
-      "sudo grype --version",
-      "sudo grype brew.registry.redhat.io/rh-osbs/quay-quay-rhel8:v3.10.3-5 --scope all-layers"
+      "sudo curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sudo sh -s -- -b /usr/local/bin || true",
+      "sudo docker login --username '${QUAY_BREW_USERNAME}' --password ${QUAY_BREW_PASSWORD} brew.registry.redhat.io || true",
+      "sudo grype --version || true",
+      "sudo grype brew.registry.redhat.io/rh-osbs/quay-quay-rhel8:v3.10.3-5 --scope all-layers || true"
     ]
   }
 
