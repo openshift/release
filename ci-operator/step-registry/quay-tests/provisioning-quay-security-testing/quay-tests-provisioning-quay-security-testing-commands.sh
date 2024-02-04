@@ -107,8 +107,8 @@ resource "aws_instance" "quaybuilder" {
       "sudo systemctl start docker",
       "sudo curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sudo sh -s -- -b /usr/local/bin || true",
       "sudo docker login --username '${QUAY_BREW_USERNAME}' --password ${QUAY_BREW_PASSWORD} brew.registry.redhat.io || true",
-      "sudo grype --version || true",
-      "sudo grype brew.registry.redhat.io/rh-osbs/quay-quay-rhel8:v3.10.3-5 --scope all-layers || true"
+      "sudo /usr/local/bin/grype --version || true",
+      "sudo /usr/local/bin/grype brew.registry.redhat.io/rh-osbs/quay-quay-rhel8:v3.10.3-5 --scope all-layers || true"
     ]
   }
 
