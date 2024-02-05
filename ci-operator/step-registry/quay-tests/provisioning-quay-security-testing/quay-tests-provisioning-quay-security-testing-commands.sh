@@ -128,7 +128,7 @@ output "instance_public_dns" {
 EOF
 
 cp /var/run/quay-qe-omr-secret/quaybuilder . && cp /var/run/quay-qe-omr-secret/quaybuilder.pub .
-chmod 600 ./quaybuilder && chmod 600 ./quaybuilder.pub && echo "" >>quaybuilder
+chmod 600 ./quaybuilder && chmod 600 ./quaybuilder.pub
 
 export TF_VAR_quay_build_instance_name="${QUAY_SECURITY_TESTING_NAME}"
 export TF_VAR_quay_build_worker_key="${QUAY_SECURITY_TESTING_NAME}"
