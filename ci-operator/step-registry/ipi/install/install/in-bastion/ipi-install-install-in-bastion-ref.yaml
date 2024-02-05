@@ -1,0 +1,30 @@
+ref:
+  as: ipi-install-install-in-bastion
+  from: upi-installer
+  grace_period: 10m
+  commands: ipi-install-install-in-bastion-commands.sh
+  cli: latest
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  env:
+  - name: OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP
+    default: ""
+    documentation: "Keep bootstrap resources after install. Warning: this should only be used for debugging purposes, and poses a risk to cluster stability."
+  - name: TF_LOG
+    default: "INFO"
+    documentation: "Specifies the logging level for terraform components."
+  - name: TF_LOG_CORE
+    default: "INFO"
+    documentation: "Specifies the logging level for terraform core library."
+  - name: TF_LOG_PROVIDER
+    default: "INFO"
+    documentation: "Specifies the logging level for terraform provider libraries."
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  documentation: |-
+    The IPI install step runs the OpenShift Installer in order to bring up an OpenShift cluster, using the provided cluster profile to choose a target IaaS platform. Anything that needs to be configured using manifests should generate them before this step and put them in the SHARED_DIR so that this step can pull in the manifests. Files with name manifest_(manifest_name).yml|yaml end up in $INSTALL_DIR/manifests, while files with name tls_(tls_asset_name).key|pub end up in $INSTALL_DIR/tls.

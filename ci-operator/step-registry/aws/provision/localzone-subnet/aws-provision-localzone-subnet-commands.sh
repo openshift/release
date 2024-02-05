@@ -295,7 +295,7 @@ if [[ ${EDGE_ZONE_TYPE} == "local-zone" ]]; then
   localzone_subnet_output="$ARTIFACT_DIR/localzone_subnet_output.json"
   localzone_subnet_params="$ARTIFACT_DIR/localzone_subnet_params.json"
 
-  localzone_name=$(head -n 1 "${SHARED_DIR}/edge-zone-name.txt")
+  localzone_name=$(head -n 1 "${SHARED_DIR}/edge-zone-names.txt")
 
   if [[ "${LOCALZONE_WORKER_ASSIGN_PUBLIC_IP}" == "yes" ]]; then
     route_table_id=$(head -n 1 "${SHARED_DIR}/public_route_table_id")
@@ -350,7 +350,7 @@ elif [[ ${EDGE_ZONE_TYPE} == "wavelength-zone" ]]; then
   wavelengthzone_subnet_params="$ARTIFACT_DIR/wavelengthzone_subnet_params.json"
 
   private_route_table_id=$(head -n 1 "${SHARED_DIR}/private_route_table_id")
-  wavelengthzone_name=$(head -n 1 "${SHARED_DIR}/edge-zone-name.txt")
+  wavelengthzone_name=$(head -n 1 "${SHARED_DIR}/edge-zone-names.txt")
   priv_subnet_cidr="10.0.129.0/24"
   pub_subnet_cidr="10.0.128.0/24"
 
