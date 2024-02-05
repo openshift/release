@@ -19,6 +19,21 @@ echo "### Copying kubeconfig files"
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 ssh -F "${SHARED_DIR}/ssh_config" "root@ci_machine" "find \${KUBECONFIG} -type f -exec cat {} \;" > ${KUBECONFIG}
 
+function update_image_registry() {
+  sleep 30
+
+  echo "$(date -u --rfc-3339=seconds) - Waiting for imageregistry config to be available"
+  while true; do
+    oc get configs.imageregistry.operator.openshift.io/cluster > /dev/null && break
+    sleep 15
+  done
+
+  echo "$(date -u --rfc-3339=seconds) - Patching image registry configuration..."
+  oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
+}
+
+update_image_registry
+
 until \
   oc wait --all=true clusteroperator --for='condition=Available=True' >/dev/null && \
   oc wait --all=true clusteroperator --for='condition=Progressing=False' >/dev/null && \
