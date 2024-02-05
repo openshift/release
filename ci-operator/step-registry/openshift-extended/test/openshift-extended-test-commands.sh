@@ -268,8 +268,16 @@ function run {
         echo "add FILTERS_ADDITIONAL into test_filters"
         test_filters="${hardcoded_filters};${TEST_FILTERS};${FILTERS_ADDITIONAL}"
     fi
+    echo "------handle test filter start------"
     echo "${test_filters}"
     handle_filters "${test_filters}"
+    echo "------handle test filter done------"
+
+    echo "------handle module filter start------"
+    echo "MODULE_FILTERS: \"${MODULE_FILTERS:-}\""
+    handle_module_filter "${MODULE_FILTERS}"
+    echo "------handle module filter done------"
+
     echo "------------------the case selected------------------"
     selected_case_num=$(cat ./case_selected|wc -l)
     if [ "W${selected_case_num}W" == "W0W" ]; then
@@ -431,6 +439,52 @@ function handle_or_filter {
         check_case_selected "${ret}"
     fi
 }
+
+function handle_module_filter {
+    local module_filter="$1"
+    declare -a module_filter_keys
+    declare -a module_filter_values
+    valid_and_get_module_filter "$module_filter"
+
+
+    for i in "${!module_filter_keys[@]}"; do
+
+        module_key="${module_filter_keys[$i]}"
+        filter_value="${module_filter_values[$i]}"
+        echo "moudle: $module_key"
+        echo "filter: $filter_value"
+        [ -s ./case_selected ] || { echo "No Case already Selected before handle ${module_key}"; continue; }
+
+        cat ./case_selected | grep -v -E "${module_key}" > ./case_selected_exclusive || true
+        cat ./case_selected | grep -E "${module_key}" > ./case_selected_inclusive || true
+        rm -fr ./case_selected && cp -fr ./case_selected_inclusive ./case_selected && rm -fr ./case_selected_inclusive
+
+        handle_filters "${filter_value}"
+
+        [ -e ./case_selected ] && cat ./case_selected_exclusive >> ./case_selected && rm -fr ./case_selected_exclusive
+        [ -e ./case_selected ] && sort -u ./case_selected > ./case_selected_sort && mv -f ./case_selected_sort ./case_selected
+
+    done
+}
+
+function valid_and_get_module_filter {
+    local module_filter_tmp="$1"
+
+    IFS='#' read -ra pairs <<< "$module_filter_tmp"
+    for pair in "${pairs[@]}"; do
+        IFS=':' read -ra kv <<< "$pair"
+        if [[ ${#kv[@]} -ne 2 ]]; then
+            echo "moudle filter format is not correct"
+            exit 1
+        fi
+
+        module_key="${kv[0]}"
+        filter_value="${kv[1]}"
+        module_filter_keys+=("$module_key")
+        module_filter_values+=("$filter_value")
+    done
+}
+
 function handle_result {
     resultfile=`ls -rt -1 ${ARTIFACT_DIR}/junit/junit_e2e_* 2>&1 || true`
     echo $resultfile
