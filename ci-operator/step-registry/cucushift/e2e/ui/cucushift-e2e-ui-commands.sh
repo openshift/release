@@ -63,22 +63,26 @@ function filter_test_by_platform() {
         ipixupi='ipi'
     fi
     platform="$(oc get infrastructure cluster -o yaml | yq '.status.platform' | tr 'A-Z' 'a-z')"
+    extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            aws|azure|gcp|nutanix)
-                export E2E_RUN_TAGS="@${platform}-${ipixupi} and ${E2E_RUN_TAGS}"
-                ;;
-            alicloud|baremetal|ibmcloud|vsphere)
-                echo "TO_BE_DONE, need extra tests, got platform as '$platform'"
-                ;;
             none)
                 export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
+                eval "$extrainfoCmd"
                 ;;
             external)
                 echo "Expected, got platform as '$platform'"
+                eval "$extrainfoCmd"
+                ;;
+            alibabacloud)
+                export E2E_RUN_TAGS="@alicloud-${ipixupi} and ${E2E_RUN_TAGS}"
+                ;;
+            aws|azure|baremetal|gcp|ibmcloud|nutanix|openstack|vsphere)
+                export E2E_RUN_TAGS="@${platform}-${ipixupi} and ${E2E_RUN_TAGS}"
                 ;;
             *)
                 echo "Unexpected, got platform as '$platform'"
+                eval "$extrainfoCmd"
                 ;;
         esac
     fi
@@ -108,6 +112,14 @@ function filter_test_by_sno() {
     nodeno="$(oc get nodes --no-headers | wc -l)"
     if [[ $nodeno -eq 1 ]] ; then
         export E2E_RUN_TAGS="@singlenode and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags
+}
+function filter_test_by_proxy() {
+    local proxy
+    proxy="$(oc get proxies.config.openshift.io cluster -o yaml | yq '.spec|(.httpProxy,.httpsProxy)' | uniq)"
+    if [[ -n "$proxy" ]] && [[ "$proxy" != 'null' ]] ; then
+        export E2E_RUN_TAGS="@proxy and ${E2E_RUN_TAGS}"
     fi
     echo_e2e_tags
 }
@@ -189,6 +201,7 @@ function filter_test_by_capability() {
 function filter_tests() {
     filter_test_by_capability
     filter_test_by_fips
+    filter_test_by_proxy
     filter_test_by_sno
     filter_test_by_network
     filter_test_by_platform

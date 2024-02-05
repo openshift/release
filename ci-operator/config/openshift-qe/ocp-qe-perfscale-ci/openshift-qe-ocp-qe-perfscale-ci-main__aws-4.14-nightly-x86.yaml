@@ -31,6 +31,7 @@ tests:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "120"
       COMPUTE_NODE_TYPE: m5.xlarge
+      PROFILE_TYPE: reporting
       SIZE_VARIANT: large
       ZONES_COUNT: "3"
     test:
@@ -45,10 +46,23 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
+      PROFILE_TYPE: reporting
       ZONES_COUNT: "3"
     test:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+- as: control-plane-etcdencrypt-24nodes
+  cron: 0 11 * * 3
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws-etcd-encryption
   timeout: 5h0m0s
 - always_run: false
   as: conc-builds-3nodes
@@ -87,6 +101,7 @@ tests:
       COMPUTE_NODE_TYPE: m6a.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.xlarge
       PODS_PER_NODE: "200"
+      PROFILE_TYPE: reporting
       ZONES_COUNT: "3"
     test:
     - chain: openshift-qe-node-density-cni
@@ -101,6 +116,7 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
       PODS_PER_NODE: "200"
+      PROFILE_TYPE: reporting
       ZONES_COUNT: "3"
     test:
     - chain: openshift-qe-node-density-heavy
@@ -158,6 +174,7 @@ tests:
       HUBBLE: "true"
       KUBE_BURNER_VERSION: 1.8.0
       PODS_PER_NODE: "200"
+      PROFILE_TYPE: reporting
       ZONES_COUNT: "3"
     test:
     - chain: openshift-qe-node-density-cni
@@ -176,6 +193,7 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m5.xlarge
       HUBBLE: "true"
       KUBE_BURNER_VERSION: 1.8.0
+      PROFILE_TYPE: reporting
       ZONES_COUNT: "3"
     test:
     - chain: openshift-qe-control-plane
@@ -194,6 +212,7 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m5.4xlarge
       HUBBLE: "true"
       KUBE_BURNER_VERSION: 1.8.0
+      PROFILE_TYPE: reporting
       ZONES_COUNT: "3"
     test:
     - chain: openshift-qe-control-plane

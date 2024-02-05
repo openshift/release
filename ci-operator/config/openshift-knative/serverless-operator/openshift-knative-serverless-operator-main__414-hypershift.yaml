@@ -3,10 +3,6 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: hypershift-operator
-  ocp_4.14_base:
-    name: "4.14"
-    namespace: ocp
-    tag: base
   ocp_4.14_cli:
     name: "4.14"
     namespace: ocp
@@ -27,10 +23,10 @@ base_images:
     name: knative-serving-src
     namespace: openshift
     tag: knative-v1.11
-  openshift_release_golang-1.19:
+  openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: rhel-8-release-golang-1.21-openshift-4.16
   origin_4.14_operator-registry:
     name: "4.14"
     namespace: origin
@@ -45,32 +41,23 @@ build_root:
 images:
 - dockerfile_path: knative-operator/Dockerfile
   inputs:
-    ocp_4.14_base:
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/4.14:base
-    openshift_release_golang-1.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
   to: serverless-knative-operator
 - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
   to: serverless-bundle
 - dockerfile_path: olm-catalog/serverless-operator/index/Dockerfile
   inputs:
-    ocp_4.14_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.14:base
     origin_4.14_operator-registry:
       as:
       - registry.ci.openshift.org/origin/4.14:operator-registry
   to: serverless-index
 - dockerfile_path: openshift-knative-operator/Dockerfile
   inputs:
-    ocp_4.14_base:
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/4.14:base
-    openshift_release_golang-1.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
   to: serverless-openshift-knative-operator
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
@@ -93,21 +80,15 @@ images:
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
   inputs:
-    ocp_4.14_base:
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/4.14:base
-    openshift_release_golang-1.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
   to: serverless-ingress
 - dockerfile_path: serving/metadata-webhook/Dockerfile
   inputs:
-    ocp_4.14_base:
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/4.14:base
-    openshift_release_golang-1.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
   to: serverless-metadata-webhook
 releases:
   latest:
@@ -129,8 +110,8 @@ tests:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_REPLICAS: "5"
       HYPERSHIFT_BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      HYPERSHIFT_NODE_COUNT: "4"
     test:
     - as: operator-e2e
       commands: make USER_MANAGEMENT_ALLOWED=false test-e2e-with-kafka

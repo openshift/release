@@ -1,13 +1,8 @@
-base_images:
-  ubi9-python311:
-    name: ubi-python-311
-    namespace: ocp
-    tag: "9"
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+      USER 0
 images:
 - dockerfile_path: Containerfile
   to: lightspeed-service-api
@@ -34,33 +29,48 @@ resources:
       memory: 200Mi
 tests:
 - as: verify
-  commands: pip install black ruff && make verify
+  commands: pip install black ruff mypy && make verify && make check-types
   container:
-    from: ubi9-python311
+    from: src
 - as: unit
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make install-deps && make install-deps-test && make test-unit
   container:
-    from: ubi9-python311
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: ols-codecov-token
 - as: integration
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make install-deps && make install-deps-test && make test-integration
   container:
-    from: ubi9-python311
-- as: e2e
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: ols-codecov-token
+- always_run: false
+  as: e2e-ols-openai-gpt35
+  cron: '@daily'
+  presubmit: true
   steps:
-    cluster_profile: aws
     test:
     - as: e2e
-      cli: latest
-      commands: make test-e2e
+      commands: |
+        export PROVIDER_KEY_PATH=/var/run/openai/token
+        export PROVIDER=openai
+        export MODEL=gpt-3.5-turbo-1106
+        scripts/test-e2e-standalone.sh
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
       from: src
+      grace_period: 5ns
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift

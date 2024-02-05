@@ -108,16 +108,6 @@ export PUBLIC_CONTAINER_REGISTRIES="{{ CI_REGISTRIES | join(',') }}"
 export OPENSHIFT_INSTALL_RELEASE_IMAGE={{ OPENSHIFT_INSTALL_RELEASE_IMAGE }}
 export TF_APPLY_ATTEMPTS=3
 
-{% if ENVIRONMENT == "production" %}
-# Testing against the production AI parameters
-export PULL_SECRET=\$(cat /root/prod/pull-secret)
-export OFFLINE_TOKEN=\$(cat /root/prod/offline-token)
-export REMOTE_SERVICE_URL=https://api.openshift.com
-export NO_MINIKUBE=true
-export MAKEFILE_SETUP_TARGET=setup
-export MAKEFILE_TARGET=test_parallel
-{% endif %}
-
 {% if PROVIDER_IMAGE != ASSISTED_CONTROLLER_IMAGE %}
 export PROVIDER_IMAGE={{ PROVIDER_IMAGE }}
 {% endif %}
@@ -172,7 +162,6 @@ cat > run_test_playbook.yaml <<-"EOF"
     RELEASE_IMAGE_LATEST: "{{ lookup('env', 'RELEASE_IMAGE_LATEST') }}"
     PROVIDER_IMAGE: "{{ lookup('env', 'PROVIDER_IMAGE') }}"
     HYPERSHIFT_IMAGE: "{{ lookup('env', 'HYPERSHIFT_IMAGE') }}"
-    ENVIRONMENT: "{{ lookup('env', 'ENVIRONMENT') }}"
     POST_INSTALL_COMMANDS: "{{ lookup('env', 'POST_INSTALL_COMMANDS') }}"
     ASSISTED_CONFIG: "{{ lookup('env', 'ASSISTED_CONFIG') }}"
     ASSISTED_TEST_INFRA_IMAGE: "{{ lookup('env', 'ASSISTED_TEST_INFRA_IMAGE')}}"
@@ -181,10 +170,6 @@ cat > run_test_playbook.yaml <<-"EOF"
     CLUSTER_PROFILE_PULL_SECRET: "{{ lookup('file', '{{ CLUSTER_PROFILE_DIR }}/pull-secret') }}"
     BREW_REGISTRY_REDHAT_IO_PULL_SECRET: "{{ lookup('file', '/var/run/vault/brew-registry-redhat-io-pull-secret/pull-secret') }}"
   tasks:
-    - name: Fail on unsupported environment
-      fail:
-        msg: "Unsupported environment {{ ENVIRONMENT }}"
-      when: ENVIRONMENT != "local" and ENVIRONMENT != "production"
     # Some Packet images have a file /usr/config left from the provisioning phase.
     # The problem is that sos expects it to be a directory. Since we don't care
     # about the Packet provisioner, remove the file if it's present.
@@ -202,20 +187,6 @@ cat > run_test_playbook.yaml <<-"EOF"
         content: "{{ pull_secret | to_nice_json }}"
         dest: /root/pull-secret
       no_log: true
-    - name: Create prod directory
-      ansible.builtin.file:
-        path: /root/prod
-        state: directory
-    - name: Copy prod offline-token to remote
-      become: true
-      ansible.builtin.copy:
-        src: "{{ CI_CREDENTIALS_DIR }}/offline-token"
-        dest: /root/prod/offline-token
-    - name: Copy prod pull-secret to remote
-      become: true
-      ansible.builtin.copy:
-        src: "{{ CI_CREDENTIALS_DIR }}/prod-pull-secret"
-        dest: /root/prod/pull-secret
     - name: Copy vsphere credentials file
       become: true
       ansible.builtin.copy:

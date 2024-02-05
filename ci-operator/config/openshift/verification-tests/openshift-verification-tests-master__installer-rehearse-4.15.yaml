@@ -48,24 +48,36 @@ tests:
     - chain: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-users-static-deprovision
     pre:
     - chain: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-users-static-provision
+- as: installer-rehearse-aws
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      RHEL_VM_TYPE: m5.xlarge
+      RHEL_WORKER_COUNT_PER_ZONE: "3"
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-workers-rhel8
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      ENABLE_DES_DEFAULT_MACHINE: "true"
-    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set-minimal-permission
+    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-minimal-permission
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
 - as: installer-rehearse-gcp
   cron: '@yearly'
   steps:
     cluster_profile: gcp-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.15
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-filestore-csi
 - as: installer-rehearse-ibmcloud-disconnected
   cron: '@yearly'
   steps:
