@@ -178,10 +178,6 @@ echo "Fetching the mac address of zVSI $zvsi_fip"
 ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "$httpd_vsi_key")
 zvsi_mac=$(ssh "${ssh_options[@]}" core@$zvsi_fip "ip link show | awk '/ether/ {print \$2}'")
 
-# Building openshift-install binary
-echo "Checking the openshift-install version"
-openshift-install version
-
 echo "Creating agent-config and install-config files"
 mkdir $HOME/$CLUSTER_NAME
 # Agent Config 
@@ -243,7 +239,7 @@ sshKey: >
   @$httpd_vsi_pub_key
 EOF
 echo "Generating pxe-boot artifacts for SNO cluster"
-openshift-install create pxe-files --dir $HOME/$CLUSTER_NAME/ --log-level debug
+${SHARED_DIR}/openshift-install create pxe-files --dir $HOME/$CLUSTER_NAME/ --log-level debug
 
 # Generating script for agent boot execution on zVSI
 echo "Uploading the pxe-boot artifacts to HTTPD server"
@@ -272,9 +268,9 @@ rm -f $HOME/setup_pxeboot.sh
 
 # Wait for bootstrapping to complete
 echo "$(date) Waiting for the bootstrapping to complete"
-openshift-install wait-for bootstrap-complete --dir $HOME/$CLUSTER_NAME/
+${SHARED_DIR}/openshift-install wait-for bootstrap-complete --dir $HOME/$CLUSTER_NAME/
 
 # Wait for installation to complete
 echo "$(date) Waiting for the installation to complete"
-openshift-install wait-for install-complete --dir $HOME/$CLUSTER_NAME/
+${SHARED_DIR}/openshift-install wait-for install-complete --dir $HOME/$CLUSTER_NAME/
 cp $HOME/$CLUSTER_NAME/auth/kubeconfig ${SHARED_DIR}/$CLUSTER_NAME-kubeconfig
