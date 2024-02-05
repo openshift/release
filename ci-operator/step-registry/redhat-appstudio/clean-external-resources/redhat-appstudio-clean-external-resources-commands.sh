@@ -16,12 +16,12 @@ CLEAN_PRIVATE_REPO_STATUS=0
 CLEAN_REGISTERED_SERVERS_STATUS=0
 PREVIOUS_RATE_REMAINING=0
 DEFAULT_QUAY_ORG=redhat-appstudio-qe
-DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/default-quay-org-token)
-QE_SPRAYPROXY_HOST=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qe-sprayproxy-host)
-QE_SPRAYPROXY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qe-sprayproxy-token)
+DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/default-quay-org-token)
+QE_SPRAYPROXY_HOST=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/qe-sprayproxy-host)
+QE_SPRAYPROXY_TOKEN=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/qe-sprayproxy-token)
 
 # user stored: username:token,username:token
-IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<<"$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github_accounts)"
+IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<<"$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/github_accounts)"
 for account in "${GITHUB_ACCOUNTS_ARRAY[@]}"; do
     :
     IFS=':' read -r -a GITHUB_USERNAME_ARRAY <<<"$account"
