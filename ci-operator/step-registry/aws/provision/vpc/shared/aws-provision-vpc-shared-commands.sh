@@ -83,6 +83,11 @@ Parameters:
     Description: The Amazon Resource Name (ARN) of the Outpost.
     Type: String
     Default: ""
+  OutpostAz:
+    ConstraintDescription: The AZ of the Outpost.
+    Description: The AZ of the Outpost.
+    Type: String
+    Default: ""
   ResourceSharePrincipals:
     ConstraintDescription: ResourceSharePrincipals
     Default: ""
@@ -341,12 +346,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: !Select [6, !Cidr [!Ref VpcCidr, !Ref CidrCount, !Ref SubnetBits]]
-      AvailabilityZone:
-        !If [
-              "AzRestriction",
-              !Select [0, !Ref AllowedAvailabilityZoneList ],
-              !Select [0, Fn::GetAZs: !Ref "AWS::Region"]
-            ]
+      AvailabilityZone: !Ref OutpostAz
       OutpostArn: !Ref OutpostArn
       Tags:
       - Key: Name
@@ -383,12 +383,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: !Select [7, !Cidr [!Ref VpcCidr, !Ref CidrCount, !Ref SubnetBits]]
-      AvailabilityZone:
-        !If [
-              "AzRestriction",
-              !Select [0, !Ref AllowedAvailabilityZoneList ],
-              !Select [0, Fn::GetAZs: !Ref "AWS::Region"]
-            ]
+      AvailabilityZone: !Ref OutpostAz
       OutpostArn: !Ref OutpostArn
       Tags:
         - Key: Name
@@ -520,16 +515,25 @@ Outputs:
       !Join [
         ",",
         [
-          !Join ["=", [
-            !Select [0, "Fn::GetAZs": !Ref "AWS::Region"],
-            !Ref PrivateRouteTable
-          ]],
+          !If [
+              "AzRestriction",
+              !Join ["=", [!Select [0, !Ref AllowedAvailabilityZoneList], !Ref PrivateRouteTable]],
+              !Join ["=", [!Select [0, "Fn::GetAZs": !Ref "AWS::Region"], !Ref PrivateRouteTable]]
+          ],
           !If [DoAz2,
-               !Join ["=", [!Select [1, "Fn::GetAZs": !Ref "AWS::Region"], !Ref PrivateRouteTable2]],
+                !If [
+                  "AzRestriction",
+                  !Join ["=", [!Select [1, !Ref AllowedAvailabilityZoneList], !Ref PrivateRouteTable2]],
+                  !Join ["=", [!Select [1, "Fn::GetAZs": !Ref "AWS::Region"], !Ref PrivateRouteTable2]]
+                ],
                !Ref "AWS::NoValue"
           ],
           !If [DoAz3,
-               !Join ["=", [!Select [2, "Fn::GetAZs": !Ref "AWS::Region"], !Ref PrivateRouteTable3]],
+               !If [
+                  "AzRestriction",
+                  !Join ["=", [!Select [2, !Ref AllowedAvailabilityZoneList], !Ref PrivateRouteTable3]],
+                  !Join ["=", [!Select [2, "Fn::GetAZs": !Ref "AWS::Region"], !Ref PrivateRouteTable3]]
+                ],
                !Ref "AWS::NoValue"
           ]
         ]
@@ -570,11 +574,19 @@ fi
 
 if [[ ${CREATE_AWS_OUTPOST_SUBNETS} == "yes" ]]; then
   outpost_arn=$(jq -r '.OutpostArn' ${CLUSTER_PROFILE_DIR}/aws_outpost_info.json)
-  outpost_zone=$(jq -r '.AvailabilityZone' ${CLUSTER_PROFILE_DIR}/aws_outpost_info.json)
+  outpost_az=$(jq -r '.AvailabilityZone' ${CLUSTER_PROFILE_DIR}/aws_outpost_info.json)
   aws_add_param_to_json "CidrCount" "8" "$vpc_params"
   aws_add_param_to_json "OutpostArn" "${outpost_arn}" "$vpc_params"
-  aws_add_param_to_json "AllowedAvailabilityZoneList" "${outpost_zone}" "$vpc_params"
-  aws_add_param_to_json "AvailabilityZoneCount" "1" "$vpc_params"
+  aws_add_param_to_json "OutpostAz" "${outpost_az}" "$vpc_params"
+fi
+
+if [[ ${ZONES_LIST} != "" ]]; then
+  zones_list_count=$(echo "$ZONES_LIST" | awk -F',' '{ print NF }')
+  if [[ "${zones_list_count}" != "${ZONES_COUNT}" ]]; then
+    echo "ERROR: ${zones_list_count} zones in the list [${ZONES_LIST}], the zone count in the list should be the same as ZONES_COUNT: ${ZONES_COUNT}, exit now"
+    exit 1
+  fi
+  aws_add_param_to_json "AllowedAvailabilityZoneList" "${ZONES_LIST}" "$vpc_params"
 fi
 
 aws --region "${REGION}" cloudformation create-stack \
@@ -648,4 +660,5 @@ if [[ ${CREATE_AWS_OUTPOST_SUBNETS} == "yes" ]]; then
   echo $o_pub_id > "${SHARED_DIR}/outpost_public_id"
   echo $o_priv_id > "${SHARED_DIR}/outpost_private_id"
   echo "outpost_public_id: ${o_pub_id}, outpost_private_id: ${o_priv_id}"
+  echo "${outpost_az}" > "${SHARED_DIR}/outpost_availability_zone"
 fi
