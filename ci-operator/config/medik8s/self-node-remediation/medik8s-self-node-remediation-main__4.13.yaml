@@ -1,29 +1,19 @@
 base_images:
-  cli:
-    name: "4.13"
-    namespace: ocp
-    tag: cli
-  operator-base:
+  base:
     name: ubi
     namespace: ocp
     tag: "8"
+  operator-sdk:
+    name: "4.13"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make build
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: operator-base
+  from: base
   to: self-node-remediation-operator
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-oc
 operator:
   bundles:
   - as: self-node-remediation-bundle
@@ -53,23 +43,41 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: medik8s-aws
-    dependencies:
-      OO_INDEX: ci-index-self-node-remediation-bundle
     env:
       BASE_DOMAIN: medik8s-ci.projects.ecosystem.sysdeseng.com
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: self-node-remediation
-      OO_PACKAGE: self-node-remediation
-      OO_TARGET_NAMESPACES: '!all'
+      INSTALL_NAMESPACE: self-node-remediation
     test:
-    - as: e2e
-      commands: export SKIP_LOG_VERIFICATION="true" && make e2e-test
-      from: src-oc
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace "$INSTALL_NAMESPACE"
+        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment self-node-remediation-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: self-node-remediation-bundle
+      env:
+      - name: INSTALL_NAMESPACE
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
+    - as: test
+      cli: latest
+      commands: |
+        export SKIP_LOG_VERIFICATION="true"
+        export SKIP_OOST_REMEDIATION_VERIFICATION="true"
+        export INSTALL_NAMESPACE="$INSTALL_NAMESPACE"
+        make e2e-test
+      env:
+      - name: INSTALL_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: medik8s
