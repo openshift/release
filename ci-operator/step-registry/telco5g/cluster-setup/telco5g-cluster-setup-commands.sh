@@ -63,6 +63,7 @@ if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
 else
     ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]}"
 fi
+ADDITIONAL_ARG="${ADDITIONAL_ARG} --bastion-ip ${BASTION_IP}"
 
 # Choose topology for different job types:
 # Run cnftests job with either 1 baremetal and 1 virtual node or 2 baremetal nodes.
