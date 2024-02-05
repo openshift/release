@@ -58,6 +58,36 @@ tests:
       WATCHER_BOT_JOB_GROUP_NAME: ROSA STS Hypershift Layered Product Scenarios
     test:
     - ref: trigger-jobs-interop-ocp-watcher-bot-send-message
+- as: ocp-self-managed-layered-product-interop-zstream-n-1
+  cron: 0 11 * * 5
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules": [{"step": "trigger-jobs", "failure_type": "all", "classification": "self-managed Trigger Failure", "jira_additional_labels": ["self-managed-lp","weekly-trigger-lp"]}]
+        }
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      JSON_TRIGGER_LIST: self-managed-lp-interop-jobs-zstream-n-1
+    post:
+    - ref: firewatch-report-issues
+    test:
+    - ref: trigger-jobs
+- as: ocp-self-managed-layered-product-interop-zstream-n-2
+  cron: 0 11 * * 5
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules": [{"step": "trigger-jobs", "failure_type": "all", "classification": "self-managed Trigger Failure", "jira_additional_labels": ["self-managed-lp","weekly-trigger-lp"]}]
+        }
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      JSON_TRIGGER_LIST: self-managed-lp-interop-jobs-zstream-n-2
+    post:
+    - ref: firewatch-report-issues
+    test:
+    - ref: trigger-jobs
 zz_generated_metadata:
   branch: main
   org: rhpit
