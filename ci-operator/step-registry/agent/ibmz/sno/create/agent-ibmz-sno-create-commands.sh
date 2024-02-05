@@ -257,7 +257,7 @@ else
 fi
 
 ires=$(grep -oba ._RELEASE_IMAGE_LOCATION_.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX $HOME/openshift-install)
-ilocation=${res%%:*}
+ilocation=${ires%%:*}
 # If the release marker was found then it means that the image is missing
 if [[ ! -z ${ilocation} ]]; then
     echo "Patching openshift-install with image ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
