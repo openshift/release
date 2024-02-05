@@ -15,7 +15,7 @@ else
   subnet_id=$(head -n 1 "${SHARED_DIR}/outpost_private_id")
 fi
 
-zone_name=$(yq-go r "${SHARED_DIR}/availability_zones" '[0]')
+zone_name=$(head -n 1 "${SHARED_DIR}/outpost_availability_zone")
 machineset_name_postfix=${RANDOM:0:2}
 
 # keeping manifest_ prefix as this step can be used in manifest injection before installation 
