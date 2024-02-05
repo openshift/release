@@ -12,6 +12,12 @@ promotion:
   to:
   - name: latest
     namespace: ci-tools-nvidia-gpu-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -25,21 +31,20 @@ tests:
   container:
     from: ci-tools-nvidia-gpu-operator
 - as: test-commit
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.14"
   steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: single-node-conf-aws
+    - ref: single-node-conf-e2e
+    - chain: ipi-install
     test:
     - as: scale-gpu-nodes
       commands: make scale_aws_gpu_nodes
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
@@ -47,32 +52,26 @@ tests:
           memory: 2Gi
     - as: test-commit
       commands: hack/test_commit.sh
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: generic-claim
 - as: nvidia-gpu-operator-e2e
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.14"
   steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: single-node-conf-aws
+    - ref: single-node-conf-e2e
+    - chain: ipi-install
     test:
     - as: scale-gpu-nodes
       commands: make scale_aws_gpu_nodes
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
@@ -80,32 +79,26 @@ tests:
           memory: 2Gi
     - as: gpu-operator-e2e
       commands: make e2e_gpu_test
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: generic-claim
 - as: master-branch-gpu-e2e
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.14"
   steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: single-node-conf-aws
+    - ref: single-node-conf-e2e
+    - chain: ipi-install
     test:
     - as: scale-gpu-nodes
       commands: make scale_aws_gpu_nodes
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
@@ -113,16 +106,11 @@ tests:
           memory: 2Gi
     - as: master-branch-gpu-operator-e2e
       commands: make master_e2e_gpu_test
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: generic-claim
 - as: mirror-vcsref-image
   postsubmit: true
   steps:
