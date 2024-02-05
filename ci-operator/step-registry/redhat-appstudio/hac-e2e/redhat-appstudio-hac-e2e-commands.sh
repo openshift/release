@@ -18,14 +18,14 @@ PATH=$PATH:/tmp/go/bin
 export  OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD QONTRACT_BASE_URL \
      QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN CYPRESS_HAC_BASE_URL CYPRESS_GH_TOKEN CYPRESS_SSO_URL
 
-QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_password)
-QONTRACT_USERNAME=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_username)
+QONTRACT_PASSWORD=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/qontract_password)
+QONTRACT_USERNAME=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/qontract_username)
 QONTRACT_BASE_URL="https://app-interface.devshift.net/graphql"
 export CYPRESS_USERNAME=user1
 export CYPRESS_PASSWORD=user1
 export CYPRESS_PERIODIC_RUN=true
-CYPRESS_GH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
-HAC_SA_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/c-rh-ceph_SA_bot)
+CYPRESS_GH_TOKEN=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/github-token)
+HAC_SA_TOKEN=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/c-rh-ceph_SA_bot)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 
