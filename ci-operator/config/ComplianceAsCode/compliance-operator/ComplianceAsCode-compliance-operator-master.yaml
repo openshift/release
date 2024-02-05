@@ -25,20 +25,21 @@ images:
 - dockerfile_path: images/openscap/Dockerfile
   to: testopenscap
 promotion:
-  excluded_images:
-  - testcontent
-  - testopenscap
-  name: "4.12"
-  namespace: ComplianceAsCode
+  to:
+  - excluded_images:
+    - testcontent
+    - testopenscap
+    name: "4.14"
+    namespace: ComplianceAsCode
 releases:
   initial:
     integration:
-      name: "4.12"
+      name: "4.14"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.14"
       namespace: ocp
 resources:
   '*':
@@ -64,7 +65,9 @@ tests:
 - as: e2e-aws-parallel
   skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
     test:
     - as: test
       cli: latest
@@ -84,7 +87,9 @@ tests:
 - as: e2e-aws-serial
   skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
   steps:
-    cluster_profile: aws
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
     test:
     - as: test
       cli: latest

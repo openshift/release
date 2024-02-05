@@ -19,9 +19,11 @@ echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n p
 sleep 120
 
 # wait for policies to be compliant
-RETRIES=30
+RETRIES=40
 for try in $(seq "${RETRIES}"); do
-  if [[ $(oc get policies -n policies) != *"NonCompliant"* ]]; then
+  results=$(oc get policies -n policies)
+  notready=$(echo "$results" | grep -E 'NonCompliant|Pending' || true)
+  if [ "$notready" == "" ]; then
     echo "OPP policyset is applied and compliant"
     break
   else

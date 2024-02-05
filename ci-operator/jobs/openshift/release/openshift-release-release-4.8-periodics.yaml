@@ -71,10 +71,11 @@ periodics:
             name: "$(BRANCH)"
             namespace: ocp
           promotion:
-            name: "$(BRANCH)"
-            namespace: ocp
-            additional_images:
-              $(TAG): $(TAG)
+            to:
+            - name: "$(BRANCH)"
+              namespace: ocp
+              additional_images:
+                $(TAG): $(TAG)
           build_root:
             image_stream_tag:
               name: release
@@ -392,7 +393,7 @@ periodics:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build05
-  cron: 39 3 */14 * *
+  cron: 39 5 7,23 * *
   decorate: true
   labels:
     job-env: aws
@@ -511,7 +512,7 @@ periodics:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build02
-  cron: 24 21 */14 * *
+  cron: 43 1 10,24 * *
   decorate: true
   labels:
     job-release: "4.8"
@@ -630,7 +631,7 @@ periodics:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build04
-  cron: 53 22 */14 * *
+  cron: 10 1 6,20 * *
   decorate: true
   labels:
     job-release: "4.8"
@@ -747,7 +748,7 @@ periodics:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build05
-  cron: 5 23 */14 * *
+  cron: 22 4 10,25 * *
   decorate: true
   labels:
     job-env: aws
@@ -853,113 +854,7 @@ periodics:
         secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build05
-  decorate: true
-  interval: 48h
-  labels:
-    job-release: "4.8"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-ocp-installer-e2e-aws-upi-4.8
-  spec:
-    containers:
-    - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --secret-dir=/usr/local/e2e-aws-upi-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-aws-upi
-      - --template=/usr/local/e2e-aws-upi
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.8
-      - name: BRANCH
-        value: "4.8"
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer_upi:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer_upi:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: e2e-aws-upi
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-upi-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-upi
-        name: job-definition
-        subPath: cluster-launch-installer-upi-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-upi-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-- agent: kubernetes
-  cluster: build05
-  cron: 37 8 */14 * *
+  cron: 17 6 5,22 * *
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -1097,7 +992,7 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   cluster: build05
-  cron: 27 19 */14 * *
+  cron: 38 10 7,24 * *
   decorate: true
   labels:
     job-release: "4.8"

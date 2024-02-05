@@ -78,11 +78,11 @@ ginkgo run \
     --output-dir ${SHARED_DIR} \
     --junit-report $junitFileName \
     -r \
-    --focus-file tests/e2e/.* | tee ${SHARED_DIR}/rhcs_tests.log
+    --focus-file tests/e2e/.* | tee ${SHARED_DIR}/rhcs_tests.log  || true
 
 # tar the shared manifest dir to make it share between pods
 cd ${SHARED_DIR}
-find ./tf-manifests -name 'terraform.tfstate*' -print0 |tar --null -T - -zcvf statefiles.tar.gz
+find ./tf-manifests -name 'terraform.[tfstate|tfvars]*' -print0|tar --null -T - -zcvf statefiles.tar.gz
 ls ${SHARED_DIR}
 
 cd ~/terraform-provider-rhcs

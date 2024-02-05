@@ -5,8 +5,9 @@ build_root:
     tag: golang-1.13
 canonical_go_repository: github.com/openshift/lightspeed-service
 promotion:
-  name: 4.16-priv
-  namespace: ocp-private
+  to:
+  - name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -26,9 +27,14 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: make test-unit
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make test-unit
   container:
     from: src
+  secret:
+    mount_path: /tmp/secret
+    name: ols-codecov-token
 - as: e2e
   steps:
     cluster_profile: aws

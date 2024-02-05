@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: "4.15"
-    namespace: ocp
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -15,6 +11,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: hypershift-operator
+  ocp_4.14_base:
+    name: "4.14"
+    namespace: ocp
+    tag: base
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -42,16 +42,18 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: tests
 - dockerfile_path: images/hello-openshift/Dockerfile.rhel
-  from: base
   inputs:
+    ocp_4.14_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: hello-openshift
 promotion:
-  disabled: true
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.15"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -252,13 +254,14 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-metal-ipi-sdn
   cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-ipv4
+    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   steps:
@@ -281,7 +284,7 @@ tests:
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-serial-ipv4
+    workflow: baremetalds-e2e-sdn-serial-ipv4
 - as: e2e-metal-ipi-serial-ovn-ipv6
   cluster: build05
   optional: true
@@ -401,6 +404,12 @@ tests:
       HYPERSHIFT_NODE_COUNT: "2"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.14
     workflow: hypershift-kubevirt-baremetalds-conformance
+- always_run: false
+  as: e2e-aws-ovn-upi
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-upi
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

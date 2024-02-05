@@ -132,6 +132,7 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-24663
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and @disconnected
         and not @fips'
@@ -347,6 +348,7 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-24663
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @azure-ipi and @disconnected
         and not @fips'
@@ -501,7 +503,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-confidential-computing
-- as: gcp-ipi-disconnected-private-workload-identity-f14
+- as: gcp-ipi-disconnected-private-oidc-f14
   cron: 48 7 3,18 * *
   steps:
     cluster_profile: gcp-qe
@@ -535,7 +537,7 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
-- as: gcp-ipi-workload-identity-rt-fips-f14
+- as: gcp-ipi-oidc-rt-fips-f14
   cron: 17 3 15,30 * *
   steps:
     cluster_profile: gcp-qe
@@ -681,7 +683,7 @@ tests:
 - as: vsphere-ipi-external-lb-post-f28
   cron: 38 19 5 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-connected-2
     env:
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @vsphere-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @vsphere-ipi and not @fips'
@@ -789,6 +791,19 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-upi
+- as: aws-ipi-ovn-winc-f7
+  cron: 36 1 2,11,18,25 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS_POSTUPG: Smokerun
+      TEST_FILTERS_PREUPG: Smokerun
+      TEST_SCENARIOS_POSTUPG: Windows_Containers
+      TEST_SCENARIOS_PREUPG: Windows_Containers
+    test:
+    - chain: openshift-upgrade-qe-test-winc
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-winc
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

@@ -8,7 +8,7 @@ fi
 
 MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
 HYPERSHIFT_NAME=hcp
-if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
+if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4"
   HYPERSHIFT_NAME=hypershift
 fi
@@ -28,17 +28,26 @@ oc create ns "${CLUSTER_NAMESPACE}"
 BASEDOMAIN=$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")
 echo "extract secret/pull-secret"
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+echo "check HYPERSHIFT_HC_RELEASE_IMAGE, if not set, use mgmt-cluster playload image"
+PLAYLOADIMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
+RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$PLAYLOADIMAGE}
 
-/tmp/${HYPERSHIFT_NAME} create cluster agent \
+EXTRA_ARGS=""
+if [[ "${IP_STACK}" == "v4v6" ]]; then
+  EXTRA_ARGS+="--cluster-cidr 10.132.0.0/14 --cluster-cidr fd03::/48 --service-cidr 172.31.0.0/16 --service-cidr fd04::/112 "
+fi
+
+/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --name=${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \
   --agent-namespace="${CLUSTER_NAMESPACE}" \
   --namespace local-cluster \
   --base-domain=${BASEDOMAIN} \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
-  --image-content-sources "${SHARED_DIR}/mgmt_iscp.yaml"
+  --image-content-sources "${SHARED_DIR}/mgmt_iscp.yaml" \
+  --release-image ${RELEASE_IMAGE}
 
-if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
+if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4"
   oc annotate hostedclusters -n local-cluster ${CLUSTER_NAME} "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
   oc apply -f - <<EOF

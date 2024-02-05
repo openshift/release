@@ -17,8 +17,12 @@ unset NAMESPACE
 REF_REPO=$(echo ${JOB_SPEC} | jq -r '.refs.repo')
 REF_ORG=$(echo ${JOB_SPEC} | jq -r '.refs.org')
 REF_BRANCH=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+# Prow build id
+PROW_BUILD=$(echo ${JOB_SPEC} | jq -r '.buildid')
 # PR SHA
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
+# Build tag
+BUILD_TAG="${PR_SHA:0:20}-${PROW_BUILD}"
 
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name
@@ -54,7 +58,7 @@ if [[ "$SERVICE_NAME" == "INSTALL_YAMLS" ]]; then
   export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:latest
 else
   export IMAGE_TAG_BASE=${PULL_REGISTRY}/${PULL_ORGANIZATION}/${OPENSTACK_OPERATOR}
-  export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${PR_SHA}
+  export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${BUILD_TAG}
 fi
 
 if [ ! -d "${BASE_DIR}/install_yamls" ]; then
@@ -192,6 +196,9 @@ patches:
             rbd_store_user=openstack
             rbd_store_pool=images
             store_description=ceph_glance_store
+    - op: replace
+      path: /spec/glance/template/glanceAPIs/default/type
+      value: split
 $(if [[ "${SERVICE_NAME}" == "IRONIC" ]]; then
   cat <<IRONIC_EOF
     - op: add

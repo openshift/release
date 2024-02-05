@@ -6,6 +6,7 @@ set -o pipefail
 
 #Create AWS S3 Storage Bucket
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
+QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 QUAY_AWS_S3_BUCKET="quayprowci$RANDOM"
 
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
@@ -83,7 +84,7 @@ spec:
   installPlanApproval: Automatic
   name: quay-operator
   channel: $QUAY_OPERATOR_CHANNEL
-  source: redhat-operators
+  source: $QUAY_OPERATOR_SOURCE
   sourceNamespace: openshift-marketplace
 EOF
 )
@@ -146,7 +147,17 @@ spec:
   - kind: monitoring
     managed: false
   - kind: horizontalpodautoscaler
-    managed: false
+    managed: true
+  - kind: quay
+    managed: true
+  - kind: mirror
+    managed: true
+  - kind: clair
+    managed: true
+  - kind: tls
+    managed: true
+  - kind: route
+    managed: true
 EOF
 
 for _ in {1..60}; do

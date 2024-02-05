@@ -44,8 +44,9 @@ operator:
   - pullspec: quay.io/openshift-kni/numaresources-operator:4.14.999-snapshot
     with: numaresources-operator
 promotion:
-  name: numaresources-operator-4.14
-  namespace: ocp-kni
+  to:
+  - name: numaresources-operator-4.14
+    namespace: ocp-kni
 releases:
   initial:
     candidate:
@@ -69,12 +70,20 @@ tests:
     from: src
 - as: ci-install-e2e
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
     env:
+      BASE_DOMAIN: sysdeseng.devcluster.openshift.com
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: numaresources-operator
       OO_PACKAGE: numaresources-operator
       OO_TARGET_NAMESPACES: '!install'
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.14
+        ci-job-fullname openshift-kni-ci-install-e2e-numaresources-operator-release-4.14
+        ci-job-type ci-install-e2e
+        ci-repo-name numaresources-operator
+        ci-org-name openshift-kni
     test:
     - as: e2e-install-test
       cli: latest
@@ -90,12 +99,20 @@ tests:
     workflow: optional-operators-ci-aws
 - as: ci-e2e
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
     env:
+      BASE_DOMAIN: sysdeseng.devcluster.openshift.com
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-numaresources
       OO_PACKAGE: numaresources-operator
       OO_TARGET_NAMESPACES: '!install'
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.14
+        ci-job-fullname openshift-kni-ci-e2e-numaresources-operator-release-4.14
+        ci-job-type ci-e2e
+        ci-repo-name numaresources-operator
+        ci-org-name openshift-kni
     test:
     - as: e2e-test
       cli: latest
@@ -112,14 +129,22 @@ tests:
 - as: ci-must-gather-e2e
   cron: 42 0 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
     dependencies:
       OO_INDEX: ci-index
     env:
+      BASE_DOMAIN: sysdeseng.devcluster.openshift.com
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-numaresources
       OO_PACKAGE: numaresources-operator
       OO_TARGET_NAMESPACES: '!install'
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.14
+        ci-job-fullname openshift-kni-ci-must-gather-e2e-numaresources-operator-release-4.14
+        ci-job-type ci-must-gather-e2e
+        ci-repo-name numaresources-operator
+        ci-org-name openshift-kni
     test:
     - as: must-gather-e2e-test
       cli: latest
@@ -130,6 +155,12 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: numaresources-operator
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.14
   org: openshift-kni

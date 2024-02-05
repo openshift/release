@@ -1,7 +1,16 @@
+base_images:
+  origin_4.16_jenkins:
+    name: "4.16"
+    namespace: origin
+    tag: jenkins
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
+  inputs:
+    origin_4.16_jenkins:
+      as:
+      - registry.ci.openshift.org/origin/4.16:jenkins
   to: jenkins
 - dockerfile_literal: |
     FROM quay.io/openshift/origin-jenkins-agent-maven:4.11.0 AS builder
@@ -18,22 +27,23 @@ images:
     mvn --version
   to: jenkins-maven-builder
 promotion:
-  additional_images:
-    jenkins-sync-plugin-e2e: src
-  excluded_images:
-  - jenkins
-  - jenkins-maven-builder
-  name: "4.15"
-  namespace: ocp
+  to:
+  - additional_images:
+      jenkins-sync-plugin-e2e: src
+    excluded_images:
+    - jenkins
+    - jenkins-maven-builder
+    name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -70,6 +80,9 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e
+      dependencies:
+      - env: JENKINS_IMAGE
+        name: pipeline:jenkins
       from: src
       resources:
         requests:

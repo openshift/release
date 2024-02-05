@@ -1,20 +1,52 @@
 base_images:
-  ci-image:
-    name: ci-image
-    namespace: operator-lifecycle-manager
-    tag: latest
-  operator-lifecycle-manager:
-    name: "4.15"
+  ocp_4.16_base-rhel9:
+    name: "4.16"
     namespace: ocp
-    tag: operator-lifecycle-manager
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.16
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: operator-lifecycle-manager.Dockerfile
+  inputs:
+    ocp_4.16_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: operator-lifecycle-manager
+- dockerfile_path: operator-registry.Dockerfile
+  inputs:
+    ocp_4.16_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: operator-registry
+- dockerfile_path: base.Dockerfile
+  from: src
+  to: ci-image
+promotion:
+  to:
+  - disabled: true
+    excluded_images:
+    - ci-image
+    name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
-      name: "4.15"
+      include_built_images: true
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -45,6 +77,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-olm-flaky
   cron: 0 0 * * *

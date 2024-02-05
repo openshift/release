@@ -21,8 +21,9 @@ images:
       - registry.ci.openshift.org/stolostron/builder:go1.19-linux
   to: cluster-proxy
 promotion:
-  name: "2.4"
-  namespace: stolostron
+  to:
+  - name: "2.4"
+    namespace: stolostron
 resources:
   '*':
     requests:
@@ -74,6 +75,16 @@ tests:
     env:
       IMAGE_REPO: cluster-proxy
       IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror-main
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-proxy
+    env:
+      IMAGE_REPO: cluster-proxy
+      IMAGE_TAG: main
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: fast-forward

@@ -28,6 +28,10 @@ if [[ "${CLUSTER_TYPE}" == *ocp-metal* ]]; then
   AUX_HOST="$(<"${CLUSTER_PROFILE_DIR}"/aux-host)"
 fi
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 function approve_csrs() {
   while [[ ! -f '/tmp/scale-out-complete' ]]; do
     sleep 30
@@ -70,9 +74,12 @@ function wait_for_power_down_and_release() {
   local bmc_address="${1}"
   local bmc_user="${2}"
   local bmc_pass="${3}"
+  local bmc_forwarded_port="${4}"
+  local vendor="${5}"
+  local ipxe_via_vmedia="${6}"
   sleep 90
   local retry_max=40 # 15*40=600 (10 min)
-  while [ $retry_max -gt 0 ] && ! ipmitool -I lanplus -H "$bmc_address" \
+  while [ $retry_max -gt 0 ] && ! ipmitool -I lanplus -H "$AUX_HOST" -p "$bmc_forwarded_port" \
     -U "$bmc_user" -P "$bmc_pass" power status | grep -q "Power is off"; do
     echo "$bmc_address is not powered off yet... waiting"
     sleep 30
@@ -88,8 +95,9 @@ function wait_for_power_down_and_release() {
       # that sometimes keep the hosts frozen before POST.
       echo "retrying $bmc_address again to reboot..."
       touch "/tmp/$bmc_address"
-      reset_host "$bmc_address" "$bmc_user" "$bmc_pass"
-      wait_for_power_down "$bmc_address" "$bmc_user" "$bmc_pass"
+      host="${bmc_forwarded_port##1[0-9]}"
+      timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
+      wait_for_power_down_and_release "$bmc_address" "$bmc_user" "$bmc_pass" "$bmc_forwarded_port" "$vendor" "$ipxe_via_vmedia"
       return $?
     fi
   fi
@@ -128,46 +136,18 @@ EOF
   return 0
 }
 
-## Valid for baremetal hosts only
-function reset_host() {
-  local bmc_address="${1}"
-  local bmc_user="${2}"
-  local bmc_pass="${3}"
-  ipmitool -I lanplus -H "$bmc_address" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    chassis bootparam set bootflag force_pxe options=PEF,watchdog,reset,power
-  ipmitool -I lanplus -H "$bmc_address" \
-    -U "$bmc_user" -P "$bmc_pass" \
-    power off || echo "Already off"
-  # If the host is not already powered off, the power on command can fail while the host is still powering off.
-  # Let's retry the power on command multiple times to make sure the command
-  # is received when the host is in the correct state.
-  for i in {1..10} max; do
-    if [ "$i" == "max" ]; then
-      echo "Failed to reset $bmc_address"
-      return 1
-    fi
-    ipmitool -I lanplus -H "$bmc_address" \
-      -U "$bmc_user" -P "$bmc_pass" \
-      power on && break
-    echo "Failed to power on $bmc_address, retrying..."
-    sleep 5
-  done
-  # Adding a 4th parameter with any string will enable the next step to wait for the host to be powered off and released
-  if [ -z "${4:-}" ]; then
-    return 0
-  fi
-  if ! wait_for_power_down_and_release "$bmc_address" "$bmc_user" "$bmc_pass"; then
-    echo "$bmc_address" >> /tmp/failed
-  fi
-}
-
 EXPECTED_NODES=$(( $(get_ready_nodes_count) + ADDITIONAL_WORKERS ))
 
 echo "Cluster type is ${CLUSTER_TYPE}"
 
 case "$CLUSTER_TYPE" in
 *ocp-metal*)
+  # Extract the ignition file for additional workers if additional workers count > 0
+  oc extract -n openshift-machine-api secret/worker-user-data-managed --keys=userData --to=- > "${SHARED_DIR}"/worker.ign
+  echo -e "\nCopying ignition files into bastion host..."
+  chmod 644 "${SHARED_DIR}"/*.ign
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}"/*.ign "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/"
+
   # For Bare metal UPI clusters, we consider the reservation of the nodes, and the configuration of the boot done
   # by the baremetal-lab-pre-* steps.
   # Therefore, we only need to power on the nodes and wait for them to join the cluster.
@@ -182,7 +162,7 @@ case "$CLUSTER_TYPE" in
       exit 1
     fi
     echo "Power on ${bmc_address//.*/} (${name})..."
-    reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}"
+    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe" &
   done
 ;;
 *)
@@ -233,7 +213,7 @@ case "$CLUSTER_TYPE" in
       echo "Removing the grub.cfg file for host with mac ${mac}..."
       rm -f "/opt/tftpboot/grub.cfg-01-${mac//:/-}" || echo "no grub.cfg for $mac."
       echo "Removing the DHCP config for ${name}/${mac}..."
-      sed -i "/^dhcp-host=$mac/d" /opt/dhcpd/root/etc/dnsmasq.conf
+      sed -i "/^dhcp-host=$mac/d" /opt/dnsmasq/etc/dnsmasq.conf
       echo "Removing the DNS config for ${name}/${mac}..."
       sed -i "/${name}.*${CLUSTER_NAME:-glob-protected-from-empty-var}/d" /opt/bind9_zones/{zone,internal_zone.rev}
       # haproxy.cfg is mounted as a volume, and we need to remove the bootstrap node from being a backup:
@@ -247,9 +227,9 @@ case "$CLUSTER_TYPE" in
       cat "${F}.tmp" > "${F}"
       rm -rf "${F}.tmp"
       docker kill -s HUP "haproxy-${CLUSTER_NAME}"
-      docker exec bind9 rndc reload
-      docker exec bind9 rndc flush
-      docker restart dhcpd
+      podman exec bind9 rndc reload
+      podman exec bind9 rndc flush
+      systemctl restart dhcp
     done
 EOF
   echo "Wiping the disks and releasing the nodes for further reservations in other jobs..."
@@ -257,7 +237,11 @@ EOF
   for bmhost in $(yq e -o=j -I=0 ".[] | select(.arch|test(\"${REGEX}\") and .name|test(\"worker-\"))" "${SHARED_DIR}/hosts.yaml"); do
     # shellcheck disable=SC1090
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-    reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" wait &
+    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe" &
+    (if ! wait_for_power_down_and_release "$bmc_address" "$bmc_user" "$bmc_pass" "$bmc_forwarded_port" "$vendor" "$ipxe_via_vmedia" \
+      "$vendor" "$ipxe_via_vmedia"; then
+      echo "$bmc_address" >> /tmp/failed
+    fi) &
   done
   wait
   echo "All children terminated."

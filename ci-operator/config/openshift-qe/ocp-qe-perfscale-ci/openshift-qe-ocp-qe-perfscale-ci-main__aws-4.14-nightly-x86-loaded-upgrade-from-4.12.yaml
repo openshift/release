@@ -7,8 +7,9 @@ images:
 - dockerfile_path: prow/Dockerfile
   to: ocp-qe-perfscale-ci-ld-414
 promotion:
-  namespace: ci
-  tag: latest
+  to:
+  - namespace: ci
+    tag: latest
 releases:
   initial:
     prerelease:
@@ -37,8 +38,9 @@ resources:
       memory: 200Mi
 tests:
 - as: perfscale-aws-5nodes-loaded-upgrade-412to413to414-periodic
-  cron: 0 12 * * 1
+  cron: 0 12 7,21 * *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
@@ -46,8 +48,11 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6i.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6i.xlarge
+      CHURN: "false"
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.xlarge
       ENABLE_FORCE: "true"
       GC: "false"
+      ITERATION_MULTIPLIER_ENV: "6"
       MAX_UNAVAILABLE: "3"
       WORKER_REPLICA_COUNT: "5"
       ZONES_COUNT: "3"

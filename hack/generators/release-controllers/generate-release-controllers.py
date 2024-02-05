@@ -40,6 +40,7 @@ def generate_app_ci_content(config, git_clone_dir):
 
             with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'admin_deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
                 content.add_imagestream_namespace_rbac(gendoc)
+                content.add_release_payload_modifier_rbac(gendoc)
 
             with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
                 content.add_osd_rc_deployments(gendoc)
@@ -48,6 +49,7 @@ def generate_app_ci_content(config, git_clone_dir):
 
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('serviceaccount.yaml'), context=config) as gendoc:
         content.add_osd_rc_service_account_resources(gendoc)
+        content.add_release_payload_modifier_service_account(gendoc)
 
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin_deploy-ocp-publish-art.yaml'), context=config) as gendoc:
         content.add_art_publish(gendoc)

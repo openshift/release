@@ -1,8 +1,4 @@
 base_images:
-  golang:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
@@ -26,17 +22,9 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: ubi_minimal
-  inputs:
-    golang:
-      as:
-      - golang:1.20
   to: kserve-controller
 - dockerfile_path: agent.Dockerfile
   from: ubi_minimal
-  inputs:
-    golang:
-      as:
-      - golang:1.20
   to: kserve-agent
 - context_dir: .
   dockerfile_path: router.Dockerfile
@@ -48,20 +36,21 @@ images:
   dockerfile_path: sklearn.Dockerfile
   to: sklearn-serving-runtime
 promotion:
-  excluded_images:
-  - kserve-controller
-  - kserve-agent
-  - kserve-router
-  - kserve-storage-initializer
-  - sklearn-serving-runtime
-  namespace: opendatahub-io
-  tag: latest
+  to:
+  - excluded_images:
+    - kserve-controller
+    - kserve-agent
+    - kserve-router
+    - kserve-storage-initializer
+    - sklearn-serving-runtime
+    namespace: opendatahub-io
+    tag: latest
 releases:
   latest:
     release:
       architecture: amd64
       channel: stable
-      version: "4.12"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -72,7 +61,12 @@ resources:
 tests:
 - as: e2e-fast
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
     test:
     - as: e2e-fast
       cli: latest
@@ -90,10 +84,15 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: hypershift-hostedcluster-workflow
 - as: e2e-slow
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
     test:
     - as: e2e-slow
       cli: latest
@@ -111,7 +110,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: hypershift-hostedcluster-workflow
 - as: pr-image-mirror-kserve-agent
   steps:
     dependencies:

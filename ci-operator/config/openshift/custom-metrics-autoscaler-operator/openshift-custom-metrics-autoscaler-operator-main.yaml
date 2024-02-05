@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: cli
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
@@ -8,19 +8,19 @@ base_images:
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.15
   operand:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: custom-metrics-autoscaler
   operand-adapter:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: custom-metrics-autoscaler-adapter
   operand-webhook:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: custom-metrics-autoscaler-webhooks
   operator-sdk:
-    name: "4.15"
+    name: "4.16"
     namespace: origin
     tag: operator-sdk
   ubi-minimal:
@@ -62,17 +62,18 @@ operator:
   - pullspec: CMA_OPERAND_PLACEHOLDER_3
     with: pipeline:operand-webhook
 promotion:
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -96,6 +97,13 @@ tests:
   commands: env && GOFLAGS="" hack/cma-verify-history.sh
   container:
     from: src
+- as: security
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: custom-metrics-autoscaler-operator
+    workflow: openshift-ci-security
 - as: cma-e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -131,25 +139,9 @@ tests:
       resources:
         requests:
           cpu: 100m
-    - as: test-internals
+    - as: test-run
       cli: latest
-      commands: cd tests; go test -p 1 -v -timeout 60m -tags e2e $(go list -tags e2e
-        ./internals/... | grep -v internals/global_custom_ca)
-      from: custom-metrics-autoscaler-tests
-      resources:
-        requests:
-          cpu: 100m
-    - as: test-scalers
-      cli: latest
-      commands: cd tests; go test -p 1 -v -timeout 60m -tags e2e ./scalers/prometheus/...
-        ./scalers/kafka/...  ./scalers/memory/...
-      from: custom-metrics-autoscaler-tests
-      resources:
-        requests:
-          cpu: 100m
-    - as: test-sequential
-      cli: latest
-      commands: cd tests;  go test -p 1 -v -timeout 60m -tags e2e ./sequential/...
+      commands: make e2e-test-openshift
       from: custom-metrics-autoscaler-tests
       resources:
         requests:

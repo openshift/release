@@ -6,6 +6,16 @@ set -o pipefail
 
 trap 'FRC=$?; createUpgradeJunit; debug' EXIT TERM
 
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
+# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
+# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
+# so that the credentials of the build farm registry can be saved in docker client config file.
+# A direct connection is required while communicating with build-farm, instead of through proxy
+KUBECONFIG="" oc --loglevel=8 registry login
+
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
     if (( FRC != 0 )); then
@@ -397,32 +407,47 @@ function wait_clusteroperators_continous_success() {
 }
 
 function check_mcp() {
-    local updating_mcp unhealthy_mcp
+    local updating_mcp unhealthy_mcp tmp_output
 
-    updating_mcp=$(oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status --no-headers | grep -v "False")
-    if [[ -n "${updating_mcp}" ]]; then
-        echo "Some mcp is updating..."
-        echo "${updating_mcp}"
+    tmp_output=$(mktemp)
+    oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status --no-headers > "${tmp_output}" || true
+    # using the size of output to determinate if oc command is executed successfully
+    if [[ -s "${tmp_output}" ]]; then
+        updating_mcp=$(cat "${tmp_output}" | grep -v "False")
+        if [[ -n "${updating_mcp}" ]]; then
+            echo "Some mcp is updating..."
+            echo "${updating_mcp}"
+            return 1
+        fi
+    else
+        echo "Did not run "oc get mcp" successfully!"
         return 1
     fi
 
     # Do not check UPDATED on purpose, beause some paused mcp would not update itself until unpaused
-    unhealthy_mcp=$(oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount --no-headers | grep -v "False.*False.*0")
-    if [[ -n "${unhealthy_mcp}" ]]; then
-        echo "Detected unhealthy mcp:"
-        echo "${unhealthy_mcp}"
-        echo "Real-time detected unhealthy mcp:"
-        oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount | grep -v "False.*False.*0"
-        echo "Real-time full mcp output:"
-        oc get mcp
-        echo ""
-        unhealthy_mcp_names=$(echo "${unhealthy_mcp}" | awk '{print $1}')
-        echo "Using oc describe to check status of unhealthy mcp ..."
-        for mcp_name in ${unhealthy_mcp_names}; do
-          echo "Name: $mcp_name"
-          oc describe mcp $mcp_name || echo "oc describe mcp $mcp_name failed"
-        done
-        return 2
+    oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount --no-headers > "${tmp_output}" || true
+    # using the size of output to determinate if oc command is executed successfully
+    if [[ -s "${tmp_output}" ]]; then
+        unhealthy_mcp=$(cat "${tmp_output}" | grep -v "False.*False.*0")
+        if [[ -n "${unhealthy_mcp}" ]]; then
+            echo "Detected unhealthy mcp:"
+            echo "${unhealthy_mcp}"
+            echo "Real-time detected unhealthy mcp:"
+            oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount | grep -v "False.*False.*0"
+            echo "Real-time full mcp output:"
+            oc get mcp
+            echo ""
+            unhealthy_mcp_names=$(echo "${unhealthy_mcp}" | awk '{print $1}')
+            echo "Using oc describe to check status of unhealthy mcp ..."
+            for mcp_name in ${unhealthy_mcp_names}; do
+              echo "Name: $mcp_name"
+              oc describe mcp $mcp_name || echo "oc describe mcp $mcp_name failed"
+            done
+            return 2
+        fi
+    else
+        echo "Did not run "oc get mcp" successfully!"
+        return 1
     fi
     return 0
 }
@@ -571,9 +596,45 @@ function admin_ack() {
     fi
 }
 
+# Check if the cluster hit the image validation error, which caused by image signature
+function error_check_invalid_image() {
+    local try=0 max_retries=5 tmp_log cmd expected_msg
+    tmp_log=$(mktemp)
+    while (( try < max_retries )); do
+        echo "Trying #${try}"
+        cmd="oc adm upgrade"
+        expected_msg="failure=The update cannot be verified:"
+        run_command "${cmd} 2>&1 | tee ${tmp_log}"
+        if grep -q "${expected_msg}" "${tmp_log}"; then
+            echo "Found the expected validation error message"
+            break
+        fi
+        (( try += 1 ))
+        sleep 60
+    done
+    if (( ${try} >= ${max_retries} )); then
+        echo >&2 "Timed out catching image invalid error message..." && return 1
+    fi
+
+}
+
+function clear_upgrade() {
+    local cmd tmp_log expected_msg
+    tmp_log=$(mktemp)
+    cmd="oc adm upgrade --clear"
+    expected_msg="Cancelled requested upgrade to"
+    run_command "${cmd} 2>&1 | tee ${tmp_log}"
+    if grep -q "${expected_msg}" "${tmp_log}"; then
+        echo "Last upgrade is cleaned."
+    else
+        echo "Clear the last upgrade fail!"
+        return 1
+    fi
+}
+
 # Upgrade the cluster to target release
 function upgrade() {
-    local log_file history_len
+    local log_file history_len cluster_src_ver
     if check_ota_case_enabled "OCP-21588"; then
         log_file=$(mktemp)
         echo "Testing --allow-explicit-upgrade option"
@@ -590,13 +651,34 @@ function upgrade() {
             exit 1
         fi
     fi
+    if check_ota_case_enabled "OCP-24663"; then
+        cluster_src_ver=$(oc version -o json | jq -r '.openshiftVersion')
+        if [[ -z "${cluster_src_ver}" ]]; then
+            echo "Did not get cluster version at this moment"
+            exit 1
+        else
+            echo "Current cluster is on ${cluster_src_ver}"
+        fi
+        echo "Negative Testing: upgrade to an unsigned image without --force option"
+        admin_ack
+        cco_annotation
+        run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade"
+        error_check_invalid_image
+        clear_upgrade
+        check_upgrade_status "${cluster_src_ver}"
+    fi
     run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
 # Monitor the upgrade status
 function check_upgrade_status() {
-    local wait_upgrade="${TIMEOUT}" out avail progress
+    local wait_upgrade="${TIMEOUT}" out avail progress cluster_version
+    if [[ -n "${1:-}" ]]; then
+        cluster_version="$1"
+    else
+        cluster_version="${TARGET_VERSION}"
+    fi
     echo "Starting the upgrade checking on $(date "+%F %T")"
     while (( wait_upgrade > 0 )); do
         sleep 5m
@@ -607,7 +689,7 @@ function check_upgrade_status() {
         if ! out="$(oc get clusterversion --no-headers)"; then continue; fi
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
-        if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${TARGET_VERSION}" ]]; then
+        if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${cluster_version}" ]]; then
             echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
             return 0
         fi

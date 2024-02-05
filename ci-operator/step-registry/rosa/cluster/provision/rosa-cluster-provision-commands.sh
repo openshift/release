@@ -92,8 +92,8 @@ fi
 ROSA_VERSION=$(rosa version)
 ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${ROSA_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
-  rosa login --env "${ROSA_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+  rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
   if [ $? -ne 0 ]; then
     echo "Login failed"
     exit 1
@@ -102,6 +102,8 @@ else
   echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
   exit 1
 fi
+AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
+AWS_ACCOUNT_ID_MASK=$(echo ${AWS_ACCOUNT_ID:0:4})
 
 # Check whether the cluster with the same cluster name exists.
 OLD_CLUSTER=$(rosa list clusters | { grep  ${CLUSTER_NAME} || true; })
@@ -112,31 +114,33 @@ if [[ ! -z "$OLD_CLUSTER" ]]; then
 fi
 
 # Get the openshift version
+version_cmd="rosa list versions --channel-group ${CHANNEL_GROUP} -o json"
+if [[ "$HOSTED_CP" == "true" ]]; then
+  version_cmd="$version_cmd --hosted-cp"
+fi
 if [[ ${AVAILABLE_UPGRADE} == "yes" ]] ; then
-  OPENSHIFT_VERSION=$(head -n 1 "${SHARED_DIR}/available_upgrade_version.txt")
+  version_cmd="$version_cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id'"
 else
-  versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq -r '.[].raw_id')
-  if [[ "$HOSTED_CP" == "true" ]]; then
-    versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} --hosted-cp -o json | jq -r '.[].raw_id')
-  fi
-  echo -e "Available cluster versions:\n${versionList}"
+  version_cmd="$version_cmd | jq -r '.[].raw_id'"
+fi
+versionList=$(eval $version_cmd)
+echo -e "Available cluster versions:\n${versionList}"
 
-  if [[ -z "$OPENSHIFT_VERSION" ]]; then
-    if [[ "$EC_BUILD" == "true" ]]; then
-      OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
-    else
-      OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
-    fi
-  elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
-    if [[ "$EC_BUILD" == "true" ]]; then
-      OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
-    else
-      OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
-    fi
+if [[ -z "$OPENSHIFT_VERSION" ]]; then
+  if [[ "$EC_BUILD" == "true" ]]; then
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
   else
-    # Match the whole line
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
+    OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
   fi
+elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
+  if [[ "$EC_BUILD" == "true" ]]; then
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
+  else
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
+  fi
+else
+  # Match the whole line
+  OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
 fi
 
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
@@ -348,7 +352,7 @@ fi
 SECURITY_GROUP_ID_SWITCH=""
 if [[ "$ADDITIONAL_SECURITY_GROUP" == "true" ]]; then
   SECURITY_GROUP_IDs=$(cat ${SHARED_DIR}/security_groups_ids | xargs |sed 's/ /,/g')
-  SECURITY_GROUP_ID_SWITCH="--additional-compute-security-group-ids ${SECURITY_GROUP_IDs}"
+  SECURITY_GROUP_ID_SWITCH="--additional-compute-security-group-ids ${SECURITY_GROUP_IDs} --additional-infra-security-group-ids ${SECURITY_GROUP_IDs} --additional-control-plane-security-group-ids ${SECURITY_GROUP_IDs}"
   record_cluster "security_groups" "enabled" ${SECURITY_GROUP_IDs}
 fi
 
@@ -456,7 +460,7 @@ if [[ "$DRY_RUN" == "true" ]]; then
 fi
 
 # Save the cluster config to ARTIFACT_DIR
-cp "${SHARED_DIR}/cluster-config" "${ARTIFACT_DIR}/"
+cat "${SHARED_DIR}/cluster-config" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${ARTIFACT_DIR}/cluster-config"
 
 echo "Parameters for cluster request:"
 echo "  Cluster name: ${CLUSTER_NAME}"
@@ -481,8 +485,8 @@ echo "  Enable Byovpc: ${ENABLE_BYOVPC}"
 echo "  Enable audit log: ${ENABLE_AUDIT_LOG}"
 echo "  Cluster Tags: ${TAGS}"
 echo "  Additional Security groups: ${ADDITIONAL_SECURITY_GROUP}"
-if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
-  echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
+echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
+if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then 
   echo "  Min replicas: ${MIN_REPLICAS}"
   echo "  Min replicas: ${MAX_REPLICAS}"  
 else
@@ -528,7 +532,8 @@ ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
 ${SHARED_VPC_SWITCH} \
 ${SECURITY_GROUP_ID_SWITCH} \
 ${DRY_RUN_SWITCH}
-" | sed -E 's/\s{2,}/ /g' > "${ARTIFACT_DIR}/create_cluster.sh"
+" | sed -E 's/\s{2,}/ /g' > "${SHARED_DIR}/create_cluster.sh"
+cat "${SHARED_DIR}/create_cluster.sh" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${ARTIFACT_DIR}/create_cluster.sh"
 
 mkdir -p "${SHARED_DIR}"
 CLUSTER_ID_FILE="${SHARED_DIR}/cluster-id"
@@ -567,7 +572,7 @@ rosa create cluster -y \
                     ${SHARED_VPC_SWITCH} \
                     ${SECURITY_GROUP_ID_SWITCH} \
                     ${DRY_RUN_SWITCH} \
-                    > "${CLUSTER_INFO}"
+                    | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${CLUSTER_INFO}"
 
 # Store the cluster ID for the post steps and the cluster deprovision
 CLUSTER_ID=$(cat "${CLUSTER_INFO}" | grep '^ID:' | tr -d '[:space:]' | cut -d ':' -f 2)
@@ -596,25 +601,16 @@ while true; do
   if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" && "${CLUSTER_STATE}" != "waiting" && "${CLUSTER_STATE}" != "validating" ]]; then
     rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}" || echo "error: Unable to pull installation log."
     echo "error: Cluster reported invalid state: ${CLUSTER_STATE}"
-    exit 1
+    exit 0
   fi
 done
 rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}"
-rosa describe cluster -c ${CLUSTER_ID} -o json
 
 # Output
 # Print console.url and api.url
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
 CONSOLE_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.console.url')
 if [[ "${API_URL}" == "null" ]]; then
-  # If api.url is null, call ocm-qe to analyze the root cause.
-  if [[ -e ${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url ]]; then
-    slack_hook_url=$(cat "${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url")
-    slack_message='{"text": "Warning: the api.url for the cluster '"${CLUSTER_ID}"' is null. Sleep 10 hours for debugging with the job '"${JOB_NAME}/${BUILD_ID}"'. <@UD955LPJL> <@UEEQ10T4L>"}'
-    curl -X POST -H 'Content-type: application/json' --data "${slack_message}" "${slack_hook_url}"
-    sleep 36000
-  fi
-
   port="6443"
   if [[ "$HOSTED_CP" == "true" ]]; then
     port="443"

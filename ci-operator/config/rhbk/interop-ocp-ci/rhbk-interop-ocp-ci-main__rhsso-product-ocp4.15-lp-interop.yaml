@@ -1,0 +1,69 @@
+base_images:
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: docker-container-executor/Dockerfile
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: rhsso-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rhsso-interop-aws
+  cron: 0 6 25 12 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI",  "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "keycloak-qe-rhsso-tests", "failure_type": "pod_failure", "classification": "Test Execution", "jira_project": "LPTOCPCI",  "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "keycloak-qe-rhsso-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "RHSSO", "group": {"name": "lp-tests", "priority": 2},"jira_additional_labels": ["rhsso","!default","interop-tests"],"jira_assignee":"ikhomyn@redhat.com"}
+            ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","rhsso-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OCP_PROJECT_NAME: keycloak
+      OPERATORS: |
+        [
+            {"name": "rhsso-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "keycloak", "operator_group": "rhsso-operator-group", "target_namespaces": "keycloak"}
+        ]
+      USER_TAGS: |
+        scenario rhsso
+    test:
+    - ref: install-operators
+    - ref: keycloak-qe-rhsso-tests
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: rhbk
+  repo: interop-ocp-ci
+  variant: rhsso-product-ocp4.15-lp-interop

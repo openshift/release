@@ -35,9 +35,9 @@ images:
     RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh
   to: custom-metrics-autoscaler-tests
 promotion:
-  disabled: true
-  name: "4.15"
-  namespace: ocp
+  to:
+  - name: "4.15"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -71,6 +71,13 @@ tests:
     clientset-generate
   container:
     from: src
+- as: security
+  optional: true
+  skip_if_only_changed: \.md$|^\.github|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: kedacore-keda
+    workflow: openshift-ci-security
 - as: keda-e2e-aws-ovn
   skip_if_only_changed: \.md$|^\.github|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:

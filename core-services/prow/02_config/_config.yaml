@@ -93,11 +93,14 @@ deck:
     rerun_auth_configs:
       github_users:
       - m1kola
+      - stevekuznetsov
   hidden_repos:
   - openshift/ose
   - openshift/online-registration
   skip_storage_path_validation: false
   spyglass:
+    bucket_aliases:
+      origin-ci-test: test-platform-results
     gcs_browser_prefixes:
       '*': https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-priv: https://gcsweb-private-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
@@ -140,6 +143,7 @@ deck:
           - ^make.*:.*\*\*\*
           - '[Ee]xit.*\s(code|status)\b.*\s[1-9][0-9]*\b'
           - '│ Error:'
+          - Object got updated more than one time without a no-op update
         name: buildlog
       required_files:
       - ^build-log.txt
@@ -166,6 +170,8 @@ deck:
     size_limit: 500000000
   tide_update_period: 10s
 default_job_timeout: 24h0m0s
+disabled_clusters:
+- arm01
 gangway:
   allowed_api_clients:
   - allowed_jobs_filters:
@@ -214,7 +220,7 @@ plank:
   - config:
       censor_secrets: true
       gcs_configuration:
-        bucket: origin-ci-test
+        bucket: test-platform-results
         default_org: openshift
         default_repo: origin
         mediaTypes:
@@ -249,17 +255,17 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20231128-bb6aa76183
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20231128-bb6aa76183
-        initupload: gcr.io/k8s-prow/initupload:v20231128-bb6aa76183
-        sidecar: gcr.io/k8s-prow/sidecar:v20231128-bb6aa76183
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20240131-27b33826e4
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20240131-27b33826e4
+        initupload: gcr.io/k8s-prow/initupload:v20240131-27b33826e4
+        sidecar: gcr.io/k8s-prow/sidecar:v20240131-27b33826e4
   - cluster: arm01
     config:
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20231128-bb6aa76183-arm64
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20231128-bb6aa76183-arm64
-        initupload: gcr.io/k8s-prow/initupload:v20231128-bb6aa76183-arm64
-        sidecar: gcr.io/k8s-prow/sidecar:v20231128-bb6aa76183-arm64
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20240131-27b33826e4-arm64
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20240131-27b33826e4-arm64
+        initupload: gcr.io/k8s-prow/initupload:v20240131-27b33826e4-arm64
+        sidecar: gcr.io/k8s-prow/sidecar:v20240131-27b33826e4-arm64
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -310,12 +316,12 @@ plank:
     openshift/distributed-tracing-qe: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/verification-tests: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
-  job_url_template: https://{{if .Spec.Hidden }}deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/origin-ci-private/{{else}}prow.ci.openshift.org/view/gs/origin-ci-test/{{end}}
+  job_url_template: https://{{if .Spec.Hidden }}deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/origin-ci-private/{{else}}prow.ci.openshift.org/view/gs/test-platform-results/{{end}}
     {{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if
     ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if
     eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else
     if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/
-  max_concurrency: 1200
+  max_concurrency: 1500
   max_goroutines: 20
   pod_pending_timeout: 30m0s
   pod_running_timeout: 48h0m0s

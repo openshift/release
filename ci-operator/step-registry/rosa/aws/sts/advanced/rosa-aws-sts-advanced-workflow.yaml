@@ -6,9 +6,8 @@ workflow:
       PERMISSIONS_BOUNDARY: "arn:aws:iam::aws:policy/AdministratorAccess"
       COMPUTE_MACHINE_TYPE: "m5.xlarge"
       WORKER_DISK_SIZE: "128GiB"
-      ENABLE_AUTOSCALING: "true"
-      MIN_REPLICAS: "3"
-      MAX_REPLICAS: "6"
+      ENABLE_AUTOSCALING: "false"
+      REPLICAS: "3"
       MULTI_AZ: "true"
       FIPS: "true"
       ENABLE_BYOVPC: "true"
@@ -21,7 +20,6 @@ workflow:
       DISABLE_SCP_CHECKS: "false"
       EC2_METADATA_HTTP_TOKENS: "required"
       DEFAULT_MACHINE_POOL_LABELS: "k8s.ovn.org/egress-assignable="
-      MP_MACHINE_TYPE: "g4dn.2xlarge"
       MP_REPLICAS: "1"
       LOCAL_ZONE: "true"
       LOCALZONE_WORKER_ASSIGN_PUBLIC_IP: "no"
@@ -35,8 +33,9 @@ workflow:
     - ref: rosa-sts-kms-key-create
     - chain: rosa-cluster-provision
     - ref: aws-provision-tags-for-byo-vpc
-    - ref: aws-provision-localzone-subnet
+    - chain: aws-provision-localzone-subnet
     - ref: rosa-conf-tags-for-localzone-subnet
+    - ref: osd-ccs-cluster-instance-types
     - ref: rosa-conf-machine-pool
     - ref: osd-ccs-conf-idp-htpasswd-multi-users
     - ref: rosa-cluster-wait-ready-nodes

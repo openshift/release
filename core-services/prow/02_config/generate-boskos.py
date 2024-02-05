@@ -32,8 +32,8 @@ CONFIG = {
         'us-east-1': 40,
     },
     'aws-cspi-qe-quota-slice': {
-        'us-east-1': 10,
-        'us-east-2': 10,
+        'us-east-1': 30,
+        'us-east-2': 30,
     },
     'aws-managed-cspi-qe-quota-slice': {
         'us-east-1': 10,
@@ -53,6 +53,9 @@ CONFIG = {
     },
     'aws-outpost-quota-slice': {
         'us-east-1': 10,
+    },
+    'aws-outpost-qe-quota-slice': {
+        'us-east-1': 5,
     },
     'aws-china-qe-quota-slice': {
         'cn-north-1': 1,
@@ -90,6 +93,12 @@ CONFIG = {
     'aws-rhtap-performance-quota-slice': {
         'eu-west-1': 10
     },
+    'aws-pipelines-performance-quota-slice': {
+        'eu-west-1': 10
+    },
+    'aws-rhdh-performance-quota-slice': {
+        'eu-west-1': 10
+    },
     'aws-opendatahub-quota-slice': {
         # Wild guesses. We can re-configure later
         # https://docs.ci.openshift.org/docs/architecture/quota-and-leases/#adding-a-new-type-of-resource
@@ -101,10 +110,10 @@ CONFIG = {
     'aws-telco-quota-slice': {
         # Wild guesses. We can re-configure later
         # https://docs.ci.openshift.org/docs/architecture/quota-and-leases/#adding-a-new-type-of-resource
-        'us-east-1': 40,
-        'us-east-2': 40,
-        'us-west-1': 40,
-        'us-west-2': 40,
+        'us-east-1': 60,
+        'us-east-2': 60,
+        'us-west-1': 60,
+        'us-west-2': 60,
     },
     'aws-devfile-quota-slice': {
         'us-west-2': 10
@@ -182,6 +191,9 @@ CONFIG = {
         'us-central1': 40,
     },
     'libvirt-s390x-quota-slice': {},
+    'libvirt-s390x-amd64-quota-slice': {
+        'libvirt-s390x-amd64-0-0': 1
+    },
     'libvirt-ppc64le-quota-slice': {},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
@@ -190,6 +202,7 @@ CONFIG = {
     'nutanix-quota-slice': {},
     'nutanix-qe-quota-slice': {},
     'nutanix-qe-dis-quota-slice': {},
+    'nutanix-qe-zone-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-quota-slice': {
         'default': 7,
@@ -256,6 +269,12 @@ CONFIG = {
     'powervs-3-quota-slice': {
         'dal10': 1,
     },
+    'powervs-4-quota-slice': {
+        'wdc06': 1,
+    },
+    'powervs-multi-1-quota-slice': {
+        'wdc06': 2,
+    },
     'ibmcloud-cspi-qe-quota-slice': {
         'us-east': 10,
     },
@@ -264,6 +283,9 @@ CONFIG = {
     },
     'ibmcloud-qe-quota-slice': {
         'jp-tok': 10,
+    },
+    'ibmcloud-qe-2-quota-slice': {
+        'us-east': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
         'us-south': 3,
@@ -319,10 +341,41 @@ CONFIG = {
         'us-east-2': 50,
         'us-west-2': 50,
     },
+    'medik8s-aws-quota-slice': {
+        'us-east-1': 15,
+        'us-east-2': 15,
+        'us-west-2': 15,
+    },
+    'gitops-aws-quota-slice': {
+        'us-west-2': 10
+    },
+    'che-aws-quota-slice': {
+        # us-east-2 is reserved for the air-gapped clusters
+        'us-east-1': 10,
+        'us-west-1': 10,
+    },
+    'osl-gcp-quota-slice': {
+        'us-central1': 10,
+    },
+    'devsandboxci-aws-quota-slice': {
+        # Wild guesses.
+        'us-east-1': 20,
+        'us-east-2': 20,
+    },
+    'quay-aws-quota-slice': {
+        'us-east-1': 20,
+        'us-west-1': 20,
+    },
+    'aws-edge-infra-quota-slice': {
+        'us-east-1': 5,
+        'us-east-2': 5,
+        'us-west-1': 5,
+        'us-west-2': 5,
+    }
 }
 
-for i in range(3):
-    for j in range(4):
+for i in range(0,4):
+    for j in range(2):
         CONFIG['libvirt-s390x-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
 # Mihawk0 is updated with RHEL 8.8, adding the Mihawk back to the lease pool
 for i in range(3):
@@ -339,6 +392,9 @@ for i in range(3):
 
 for i in range(3):
     CONFIG['nutanix-qe-dis-quota-slice']['nutanix-qe-dis-segment-{0:0>2}'.format(i)] = 1
+
+for i in range(3):
+    CONFIG['nutanix-qe-zone-quota-slice']['nutanix-qe-zone-segment-{0:0>2}'.format(i)] = 1
 
 for i in range(2):
     CONFIG['openstack-osuosl-quota-slice']['openstack-osuosl-{0:0>2}'.format(i)] = 1

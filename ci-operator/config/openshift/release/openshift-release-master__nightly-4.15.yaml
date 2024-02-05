@@ -96,10 +96,9 @@ releases:
       stream: nightly
       version: "4.15"
   oldest-supported-z-rollback:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.15"
+    release:
+      channel: candidate
+      version: 4.15.0-rc.0
 resources:
   '*':
     requests:
@@ -232,7 +231,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6
-- as: e2e-metal-ipi-sdn-serial-virtualmedia-bond
+- as: e2e-metal-ipi-ovn-serial-virtualmedia-bond
   cluster: build05
   interval: 168h
   steps:
@@ -240,7 +239,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: baremetalds-e2e-sdn-serial-virtualmedia-bond
+    workflow: baremetalds-e2e-serial-virtualmedia-bond
 - as: e2e-metal-ipi-serial-ovn-dualstack
   cluster: build05
   interval: 168h
@@ -305,10 +304,23 @@ tests:
   interval: 168h
   steps:
     cluster_profile: vsphere-8-vpn
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-sdn
+- as: e2e-vsphere-static-ovn
+  interval: 168h
+  steps:
+    cluster_profile: vsphere-8-vpn
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-staticip
+  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-techpreview
   interval: 168h
   steps:
@@ -448,6 +460,7 @@ tests:
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       FIPS_ENABLED: "true"
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
@@ -473,6 +486,8 @@ tests:
   interval: 168h
   steps:
     cluster_profile: gcp-3
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
@@ -492,6 +507,7 @@ tests:
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -525,6 +541,7 @@ tests:
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       FIPS_ENABLED: "true"
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SUITE: openshift/conformance/serial
     observers:
       enable:
@@ -554,6 +571,7 @@ tests:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     env:
       FIPS_ENABLED: "true"
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SUITE: openshift/conformance/serial
     observers:
       enable:
@@ -600,24 +618,39 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-xpn
   timeout: 6h0m0s
-- as: e2e-aws-ovn-upgrade-rollback-oldest-supported
+- as: aws-ovn-upgrade-rollback-oldest-supported
   interval: 48h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      TEST_TYPE: upgrade-conformance
-      TEST_UPGRADE_OPTIONS: abort-at=100
-    workflow: openshift-upgrade-aws
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_LATEST},${RELEASE_IMAGE_Z_ROLLBACK}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_Z_ROLLBACK
+        name: release:oldest-supported-z-rollback
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
+  timeout: 6h0m0s
 - as: e2e-aws-sdn-upgrade
   interval: 168h
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -629,6 +662,7 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
@@ -639,6 +673,7 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
@@ -669,6 +704,7 @@ tests:
     cluster_profile: azure-2
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
@@ -709,6 +745,7 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
@@ -729,6 +766,7 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
@@ -867,7 +905,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-telco5g-sno-cnftests
   cluster: build05
-  cron: 40 13 */1 * 1-5
+  cron: 00 18 */1 * 1-5
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -968,6 +1006,8 @@ tests:
   interval: 168h
   steps:
     cluster_profile: gcp-3
+    env:
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
@@ -1024,12 +1064,17 @@ tests:
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-shared-vpc-phz
-- as: e2e-agent-compact-ipv4
+- as: e2e-agent-compact-ipv4-conformance
   cluster: build05
   cron: 0 */12 * * *
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: agent-e2e-compact-ipv4
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        FIPS_MODE=true
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: agent-e2e-generic-conformance
   timeout: 5h0m0s
 - as: e2e-agent-sno-ipv6
   cluster: build05
@@ -1038,12 +1083,16 @@ tests:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-sno-ipv6
   timeout: 5h0m0s
-- as: e2e-agent-ha-dualstack
+- as: e2e-agent-ha-dualstack-conformance
   cluster: build05
   cron: 0 */12 * * *
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: agent-e2e-ha-dualstack
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: agent-e2e-generic-conformance
   timeout: 5h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-suspend-30d
   cron: '@weekly'
@@ -1197,46 +1246,24 @@ tests:
   steps:
     cluster_profile: aws-2
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
+      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential
       BASE_DOMAIN: aws-2.ci.openshift.org
       BASELINE_CAPABILITY_SET: None
       PERSISTENT_MONITORING: "false"
       SKEW: +30d
     workflow: openshift-e2e-aws-cert-rotation
   timeout: 4h0m0s
-- as: e2e-aws-ovn-shared-vpc-localzones
+- as: e2e-aws-ovn-edge-zones
   cron: '@weekly'
   steps:
-    cluster_profile: aws-local-zones
-    env:
-      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
-    workflow: openshift-e2e-aws-local-zones-byo-vpc
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-edge-zones
   timeout: 6h0m0s
-- as: e2e-aws-ovn-shared-vpc-wavelengthzones
+- as: e2e-aws-ovn-shared-vpc-edge-zones
   cron: '@weekly'
   steps:
-    cluster_profile: aws-local-zones
-    env:
-      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
-      EDGE_ZONE_TYPE: wavelength-zone
-    workflow: openshift-e2e-aws-local-zones-byo-vpc
-  timeout: 6h0m0s
-- as: e2e-aws-ovn-localzones
-  cron: '@weekly'
-  steps:
-    cluster_profile: aws-local-zones
-    env:
-      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
-    workflow: openshift-e2e-aws-local-zones
-  timeout: 6h0m0s
-- as: e2e-aws-ovn-wavelengthzones
-  cron: '@weekly'
-  steps:
-    cluster_profile: aws-local-zones
-    env:
-      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
-      EDGE_ZONE_TYPE: wavelength-zone
-    workflow: openshift-e2e-aws-local-zones
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-edge-zones-byo-vpc
   timeout: 6h0m0s
 - as: e2e-aws-overlay-mtu-ovn-5000
   cron: '@weekly'
@@ -1246,32 +1273,12 @@ tests:
       CLUSTER_NETWORK_MTU: "5000"
     workflow: openshift-e2e-aws-network-mtu
   timeout: 6h0m0s
-- as: e2e-aws-overlay-mtu-sdn-5000
+- as: e2e-aws-overlay-mtu-ovn-edge-1100
   cron: '@weekly'
   steps:
     cluster_profile: aws
     env:
-      CLUSTER_NETWORK_MTU: "5000"
-      NETWORK_TYPE: OpenShiftSDN
-    workflow: openshift-e2e-aws-network-mtu
-  timeout: 6h0m0s
-- as: e2e-aws-overlay-mtu-ovn-edge-1100
-  cron: '@weekly'
-  steps:
-    cluster_profile: aws-local-zones
-    env:
-      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
       CLUSTER_NETWORK_MTU: "1100"
-    workflow: openshift-e2e-aws-network-mtu-edge-zones
-  timeout: 6h0m0s
-- as: e2e-aws-overlay-mtu-sdn-edge-1100
-  cron: '@weekly'
-  steps:
-    cluster_profile: aws-local-zones
-    env:
-      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
-      CLUSTER_NETWORK_MTU: "1100"
-      NETWORK_TYPE: OpenShiftSDN
     workflow: openshift-e2e-aws-network-mtu-edge-zones
   timeout: 6h0m0s
 zz_generated_metadata:

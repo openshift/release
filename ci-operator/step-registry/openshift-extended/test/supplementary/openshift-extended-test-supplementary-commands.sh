@@ -92,6 +92,11 @@ then
     TEST_ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token") || true
     export TEST_ROSA_TOKEN
 fi
+if test -f "${SHARED_DIR}/cluster-id"
+then
+    CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id") || true
+    export CLUSTER_ID
+fi
 
 # configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
@@ -263,8 +268,16 @@ function run {
         echo "add FILTERS_ADDITIONAL_SUPPLEMENTARY into test_filters"
         test_filters="${hardcoded_filters};${TEST_FILTERS_SUPPLEMENTARY};${FILTERS_ADDITIONAL_SUPPLEMENTARY}"
     fi
+    echo "------handle test filter start------"
     echo "${test_filters}"
     handle_filters "${test_filters}"
+    echo "------handle test filter done------"
+
+    echo "------handle module filter start------"
+    echo "MODULE_FILTERS_SUPPLEMENTARY: \"${MODULE_FILTERS_SUPPLEMENTARY:-}\""
+    handle_module_filter "${MODULE_FILTERS_SUPPLEMENTARY}"
+    echo "------handle module filter done------"
+
     echo "------------------the case selected------------------"
     selected_case_num=$(cat ./case_selected|wc -l)
     if [ "W${selected_case_num}W" == "W0W" ]; then
@@ -306,7 +319,7 @@ function run {
     fi
 
     # summarize test results
-    echo "Summarizing test result..."
+    echo "Summarizing test results..."
     failures=0 errors=0 skipped=0 tests=0
     grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
     while read -a row ; do
@@ -314,13 +327,24 @@ function run {
         let errors+=${row[0]} failures+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
     done < /tmp/zzz-tmp.log
 
-    TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results"
-    echo -e "\nfailures: $failures, errors: $errors, skipped: $skipped, tests: $tests in openshift-extended-test-supplementary" | tee -a "${TEST_RESULT_FILE}"
+    TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
+    cat > "${TEST_RESULT_FILE}" <<- EOF
+ginkgo:
+  type: openshift-extended-test-supplementary
+  total: $tests
+  failures: $failures
+  errors: $errors
+  skipped: $skipped
+EOF
+
     if [ $((failures)) != 0 ] ; then
-        echo "Failing Scenarios:" | tee -a "${TEST_RESULT_FILE}"
-        grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | grep -v grep | cut -d'"' -f2 | sort -t':' -k2 | uniq | sed -E 's/^( +)?/  /' | tee -a "${TEST_RESULT_FILE}" || true
+        echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
+        readarray -t failingscenarios < <(grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | awk -v n=4 '{ for (i=n; i<=NF; i++) printf "%s%s", $i, (i<NF ? OFS : ORS)}' | sort --unique)
+        for (( i=0; i<${#failingscenarios[@]}; i++ )) ; do
+            echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
+        done
     fi
-    cat "${TEST_RESULT_FILE}" >> "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
+    cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
 
     # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
     # please refer to the junit result for case result, not depends on step result.
@@ -416,6 +440,52 @@ function handle_or_filter {
         check_case_selected "${ret}"
     fi
 }
+
+function handle_module_filter {
+    local module_filter="$1"
+    declare -a module_filter_keys
+    declare -a module_filter_values
+    valid_and_get_module_filter "$module_filter"
+
+
+    for i in "${!module_filter_keys[@]}"; do
+
+        module_key="${module_filter_keys[$i]}"
+        filter_value="${module_filter_values[$i]}"
+        echo "moudle: $module_key"
+        echo "filter: $filter_value"
+        [ -s ./case_selected ] || { echo "No Case already Selected before handle ${module_key}"; continue; }
+
+        cat ./case_selected | grep -v -E "${module_key}" > ./case_selected_exclusive || true
+        cat ./case_selected | grep -E "${module_key}" > ./case_selected_inclusive || true
+        rm -fr ./case_selected && cp -fr ./case_selected_inclusive ./case_selected && rm -fr ./case_selected_inclusive
+
+        handle_filters "${filter_value}"
+
+        [ -e ./case_selected ] && cat ./case_selected_exclusive >> ./case_selected && rm -fr ./case_selected_exclusive
+        [ -e ./case_selected ] && sort -u ./case_selected > ./case_selected_sort && mv -f ./case_selected_sort ./case_selected
+
+    done
+}
+
+function valid_and_get_module_filter {
+    local module_filter_tmp="$1"
+
+    IFS='#' read -ra pairs <<< "$module_filter_tmp"
+    for pair in "${pairs[@]}"; do
+        IFS=':' read -ra kv <<< "$pair"
+        if [[ ${#kv[@]} -ne 2 ]]; then
+            echo "moudle filter format is not correct"
+            exit 1
+        fi
+
+        module_key="${kv[0]}"
+        filter_value="${kv[1]}"
+        module_filter_keys+=("$module_key")
+        module_filter_values+=("$filter_value")
+    done
+}
+
 function handle_result {
     resultfile=`ls -rt -1 ${ARTIFACT_DIR}/junit/junit_e2e_* 2>&1 || true`
     echo $resultfile

@@ -3,21 +3,22 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.20-openshift-4.14
+    tag: rhel-9-release-golang-1.20-openshift-4.16
 images:
 - dockerfile_literal: FROM bin
   from: bin
   to: openstack-tests
 promotion:
-  additional_images:
-    openstack-tests: bin
-  name: "4.15"
-  namespace: ocp
+  to:
+  - additional_images:
+      openstack-tests: bin
+    name: "4.16"
+    namespace: ocp
 releases:
   latest:
     integration:
       include_built_images: true
-      name: "4.15"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -87,6 +88,22 @@ tests:
     - ref: openstack-test-openstack
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-dualstack
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    workflow: openshift-e2e-openstack-dualstack
+- always_run: false
+  as: e2e-openstack-dualstack-v6primary
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    env:
+      CONFIG_TYPE: dualstack-v6primary
+      TEST_SKIPS: when FIPS is disabled the HAProxy router should serve routes when
+        configured with a 1024-bit RSA key\|should redirect on blob pull
+    workflow: openshift-e2e-openstack-dualstack
 zz_generated_metadata:
   branch: main
   org: openshift

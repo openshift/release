@@ -2,11 +2,11 @@ base_images:
   base:
     name: "4.16"
     namespace: ocp
-    tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   image_stream_tag:
     name: release
@@ -16,13 +16,15 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cloud-event-proxy
 promotion:
-  name: "4.16"
-  namespace: ocp
+  to:
+  - disabled: true
+    name: "4.16"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -44,7 +46,16 @@ tests:
 - as: e2e-aws
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: sysdeseng.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname redhat-cne-cloud-event-proxy-main
+        ci-job-type e2e-aws
+        ci-repo-name cloud-event-proxy
+        ci-org-name redhat-cne
     test:
     - as: functests
       cli: latest
@@ -66,6 +77,12 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: cloud-event-proxy
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.16
   org: redhat-cne

@@ -3,14 +3,10 @@ base_images:
     name: nginx-unprivileged
     namespace: ci
     tag: stable
-  cli:
-    name: "4.14"
-    namespace: ocp
-    tag: cli
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.48.0
+    tag: v1.54.2
   hypershift:
     name: hypershift-cli
     namespace: ci
@@ -73,10 +69,10 @@ images:
 - context_dir: images/dptp-3312-hypershift-leaks-cleaner/
   from: os
   inputs:
-    cli:
+    bin:
       paths:
       - destination_dir: .
-        source_path: /usr/bin/oc
+        source_path: /usr/local/bin/oc
     hypershift:
       paths:
       - destination_dir: .
@@ -121,6 +117,8 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/ci-operator
+      - destination_dir: .
+        source_path: /usr/bin/manifest-tool
   to: ci-operator
 - context_dir: images/ci-operator-checkconfig/
   from: os
@@ -221,10 +219,8 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/ci-images-mirror
-    cli:
-      paths:
       - destination_dir: usr/bin
-        source_path: /usr/bin/oc
+        source_path: /usr/local/bin/oc
   to: ci-images-mirror
 - dockerfile_literal: |-
     FROM quay.io/centos/centos:stream8
@@ -321,10 +317,8 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/applyconfig
-    cli:
-      paths:
       - destination_dir: usr/bin
-        source_path: /usr/bin/oc
+        source_path: /usr/local/bin/oc
   to: applyconfig
 - context_dir: images/autoowners
   from: os
@@ -419,10 +413,8 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/ci-secret-generator
-    cli:
-      paths:
       - destination_dir: usr/bin
-        source_path: /usr/bin/oc
+        source_path: /usr/local/bin/oc
   to: ci-secret-generator
 - context_dir: images/ci-operator-config-mirror
   from: os
@@ -702,10 +694,8 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/sync-rover-groups
-    cli:
-      paths:
       - destination_dir: usr/bin
-        source_path: /usr/bin/oc
+        source_path: /usr/local/bin/oc
   to: sync-rover-groups
 - dockerfile_literal: |-
     FROM quay.io/centos/centos:stream8
@@ -739,14 +729,32 @@ images:
         source_path: /go/bin/multi-arch-builder-controller
       - destination_dir: .
         source_path: /usr/bin/manifest-tool
-    cli:
+      - destination_dir: .
+        source_path: /usr/local/bin/oc
+  to: multi-arch-builder-controller
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    ADD ci-scheduling-webhook /usr/bin/ci-scheduling-webhook
+    ENTRYPOINT ["/usr/bin/ci-scheduling-webhook"]
+  from: os
+  inputs:
+    bin:
       paths:
       - destination_dir: .
-        source_path: /usr/bin/oc
-  to: multi-arch-builder-controller
+        source_path: /go/bin/ci-scheduling-webhook
+  to: ci-scheduling-webhook
+- context_dir: images/gpu-scheduling-webhook
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/gpu-scheduling-webhook
+  to: gpu-scheduling-webhook
 promotion:
-  namespace: ci
-  tag: latest
+  to:
+  - namespace: ci
+    tag: latest
 resources:
   '*':
     requests:
@@ -805,7 +813,8 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: e2e-oo
-  run_if_changed: pkg/steps/(index|bundle).*.go
+  optional: true
+  pipeline_run_if_changed: pkg/steps/(index|bundle).*.go
   steps:
     test:
     - as: e2e-oo

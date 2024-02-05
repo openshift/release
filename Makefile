@@ -67,7 +67,7 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20231128-bb6aa76183 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20240131-27b33826e4 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
@@ -175,12 +175,8 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns publishing-bot content-mirror azure metering coreos
+projects: ci-ns publishing-bot azure metering coreos
 .PHONY: projects
-
-content-mirror:
-	$(MAKE) apply WHAT=projects/content-mirror/pipeline.yaml
-.PHONY: content-mirror
 
 node-problem-detector:
 	$(MAKE) apply WHAT=projects/kubernetes/node-problem-detector.yaml
@@ -306,7 +302,7 @@ openshift-image-mirror-mappings:
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/promoted-image-governor:latest --ci-operator-config-path /release/ci-operator/config --release-controller-mirror-config-dir /release/core-services/release-controller/_releases --openshift-mapping-dir /release/core-services/image-mirroring/openshift --openshift-mapping-config /release/core-services/image-mirroring/openshift/_config.yaml
 .PHONY: openshift-image-mirror-mappings
 
-config_updater_vault_secret:
+config_updater_vault_secret: build_farm_credentials_folder
 	@[[ $$cluster ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/applyconfig:latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) \
@@ -318,9 +314,17 @@ config_updater_vault_secret:
 		--context=$(cluster) \
 		--confirm \
 		--kubeconfig=/_kubeconfig
-	mkdir -p $(build_farm_credentials_folder)
-	oc --context "$(cluster)" sa create-kubeconfig -n ci config-updater > "$(build_farm_credentials_folder)/sa.config-updater.$(cluster).config"
+
+	./clusters/psi/create_kubeconfig.sh "$(build_farm_credentials_folder)/sa.config-updater.${cluster}.config" ${cluster} config-updater ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
+
+	ls $(build_farm_credentials_folder)
+
+	oc --context app.ci -n ci create secret generic config-updater \
+		--from-file=$(build_farm_credentials_folder) \
+		--dry-run=client -o json | oc --context app.ci apply --dry-run=${DRY_RUN} --as system:admin --server-side -f -
+
 	make dry_run=false ci-secret-generator
+
 .PHONY: config_updater_vault_secret
 
 ### one-off configuration on a build farm cluster
@@ -406,7 +410,7 @@ list-token-secrets:
 .PHONY: list-token-secrets
 
 config-updater-kubeconfig:
-	$(timeout_cmd) 60 ./clusters/psi/create_kubeconfig.sh "$(TMPDIR)/sa.config-updater.${CLUSTER}.config" ${CLUSTER} $@ ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
+	$(timeout_cmd) 60 ./clusters/psi/create_kubeconfig.sh "$(TMPDIR)/sa.config-updater.${CLUSTER}.config" ${CLUSTER} config-updater ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
 	cat "$(TMPDIR)/sa.config-updater.${CLUSTER}.config"
 .PHONY: config-updater-kubeconfig
 
@@ -422,7 +426,6 @@ secret-config-updater:
 	--from-file=sa.config-updater.build09.config=$(TMPDIR)/sa.config-updater.build09.config \
 	--from-file=sa.config-updater.hive.config=$(TMPDIR)/sa.config-updater.hive.config \
 	--from-file=sa.config-updater.multi01.config=$(TMPDIR)/sa.config-updater.multi01.config \
-	--from-file=sa.config-updater.vsphere.config=$(TMPDIR)/sa.config-updater.vsphere.config \
 	--from-file=sa.config-updater.vsphere02.config=$(TMPDIR)/sa.config-updater.vsphere02.config \
 	--dry-run=client -o json | oc --context app.ci apply --dry-run=${DRY_RUN} --as system:admin -f -
 .PHONY: secret-config-updater

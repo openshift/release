@@ -11,6 +11,11 @@ BASE_DOMAIN="$(yq-go r "${SHARED_DIR}/install-config.yaml" 'baseDomain')"
 which openshift-install
 openshift-install version
 
+function get_arch() {
+  ARCH=$(uname -m | sed -e 's/aarch64/arm64/' -e 's/x86_64/amd64/')
+  echo "${ARCH}"
+}
+
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
@@ -98,6 +103,45 @@ function wait_router_lb_provision() {
     return 0
 }
 
+function patch_public_ip_for_edge_node() {
+  set -x
+  local dir=${1}
+  
+  pushd "${dir}/openshift"
+
+  # For wavelength zone & byo vpc only
+  if [[ "${EDGE_ZONE_TYPE:-}"  == 'wavelength-zone' ]] && [[ -e ${SHARED_DIR}/edge_zone_subnet_id ]]; then
+
+    if [ ! -f /tmp/yq ]; then
+      curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$( get_arch )" \
+      -o /tmp/yq && chmod +x /tmp/yq
+    fi
+    
+    PATCH=$(mktemp)
+    cat <<EOF > ${PATCH}
+spec:
+  template:
+    spec:
+      providerSpec:
+        value:
+          publicIp: true
+EOF
+
+    SUBNET_ID=$(head -n 1 ${SHARED_DIR}/edge_zone_subnet_id)
+
+    echo "wavelength zone: patching publi ip: ${PATCH}"
+
+    for MACHINESET in $(grep -lr "machine.openshift.io/cluster-api-machine-role: edge" .)
+    do
+      echo -e "\tpatching: ${MACHINESET}"
+      sed -i "s/subnet-.*/${SUBNET_ID}/g" ${MACHINESET}
+      /tmp/yq m -x -i "${MACHINESET}" "${PATCH}"
+    done
+  fi
+  popd
+  set +x
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM
 
@@ -183,6 +227,10 @@ if [ "${ENABLE_AWS_LOCALZONE}" == "yes" ]; then
         yq-go d "${local_zone_machineset}" spec.template.spec.taints
       done
     fi
+  fi
+
+  if [[ "${LOCALZONE_WORKER_ASSIGN_PUBLIC_IP:-}"  == 'yes' ]]; then
+    patch_public_ip_for_edge_node ${dir}
   fi
   
 fi

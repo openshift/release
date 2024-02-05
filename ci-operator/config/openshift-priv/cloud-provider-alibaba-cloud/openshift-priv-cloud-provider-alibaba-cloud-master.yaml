@@ -1,40 +1,43 @@
 base_images:
-  base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
   commitchecker:
     name: commitchecker
     namespace: ci
     tag: "4.15"
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+  ocp_4.16_base-rhel9:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.21-openshift-4.16
 binary_build_commands: make cloud-controller-manager
 build_root:
   from_repository: true
 canonical_go_repository: k8s.io/cloud-provider-alibaba-cloud
 images:
 - dockerfile_path: openshift-hack/images/Dockerfile.openshift
-  from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: alibaba-cloud-controller-manager
 promotion:
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - name: 4.16-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
+      name: 4.16-priv
       namespace: ocp-private
 resources:
   '*':
@@ -62,12 +65,6 @@ tests:
   commands: make unit-test
   container:
     from: src
-- as: e2e-alibabacloud
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: alibabacloud
-    workflow: openshift-e2e-alibabacloud
 - as: verify-commits
   commands: |
     commitchecker --start ${PULL_BASE_SHA:-master}

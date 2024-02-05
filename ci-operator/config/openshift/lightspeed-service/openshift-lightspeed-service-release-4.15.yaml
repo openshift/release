@@ -4,9 +4,10 @@ build_root:
     namespace: openshift
     tag: golang-1.13
 promotion:
-  disabled: true
-  name: "4.15"
-  namespace: ocp
+  to:
+  - disabled: true
+    name: "4.15"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -26,9 +27,14 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: make test-unit
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make test-unit
   container:
     from: src
+  secret:
+    mount_path: /tmp/secret
+    name: ols-codecov-token
 - as: e2e
   steps:
     cluster_profile: aws

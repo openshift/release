@@ -65,7 +65,7 @@ tests:
     test:
     - as: cloud-provider-ibm
       commands: |
-        export BRANCH_NAME=release-1.28
+        export BRANCH_NAME=release-1.29
         rebasebot --source https://github.com/IBM-Cloud/cloud-provider-ibm:${BRANCH_NAME} \
                   --dest openshift/cloud-provider-ibm:master \
                   --rebase openshift-cloud-team/cloud-provider-ibm:rebase-bot-master \
@@ -122,7 +122,7 @@ tests:
     test:
     - as: cloud-provider-powervs
       commands: |
-        export BRANCH_NAME=release-1.28
+        export BRANCH_NAME=release-1.29
         rebasebot --source https://github.com/IBM-Cloud/cloud-provider-ibm:${BRANCH_NAME} \
                   --dest openshift/cloud-provider-powervs:main \
                   --rebase openshift-cloud-team/cloud-provider-powervs:rebase-bot-main \
@@ -484,6 +484,68 @@ tests:
         namespace: test-credentials
       - mount_path: /secrets/metal-net-cloner-bot
         name: metal-net-cloner-bot-private-key
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: tempo-operator
+  cron: 0 23 * * 1-5
+  steps:
+    test:
+    - as: tempo-operator
+      commands: |
+        rebasebot --source https://github.com/grafana/tempo-operator:main \
+                  --dest openshift/grafana-tempo-operator:main \
+                  --rebase IshwarKanse/tempo-operator:rebase-bot-main \
+                  --update-go-modules \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/dt-secrets/dt-cloner \
+                  --github-cloner-id 811756 \
+                  --git-username tracing-team-rebase-bot \
+                  --git-email tracing-team@redhat.com \
+                  --bot-emails tracing-team@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=none
+      credentials:
+      - mount_path: /secrets/dt-secrets
+        name: dt-secrets
+        namespace: test-credentials
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: opentelemetry-operator
+  cron: 0 23 * * 1-5
+  steps:
+    test:
+    - as: opentelemetry-operator
+      commands: |
+        rebasebot --source https://github.com/open-telemetry/opentelemetry-operator:main \
+                  --dest openshift/open-telemetry-opentelemetry-operator:main \
+                  --rebase IshwarKanse/opentelemetry-operator:rebase-bot-main \
+                  --update-go-modules \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/dt-secrets/dt-cloner \
+                  --github-cloner-id 811756 \
+                  --git-username tracing-team-rebase-bot \
+                  --git-email tracing-team@redhat.com \
+                  --bot-emails tracing-team@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=none
+      credentials:
+      - mount_path: /secrets/dt-secrets
+        name: dt-secrets
+        namespace: test-credentials
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
         namespace: test-credentials
       from: rebasebot
       resources:

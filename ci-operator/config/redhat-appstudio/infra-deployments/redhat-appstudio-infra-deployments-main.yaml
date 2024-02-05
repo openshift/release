@@ -12,7 +12,7 @@ releases:
     release:
       architecture: amd64
       channel: fast
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -30,7 +30,7 @@ tests:
     owner: rhtap
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.13"
   optional: true
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^components/(authentication|quality-dashboard|hac-pact-broker|tekton-ci)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -47,11 +47,27 @@ tests:
     owner: rhtap
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.13"
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^components/(authentication|quality-dashboard|hac-pact-broker|tekton-ci)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - ref: redhat-appstudio-e2e
+    workflow: redhat-appstudio-claim
+- as: appstudio-upgrade-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  optional: true
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^components/(authentication|quality-dashboard|hac-pact-broker|tekton-ci)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    test:
+    - ref: redhat-appstudio-upgrade
     workflow: redhat-appstudio-claim
 - always_run: false
   as: appstudio-load-test
@@ -72,8 +88,8 @@ tests:
     owner: rhtap
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
-  cron: 0 */24 * * *
+    version: "4.13"
+  cron: 0 */4 * * *
   steps:
     test:
     - ref: redhat-appstudio-e2e

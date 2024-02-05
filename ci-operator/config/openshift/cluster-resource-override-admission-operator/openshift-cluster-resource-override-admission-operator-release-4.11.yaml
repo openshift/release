@@ -30,8 +30,9 @@ images:
       - registry.ci.openshift.org/openshift/release:golang-1.15
   to: cluster-resource-override-admission-operator-registry
 promotion:
-  name: "4.11"
-  namespace: ocp
+  to:
+  - name: "4.11"
+    namespace: ocp
 releases:
   initial:
     integration:
@@ -58,6 +59,12 @@ tests:
   commands: make verify
   container:
     from: src
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: cluster-resource-override-admission-operator
+    workflow: openshift-ci-security
 - as: e2e-aws-operator
   steps:
     cluster_profile: aws

@@ -17,8 +17,9 @@ images:
         source_path: /go/src/github.com/openshift-kni/mixed-cpu-node-plugin/build/bin/mixedcpu
   to: mixed-cpu-node-plugin
 promotion:
-  name: mixed-cpu-node-plugin
-  namespace: ocp-kni
+  to:
+  - name: mixed-cpu-node-plugin
+    namespace: ocp-kni
 releases:
   initial:
     candidate:
@@ -42,7 +43,16 @@ tests:
     from: src
 - as: ci-e2e
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: sysdeseng.devcluster.openshift.com
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname openshift-kni-mixed-cpu-node-plugin-main
+        ci-job-type openshift-e2e-aws
+        ci-repo-name mixed-cpu-node-plugin
+        ci-org-name openshift-kni
     test:
     - as: e2e-test
       cli: latest

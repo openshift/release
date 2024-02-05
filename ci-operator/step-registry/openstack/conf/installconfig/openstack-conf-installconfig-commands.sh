@@ -158,9 +158,39 @@ if [ "${FIPS_ENABLED:-}" = "true" ]; then
 fi
 
 if [ -n "${FEATURE_SET}" ]; then
-        echo "Adding 'featureSet: ...' to install-config.yaml"
+        echo "Adding 'featureSet: ${FEATURE_SET}' to install-config.yaml"
 	yq --yaml-output --in-place ".
 		| .featureSet = \"${FEATURE_SET}\"
+	" "$INSTALL_CONFIG"
+fi
+
+if [ -n "${FEATURE_GATES}" ]; then
+	IFS=',' read -ra gates <<< "$FEATURE_GATES"
+	for gate in "${gates[@]}"; do
+		echo "Adding feature gate '${gate}' to install-config.yaml"
+		yq --yaml-output --in-place ".
+			| .featureGates +=  [\"${gate}\"]
+		" "$INSTALL_CONFIG"
+	done
+fi
+
+if [[ -n "${OVERRIDE_OPENSHIFT_SDN_DEPRECATION:-}" ]]; then
+        # Needed for 4.15+; see ci-operator/step-registry/sdn/conf/sdn-conf-commands.sh
+        cat > "${SHARED_DIR}/manifest_cluster-network-02-config.yml" << EOF
+apiVersion: config.openshift.io/v1
+kind: Network
+metadata:
+  name: cluster
+spec:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  networkType: OpenShiftSDN
+  serviceNetwork:
+  - 172.30.0.0/16
+EOF
+        yq --yaml-output --in-place ".
+		| .networking.networkType = \"OVNKubernetes\"
 	" "$INSTALL_CONFIG"
 fi
 

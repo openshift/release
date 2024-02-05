@@ -1,12 +1,12 @@
 periodics:
 - agent: kubernetes
   cluster: build05
+  cron: 0 23 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.13
     org: openshift
     repo: cluster-api-actuator-pkg
-  interval: 72h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -76,13 +76,13 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build04
+  cron: 39 2 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.13
     org: openshift
     repo: cluster-api-actuator-pkg
-  interval: 72h
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure4
@@ -153,12 +153,12 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build02
+  cron: 36 12 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.13
     org: openshift
     repo: cluster-api-actuator-pkg
-  interval: 72h
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp
@@ -238,13 +238,21 @@ periodics:
   - base_ref: release-4.13
     org: openshift
     repo: cluster-api-actuator-pkg
-  interval: 72h
   labels:
     ci-operator.openshift.io/cloud: openstack-vexxhost
     ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  minimum_interval: 72h
   name: periodic-ci-openshift-cluster-api-actuator-pkg-release-4.13-e2e-openstack-operator-periodic
+  reporter_config:
+    slack:
+      channel: '#shiftstack-bot'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> :volcano:'
   spec:
     containers:
     - args:
@@ -309,12 +317,12 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: vsphere02
+  cron: 55 9 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.13
     org: openshift
     repo: cluster-api-actuator-pkg
-  interval: 72h
   labels:
     ci-operator.openshift.io/cloud: vsphere
     ci-operator.openshift.io/cloud-cluster-profile: vsphere-2

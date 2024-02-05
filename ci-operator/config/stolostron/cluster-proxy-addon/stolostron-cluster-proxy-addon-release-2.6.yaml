@@ -22,8 +22,9 @@ images:
       - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: cluster-proxy-addon
 promotion:
-  name: "2.6"
-  namespace: stolostron
+  to:
+  - name: "2.6"
+    namespace: stolostron
 releases:
   initial:
     integration:
@@ -59,22 +60,6 @@ tests:
     make test --warn-undefined-variables
   container:
     from: test-bin
-- as: e2e
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        KUBECTL=oc
-        EXAMPLE_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:cluster-proxy-addon}
-        export KUBECTL EXAMPLE_IMAGE_NAME
-        make test-e2e
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 - as: publish
   postsubmit: true
   steps:

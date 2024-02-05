@@ -3,10 +3,6 @@ base_images:
     name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
-  builder:
-    name: ubi
-    namespace: ocp
-    tag: "9"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -25,43 +21,15 @@ build_root:
     namespace: openshift
     tag: golang-1.19
 images:
-- dockerfile_literal: |
-    FROM registry.redhat.io/ubi9/ubi:latest as builder
-    RUN INSTALL_PKGS=" \
-          gcc-c++ \
-          cmake \
-          make \
-          git \
-          unzip \
-          llvm-toolset \
-          " && \
-        dnf install -y $INSTALL_PKGS && \
-        rpm -V $INSTALL_PKGS && \
-        dnf clean all
-
-    ENV HOME=/root
-    RUN PB_REL="https://github.com/protocolbuffers/protobuf/releases" && \
-        curl -LO $PB_REL/download/v3.15.8/protoc-3.15.8-linux-x86_64.zip && \
-        unzip protoc-3.15.8-linux-x86_64.zip -d $HOME/.local
-    ENV PATH="$PATH:$HOME/.local/bin"
-
-    RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
-    ENV CARGO_HOME=$HOME/.cargo
-    ENV PATH=$CARGO_HOME/bin:$PATH
-
-    RUN mkdir -p /src
-    WORKDIR /src
-    COPY . /src
-
-    RUN chmod -R 777 /src $CARGO_HOME
-  from: builder
+- dockerfile_path: Dockerfile.prow
   to: recert-check
 - dockerfile_path: Dockerfile
   to: recert
 promotion:
-  namespace: edge-infrastructure
-  tag: latest
-  tag_by_commit: true
+  to:
+  - namespace: edge-infrastructure
+    tag: latest
+    tag_by_commit: true
 releases:
   latest:
     release:
@@ -115,8 +83,6 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and @singlenode
-        and not @fips'
       FILTERS_ADDITIONAL: ~LSO&
     observers:
       enable:
@@ -126,17 +92,18 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: openshift-e2e-aws-single-node-recert
   timeout: 8h0m0s
-- as: aws-sno-fips-recert
+- as: e2e-aws-ipi-sno-fips-recert
   cron: '@weekly'
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Disruptive&;~Serial&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-aws-ipi-sno-recert
-  timeout: 8h0m0s
+    - ref: single-node-recert
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-sno
 - always_run: false
   as: baremetalds-sno-recert-cluster-rename
   steps:

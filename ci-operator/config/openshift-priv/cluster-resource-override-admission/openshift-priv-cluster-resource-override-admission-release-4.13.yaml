@@ -20,8 +20,9 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: cluster-resource-override-admission
 promotion:
-  name: 4.13-priv
-  namespace: ocp-private
+  to:
+  - name: 4.13-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -44,6 +45,12 @@ tests:
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: cluster-resource-override-admission
+    workflow: openshift-ci-security
 - as: e2e-aws
   steps:
     cluster_profile: aws

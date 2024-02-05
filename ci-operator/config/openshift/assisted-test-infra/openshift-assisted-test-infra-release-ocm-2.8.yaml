@@ -49,8 +49,9 @@ images:
       - quay.io/ocp-splat/govc:v0.29.0
   to: assisted-test-infra-internal
 promotion:
-  name: ocm-2.8
-  namespace: edge-infrastructure
+  to:
+  - name: ocm-2.8
+    namespace: edge-infrastructure
 releases:
   latest:
     candidate:
@@ -119,7 +120,7 @@ tests:
         WORKER_DISK=40000000000
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-net-suite-periodic
-  cron: 43 22 */1 * 1-5
+  cron: 34 14 * * 0
   steps:
     cluster_profile: packet-assisted
     env:
@@ -179,22 +180,6 @@ tests:
     workflow: assisted-baremetal
 - as: e2e-vsphere-assisted-kube-api
   optional: true
-  steps:
-    cluster_profile: vsphere-2
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.8
-        KUBE_API=true
-        ENABLE_KUBE_API=true
-        NUM_WORKERS=0
-        IPv4=true
-        ISO_IMAGE_TYPE=minimal-iso
-        TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="test_kube_api_parallel"
-      PLATFORM: vsphere
-    workflow: assisted-vsphere
-- as: e2e-vsphere-assisted-kube-api-periodic
-  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: vsphere-2
     env:

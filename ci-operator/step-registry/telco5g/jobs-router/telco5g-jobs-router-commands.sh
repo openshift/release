@@ -19,6 +19,8 @@ echo "export DEBUG_JOB_TYPE='${JOB_TYPE}'" >> "$MAINENV"
 echo "export DEBUG_RELEASE_IMAGE_LATEST='${RELEASE_IMAGE_LATEST-}'" >> "$MAINENV"
 echo "export GIT_COMMITTER_NAME='CI User'" >> "$MAINENV"
 echo "export GIT_COMMITTER_EMAIL='cnf-devel@redhat.com'" >> "$MAINENV"
+echo "export REPO_OWNER=${REPO_OWNER:-''}" >> "$MAINENV"
+echo "export REPO_NAME=${REPO_NAME:-''}" >> "$MAINENV"
 echo "#######################################################" >> "$MAINENV"
 
 if [[ "$PROW_JOB_ID" = *"nightly"* ]] && [[ "$JOB_TYPE" == "periodic" ]]; then

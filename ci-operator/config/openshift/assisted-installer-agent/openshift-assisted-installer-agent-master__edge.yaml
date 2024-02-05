@@ -60,8 +60,9 @@ images:
   from: src
   to: assisted-installer-agent-src
 promotion:
-  name: ocm-2.10
-  namespace: edge-infrastructure
+  to:
+  - name: ocm-2.10
+    namespace: edge-infrastructure
 releases:
   latest:
     candidate:
@@ -135,6 +136,8 @@ tests:
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test-postsubmit
   commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
@@ -197,9 +200,11 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=lvm
-        MASTERS_COUNT=1
+        NUM_MASTERS=3
+        NUM_WORKERS=0
         MASTER_MEMORY=18000
         MASTER_CPU=9
+        MASTER_DISK_COUNT=2
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf
   optional: true
@@ -237,6 +242,8 @@ tests:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       INDEX_IMAGE: assisted-service-index
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      PACKET_PLAN: c3.medium.x86
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-oci-assisted
   optional: true
@@ -253,6 +260,15 @@ tests:
         OPENSHIFT_VERSION=4.14
       PLATFORM: assisted-oci
     workflow: assisted-oci
+- always_run: false
+  as: e2e-metal-assisted-external
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        PLATFORM=external
+    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master
   org: openshift

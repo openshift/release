@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
   driver-operand:
     name: 4.15-priv
     namespace: ocp-private
@@ -11,6 +7,10 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: csi-livenessprobe
+  ocp_4.15_base:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: base
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
@@ -41,15 +41,19 @@ build_root:
 canonical_go_repository: github.com/openshift/aws-efs-csi-driver-operator
 images:
 - dockerfile_path: Dockerfile
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: aws-efs-csi-driver-operator
 - dockerfile_path: Dockerfile.create_efs
-  from: base
   inputs:
+    ocp_4.15_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
@@ -75,9 +79,9 @@ operator:
   - pullspec: quay.io/openshift/origin-aws-efs-csi-driver-operator:latest
     with: pipeline:aws-efs-csi-driver-operator
 promotion:
-  disabled: true
-  name: 4.15-priv
-  namespace: ocp-private
+  to:
+  - name: 4.15-priv
+    namespace: ocp-private
 releases:
   initial:
     integration:
@@ -105,7 +109,6 @@ tests:
   container:
     from: src
 - as: operator-e2e
-  optional: true
   steps:
     cluster_profile: aws
     dependencies:

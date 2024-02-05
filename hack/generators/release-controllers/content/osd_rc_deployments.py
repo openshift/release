@@ -24,7 +24,7 @@ def _add_osd_rc_bootstrap(gendoc):
                 {
                     'from': {
                         'kind': 'DockerImage',
-                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.14:tests'
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.16:tests'
                     },
                     'importPolicy': {
                         'scheduled': True
@@ -335,7 +335,6 @@ def _add_osd_rc_deployment(gendoc):
                                         '--supplemental-plugin-config-dir=/etc/plugins',
                                         '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.',
                                         f'--art-suffix={context.art_suffix}',
-                                        "--process-legacy-results",
                                         "--manifest-list-mode"
                                         ],
                             'image': 'release-controller:latest',
