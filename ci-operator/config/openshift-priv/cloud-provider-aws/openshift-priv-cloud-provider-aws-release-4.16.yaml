@@ -16,9 +16,9 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
   rhel-coreos-9-base:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
-    tag: rhel-coreos-9
+    tag: rhel-coreos
 binary_build_commands: make aws-cloud-controller-manager
 build_root:
   image_stream_tag:
@@ -47,7 +47,8 @@ images:
     FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-9
     COPY --from=build /*.rpm /
     # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
-    RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
+    # use -F rather than -U as we otherwise conflict with the production build in rhel-coreos
+    RUN rpm -Fvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
   inputs:
     base-machine-with-rpms:
       as:
@@ -58,7 +59,9 @@ images:
   to: rhel-coreos-9
 promotion:
   to:
-  - disabled: true
+  - additional_images:
+      cloud-provider-aws-rpms: rpms
+    disabled: true
     name: 4.16-priv
     namespace: ocp-private
 raw_steps:
