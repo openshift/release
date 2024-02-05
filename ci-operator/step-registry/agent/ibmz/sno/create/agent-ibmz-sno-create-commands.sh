@@ -238,8 +238,36 @@ pullSecret: >
 sshKey: >
   @$httpd_vsi_pub_key
 EOF
+
+echo "Fetching openshift-install binary"
+release_version=$(echo "$JOB_SPEC" | grep -oP 'extra_refs:\[\{[^}]+\}\]' | cut -d ',' -f 3 | cut -d '-' -f 2)
+wget -O $HOME/openshift-install.tar.gz https://mirror.openshift.com/pub/openshift-v4/s390x/clients/ocp/candidate-${release_version}/openshift-install-linux-amd64.tar.gz
+tar -xvf $HOME/openshift-install.tar.gz
+
+version=$(oc adm release info -o template --template '{{.metadata.version}}' --insecure=true ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE})
+echo "Patching the image and version for the installer"
+vres=$(grep -oba ._RELEASE_VERSION_LOCATION_.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX $HOME/openshift-install)
+vlocation=${vres%%:*}
+# If the release marker was found then it means that the version is missing
+if [[ ! -z ${vlocation} ]]; then
+    echo "Patching openshift-install with version ${version}"
+    printf "${version}\0" | dd of=$HOME/openshift-install bs=1 seek=${vlocation} conv=notrunc &> /dev/null
+else
+    echo "Version already patched"
+fi
+
+ires=$(grep -oba ._RELEASE_IMAGE_LOCATION_.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX $HOME/openshift-install)
+ilocation=${res%%:*}
+# If the release marker was found then it means that the image is missing
+if [[ ! -z ${ilocation} ]]; then
+    echo "Patching openshift-install with image ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+    printf "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}\0" | dd of=$HOME/openshift-install bs=1 seek=${ilocation} conv=notrunc &> /dev/null
+else
+    echo "Image already patched"
+fi
+
 echo "Generating pxe-boot artifacts for SNO cluster"
-${SHARED_DIR}/openshift-install create pxe-files --dir $HOME/$CLUSTER_NAME/ --log-level debug
+$HOME/openshift-install create pxe-files --dir $HOME/$CLUSTER_NAME/ --log-level debug
 
 # Generating script for agent boot execution on zVSI
 echo "Uploading the pxe-boot artifacts to HTTPD server"
@@ -268,9 +296,9 @@ rm -f $HOME/setup_pxeboot.sh
 
 # Wait for bootstrapping to complete
 echo "$(date) Waiting for the bootstrapping to complete"
-${SHARED_DIR}/openshift-install wait-for bootstrap-complete --dir $HOME/$CLUSTER_NAME/
+$HOME/openshift-install wait-for bootstrap-complete --dir $HOME/$CLUSTER_NAME/
 
 # Wait for installation to complete
 echo "$(date) Waiting for the installation to complete"
-${SHARED_DIR}/openshift-install wait-for install-complete --dir $HOME/$CLUSTER_NAME/
+$HOME/openshift-install wait-for install-complete --dir $HOME/$CLUSTER_NAME/
 cp $HOME/$CLUSTER_NAME/auth/kubeconfig ${SHARED_DIR}/$CLUSTER_NAME-kubeconfig
