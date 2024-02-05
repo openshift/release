@@ -17,15 +17,15 @@ quay_container_security_operator_image="brew.registry.redhat.io/rh-osbs/$QUAY_CO
 quay_builder_image="brew.registry.redhat.io/rh-osbs/$QUAY_BUILDER_IMAGE"
 quay_builder_qemu_image="brew.registry.redhat.io/rh-osbs/$QUAY_BUILDER_QEMU_IMAGE"
       
-function scan_quay_images(quay_security_testing_hostname,image_tag,image_type){
+function scan_quay_images(){
     ssh -i quaybuilder -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null centos@$1 "sudo /usr/local/bin/grype $2 --scope all-layers > $3_image_vulnerability-report" || true
     scp -i quaybuilder -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null centos@$1:/home/centos/$3_image_vulnerability-report $ARTIFACT_DIR/$3_image_vulnerability-report || true
 }
 
-scan_quay_images(quay_security_testing_hostname,quay_operator_image,"quay_operator")
-scan_quay_images(quay_security_testing_hostname,quay_app_image,"quay_app")
-scan_quay_images(quay_security_testing_hostname,quay_clair_image,"quay_clair")
-scan_quay_images(quay_security_testing_hostname,quay_bridge_operator_image,"quay_bridge_operator")
-scan_quay_images(quay_security_testing_hostname,quay_container_security_operator_image,"quay_container_security_operator")
-scan_quay_images(quay_security_testing_hostname,quay_builder_image,"quay_builder")
-scan_quay_images(quay_security_testing_hostname,quay_builder_qemu_image,"quay_builder_qemu")
+scan_quay_images $quay_security_testing_hostname $quay_operator_image "quay_operator"
+scan_quay_images $quay_security_testing_hostname $quay_app_image "quay_app"
+scan_quay_images $quay_security_testing_hostname $quay_clair_image "quay_clair"
+scan_quay_images $quay_security_testing_hostname $quay_bridge_operator_image "quay_bridge_operator"
+scan_quay_images $quay_security_testing_hostname $quay_container_security_operator_image "quay_container_security_operator"
+scan_quay_images $quay_security_testing_hostname $quay_builder_image "quay_builder"
+scan_quay_images $quay_security_testing_hostname $quay_builder_qemu_image "quay_builder_qemu"
