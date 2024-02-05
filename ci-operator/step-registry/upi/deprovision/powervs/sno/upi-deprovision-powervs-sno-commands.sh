@@ -26,15 +26,16 @@ ibmcloud plugin install power-iaas
 ibmcloud plugin install cis
 
 # Set target powervs and cis service instance
-ibmcloud pi st ${POWERVS_INSTANCE_CRN}
+ibmcloud pi ws tg ${POWERVS_INSTANCE_CRN}
 ibmcloud cis instance-set ${CIS_INSTANCE}
 
 # Setting IBMCLOUD_TRACE to true to enable debug logs for pi and cis operations
 export IBMCLOUD_TRACE=true
 
-instance_id=$(ibmcloud pi instances --json | jq -r --arg serverName ${POWERVS_VSI_NAME} '.pvmInstances[] | select (.serverName == $serverName ) | .pvmInstanceID')
-
-ibmcloud pi instance-delete ${instance_id}
+instance_id=$(ibmcloud pi ins ls --json | jq -r --arg serverName ${POWERVS_VSI_NAME} '.pvmInstances[] | select (.name == $serverName ) | .id')
+if [ -n "${instance_id}" ]; then
+  ibmcloud pi ins delete ${instance_id}
+fi
 
 # Cleanup cis dns records
 idToDelete=$(ibmcloud cis dns-records ${CIS_DOMAIN_ID} --name "*.apps.${CLUSTER_NAME}.${BASE_DOMAIN}" --output json | jq -r '.[].id')
@@ -60,4 +61,4 @@ chmod 0600 ${SSH_PRIVATE}
 SSH_OPTIONS=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i "${SSH_PRIVATE}")
 
 # Run cleanup-sno.sh to clean up the things created on bastion for SNO node net boot
-ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR} && ./cleanup-sno.sh ${CLUSTER_NAME}"
+ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./cleanup-sno.sh ${CLUSTER_NAME}"

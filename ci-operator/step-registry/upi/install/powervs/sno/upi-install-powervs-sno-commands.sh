@@ -25,7 +25,7 @@ ibmcloud plugin install power-iaas
 ibmcloud plugin install cis
 
 # Set target powervs and cis service instance
-ibmcloud pi st ${POWERVS_INSTANCE_CRN}
+ibmcloud pi ws tg ${POWERVS_INSTANCE_CRN}
 ibmcloud cis instance-set ${CIS_INSTANCE}
 
 # Setting IBMCLOUD_TRACE to true to enable debug logs for pi and cis operations
@@ -33,16 +33,16 @@ export IBMCLOUD_TRACE=true
 
 # Creating VSI in PowerVS instance
 echo "$(date) Creating VSI in PowerVS instance"
-ibmcloud pi instance-create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --network ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE} --replicants 1 --replicant-scheme suffix
+ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --subnets ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE}
 
-instance_id=$(ibmcloud pi instances --json | jq -r --arg serverName ${POWERVS_VSI_NAME} '.pvmInstances[] | select (.serverName == $serverName ) | .pvmInstanceID')
+instance_id=$(ibmcloud pi ins ls --json | jq -r --arg serverName ${POWERVS_VSI_NAME} '.pvmInstances[] | select (.name == $serverName ) | .id')
 
 # Retrieving ip and mac from workers created in ibmcloud powervs
 echo "$(date) Retrieving ip and mac from workers created in ibmcloud powervs"
 export MAC_ADDRESS=""
 export IP_ADDRESS=""
 for ((i=1; i<=20; i++)); do
-    instance_id=$(ibmcloud pi instances --json | jq -r --arg serverName ${POWERVS_VSI_NAME} '.pvmInstances[] | select (.serverName == $serverName ) | .pvmInstanceID')
+    instance_id=$(ibmcloud pi ins ls --json | jq -r --arg serverName ${POWERVS_VSI_NAME} '.pvmInstances[] | select (.name == $serverName ) | .id')
     if [ -z "$instance_id" ]; then
         echo "$(date) Waiting for instance id to be populated"
         sleep 60
@@ -52,7 +52,7 @@ for ((i=1; i<=20; i++)); do
 done
 
 for ((i=1; i<=20; i++)); do
-    instance_info=$(ibmcloud pi instance $instance_id --json)
+    instance_info=$(ibmcloud pi ins get $instance_id --json)
     MAC_ADDRESS=$(echo "$instance_info" | jq -r '.networks[].macAddress')
     IP_ADDRESS=$(echo "$instance_info" | jq -r '.networks[].ipAddress')
 
@@ -71,7 +71,7 @@ if [ -z "$MAC_ADDRESS" ] || [ -z "$IP_ADDRESS" ]; then
 fi
 
 # Retrieving wwn from VSI to form the installation disk
-volume_wwn=$(ibmcloud pi inlv $instance_id --json | jq -r '.volumes[].wwn')
+volume_wwn=$(ibmcloud pi ins vol ls $instance_id --json | jq -r '.volumes[].wwn')
 
 if [ -z "$volume_wwn" ]; then
     echo "Required volume WWN not collected, exiting test"
@@ -88,32 +88,568 @@ chmod 0600 ${SSH_PRIVATE}
 
 SSH_OPTIONS=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'ServerAliveInterval=60' -o 'ServerAliveCountMax=60' -o 'UserKnownHostsFile=/dev/null' -i "${SSH_PRIVATE}")
 
-# https://codeload.github.com/ppc64le-cloud/ocp-sno-hacks/zip/refs/heads/main contains the scripts to setup the SNO cluster
-ssh "${SSH_OPTIONS[@]}" root@${BASTION} "mkdir ${BASTION_CI_SCRIPTS_DIR} && cd ${BASTION_CI_SCRIPTS_DIR} && curl https://codeload.github.com/ppc64le-cloud/ocp-ci-hacks/zip/refs/heads/main -o ocp-ci-hacks.zip && unzip ocp-ci-hacks.zip && mv ocp-ci-hacks-main/sno/* ${BASTION_CI_SCRIPTS_DIR} && rm -rf ocp-ci-hacks.zip ocp-ci-hacks-main"
+# Save private-key, pull-secret and offline-token to bastion
+ssh "${SSH_OPTIONS[@]}" root@${BASTION} "mkdir -p ~/.sno"
+scp "${SSH_OPTIONS[@]}" /etc/sno-power-credentials/{ssh-publickey,pull-secret,offline-token} root@${BASTION}:~/.sno/.
 
+# set the default INSTALL_TYPE to sno
+INSTALL_TYPE=${INSTALL_TYPE:-sno}
+
+#############################
+rm -rf ${BASTION_CI_SCRIPTS_DIR}
+mkdir -p ${BASTION_CI_SCRIPTS_DIR}
+
+cat > ${BASTION_CI_SCRIPTS_DIR}/cluster-create-template.json << EOF
+{
+    "base_dns_domain": "\${BASE_DOMAIN}",
+    "name": "\${CLUSTER_NAME}",
+    "cpu_architecture": "ppc64le",
+    "openshift_version": "\${OCP_VERSION}",
+    "high_availability_mode": "None",
+    "user_managed_networking": true,
+    "network_type": "OVNKubernetes",
+    "cluster_network_cidr": "10.128.0.0/14",
+    "cluster_network_host_prefix": 23,
+    "service_network_cidr": "172.30.0.0/16",
+    "pull_secret": \${PULL_SECRET},
+    "ssh_public_key": "\${SSH_PUB_KEY}"
+}
+EOF
+
+cat > ${BASTION_CI_SCRIPTS_DIR}/cluster-register-template.json << EOF
+{
+    "cluster_id": "\${NEW_CLUSTER_ID}",
+    "name": "\${CLUSTER_NAME}-infra-env",
+    "cpu_architecture": "ppc64le",
+    "openshift_version": "\${OCP_VERSION}",
+    "image_type": "full-iso",
+    "pull_secret": \${PULL_SECRET},
+    "ssh_authorized_key": "\${SSH_PUB_KEY}"
+}
+EOF
+
+cat > ${BASTION_CI_SCRIPTS_DIR}/assisted-sno.sh << EOF
+# https://access.redhat.com/documentation/en-us/assisted_installer_for_openshift_container_platform/2023/html/assisted_installer_for_openshift_container_platform/index
+# https://api.openshift.com/?urls.primaryName=assisted-service%20service
+#
+# This script contains all the function calls for using with assisted installer.
+
+set -x
+set +e
+
+API_URL="https://api.openshift.com/api/assisted-install/v2"
+OFFLINE_TOKEN_FILE="\${OFFLINE_TOKEN_FILE:-/root/.sno/offline-token}"
+PULL_SECRET_FILE="\${PULL_SECRET_FILE:-/root/.sno/pull-secret}"
+SSH_PUB_KEY_FILE="\${PUBLIC_KEY_FILE:-/root/.sno/id_rsa.pub}"
+OFFLINE_TOKEN=\$(cat \${OFFLINE_TOKEN_FILE})
+PULL_SECRET=\$(cat \${PULL_SECRET_FILE} | tr -d '\n' | jq -R .)
+SSH_PUB_KEY=\$(cat \${SSH_PUB_KEY_FILE})
+
+CONFIG_DIR="/tmp/\${CLUSTER_NAME}-config"
+IMAGES_DIR="/var/lib/tftpboot/images/\${CLUSTER_NAME}"
+WWW_DIR="/var/www/html/\${CLUSTER_NAME}"
+
+CPU_ARCH="ppc64le"
+OCP_VERSION="\${OCP_VERSION:-4.15}"
+BASE_DOMAIN="\${BASE_DOMAIN:-api.ai}"
+CLUSTER_NAME="\${CLUSTER_NAME:-sno}"
+#SUBNET="\${MACHINE_NETWORK}"
+
+refresh_api_token() {
+  echo "Refresh API token"
+  export API_TOKEN=\$( \
+    curl \
+    --silent \
+    --header "Accept: application/json" \
+    --header "Content-Type: application/x-www-form-urlencoded" \
+    --data-urlencode "grant_type=refresh_token" \
+    --data-urlencode "client_id=cloud-services" \
+    --data-urlencode "refresh_token=\${OFFLINE_TOKEN}" \
+    "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token" \
+    | jq --raw-output ".access_token" \
+  )
+}
+
+create_cluster() {
+  echo "Create cluster for \${CPU_ARCH}"
+  cat cluster-create-template.json | envsubst > \${CONFIG_DIR}/cluster-create.json
+
+  curl -s -X POST "\${API_URL}/clusters" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer \${API_TOKEN}" \
+      -d @\${CONFIG_DIR}/cluster-create.json | jq . > \${CONFIG_DIR}/create-output.json
+
+  export NEW_CLUSTER_ID=\$(cat \${CONFIG_DIR}/create-output.json | jq '.id' | awk -F'"' '{print \$2}')
+  if [[ -z \$NEW_CLUSTER_ID ]]; then
+    echo "Failed to create the cluster \${CLUSTER_NAME}"
+    cat \${CONFIG_DIR}/create-output.json
+    exit 1
+  fi
+}
+
+register_infra() {
+  echo "Register the cluster: \${NEW_CLUSTER_ID}"
+  cat cluster-register-template.json | envsubst > \${CONFIG_DIR}/cluster-register.json
+ 
+  curl -s -X POST "\${API_URL}/infra-envs" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer \${API_TOKEN}" \
+      -d @\${CONFIG_DIR}/cluster-register.json | jq . > \${CONFIG_DIR}/register-output.json
+
+  export NEW_INFRAENVS_ID=\$(cat \${CONFIG_DIR}/register-output.json | jq '.id' | awk -F'"' '{print \$2}')
+  export ISO_URL=\$(cat \${CONFIG_DIR}/register-output.json | jq '.download_url' | awk -F'"' '{print \$2}')
+  if [[ -z \$ISO_URL ]]; then
+    echo "Could not register cluster"
+    cat \${CONFIG_DIR}/register-output.json
+    exit 1
+  fi
+}
+
+download_iso() {
+
+  echo "Downloading ISO \${ISO_URL} ..."
+  curl \${ISO_URL} -o \${CONFIG_DIR}/assisted.iso
+
+  if [[ -f "\${CONFIG_DIR}/assisted.iso" ]]; then
+    echo "Extract pxe files from ISO"
+    rm -rf \${CONFIG_DIR}/pxe
+    mkdir \${CONFIG_DIR}/pxe
+    coreos-installer iso ignition show \${CONFIG_DIR}/assisted.iso > \${CONFIG_DIR}/pxe/assisted.ign
+    coreos-installer iso extract pxe -o \${CONFIG_DIR}/pxe \${CONFIG_DIR}/assisted.iso
+
+    echo "install pxe file to tftp/http"
+    cp \${CONFIG_DIR}/pxe/assisted-initrd.img \${IMAGES_DIR}/initramfs.img
+    cp \${CONFIG_DIR}/pxe/assisted-vmlinuz \${IMAGES_DIR}/kernel
+    chmod +x \${IMAGES_DIR}/*
+    cp \${CONFIG_DIR}/pxe/assisted-rootfs.img \${WWW_DIR}/rootfs.img
+    chmod +x \${WWW_DIR}/rootfs.img
+    cp \${CONFIG_DIR}/pxe/assisted.ign \${WWW_DIR}/bootstrap.ign
+  else
+    echo "Failed to download ISO: \${ISO_URL}"
+    exit 1
+  fi
+}
+
+get_cluster_status() {
+  #echo "Get cluster status"
+  curl -s -X GET "\${API_URL}/clusters/\${NEW_CLUSTER_ID}" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer \${API_TOKEN}" | jq . > \${CONFIG_DIR}/cluster-status-output.json
+}
+
+start_install() {
+  echo "Start install"
+  curl -s -X POST "\${API_URL}/clusters/\${NEW_CLUSTER_ID}/actions/install" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer \${API_TOKEN}" | jq . > \${CONFIG_DIR}/cluster-start-install-output.json
+}
+
+download_kubeconfig() {
+  echo "Download kubeconfig"
+  mkdir -p \${CONFIG_DIR}/auth
+  curl -s -X GET "\${API_URL}/clusters/\${NEW_CLUSTER_ID}/downloads/credentials?file_name=kubeconfig" \
+      -H "Authorization: Bearer \${API_TOKEN}" > \${CONFIG_DIR}/auth/kubeconfig
+  curl -s -X GET "\${API_URL}/clusters/\${NEW_CLUSTER_ID}/downloads/credentials?file_name=kubeadmin-password" \
+      -H "Authorization: Bearer \${API_TOKEN}" > \${CONFIG_DIR}/auth/kubeadmin-password
+  mkdir -p ~/.kube
+  cp \${CONFIG_DIR}/auth/kubeconfig ~/.kube/config
+}
+
+wait_to_install() {
+  echo "wait to install"
+  refresh_api_token
+  for i in {1..15}; do
+    get_cluster_status
+    status=\$(cat \${CONFIG_DIR}/cluster-status-output.json | jq '.status' | awk -F'"' '{print \$2}')
+    echo "Current cluster_status: \${status}"
+    if [[ \${status} == "ready" ]]; then
+      sleep 30
+      start_install
+    elif [[ \${status} == "installed" || \${status} == "installing" ]]; then
+      download_kubeconfig
+      break
+    fi
+    sleep 60
+  done
+}
+
+wait_install_complete() {
+  echo "wait the installation completed"
+  pre_status=""
+  for count in {1..10}; do
+    echo "Refresh token: \${count}"
+    refresh_api_token
+    for i in {1..15}; do
+      get_cluster_status
+      status=\$(cat \${CONFIG_DIR}/cluster-status-output.json | jq '.status' | awk -F'"' '{print \$2}')
+      if [[ \${pre_status} != \${status} ]]; then
+        echo "Current installation status: \${status} : \${i}"
+        pre_status=\${status}
+      fi
+      if [[ \${status} == "installed" ]]; then
+        echo "Done of OCP installation" 
+        break
+      fi
+      sleep 60
+    done
+    if [[ \${status} == "installed" ]]; then
+      break
+    fi
+  done
+}
+
+ai_prepare_cluster() {
+  refresh_api_token
+  create_cluster
+  register_infra
+  download_iso
+}
+
+ai_wait_compelete() {
+  export NEW_CLUSTER_ID=\$(cat \${CONFIG_DIR}/create-output.json | jq '.id' | awk -F'"' '{print \$2}')
+  wait_to_install
+  wait_install_complete
+}
+
+EOF
+
+cat > ${BASTION_CI_SCRIPTS_DIR}/install-config-template.yaml << EOF
+apiVersion: v1
+baseDomain: \${BASE_DOMAIN}
+compute:
+- name: worker
+  replicas: 0
+controlPlane:
+  name: master
+  replicas: 1
+metadata:
+  name: \${CLUSTER_NAME}
+networking:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  machineNetwork:
+  - cidr: \${MACHINE_NETWORK}
+  networkType: OVNKubernetes
+  serviceNetwork:
+  - 172.30.0.0/16
+platform:
+  none: {}
+bootstrapInPlace:
+  installationDisk: \${INSTALLATION_DISK}
+pullSecret: '\${PULL_SECRET}'
+sshKey: |
+  \${SSH_PUB_KEY}
+EOF
+
+
+cat > ${BASTION_CI_SCRIPTS_DIR}/grub-menu.template << EOF
+    if [ \${GRUB_MAC_CONFIG} = "\${MAC_ADDRESS}" ]; then
+        linux \${KERNEL_PATH} ignition.firstboot ignition.platform.id=metal 'coreos.live.rootfs_url=\${ROOTFS_URL}' 'ignition.config.url=\${IGNITION_URL}'
+        initrd \${INITRAMFS_PATH}
+    fi
+EOF
+
+cat > ${BASTION_CI_SCRIPTS_DIR}/setup-sno.sh << EOF
+#!/bin/bash
+
+# This script tries to setup things required for creating a SNO cluster via bastion
+# Run this script inside the bastion configured for pxe boot which will generate ignition config and configure the net boot for SNO node to boot
+# Need to create the SNO worker before running this script to retrieve mac, ip addresses and volume wwn to use it as a installation disk while generating the ignition for SNO
+# Volume wwn will usually in 600507681381021CA800000000002CF2 this format need to format it like this /dev/disk/by-id/wwn-0x600507681381021ca800000000002cf2 and pass it to the script
+#
+# Usage: ./setup-sno.sh \$CLUSTER_NAME \$BASE_DOMAIN \$MACHINE_NETWORK \$INSTALLATION_DISK \$ROOTFS_URL \$KERNEL_URL \$INITRAMFS_URL \$BASTION_HTTP_URL \$MAC_ADDRESS \$IP_ADDRESS
+# \$CLUSTER_NAME \$BASE_DOMAIN \$MACHINE_NETWORK \$INSTALLATION_DISK are required to create install-config.yaml to generate the ignition via single-node-ignition-config openshift-install command
+# MAC, IP and ISO URLs are required to download and setup the net boot for SNO node
+#
+# Sample usage: ./setup-sno.sh test-cluster ocp-dev-ppc64le.com 192.168.140.0/24 /dev/disk/by-id/wwn-0x600507681381021ca800000000002cf2 https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/4.14/latest/rhcos-live-rootfs.ppc64le.img https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/4.14/latest/rhcos-live-kernel-ppc64le https://mirror.openshift.com/pub/openshift-v4/ppc64le/dependencies/rhcos/4.14/latest/rhcos-live-initramfs.ppc64le.img http://rh-sno-ci-bastion.ocp-dev-ppc64le.com fa:c2:10:e3:5a:20 192.168.140.105
+#
+
+set -euox pipefail
+
+export CLUSTER_NAME=\$1
+export BASE_DOMAIN=\$2
+export MACHINE_NETWORK=\$3
+export INSTALLATION_DISK=\$4
+ROOTFS_URL=\$5
+KERNEL_URL=\$6
+INITRAMFS_URL=\$7
+BASTION_HTTP_URL=\$8
+export MAC_ADDRESS=\$9
+export IP_ADDRESS=\${10}
+
+if [[ \$# -eq 10 ]]; then
+    export INSTALL_TYPE="sno"
+else
+    export INSTALL_TYPE=\${11}
+    export OCP_VERSION=\${12}
+    export INSTALLER_URL=\${13:-}
+fi
+
+IFS=""
+
+POWERVS_VSI_NAME="\${CLUSTER_NAME}-worker"
+
+set +x
+export PULL_SECRET_FILE=/root/.sno/pull-secret
+export PULL_SECRET="\$(cat \$PULL_SECRET_FILE)"
+SSH_PUB_KEY_FILE=/root/.sno/id_rsa.pub
+export SSH_PUB_KEY="\$(cat \$SSH_PUB_KEY_FILE)"
+export OFFLINE_TOKEN_FILE=/root/.sno/offline-token
+
+set -x
+
+CONFIG_DIR="/tmp/\${CLUSTER_NAME}-config"
+IMAGES_DIR="/var/lib/tftpboot/images/\${CLUSTER_NAME}"
+WWW_DIR="/var/www/html/\${CLUSTER_NAME}"
+
+mkdir -p \$IMAGES_DIR \$WWW_DIR \$CONFIG_DIR
+
+# Download the openshift-install
+if [[ \${INSTALL_TYPE} != "sno" ]]; then
+    # install required package for agent based installer
+    dnf install -y /usr/bin/nmstatectl coreos-installer jq
+fi
+
+sno_prepare_cluster() {
+    cat install-config-template.yaml | envsubst > \${CONFIG_DIR}/install-config.yaml
+
+    openshift-install --dir=\${CONFIG_DIR} create single-node-ignition-config
+
+    cp \${CONFIG_DIR}/bootstrap-in-place-for-live-iso.ign \${WWW_DIR}/bootstrap.ign
+    chmod 644 \${WWW_DIR}/bootstrap.ign
+    curl \${ROOTFS_URL} -o \${WWW_DIR}/rootfs.img
+
+    curl \${INITRAMFS_URL} -o \${IMAGES_DIR}/initramfs.img
+    curl \${KERNEL_URL} -o \${IMAGES_DIR}/kernel
+}
+
+if [[ \${INSTALL_TYPE} == "assisted" ]]; then
+    echo "call to ai_prepare_cluster"
+    . assisted-sno.sh
+    ai_prepare_cluster
+else
+    echo "call to sno_prepare_cluster"
+    sno_prepare_cluster
+fi
+
+export GRUB_MAC_CONFIG="\\\${net_default_mac}"
+export ROOTFS_URL=\${BASTION_HTTP_URL}/\${CLUSTER_NAME}/rootfs.img
+export IGNITION_URL=\${BASTION_HTTP_URL}/\${CLUSTER_NAME}/bootstrap.ign
+export KERNEL_PATH="images/\${CLUSTER_NAME}/kernel"
+export INITRAMFS_PATH="images/\${CLUSTER_NAME}/initramfs.img"
+
+GRUB_MENU_START="# menuentry for \${CLUSTER_NAME} start\n"
+GRUB_MENU_END="\n# menuentry for \${CLUSTER_NAME} end"
+
+GRUB_MENU_OUTPUT+=\${GRUB_MENU_START}
+MENU_ENTRY_CONTENT=\$(cat grub-menu.template | envsubst)
+GRUB_MENU_OUTPUT+=\${MENU_ENTRY_CONTENT}
+GRUB_MENU_OUTPUT+=\${GRUB_MENU_END}
+
+GRUB_MENU_OUTPUT_FILE="/tmp/\${CLUSTER_NAME}-grub-menu.output"
+echo -e \${GRUB_MENU_OUTPUT} > \${GRUB_MENU_OUTPUT_FILE}
+
+LOCK_FILE="lockfile.lock"
+(
+flock 200 || exit 1
+echo "writing menuentry to grub.cfg "
+sed -i -e "/menuentry 'RHEL CoreOS (Live)' --class fedora --class gnu-linux --class gnu --class os {/r \$(printf '%s' "\$GRUB_MENU_OUTPUT_FILE")" /var/lib/tftpboot/boot/grub2/grub.cfg;
+systemctl restart tftp;
+
+echo "writing host entries to dhcpd.conf"
+HOST_ENTRY="host \${POWERVS_VSI_NAME} { hardware ethernet \${MAC_ADDRESS}; fixed-address \${IP_ADDRESS}; }"
+sed -i "/# Static entries/a\    \$(printf '%s' "\$HOST_ENTRY")" /etc/dhcp/dhcpd.conf;
+
+echo "restarting services tftp & dhcpd"
+systemctl restart dhcpd;
+)200>"\$LOCK_FILE"
+
+EOF
+
+cat > ${BASTION_CI_SCRIPTS_DIR}/update-boot-disk.sh << EOF
+#!/bin/bash
+
+# This script will update the boot disk of SNO node to the volume mounted where coreos is downloaded and written by initial boot
+# Run this script inside the bastion configured for pxe boot
+# Once ./setup-sno.sh is invoked and machines are rebooted invoke this script to update the boot disk
+# Usage: ./update-boot-disk.sh \$IP_ADDRESS \$INSTALLATION_DISK
+#
+# Sample usage: ./update-boot-disk.sh 192.168.140.105 /dev/disk/by-id/wwn-0x600507681381021ca800000000002cf2
+#
+
+set -x
+set +e
+
+IP_ADDRESS=\$1
+INSTALLATION_DISK=\$2
+
+SSH_OPTIONS=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i /root/.sno/id_rsa)
+
+for _ in {1..20}; do
+    echo "Set boot dev to disk in worker"
+    ssh "\${SSH_OPTIONS[@]}" core@\${IP_ADDRESS} "sudo bootlist -m normal -o \${INSTALLATION_DISK}"
+    if [ \$? == 0 ]; then
+        echo "Successfully set boot dev to disk in worker"
+        break
+    else
+        echo "Retrying after a minute"
+        sleep 60
+    fi
+done
+EOF
+
+cat > ${BASTION_CI_SCRIPTS_DIR}/wait-sno-complete.sh << EOF
+#!/bin/bash
+# This script is used to wait for cluster installation completed.
+# Run this script inside the bastion.
+# Usage: ./wait-sno-complete.sh \$CLUSTER_NAME \$INSTALL_TYPE.
+#
+# Sample usage: wait-sno-complete.sh  test-cluster sno
+#
+
+set -x
+set +e
+
+CLUSTER_NAME=\$1
+INSTALL_TYPE=\$2
+
+export OFFLINE_TOKEN_FILE=/root/.sno/offline-token
+export CONFIG_DIR="/tmp/\${CLUSTER_NAME}-config"
+
+#################################
+# for agent based install
+#################################
+get_cluster_id() {
+    echo "Get cluster_id"
+    for i in {1..30}; do
+        curl -s -X GET  "\${API_URL}/infra-envs" \
+             -H "Content-Type: application/json" | jq . > \${CONFIG_DIR}/infra-evns-output.json
+        NEW_CLUSTER_ID=\$(cat \${CONFIG_DIR}/infra-evns-output.json | jq '.[0].cluster_id' |  awk -F'"' '{print \$2}')
+        if [[ ! -z "\${NEW_CLUSTER_ID}" ]]; then
+            echo "NEW_CLUSTER_ID: \${NEW_CLUSTER_ID}"
+            break
+        fi
+        sleep 30
+    done
+    if [[ -z "\${NEW_CLUSTER_ID}" ]]; then
+        echo "Could not get cluster ID"
+        exit 1
+    fi
+}
+
+get_cluster_status() {
+  #echo "Get cluster status"
+  curl -s -X GET  "\${API_URL}/clusters/\${NEW_CLUSTER_ID}" \
+       -H "Content-Type: application/json" | jq . > \${CONFIG_DIR}/cluster-status-output.json
+}
+
+start_install() {
+  echo "Start install"
+  curl -s -X POST  "\${API_URL}/clusters/\${NEW_CLUSTER_ID}/actions/install" \
+       -H "Content-Type: application/json" | jq . > \${CONFIG_DIR}/cluster-start-install-output.json
+}
+
+wait_to_install() {
+  echo "wait to install"
+  get_cluster_id
+  for i in {1..15}; do
+    get_cluster_status
+    status=\$(cat \${CONFIG_DIR}/cluster-status-output.json | jq '.status' | awk -F'"' '{print \$2}')
+    echo "Current cluster_status: \${status}"
+    if [[ \${status} == "ready" ]]; then
+      sleep 30
+      start_install
+    elif [[ \${status} == "installed" || \${status} == "installing" ]]; then
+      break
+    fi
+    sleep 60
+  done
+}
+###################################
+
+sno_wait() {
+    openshift-install --dir="\${CONFIG_DIR}" wait-for bootstrap-complete
+    openshift-install --dir="\${CONFIG_DIR}" wait-for install-complete
+}
+
+assisted_wait() {
+    . assisted-sno.sh
+    ai_wait_compelete
+}
+
+if [[ \${INSTALL_TYPE} == "assisted" ]]; then
+    assisted_wait
+else
+    sno_wait
+fi
+
+EOF
+
+cat > ${BASTION_CI_SCRIPTS_DIR}/cleanup-sno.sh << EOF
+#!/bin/bash
+
+# This script tries to clean up things configured for SNO cluster by setup-sno.sh
+# Run this script inside the bastion configured for pxe boot.
+# Usage: ./cleanup-sno.sh \$CLUSTER_NAME.
+#
+# Sample usage: ./cleanup-sno.sh test-cluster
+#
+
+
+set -x
+set +e
+
+export CLUSTER_NAME=\$1
+POWERVS_VSI_NAME="\${CLUSTER_NAME}-worker"
+
+CONFIG_DIR="/tmp/\${CLUSTER_NAME}-config"
+IMAGES_DIR="/var/lib/tftpboot/images/\${CLUSTER_NAME}"
+WWW_DIR="/var/www/html/\${CLUSTER_NAME}"
+
+LOCK_FILE="lockfile.lock"
+(
+flock -n 200 || exit 1;
+echo "removing server host entry from dhcpd.conf"
+HOST_ENTRY="host \${POWERVS_VSI_NAME}"
+sed -i "/\$(printf '%s' "\$HOST_ENTRY")/d" /etc/dhcp/dhcpd.conf
+
+systemctl restart dhcpd;
+
+echo "removing menuentry from grub.cfg"
+sed -i "/# menuentry for \$(printf '%s' "\${CLUSTER_NAME}") start/,/# menuentry for \$(printf '%s' "\${CLUSTER_NAME}") end/d" /var/lib/tftpboot/boot/grub2/grub.cfg
+
+echo "restarting tftp & dhcpd"
+systemctl restart tftp;
+) 200>"\$LOCK_FILE"
+
+rm -rf /tmp/\${CLUSTER_NAME}* \${IMAGES_DIR} \${WWW_DIR}
+
+EOF
+
+chmod +x ${BASTION_CI_SCRIPTS_DIR}/*.sh
+ssh  "${SSH_OPTIONS[@]}" root@${BASTION} "rm -rf ${BASTION_CI_SCRIPTS_DIR}; mkdir -p ${BASTION_CI_SCRIPTS_DIR}/scripts; touch ${BASTION_CI_SCRIPTS_DIR}/scripts/lockfile.lock"
+scp  "${SSH_OPTIONS[@]}" ${BASTION_CI_SCRIPTS_DIR}/* root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/scripts/.
+
+#############################
 # Setting up the SNO config, generating the ignition and network boot on the bastion
-ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR} && ./setup-sno.sh ${CLUSTER_NAME} ${BASE_DOMAIN} ${POWERVS_MACHINE_NETWORK_CIDR} ${INSTALLATION_DISK} $(eval "echo ${LIVE_ROOTFS_URL}") $(eval "echo ${LIVE_KERNEL_URL}") $(eval "echo ${LIVE_INITRAMFS_URL}") $(printf "http://%s" "${BASTION}") ${MAC_ADDRESS} ${IP_ADDRESS}"
+ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./setup-sno.sh ${CLUSTER_NAME} ${BASE_DOMAIN} ${POWERVS_MACHINE_NETWORK_CIDR} ${INSTALLATION_DISK} $(eval "echo ${LIVE_ROOTFS_URL}") $(eval "echo ${LIVE_KERNEL_URL}") $(eval "echo ${LIVE_INITRAMFS_URL}") $(printf "http://%s" "${BASTION}") ${MAC_ADDRESS} ${IP_ADDRESS} ${INSTALL_TYPE} ${OCP_VERSION}"
 
 # Creating dns records in ibmcloud cis service for SNO node to reach hosted cluster and for ingress purpose
 ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "api.${CLUSTER_NAME}" --content "${IP_ADDRESS}"
 ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "api-int.${CLUSTER_NAME}" --content "${IP_ADDRESS}"
 ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "*.apps.${CLUSTER_NAME}" --content "${IP_ADDRESS}"
 
+# Rebooting the node to boot from net
+ibmcloud pi ins act $instance_id --operation soft-reboot
+
 sleep 180
 
-# Rebooting the node to boot from net
-ibmcloud pi instance-soft-reboot $instance_id
+# Updating the boot disk of SNO node to volume attached to VSI, it required only for normal SNO installastion.
+if [[ ${INSTALL_TYPE} == "sno" ]]; then
+    ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./update-boot-disk.sh ${IP_ADDRESS} ${INSTALLATION_DISK}" &
+fi
 
-# Updating the boot disk of SNO node to volume attached to VSI
-ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR} && ./update-boot-disk.sh ${IP_ADDRESS} ${INSTALLATION_DISK}" &
+# Run wait-sno-complete
+ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./wait-sno-complete.sh ${CLUSTER_NAME} ${INSTALL_TYPE}"
 
-# Run bootstrap-complete
-# Sometimes bootstrap-complete may timeout, but still install-complete can be tried so set +e
-set +e
-ssh "${SSH_OPTIONS[@]}" root@${BASTION} "openshift-install --dir=${BASTION_CI_SCRIPTS_DIR} wait-for bootstrap-complete --log-level debug"
-
-# set -e to capture on install-complete command
-set -e
-
-# Run install-complete
-ssh "${SSH_OPTIONS[@]}" root@${BASTION} "openshift-install --dir=${BASTION_CI_SCRIPTS_DIR} wait-for install-complete --log-level debug"
