@@ -17,7 +17,7 @@ quay_container_security_operator_image="brew.registry.redhat.io/rh-osbs/$QUAY_CO
 quay_builder_image="brew.registry.redhat.io/rh-osbs/$QUAY_BUILDER_IMAGE"
 quay_builder_qemu_image="brew.registry.redhat.io/rh-osbs/$QUAY_BUILDER_QEMU_IMAGE"
       
-function scan_quay_images(quay_security_testing_hostname,image_tag,image_type) {
+function scan_quay_images(quay_security_testing_hostname,image_tag,image_type){
     ssh -i quaybuilder -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null centos@$1 "sudo /usr/local/bin/grype $2 --scope all-layers > $3_image_vulnerability-report" || true
     scp -i quaybuilder -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null centos@$1:/home/centos/$3_image_vulnerability-report $ARTIFACT_DIR/$3_image_vulnerability-report || true
 }
