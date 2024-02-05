@@ -18,9 +18,9 @@ validate_install() {
 
 must_gather() {
 	echo "Running must gather"
-	oc get pods -n "$KEPLER_NS"
-	oc describe daemonset "$KEPLER_DEPLOY_NAME" -n "$KEPLER_NS"
-	oc logs -n "$KEPLER_NS" "daemonset/$KEPLER_DEPLOY_NAME"
+	oc get pods -n "$KEPLER_NS" | tee "$LOGS_DIR/kepler-pods.log"
+	oc describe daemonset "$KEPLER_DEPLOY_NAME" -n "$KEPLER_NS" | tee "$LOGS_DIR/daemonset.log"
+	oc logs -n "$KEPLER_NS" "daemonset/$KEPLER_DEPLOY_NAME" | tee "$LOGS_DIR/kepler-logs.log"
 }
 log_events() {
 	local ns="$1"
@@ -36,6 +36,18 @@ main() {
 		echo "Kepler validation failed"
 		return 1
 	}
+
+	echo "getting kepler metrics"
+	until [[ -f /tmp/unsleep ]]; do
+		echo "sleeping for 5m"
+		sleep 300
+	done
+	oc port-forward -n kepler svc/kepler-exporter 9102:9102 &
+	id=$!
+	echo "sleeping for 5m"
+	sleep 300
+	curl http://localhost:9102/metrics | tee "$LOGS_DIR/metrics.log"
+	kill $id
 
 	echo "Running e2e tests"
 
