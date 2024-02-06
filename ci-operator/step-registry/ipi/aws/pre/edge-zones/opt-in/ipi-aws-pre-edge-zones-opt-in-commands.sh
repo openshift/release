@@ -82,27 +82,14 @@ function select_option() {
             echo "Selecting random zone with type: ${zone_type}";
             select_and_opt_in_zone "${zone_type}";
             ;;
-        "") echo "Ignoring single zone EDGE_ZONE_TYPE=${zone_type}" ;;
         *)
-            echo "ERROR: invalid value for variable EDGE_ZONE_TYPE. Got: ${zone_type}, Allowed values: [local-zone | wavelength-zone]";
+            echo "ERROR: invalid value for variable EDGE_ZONE_TYPES. Got: ${zone_type}, Allowed values: [local-zone | wavelength-zone]";
             exit 1 ;;
     esac
 }
 
-function option_multi_zone() {
-    for ZTYPE in $(echo ${EDGE_ZONE_TYPES-}  | tr ',' '\n');
-    do
-        select_option "$ZTYPE";
-    done
-}
 
-function option_single_zone() {
-    select_option "${EDGE_ZONE_TYPE-}";
-}
-
-if [[ ${EDGE_ZONE_TYPE-} != "" ]]; then
-  # Keeping compatibility with EDGE_ZONE_TYPE (deprecated)
-  option_single_zone
-else
-  option_multi_zone
-fi
+for ZTYPE in $(echo ${EDGE_ZONE_TYPES-}  | tr ',' '\n');
+do
+    select_option "$ZTYPE";
+done
