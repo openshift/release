@@ -34,7 +34,7 @@ RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$PLAYLOADIMAGE}
 
 EXTRA_ARGS=""
 if [[ "${IP_STACK}" == "v4v6" ]]; then
-  EXTRA_ARGS+="--cluster-cidr 10.132.0.0/14 --cluster-cidr fd03::/48 --service-cidr 172.31.0.0/16 --service-cidr fd04::/112 "
+  EXTRA_ARGS+="--default-dual "
 fi
 
 /tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
