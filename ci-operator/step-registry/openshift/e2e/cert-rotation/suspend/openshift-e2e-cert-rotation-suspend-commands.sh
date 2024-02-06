@@ -23,7 +23,7 @@ cat >"${SHARED_DIR}"/time-skew-test.sh <<'EOF'
 set -euxo pipefail
 sudo systemctl stop chronyd
 
-SKEW=${1:-+90d}
+SKEW=${1:-90d}
 OC=${OC:-oc}
 SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
 SCP=${SCP:-scp ${SSH_OPTS}}
