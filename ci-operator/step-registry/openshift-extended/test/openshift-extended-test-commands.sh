@@ -207,6 +207,9 @@ oc wait nodes --all --for=condition=Ready=true --timeout=15m
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
 oc get clusterversion version -o yaml || true
 
+# for debugging
+sleep 21600
+
 # execute the cases
 function run {
     test_scenarios=""
