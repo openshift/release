@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+CLUSTER_PROFILE_DIR="${CLUSTER_PROFILE_DIR:-}"
+
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
