@@ -3,6 +3,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -x
 
 export STORE_PATH="${ARTIFACT_DIR}/resource-watch-store"
 export REPOSITORY_PATH="${ARTIFACT_DIR}/resource-watch-store/repo"
@@ -10,9 +11,31 @@ export REPOSITORY_PATH="${ARTIFACT_DIR}/resource-watch-store/repo"
 function cleanup() {
   echo "killing resource watch"
   CHILDREN=$(jobs -p)
+  echo ${CHILDREN}
   if test -n "${CHILDREN}"
   then
-    kill ${CHILDREN} && wait
+    ps -o pid,ppid,cmd,state -p ${CHILDREN}
+    kill ${CHILDREN};
+    sleep 35;
+    ps -o pid,ppid,cmd,state -p ${CHILDREN}
+    sleep 35;
+    ps -o pid,ppid,cmd,state -p ${CHILDREN}
+    sleep 35;
+    ps -o pid,ppid,cmd,state -p ${CHILDREN}
+    sleep 35;
+    ps -o pid,ppid,cmd,state -p ${CHILDREN}
+    sleep 35;
+    ps -o pid,ppid,cmd,state -p ${CHILDREN}
+    sleep 35;
+    ps -o pid,ppid,cmd,state -p ${CHILDREN}
+    sleep 35;
+    ps -o pid,ppid,cmd,state -p ${CHILDREN}
+    sleep 35;
+    ps -o pid,ppid,cmd,state -p ${CHILDREN}
+    sleep 35;
+    ps -o pid,ppid,cmd,state -p ${CHILDREN}
+    sleep 35;
+    ps -o pid,ppid,cmd,state -p ${CHILDREN}
   fi
 
   tar -czC $STORE_PATH -f "${ARTIFACT_DIR}/resource-watch-store.tar.gz" .
