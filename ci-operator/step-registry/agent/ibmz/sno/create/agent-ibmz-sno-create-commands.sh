@@ -248,7 +248,7 @@ sshKey: >
 EOF
 
 echo "Fetching openshift-install binary"
-release_version=$(echo "$JOB_SPEC" | grep -oP 'extra_refs:\[\{[^}]+\}\]' | cut -d ',' -f 3 | cut -d '-' -f 2)
+release_version=$(echo "$JOB_SPEC" | jq -r '.extra_refs|.[].base_ref' | cut -d '-' -f 2)
 wget -O $HOME/openshift-install.tar.gz https://mirror.openshift.com/pub/openshift-v4/s390x/clients/ocp/candidate-${release_version}/openshift-install-linux-amd64.tar.gz
 tar -xvf $HOME/openshift-install.tar.gz
 
