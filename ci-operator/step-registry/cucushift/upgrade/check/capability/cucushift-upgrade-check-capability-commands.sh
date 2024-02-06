@@ -6,6 +6,7 @@ set -o pipefail
 
 trap 'FRC=$?; create_postupgrade_junit' EXIT TERM
 
+# ENABLE_OTA_TEST: OCP-50079, OCP-50170, OCP-50172, OCP-50173, OCP-55974
 # Generate the Junit for cap check
 function create_postupgrade_junit() {
     echo "Generating the Junit for post upgrade check on capability"
