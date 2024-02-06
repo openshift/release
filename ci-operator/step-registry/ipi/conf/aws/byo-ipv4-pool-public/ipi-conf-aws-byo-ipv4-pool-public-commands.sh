@@ -12,11 +12,14 @@ export AWS_REGION="${LEASED_RESOURCE}"
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 # Total Public IPs:
-# bootstrap + (( Public LBs[API+Router] + Nat GWs) * Zones) = 1 + (3*2) = 7
-zone_count=$(yq-go r -j "$CONFIG" | jq -r '.controlPlane.platform.aws.zones | length')
-expected_ip_available=$(( ( zone_count * 3 ) + 1 ))
+## bootstrap + (( Public LBs[API+Router] + Nat GWs) * Zones) = 1 + (3*2) = 7
+#zone_count=$(yq-go r -j "$CONFIG" | jq -r '.controlPlane.platform.aws.zones | length')
+#expected_ip_available=$(( ( zone_count * 3 ) + 1 ))
 
-# Q: Do we need to discover or use static pools?
+##> TODO> setting fixed number of available IPs to have a buffer while a 'pool semaphore'
+# is not created.
+expected_ip_available=30
+
 echo "Retrieving available Public IPv4 Pools in the region..."
 aws ec2 describe-public-ipv4-pools > /tmp/public-pool.json
 
