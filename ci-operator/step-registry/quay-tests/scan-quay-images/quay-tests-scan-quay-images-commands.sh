@@ -16,7 +16,7 @@ quay_container_security_operator_image_tag="brew.registry.redhat.io/rh-osbs/${QU
 quay_builder_image_tag="brew.registry.redhat.io/rh-osbs/${QUAY_BUILDER_IMAGE}"
 quay_builder_qemu_image_tag="brew.registry.redhat.io/rh-osbs/${QUAY_BUILDER_QEMU_IMAGE}"
 
-sleep 1800
+sleep 2000
       
 function scan_quay_images(){
     ssh -o StrictHostKeyChecking=no -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder centos@$1 "sudo /usr/local/bin/grype $2 --scope all-layers > $3_image_vulnerability-report" || true
