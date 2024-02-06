@@ -1,4 +1,8 @@
 base_images:
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
   origin_4.16_cli:
     name: "4.16"
     namespace: origin
@@ -13,11 +17,13 @@ images:
     FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16 as builder
     WORKDIR /go/src/github.com/openshift/rosa
     RUN go install ./cmd/rosa
-    RUN rosa version
     RUN rosa verify openshift-client
+
+    FROM registry.ci.openshift.org/ci/cli-ocm:latest as ocmcli
 
     FROM registry.ci.openshift.org/origin/4.16:cli
     COPY --from=builder /go/bin/rosa /usr/bin/rosa
+    COPY --from=ocmcli /usr/bin/ocm /usr/bin/ocm
     RUN yum -y install --setopt=skip_missing_names_on_install=False \
         openssl \
         jq \
