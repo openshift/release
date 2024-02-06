@@ -14,7 +14,10 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/installer-altinfra/Dockerfile.ci
+- build_args:
+  - name: OPENSHIFT_INSTALL_CLUSTER_API
+    value: "true"
+  dockerfile_path: images/installer-altinfra/Dockerfile.ci
   inputs:
     ocp_4.16_base:
       as:
@@ -67,9 +70,9 @@ resources:
       cpu: "3"
       memory: 5Gi
 tests:
-- as: e2e-aws-custom-security-groups
+- always_run: false
+  as: e2e-aws-custom-security-groups
   optional: true
-  run_if_changed: aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-custom-security-groups
@@ -86,9 +89,9 @@ tests:
         keyC valueC
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
-- as: e2e-aws-ovn-fips
+- always_run: false
+  as: e2e-aws-ovn-fips
   optional: true
-  run_if_changed: aws
   steps:
     cluster_profile: aws
     env:
@@ -117,13 +120,6 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
   timeout: 6h0m0s
-- as: e2e-aws-ovn-public-subnets
-  optional: true
-  run_if_changed: /aws/subnet.go
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-publicsubnets
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-shared-vpc
   optional: true
@@ -131,37 +127,16 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-sharednetwork
   timeout: 6h0m0s
-- as: e2e-aws-ovn-single-node
+- always_run: false
+  as: e2e-aws-ovn-single-node
   optional: true
-  run_if_changed: aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-aws-ovn-upgrade
-  optional: true
-  steps:
-    cluster_profile: aws
-    workflow: openshift-upgrade-aws-latestinstaller
-  timeout: 6h0m0s
-- as: e2e-aws-ovn-upi
-  run_if_changed: ^(upi/aws/.*)|^(images/installer/Dockerfile\.upi.*)
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-upi
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-upi-proxy
-  optional: true
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-upi-proxy
-  timeout: 6h0m0s
-- always_run: false
   as: e2e-aws-ovn-localzones
   optional: true
-  run_if_changed: aws
   steps:
     cluster_profile: aws
     env:
@@ -171,7 +146,6 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-wavelengthzones
   optional: true
-  run_if_changed: aws
   steps:
     cluster_profile: aws
     env:
@@ -187,46 +161,79 @@ tests:
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-azure-ovn
+  as: e2e-aws-capi-ovn
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-capi-ovn
   optional: true
   steps:
     cluster_profile: azure4
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-azure
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-azure-ovn-shared-vpc
-  optional: true
+  as: e2e-gcp-capi-ovn
   steps:
-    cluster_profile: azure4
-    workflow: openshift-e2e-azure-sharednetwork
+    cluster_profile: gcp
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-gcp
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-azure-ovn-resourcegroup
+  as: e2e-ibmcloud-capi-ovn
   optional: true
   steps:
-    cluster_profile: azure4
-    workflow: openshift-e2e-azure-resourcegroup
+    cluster_profile: ibmcloud
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-ibmcloud
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-vsphere-ovn
+  as: e2e-nutanix-capi-ovn
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: nutanix
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-nutanix-ovn
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-capi-ovn
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      FEATURE_GATES: ClusterAPIInstall=true
+      FEATURE_SET: CustomNoUpgrade
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-ipi
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-capi-ovn
   optional: true
   steps:
     cluster_profile: vsphere-2
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-vsphere
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-vsphere-static-ovn
-  optional: true
-  steps:
-    cluster_profile: vsphere-8-vpn
-    workflow: openshift-e2e-vsphere-staticip
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-vsphere-zones
-  optional: true
-  steps:
-    cluster_profile: vsphere-multizone-2
-    workflow: openshift-e2e-vsphere-zones
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.16
