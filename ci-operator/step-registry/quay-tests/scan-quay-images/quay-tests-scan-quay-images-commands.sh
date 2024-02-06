@@ -6,7 +6,7 @@ set -euo pipefail
 quay_security_testing_hostname="$(cat ${SHARED_DIR}/QUAY_SECURITY_TESTING_HOST_NAME)"
 
 #Retrieve the private key of Quay Security Testing Hostname
-cp /var/run/quay-qe-omr-secret/quaybuilder /tmp && cd /tmp && chmod 600 quaybuilder || true
+cp /var/run/quay-qe-omr-secret/quaybuilder /tmp && cd /tmp && chmod 600 quaybuilder && echo "" >>quaybuilder || true
 
 quay_operator_image_tag="brew.registry.redhat.io/rh-osbs/${QUAY_OPERATOR_IMAGE}"
 quay_app_image_tag="brew.registry.redhat.io/rh-osbs/${QUAY_IMAGE}"
