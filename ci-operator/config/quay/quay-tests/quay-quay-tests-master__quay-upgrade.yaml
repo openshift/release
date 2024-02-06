@@ -1,4 +1,8 @@
 base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
   ocp_builder_rhel-8-golang-1.20-openshift-4.16:
     name: builder
     namespace: ocp
@@ -38,6 +42,20 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: quay311-ocp415-upgrade
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.8xlarge
+      QUAY_OPERATOR_CHANNEL: stable-3.10
+      quay_index_image: brew.registry.redhat.io/rh-osbs/iib:655085
+      quayregistry_quay_version: "3.10"
+    test:
+    - ref: quay-tests-quay-upgrade
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay
