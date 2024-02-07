@@ -177,7 +177,7 @@ function mirror_optional_images () {
         # error: unable to retrieve source image registry.redhat.io/openshift-logging/cluster-logging-rhel9-operator manifest sha256:2801ca51e913273d7db6728f05cb50f18b5c0062f95e92609645b592512aed21: manifest unknown: manifest unknown
         # so, replace registry.redhat.io with brew.registry.redhat.io.
         run_command "sed -i 's/^registry.redhat.io/brew.registry.redhat.io/g' /tmp/olm_mirror/mapping.txt"
-        run_command "oc image mirror --insecure=true --skip-missing=true --skip-verification=true -a \"/tmp/new-dockerconfigjson\" -f /tmp/olm_mirror/mapping.txt" || ret=$?
+        run_command "oc image mirror --insecure=true --skip-missing=true --keep-manifest-list=true --skip-verification=true -a \"/tmp/new-dockerconfigjson\" -f /tmp/olm_mirror/mapping.txt" || ret=$?
         if [[ $ret -eq 0 ]]; then
             echo "mirror optional operator images succeed!"
         else
