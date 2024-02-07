@@ -4,9 +4,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-pwd
-ls -l
-ls -l /
 CONFIG_FILE=yamllint.yaml
 cat <<EOF > "$CONFIG_FILE"
 ---
