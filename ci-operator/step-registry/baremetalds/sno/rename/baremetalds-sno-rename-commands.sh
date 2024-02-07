@@ -14,26 +14,31 @@ function collect_artifacts {
 }
 trap collect_artifacts EXIT TERM
 
-cat >"${SHARED_DIR}"/run-recert-cluster-rename-step.sh << "EOF"
+cat >"${SHARED_DIR}"/run-recert-cluster-rename-hostname-change-step.sh << "EOF"
 #!/usr/bin/env bash
 
 export PREVIOUS_CLUSTER_NAME="${PREVIOUS_CLUSTER_NAME:-test-infra-cluster}"
 export PREVIOUS_BASE_DOMAIN="${PREVIOUS_BASE_DOMAIN:-redhat.com}"
 export NEW_CLUSTER_NAME="${NEW_CLUSTER_NAME:-another-name}"
 export NEW_BASE_DOMAIN="${NEW_BASE_DOMAIN:-another.domain}"
+export NEW_HOSTNAME="${NEW_HOSTNAME:-another-hostname}"
 export SINGLE_NODE_IP="${SINGLE_NODE_IP:-192.168.127.10}"
 export SINGLE_NODE_NETWORK_PREFIX="$(echo ${SINGLE_NODE_IP} | cut -d '.' -f 1,2,3).0"
 
 export SSH_OPTS=(-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no)
 
+function info {
+  echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*"
+}
+
 function gather_recert_logs {
-  echo "Saving systemd recert.service log to /tmp/recert.log..."
+  info "Saving systemd recert.service log to /tmp/recert.log..."
   ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "journalctl -u recert.service > /tmp/recert.log"
 
-  echo "Adding systemd recert.service log to CI artifacts..."
+  info "Adding systemd recert.service log to CI artifacts..."
   scp ${SSH_OPTS[@]} core@${SINGLE_NODE_IP}:/tmp/recert.log /tmp/artifacts
 
-  echo "Adding recert_summary_clean.yaml to CI artifacts..."
+  info "Adding recert_summary_clean.yaml to CI artifacts..."
   scp ${SSH_OPTS[@]} core@${SINGLE_NODE_IP}:/etc/kubernetes/recert_summary_clean.yaml /tmp/artifacts
 }
 trap gather_recert_logs EXIT TERM
@@ -98,6 +103,8 @@ function recert {
   local previous_cluster_name="${PREVIOUS_CLUSTER_NAME:-test-infra-cluster}"
   local new_base_domain="${NEW_BASE_DOMAIN:-another.domain}"
   local new_cluster_name="${NEW_CLUSTER_NAME:-another-name}"
+  local previous_hostname="${PREVIOUS_HOSTNAME:-test-infra-cluster-master-0}"
+  local new_hostname="${NEW_HOSTNAME:-another-hostname}"
 
   podman run --authfile=/var/lib/kubelet/config.json \
       --name recert_etcd \
@@ -136,6 +143,10 @@ function recert {
       --cn-san-replace api-int.\${previous_cluster_name}.\${previous_base_domain}:api-int.\${new_cluster_name}.\${new_base_domain} \
       --cn-san-replace api.\${previous_cluster_name}.\${previous_base_domain}:api.\${new_cluster_name}.\${new_base_domain} \
       --cn-san-replace *.apps.\${previous_cluster_name}.\${previous_base_domain}:*.apps.\${new_cluster_name}.\${new_base_domain} \
+      --cn-san-replace system:node:\${previous_hostname},system:node:\${new_hostname} \
+      --cn-san-replace system:ovn-node:\${previous_hostname},system:ovn-node:\${new_hostname} \
+      --cn-san-replace system:multus:\${previous_hostname},system:multus:\${new_hostname} \
+      --hostname \${new_hostname} \
       --cluster-rename \${new_cluster_name}:\${new_base_domain} \
       --summary-file-clean /kubernetes/recert_summary_clean.yaml \
 
@@ -152,17 +163,48 @@ function delete_crts_keys {
 }
 
 oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=30m
-fetch_crts_keys
-fetch_etcd_image
-stop_containers
 
-recert
+if [[ "\$(hostname)" != "${NEW_HOSTNAME}" ]]
+then
+  echo "Deleting node object before changing the hostname..."
+  oc delete node "\$(oc get nodes -ojsonpath='{.items[?(@.metadata.name == "'"\$(hostname)"'")].metadata.name}')"
 
-start_containers
-delete_crts_keys
+  systemctl stop kubelet.service
+  # Forcefully remove all pods rather than just stop them, because a different hostname
+  # requires new pods to be created by kubelet.
+  until crictl rmp --force --all &> /dev/null
+  do
+    sleep 2
+  done
+  systemctl stop crio.service
 
-touch /var/recert.done
-echo "Cluster name and domain changed via recert successfully."
+  hostnamectl hostname "${NEW_HOSTNAME}"
+
+  reboot
+  exit 0
+fi
+
+if ! [ -f "/var/recert.done" ]
+then
+  fetch_crts_keys
+  fetch_etcd_image
+  stop_containers
+
+  recert
+  touch /var/recert.done
+  echo "Cluster name, domain and hostname changed via recert successfully."
+
+  delete_crts_keys
+
+  stable_period_minutes=2
+  start=\$(date +%s)
+  start_containers
+  oc adm wait-for-stable-cluster --minimum-stable-period="\${stable_period_minutes}m" --timeout=30m
+  end=\$(date +%s)
+
+  runtime=\$((end-start-(stable_period_minutes*60)))
+  echo "OCP stabilization after recert took: \${runtime} seconds" >> /var/recert-ocp-stabilization-duration.txt
+fi
 IEOF
 )
 
@@ -204,7 +246,7 @@ spec:
         name: recert.service
 IEOF
 )
-echo "Created \"${recert_machineconfig}\" MachineConfig"
+info "Created \"${recert_machineconfig}\" MachineConfig"
 
 function generate_dnsmasq_single_node_conf {
   cat <<IEOF
@@ -283,35 +325,64 @@ spec:
             WantedBy=multi-user.target
 IEOF
 )
-echo "Created \"${dnsmasq_machineconfig}\" MachineConfig"
+info "Created \"${dnsmasq_machineconfig}\" MachineConfig"
 
-echo "Waiting for master MachineConfigPool to have condition=updating..."
+info "Waiting for master MachineConfigPool to have condition=updating..."
 oc wait --for=condition=updating machineconfigpools master --timeout 10m
 
-echo "Waiting for recert to be completed..."
+info "Waiting for recert to be completed..."
 until ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "cat /var/recert.done" &> /dev/null
 do
-  echo "Waiting for recert to be completed..."
+  info "Waiting for recert to be completed..."
   sleep 5
 done
-echo "Recert completed successfully"
+info "Recert completed successfully"
 
 sed -i -e "s/${PREVIOUS_CLUSTER_NAME}/${NEW_CLUSTER_NAME}/g" -e "s/${PREVIOUS_BASE_DOMAIN}/${NEW_BASE_DOMAIN}/g" ${KUBECONFIG}
 echo "${SINGLE_NODE_IP} api.${NEW_CLUSTER_NAME}.${NEW_BASE_DOMAIN}" | tee --append /etc/hosts
-echo "Replaced server field in ${KUBECONFIG} to reflect recert cluster rename and base domain changes"
+info "Replaced server field in ${KUBECONFIG} to reflect recert cluster rename and base domain changes"
 
-echo "Waiting for master MachineConfigPool to have condition=updated..."
+info "Waiting for master MachineConfigPool to have condition=updated..."
 until oc wait --for=condition=updated machineconfigpools master --timeout=2m &> /dev/null
 do
-  echo "Waiting for master MachineConfigPool to have condition=updated..."
+  info "Waiting for master MachineConfigPool to have condition=updated..."
   sleep 5
 done
 
-oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m
+info "Waiting for OCP stabilization..."
+until ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt" &> /dev/null
+do
+  info "Waiting for OCP stabilization..."
+  sleep 5
+done
+info $(ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt")
+
+
+info "Checking for etcd, kube-apiserver, kube-controller-manager and kube-scheduler revision triggers in the respective cluster operator logs..."
+declare -a components=(
+  "openshift-etcd-operator etcd-operator"
+  "openshift-kube-apiserver-operator kube-apiserver-operator"
+  "openshift-kube-controller-manager-operator kube-controller-manager-operator"
+  "openshift-kube-scheduler-operator openshift-kube-scheduler-operator"
+)
+for component in "${components[@]}"
+do
+  read -a tuple <<< "${component}"
+  namespace="${tuple[0]}"
+  app="${tuple[1]}"
+
+  if oc logs --namespace "${namespace}" --selector app="${app}" --tail=-1 |grep --quiet "RevisionTriggered"
+  then
+      info "${app} had additional rollouts after recert. Please check the respective cluster operator's logs for details."
+      exit 1
+  fi
+done
+
+info "No control-plane component revision triggers logged."
 EOF
 
-chmod +x "${SHARED_DIR}"/run-recert-cluster-rename-step.sh
-scp "${SSHOPTS[@]}" "${SHARED_DIR}"/run-recert-cluster-rename-step.sh "root@${IP}:/usr/local/bin"
+chmod +x "${SHARED_DIR}"/run-recert-cluster-rename-hostname-change-step.sh
+scp "${SSHOPTS[@]}" "${SHARED_DIR}"/run-recert-cluster-rename-hostname-change-step.sh "root@${IP}:/usr/local/bin"
 
 timeout \
   --kill-after 60m \
@@ -319,4 +390,4 @@ timeout \
   ssh \
   "${SSHOPTS[@]}" \
   "root@${IP}" \
-  /usr/local/bin/run-recert-cluster-rename-step.sh \
+  /usr/local/bin/run-recert-cluster-rename-hostname-change-step.sh \
