@@ -40,11 +40,18 @@ fi
 
 [[ -d /usr/local/go ]] && export PATH=${PATH}:/usr/local/go/bin
 
-if [ ! -d "./ovn-kubernetes" ]; then 
+set -x
+if [ ! -d "./ovn-kubernetes" ]; then
 	echo "### Cloning OVN-k ${version}}"
 	git clone --branch release-${version} https://github.com/openshift/ovn-kubernetes.git ./ovn-kubernetes
+  if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" == pull-* ]]; then
+      pushd ovn-kubernetes
+      git fetch origin "pull/${PULL_NUMBER}/head"
+      git checkout -b "pr-${PULL_NUMBER}" FETCH_HEAD
+      popd
+  fi
 fi
-
+set +x
 
 cd ovn-kubernetes/test
 
