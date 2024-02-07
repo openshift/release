@@ -33,7 +33,7 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
     # install skipper
     dnf install -y python3-pip
     pip3 install --upgrade pip
-    pip3 install strato-skipper
+    pip3 install strato-skipper==2.0.2
 
     # misc tools
     dnf install -y sos

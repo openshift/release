@@ -587,12 +587,12 @@ total_worker_nodes=$(oc get nodes -l node-role.kubernetes.io/worker= -oname|wc -
 
 scale_type=""
 #Currently only support AWS reference to ROSA settings
-if [[ $total_worker_nodes -gt 100 ]];then
+if [[ $total_worker_nodes -ge 100 ]];then
 	scale_type=medium
-elif [[ $total_worker_nodes -gt 26 && $total_worker_nodes -lt 100 ]];then
+elif [[ $total_worker_nodes -ge 25 && $total_worker_nodes -lt 100 ]];then
 	scale_type=small
 elif [[ $total_worker_nodes -ge 1 && $total_worker_nodes -lt 25 ]];then
-	scale_type=small
+	scale_type=extrasmall
 fi
 
 ######################################################################################
