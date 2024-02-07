@@ -53,6 +53,54 @@ function copy-file-from-first-master {
   timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_nodes[0]}:${1}" "${2}"
 }
 
+function wait-for-nodes-to-be-ready {
+  run-on-first-master "
+    export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
+    until oc get nodes; do sleep 30; done
+    for nodename in $(oc get nodes -o name); do
+      node_ready=false
+      until ${node_ready}; do
+        STATUS=$(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+        TIME_DIFF=$(($(date +%s)-$(date -d $(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}') +%s)))
+        if [[ ${DIFF} < 100 && ${STATUS} == True ]]; then
+          node_ready=true
+        fi
+        oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
+        sleep 30
+      done
+    done
+    oc get csr | grep Pending
+    oc get nodes
+  "
+}
+
+function retry() {
+    local check_func=$1
+    local max_retries=10
+    local retry_delay=30
+    local retries=0
+
+    while (( retries < max_retries )); do
+        if $check_func; then
+            return 0
+        fi
+
+        (( retries++ ))
+        if (( retries < max_retries )); then
+            sleep $retry_delay
+        fi
+    done
+    return 1
+}
+
+function pod-restart-workarounds {
+  # Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
+  # Restart OVN / Multus before proceeding
+  retry oc -n openshift-multus delete pod -l app=multus --force --grace-period=0
+  retry oc -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0
+  retry oc -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0
+}
+
 ssh-keyscan -H ${control_nodes[@]} ${compute_nodes[@]} >> ~/.ssh/known_hosts
 
 # Save found node IPs for "gather-cert-rotation" step
@@ -115,19 +163,7 @@ done
 until run-on-all-nodes "timedatectl status"; do sleep 30; done
 
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
-run-on-first-master "
-  export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
-  until oc get nodes; do sleep 30; done
-  sleep 5m
-  until oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready --timeout=30s; do
-    oc get nodes
-    if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
-      oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
-    fi
-    sleep 30
-  done
-  oc get nodes
-  "
+wait-for-nodes-to-be-ready
 
 # Wait for kube-apiserver operator to generate new localhost-recovery kubeconfig
 run-on-first-master "while diff -q ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE}; do sleep 30; done"
@@ -137,22 +173,9 @@ run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:
 copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
 # Approve certificates for workers, so that all operators would complete
-run-on-first-master "
-  export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
-  until oc wait node --selector='node-role.kubernetes.io/worker' --for condition=Ready --timeout=30s; do
-    oc get nodes
-    if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
-      oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
-    fi
-    sleep 30
-  done
-"
+wait-for-nodes-to-be-ready
 
-# Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
-# Restart OVN / Multus before proceeding
-oc -n openshift-multus delete pod -l app=multus
-oc -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node
-oc -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane
+pod-restart-workarounds
 
 # Wait for operators to stabilize
 if
