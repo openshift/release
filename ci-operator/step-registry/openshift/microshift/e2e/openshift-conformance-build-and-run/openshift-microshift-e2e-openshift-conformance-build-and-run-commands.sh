@@ -30,6 +30,7 @@ mkdir -p ${DEST_DIR}
 if [ -f "${ROOT_DIR}/origin/run.sh" ]; then
     DEST_DIR="${DEST_DIR}" \
     KUBECONFIG="/tmp/kubeconfig" \
+    RESTRICTED="${RESTRICTED}" \
     "${ROOT_DIR}/origin/run.sh"
 fi
 EOF
