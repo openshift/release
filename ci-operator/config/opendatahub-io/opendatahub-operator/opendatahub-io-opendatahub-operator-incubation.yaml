@@ -3,6 +3,14 @@ base_images:
     name: centos
     namespace: origin
     tag: stream8
+  operator-sdk:
+    name: "4.13"
+    namespace: origin
+    tag: operator-sdk
+  previous-bundle:
+    name: opendatahub-operator-bundle
+    namespace: opendatahub-operator-upgrade
+    tag: opendatahub-operator-bundle
 build_root:
   image_stream_tag:
     name: release
@@ -18,10 +26,17 @@ images:
   to: opendatahub-operator
 operator:
   bundles:
-  - dockerfile_path: Dockerfiles/bundle.Dockerfile
+  - as: odho-bundle
+    dockerfile_path: Dockerfiles/bundle.Dockerfile
   substitutions:
   - pullspec: REPLACE_IMAGE:latest
     with: pipeline:opendatahub-operator
+promotion:
+  to:
+  - additional_images:
+      opendatahub-operator-bundle: odho-bundle
+    name: opendatahub-operator-bundle-latest
+    namespace: opendatahub-operator-upgrade
 releases:
   initial:
     integration:
@@ -75,6 +90,34 @@ tests:
           cpu: 2000m
           memory: 3Gi
     workflow: optional-operators-ci-gcp
+- as: opendatahub-operator-upgrade
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        export OPERATOR_NAMESPACE=opendatahub-operator-upgrade
+        oc create namespace $OPERATOR_NAMESPACE
+        operator-sdk run bundle -n $OPERATOR_NAMESPACE "$PREVIOUS_BUNDLE" # install operator with the version before upgrading
+        oc wait --timeout=10m --for condition=Available -n $OPERATOR_NAMESPACE deployment opendatahub-operator-controller-manager # wait until operator is ready
+      dependencies:
+      - env: PREVIOUS_BUNDLE
+        name: previous-bundle
+    - as: upgrade
+      cli: latest
+      commands:
+        export OPERATOR_NAMESPACE=opendatahub-operator-upgrade
+        operator-sdk run bundle-upgrade --timeout=10m -n $OPERATOR_NAMESPACE "$OO_BUNDLE"
+        sleep 5m
+        oc wait --timeout=5m --for condition=Available -n $OPERATOR_NAMESPACE deployment opendatahub-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: odho-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
 zz_generated_metadata:
   branch: incubation
   org: opendatahub-io
