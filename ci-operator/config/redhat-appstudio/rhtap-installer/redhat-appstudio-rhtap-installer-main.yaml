@@ -1,0 +1,75 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+images:
+- dockerfile_literal: |-
+    FROM src
+    ENV SHELLCHECK_VERSION=0.7.1
+    ENV YQ_VERSION=v4.25.2
+    ENV TEKTONCD_CLI_VERSION="v0.33.0"
+
+    # Install yamllint, shellcheck, yq, heml
+    RUN pip3 install --upgrade setuptools pip && \
+        pip3 install yamllint && yamllint --version && \
+        curl --fail -sSL  https://github.com/koalaman/shellcheck/releases/download/v$SHELLCHECK_VERSION/shellcheck-v$SHELLCHECK_VERSION.linux.x86_64.tar.xz | tar -xJvf - shellcheck-v$SHELLCHECK_VERSION/shellcheck && \
+        mv shellcheck-v$SHELLCHECK_VERSION/shellcheck /usr/local/bin/shellcheck && chmod 755 /usr/local/bin/shellcheck && rm -rf "shellcheck-v$SHELLCHECK_VERSION" && \
+        curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64 && chmod +x /usr/local/bin/yq && \
+        curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh && rm -rf get_helm.sh && \
+        curl -fsSL -o tkn.tgz "https://github.com/tektoncd/cli/releases/download/${TEKTONCD_CLI_VERSION}/tkn_${TEKTONCD_CLI_VERSION:1}_Linux_x86_64.tar.gz" && tar -C "/usr/local/bin" --no-same-owner -xzf "tkn.tgz" tkn && rm -rf "tkn.tgz"
+  from: src
+  to: rhtap-installer
+promotion:
+  to:
+  - name: redhat-appstudio
+    namespace: ci
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rhtap-installer-static-checks
+  steps:
+    test:
+    - as: shellcheck
+      commands: |
+        #!/usr/bin/env bash
+        ls -l
+      from: rhtap-installer
+      resources:
+        requests:
+          cpu: 100m
+- as: rhtap-installer-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^tests/release/pipelines/|^tests/load-tests/|^cmd/loadTests.go$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    test:
+    - ref: redhat-appstudio-rhtap-installer-e2e-test
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: redhat-appstudio
+  repo: rhtap-installer
