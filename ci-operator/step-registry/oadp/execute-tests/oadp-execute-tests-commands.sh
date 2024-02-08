@@ -13,7 +13,6 @@ export BUCKET="${PROW_NAMESPACE}-${BUCKET_NAME}"
 export KUBECONFIG="/home/jenkins/.kube/config"
 export OADP_TEST_FOCUS="--ginkgo.focus=${OADP_TEST_FOCUS}"
 export ANSIBLE_REMOTE_TMP="/tmp/"
-export TESTS_FOLDER=e2e/cloudstorage
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 RESULTS_FILE="/alabama/cspi/e2e/junit_report.xml"
