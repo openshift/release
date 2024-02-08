@@ -13,13 +13,10 @@ else
     echo "no proxy setting."
 fi
 
-sleep 4h
-#Installing odf-operator from redhat-operators channel stable-4.14 into openshift-operators
-#Error: Failed to deploy odf-operator
-#CSV odf-operator.v4.14.4-rhodf YAML
-#error: the server doesn't have a resource type "CSV"
-#
-#CSV odf-operator.v4.14.4-rhodf Describe
+#operator_name="odf-operator"
+#operator_target_namespaces="openshift-storage"
+#operator_channel="stable-4.14"
+trap 'sleep 4h' EXIT TERM SIGINT INT
 
 
 # Read each operator in the JSON provided to an item in a BASH array.
