@@ -1,28 +1,36 @@
 chain:
   as: hypershift-azure-destroy
   steps:
-  - as: destroy
-    cli: latest
-    env:
-    - name: HYPERSHIFT_AZURE_LOCATION
-      default: "eastus"
-      documentation: "The Azure location of the cluster."
-    commands: |-
-      set -exuo pipefail
+    - as: destroy
+      cli: latest
+      env:
+        - name: HYPERSHIFT_AZURE_LOCATION
+          default: "eastus"
+          documentation: "The Azure location of the cluster."
+        - name: HYPERSHIFT_BASE_DOMAIN
+          default: "hypershift.azure.devcluster.openshift.com"
+          documentation: "The cluster's FQDN will be a subdomain of the base domain."
+      commands: |-
+        set -exuo pipefail
 
-      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-      echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
-      bin/hypershift destroy cluster azure \
-        --azure-creds=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json  \
-        --name ${CLUSTER_NAME} \
-        --location ${HYPERSHIFT_AZURE_LOCATION} \
-        --cluster-grace-period 40m
+        CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
+        bin/hypershift destroy cluster azure \
+          --azure-creds="etc/hypershift-ci-jobs-azurecreds/credentials"  \
+          --name ${CLUSTER_NAME} \
+          --location ${HYPERSHIFT_AZURE_LOCATION} \
+          --base-domain ${DOMAIN} \
+          --cluster-grace-period 40m
 
-      echo "$(date) Finished deleting cluster"
-    from: hypershift-operator
-    grace_period: 5m0s
-    resources:
-      requests:
-        cpu: 100m
-        memory: 100Mi
-    timeout: 15m0s
+        \echo "$(date) Finished deleting cluster"
+      from: hypershift-operator
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 45m0s
+      credentials:
+        - mount_path: /etc/hypershift-ci-jobs-azurecreds
+          name: hypershift-ci-jobs-azurecreds
+          namespace: test-credentials
