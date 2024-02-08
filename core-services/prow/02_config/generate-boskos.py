@@ -366,6 +366,10 @@ CONFIG = {
         'us-east-1': 20,
         'us-west-1': 20,
     },
+    'rosa-aws-quota-slice': {
+        'us-east-1': 20,
+        'us-west-1': 20,
+    },
     'aws-edge-infra-quota-slice': {
         'us-east-1': 5,
         'us-east-2': 5,
