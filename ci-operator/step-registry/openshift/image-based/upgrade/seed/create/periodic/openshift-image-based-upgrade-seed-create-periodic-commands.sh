@@ -34,13 +34,15 @@ case $SEED_IMAGE_TAG_FORMAT in
     SEED_IMAGE_TAG="nightly-${SEED_VERSION}-$(date +%F)"
     ;;
   "presubmit")
-    SEED_IMAGE_TAG="pre-${PROW_JOB_ID}"
+    SEED_IMAGE_TAG="pre-${PULL_PULL_SHA}"
     ;;
   *)
     echo "Unknown image tag format specified ${SEED_IMAGE_TAG_FORMAT}"
     exit 1
     ;;
 esac
+
+echo "${SEED_VM_NAME}" > "${SHARED_DIR}/seed_vm_name"
 
 echo "Creating seed script..."
 cat <<EOF > ${SHARED_DIR}/create_seed.sh
@@ -59,19 +61,17 @@ export LCA_IMAGE="${LCA_PULL_REF}"
 cd ${remote_workdir}/ib-orchestrate-vm
 
 # Create the seed vm
-make seed
+make seed-vm-create wait-for-seed dnsmasq-workaround seed-cluster-prepare
 
 # Create and push the seed image
 make trigger-seed-image-create SEED_IMAGE=${SEED_IMAGE}:${SEED_IMAGE_TAG}
 
-echo "Waiting for seed creation to finish"
+echo "Waiting 10 minutes for seed creation to finish"
+sleep 10m
 until oc --kubeconfig ${seed_kubeconfig} wait --timeout 5m seedgenerator seedimage --for=condition=SeedGenCompleted=true; do \
   echo "Cluster unavailable. Waiting 5 minutes and then trying again..."; \
-  sleep 5m; \
+  sleep 1m; \
 done;
-
-echo "Removing seed VM"
-make seed-vm-remove
 
 EOF
 
