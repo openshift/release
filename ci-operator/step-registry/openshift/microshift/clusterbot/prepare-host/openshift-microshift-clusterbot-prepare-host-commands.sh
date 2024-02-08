@@ -116,7 +116,7 @@ skip_if_unavailable=0
 2EOF2
     fi
 
-	"${DNF_RETRY}" "install" "microshift-${version}"
+	"${DNF_RETRY}" "install" "microshift*-${version}"
 	sudo systemctl enable --now microshift
 fi
 EOF

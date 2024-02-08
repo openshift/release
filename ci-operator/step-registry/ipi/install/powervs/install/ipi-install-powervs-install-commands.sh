@@ -30,7 +30,7 @@ function populate_artifact_dir() {
       unset IBMCLOUD_TRACE
 
       echo "8<--------8<--------8<--------8<-------- Instance names, ids, and MAC addresses 8<--------8<--------8<--------8<--------"
-      ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | [.serverName, .pvmInstanceID, .addresses[].ip, .addresses[].macAddress]'
+      ibmcloud pi instance list --json | jq -r '.pvmInstances[] | select (.name|test("'${CLUSTER_NAME}'")) | [.name, .id, .networkPorts[].ip, .networkPorts[].macAddress]'
       echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
       ;;
     *)
@@ -359,7 +359,7 @@ function init_ibmcloud() {
   # BUG, this:
   #  ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .crn'
   # does not always return a match!  This also is likely to fail:
-  #  ibmcloud pi service-list --json | jq -r '.[] | select(.CRN|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .CRN'
+  #  ibmcloud pi workspace list --json | jq -r '.[] | select(.CRN|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .CRN'
   SERVICE_INSTANCE_CRN="$(ibmcloud resource search "crn:*${POWERVS_SERVICE_INSTANCE_ID}*" --output json | jq -r '.items[].crn')"
   if [ -z "${SERVICE_INSTANCE_CRN}" ]; then
     echo "Error: SERVICE_INSTANCE_CRN is empty!"
@@ -367,7 +367,7 @@ function init_ibmcloud() {
   fi
   export SERVICE_INSTANCE_CRN
 
-  ibmcloud pi service-target ${SERVICE_INSTANCE_CRN}
+  ibmcloud pi workspace target ${SERVICE_INSTANCE_CRN}
 
   CLOUD_INSTANCE_ID="$(echo ${SERVICE_INSTANCE_CRN} | cut -d: -f8)"
   if [ -z "${CLOUD_INSTANCE_ID}" ]; then
@@ -405,7 +405,7 @@ function check_resources() {
   #
   # Quota check for image imports
   #
-  JOBS=$(ibmcloud pi jobs --operation-action imageImport --json | jq -r '.jobs[] | select (.status.state|test("running")) | .id')
+  JOBS=$(ibmcloud pi job list --operation-action imageImport --json | jq -r '.jobs[] | select (.status.state|test("running")) | .id')
   if [ -n "${JOBS}" ]
   then
     echo "JOBS=${JOBS}"
@@ -426,14 +426,14 @@ function delete_network() {
   (
     while read UUID
     do
-      echo ibmcloud pi network-delete ${UUID}
-      ibmcloud pi network-delete ${UUID}
+      echo ibmcloud pi subnet delete ${UUID}
+      ibmcloud pi subnet delete ${UUID}
     done
-  ) < <(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID')
+  ) < <(ibmcloud pi subnet list --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID')
 
   for (( TRIES=0; TRIES<20; TRIES++ ))
   do
-    LINES=$(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID' | wc -l)
+    LINES=$(ibmcloud pi subnet list --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID' | wc -l)
     echo "LINES=${LINES}"
     if (( LINES == 0 ))
     then
@@ -663,10 +663,10 @@ function dump_resources() {
   )
 
   echo "8<--------8<--------8<--------8<-------- Instance names, health 8<--------8<--------8<--------8<--------"
-  ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | " \(.serverName) - \(.status) - health: \(.health.reason) - \(.health.status)"'
+  ibmcloud pi instance list --json | jq -r '.pvmInstances[] | select(.name|test("'${CLUSTER_NAME}'")) | " \(.name) - \(.status) - health reason: \(.health.reason) - health status: \(.health.status)"'
 
   echo "8<--------8<--------8<--------8<-------- Running jobs 8<--------8<--------8<--------8<--------"
-  ibmcloud pi jobs --json | jq -r '.jobs[] | select (.status.state|test("running"))'
+  ibmcloud pi job list --json | jq -r '.jobs[] | select (.status.state|test("running"))'
 
   echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
 
