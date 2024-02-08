@@ -71,9 +71,10 @@ fi
 # create disk encryption set
 # We must randomize the name of the keyvault as they do not get fully deleted for 90 days.
 # A vault's name must be between 3-24 alphanumeric characters
+# The vault name must begin with a letter, end with a letter or digit, and not contain consecutive hyphens.
 cluster_sp_id=$(cat "${AZURE_AUTH_LOCATION}" | jq -r ".clientId")
 azure_des_json="{}"
-kv_prefix="${NAMESPACE#ci-op-}-${UNIQUE_HASH}"
+kv_prefix="ci-${NAMESPACE: -6}-${UNIQUE_HASH}"
 if [[ "${ENABLE_DES_DEFAULT_MACHINE}" == "true" ]]; then
     echo "Creating keyvault and disk encryption set in ${RESOURCE_GROUP} for defaultMachinePlatform"
     keyvault_default="${kv_prefix}-kv-d"
