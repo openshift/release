@@ -264,6 +264,21 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-informing
     name: osde2e-informing
+- as: cleanup-tekton-aws-iam
+  commands: |
+    export SECRET_LOCATIONS="/usr/local/osde2e-tekton-copy"
+
+    go mod tidy
+    make build
+
+    out/osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --iam-dry-run false
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 8 * * *
+  secrets:
+  - mount_path: /usr/local/osde2e-tekton-copy
+    name: osde2e-tekton-copy
 zz_generated_metadata:
   branch: main
   org: openshift
