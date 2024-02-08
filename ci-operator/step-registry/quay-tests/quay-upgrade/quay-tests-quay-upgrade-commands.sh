@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+export REPORT_HANDLE_PATH="/usr/bin"
 
 ls -al
 pwd
@@ -117,5 +118,40 @@ oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available -
 echo "files in new-quay-operator-tests:"
 ls  ./tmp
 extended-platform-tests run all --dry-run | grep "20934"| extended-platform-tests run --timeout 150m --junit-dir="${ARTIFACT_DIR}" -f - 
-# go version
+
+function handle_result {
+
+  ##correct ginkgo report numbers
+    resultfile=`ls -rt -1 ${ARTIFACT_DIR}/junit/junit_e2e_* 2>&1 || true`
+    echo $resultfile
+    if (echo $resultfile | grep -E "no matches found") || (echo $resultfile | grep -E "No such file or directory") ; then
+        echo "there is no result file generated"
+        return
+    fi
+    current_time=`date "+%Y-%m-%d-%H-%M-%S"`
+    newresultfile="${ARTIFACT_DIR}/junit/junit_e2e_${current_time}.xml"
+    replace_ret=0
+    python3 ${REPORT_HANDLE_PATH}/handleresult.py -a replace -i ${resultfile} -o ${newresultfile} || replace_ret=$?
+    if ! [ "W${replace_ret}W" == "W0W" ]; then
+        echo "replacing file is not ok"
+        rm -fr ${resultfile}
+        return
+    fi 
+    rm -fr ${resultfile}
+    echo ${newresultfile}
+
+ ##copy quay operator logs
+    quayoperatorlogfile=`ls -rt -1 /tmp/*quayoperatorlogs.txt 2>&1 || true`
+    echo $quayoperatorlogfile
+
+    if (echo $quayoperatorlogfile | grep -E "no matches found") || (echo $quayoperatorlogfile | grep -E "No such file or directory") ; then
+        echo "there is no result file generated"
+        return
+    fi
+    cp $quayoperatorlogfile ${ARTIFACT_DIR}/ || true
+    
+}
+handle_result
+
+
 sleep 10
