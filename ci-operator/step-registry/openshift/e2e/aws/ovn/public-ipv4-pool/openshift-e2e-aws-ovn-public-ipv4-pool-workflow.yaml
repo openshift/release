@@ -1,0 +1,21 @@
+workflow:
+  as: openshift-e2e-aws-ovn-public-ipv4-pool
+  steps:
+    allow_best_effort_post_steps: true
+    leases:
+      - env: LEASED_RESOURCE
+        resource_type: aws-3-quota-slice
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-aws-byo-ipv4-pool-public
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    env:
+      FAIL_ON_CORE_DUMP: "false"
+  documentation: |-
+    The Openshift E2E OVN workflow executes the common end-to-end test suite with the test suite with the custom/owned Public IPv4 Pool.
