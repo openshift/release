@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-mkdir -p
+mkdir -p "${HOME}"
 
 REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
 export REGION
