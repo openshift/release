@@ -10,6 +10,11 @@ build_root:
     tag: "2.5"
   use_build_cache: true
 releases:
+  arm64-latest:
+    release:
+      architecture: arm64
+      channel: stable
+      version: "4.14"
   latest:
     release:
       channel: fast
@@ -48,6 +53,64 @@ tests:
           memory: 100Mi
       timeout: 20m0s
     - as: maistra-proxy-unit-2-5
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          sh -c \
+          "export CI=${CI}; \
+           export LOCAL_CPU_RESOURCES=${LOCAL_CPU_RESOURCES}; \
+           export LOCAL_RAM_RESOURCES=${LOCAL_RAM_RESOURCES}; \
+           export LOCAL_JOBS=${LOCAL_JOBS}; \
+          ./maistra/ci/pre-submit.sh"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: CI
+      - name: LOCAL_CPU_RESOURCES
+      - name: LOCAL_RAM_RESOURCES
+      - name: LOCAL_JOBS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 8h0m0s
+    workflow: servicemesh-proxy-e2e-aws
+  timeout: 8h0m0s
+- as: maistra-proxy-unit-2-5-arm64
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:arm64-latest
+    env:
+      CI: "true"
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m6gd.8xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6gd.8xlarge
+      LOCAL_CPU_RESOURCES: "30"
+      LOCAL_JOBS: "30"
+      LOCAL_RAM_RESOURCES: "61440"
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.5
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-proxy-test-pod
+      OCP_ARCH: arm64
+    test:
+    - as: maistra-proxy-unit-copy-src
+      cli: latest
+      commands: |
+        tar cf - . | oc exec -i -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" -- tar xf - -C /work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: maistra-proxy-unit-2-5-arm64
       cli: latest
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
