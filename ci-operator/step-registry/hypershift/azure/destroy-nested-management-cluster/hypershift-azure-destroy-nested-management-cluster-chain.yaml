@@ -38,20 +38,14 @@ chain:
         default: ""
         documentation: "The cluster's FQDN will be a subdomain of the base domain."
     commands: |-
-      AZURE_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-azurecreds/credentials"
-      DEFAULT_BASE_DOMAIN=hypershift.azure.devcluster.openshift.com
-      
-    
-      DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
-      
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
       export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
+      AZURE_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-azurecreds/credentials"
       bin/hypershift destroy cluster azure \
       --azure-creds=${AZURE_GUEST_INFRA_CREDENTIALS_FILE}  \
       --name="${CLUSTER_NAME}" \
       --namespace="${HYPERSHIFT_NAMESPACE}" \
       --infra-id=${CLUSTER_NAME} \
-      --base-domain=${DOMAIN} \
       --cluster-grace-period 40m
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-azurecreds
