@@ -67,7 +67,7 @@ echo "homepage-url: $homepage_url"
 echo "callback-url: $callback_url"
 echo "webhook-url: $webhook_url"
 
-sleep 2h
+sleep 1h
 
 ##todo: handle the requests via sprayproxy
 echo "[INFO]Trigger e2e tests..."
