@@ -10,11 +10,15 @@ chain:
       fi
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       bin/hypershift dump cluster --artifact-dir=$ARTIFACT_DIR \
+      --namespace $NAMESPACE \
       --dump-guest-cluster=true \
       --name="${CLUSTER_NAME}"
     from: hypershift-operator
     resources:
       requests:
         cpu: 100m
+    env:
+      - name: NAMESPACE
+        default: clusters
     timeout: 15m0s
   - ref: hypershift-debug
