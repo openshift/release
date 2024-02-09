@@ -18,6 +18,13 @@ API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:64
 RESULTS_FILE="/alabama/cspi/e2e/junit_report.xml"
 LOGS_FOLDER="/alabama/cspi/e2e/logs"
 
+#Setup junit path for ROSA
+IS_OIDC=$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')
+
+if [ ! -z $IS_OIDC ] then
+   RESULTS_FILE="/alabama/cspi/e2e/cloudstorage/junit_report.xml"
+fi
+
 # Extract additional repository archives
 mkdir -p {$OADP_GIT_DIR,$OADP_APPS_DIR,$PYCLIENT_DIR}
 echo "Extract /home/jenkins/oadp-e2e-qe.tar.gz to ${OADP_GIT_DIR}"
