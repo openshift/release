@@ -70,7 +70,13 @@ function confirm_labels () {
 
   LABELS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels)
   LABELS_COUNT=$(echo "$LABELS_OUTPUT" | jq -r .total)
-  if [[ "$LABELS_COUNT" -gt "$count" ]]; then
+  ## validation for OCPQE-19422
+  LABELS_PAGE=$(echo "$LABELS_OUTPUT" | jq -r .page)
+  if [[ "$LABELS_PAGE" -ne 1 ]]; then
+    echo "ERROR. Expected labels starting page to be 1. Got: $LABELS_PAGE"
+    TEST_PASSED=false
+  fi
+  if [[ "$LABELS_COUNT" -ne "$count" ]]; then
     echo "ERROR. Expected labels count for $cluster_type with $cluster_id to be $count. Got: $LABELS_COUNT"
     TEST_PASSED=false
   fi
