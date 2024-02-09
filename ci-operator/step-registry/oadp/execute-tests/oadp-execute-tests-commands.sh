@@ -21,8 +21,9 @@ LOGS_FOLDER="/alabama/cspi/e2e/logs"
 #Setup junit path for ROSA
 IS_OIDC=$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')
 
-if [ ! -z $IS_OIDC ] then
-   RESULTS_FILE="/alabama/cspi/e2e/cloudstorage/junit_report.xml"
+if [ ! -z $IS_OIDC ] 
+then
+  RESULTS_FILE="/alabama/cspi/e2e/cloudstorage/junit_report.xml"
 fi
 
 # Extract additional repository archives
