@@ -3,11 +3,38 @@ chain:
   steps:
   - as: cluster-claim-check
     commands: |-
-      oc --kubeconfig="${MANAGEMENT_CLUSTER_KUBECONFIG}" get deploy -n hypershift operator || exit 0
-      BUILD_ID=$(oc --kubeconfig="${MANAGEMENT_CLUSTER_KUBECONFIG}" get deploy -n hypershift operator -o jsonpath='{.metadata.labels.build-id}')
-      echo "HyperShift operator deployment found on the PR test cluster. There may be another PR test in progress."
-      if [[ "${BUILD_ID}" != "" ]]; then
-        echo "Build ${BUILD_ID} installed the current HO deployment."
+      # Retrieve the creation timestamp of the deployment if it exists
+      if CREATION_TIMESTAMP=$(oc --kubeconfig="${MANAGEMENT_CLUSTER_KUBECONFIG}" get deploy -n hypershift operator -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null); then
+        # Get current timestamp and convert it
+        CURRENT_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        CREATION_TIME=$(date -d"${CREATION_TIMESTAMP}" +"%s")
+        CURRENT_TIME=$(date -d"${CURRENT_TIMESTAMP}" +"%s")
+
+        # Calculate the age of the deployment in seconds
+        AGE=$((CURRENT_TIME - CREATION_TIME))
+
+        # Get the build ID of the deployment
+        BUILD_ID=$(oc --kubeconfig="${MANAGEMENT_CLUSTER_KUBECONFIG}" get deploy -n hypershift operator -o jsonpath='{.metadata.labels.build-id}' || true)
+
+        # Print information about the deployment
+        echo "HyperShift operator deployment found on the PR test cluster. There may be another PR test in progress."
+        if [[ "${BUILD_ID}" != "" ]]; then
+          echo "Build ${BUILD_ID} installed the current HO deployment."
+        fi
+
+        # Check if the deployment age is over a day (86400 seconds)
+        if [[ $AGE -gt 86400 ]]; then
+          # If the deployment is over a day old, attempt to delete it
+          if oc --kubeconfig="${MANAGEMENT_CLUSTER_KUBECONFIG}" delete deploy -n hypershift operator; then
+            echo "Deployment deleted successfully."
+          else
+            echo "Failed to delete deployment."
+          fi
+        else
+          echo "Skipping deletion because deployment is still recent"
+        fi
+      else
+        echo "HyperShift operator deployment not found. Skipping deletion."
       fi
       exit 1
     credentials:
