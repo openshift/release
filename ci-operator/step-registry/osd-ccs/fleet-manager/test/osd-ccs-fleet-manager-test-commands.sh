@@ -76,7 +76,7 @@ function confirm_labels () {
     echo "ERROR. Expected labels starting page to be 1. Got: $LABELS_PAGE"
     TEST_PASSED=false
   fi
-  if [[ "$LABELS_COUNT" -gt "$count" ]]; then
+  if [[ "$LABELS_COUNT" -ne "$count" ]]; then
     echo "ERROR. Expected labels count for $cluster_type with $cluster_id to be $count. Got: $LABELS_COUNT"
     TEST_PASSED=false
   fi
