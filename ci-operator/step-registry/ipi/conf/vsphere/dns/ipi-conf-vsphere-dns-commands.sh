@@ -16,6 +16,10 @@ export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
 export HOME=/tmp
 
+
+which python || true
+whereis python || true
+
 if ! command -v aws &> /dev/null
 then
     echo "$(date -u --rfc-3339=seconds) - Install AWS cli..."
@@ -49,16 +53,12 @@ echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 
 if [ "${JOB_NAME_SAFE}" = "launch" ]; then
   # setup DNS records for clusterbot to point to the IBM VIP
-  api_dns_target='"TTL": 60,
-    "ResourceRecords": [{"Value": "'${vips[0]}'"}, {"Value": "169.59.251.161"}, {"Value": "169.63.237.210"}]'
-  apps_dns_target='"TTL": 60,
-    "ResourceRecords": [{"Value": "169.59.251.161"}, {"Value": "169.63.237.210"}]'
+  api_dns_target='"TTL": 60, "ResourceRecords": [{"Value": "'${vips[0]}'"}, {"Value": "169.59.251.161"}, {"Value": "169.63.237.210"}]'
+  apps_dns_target='"TTL": 60, "ResourceRecords": [{"Value": "169.59.251.161"}, {"Value": "169.63.237.210"}]'
 else
   # Configure DNS direct to respective VIP
-  api_dns_target='"TTL": 60,
-        "ResourceRecords": [{"Value": "'${vips[0]}'"}]'
-  apps_dns_target='"TTL": 60,
-        "ResourceRecords": [{"Value": "'${vips[1]}'"}]'
+  api_dns_target='"TTL": 60, "ResourceRecords": [{"Value": "'${vips[0]}'"}]'
+  apps_dns_target='"TTL": 60, "ResourceRecords": [{"Value": "'${vips[1]}'"}]'
 fi
 
 # api-int record is needed just for Windows nodes
