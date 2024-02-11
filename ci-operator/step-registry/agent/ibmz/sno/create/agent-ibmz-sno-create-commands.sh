@@ -252,27 +252,27 @@ release_version=$(echo "$JOB_SPEC" | jq -r '.extra_refs|.[].base_ref' | cut -d '
 wget -O $HOME/openshift-install.tar.gz https://mirror.openshift.com/pub/openshift-v4/s390x/clients/ocp/candidate-${release_version}/openshift-install-linux-amd64.tar.gz
 tar -xvf $HOME/openshift-install.tar.gz -C $HOME/
 
-version=$(oc adm release info -o template --template '{{.metadata.version}}' --insecure=true ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} -a "${AGENT_IBMZ_CREDENTIALS}/registry-secret")
-echo "Patching the image and version for the installer"
-vres=$(grep -oba ._RELEASE_VERSION_LOCATION_.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX $HOME/openshift-install)
-vlocation=${vres%%:*}
-# If the release marker was found then it means that the version is missing
-if [[ ! -z ${vlocation} ]]; then
-    echo "Patching openshift-install with version ${version}"
-    printf "${version}\0" | dd of=$HOME/openshift-install bs=1 seek=${vlocation} conv=notrunc &> /dev/null
-else
-    echo "Version already patched"
-fi
+# version=$(oc adm release info -o template --template '{{.metadata.version}}' --insecure=true ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} -a "${AGENT_IBMZ_CREDENTIALS}/registry-secret")
+# echo "Patching the image and version for the installer"
+# vres=$(grep -oba ._RELEASE_VERSION_LOCATION_.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX $HOME/openshift-install)
+# vlocation=${vres%%:*}
+# # If the release marker was found then it means that the version is missing
+# if [[ ! -z ${vlocation} ]]; then
+#     echo "Patching openshift-install with version ${version}"
+#     printf "${version}\0" | dd of=$HOME/openshift-install bs=1 seek=${vlocation} conv=notrunc &> /dev/null
+# else
+#     echo "Version already patched"
+# fi
 
-ires=$(grep -oba ._RELEASE_IMAGE_LOCATION_.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX $HOME/openshift-install)
-ilocation=${ires%%:*}
-# If the release marker was found then it means that the image is missing
-if [[ ! -z ${ilocation} ]]; then
-    echo "Patching openshift-install with image ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-    printf "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}\0" | dd of=$HOME/openshift-install bs=1 seek=${ilocation} conv=notrunc &> /dev/null
-else
-    echo "Image already patched"
-fi
+# ires=$(grep -oba ._RELEASE_IMAGE_LOCATION_.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX $HOME/openshift-install)
+# ilocation=${ires%%:*}
+# # If the release marker was found then it means that the image is missing
+# if [[ ! -z ${ilocation} ]]; then
+#     echo "Patching openshift-install with image ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+#     printf "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}\0" | dd of=$HOME/openshift-install bs=1 seek=${ilocation} conv=notrunc &> /dev/null
+# else
+#     echo "Image already patched"
+# fi
 
 echo "Generating pxe-boot artifacts for SNO cluster"
 $HOME/openshift-install create pxe-files --dir $HOME/$CLUSTER_NAME/ --log-level debug
