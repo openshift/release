@@ -23,7 +23,7 @@ mirror_registry=\$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spe
 mirror_registry=\${mirror_registry%%/*}
 if [[ \$mirror_registry == "" ]] ; then
     echo "Warning: Can not find the mirror registry, abort !!!"
-    exit 0
+    exit 1
 fi
 echo "mirror registry is \${mirror_registry}"
 
@@ -128,8 +128,7 @@ pushd /home
 popd
 
 echo "6. Create imageconentsourcepolicy and catalogsource"
-RESULTS_FILE=\$(find /home/oc-mirror-workspace -type d -name '*results*')
-oc apply -f "\$RESULTS_FILE/*.yaml"
+find /home/oc-mirror-workspace -type d -name '*results*' -exec oc apply -f {}/*.yaml \;
 cat << END | oc apply -f -
 apiVersion: operator.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
