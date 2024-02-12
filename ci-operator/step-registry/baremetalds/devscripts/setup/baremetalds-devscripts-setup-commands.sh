@@ -302,10 +302,14 @@ then
   ROOT_DISK=\$(lsblk -o pkname --noheadings --path | grep -E "^\S+" | sort | uniq)
 
   # Use the largest disk available for dev-scripts
-  DATA_DISK=\$(lsblk -o name --noheadings --sort size --path | grep -v "\${ROOT_DISK}" | tail -n1)
-  mkfs.xfs -f "\${DATA_DISK}"
-  mkdir /opt/dev-scripts
-  mount "\${DATA_DISK}" /opt/dev-scripts
+  DATA_DISK=\$(lsblk -o name --noheadings --sort size --path | grep -v "\${ROOT_DISK}" | tail -n1) || true
+
+  # There may have only been one disk
+  if [ -n "\$DATA_DISK" ] ; then
+    mkfs.xfs -f "\${DATA_DISK}"
+    mkdir /opt/dev-scripts
+    mount "\${DATA_DISK}" /opt/dev-scripts
+  fi
 elif [ ! -z "${NVME_DEVICE}" ] && [ -e "${NVME_DEVICE}" ] && [[ "\$(mount | grep ${NVME_DEVICE})" == "" ]];
 then
   mkfs.xfs -f "${NVME_DEVICE}"

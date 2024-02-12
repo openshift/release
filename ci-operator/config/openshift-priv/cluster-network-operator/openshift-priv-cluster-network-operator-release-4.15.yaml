@@ -206,13 +206,13 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SDN_LIVE_MIGRATION_OPTIONS: target-cni=OVNKubernetes
       TEST_SUITE: openshift/network/live-migration
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-multicast
+    - ref: ovn-sdn-live-migration-init
     - ref: openshift-e2e-test
     - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
@@ -223,13 +223,13 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SDN_LIVE_MIGRATION_OPTIONS: target-cni=OVNKubernetes,rollback=true
       TEST_SUITE: openshift/network/live-migration
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-multicast
+    - ref: ovn-sdn-live-migration-init
     - ref: openshift-e2e-test
     - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
@@ -428,6 +428,13 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
+- as: security
+  optional: true
+  steps:
+    env:
+      ALL_PROJECTS: "true"
+      PROJECT_NAME: cluster-network-operator
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.21-openshift-4.16
 resources:
   '*':
     requests:
@@ -16,12 +16,8 @@ resources:
 tests:
 - as: lint
   commands: |
-    export GOLANGCI_LINT_VERSION=$(cat .golangciversion)
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     unset GOFLAGS
-    mkdir -p /go/bin
-    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v${GOLANGCI_LINT_VERSION:?'golangci-lint version is unset'}
-    go mod download
     make lint
   container:
     from: src
@@ -33,7 +29,7 @@ tests:
     from: src
 - as: test
   commands: |
-    make test
+    make test verify
   container:
     from: src
 - as: commits
@@ -41,6 +37,25 @@ tests:
     make commits/check
   container:
     from: src
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make codecov
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: rosa-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make codecov
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: rosa-codecov-token
 zz_generated_metadata:
   branch: master
   org: openshift

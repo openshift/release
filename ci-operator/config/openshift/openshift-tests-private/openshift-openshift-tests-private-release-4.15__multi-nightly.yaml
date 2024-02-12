@@ -594,7 +594,6 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@proxy'
       EXTRACT_MANIFEST_INCLUDED: "true"
       FEATURE_GATES: '[InstallAlternateInfrastructureAWS=true]'
       FEATURE_SET: CustomNoUpgrade
@@ -610,7 +609,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@proxy'
       EXTRACT_MANIFEST_INCLUDED: "true"
       FEATURE_GATES: '[InstallAlternateInfrastructureAWS=true]'
       FEATURE_SET: CustomNoUpgrade
@@ -917,7 +915,8 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      ENABLE_DES_DEFAULT_MACHINE: "true"
+      ENABLE_DES_COMPUTE: "true"
+      ENABLE_DES_CONTROL_PLANE: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set-minimal-permission
@@ -967,7 +966,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@proxy'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
@@ -980,7 +978,6 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      E2E_RUN_TAGS: '@proxy'
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
@@ -1050,10 +1047,9 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       FEATURE_SET: TechPreviewNoUpgrade
-      OUTBOUND_TYPE: NatGateway
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi
+    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway
 - as: azure-ipi-nat-gateway-tp-arm-f14
   cron: 5 23 9,17 * *
   steps:
@@ -1065,10 +1061,9 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       FEATURE_SET: TechPreviewNoUpgrade
       OCP_ARCH: arm64
-      OUTBOUND_TYPE: NatGateway
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi
+    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway
 - as: azure-ipi-oidc-amd-f28-destructive
   cron: 49 20 6 * *
   steps:
@@ -1153,7 +1148,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@proxy'
       FEATURE_SET: TechPreviewNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -1167,7 +1161,6 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      E2E_RUN_TAGS: '@proxy'
       FEATURE_SET: TechPreviewNoUpgrade
       OCP_ARCH: arm64
     test:
@@ -1267,6 +1260,7 @@ tests:
       MCO_CONF_DAY2_INSTALL_KERNEL_MCPS: 64k-pages
       MCO_CONF_DAY2_INSTALL_KERNEL_TYPE: 64k-pages
       OCP_ARCH: arm64
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: ipi-install-heterogeneous-day2-kerneltype
     - chain: openshift-e2e-test-qe
@@ -1319,6 +1313,50 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-publish-mixed-ingress-internal
+- as: baremetal-compact-agent-ipv4-dhcp-day2-amd-mixarch-f28
+  cluster: build05
+  cron: 1 18 15 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKERS: "1"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-agent-install-network-dynamic-day2
+- as: baremetal-compact-agent-ipv4-dhcp-disc-day2-amd-mixarch-f28
+  cluster: build05
+  cron: 47 21 6 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKERS: "1"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "true"
+      E2E_RUN_TAGS: '@disconnected'
+      RESERVE_BOOTSTRAP: "false"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-agent-install-network-dynamic-disconnected-day2
 - as: gcp-ipi-baselinecaps-none-additionalcaps-amd-f28-destructive
   cron: 39 15 24 * *
   steps:
@@ -1354,7 +1392,7 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.14
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.15
     env:
       E2E_RUN_TAGS: not @storage
       SIZE_VARIANT: compact
@@ -1368,7 +1406,7 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.14
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.15
     env:
       E2E_RUN_TAGS: not @storage
       OCP_ARCH: arm64
@@ -1508,8 +1546,6 @@ tests:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      E2E_RUN_TAGS: '@proxy'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
@@ -1521,7 +1557,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
-      E2E_RUN_TAGS: '@proxy'
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
@@ -1532,8 +1567,6 @@ tests:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      E2E_RUN_TAGS: '@proxy'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
@@ -1545,7 +1578,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
-      E2E_RUN_TAGS: '@proxy'
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
@@ -1557,7 +1589,6 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      E2E_RUN_TAGS: '@proxy'
       FEATURE_SET: TechPreviewNoUpgrade
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -1570,7 +1601,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
-      E2E_RUN_TAGS: '@proxy'
       FEATURE_SET: TechPreviewNoUpgrade
       OCP_ARCH: arm64
     test:
@@ -1583,7 +1613,7 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      E2E_RUN_TAGS: '@proxy'
+      EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
@@ -1595,7 +1625,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
-      E2E_RUN_TAGS: '@proxy'
+      EXTRACT_MANIFEST_INCLUDED: "true"
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
@@ -1700,6 +1730,8 @@ tests:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-workload-identity
@@ -1711,6 +1743,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      EXTRACT_MANIFEST_INCLUDED: "true"
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe

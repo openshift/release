@@ -32,14 +32,14 @@ openshift-openshift-tests-private-release-VERSION__ARCH-TargetStream-TargetVersi
 For example: **openshift-openshift-tests-private-release-4.15__multi-nightly-4.15-upgrade-from-stable-4.14.yaml**
 
 ## Job Naming
-All jobs under the job configuration location should have a consistent file naming rule as e2e-PLATFORM-INSTALLMETHOD-CONFIG1-CONFIG2-CONFIG*-FREQUENCY
+All jobs under the job configuration location should have a consistent file naming rule as PLATFORM-INSTALLMETHOD-CONFIG1-CONFIG2-CONFIG*-FREQUENCY
 
 - PLATFORM: the platform to run e2e, valid values are: alicloud, aws, azure, baremetal, gcp, ibmcloud, nutanix, openstack, vsphere
 - INSTALLMETHOD: valid values are: ipi, upi
 - CONFIG1, CONFIG2, CONFIG*: represent a cluster configuration, like ovn, ipsec, fips, proxy, cco etc. You could add multiple configs following the same convention.
 - FREQUENCY: how often is the job executed, see more details in job frequency
 
-Example: **e2e-aws-ipi-ovn-ipsec-f1**: runs e2e tests on profile aws ipi with ovn, ipsec, and test frequency is f1 (daily)
+Example: **aws-ipi-ovn-ipsec-f1**: runs e2e tests on profile aws ipi with ovn, ipsec, and test frequency is f1 (daily)
 
 
 ## Job Frequency

@@ -5,10 +5,12 @@ base_images:
     tag: cli
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.14"
+      version_bounds:
+        lower: 4.14.0-0
+        stream: 4-stable
+        upper: 4.15.0-0
 resources:
   '*':
     limits:
@@ -27,21 +29,24 @@ tests:
         {
           "failure_rules":
             [
-              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster"},
-              {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators"},
-              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other"},
+              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
-              {"step": "openshift-*", "failure_type": "all", "classification": "Other"},
-              {"step": "aap-install-automation-controller", "failure_type": "all", "classification": "Ansible Automation Platform controller provisioning", "jira_project": "AAP", "jira_assignee": "!default"},
-              {"step": "aap-tests-integration", "failure_type": "test_failure", "classification": "Ansible Automation Platform Test Failure", "jira_project": "AAP", "jira_assignee": "!default"}
+              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "aap-install-automation-controller", "failure_type": "all", "classification": "Ansible Automation Platform controller provisioning", "jira_project": "AAP", "group": {"name": "lp-tests", "priority": 1}, "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "aap-tests-integration", "failure_type": "test_failure", "classification": "Ansible Automation Platform Test Failure", "jira_project": "AAP", "group": {"name": "lp-tests", "priority": 2}, "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.14-lp","self-managed-lp","aap-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: fasta@redhat.com
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       OPERATORS: |
         [
-            {"name": "ansible-automation-platform-operator", "source": "redhat-operators", "channel": "stable-2.4", "install_namespace": "aap", "operator_group":"aap-operator", "target_namespaces": "aap"}
+            {"name": "ansible-automation-platform-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "aap", "operator_group":"aap-operator", "target_namespaces": "aap"}
         ]
+      USER_TAGS: |
+        scenario aap
     test:
     - ref: install-operators
     - ref: aap-install-automation-controller

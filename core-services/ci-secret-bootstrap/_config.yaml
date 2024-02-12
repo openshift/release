@@ -25,16 +25,16 @@ cluster_groups:
   - vsphere02
   non_app_ci_arm:
   - arm01
-  non_osd_x86:
+  openshift_config_pull_secret:
   - build01
   - build02
+  - build09
+  - multi01
   - vsphere02
   osd_global_pull_secret:
   - build03
   - build04
   - build05
-  - build09
-  - multi01
 secret_configs:
 - from:
     ops-mirror.pem:
@@ -687,7 +687,7 @@ secret_configs:
         registry_url: registry.redhat.io
   to:
   - cluster_groups:
-    - non_osd_x86
+    - openshift_config_pull_secret
     name: pull-secret
     namespace: openshift-config
     type: kubernetes.io/dockerconfigjson
@@ -947,6 +947,10 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-aws-edge-infra
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-devsandboxci-aws
     namespace: ci
 - from:
     pull-secret:
@@ -1765,6 +1769,45 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-libvirt-s390x
+    namespace: ci
+- from:
+    insights-live.yaml:
+      field: insights-live.yaml
+      item: insights-ci-account
+    ops-mirror.pem:
+      field: cert-key.pem
+      item: mirror.openshift.com
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+    ssh-privatekey:
+      field: ssh-privatekey
+      item: jenkins-ci-iam
+    ssh-publickey:
+      field: ssh-publickey
+      item: jenkins-ci-iam
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-libvirt-s390x-amd64
     namespace: ci
 - from:
     insights-live.yaml:
@@ -4359,6 +4402,10 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-ibmcloud-multi-s390x
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-powervs-multi-1
     namespace: ci
 - from:
     insights-live.yaml:

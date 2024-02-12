@@ -54,7 +54,7 @@ function wait_for_prometheus_status() {
 
 function check_monitoring_statefulset_status()
 {
-  attempts=20
+  attempts=30
   infra_nodes=$(oc get nodes -l 'node-role.kubernetes.io/infra=' --no-headers | awk '{print $1}' |  tr '\n' '|')
   infra_nodes=${infra_nodes:0:-1}
   echo -e "\nQuery infra_nodes in check_monitoring_statefulset_status:\n[ $infra_nodes ]"
@@ -63,9 +63,14 @@ function check_monitoring_statefulset_status()
   for statefulset in $statefulset_list; do
     echo "statefulset in openshift-monitoring is $statefulset"	  
     retries=0
-    ready_replicas=$(oc get statefulsets $statefulset -n openshift-monitoring -ojsonpath='{.status.availableReplicas}')
-    wanted_replicas=$(oc get statefulsets $statefulset -n openshift-monitoring -ojsonpath='{.spec.replicas}')
+    wanted_replicas=$( ! oc -n openshift-monitoring get statefulsets $statefulset -oyaml | grep 'replicas:'>/dev/null || oc get statefulsets $statefulset -n openshift-monitoring -ojsonpath='{.spec.replicas}')
+    echo wanted_replicas is $wanted_replicas
+    sleep 30
+    #wait for 30s to make sure the .status.availableReplicas was updated
+    ready_replicas=$( ! oc -n openshift-monitoring get statefulsets $statefulset -oyaml |grep availableReplicas>/dev/null || oc get statefulsets $statefulset -n openshift-monitoring -ojsonpath='{.status.availableReplicas}')
+    echo ready_replicas is $ready_replicas
     infra_pods=$(oc get pods -n openshift-monitoring --no-headers -o wide | grep -E "$infra_nodes" | grep Running | grep "$statefulset" | wc -l  | xargs)
+    echo infra_pods is $infra_pods
     echo
     echo "-------------------------------------------------------------------------------------------"
     echo "current replicas in $statefulset: wanted--$wanted_replicas, current ready--$ready_replicas!"
@@ -444,6 +449,7 @@ platform_type=$(oc get infrastructure cluster -o=jsonpath='{.status.platformStat
 platform_type=$(echo $platform_type | tr -s 'A-Z' 'a-z')
 
 default_sc=$(oc get sc -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}')
+
 if [[ -n $default_sc ]]; then
     set_storage_class
     apply_monitoring_configmap_withpvc
@@ -530,6 +536,16 @@ then
 	exit 0
 fi
 
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+	# shellcheck disable=SC1090
+	source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 # Download jq
 if [ ! -d /tmp/bin ];then
@@ -557,47 +573,50 @@ export OPENSHIFT_ALERTMANAGER_STORAGE_SIZE=2Gi
 
 case ${platform_type} in
 	aws)
-           #Both Architectures also need:
-           OPENSHIFT_PROMETHEUS_STORAGE_CLASS=gp3-csi
-           OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=gp3-csi
-             ;;
+    #Both Architectures also need:
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=gp3-csi
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=gp3-csi
+    ;;
 	gcp)
-           OPENSHIFT_PROMETHEUS_STORAGE_CLASS=ssd-csi
-	   OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=ssd-csi
-             ;;
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=ssd-csi
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=ssd-csi
+    ;;
 	ibmcloud)
-	   OPENSHIFT_PROMETHEUS_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
-	   OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
-           OPENSHIFT_PROMETHEUS_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
-	   OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
-             ;;
-    	openstack)
-           OPENSHIFT_PROMETHEUS_STORAGE_CLASS=standard-csi
-           OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=standard-csi
-             ;;
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=ibmc-vpc-block-5iops-tier
+    ;;
+    openstack)
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=standard-csi
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=standard-csi
+    ;;
 	alibabacloud)
-	   OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=alicloud-disk
-	   OPENSHIFT_PROMETHEUS_STORAGE_CLASS=alicloud-disk
-           OPENSHIFT_PROMETHEUS_STORAGE_CLASS=alicloud-disk
-           OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=alicloud-disk
-             ;;
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=alicloud-disk
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=alicloud-disk
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=alicloud-disk
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=alicloud-disk
+    ;;
 
 	azure)
-	   #Azure use VM_SIZE as instance type, to unify variable, define all to INSTANCE_TYPE
-	   OPENSHIFT_PROMETHEUS_STORAGE_CLASS=managed-csi
-	   OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=managed-csi
-             ;;
-        nutanix)
-	   #nutanix use VM_SIZE as instance type, to uniform variable, define all to INSTANCE_TYPE
-           OPENSHIFT_PROMETHEUS_STORAGE_CLASS=nutanix-volume
-           OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=nutanix-volume
-	   ;;
-        vsphere|default)
+    #Azure use VM_SIZE as instance type, to unify variable, define all to INSTANCE_TYPE
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=managed-csi
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=managed-csi
+    ;;
+  nutanix)
+    #nutanix use VM_SIZE as instance type, to uniform variable, define all to INSTANCE_TYPE
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=nutanix-volume
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=nutanix-volume
+    ;;
+  vsphere)
+    OPENSHIFT_PROMETHEUS_STORAGE_CLASS=thin-csi
+    OPENSHIFT_ALERTMANAGER_STORAGE_CLASS=thin-csi
+    ;;
+  default)
 	  ;;
-	    
-	 *)
-	   echo "Un-supported infrastructure cluster detected."
-	   exit 1
+	*)
+    echo "Un-supported infrastructure cluster detected."
+    exit 1
 esac
 
 
