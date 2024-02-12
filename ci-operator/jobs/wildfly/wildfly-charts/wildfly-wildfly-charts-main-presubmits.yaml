@@ -1,35 +1,30 @@
 presubmits:
-  CSPI-QE/MSI:
+  wildfly/wildfly-charts:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^multi-cluster-smoke$
-    - ^multi-cluster-smoke-
-    cluster: build05
-    context: ci/prow/v4.14-multicluster-aws-4-14-nightly-hypershift-4-14-candidate-smoke
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/wildfly-wildfly-charts-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-managed-cspi-qe
-      ci-operator.openshift.io/variant: v4.14
       ci.openshift.io/generator: prowgen
-      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-CSPI-QE-MSI-multi-cluster-smoke-v4.14-multicluster-aws-4-14-nightly-hypershift-4-14-candidate-smoke
-    rerun_command: /test v4.14-multicluster-aws-4-14-nightly-hypershift-4-14-candidate-smoke
+    name: pull-ci-wildfly-wildfly-charts-main-wildfly-wildfly-charts-e2e
+    rerun_command: /test wildfly-wildfly-charts-e2e
+    skip_if_only_changed: .github/.*|.ci/.*|.*\.adoc
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/multicluster-aws-4-14-nightly-hypershift-4-14-candidate-smoke-cluster-profile
-        - --target=multicluster-aws-4-14-nightly-hypershift-4-14-candidate-smoke
-        - --variant=v4.14
+        - --target=wildfly-wildfly-charts-e2e
         command:
         - ci-operator
         image: ci-operator:latest
@@ -39,16 +34,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/multicluster-aws-4-14-nightly-hypershift-4-14-candidate-smoke-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -61,18 +54,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
+      - name: hive-hive-credentials
         secret:
-          secretName: cluster-secrets-aws-managed-cspi-qe
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -82,4 +69,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v4.14-multicluster-aws-4-14-nightly-hypershift-4-14-candidate-smoke,?($|\s.*)
+    trigger: (?m)^/test( | .* )wildfly-wildfly-charts-e2e,?($|\s.*)
