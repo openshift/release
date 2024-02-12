@@ -78,7 +78,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-microshift-release-4.17-metal-periodic-test
@@ -169,7 +168,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-microshift-release-4.17-metal-periodic-test-arm
@@ -260,7 +258,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-microshift-release-4.17-microshift-metal-cache
@@ -351,7 +348,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-microshift-release-4.17-microshift-metal-cache-arm
@@ -442,7 +438,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-microshift-release-4.17-microshift-metal-tests
@@ -533,7 +528,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-microshift-release-4.17-microshift-metal-tests-arm
@@ -624,7 +618,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-microshift-release-4.17-ocp-conformance-rhel-eus
@@ -715,7 +708,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-microshift-release-4.17-ocp-conformance-rhel-eus-arm
@@ -793,6 +785,76 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )ocp-conformance-rhel-eus-arm,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.17$
+    - ^release-4\.17-
+    context: ci/prow/rebase-on-nightlies
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-microshift-release-4.17-rebase-on-nightlies
+    path_alias: github.com/openshift/microshift
+    rerun_command: /test rebase-on-nightlies
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=rebase-on-nightlies
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rebase-on-nightlies,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.17$
@@ -804,7 +866,6 @@ presubmits:
       skip_cloning: true
     hidden: true
     labels:
-      ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-microshift-release-4.17-test-rebase
@@ -878,7 +939,6 @@ presubmits:
       skip_cloning: true
     hidden: true
     labels:
-      ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-microshift-release-4.17-test-rpm
@@ -944,7 +1004,6 @@ presubmits:
       skip_cloning: true
     hidden: true
     labels:
-      ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-microshift-release-4.17-test-unit
@@ -1009,7 +1068,6 @@ presubmits:
       skip_cloning: true
     hidden: true
     labels:
-      ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-microshift-release-4.17-verify
