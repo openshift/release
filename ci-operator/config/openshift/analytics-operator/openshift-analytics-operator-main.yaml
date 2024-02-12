@@ -81,8 +81,10 @@ tests:
         /go/src/github.com/openshift/analytics-operator/\necho \"---------\"\nls ./config/samples/\necho
         \"---------\"\nset +e \noc new-project temp-osa\noc project temp-osa \necho
         \"print1\"\nGOFLAGS=\"\" sh ./tests/run-e2e.sh --no-build --image-base registry.ci.openshift.org/osa
-        --version latest\necho \"print2\"\noc delete project temp-osa \necho \"------------------\"\nkubectl
-        get cronjob -n \"osa-anomaly-detection\"\necho \"print12.4\"\ncontroller_manager_pod=\"\"\npresent=false\nfor
+        --version latest\nif [ $? -eq 0 ] \nthen \n  echo \"Successfully executed
+        script\" \nelse \n  echo \"Failed to execute script\"  \nfi\necho \"print2\"\noc
+        delete project temp-osa \necho \"------------------\"\nkubectl get cronjob
+        -n \"osa-anomaly-detection\"\necho \"print12.4\"\ncontroller_manager_pod=\"\"\npresent=false\nfor
         elm in $(kubectl get pod  -n \"analytics-operator-system\"); do \n    if [[
         \"$elm\" == \"analytics-operator-controller-manager\"* ]]; then\n        controller_manager_pod=$elm\n
         \       present=true\n        break\n    fi\ndone\necho \"print12.5\"\necho
