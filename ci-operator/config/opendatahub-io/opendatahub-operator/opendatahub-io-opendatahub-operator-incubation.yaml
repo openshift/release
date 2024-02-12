@@ -3,14 +3,6 @@ base_images:
     name: centos
     namespace: origin
     tag: stream8
-  operator-sdk:
-    name: "4.13"
-    namespace: origin
-    tag: operator-sdk
-  previous-bundle:
-    name: opendatahub-operator-bundle
-    namespace: opendatahub-operator-upgrade
-    tag: opendatahub-operator-bundle
 build_root:
   image_stream_tag:
     name: release
@@ -26,17 +18,10 @@ images:
   to: opendatahub-operator
 operator:
   bundles:
-  - as: odho-bundle
-    dockerfile_path: Dockerfiles/bundle.Dockerfile
+  - dockerfile_path: Dockerfiles/bundle.Dockerfile
   substitutions:
   - pullspec: REPLACE_IMAGE:latest
     with: pipeline:opendatahub-operator
-promotion:
-  to:
-  - additional_images:
-      opendatahub-operator-bundle: odho-bundle
-    name: opendatahub-operator-bundle-latest
-    namespace: opendatahub-operator-upgrade
 releases:
   initial:
     integration:
@@ -96,24 +81,26 @@ tests:
     - as: install
       cli: latest
       commands: |
-        export OPERATOR_NAMESPACE=opendatahub-operator-upgrade
-        oc create namespace $OPERATOR_NAMESPACE
-        operator-sdk run bundle -n $OPERATOR_NAMESPACE "$PREVIOUS_BUNDLE" # install operator with the version before upgrading
+        export OPERATOR_NAMESPACE=openshift-operators
+        export IMG=quay.io/opendatahub/opendatahub-operator:incubation
+        export BUNDLE_IMG=quay.io/opendatahub/opendatahub-operator-bundle:incubation
+        make deploy-bundle IMG=$IMG BUNDLE_IMG=$BUNDLE_IMG OPERATOR_NAMESPACE=$OPERATOR_NAMESPACE # install operator with the version before upgrading
         oc wait --timeout=10m --for condition=Available -n $OPERATOR_NAMESPACE deployment opendatahub-operator-controller-manager # wait until operator is ready
-      dependencies:
-      - env: PREVIOUS_BUNDLE
-        name: previous-bundle
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
     - as: upgrade
       cli: latest
-      commands:
-        export OPERATOR_NAMESPACE=opendatahub-operator-upgrade
-        operator-sdk run bundle-upgrade --timeout=10m -n $OPERATOR_NAMESPACE "$OO_BUNDLE"
+      commands: |
+        export OPERATOR_NAMESPACE=openshift-operators
+        export IMG=quay.io/opendatahub/opendatahub-operator:pr-${PULL_NUMBER}
+        export BUNDLE_IMG=quay.io/opendatahub/opendatahub-operator-bundle:pr-${PULL_NUMBER}
+        make upgrade-bundle IMG=$IMG BUNDLE_IMG=$BUNDLE_IMG OPERATOR_NAMESPACE=$OPERATOR_NAMESPACE
         sleep 5m
         oc wait --timeout=5m --for condition=Available -n $OPERATOR_NAMESPACE deployment opendatahub-operator-controller-manager
-      dependencies:
-      - env: OO_BUNDLE
-        name: odho-bundle
-      from: operator-sdk
+      from: src
       resources:
         requests:
           cpu: 2000m
