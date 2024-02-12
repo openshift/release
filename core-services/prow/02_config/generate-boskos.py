@@ -371,6 +371,12 @@ CONFIG = {
         'us-east-2': 5,
         'us-west-1': 5,
         'us-west-2': 5,
+    },
+    'rh-openshift-ecosystem-quota-slice': {
+        'us-east-1': 5,
+        'us-east-2': 5,
+        'us-west-1': 5,
+        'us-west-2': 5,
     }
 }
 
