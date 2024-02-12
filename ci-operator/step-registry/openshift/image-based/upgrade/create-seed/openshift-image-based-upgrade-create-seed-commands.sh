@@ -31,7 +31,7 @@ case $SEED_IMAGE_TAG_FORMAT in
     SEED_IMAGE_TAG="latest"
     ;;
   "nightly")
-    SEED_IMAGE_TAG="nightly-$(date +%F)"
+    SEED_IMAGE_TAG="nightly-${SEED_VERSION}-$(date +%F)"
     ;;
   "presubmit")
     SEED_IMAGE_TAG="pre-${PROW_JOB_ID}"
