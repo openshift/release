@@ -421,7 +421,11 @@ fi
 
 # Wait for agent installation to get completed
 echo "$(date) Approved the agents, waiting for the installation to get completed on them"
-oc wait --all=true agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=45m
+until \
+  oc wait --all=true agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster > /dev/null; do
+  oc get agents -n ${HOSTED_CONTROL_PLANE_NAMESPACE} -o wide 2> /dev/null || true
+  sleep 5
+done
 
 # Download guest cluster kubeconfig
 echo "$(date) Setup nested_kubeconfig"
