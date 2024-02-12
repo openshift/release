@@ -27,14 +27,18 @@ export SINGLE_NODE_NETWORK_PREFIX="$(echo ${SINGLE_NODE_IP} | cut -d '.' -f 1,2,
 
 export SSH_OPTS=(-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no)
 
+function info {
+  echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*"
+}
+
 function gather_recert_logs {
-  echo "Saving systemd recert.service log to /tmp/recert.log..."
+  info "Saving systemd recert.service log to /tmp/recert.log..."
   ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "journalctl -u recert.service > /tmp/recert.log"
 
-  echo "Adding systemd recert.service log to CI artifacts..."
+  info "Adding systemd recert.service log to CI artifacts..."
   scp ${SSH_OPTS[@]} core@${SINGLE_NODE_IP}:/tmp/recert.log /tmp/artifacts
 
-  echo "Adding recert_summary_clean.yaml to CI artifacts..."
+  info "Adding recert_summary_clean.yaml to CI artifacts..."
   scp ${SSH_OPTS[@]} core@${SINGLE_NODE_IP}:/etc/kubernetes/recert_summary_clean.yaml /tmp/artifacts
 }
 trap gather_recert_logs EXIT TERM
@@ -187,12 +191,19 @@ then
   stop_containers
 
   recert
-
-  start_containers
-  delete_crts_keys
-
   touch /var/recert.done
   echo "Cluster name, domain and hostname changed via recert successfully."
+
+  delete_crts_keys
+
+  stable_period_minutes=2
+  start=\$(date +%s)
+  start_containers
+  oc adm wait-for-stable-cluster --minimum-stable-period="\${stable_period_minutes}m" --timeout=30m
+  end=\$(date +%s)
+
+  runtime=\$((end-start-(stable_period_minutes*60)))
+  echo "OCP stabilization after recert took: \${runtime} seconds" >> /var/recert-ocp-stabilization-duration.txt
 fi
 IEOF
 )
@@ -235,7 +246,7 @@ spec:
         name: recert.service
 IEOF
 )
-echo "Created \"${recert_machineconfig}\" MachineConfig"
+info "Created \"${recert_machineconfig}\" MachineConfig"
 
 function generate_dnsmasq_single_node_conf {
   cat <<IEOF
@@ -314,32 +325,40 @@ spec:
             WantedBy=multi-user.target
 IEOF
 )
-echo "Created \"${dnsmasq_machineconfig}\" MachineConfig"
+info "Created \"${dnsmasq_machineconfig}\" MachineConfig"
 
-echo "Waiting for master MachineConfigPool to have condition=updating..."
+info "Waiting for master MachineConfigPool to have condition=updating..."
 oc wait --for=condition=updating machineconfigpools master --timeout 10m
 
-echo "Waiting for recert to be completed..."
+info "Waiting for recert to be completed..."
 until ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "cat /var/recert.done" &> /dev/null
 do
-  echo "Waiting for recert to be completed..."
+  info "Waiting for recert to be completed..."
   sleep 5
 done
-echo "Recert completed successfully"
+info "Recert completed successfully"
 
 sed -i -e "s/${PREVIOUS_CLUSTER_NAME}/${NEW_CLUSTER_NAME}/g" -e "s/${PREVIOUS_BASE_DOMAIN}/${NEW_BASE_DOMAIN}/g" ${KUBECONFIG}
 echo "${SINGLE_NODE_IP} api.${NEW_CLUSTER_NAME}.${NEW_BASE_DOMAIN}" | tee --append /etc/hosts
-echo "Replaced server field in ${KUBECONFIG} to reflect recert cluster rename and base domain changes"
+info "Replaced server field in ${KUBECONFIG} to reflect recert cluster rename and base domain changes"
 
-echo "Waiting for master MachineConfigPool to have condition=updated..."
+info "Waiting for master MachineConfigPool to have condition=updated..."
 until oc wait --for=condition=updated machineconfigpools master --timeout=2m &> /dev/null
 do
-  echo "Waiting for master MachineConfigPool to have condition=updated..."
+  info "Waiting for master MachineConfigPool to have condition=updated..."
   sleep 5
 done
 
-oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m
+info "Waiting for OCP stabilization..."
+until ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt" &> /dev/null
+do
+  info "Waiting for OCP stabilization..."
+  sleep 5
+done
+info $(ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt")
 
+
+info "Checking for etcd, kube-apiserver, kube-controller-manager and kube-scheduler revision triggers in the respective cluster operator logs..."
 declare -a components=(
   "openshift-etcd-operator etcd-operator"
   "openshift-kube-apiserver-operator kube-apiserver-operator"
@@ -354,10 +373,12 @@ do
 
   if oc logs --namespace "${namespace}" --selector app="${app}" --tail=-1 |grep --quiet "RevisionTriggered"
   then
-      echo "${app} had additional rollouts after recert. Please check the respective cluster operator's logs for details."
+      info "${app} had additional rollouts after recert. Please check the respective cluster operator's logs for details."
       exit 1
   fi
 done
+
+info "No control-plane component revision triggers logged."
 EOF
 
 chmod +x "${SHARED_DIR}"/run-recert-cluster-rename-hostname-change-step.sh
