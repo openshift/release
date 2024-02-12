@@ -51,7 +51,6 @@ tag_specification:
   namespace: ocp
 tests:
 - as: verify
-  cluster: build02
   steps:
     test:
     - as: verify
@@ -65,18 +64,15 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: test-unit
-  cluster: build02
   commands: make test-unit
   container:
     from: src
 - as: test-rpm
-  cluster: build02
   commands: RPM_INFO=true make rpm srpm
   container:
     from: microshift-test-rpm
   run_if_changed: ^(rpm/.*|packaging/.*|Makefile)$
 - as: test-rebase
-  cluster: build02
   optional: true
   run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod)$
   steps:
@@ -84,7 +80,6 @@ tests:
       DRY_RUN: "y"
     workflow: openshift-microshift-rebase
 - as: microshift-metal-tests
-  cluster: build02
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: aws
@@ -93,7 +88,6 @@ tests:
       MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-tests
 - as: microshift-metal-tests-arm
-  cluster: build02
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: aws
@@ -102,7 +96,6 @@ tests:
       EC2_INSTANCE_TYPE: c6g.metal
     workflow: openshift-microshift-e2e-metal-tests
 - as: microshift-metal-cache
-  cluster: build02
   run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
   steps:
     cluster_profile: aws
@@ -110,7 +103,6 @@ tests:
       MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-cache
 - as: microshift-metal-cache-nightly
-  cluster: build02
   cron: 0 0 * * *
   steps:
     cluster_profile: aws
@@ -118,7 +110,6 @@ tests:
       MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-cache
 - as: microshift-metal-cache-arm
-  cluster: build02
   run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
   steps:
     cluster_profile: aws
@@ -127,7 +118,6 @@ tests:
       MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-cache
 - as: microshift-metal-cache-nightly-arm
-  cluster: build02
   cron: 0 0 * * *
   steps:
     cluster_profile: aws
@@ -136,11 +126,9 @@ tests:
       MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-cache
 - as: rebase-on-nightlies
-  cron: 0 5 * * 1-5
   steps:
     workflow: openshift-microshift-rebase
 - as: metal-periodic-test
-  cluster: build02
   run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*)$
   steps:
     cluster_profile: aws
@@ -149,7 +137,6 @@ tests:
       MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-tests
 - as: metal-periodic-test-arm
-  cluster: build02
   run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*)$
   steps:
     cluster_profile: aws
@@ -158,7 +145,6 @@ tests:
       EC2_INSTANCE_TYPE: c6g.metal
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly
-  cluster: build02
   cron: 0 1,13 * * *
   steps:
     cluster_profile: aws
@@ -167,7 +153,6 @@ tests:
       MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly-arm
-  cluster: build02
   cron: 0 1,13 * * *
   steps:
     cluster_profile: aws
@@ -176,13 +161,11 @@ tests:
       MICROSHIFT_OS: rhel-9.3
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-conformance-rhel-eus-nightly
-  cluster: build02
   cron: 0 1,13 * * *
   steps:
     cluster_profile: aws
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-conformance-rhel-eus-nightly-arm
-  cluster: build02
   cron: 0 1,13 * * *
   steps:
     cluster_profile: aws
@@ -190,13 +173,11 @@ tests:
       EC2_INSTANCE_TYPE: t4g.2xlarge
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-conformance-rhel-eus
-  cluster: build02
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|origin/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: aws
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-conformance-rhel-eus-arm
-  cluster: build02
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|origin/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: aws
@@ -204,7 +185,6 @@ tests:
       EC2_INSTANCE_TYPE: t4g.2xlarge
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-conformance-full-rhel-eus-weekly
-  cluster: build02
   cron: 0 2 * * 1
   steps:
     cluster_profile: aws
@@ -212,7 +192,6 @@ tests:
       RESTRICTED: "false"
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: clusterbot
-  cluster: build02
   cron: 0 1 * * *
   steps:
     cluster_profile: aws
