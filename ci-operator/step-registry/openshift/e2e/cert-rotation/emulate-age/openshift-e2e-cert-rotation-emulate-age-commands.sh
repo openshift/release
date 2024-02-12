@@ -22,14 +22,8 @@ cat >"${SHARED_DIR}"/cluster-age-test.sh <<'EOF'
 set -euxo pipefail
 sudo systemctl stop chronyd
 
-OC=${OC:-oc}
-CLUSTER_AGE_DAYS=${1:-30}
-SKEW_STEP=30
-SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
-SCP=${SCP:-scp ${SSH_OPTS}}
-SSH=${SSH:-ssh ${SSH_OPTS}}
-SETTLE_TIMEOUT=5m
-COMMAND_TIMEOUT=15m
+CLUSTER_AGE_DAYS=${1:-90}
+SKEW_STEP=90
 
 # HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
 if [ -d "$KUBECONFIG" ]; then
@@ -38,96 +32,19 @@ if [ -d "$KUBECONFIG" ]; then
   done
 fi
 
+source /usr/local/share/cert-rotation-functions.sh
+
 export KUBECONFIG_NODE_DIR="/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs"
-
-mapfile -d ' ' -t control_nodes < <( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
-
-mapfile -d ' ' -t compute_nodes < <( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
-
-function run-on-all-nodes {
-  for n in ${control_nodes[@]} ${compute_nodes[@]}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" sudo 'bash -eEuxo pipefail' <<< ${1}; done
-}
-
-function run-on-first-master {
-  timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
-}
-
-function copy-file-from-first-master {
-  timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_nodes[0]}:${1}" "${2}"
-}
-
-function wait-for-nodes-to-be-ready {
-  run-on-first-master "
-    export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
-    until oc get nodes; do sleep 30; done
-    for nodename in $(oc get nodes -o name); do
-      node_ready=false
-      until ${node_ready}; do
-        STATUS=$(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
-        TIME_DIFF=$(($(date +%s)-$(date -d $(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}') +%s)))
-        if [[ ${DIFF} < 100 && "${STATUS} == "True" ]]; then
-          node_ready=true
-        fi
-        oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
-        sleep 30
-      done
-    done
-    oc get csr | grep Pending
-    oc get nodes
-  "
-}
-
-function retry() {
-    local check_func=$1
-    local max_retries=10
-    local retry_delay=30
-    local retries=0
-
-    while (( retries < max_retries )); do
-        if $check_func; then
-            return 0
-        fi
-
-        (( retries++ ))
-        if (( retries < max_retries )); then
-            sleep $retry_delay
-        fi
-    done
-    return 1
-}
-
-function pod-restart-workarounds {
-  # Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
-  # Restart OVN / Multus before proceeding
-  retry oc -n openshift-multus delete pod -l app=multus --force --grace-period=0
-  retry oc -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0
-  retry oc -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0
-}
-
-ssh-keyscan -H ${control_nodes[@]} ${compute_nodes[@]} >> ~/.ssh/known_hosts
-
-# Save found node IPs for "gather-cert-rotation" step
-echo -n "${control_nodes[@]}" > /srv/control_node_ips
-echo -n "${compute_nodes[@]}" > /srv/compute_node_ips
-
-echo "Wrote control_node_ips: $(cat /srv/control_node_ips), compute_node_ips: $(cat /srv/compute_node_ips)"
-
-# Prepull tools image on the nodes. "gather-cert-rotation" step uses it to run sos report
-# However, if time is too far in the future the pull will fail with "Trying to pull registry.redhat.io/rhel8/support-tools:latest...
-# Error: initializing source ...: tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time ... is after <now + 6m>"
-run-on-all-nodes "podman pull --authfile /var/lib/kubelet/config.json registry.redhat.io/rhel8/support-tools:latest"
 
 # Stop chrony service on all nodes
 run-on-all-nodes "systemctl disable chronyd --now"
 
-for i in $(seq $((${CLUSTER_AGE_DAYS}/${SKEW_STEP}))); do
+function emulate-cluster-age {
   # Set date for host
-  sudo timedatectl status
-  sudo timedatectl set-time +${SKEW_STEP}d
-  sudo timedatectl status
+  sudo timedatectl set-time +${1}d
 
   # Skew clock on every node
-  run-on-all-nodes "timedatectl set-time +${SKEW_STEP}d && timedatectl status"
+  run-on-all-nodes "timedatectl set-time +${1}d"
 
   # Restart kubelet
   run-on-all-nodes "systemctl restart kubelet"
@@ -137,14 +54,20 @@ for i in $(seq $((${CLUSTER_AGE_DAYS}/${SKEW_STEP}))); do
 
   pod-restart-workarounds
 
-  # Wait for operators to stabilize
-  if
-    ! oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m; then
-      oc get nodes
-      oc get co | grep -v "True\s\+False\s\+False"
-      exit 1
-  fi
-done
+  wait-for-operators-to-stabilize
+}
+
+full_steps=$((${CLUSTER_AGE_DAYS}/${SKEW_STEP}))
+modulo=$((${CLUSTER_AGE_DAYS}%${SKEW_STEP}))
+
+if [[ ${full_steps} -gt 0 ]]; then
+  for i in $(seq 1 ${full_steps}); do
+    emulate-cluster-age ${SKEW_STEP}
+  done
+fi
+if [[ ${modulo} -gt 0 ]]; then
+  emulate-cluster-age ${modulo}
+fi
 exit 0
 
 EOF
