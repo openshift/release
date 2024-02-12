@@ -6,4 +6,5 @@ set -o pipefail
 
 pwd
 ls -l
+ls -l /
 find . -type f -name "*.sh" -print0 | xargs -r -0 shellcheck
