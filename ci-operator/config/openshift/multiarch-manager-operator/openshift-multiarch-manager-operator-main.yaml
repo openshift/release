@@ -88,16 +88,16 @@ tests:
         mkdir -p /tmp/bin
         export PATH=/tmp/bin:$PATH
         ln -s $(which oc) /tmp/bin/kubectl
-        oc create namespace openshift-multiarch-operator
-        oc annotate namespace openshift-multiarch-operator \
+        oc create namespace openshift-multiarch-manager-operator
+        oc annotate namespace openshift-multiarch-manager-operator \
           scheduler.alpha.kubernetes.io/node-selector="kubernetes.io/arch=amd64"
         export NO_DOCKER=1
         # TODD: The following should change to use the operator-sdk and OLM
         make deploy IMG=${OPERATOR_IMAGE}
-        oc wait deployments -n openshift-multiarch-operator \
-          -l app.kubernetes.io/part-of=multiarch-operator \
+        oc wait deployments -n openshift-multiarch-manager-operator \
+          -l app.kubernetes.io/part-of=multiarch-manager-operator \
           --for=condition=Available=True
-        oc wait pods -n openshift-multiarch-operator \
+        oc wait pods -n openshift-multiarch-manager-operator \
           -l control-plane=controller-manager \
           --for=condition=Ready=True
         make e2e
