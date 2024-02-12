@@ -9,9 +9,9 @@ IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
 httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
-httpd_vsi_pub_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key"
+httpd_vsi_pub_key=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key")
 export httpd_vsi_pub_key
-pull_secret="${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret"
+pull_secret=$(cat "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret")
 export pull_secret
 
 # Installing CLI tools
@@ -242,9 +242,9 @@ networking:
 platform:
   none: {}
 pullSecret: >
-  @$pull_secret
+  $pull_secret
 sshKey: >
-  @$httpd_vsi_pub_key
+  $httpd_vsi_pub_key
 EOF
 
 echo "Fetching openshift-install binary"
