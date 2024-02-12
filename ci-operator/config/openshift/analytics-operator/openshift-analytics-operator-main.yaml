@@ -77,22 +77,12 @@ tests:
       cli: latest
       commands: "echo \"command execution started\"\noc version\n# Make kubectl available
         by creating a symlink to oc.\npushd \"$CLI_DIR\"\nif [ ! -f kubectl ]; then\n
-        \   ln -s oc kubectl\nfi\npopd\necho \"listing files\"\nls /\necho \"---------\"\nls
-        /go/src/github.com/openshift/analytics-operator/\necho \"---------\"\nls ./config/samples/\necho
-        \"---------\"\nset +e \noc new-project temp-osa\noc project temp-osa \necho
-        \"print1\"\nGOFLAGS=\"\" sh ./tests/run-e2e.sh --no-build --image-base registry.ci.openshift.org/osa
-        --version latest\nif [ $? -eq 0 ] \nthen \n  echo \"Successfully executed
-        script\" \nelse \n  echo \"Failed to execute script\"  \nfi\necho \"print2\"\noc
-        delete project temp-osa \necho \"------------------\"\nkubectl get cronjob
-        -n \"osa-anomaly-detection\"\necho \"print12.4\"\ncontroller_manager_pod=\"\"\npresent=false\nfor
-        elm in $(kubectl get pod  -n \"analytics-operator-system\"); do \n    if [[
-        \"$elm\" == \"analytics-operator-controller-manager\"* ]]; then\n        controller_manager_pod=$elm\n
-        \       present=true\n        break\n    fi\ndone\necho \"print12.5\"\necho
-        \"kubectl get pod -n $NAMESPACE\"\nkubectl get pod -n $NAMESPACE\necho \"present
-        : $present, controller_manager_pod: $controller_manager_pod\"\necho \"print12.8\"\nkubectl
-        logs $controller_manager_pod -n \"analytics-operator-system\"\necho \"print13\"\nkubectl
-        get cronjob --all-namespaces\necho \"print13.1\"\nsleep 300\nkubectl get pods
-        \ -n \"osa-anomaly-detection\"\necho \"print14\"\nsleep 300\necho \"print15\"\n"
+        \   ln -s oc kubectl\nfi\npopd\nset +e \noc new-project temp-osa\noc project
+        temp-osa \necho \"print1\"\nGOFLAGS=\"\" sh ./tests/run-e2e.sh --no-build
+        --image-base registry.ci.openshift.org/osa --version latest\nif [ $? -eq 0
+        ] \nthen \n  echo \"Successfully executed script\" \n  exit 1\nelse \n  echo
+        \"Failed to execute script\"  \nfi\necho \"print2\"\noc delete project temp-osa
+        \necho \"print3\"\n"
       from: src
       resources:
         requests:
