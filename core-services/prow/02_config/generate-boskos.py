@@ -204,9 +204,6 @@ CONFIG = {
     'nutanix-qe-dis-quota-slice': {},
     'nutanix-qe-zone-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
-    'openstack-quota-slice': {
-        'default': 7,
-    },
     'openstack-vexxhost-quota-slice': {
         'default': 9,
     },
