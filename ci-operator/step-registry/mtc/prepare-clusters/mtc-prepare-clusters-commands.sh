@@ -3,7 +3,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "TEMP"
 echo "Extracting cluster data"
 tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=/tmp/clusters-data
 
