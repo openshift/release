@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-ping openshift-ci-trigger-cspi-tools.apps.ocp-c1.prod.psi.redhat.com
+curl https://openshift-ci-trigger-cspi-tools.apps.ocp-c1.prod.psi.redhat.com
 
 AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
