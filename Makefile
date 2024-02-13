@@ -303,7 +303,7 @@ openshift-image-mirror-mappings:
 .PHONY: openshift-image-mirror-mappings
 
 config_updater_vault_secret: build_farm_credentials_folder
-	@[[ $$cluster ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
+	@[[ $$CLUSTER ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/applyconfig:latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) \
 		--rm \
@@ -311,11 +311,11 @@ config_updater_vault_secret: build_farm_credentials_folder
 		-v "$(kubeconfig_path):/_kubeconfig$(VOLUME_MOUNT_FLAGS)" \
 		registry.ci.openshift.org/ci/applyconfig:latest \
 		--config-dir=/manifests \
-		--context=$(cluster) \
+		--context=$(CLUSTER) \
 		--confirm \
 		--kubeconfig=/_kubeconfig
 
-	./clusters/psi/create_kubeconfig.sh "$(build_farm_credentials_folder)/sa.config-updater.${cluster}.config" ${cluster} config-updater ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
+	./clusters/psi/create_kubeconfig.sh "$(build_farm_credentials_folder)/sa.config-updater.${CLUSTER}.config" ${CLUSTER} config-updater ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
 
 	ls $(build_farm_credentials_folder)
 
@@ -394,7 +394,7 @@ refresh-token-version:
 
 DRY_RUN ?= server
 CLUSTER ?= app.ci
-API_SERVER_URL ?= "https://api.ci.l2s4.p1.openshiftapps.com:6443"
+API_SERVER_URL ?= $(shell oc --context ${CLUSTER} config view --minify --output jsonpath="{.clusters[*].cluster.server}")
 TMPDIR ?= /tmp
 
 expire-token-version:
