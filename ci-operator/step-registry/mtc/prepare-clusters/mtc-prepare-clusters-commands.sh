@@ -3,9 +3,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-sleep 4h
 echo "Extracting cluster data"
 tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=/tmp/clusters-data
+
+SOURCE_CLUSTER_NAME=$(ls tmp/clusters-data/${TEST_PLATFORM} | grep $SOURCE_CLUSTER_PREFIX*)
+TARGET_CLUSTER_NAME=$(ls tmp/clusters-data/${TEST_PLATFORM} | grep $TARGET_CLUSTER_PREFIX*)
 
 SOURCE_KUBEADMIN_PASSWORD_FILE="/tmp/clusters-data/${TEST_PLATFORM}/${SOURCE_CLUSTER_NAME}/auth/kubeadmin-password"
 SOURCE_KUBECONFIG="/tmp/clusters-data/${TEST_PLATFORM}/${SOURCE_CLUSTER_NAME}/auth/kubeconfig"
