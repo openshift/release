@@ -45,7 +45,7 @@ Please see the [`firewatch-ipi-aws`](https://steps.ci.openshift.org/workflow/fir
 
 - `securesign-operator`
   - [Containerfile](https://github.com/securesign/secure-sign-operator/blob/main/Dockerfile)
-  - This Dockerfile is used to build a container image for the TAS Operator. It starts with a Golang base image and sets up the workspace. It then copies the Go Modules manifests and source code files into the container. The build process includes installing dependencies, setting build arguments, and compiling the Go code into a binary called "securesign-operator." The final image is based on Red Hat Universal Base Image (UBI) and includes additional packages and setup steps. The entry point of the container is set to execute the "jaeger-operator" binary.
+  - This Dockerfile is used to build a container image for the TAS Operator.
 - `securesign-bundle`
   - [Containerfile](https://github.com/securesign/secure-sign-operator/blob/main/bundle.Dockerfile)
-  - This Dockerfile is used to build the Jaeger Operator bundle. It creates an image from scratch, indicating that it starts with an empty base. The labels define metadata for the bundle, including its media type, manifests, metadata, package, channels, and metrics. The COPY commands copy the bundle's manifests and metadata files to the appropriate locations as specified by the labels.
+  - This Dockerfile is used to build the TAS Operator bundle.
