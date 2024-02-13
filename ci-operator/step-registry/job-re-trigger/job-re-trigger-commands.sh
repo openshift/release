@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-SERVER_URL=$("${CLUSTER_PROFILE_DIR}/openshift-ci-job-trigger-server-url")
+SERVER_URL=$(cat "${CLUSTER_PROFILE_DIR}/openshift-ci-job-trigger-server-url")
 TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/openshift-ci-api-token")
 
 if [ -z "$SERVER_URL" ]; then
