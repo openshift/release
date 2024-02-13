@@ -271,7 +271,7 @@ HYPERSHIFT_SWITCH=""
 if [[ "$HOSTED_CP" == "true" ]]; then
   HYPERSHIFT_SWITCH="--hosted-cp"
   if [[ "$ENABLE_SECTOR" == "true" ]]; then
-    PROVISION_SHARD_ID=$(cat ${SHARED_DIR}/provision_shard_ids | head -n 1)
+    PROVISION_SHARD_ID="93913069-c9d0-11ee-8fe1-0a580a83075b"
     if [[ -z "$PROVISION_SHARD_ID" ]]; then
       echo -e "No available provision shard."
       exit 1
