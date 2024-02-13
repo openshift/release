@@ -44,6 +44,10 @@ ports = sys.argv[4:]
 # However, the rollback mechanism of the tests in Prow will take care of reverting the changes in the post steps.
 # and we can safely change the configuration of each switch independently.
 
+if not vlan_id.isdigit():
+  print(f"The vlan_id is not an integer: {vlan_id}. Verify that the reservation step allocated VIPs for the cluster (use RESERVE_BOOTSTRAP: 'false' in your test config)")
+  sys.exit(1)
+
 # Let's group the ports by switch stack in a dictionary
 switches = {}
 for port in ports:
@@ -62,6 +66,7 @@ for switch_address in switches:
     switch_port = switch_address.split(":")[1]
     with Device(host=switch_hostname, port=switch_port, user='admin', ssh_private_key_file=ssh_key_path) as dev:
         with Config(dev, mode="private") as cu:
+            print(f"Create the vlan {vlan_name} vlan-id {vlan_id}")
             # Create the vlan
             cu.load(f"set vlans {vlan_name} vlan-id {vlan_id}")
             for port in switches[switch_address]:
@@ -137,16 +142,8 @@ interfaces:
     id: ${VLAN_ID}
 "
 
-
 echo "[INFO] Configuring the provisioning network in the provisioning host via the NMState specs: "
 echo "${NMSTATE_CONFIG}" | tee "${ARTIFACT_DIR}/nmstate-provisioning-net-config.yaml"
-
-SSHOPTS=(-o 'ConnectTimeout=5'
-  -o 'StrictHostKeyChecking=no'
-  -o 'UserKnownHostsFile=/dev/null'
-  -o 'ServerAliveInterval=90'
-  -o LogLevel=ERROR
-  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "'${NMSTATE_CONFIG}'" "br-${CLUSTER_NAME: -12}"  << 'EOF'
