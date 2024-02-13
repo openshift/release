@@ -377,6 +377,9 @@ CONFIG = {
         'us-east-2': 5,
         'us-west-1': 5,
         'us-west-2': 5,
+    },
+    'odf-aws-quota-slice': {
+        'us-east-1': 10,
     }
 }
 
