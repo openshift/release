@@ -6,6 +6,14 @@ periodics:
   labels:
     ci.openshift.io/role: infra
   name: periodic-build01-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `build01` has not been completed over 24 hours. Please check if anything blocks
+        the process.
   spec:
     containers:
     - args:
@@ -14,7 +22,7 @@ periodics:
       - --to-latest
       command:
       - /usr/bin/oc
-      image: registry.ci.openshift.org/ocp/4.12:cli
+      image: registry.ci.openshift.org/ocp/4.14:cli
       imagePullPolicy: Always
       name: ""
       resources:
