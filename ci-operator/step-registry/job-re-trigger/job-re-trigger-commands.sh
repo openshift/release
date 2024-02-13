@@ -5,9 +5,8 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-SECRETS_PATH="/var/run/secrets/ci.openshift.io/cluster-profile"
-SERVER_URL=$(cat $SECRETS_PATH/openshift-ci-job-trigger-server-url)
-TOKEN=$(cat $SECRETS_PATH/openshift-ci-api-token)
+SERVER_URL=$("${CLUSTER_PROFILE_DIR}/openshift-ci-job-trigger-server-url")
+TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/openshift-ci-api-token")
 
 if [ -z "$SERVER_URL" ]; then
   echo "openshift-ci-job-trigger-server-url is empty"
