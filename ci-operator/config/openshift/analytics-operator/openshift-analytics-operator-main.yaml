@@ -75,30 +75,13 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: |
-        echo "command execution started"
-        oc version
-        # Make kubectl available by creating a symlink to oc.
-        pushd "$CLI_DIR"
-        if [ ! -f kubectl ]; then
-            ln -s oc kubectl
-        fi
-        popd
-        set +e 
-        echo "creating temp project"
-        oc new-project temp-osa
-        oc project temp-osa 
-        echo "Running shell script"
-        GOFLAGS="" sh ./tests/run-e2e.sh --no-build --image-base registry.ci.openshift.org/osa --version latest
-        echo "delete temp project"
-        oc delete project temp-osa 
-        if [ $? -eq 0 ] 
-        then 
-          echo "Successfully executed E2E test script" 
-        else 
-          echo "E2E test failed"  
-          exit 1
-        fi
+      commands: "echo \"command execution started\"\noc version\nkubectl version\npushd
+        \"$CLI_DIR\"\npopd\nset +e \necho \"creating temp project\"\noc new-project
+        temp-osa\noc project temp-osa \necho \"Running shell script\"\nGOFLAGS=\"\"
+        sh ./tests/run-e2e.sh --no-build --image-base registry.ci.openshift.org/osa
+        --version latest\necho \"delete temp project\"\noc delete project temp-osa
+        \nif [ $? -eq 0 ] \nthen \n  echo \"Successfully executed E2E test script\"
+        \nelse \n  echo \"E2E test failed\"  \n  exit 1\nfi\n"
       from: src
       resources:
         requests:
