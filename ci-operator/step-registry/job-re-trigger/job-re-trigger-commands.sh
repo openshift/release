@@ -5,11 +5,18 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-SECRETS_DIR=/run/secrets/ci.openshift.io/cluster-profile
-SECRET_PATH="openshift-ci-job-trigger"
+SECRETS_PATH="/var/run/secrets/ci.openshift.io/cluster-profile"
+SERVER_URL=$(cat $SECRETS_PATH/openshift-ci-job-trigger-server-url)
+TOKEN=$(cat $SECRETS_PATH/openshift-ci-api-token)
 
-SERVER_IP=$(cat $SECRETS_DIR/$SECRET_PATH-server-ip)
-SERVER_PORT=$(cat $SECRETS_DIR/$SECRET_PATH-server-port)
-TOKEN=$(cat $SECRETS_DIR/$SECRET_PATH-token)
+if [ -z "$SERVER_URL" ]; then
+  echo "openshift-ci-job-trigger-server-url is empty"
+  exit 1
+fi
 
-curl -X POST  "http://${SERVER_IP}:${SERVER_PORT}/openshift_ci_job_trigger" -d '{"job_name":"'"$JOB_NAME"'", "build_id": "'"$BUILD_ID"'", "prow_job_id":"'"$PROW_JOB_ID"'", "token":  "'"$TOKEN"'"}' -H "Content-Type: application/json" &
+if [ -z "$TOKEN" ]; then
+  echo "openshift-ci-api-token is empty"
+  exit 1
+fi
+
+curl -X POST  "$SERVER_URL" -d '{"job_name":"'"$JOB_NAME"'", "build_id": "'"$BUILD_ID"'", "prow_job_id":"'"$PROW_JOB_ID"'", "token":  "'"$TOKEN"'"}' -H "Content-Type: application/json" &
