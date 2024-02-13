@@ -52,6 +52,26 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: ols-codecov-token
+- as: e2e-ols-bam-granite13b-chat-v2
+  cron: '@daily'
+  presubmit: true
+  steps:
+    test:
+    - as: e2e
+      commands: |
+        export PROVIDER_KEY_PATH=/var/run/bam/token
+        export PROVIDER=bam
+        export MODEL=ibm/granite-13b-chat-v2
+        scripts/test-e2e-standalone.sh
+      credentials:
+      - mount_path: /var/run/bam
+        name: bam-apitoken
+        namespace: test-credentials
+      from: src
+      grace_period: 5ns
+      resources:
+        requests:
+          cpu: 100m
 - always_run: false
   as: e2e-ols-openai-gpt35
   cron: '@daily'
