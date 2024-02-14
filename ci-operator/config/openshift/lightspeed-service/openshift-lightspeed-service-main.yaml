@@ -55,6 +55,7 @@ tests:
 - as: e2e-ols-bam-granite13b-chat-v2
   cron: '@daily'
   presubmit: true
+  run_if_changed: ^(Containerfile.*|Makefile|manifests/.*|ols/.*|pyproject.toml|pdm.lock|scripts/.*|tests/.*)$
   steps:
     test:
     - as: e2e
@@ -87,6 +88,28 @@ tests:
       credentials:
       - mount_path: /var/run/openai
         name: openai-apitoken
+        namespace: test-credentials
+      from: src
+      grace_period: 5ns
+      resources:
+        requests:
+          cpu: 100m
+- always_run: false
+  as: e2e-ols-watsonx-granite13b-chat-v2
+  cron: '@daily'
+  presubmit: true
+  steps:
+    test:
+    - as: e2e
+      commands: |
+        export PROVIDER_KEY_PATH=/var/run/watsonx/token
+        export PROVIDER=watsonx
+        export PROVIDER_PROJECT_ID=ad629765-c373-4731-9d69-dc701724c081
+        export MODEL=ibm/granite-13b-chat-v2
+        scripts/test-e2e-standalone.sh
+      credentials:
+      - mount_path: /var/run/watsonx
+        name: watsonx-apitoken
         namespace: test-credentials
       from: src
       grace_period: 5ns
