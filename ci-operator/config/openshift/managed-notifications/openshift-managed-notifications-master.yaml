@@ -22,7 +22,6 @@ tests:
     EMAIL="sd-docs@redhat.com"
     TEMP_FILE=$(mktemp)
 
-<<<<<<< HEAD
     [[ -d "temp_repo" ]] && rm -rf temp_repo
     git clone "$REPO_URL" temp_repo && cd temp_repo || exit
 
@@ -43,31 +42,6 @@ tests:
       sendmail $EMAIL < email.txt
     else
       echo "No broken links detected."
-=======
-    check_link() {
-        local URL=$1
-        if [ "$(curl -o /dev/null -s -w '%{http_code}' "$url")" != "200" ]; then
-            echo "$url" >> "$TEMP_FILE"
-        fi
-    }
-    export -f check_link
-
-    [[ -d "temp_repo" ]] && rm -rf temp_repo
-    git clone "$REPO_URL" temp_repo && cd temp_repo || exit
-    grep -rEo "(http|https)://[a-zA-Z0-9./?=_-]*" . | sort -u | xargs -n 1 -P 4 -I {} bash -c 'check_link "$@"' _ {}
-
-    if [ -s "$TEMP_FILE" ]; then
-        {
-            echo "Subject: Broken Links Detected in Repo $REPO_URL"
-            echo "To: $EMAIL"
-            echo
-            echo "The following links are broken:"
-            cat "$TEMP_FILE"
-        } > email.txt
-        sendmail $EMAIL < email.txt
-    else
-        echo "No broken links detected."
->>>>>>> a7fe0df463c (Add check broken links job to openshift-managed-notifications)
     fi
     rm -f "$TEMP_FILE"
     rm -rf temp_repo
@@ -79,7 +53,6 @@ tests:
     REPO_URL="https://github.com/openshift/managed-notifications/"
     EMAIL="sd-docs@redhat.com"
     TEMP_FILE=$(mktemp)
-<<<<<<< HEAD
     [[ -d "temp_repo" ]] && rm -rf temp_repo
     git clone "$REPO_URL" temp_repo && cd temp_repo || exit
     grep -rEo "(http|https)://[a-zA-Z0-9./?=_-]*" . | sort -u | while read -r URL; do
@@ -98,42 +71,12 @@ tests:
       sendmail $EMAIL < email.txt
     else
       echo "No broken links detected."
-=======
-
-    check_link() {
-        local URL=$1
-        if [ "$(curl -o /dev/null -s -w '%{http_code}' "$url")" != "200" ]; then
-            echo "$url" >> "$TEMP_FILE"
-        fi
-    }
-    export -f check_link
-
-    [[ -d "temp_repo" ]] && rm -rf temp_repo
-    git clone "$REPO_URL" temp_repo && cd temp_repo || exit
-    grep -rEo "(http|https)://[a-zA-Z0-9./?=_-]*" . | sort -u | xargs -n 1 -P 4 -I {} bash -c 'check_link "$@"' _ {}
-
-    if [ -s "$TEMP_FILE" ]; then
-        {
-            echo "Subject: Broken Links Detected in Repo $REPO_URL"
-            echo "To: $EMAIL"
-            echo
-            echo "The following links are broken:"
-            cat "$TEMP_FILE"
-        } > email.txt
-        sendmail $EMAIL < email.txt
-    else
-        echo "No broken links detected."
->>>>>>> a7fe0df463c (Add check broken links job to openshift-managed-notifications)
     fi
     rm -f "$TEMP_FILE"
     rm -rf temp_repo
   container:
     from: src
-<<<<<<< HEAD
   cron: '*/15 * * * *'
-=======
-  cron: 0 0 * * 0
->>>>>>> a7fe0df463c (Add check broken links job to openshift-managed-notifications)
 zz_generated_metadata:
   branch: master
   org: openshift
