@@ -24,6 +24,7 @@ if [ "${RE_TRIGGER_ON_FAILURE}" = "true" ]; then
 
   curl -X POST  "$SERVER_URL" -d '{"job_name":"'"$JOB_NAME"'", "build_id": "'"$BUILD_ID"'", "prow_job_id":"'"$PROW_JOB_ID"'", "token":  "'"$TOKEN"'"}' -H "Content-Type: application/json"
 
-fi
+else
+  echo "RE_TRIGGER_ON_FAILURE is set to false; job was not re-triggered"
 
-echo "RE_TRIGGER_ON_FAILURE is set to false; job was not re-triggered"
+fi
