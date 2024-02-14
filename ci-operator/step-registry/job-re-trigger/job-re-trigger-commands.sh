@@ -18,4 +18,6 @@ if [ -z "$TOKEN" ]; then
   exit 1
 fi
 
+sleep 50000000
+
 curl -X POST  "$SERVER_URL" -d '{"job_name":"'"$JOB_NAME"'", "build_id": "'"$BUILD_ID"'", "prow_job_id":"'"$PROW_JOB_ID"'", "token":  "'"$TOKEN"'"}' -H "Content-Type: application/json" &
