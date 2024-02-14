@@ -65,6 +65,9 @@ if [[ ! -z "${one_net_mode_network_name:-}" ]]; then
 fi
 
 subnets_json=$(curl -ks -u "${un}":"${pw}" -X POST ${api_ep} -H "Content-Type: application/json" -d @-<<<"${data}")
+
+echo ${subnets_json}
+
 subnet_uuid=$(echo "${subnets_json}" | jq ".entities[0] | select (.spec.name == \"${subnet_name}\") | .metadata.uuid ")
 
 if [[ -z "${subnet_uuid}" ]]; then
