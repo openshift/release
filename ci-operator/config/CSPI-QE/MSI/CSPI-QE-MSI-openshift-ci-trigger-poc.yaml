@@ -1,0 +1,48 @@
+base_images:
+  managed-services-integration-tests:
+    name: managed-services-integration-tests
+    namespace: ci
+    tag: latest
+  openshift-cli-installer:
+    name: openshift-cli-installer
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test-fail-setup
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-managed-cspi-qe
+    test:
+    - ref: cluster-msi-tests
+    workflow: cluster
+- as: test-fail-test
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-managed-cspi-qe
+    env:
+      CLUSTER1_CONFIG: name=ci-hyper;platform=hypershift;region=us-west-2;version=4.14;channel-group=candidate;compute-machine-type=m5.4xlarge;replicas=2;expiration-time=4h;timeout=1h;ocm-env=stage
+      CLUSTER1_KUBECONFIG_PATH: /tmp/clusters-data/hypershift/ci-hyper/auth/kubeconfigxxxxx
+      PULL_SECRET_NAME: pull-secret
+      RE_TRIGGER_ON_FAILURE: "true"
+      S3_BUCKET_NAME: openshift-cli-installer
+      S3_BUCKET_PATH: openshift-ci
+    test:
+    - ref: cluster-msi-tests
+    workflow: cluster
+zz_generated_metadata:
+  branch: openshift-ci-trigger-poc
+  org: CSPI-QE
+  repo: MSI
