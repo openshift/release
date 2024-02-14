@@ -23,7 +23,7 @@ set -euxo pipefail
 sudo systemctl stop chronyd
 
 CLUSTER_AGE_DAYS=${1:-90}
-SKEW_STEP=90
+SKEW_STEP=${2:-30}
 
 # HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
 if [ -d "$KUBECONFIG" ]; then
@@ -81,4 +81,5 @@ timeout \
 	"${SSHOPTS[@]}" \
 	"root@${IP}" \
 	/usr/local/bin/cluster-age-test.sh \
-	${CLUSTER_AGE_DAYS}
+	${CLUSTER_AGE_DAYS} \
+  ${SKEW_STEP}
