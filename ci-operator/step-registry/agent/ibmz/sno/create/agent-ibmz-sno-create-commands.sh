@@ -217,7 +217,7 @@ hosts:
 EOF
 
 # Install Config
-curl -k -L --output $HOME/$CLUSTER_NAME/install-config.yaml "http://$httpd_vsi_ip:80/agent-sno-install-config.yaml."
+curl -k -L --output $HOME/$CLUSTER_NAME/install-config.yaml "http://$httpd_vsi_ip:80/agent-sno-install-config.yaml"
 sed -i "s|BASE_DOMAIN|$BASEDOMAIN|" $HOME/$CLUSTER_NAME/install-config.yaml
 sed -i "s|CLUSTER_NAME|$CLUSTER_NAME|" $HOME/$CLUSTER_NAME/install-config.yaml
 sed -i "s|MACHINE_CIDR|$sn_cidr|" $HOME/$CLUSTER_NAME/install-config.yaml
