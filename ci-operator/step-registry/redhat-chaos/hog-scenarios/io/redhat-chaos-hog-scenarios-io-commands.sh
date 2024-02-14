@@ -19,7 +19,6 @@ export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 
-chmod +x ./io-hog/prow_run.sh
 ./io-hog/prow_run.sh
 rc=$?
 echo "Finished running io hog scenario"

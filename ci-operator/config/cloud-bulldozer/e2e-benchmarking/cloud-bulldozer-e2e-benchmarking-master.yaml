@@ -1,0 +1,40 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+      USER 0
+images:
+- dockerfile_path: prow/Dockerfile
+  to: e2e-benchmarking
+promotion:
+  to:
+  - namespace: e2e
+    tag: latest
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.15"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: echo "test"
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: cloud-bulldozer
+  repo: e2e-benchmarking
