@@ -83,7 +83,7 @@ function collect_bootstrap() {
 
 	echo "collect_bootstrap: ssh ${BOOTSTRAP_HOSTNAME}:${BASTION_SSH_PORTS[${RESOURCE_ID}]}"
 	set +e
-	ssh \
+	mock-nss.sh ssh \
 		-o 'ConnectTimeout=1' \
 		-o 'StrictHostKeyChecking=no' \
 		-i ${CLUSTER_PROFILE_DIR}/ssh-privatekey \
@@ -96,7 +96,7 @@ function collect_bootstrap() {
 		FROM="/var/home/core/log-bundle-${ID}.tar.gz"
 		TO="/logs/artifacts/bootstrap-log-bundle-${ID}.tar.gz"
 		echo "collect_bootstrap: scp ${BOOTSTRAP_HOSTNAME}:${BASTION_SSH_PORTS[${RESOURCE_ID}]}"
-		scp \
+		mock-nss.sh scp \
 			-o 'ConnectTimeout=1' \
 			-o 'StrictHostKeyChecking=no' \
 			-i ${CLUSTER_PROFILE_DIR}/ssh-privatekey \
