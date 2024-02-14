@@ -11,6 +11,8 @@ function dump_cluster_state {
   oc get co -A
 }
 
+export -f dump_cluster_state
+
 function wait_for_operators_and_nodes {
   # wait for all cluster operators to be done rolling out
   timeout $1 bash <<EOT
@@ -20,9 +22,11 @@ function wait_for_operators_and_nodes {
     oc wait co --all --for='condition=DEGRADED=False' --timeout=10s && \
     oc wait node --all --for condition=Ready --timeout=10s;
   do
-    sleep 10
+    sleep 30
+    date
     echo "Some ClusterOperators Degraded=False,Progressing=True,or Available=False";
   done
+  dump_cluster_state
 EOT
   if [ $? -ne 0 ]; then
     echo "Error: timed out waiting for ClusterOperators to be ready" >&2
@@ -81,6 +85,8 @@ if ! oc wait machinesets -n openshift-machine-api "$NODE_TO_SCALE" --for=jsonpat
     dump_cluster_state
     exit 1
 fi
+dump_cluster_state
+
 # machinesets are Ready, but there is a chance the final node that we expect to be notReady is not even deployed
 # from the cloud provider, so let's make sure (10m) we have 9 nodes in total before we move on
 timeout 600 bash <<EOT
@@ -88,11 +94,16 @@ until [ \$(oc get nodes --no-headers | wc -l) -eq 9 ]
 do
   echo "Waiting to have 9 nodes\n"
   oc get nodes
-  sleep 10
+  sleep 30
 done
+oc get nodes
 EOT
 
-# debug info
+# even though we may have 9 nodes provisioned now, it's been seen that it can take time for some operators
+# to finish progressing with these new nodes. We need to poll on that. There is some race condition such
+# that if we expand the clusterNetwork CIDR before these operators are done progressing, the node with the
+# missing subnet will never get it
+wait_for_operators_and_nodes 900
 dump_cluster_state
 
 # check the results
@@ -117,6 +128,11 @@ if [ "$nodes_with_subnet" -ne 8 ] || [ "$nodes_without_subnet" -ne 1 ]; then
   echo "Error: expected 8 nodes with subnets and 1 node with no subnet" >&2
   exit 1
 fi
+
+echo "adding extra 900s sleep"
+sleep 900
+dump_cluster_state
+
 # patch the cluster to give it more ip space with /22
 oc patch Network.config.openshift.io cluster --type='merge' --patch '{ "spec":{ "clusterNetwork": [ {"cidr":"10.128.0.0/22","hostPrefix":26} ], "networkType": "OVNKubernetes" }}'
 
@@ -128,7 +144,11 @@ if ! oc wait co network --for='condition=PROGRESSING=True' --timeout=120s; then
 fi
 
 # it can take a while for operators to roll out after the CIDR mask change. give it up to 30m
-wait_for_operators_and_nodes 1800
+wait_for_operators_and_nodes 3600
+
+echo "adding extra 900s sleep"
+sleep 900
+dump_cluster_state
 
 # double check that 9th node became available. Should not have to wait long as it should have
 # moved to Ready state during the ovnk rollout process above
