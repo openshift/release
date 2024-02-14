@@ -31,6 +31,7 @@ GITHUB__APP__CLIENT_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-c
 GITHUB__APP__WEBHOOK_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-webhook-secret)
 GITHUB__APP__WEBHOOK_URL=GITHUB_APP_WEBHOOK_URL
 GITHUB__APP__PRIVATE_KEY=$(base64 -d < /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-private-key)
+
 TPA__GUAC__PASSWORD="guac1234"
 TPA__KEYCLOAK__ADMIN_PASSWORD="admin123456"
 TPA__MINIO__ROOT_PASSWORD="minio123456"
@@ -40,6 +41,11 @@ TPA__OIDC__WALKER_CLIENT_SECRET="5460cc91-4e20-4edd-881c-b15b169f8a79"
 TPA__POSTGRES__POSTGRES_PASSWORD="postgres123456"
 TPA__POSTGRES__TPA_PASSWORD="postgres1234"
 
+SPRAYPROXY_SERVER_URL=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-url)
+SPRAYPROXY_SERVER_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-token)
+
+NAMESPACE=rhtap
+
 wait_for_pipeline() {
   if ! oc wait --for=condition=succeeded "$1" -n "$2" --timeout 300s >"$DEBUG_OUTPUT"; then
     echo "[ERROR] Pipeline failed to complete successful" >&2
@@ -48,51 +54,83 @@ wait_for_pipeline() {
   fi
 }
 
-echo "$HOME"
+install_rhtap(){
+  echo "[INFO]Generate private-values.yaml file ..."
+  ./bin/make.sh values
 
-echo "[INFO]Generate private-values.yaml file ..."
-./bin/make.sh values
+  echo "[INFO]Install RHTAP ..."
+  ./bin/make.sh apply -n $NAMESPACE -- --values private-values.yaml
 
-echo "[INFO]Install RHTAP ..."
-./bin/make.sh apply -n rhtap -- --values private-values.yaml
-
-echo ""
-echo "[INFO]Extract the configuration information from logs of the pipeline"
-
-cat << EOF > rhtap-pe-info.yaml
-apiVersion: tekton.dev/v1
-kind: PipelineRun
-metadata:
-  generateName: rhtap-pe-info-
-  namespace: rhtap
-spec:
-  pipelineSpec:
-    tasks:
-      - name: configuration-info
-        taskRef:
-          resolver: cluster
-          params:
-            - name: kind
-              value: task
-            - name: name
-              value: rhtap-pe-info
-            - name: namespace
-              value: rhtap
+  echo ""
+  echo "[INFO]Extract the configuration information from logs of the pipeline"
+  cat << EOF > rhtap-pe-info.yaml
+    apiVersion: tekton.dev/v1
+    kind: PipelineRun
+    metadata:
+      generateName: rhtap-pe-info-
+      namespace: "$NAMESPACE"
+    spec:
+      pipelineSpec:
+        tasks:
+          - name: configuration-info
+            taskRef:
+              resolver: cluster
+              params:
+                - name: kind
+                  value: task
+                - name: name
+                  value: rhtap-pe-info
+                - name: namespace
+                  value: "$NAMESPACE"
 EOF
 
-pipeline_name=$(oc create -f rhtap-pe-info.yaml | cut -d' ' -f1 | awk -F'/' '{print $2}')
-wait_for_pipeline "pipelineruns/$pipeline_name" rhtap
-tkn -n rhtap pipelinerun logs "$$pipeline_name" -f >"$DEBUG_OUTPUT"
+  pipeline_name=$(oc create -f rhtap-pe-info.yaml | cut -d' ' -f1 | awk -F'/' '{print $2}')
+  wait_for_pipeline "pipelineruns/$pipeline_name" "$NAMESPACE"
+  tkn -n "$NAMESPACE" pipelinerun logs "$pipeline_name" -f >"$DEBUG_OUTPUT"
 
-homepage_url=$(grep "homepage-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
-callback_url=$(grep "callback-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
-webhook_url=$(grep "webhook-url" < "$DEBUG_OUTPUT"  | sed 's/.*: //g') 
+  homepage_url=$(grep "homepage-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
+  callback_url=$(grep "callback-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
+  webhook_url=$(grep "webhook-url" < "$DEBUG_OUTPUT"  | sed 's/.*: //g') 
 
-echo "homepage-url: $homepage_url"
-echo "callback-url: $callback_url"
-echo "webhook-url: $webhook_url"
+  echo "homepage-url: $homepage_url"
+  echo "callback-url: $callback_url"
+  echo "webhook-url: $webhook_url"
+}
 
-##todo: handle the requests via sprayproxy
-echo "[INFO]Trigger e2e tests..."
-# ./test/e2e.sh -t test -- --values private-values.yaml
-./bin/make.sh -n rhtap test
+register_pac_server(){
+  echo "Registering PAC server to SprayProxy server"
+  for _ in {1..5}; do
+    if curl -k -X POST -H "Authorization: Bearer ${SPRAYPROXY_SERVER_TOKEN}" "${SPRAYPROXY_SERVER_URL}"/backends --data '{"url": "'"$webhook_url"'"}'; then
+      break
+    fi
+    sleep 5
+  done
+}
+
+unregister_pac_server(){
+  echo "Unregistering PAC server from SprayProxy server"
+  for _ in {1..5}; do
+    if curl -k -X DELETE -H "Authorization: Bearer ${SPRAYPROXY_SERVER_TOKEN}" "${SPRAYPROXY_SERVER_URL}"/backends/"$webhook_url" --data '{"url": "'"$webhook_url"'"}'; then
+      break
+    fi
+    sleep 5
+  done
+}
+
+e2e_test(){
+  echo "[INFO]Trigger e2e tests..."
+  # ./test/e2e.sh -t test -- --values private-values.yaml
+  ./bin/make.sh -n "$NAMESPACE" test
+}
+
+main(){
+  install_rhtap
+  register_pac_server
+  e2e_test
+  unregister_pac_server
+}
+
+
+if [ "${BASH_SOURCE[0]}" == "$0" ]; then
+  main "$@"
+fi
