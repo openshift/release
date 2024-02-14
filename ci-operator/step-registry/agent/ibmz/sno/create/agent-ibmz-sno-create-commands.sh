@@ -93,6 +93,7 @@ if [ "$sn_status" != "available" ]; then
 else 
   echo "Subnet $infra_name-sn is created successfully in the $infra_name-vpc VPC."
 fi
+sn_cidr=$(ibmcloud is subnet $infra_name-sn --vpc $infra_name-vpc --output JSON | jq -r '.ipv4_cidr_block')
 
 # Create zVSI compute nodes
 set -e
@@ -214,38 +215,12 @@ hosts:
                 prefix-length: 24
             dhcp: true
 EOF
+
 # Install Config
-cat <<EOF > $HOME/$CLUSTER_NAME/install-config.yaml
-apiVersion: v1
-baseDomain: $BASEDOMAIN
-controlPlane:
-  architecture: s390x
-  hyperthreading: Enabled
-  name: master
-  replicas: 1
-compute:
-- architecture: s390x
-  hyperthreading: Enabled
-  name: worker
-  replicas: 0
-metadata:
-  name: $CLUSTER_NAME
-networking:
-  clusterNetwork:
-  - cidr: 10.128.0.0/14
-    hostPrefix: 23
-  machineNetwork:
-  - cidr: 10.244.0.0/24
-  networkType: OVNKubernetes 
-  serviceNetwork:
-  - 172.30.0.0/16
-platform:
-  none: {}
-pullSecret: >
-  $pull_secret
-sshKey: >
-  $httpd_vsi_pub_key
-EOF
+curl -k -L --output $HOME/$CLUSTER_NAME/install-config.yaml "http://$httpd_vsi_ip:80/agent-sno/agent-sno-install-config.yaml."
+sed -i "s|BASE_DOMAIN|$BASEDOMAIN" $HOME/$CLUSTER_NAME/install-config.yaml
+sed -i "s|CLUSTER_NAME|$CLUSTER_NAME" $HOME/$CLUSTER_NAME/install-config.yaml
+sed -i "s|MACHINE_CIDR|$sn_cidr" $HOME/$CLUSTER_NAME/install-config.yaml
 
 echo "Fetching openshift-install binary"
 release_version=$(echo "$JOB_SPEC" | jq -r '.extra_refs|.[].base_ref' | cut -d '-' -f 2)
