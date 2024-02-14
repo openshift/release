@@ -20,6 +20,10 @@ if [ "${RE_TRIGGER_ON_FAILURE}" = "true" ]; then
     exit 1
   fi
 
+  echo "Send job re-triggering for job ${JOB_NAME}, build ${BUILD_ID} prow job ${PROW_JOB_ID}"
+
   curl -X POST  "$SERVER_URL" -d '{"job_name":"'"$JOB_NAME"'", "build_id": "'"$BUILD_ID"'", "prow_job_id":"'"$PROW_JOB_ID"'", "token":  "'"$TOKEN"'"}' -H "Content-Type: application/json"
 
 fi
+
+echo "Job was not re-triggered"
