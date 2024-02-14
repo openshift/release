@@ -26,4 +26,4 @@ if [ "${RE_TRIGGER_ON_FAILURE}" = "true" ]; then
 
 fi
 
-echo "Job was not re-triggered"
+echo "RE_TRIGGER_ON_FAILURE is set to false; job was not re-triggered"
