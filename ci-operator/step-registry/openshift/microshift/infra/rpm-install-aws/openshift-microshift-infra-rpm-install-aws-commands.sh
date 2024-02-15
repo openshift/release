@@ -38,12 +38,7 @@ sudo mkdir -p /etc/microshift
 sudo mv /tmp/config.yaml /etc/microshift/config.yaml
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 cd ~/microshift
-./scripts/devenv-builder/configure-vm.sh --force-firewall --no-build /tmp/pull-secret
-sudo dnf clean all -y
-make rpm
-sudo dnf localinstall -y ./_output/rpmbuild/RPMS/*/*.rpm
-sudo systemctl enable --now crio
-sudo systemctl enable --now microshift
+./scripts/devenv-builder/configure-vm.sh --force-firewall --pull-images /tmp/pull-secret
 EOF
 chmod +x /tmp/install.sh
 
