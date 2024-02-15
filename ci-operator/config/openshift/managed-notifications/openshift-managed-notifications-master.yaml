@@ -19,25 +19,33 @@ tests:
   commands: |
     #!/bin/bash
     REPO_URL="https://github.com/openshift/managed-notifications/"
-    EMAIL="sd-docs@redhat.com"
-    TEMP_FILE=$(mktemp)
+    ARTIFACT_DIR="${ARTIFACTS:-/tmp/artifacts}"
+    LOG_FILE="$ARTIFACT_DIR/build-log.log"
+    mkdir -p "$ARTIFACT_DIR"
+    TEMP_FILE=$(mktemp -p "$ARTIFACT_DIR" broken_links_XXXXXX)
     [[ -d "temp_repo" ]] && rm -rf temp_repo
     git clone "$REPO_URL" temp_repo && cd temp_repo || exit
-    grep -rEo "(http|https)://[a-zA-Z0-9./?=_-]*" . | sort -u | while read -r URL; do
+    grep -rEo "(http|https)://[a-zA-Z0-9./?=_-]*" . | sort -u | while IFS= read -r URL; do
         if [ "$(curl -o /dev/null -s -w '%{http_code}' "$URL")" != "200" ]; then
             echo "$URL" >> "$TEMP_FILE"
         fi
     done
-    rm -f "$TEMP_FILE"
+    if [ -s "$TEMP_FILE" ]; then
+        echo "Broken links detected:" | tee -a "$LOG_FILE"
+        cat "$TEMP_FILE" >> "$LOG_FILE"
+    else
+        echo "No broken links detected." | tee -a "$LOG_FILE"
+    fi
     rm -rf temp_repo
   container:
     from: src
 - as: checklinks-weekly
   commands: |
-    #!/bin/bash
     REPO_URL="https://github.com/openshift/managed-notifications/"
     EMAIL="sd-docs@redhat.com"
-    TEMP_FILE=$(mktemp)
+    ARTIFACT_DIR="${ARTIFACTS:-/tmp/artifacts}"
+    mkdir -p "$ARTIFACT_DIR"
+    TEMP_FILE=$(mktemp -p "$ARTIFACT_DIR" broken_links_XXXXXX)
     [[ -d "temp_repo" ]] && rm -rf temp_repo
     git clone "$REPO_URL" temp_repo && cd temp_repo || exit
     grep -rEo "(http|https)://[a-zA-Z0-9./?=_-]*" . | sort -u | while read -r URL; do
@@ -45,7 +53,12 @@ tests:
             echo "$URL" >> "$TEMP_FILE"
         fi
     done
-    rm -f "$TEMP_FILE"
+    if [ -s "$TEMP_FILE" ]; then
+        echo "Broken links detected:" | tee -a "$LOG_FILE"
+        cat "$TEMP_FILE" >> "$LOG_FILE"
+    else
+        echo "No broken links detected." | tee -a "$LOG_FILE"
+    fi
     rm -rf temp_repo
   container:
     from: src
