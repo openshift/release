@@ -4,7 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/openshift-release-dev/ocp-release:4.15.0-rc.5-x86_64"
+#export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/openshift-release-dev/ocp-release:4.15.0-rc.5-x86_64"
+
+echo "Using release image ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH=/tmp/install-config-external.yaml.patch
