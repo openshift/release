@@ -8,7 +8,7 @@ chain:
       default: "3"
       documentation: "The number nodes to automatically create and join to the cluster."
     - name: HYPERSHIFT_BASE_DOMAIN
-      default: "hypershift.azure.devcluster.openshift.com"
+      default: "ci.azure.devcluster.openshift.com"
       documentation: "The cluster's FQDN will be a subdomain of the base domain."
     - name: HYPERSHIFT_HC_RELEASE_IMAGE
       default: ""
@@ -19,6 +19,9 @@ chain:
     - name: CONTROLPLANE_OPERATOR_IMAGE
       default: ""
       documentation: "The CPO image to use. Set to LATEST to use the latest one"
+    - name: USE_HYPERSHIFT_AZURE_CREDS
+      default: "false"
+      documentation: "Whether to use hypershift-ci-jobs-azurecreds secret for Azure credentials. Set to 'true' to use the secret. Set to 'false' to use the default credentials."
     commands: |-
       set -exuo pipefail
 
@@ -26,6 +29,13 @@ chain:
       echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
       
       RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
+      
+      AZURE_CREDS=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+      
+      if [[ "${USE_HYPERSHIFT_AZURE_CREDS:-}" == 'true' ]]; then
+        export AZURE_CREDS="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+      fi
+      
       
       
       # We don't have the value of HYPERSHIFT_RELEASE_LATEST when we set CONTROLPLANE_OPERATOR_IMAGE so we
@@ -37,9 +47,10 @@ chain:
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
         --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-        --azure-creds=etc/hypershift-ci-jobs-azurecreds/credentials \
+        --azure-creds=${AZURE_CREDS} \
         --location ${HYPERSHIFT_AZURE_LOCATION} \
         --release-image ${RELEASE_IMAGE} \
+        --infra-id=${CLUSTER_NAME} \
         --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
         --annotations=hypershift.openshift.io/skip-release-image-validation=true
 
