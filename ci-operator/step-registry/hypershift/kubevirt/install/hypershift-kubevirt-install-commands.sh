@@ -6,17 +6,30 @@ function ocp_version() {
     oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}'
 }
 
-CNV_PRERELEASE_VERSION=${CNV_PRERELEASE_VERSION:-$(ocp_version)}
-CNV_PRERELEASE_CATALOG_IMAGE=${CNV_PRERELEASE_CATALOG_IMAGE:-quay.io/openshift-cnv/nightly-catalog:${CNV_PRERELEASE_VERSION}}
+# Get yq tool
+YQ="/tmp/yq"
+curl -L -o ${YQ} https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+chmod +x ${YQ}
 
-if [ -z "${CNV_PRERELEASE_VERSION}" ]
+# Dynamically get CNV catalog image that was provided to the job via gangway API
+CNV_PRERELEASE_CATALOG_IMAGE=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
+  ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_PRERELEASE_CATALOG_IMAGE") | .value')
+
+if [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ]
 then
   CNV_RELEASE_CHANNEL=stable
-  CNV_SUBSCRIPTION_SOURCE=redhat-operators
-else
+  CNV_SUBSCRIPTION_SOURCE=cnv-prerelease-catalog-source
+elif [ -n "${CNV_PRERELEASE_VERSION}" ]
+then
   CNV_RELEASE_CHANNEL=nightly-${CNV_PRERELEASE_VERSION}
-  CNV_SUBSCRIPTION_SOURCE=cnv-nightly-catalog-source
+  CNV_SUBSCRIPTION_SOURCE=cnv-prerelease-catalog-source
+else
+  CNV_RELEASE_CHANNEL=stable
+  CNV_SUBSCRIPTION_SOURCE=redhat-operators
 fi
+
+CNV_PRERELEASE_VERSION=${CNV_PRERELEASE_VERSION:-$(ocp_version)}
+CNV_PRERELEASE_CATALOG_IMAGE=${CNV_PRERELEASE_CATALOG_IMAGE:-quay.io/openshift-cnv/nightly-catalog:${CNV_PRERELEASE_VERSION}}
 
 # The kubevirt tests require wildcard routes to be allowed
 oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
@@ -45,12 +58,12 @@ if [ -n "${CNV_PRERELEASE_VERSION}" ]
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: cnv-nightly-catalog-source
+  name: cnv-prerelease-catalog-source
   namespace: openshift-marketplace
 spec:
   sourceType: grpc
   image: ${CNV_PRERELEASE_CATALOG_IMAGE}
-  displayName: OpenShift Virtualization Nightly Index
+  displayName: OpenShift Virtualization Pre-Release Catalog
   publisher: Red Hat
   updateStrategy:
     registryPoll:
