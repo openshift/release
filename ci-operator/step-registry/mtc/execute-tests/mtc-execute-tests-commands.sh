@@ -24,7 +24,7 @@ python3 -m pip install -r $TEST_REPOSITORY_DIR/requirements.txt --ignore-install
 python3 -m pip install $MTC_APPS_DEPLOYER_DIR
 python3 -m pip install $MTC_PYTHON_CLIENT_DIR
 
-TARGET_CLUSTER_NAME=$(ls tmp/clusters-data/${TEST_PLATFORM} | grep "${TARGET_CLUSTER_PREFIX}*")
+TARGET_CLUSTER_NAME=$(find tmp/clusters-data/${TEST_PLATFORM} -type d -name "${TARGET_CLUSTER_PREFIX}*")
 TARGET_KUBEADMIN_PASSWORD_FILE="/tmp/clusters-data/${TEST_PLATFORM}/${TARGET_CLUSTER_NAME}/auth/kubeadmin-password"
 TARGET_KUBECONFIG="/tmp/clusters-data/${TEST_PLATFORM}/${TARGET_CLUSTER_NAME}/auth/kubeconfig"
 RESULTS_FILE="${TEST_REPOSITORY_DIR}/junit-report.xml"
