@@ -79,6 +79,7 @@ function getCIR(){
     # ofcir may be unavailable in the cluster(or the ingress machinery), retry once incase we get unlucky,
     # we don't want to overdo it on the retries incase we start leaking CIR's
     if ! timeout 70s curl --retry-all-errors --retry-delay 60 --retry 1 -kfX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o $CIRFILE ; then
+        cat "$CIRFILE"
         return 1
     fi
 
