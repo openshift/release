@@ -10,6 +10,10 @@ oc projects
 pwd
 ls -lhart
 echo "Current user: $(whoami)"
+git clone https://github.com/cloud-bulldozer/e2e-benchmarking
+cd ~
+git clone https://github.com/cloud-bulldozer/e2e-benchmarking
+git clone https://github.com/cloud-bulldozer/e2e-benchmarking --depth 1
 if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] && [[ "$REPO_NAME" = "e2e-benchmarking" ]]; then
     git clone https://github.com/${REPO_OWNER}/${REPO_NAME}
     pushd ${REPO_NAME}
