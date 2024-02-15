@@ -207,17 +207,3 @@ if [ ${FIPS_ENABLED} = "true" ]; then
 fips: true
 EOF
 fi
-
-# DNS records for libvirt versions that don't support dnsmasq options
-cat >> ${SHARED_DIR}/worker-hostrecords.xml << EOF
-<host ip='192.168.${CLUSTER_SUBNET}.1'>
-  <hostname>alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-  <hostname>canary-openshift-ingress-canary.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-  <hostname>console-openshift-console.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-  <hostname>downloads-openshift-console.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-  <hostname>grafana-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-  <hostname>oauth-openshift.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-  <hostname>prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-  <hostname>test-disruption-openshift-image-registry.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-</host>
-EOF
