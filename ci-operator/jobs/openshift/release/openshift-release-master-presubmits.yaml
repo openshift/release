@@ -302,7 +302,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20230908-da54d76
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20240212-5972d0c
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -893,7 +893,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20240205-8f023a0da6
+        image: gcr.io/k8s-prow/checkconfig:v20240214-e08ed13174
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1115,55 +1115,6 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )jira-lifecycle-config,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: app.ci
-    context: ci/build-farm/multi01-dry
-    decorate: true
-    labels:
-      ci.openshift.io/build-farm: multi01
-      ci.openshift.io/generator: cluster-init
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-multi01-dry
-    rerun_command: /test multi01-dry
-    run_if_changed: ^clusters/.*
-    spec:
-      containers:
-      - args:
-        - --config-dir=clusters/build-clusters/multi01
-        - --as=
-        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
-        command:
-        - applyconfig
-        env:
-        - name: HOME
-          value: /tmp
-        image: registry.ci.openshift.org/ci/applyconfig:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
-        - mountPath: /tmp
-          name: tmp
-      serviceAccountName: config-updater
-      volumes:
-      - name: build-farm-credentials
-        secret:
-          items:
-          - key: sa.config-updater.multi01.config
-            path: kubeconfig
-          secretName: config-updater
-      - emptyDir: {}
-        name: tmp
-    trigger: (?m)^/test( | .* )multi01-dry,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
