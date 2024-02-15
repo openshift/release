@@ -25,8 +25,11 @@ fi
 
 # HACK: Platform External
 # TODO? discover platform type == external or intro vars
-export CLUSTER_TYPE="external"
-
+#export CLUSTER_TYPE="external"
+STATUS_PLATFORM_TYPE="$(oc get Infrastructure cluster -o jsonpath='{.status.platform}' || true)"
+if [[ "${STATUS_PLATFORM_TYPE-}" == "external" ]]; then
+    export CLUSTER_TYPE="external"
+fi
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
