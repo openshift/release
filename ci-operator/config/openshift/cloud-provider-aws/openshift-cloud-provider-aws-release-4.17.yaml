@@ -7,7 +7,7 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: "4.15"
-  ocp_4.16_base-rhel9:
+  ocp_4.17_base-rhel9:
     name: "4.17"
     namespace: ocp
     tag: base-rhel9
@@ -15,7 +15,7 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
-  rhel-coreos-9-base:
+  rhel-coreos-base:
     name: "4.17"
     namespace: ocp
     tag: rhel-coreos
@@ -29,22 +29,22 @@ canonical_go_repository: k8s.io/cloud-provider-aws
 images:
 - dockerfile_path: Dockerfile.openshift
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: aws-cloud-controller-manager
 - dockerfile_literal: |
-    # This uses the new rhel-coreos-9 base image
+    # This uses the new rhel-coreos base image
     # https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
     FROM quay.io/centos/centos:stream9 as build
     # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
     # in a container https://github.com/coreos/rpm-ostree/issues/4034
     RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download ecr-credential-provider
     # See also https://issues.redhat.com/browse/ART-4352
-    FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-9
+    FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
     COPY --from=build /*.rpm /
     # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
     # use -F rather than -U as we otherwise conflict with the production build in rhel-coreos
@@ -53,14 +53,16 @@ images:
     base-machine-with-rpms:
       as:
       - quay.io/centos/centos:stream9
-    rhel-coreos-9-base:
+    rhel-coreos-base:
       as:
-      - registry.ci.openshift.org/rhcos-devel/rhel-coreos-9
-  to: rhel-coreos-9
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos
+  to: rhel-coreos
 promotion:
   to:
   - additional_images:
       cloud-provider-aws-rpms: rpms
+    excluded_images:
+    - rhel-coreos
     name: "4.17"
     namespace: ocp
 raw_steps:
@@ -84,7 +86,7 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-rpm_build_commands: openshift-hack/build-rpm.sh 4.16.0
+rpm_build_commands: openshift-hack/build-rpm.sh 4.17.0
 rpm_build_location: _output/RPMS/x86_64
 test_binary_build_commands: make test
 tests:
