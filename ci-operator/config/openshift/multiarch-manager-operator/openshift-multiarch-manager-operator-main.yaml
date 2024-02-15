@@ -1,4 +1,8 @@
 base_images:
+  operator-sdk:
+    name: "4.15"
+    namespace: origin
+    tag: operator-sdk
   ubi:
     name: ubi
     namespace: ocp
@@ -10,6 +14,34 @@ images:
 - dockerfile_path: Dockerfile
   from: ubi
   to: multiarch-manager-operator
+- dockerfile_literal: |
+    FROM src
+    COPY . /code
+    COPY operator-sdk /usr/local/bin/
+    RUN chmod -R g+rwX /code
+    WORKDIR /code
+  from: src
+  inputs:
+    operator-sdk:
+      as:
+      - operator-sdk
+      paths:
+      - destination_dir: .
+        source_path: /usr/local/bin/operator-sdk
+  to: operator-sdk-src
+operator:
+  bundles:
+  - as: multiarch-manager-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: controller:latest
+    with: pipeline:multiarch-manager-operator
+promotion:
+  to:
+  - excluded_images:
+    - operator-sdk-src
+    namespace: origin
+    tag: main
 releases:
   initial:
     integration:
@@ -33,6 +65,9 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  sast:
+    requests:
+      cpu: 200m
 tests:
 - as: fmt
   commands: NO_DOCKER=1 make fmt && make verify-diff
@@ -66,7 +101,7 @@ tests:
   commands: NO_DOCKER=1 make unit
   container:
     from: src
-- as: e2e-gcp-multi-operator
+- as: e2e-gcp-multi-operator-olm
   steps:
     cluster_profile: gcp
     dependencies:
@@ -83,24 +118,38 @@ tests:
     - ref: ipi-install-heterogeneous
     - as: test
       cli: latest
-      commands: |
-        #!/bin/bash
-        mkdir -p /tmp/bin
-        export PATH=/tmp/bin:$PATH
-        ln -s $(which oc) /tmp/bin/kubectl
-        oc create namespace openshift-multiarch-manager-operator
-        oc annotate namespace openshift-multiarch-manager-operator \
-          scheduler.alpha.kubernetes.io/node-selector="kubernetes.io/arch=amd64"
-        export NO_DOCKER=1
-        # TODD: The following should change to use the operator-sdk and OLM
-        make deploy IMG=${OPERATOR_IMAGE}
-        oc wait deployments -n openshift-multiarch-manager-operator \
-          -l app.kubernetes.io/part-of=multiarch-manager-operator \
-          --for=condition=Available=True
-        oc wait pods -n openshift-multiarch-manager-operator \
-          -l control-plane=controller-manager \
-          --for=condition=Ready=True
-        make e2e
+      commands: USE_OLM=true ./hack/deploy-and-e2e.sh
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: pipeline:multiarch-manager-operator
+      - env: OO_BUNDLE
+        name: pipeline:multiarch-manager-operator-bundle
+      from: operator-sdk-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-multi-operator
+  optional: true
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPERATOR_IMAGE: pipeline:multiarch-manager-operator
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+    test:
+    - ref: ipi-install-heterogeneous
+    - as: test
+      cli: latest
+      commands: ./hack/deploy-and-e2e.sh
       dependencies:
       - env: OPERATOR_IMAGE
         name: pipeline:multiarch-manager-operator
