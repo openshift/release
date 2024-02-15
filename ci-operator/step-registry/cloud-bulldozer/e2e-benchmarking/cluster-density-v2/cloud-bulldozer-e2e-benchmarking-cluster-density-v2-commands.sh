@@ -7,6 +7,9 @@ cat /etc/os-release
 oc config view
 oc projects
 
+pwd
+ls -lhart
+echo "Current user: $(whoami)"
 if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] && [[ "$REPO_NAME" = "e2e-benchmarking" ]]; then
     git clone https://github.com/${REPO_OWNER}/${REPO_NAME}
     pushd ${REPO_NAME}
