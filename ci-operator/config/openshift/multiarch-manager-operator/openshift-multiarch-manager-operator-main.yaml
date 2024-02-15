@@ -1,31 +1,35 @@
 base_images:
-  operator-sdk:
-    name: "4.15"
-    namespace: origin
-    tag: operator-sdk
+  builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
   ubi:
     name: ubi
     namespace: ocp
     tag: "9"
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
 images:
 - dockerfile_path: Dockerfile
   from: ubi
   to: multiarch-manager-operator
 - dockerfile_literal: |
+    FROM quay.io/operator-framework/operator-sdk:v1.26.0 as osdk
     FROM src
     COPY . /code
-    COPY operator-sdk /usr/local/bin/
+    COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
     RUN chmod -R g+rwX /code
     WORKDIR /code
   from: src
   inputs:
-    operator-sdk:
-      paths:
-      - destination_dir: .
-        source_path: /usr/local/bin/operator-sdk
+    builder:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.21
+      - golang:1.21
   to: operator-sdk-src
 operator:
   bundles:
