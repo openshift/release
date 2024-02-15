@@ -44,6 +44,11 @@ popd
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 REGION="${LEASED_RESOURCE}"
+
+if  [[ "${HYPERSHIFT_AZURE_REGION}" != "" ]]; then
+  REGION="${HYPERSHIFT_AZURE_REGION}"
+fi
+
 echo "Azure region: ${REGION}"
 
 workers=${COMPUTE_NODE_REPLICAS:-3}
