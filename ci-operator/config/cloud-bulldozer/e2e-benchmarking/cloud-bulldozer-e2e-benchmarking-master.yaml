@@ -11,10 +11,10 @@ promotion:
   - namespace: e2e
     tag: latest
 releases:
-  initial:
+  arm64-latest:
     candidate:
+      architecture: arm64
       product: ocp
-      relative: 1
       stream: nightly
       version: "4.15"
   latest:
@@ -24,16 +24,27 @@ releases:
       version: "4.15"
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
-  commands: echo "test"
-  container:
-    from: src
+- always_run: false
+  as: e2e-cluster-density-v2-single-node
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      SPOT_INSTANCES: "true"
+    test:
+    - ref: cloud-bulldozer-e2e-benchmarking-cluster-density-v2
+    workflow: openshift-qe-installer-aws
 zz_generated_metadata:
   branch: master
   org: cloud-bulldozer
