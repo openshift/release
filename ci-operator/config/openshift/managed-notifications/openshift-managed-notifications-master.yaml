@@ -15,6 +15,41 @@ tests:
   commands: make validate
   container:
     from: src
+- as: checklinks-pr
+  commands: |
+    #!/bin/bash
+    REPO_URL="https://github.com/openshift/managed-notifications/"
+    EMAIL="sd-docs@redhat.com"
+    TEMP_FILE=$(mktemp)
+    [[ -d "temp_repo" ]] && rm -rf temp_repo
+    git clone "$REPO_URL" temp_repo && cd temp_repo || exit
+    grep -rEo "(http|https)://[a-zA-Z0-9./?=_-]*" . | sort -u | while read -r URL; do
+        if [ "$(curl -o /dev/null -s -w '%{http_code}' "$URL")" != "200" ]; then
+            echo "$URL" >> "$TEMP_FILE"
+        fi
+    done
+    rm -f "$TEMP_FILE"
+    rm -rf temp_repo
+  container:
+    from: src
+- as: checklinks-weekly
+  commands: |
+    #!/bin/bash
+    REPO_URL="https://github.com/openshift/managed-notifications/"
+    EMAIL="sd-docs@redhat.com"
+    TEMP_FILE=$(mktemp)
+    [[ -d "temp_repo" ]] && rm -rf temp_repo
+    git clone "$REPO_URL" temp_repo && cd temp_repo || exit
+    grep -rEo "(http|https)://[a-zA-Z0-9./?=_-]*" . | sort -u | while read -r URL; do
+        if [ "$(curl -o /dev/null -s -w '%{http_code}' "$URL")" != "200" ]; then
+            echo "$URL" >> "$TEMP_FILE"
+        fi
+    done
+    rm -f "$TEMP_FILE"
+    rm -rf temp_repo
+  container:
+    from: src
+  cron: '*/15 * * * *'
 zz_generated_metadata:
   branch: master
   org: openshift
