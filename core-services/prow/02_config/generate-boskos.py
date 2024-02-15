@@ -383,7 +383,7 @@ CONFIG = {
     }
 }
 
-for i in range(0,4):
+for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
 # Mihawk0 is updated with RHEL 8.8, adding the Mihawk back to the lease pool
