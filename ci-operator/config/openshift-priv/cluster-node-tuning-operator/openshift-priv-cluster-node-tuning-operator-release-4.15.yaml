@@ -85,6 +85,22 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-techpreview
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: e2e-pao-mixed-cpus
+      cli: latest
+      commands: CLUSTER=mcp-only make cluster-label-worker-cnf cluster-deploy-pao
+        pao-functests-mixedcpus
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
 - as: e2e-aws-operator
   steps:
     cluster_profile: aws
