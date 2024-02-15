@@ -17,10 +17,10 @@ tests:
     from: src
 - as: checklinks-pr
   commands: |
-    #!/bin/bash
     REPO_URL="https://github.com/openshift/managed-notifications/"
-    EMAIL="sd-docs@redhat.com"
-    TEMP_FILE=$(mktemp)
+    ARTIFACT_DIR="${ARTIFACTS:-/tmp/artifacts}"
+    mkdir -p "$ARTIFACT_DIR"
+    TEMP_FILE=$(mktemp -p "$ARTIFACT_DIR" broken_links_XXX)
     [[ -d "temp_repo" ]] && rm -rf temp_repo
     git clone "$REPO_URL" temp_repo && cd temp_repo || exit
     grep -rEo "(http|https)://[a-zA-Z0-9./?=_-]*" . | sort -u | while read -r URL; do
@@ -28,16 +28,17 @@ tests:
             echo "$URL" >> "$TEMP_FILE"
         fi
     done
-    rm -f "$TEMP_FILE"
     rm -rf temp_repo
   container:
     from: src
 - as: checklinks-weekly
   commands: |
-    #!/bin/bash
     REPO_URL="https://github.com/openshift/managed-notifications/"
     EMAIL="sd-docs@redhat.com"
-    TEMP_FILE=$(mktemp)
+    ARTIFACT_DIR="${ARTIFACTS:-/tmp/artifacts}"
+    mkdir -p "$ARTIFACT_DIR"
+    ARTIFACT_DIR="${ARTIFACTS:-/tmp/artifacts}"
+    TEMP_FILE=$(mktemp -p "$ARTIFACT_DIR" broken_links_XXX)
     [[ -d "temp_repo" ]] && rm -rf temp_repo
     git clone "$REPO_URL" temp_repo && cd temp_repo || exit
     grep -rEo "(http|https)://[a-zA-Z0-9./?=_-]*" . | sort -u | while read -r URL; do
@@ -45,7 +46,6 @@ tests:
             echo "$URL" >> "$TEMP_FILE"
         fi
     done
-    rm -f "$TEMP_FILE"
     rm -rf temp_repo
   container:
     from: src
