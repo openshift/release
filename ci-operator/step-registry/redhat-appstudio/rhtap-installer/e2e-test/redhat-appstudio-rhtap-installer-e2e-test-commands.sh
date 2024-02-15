@@ -4,16 +4,6 @@ set -o nounset
 set -o pipefail
 
 DEBUG_OUTPUT=/tmp/log.txt
-export ACS__API_TOKEN ACS__CENTRAL_ENDPOINT DEVELOPER_HUB__CATALOG__URL GITHUB__APP__APP_ID GITHUB__APP__CLIENT_ID GITHUB__APP__CLIENT_SECRET GITHUB__APP__WEBHOOK_SECRET GITHUB__APP__WEBHOOK_URL GITHUB__APP__PRIVATE_KEY
-ACS__API_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-api-token)
-ACS__CENTRAL_ENDPOINT=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-central-endpoint)
-DEVELOPER_HUB__CATALOG__URL=https://github.com/redhat-appstudio/tssc-sample-templates/blob/main/all.yaml
-GITHUB__APP__APP_ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-app-id)
-GITHUB__APP__CLIENT_ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-id)
-GITHUB__APP__CLIENT_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-secret)
-GITHUB__APP__WEBHOOK_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-webhook-secret)
-GITHUB__APP__WEBHOOK_URL=GITHUB_APP_WEBHOOK_URL
-GITHUB__APP__PRIVATE_KEY=$(base64 -d < /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-private-key)
 
 wait_for_pipeline() {
   if ! oc wait --for=condition=succeeded "$1" -n "$2" --timeout 300s >"$DEBUG_OUTPUT"; then
@@ -22,14 +12,6 @@ wait_for_pipeline() {
     exit 1
   fi
 }
-
-echo "$HOME"
-
-echo "[INFO]Generate private-values.yaml file ..."
-./bin/make.sh values
-
-echo "[INFO]Install RHTAP ..."
-./bin/make.sh apply -n rhtap -- --values private-values.yaml
 
 echo ""
 echo "[INFO]Extract the configuration information from logs of the pipeline"
