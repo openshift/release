@@ -1,0 +1,68 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: prow/Dockerfile
+  to: ocp-qe-perfscale-ci-ld414
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+releases:
+  initial:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.13.0-0
+        upper: 4.14.0-0
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: perfscale-aws-252nodes-loaded-upgrade-413to414
+  cron: 0 8 3,17 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.8xlarge
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "31"
+      PROFILE_TYPE: reporting
+      USER_TAGS: |
+        TicketId 382
+      WORKER_REPLICA_COUNT: "252"
+      ZONES_COUNT: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-loaded-upgrade
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: aws-4.14-nightly-x86-loaded-upgrade-from-4.13
