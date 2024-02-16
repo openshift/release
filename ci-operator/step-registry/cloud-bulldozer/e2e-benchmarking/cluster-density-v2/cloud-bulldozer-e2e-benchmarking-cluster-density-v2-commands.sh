@@ -7,6 +7,13 @@ cat /etc/os-release
 oc config view
 oc projects
 
+pushd workloads/kube-burner-ocp-wrapper
+export WORKLOAD=cluster-density-v2
+
+current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
+
+ES_SERVER="" ITERATIONS=${current_worker_count} CHURN=false ./run.sh
+
 if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] && [[ "$REPO_NAME" = "e2e-benchmarking" ]]; then
     pushd workloads/kube-burner-ocp-wrapper
     export WORKLOAD=cluster-density-v2
