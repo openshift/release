@@ -886,13 +886,29 @@ tests:
   optional: true
   steps:
     cluster_profile: oci-assisted
+    workflow: assisted-oci
+- always_run: false
+  as: e2e-oci-assisted-opct
+  optional: true
+  steps:
+    cluster_profile: oci-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=3
         WORKER_DISK=100000000000
         WORKER_MEMORY=16384
-        WORKER_CPU=4
-    workflow: assisted-oci
+    workflow: assisted-oci-opct
+  timeout: 6h0m0s
+- as: e2e-oci-assisted-opct-periodic
+  cron: '@weekly'
+  steps:
+    cluster_profile: oci-assisted
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=3
+        WORKER_DISK=100000000000
+        WORKER_MEMORY=16384
+    workflow: assisted-oci-opct
   timeout: 6h0m0s
 - always_run: false
   as: e2e-oci-assisted-4-14
@@ -902,7 +918,6 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.14
-      PLATFORM: assisted-oci
     workflow: assisted-oci
 - always_run: false
   as: e2e-oci-assisted-iscsi
