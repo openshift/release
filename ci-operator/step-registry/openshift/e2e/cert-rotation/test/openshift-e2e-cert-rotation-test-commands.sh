@@ -545,9 +545,9 @@ cat <<'EOF' > ${SHARED_DIR}/test-list
 "[sig-storage] Subpath Atomic writer volumes should support subpaths with secret pod [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 "[sig-storage] Subpath Container restart should verify that container can restart successfully after configmaps modified [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage] Volumes ConfigMap should be mountable [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] Proxy version v1 should proxy logs on node with explicit kubelet port using proxy subresource"
+"[sig-network] Proxy version v1 should proxy logs on node using proxy subresource"
 EOF
-#[sig-network] Proxy version v1 should proxy logs on node with explicit kubelet port using proxy subresource
-#[sig-network] Proxy version v1 should proxy logs on node using proxy subresource
 echo "### Copying test-list file"
 scp "${SSHOPTS[@]}" "${SHARED_DIR}/test-list" "root@${IP}:/tmp/test-list"
 
@@ -560,11 +560,10 @@ for kubeconfig in $(find ${KUBECONFIG} -type f); do
     export KUBECONFIG=${kubeconfig}
 done
 fi
-chmod a+r /tmp/test-list
 openshift-tests run \
     -v 2 \
     --provider=none \
-    --disable-monitor='pathological-event-analyzer,alert-summary-serializer' \
+    --monitor='node-lifecycle' \
     -f /tmp/test-list \
     -o /tmp/artifacts/e2e.log \
     --junit-dir /tmp/artifacts/junit \
