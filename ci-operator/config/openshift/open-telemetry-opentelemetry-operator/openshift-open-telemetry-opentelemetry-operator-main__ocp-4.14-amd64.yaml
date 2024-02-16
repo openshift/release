@@ -66,13 +66,18 @@ resources:
       memory: 200Mi
 tests:
 - as: opentelemetry-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.14"
   cron: 0 6 * * 2
   steps:
-    cluster_profile: aws-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      SKIP_TESTS: tests/e2e-openshift/multi-cluster tests/e2e/targetallocator-features
-        tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
+      SKIP_TESTS: tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
+        tests/e2e-targetallocator/targetallocator-features tests/e2e-targetallocator/targetallocator-kubernetessd
     test:
     - ref: operatorhub-subscribe-amq-streams
     - ref: distributed-tracing-install-jaeger-product
@@ -92,7 +97,7 @@ tests:
           cpu: 1000m
           memory: 400Mi
     - ref: distributed-tracing-tests-opentelemetry
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
