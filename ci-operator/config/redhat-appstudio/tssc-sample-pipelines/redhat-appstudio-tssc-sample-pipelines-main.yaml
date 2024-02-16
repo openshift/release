@@ -76,9 +76,27 @@ tests:
       truthy:
         check-keys: false
     EOF
+
     yamllint -c "$CONFIG_FILE" .
   container:
     from: rhtap-installer
+- as: validate-rhtap-sample-pipelines
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    test:
+    - ref: redhat-appstudio-openshift-trusted-ca
+    - ref: redhat-appstudio-rhtap-installer-install-rhtap
+    - ref: redhat-appstudio-tssc-sample-pipelines-validate-rhtap-pipelines
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: redhat-appstudio

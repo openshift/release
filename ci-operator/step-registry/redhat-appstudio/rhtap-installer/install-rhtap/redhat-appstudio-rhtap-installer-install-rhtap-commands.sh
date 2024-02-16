@@ -159,6 +159,7 @@ e2e_test(){
   ./bin/make.sh -n "$NAMESPACE" test
 }
 
+echo "hello before clone $(pwd)"
 clone_repo
 install_rhtap
 e2e_test
