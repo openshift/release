@@ -7,11 +7,8 @@ cat /etc/os-release
 oc config view
 oc projects
 
+
 if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] && [[ "$REPO_NAME" = "e2e-benchmarking" ]]; then
-    git clone https://github.com/${REPO_OWNER}/${REPO_NAME}
-    pushd ${REPO_NAME}
-    git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER}
-    git switch ${PULL_NUMBER}
     pushd workloads/kube-burner-ocp-wrapper
     export WORKLOAD=cluster-density-v2
 
