@@ -61,7 +61,11 @@ function wait-for-nodes-to-be-ready {
         sleep 30
       done
     done
-    oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
+    oc get nodes
+    for i in 1 2 3 4 5; do
+      oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
+      sleep 30
+    done
   "
 }
 
@@ -125,6 +129,13 @@ if [ -d "$KUBECONFIG" ]; then
     export KUBECONFIG=${kubeconfig}
   done
 fi
+
+# Use emptyDir for image-registry
+oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
+
+# Disable all marketplace sources to avoid "Back-off pulling image"
+oc patch OperatorHub cluster --type json \
+    -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 
 source /usr/local/share/cert-rotation-functions.sh
 prepull-tools-image-for-gather-step
