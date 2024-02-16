@@ -2,96 +2,97 @@
 
 set -euox pipefail
 
-CLUSTER_NAME="$(printf $PROW_JOB_ID|sha256sum|cut -c-20)"
+CLUSTER_NAME="cicd-$(printf $PROW_JOB_ID|sha256sum|cut -c-10)"
 POWERVS_VSI_NAME="${CLUSTER_NAME}-worker"
 BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
 
-# Installing required tools
-echo "$(date) Installing required tools"
-mkdir /tmp/ibm_cloud_cli
-curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.16.1/IBM_Cloud_CLI_2.16.1_amd64.tar.gz
-tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
-export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
-mkdir /tmp/bin
-curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/bin/jq && chmod +x /tmp/bin/jq
-export PATH=$PATH:/tmp/bin
+setup_env() {
+  # Installing required tools
+  echo "$(date) Installing required tools"
+  mkdir /tmp/ibm_cloud_cli
+  curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.16.1/IBM_Cloud_CLI_2.16.1_amd64.tar.gz
+  tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
+  export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
+  mkdir /tmp/bin
+  curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/bin/jq && chmod +x /tmp/bin/jq
+  export PATH=$PATH:/tmp/bin
 
-# IBM cloud login
-echo | ibmcloud login --apikey @"/etc/sno-power-credentials/.powercreds"
+  # IBM cloud login
+  echo | ibmcloud login --apikey @"/etc/sno-power-credentials/.powercreds"
 
-# Installing required ibmcloud plugins
-echo "$(date) Installing required ibmcloud plugins"
-ibmcloud plugin install power-iaas
-ibmcloud plugin install cis
+  # Installing required ibmcloud plugins
+  echo "$(date) Installing required ibmcloud plugins"
+  ibmcloud plugin install power-iaas
+  ibmcloud plugin install cis
 
-# Set target powervs and cis service instance
-ibmcloud pi ws tg ${POWERVS_INSTANCE_CRN}
-ibmcloud cis instance-set ${CIS_INSTANCE}
+  # Set target powervs and cis service instance
+  ibmcloud pi ws tg ${POWERVS_INSTANCE_CRN}
+  ibmcloud cis instance-set ${CIS_INSTANCE}
 
-# Setting IBMCLOUD_TRACE to true to enable debug logs for pi and cis operations
-export IBMCLOUD_TRACE=true
+  # Setting IBMCLOUD_TRACE to true to enable debug logs for pi and cis operations
+  export IBMCLOUD_TRACE=true
+}
 
-# Creating VSI in PowerVS instance
-echo "$(date) Creating VSI in PowerVS instance"
-ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --subnets ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE}
+create_sno_vm() {
+  # Creating VSI in PowerVS instance
+  echo "$(date) Creating VSI in PowerVS instance"
+  ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --subnets ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE}
 
-instance_id=$(ibmcloud pi ins ls --json | jq -r --arg serverName ${POWERVS_VSI_NAME} '.pvmInstances[] | select (.name == $serverName ) | .id')
+  instance_id=$(ibmcloud pi ins ls --json | jq -r --arg serverName ${POWERVS_VSI_NAME} '.pvmInstances[] | select (.name == $serverName ) | .id')
 
-# Retrieving ip and mac from workers created in ibmcloud powervs
-echo "$(date) Retrieving ip and mac from workers created in ibmcloud powervs"
-export MAC_ADDRESS=""
-export IP_ADDRESS=""
-for ((i=1; i<=20; i++)); do
-    instance_id=$(ibmcloud pi ins ls --json | jq -r --arg serverName ${POWERVS_VSI_NAME} '.pvmInstances[] | select (.name == $serverName ) | .id')
-    if [ -z "$instance_id" ]; then
-        echo "$(date) Waiting for instance id to be populated"
-        sleep 60
-        continue
-    fi
-    break
-done
+  # Retrieving ip and mac from workers created in ibmcloud powervs
+  echo "$(date) Retrieving ip and mac from workers created in ibmcloud powervs"
+  export MAC_ADDRESS=""
+  export IP_ADDRESS=""
+  for ((i=1; i<=20; i++)); do
+      instance_id=$(ibmcloud pi ins ls --json | jq -r --arg serverName ${POWERVS_VSI_NAME} '.pvmInstances[] | select (.name == $serverName ) | .id')
+      if [ -z "$instance_id" ]; then
+          echo "$(date) Waiting for instance id to be populated"
+          sleep 60
+          continue
+      fi
+      break
+  done
 
-for ((i=1; i<=20; i++)); do
-    instance_info=$(ibmcloud pi ins get $instance_id --json)
-    MAC_ADDRESS=$(echo "$instance_info" | jq -r '.networks[].macAddress')
-    IP_ADDRESS=$(echo "$instance_info" | jq -r '.networks[].ipAddress')
+  for ((i=1; i<=20; i++)); do
+      instance_info=$(ibmcloud pi ins get $instance_id --json)
+      MAC_ADDRESS=$(echo "$instance_info" | jq -r '.networks[].macAddress')
+      IP_ADDRESS=$(echo "$instance_info" | jq -r '.networks[].ipAddress')
 
-    if [ -z "$MAC_ADDRESS" ] || [ -z "$IP_ADDRESS" ]; then
-        echo "$(date) Waiting for mac and ip to be populated in $POWERVS_VSI_NAME"
-        sleep 60
-        continue
-    fi
+      if [ -z "$MAC_ADDRESS" ] || [ -z "$IP_ADDRESS" ]; then
+          echo "$(date) Waiting for mac and ip to be populated in $POWERVS_VSI_NAME"
+          sleep 60
+          continue
+      fi
 
-    break
-done
+      break
+  done
 
-if [ -z "$MAC_ADDRESS" ] || [ -z "$IP_ADDRESS" ]; then
-  echo "Required mac and ip addresses not collected, exiting test"
-  exit 1
-fi
-
-# Retrieving wwn from VSI to form the installation disk
-volume_wwn=$(ibmcloud pi ins vol ls $instance_id --json | jq -r '.volumes[].wwn')
-
-if [ -z "$volume_wwn" ]; then
-    echo "Required volume WWN not collected, exiting test"
+  if [ -z "$MAC_ADDRESS" ] || [ -z "$IP_ADDRESS" ]; then
+    echo "Required mac and ip addresses not collected, exiting test"
     exit 1
-fi
+  fi
 
-# Forming installation disk, ',,' to convert to lower case
-INSTALLATION_DISK=$(printf "/dev/disk/by-id/wwn-0x%s" "${volume_wwn,,}")
+  # Retrieving wwn from VSI to form the installation disk
+  volume_wwn=$(ibmcloud pi ins vol ls $instance_id --json | jq -r '.volumes[].wwn')
+
+  if [ -z "$volume_wwn" ]; then
+      echo "Required volume WWN not collected, exiting test"
+      exit 1
+  fi
+
+  # Forming installation disk, ',,' to convert to lower case
+  INSTALLATION_DISK=$(printf "/dev/disk/by-id/wwn-0x%s" "${volume_wwn,,}")
+}
 
 # Create private key with 0600 permission for ssh purpose
 SSH_PRIVATE="/tmp/ssh-privatekey"
 cp "/etc/sno-power-credentials/ssh-privatekey" ${SSH_PRIVATE}
 chmod 0600 ${SSH_PRIVATE}
-
 SSH_OPTIONS=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'ServerAliveInterval=60' -o 'ServerAliveCountMax=60' -o 'UserKnownHostsFile=/dev/null' -i "${SSH_PRIVATE}")
-
 # Save private-key, pull-secret and offline-token to bastion
 ssh "${SSH_OPTIONS[@]}" root@${BASTION} "mkdir -p ~/.sno"
 scp "${SSH_OPTIONS[@]}" /etc/sno-power-credentials/{ssh-publickey,pull-secret,offline-token} root@${BASTION}:~/.sno/.
-
 # set the default INSTALL_TYPE to sno
 INSTALL_TYPE=${INSTALL_TYPE:-sno}
 
@@ -457,12 +458,16 @@ echo "writing menuentry to grub.cfg "
 sed -i -e "/menuentry 'RHEL CoreOS (Live)' --class fedora --class gnu-linux --class gnu --class os {/r \$(printf '%s' "\$GRUB_MENU_OUTPUT_FILE")" /var/lib/tftpboot/boot/grub2/grub.cfg;
 systemctl restart tftp;
 
-echo "writing host entries to dhcpd.conf"
+eecho "writing host entries to dhcpd.conf"
 HOST_ENTRY="host \${POWERVS_VSI_NAME} { hardware ethernet \${MAC_ADDRESS}; fixed-address \${IP_ADDRESS}; }"
 sed -i "/# Static entries/a\    \$(printf '%s' "\$HOST_ENTRY")" /etc/dhcp/dhcpd.conf;
+systemctl restart dhcpd;
+
+echo "write config for haproxy"
+cat /etc/haproxy/haproxy.cfg.cicd | envsubst > /etc/haproxy/haproxy.cfg
+systemctl restart haproxy;
 
 echo "restarting services tftp & dhcpd"
-systemctl restart dhcpd;
 )200>"\$LOCK_FILE"
 
 EOF
@@ -586,59 +591,23 @@ fi
 
 EOF
 
-cat > ${BASTION_CI_SCRIPTS_DIR}/cleanup-sno.sh << EOF
-#!/bin/bash
-
-# This script tries to clean up things configured for SNO cluster by setup-sno.sh
-# Run this script inside the bastion configured for pxe boot.
-# Usage: ./cleanup-sno.sh \$CLUSTER_NAME.
-#
-# Sample usage: ./cleanup-sno.sh test-cluster
-#
-
-
-set -x
-set +e
-
-export CLUSTER_NAME=\$1
-POWERVS_VSI_NAME="\${CLUSTER_NAME}-worker"
-
-CONFIG_DIR="/tmp/\${CLUSTER_NAME}-config"
-IMAGES_DIR="/var/lib/tftpboot/images/\${CLUSTER_NAME}"
-WWW_DIR="/var/www/html/\${CLUSTER_NAME}"
-
-LOCK_FILE="lockfile.lock"
-(
-flock -n 200 || exit 1;
-echo "removing server host entry from dhcpd.conf"
-HOST_ENTRY="host \${POWERVS_VSI_NAME}"
-sed -i "/\$(printf '%s' "\$HOST_ENTRY")/d" /etc/dhcp/dhcpd.conf
-
-systemctl restart dhcpd;
-
-echo "removing menuentry from grub.cfg"
-sed -i "/# menuentry for \$(printf '%s' "\${CLUSTER_NAME}") start/,/# menuentry for \$(printf '%s' "\${CLUSTER_NAME}") end/d" /var/lib/tftpboot/boot/grub2/grub.cfg
-
-echo "restarting tftp & dhcpd"
-systemctl restart tftp;
-) 200>"\$LOCK_FILE"
-
-rm -rf /tmp/\${CLUSTER_NAME}* \${IMAGES_DIR} \${WWW_DIR}
-
-EOF
-
 chmod +x ${BASTION_CI_SCRIPTS_DIR}/*.sh
-ssh  "${SSH_OPTIONS[@]}" root@${BASTION} "rm -rf ${BASTION_CI_SCRIPTS_DIR}; mkdir -p ${BASTION_CI_SCRIPTS_DIR}/scripts; touch ${BASTION_CI_SCRIPTS_DIR}/scripts/lockfile.lock"
+ssh  "${SSH_OPTIONS[@]}" root@${BASTION} "rm -rf ${BASTION_CI_SCRIPTS_DIR}; mkdir -p ${BASTION_CI_SCRIPTS_DIR}/{scripts,auth}; touch ${BASTION_CI_SCRIPTS_DIR}/scripts/lockfile.lock"
 scp  "${SSH_OPTIONS[@]}" ${BASTION_CI_SCRIPTS_DIR}/* root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/scripts/.
 
 #############################
+echo "Install required packages"
+setup_env
+echo "Create SNO cluster node VM"
+create_sno_node
+
 # Setting up the SNO config, generating the ignition and network boot on the bastion
 ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./setup-sno.sh ${CLUSTER_NAME} ${BASE_DOMAIN} ${POWERVS_MACHINE_NETWORK_CIDR} ${INSTALLATION_DISK} $(eval "echo ${LIVE_ROOTFS_URL}") $(eval "echo ${LIVE_KERNEL_URL}") $(eval "echo ${LIVE_INITRAMFS_URL}") $(printf "http://%s" "${BASTION}") ${MAC_ADDRESS} ${IP_ADDRESS} ${INSTALL_TYPE} ${OCP_VERSION}"
 
 # Creating dns records in ibmcloud cis service for SNO node to reach hosted cluster and for ingress purpose
-ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "api.${CLUSTER_NAME}" --content "${IP_ADDRESS}"
-ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "api-int.${CLUSTER_NAME}" --content "${IP_ADDRESS}"
-ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "*.apps.${CLUSTER_NAME}" --content "${IP_ADDRESS}"
+ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "api.${CLUSTER_NAME}" --content "${BASTION_IP}"
+ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "api-int.${CLUSTER_NAME}" --content "${BASTION_IP}"
+ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "*.apps.${CLUSTER_NAME}" --content "${BASTION_IP}"
 
 # Rebooting the node to boot from net
 ibmcloud pi ins act $instance_id --operation soft-reboot
@@ -653,3 +622,26 @@ fi
 # Run wait-sno-complete
 ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./wait-sno-complete.sh ${CLUSTER_NAME} ${INSTALL_TYPE}"
 
+# Run wait-sno-complete
+ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./wait-sno-complete.sh ${CLUSTER_NAME} ${INSTALL_TYPE}"
+
+################################################################
+echo "If installation completed successfully Copying required artifacts to shared dir"
+# Powervs requires config.json
+IBMCLOUD_API_KEY=$(cat /etc/sno-power-credentials/.powercreds)
+POWERVS_SERVICE_INSTANCE_ID=$(echo ${POWERVS_INSTANCE_CRN} | cut -f8 -d":")
+POWERVS_REGION=$(echo ${POWERVS_INSTANCE_CRN} | cut -f6 -d":")
+POWERVS_ZONE=$(echo ${POWERVS_REGION} | sed 's/-*[0-9].*//')
+POWERVS_RESOURCE_GROUP=""
+cat > "/tmp/powervs-config.json" << EOF
+{"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${POWERVS_RESOURCE_GROUP}"}
+EOF
+cp "/tmp/powervs-config.json" "${SHARED_DIR}/"
+#Copy the auth artifacts to shared dir for the next steps
+scp -r "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/* ${SHARED_DIR}/.
+echo "Finished prepare_next_steps"
+
+echo "Test cluster accessiblity"
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+oc get node -o wide
+oc get clusterversion
