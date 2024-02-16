@@ -10,7 +10,7 @@ setup_env() {
   # Installing required tools
   echo "$(date) Installing required tools"
   mkdir /tmp/ibm_cloud_cli
-  curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.16.1/IBM_Cloud_CLI_2.16.1_amd64.tar.gz
+  curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.23.0/IBM_Cloud_CLI_2.23.0_amd64.tar.gz
   tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
   export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
   mkdir /tmp/bin
@@ -18,6 +18,7 @@ setup_env() {
   export PATH=$PATH:/tmp/bin
 
   # IBM cloud login
+  ibmcloud config --check-version=false
   echo | ibmcloud login --apikey @"/etc/sno-power-credentials/.powercreds"
 
   # Installing required ibmcloud plugins
@@ -33,7 +34,7 @@ setup_env() {
   export IBMCLOUD_TRACE=true
 }
 
-create_sno_vm() {
+create_sno_node() {
   # Creating VSI in PowerVS instance
   echo "$(date) Creating VSI in PowerVS instance"
   ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --subnets ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE}

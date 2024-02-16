@@ -10,7 +10,7 @@ BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
 # Installing required tools
 echo "$(date) Installing required tools"
 mkdir /tmp/ibm_cloud_cli
-curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.16.1/IBM_Cloud_CLI_2.16.1_amd64.tar.gz
+curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.23.0/IBM_Cloud_CLI_2.23.0_amd64.tar.gz
 tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
 export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
 mkdir /tmp/bin
@@ -18,6 +18,7 @@ curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /t
 export PATH=$PATH:/tmp/bin
 
 # IBM cloud login
+ibmcloud config --check-version=false
 echo | ibmcloud login --apikey @"/etc/sno-power-credentials/.powercreds"
 
 # Installing required ibmcloud plugins
