@@ -1,0 +1,50 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-odh-kueue
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+    test:
+    - as: e2e-test-odh-kueue
+      cli: latest
+      commands: |
+        oc apply --server-side -k "github.com/ChughShilpa/kueue/config/default?ref=add_wait"
+        echo "Adding label on worker node ..."
+        oc label node --selector=node-role.kubernetes.io/worker instance-type=on-demand
+        echo "Enabling Visibility Feature Gate ..."
+        oc patch deployment kueue-controller-manager -n kueue-system --type=json -p '[{"op" : "add" ,"path" : "/spec/template/spec/containers/0/args/-" ,"value" : "--feature-gates=VisibilityOnDemand=true"}]'
+        go version
+        echo "Installing ginkgo ..."
+        go install github.com/onsi/ginkgo/v2/ginkgo
+        ginkgo version
+        ginkgo --focus "Creating a Job In a Twostepadmission Queue" -v ./test/e2e/singlecluster/
+      from: src
+      resources:
+        requests:
+          cpu: 8000m
+          memory: 16Gi
+    workflow: hypershift-hostedcluster-workflow
+zz_generated_metadata:
+  branch: test
+  org: opendatahub-io
+  repo: kueue
