@@ -4,7 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-#export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/openshift-release-dev/ocp-release:4.15.0-rc.5-x86_64"
+# TEMP until figure out issues in deployment when declaring release:initial in workflow
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/openshift-release-dev/ocp-release:4.15.0-rc.5-x86_64"
 
 echo "Using release image ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 

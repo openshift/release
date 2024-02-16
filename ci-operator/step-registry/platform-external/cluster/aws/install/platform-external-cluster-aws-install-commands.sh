@@ -4,9 +4,18 @@ set -euo pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 #Save exit code for must-gather to generate junit
 trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
+
+function save_stack_events_to_artifacts()
+{
+  set +o errexit
+  while read -r stack_name
+  do
+    aws --region ${AWS_REGION} cloudformation describe-stack-events --stack-name ${stack_name} --output json > "${ARTIFACT_DIR}/stack-events-${stack_name}.json"
+  done < "${NEW_STACKS}"
+  set -o errexit
+}
 #Save stacks events
 trap 'save_stack_events_to_artifacts' EXIT TERM INT
-
 
 function echo_date() {
   echo "$(date -u --rfc-3339=seconds) - $*"
@@ -32,12 +41,46 @@ echo "======================="
 echo "Installing dependencies"
 echo "======================="
 
+# Install awscli
+function install_awscli() {
+  # Install AWS CLI
+  if ! command -v aws &> /dev/null
+  then
+      echo_date "Installing AWS cli..."
+      export PATH="${HOME}/.local/bin:${PATH}"
+      if command -v pip3 &> /dev/null
+      then
+          pip3 install --user awscli
+      else
+          if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]
+          then
+            easy_install --user 'pip<21'
+            pip install --user awscli
+          else
+            echo_date "No pip available exiting..."
+            exit 1
+          fi
+      fi
+  fi
+}
+
+# Make sure jq is installed
+echo_date "Checking/installing jq..."
+if ! command -v jq; then
+    # TODO move to image
+    wget -qO /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+    chmod +x /tmp/jq
+fi
+
 echo_date "Checking/installing yq3..."
 if ! [ -x "$(command -v yq3)" ]; then
   wget -qO /tmp/yq3 https://github.com/mikefarah/yq/releases/download/3.4.0/yq_linux_amd64
   chmod u+x /tmp/yq3
 fi
 which yq3
+
+install_awscli
+which aws
 
 echo "==============================="
 echo "Patch CloudFormation Templates"
@@ -95,16 +138,6 @@ function gather_bootstrap_and_fail() {
   return 1
 }
 
-function save_stack_events_to_artifacts()
-{
-  set +o errexit
-  while read -r stack_name
-  do
-    aws --region ${AWS_REGION} cloudformation describe-stack-events --stack-name ${stack_name} --output json > "${ARTIFACT_DIR}/stack-events-${stack_name}.json"
-  done < "${NEW_STACKS}"
-  set -o errexit
-}
-
 # echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 # SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 # PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
@@ -135,7 +168,7 @@ echo ${CLUSTER_NAME} > ${SHARED_DIR}/CLUSTER_NAME
 MACHINE_CIDR=10.0.0.0/16
 
 # begin bootstrapping
-if openshift-install coreos print-stream-json 2>/tmp/err.txt > /tmp/coreos.json; then
+if openshift-install coreos print-stream-json 2> "${ARTIFACT_DIR}/err.txt" > /tmp/coreos.json; then
   RHCOS_AMI="$(jq -r --arg region "$AWS_REGION" '.architectures.x86_64.images.aws.regions[$region].image' /tmp/coreos.json)"
   # if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; then
   #   RHCOS_AMI="$(jq -r --arg region "$AWS_REGION" '.architectures.aarch64.images.aws.regions[$region].image' coreos.json)"

@@ -13,11 +13,33 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-
-REGION="${LEASED_RESOURCE}"
+export REGION="${LEASED_RESOURCE}"
 
 function echo_date() {
   echo "$(date -u --rfc-3339=seconds) - $*"
+}
+
+# Install awscli
+function install_awscli() {
+  # Install AWS CLI
+  if ! command -v aws &> /dev/null
+  then
+      echo_date "Installing AWS cli..."
+      export PATH="${HOME}/.local/bin:${PATH}"
+      if command -v pip3 &> /dev/null
+      then
+          pip3 install --user awscli
+      else
+          if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]
+          then
+            easy_install --user 'pip<21'
+            pip install --user awscli
+          else
+            echo_date "No pip available exiting..."
+            exit 1
+          fi
+      fi
+  fi
 }
 
 function delete_stack() {
@@ -74,4 +96,5 @@ delete_stacks() {
   echo_date "Serial delete completed!"
 }
 
+install_awscli
 delete_stacks

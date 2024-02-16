@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# TEMP until figure out issues in deployment when declaring release:initial in workflow
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/openshift-release-dev/ocp-release:4.15.0-rc.5-x86_64"
+
 function echo_date() {
   echo "$(date -u --rfc-3339=seconds) - $*"
 }
@@ -27,7 +30,7 @@ echo "Using CCM image=${CCM_IMAGE}"
 
 echo_date "Creating CloudController Manager deployment"
 
-cat << EOF | envsubst > $CCM_MANIFEST_PATH
+cat << EOF > "$CCM_MANIFEST_PATH"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -139,7 +142,7 @@ EOF
 echo_date "Created!"
 echo "$CCM_MANIFEST" >> ${SHARED_DIR}/ccm-manifests.txt
 echo "CCM_STATUS_KEY=.status.availableReplicas" >> "${SHARED_DIR}/deploy.env"
-cp -v ${SHARED_DIR}/ccm-manifests.txt ${ARTIFACT_DIR}/
+cp -v "${SHARED_DIR}/ccm-manifests.txt" "${ARTIFACT_DIR}/"
 
 cat << EOF > "${SHARED_DIR}/ccm.env"
 CCM_RESOURCE="Deployment/aws-cloud-controller-manager"
