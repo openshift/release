@@ -11,6 +11,9 @@ echo "************ openshift cert rotation shutdown test command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+echo "### Copying test binaries"
+scp "${SSHOPTS[@]}" /usr/bin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/local/bin"
+
 # This file is scp'd to the machine where the nested libvirt cluster is running
 # It stops kubelet service, kills all containers on each node, kills all pods,
 # disables chronyd service on each node and on the machine itself, sets date ahead 400days
@@ -208,10 +211,20 @@ source ~/config.sh
 export OCP_RELEASE=$( oc adm release -a ~/pull-secret info "${RELEASE_IMAGE_LATEST}" -o template --template='{{.metadata.version}}' )
 export LOCAL_REPO='ocp/openshift4'
 
+# Mirror release
 oc adm release mirror -a ~/pull-secret \
     --from="${RELEASE_IMAGE_LATEST}" \
     --to-release-image="${LOCAL_REG}/${LOCAL_REPO}:${OCP_RELEASE}" \
     --to="${LOCAL_REG}/${LOCAL_REPO}" | tee /tmp/oc-mirror.output
+
+# Mirror test images
+DEVSCRIPTS_TEST_IMAGE_REPO=${LOCAL_REG}/localimages/local-test-image
+openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
+oc image mirror -f /tmp/mirror --registry-config ~/pull-secret
+echo "${DEVSCRIPTS_TEST_IMAGE_REPO}" > /tmp/local-test-image-repo
+oc image mirror --registry-config ~/pull-secret --filter-by-os="linux/amd64.*" registry.k8s.io/pause:3.8  ${DEVSCRIPTS_TEST_IMAGE_REPO}:e2e-28-registry-k8s-io-pause-3-8-aP7uYsw5XCmoDy5W
+# until we land k8s 1.28 we need to mirror both the 3.8 (current image) and 3.9 (coming in k8s 1.28)
+oc image mirror --registry-config ~/pull-secret --filter-by-os="linux/amd64.*" registry.k8s.io/pause:3.9  ${DEVSCRIPTS_TEST_IMAGE_REPO}:e2e-27-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
 
 # Build registries.conf
 tail -n 12 /tmp/oc-mirror.output | tee /tmp/icsp.yaml
