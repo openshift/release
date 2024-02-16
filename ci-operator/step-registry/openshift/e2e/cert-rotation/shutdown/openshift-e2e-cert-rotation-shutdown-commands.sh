@@ -23,7 +23,7 @@ cat >"${SHARED_DIR}"/time-skew-test.sh <<'EOF'
 set -euxo pipefail
 sudo systemctl stop chronyd
 
-SKEW=${1:-+90d}
+SKEW=${1:-90d}
 OC=${OC:-oc}
 SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
 SCP=${SCP:-scp ${SSH_OPTS}}
@@ -37,34 +37,7 @@ if [ -d "$KUBECONFIG" ]; then
   done
 fi
 
-mapfile -d ' ' -t control_nodes < <( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
-
-mapfile -d ' ' -t compute_nodes < <( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
-
-function run-on-all-nodes {
-  for n in ${control_nodes[@]} ${compute_nodes[@]}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" sudo 'bash -eEuxo pipefail' <<< ${1}; done
-}
-
-function run-on-first-master {
-  timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
-}
-
-function copy-file-from-first-master {
-  timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_nodes[0]}:${1}" "${2}"
-}
-
-ssh-keyscan -H ${control_nodes[@]} ${compute_nodes[@]} >> ~/.ssh/known_hosts
-
-# Save found node IPs for "gather-cert-rotation" step
-echo -n "${control_nodes[@]}" > /srv/control_node_ips
-echo -n "${compute_nodes[@]}" > /srv/compute_node_ips
-
-echo "Wrote control_node_ips: $(cat /srv/control_node_ips), compute_node_ips: $(cat /srv/compute_node_ips)"
-
-# Prepull tools image on the nodes. "gather-cert-rotation" step uses it to run sos report
-# However, if time is too far in the future the pull will fail with "Trying to pull registry.redhat.io/rhel8/support-tools:latest...
-# Error: initializing source ...: tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time ... is after <now + 6m>"
-run-on-all-nodes "podman pull --authfile /var/lib/kubelet/config.json registry.redhat.io/rhel8/support-tools:latest"
+source /usr/local/share/cert-rotation-functions.sh
 
 # Stop chrony service on all nodes
 run-on-all-nodes "systemctl disable chronyd --now"
@@ -96,7 +69,7 @@ done
 
 # Set date for host
 sudo timedatectl status
-sudo timedatectl set-time ${SKEW}
+sudo timedatectl set-time +${SKEW}
 sudo timedatectl status
 
 # Start nodes again
@@ -115,19 +88,7 @@ done
 until run-on-all-nodes "timedatectl status"; do sleep 30; done
 
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
-run-on-first-master "
-  export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
-  until oc get nodes; do sleep 30; done
-  sleep 5m
-  until oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready --timeout=30s; do
-    oc get nodes
-    if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
-      oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
-    fi
-    sleep 30
-  done
-  oc get nodes
-  "
+wait-for-nodes-to-be-ready
 
 # Wait for kube-apiserver operator to generate new localhost-recovery kubeconfig
 run-on-first-master "while diff -q ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE}; do sleep 30; done"
@@ -137,36 +98,11 @@ run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:
 copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
 # Approve certificates for workers, so that all operators would complete
-run-on-first-master "
-  export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
-  until oc wait node --selector='node-role.kubernetes.io/worker' --for condition=Ready --timeout=30s; do
-    oc get nodes
-    if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
-      oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
-    fi
-    sleep 30
-  done
-"
+wait-for-nodes-to-be-ready
 
-# Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
-# Restart OVN / Multus before proceeding
-oc -n openshift-multus delete pod -l app=multus
-oc -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node
-oc -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane
+pod-restart-workarounds
 
-# Wait for operators to stabilize
-if
-  ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=60m; then
-    oc get nodes
-    oc get co | grep -v "True\s\+False\s\+False"
-    exit 1
-else
-  oc get nodes
-  oc get co
-  oc get clusterversion
-fi
-exit 0
-
+wait-for-operators-to-stabilize
 EOF
 chmod +x "${SHARED_DIR}"/time-skew-test.sh
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/time-skew-test.sh "root@${IP}:/usr/local/bin"
