@@ -130,7 +130,8 @@ else
     tests/e2e-prometheuscr \
     tests/e2e-instrumentation \
     tests/e2e-pdb \
-    tests/e2e-opampbridge
+    tests/e2e-opampbridge \
+    tests/e2e-targetallocator
 
   # Enable required feature gates.
   OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
