@@ -33,21 +33,9 @@ images:
         source_path: /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/operator-opamp-bridge/bin/opampbridge_amd64
   to: opentelemetry-opampbridge
 releases:
-  arm64-latest:
-    candidate:
-      architecture: arm64
-      product: ocp
-      stream: nightly
-      version: "4.14"
   latest:
     candidate:
-      architecture: amd64
-      product: ocp
-      stream: nightly
-      version: "4.14"
-  target:
-    candidate:
-      architecture: multi
+      architecture: arm64
       product: ocp
       stream: nightly
       version: "4.14"
@@ -58,22 +46,21 @@ resources:
       memory: 200Mi
 tests:
 - as: opentelemetry-stage-tests
+  cluster_claim:
+    architecture: arm64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.14"
   cron: 0 6 1 10 *
   steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       AMQ_SOURCE: dt-catalogsource
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      DOWNSTREAM_TESTS_COMMIT: 36a49339742e9bc9e3e6e19e653d73328e8d1110
+      DOWNSTREAM_TESTS_COMMIT: 16c712c5a4fbbeb8e428f0af962277d762228961
       JAEGER_SOURCE: dt-catalogsource
-      OCP_ARCH: arm64
       OTEL_SOURCE: dt-catalogsource
-      SKIP_TESTS: tests/e2e/targetallocator-features tests/e2e-instrumentation/instrumentation-nginx
-        tests/e2e-openshift/multi-cluster tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
+      SKIP_TESTS: tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
       TEMPO_SOURCE: dt-catalogsource
     test:
     - ref: enable-stage-catalogsource
@@ -82,7 +69,7 @@ tests:
     - ref: distributed-tracing-install-jaeger-product
     - ref: distributed-tracing-install-tempo-product
     - ref: distributed-tracing-tests-opentelemetry
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
