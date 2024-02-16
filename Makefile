@@ -417,7 +417,6 @@ config-updater-kubeconfig:
 secret-config-updater:
 	oc --context app.ci -n ci create secret generic config-updater \
 	--from-file=sa.config-updater.app.ci.config=$(TMPDIR)/sa.config-updater.app.ci.config \
-	--from-file=sa.config-updater.arm01.config=$(TMPDIR)/sa.config-updater.arm01.config \
 	--from-file=sa.config-updater.build01.config=$(TMPDIR)/sa.config-updater.build01.config \
 	--from-file=sa.config-updater.build02.config=$(TMPDIR)/sa.config-updater.build02.config \
 	--from-file=sa.config-updater.build03.config=$(TMPDIR)/sa.config-updater.build03.config \
@@ -425,7 +424,6 @@ secret-config-updater:
 	--from-file=sa.config-updater.build05.config=$(TMPDIR)/sa.config-updater.build05.config \
 	--from-file=sa.config-updater.build09.config=$(TMPDIR)/sa.config-updater.build09.config \
 	--from-file=sa.config-updater.hive.config=$(TMPDIR)/sa.config-updater.hive.config \
-	--from-file=sa.config-updater.multi01.config=$(TMPDIR)/sa.config-updater.multi01.config \
 	--from-file=sa.config-updater.vsphere02.config=$(TMPDIR)/sa.config-updater.vsphere02.config \
 	--dry-run=client -o json | oc --context app.ci apply --dry-run=${DRY_RUN} --as system:admin -f -
 .PHONY: secret-config-updater
