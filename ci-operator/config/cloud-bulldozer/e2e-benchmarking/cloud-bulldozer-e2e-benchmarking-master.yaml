@@ -1,0 +1,51 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+      USER 0
+images:
+- dockerfile_path: prow/Dockerfile
+  to: e2e-benchmarking
+promotion:
+  to:
+  - namespace: e2e
+    tag: latest
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.15"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-cluster-density-v2-single-node
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      SPOT_INSTANCES: "true"
+    test:
+    - ref: cloud-bulldozer-e2e-benchmarking-cluster-density-v2
+    workflow: openshift-qe-installer-aws
+zz_generated_metadata:
+  branch: master
+  org: cloud-bulldozer
+  repo: e2e-benchmarking

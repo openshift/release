@@ -9,7 +9,7 @@ function waitForReady() {
     set +x
     local retries=0
     local attempts=140
-    while [[ $(oc get nodes --no-headers -l node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs) != "$1" ]]; do
+    while [[ $(oc get nodes --no-headers -l node-role.kubernetes.io/worker,node-role.kubernetes.io/infra!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].status}" | tr ' ' '\n' | grep -c "True") != "$1" ]]; do
         log "Following nodes are currently present, waiting for desired count $1 to be met."
         log "Machinesets:"
         oc get machinesets -A

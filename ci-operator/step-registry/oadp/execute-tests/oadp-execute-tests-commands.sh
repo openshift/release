@@ -38,7 +38,23 @@ touch /tmp/test-settings/default_settings.json
 echo "Login as Kubeadmin to the test cluster at ${API_URL}..."
 mkdir -p /home/jenkins/.kube
 touch /home/jenkins/.kube/config
-oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
+
+# Login for Interop
+if test -f ${SHARED_DIR}/kubeadmin-password
+then
+  oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
+#Login for ROSA Classic and Hypershift platforms
+else
+  eval "$(cat "${SHARED_DIR}/api.login")"
+fi
+
+#Setup junit path for ROSA
+IS_OIDC=$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')
+
+if [ ! -z $IS_OIDC ]
+then
+  RESULTS_FILE="/alabama/cspi/e2e/cloudstorage/junit_report.xml"
+fi
 
 # Setup Python Virtual Environment
 echo "Create virtual environment and install required packages..."
