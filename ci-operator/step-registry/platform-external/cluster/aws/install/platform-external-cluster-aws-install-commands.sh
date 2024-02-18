@@ -17,13 +17,11 @@ function save_stack_events_to_artifacts()
 #Save stacks events
 trap 'save_stack_events_to_artifacts' EXIT TERM INT
 
-function echo_date() {
-  echo "$(date -u --rfc-3339=seconds) - $*"
-}
+source "${SHARED_DIR}/init-fn.sh" || true
 
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
-  echo_date "Failed to acquire lease"
+  log "Failed to acquire lease"
   exit 1
 fi
 AWS_REGION=${LEASED_RESOURCE}
@@ -41,46 +39,9 @@ echo "======================="
 echo "Installing dependencies"
 echo "======================="
 
-# Install awscli
-function install_awscli() {
-  # Install AWS CLI
-  if ! command -v aws &> /dev/null
-  then
-      echo_date "Installing AWS cli..."
-      export PATH="${HOME}/.local/bin:${PATH}"
-      if command -v pip3 &> /dev/null
-      then
-          pip3 install --user awscli
-      else
-          if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]
-          then
-            easy_install --user 'pip<21'
-            pip install --user awscli
-          else
-            echo_date "No pip available exiting..."
-            exit 1
-          fi
-      fi
-  fi
-}
-
-# Make sure jq is installed
-echo_date "Checking/installing jq..."
-if ! command -v jq; then
-    # TODO move to image
-    wget -qO /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
-    chmod +x /tmp/jq
-fi
-
-echo_date "Checking/installing yq3..."
-if ! [ -x "$(command -v yq3)" ]; then
-  wget -qO /tmp/yq3 https://github.com/mikefarah/yq/releases/download/3.4.0/yq_linux_amd64
-  chmod u+x /tmp/yq3
-fi
-which yq3
-
+install_jq
+install_yq3
 install_awscli
-which aws
 
 echo "==============================="
 echo "Patch CloudFormation Templates"
@@ -104,7 +65,7 @@ TEMPLATES+=( "06_cluster_worker_node.yaml" )
 TEMPLTE_DEST="/tmp"
 
 for TEMPLATE in "${TEMPLATES[@]}"; do
-  echo "Updating ${TEMPLATE}"
+  log "Updating ${TEMPLATE}"
   curl -sL "${TEMPLATE_URL}/${TEMPLATE}" > "${TEMPLTE_DEST}/${TEMPLATE}"
 done
 
@@ -187,7 +148,7 @@ HOSTED_ZONE="$(aws route53 list-hosted-zones-by-name \
   --output text)"
 
 if [[ -z "${HOSTED_ZONE}" ]]; then
-  echo_date "Hosted zone not found"
+  log "Hosted zone not found"
   exit 1
 fi
 
@@ -206,7 +167,7 @@ echo "==================="
 echo "CREATING STACK: VPC"
 echo "==================="
 
-echo_date "Creating VPC Stack..."
+log "Creating VPC Stack..."
 
 # If we are using a proxy, create a 'black-hole' private subnet vpc TODO
 # For now this is just a placeholder...
@@ -245,7 +206,7 @@ echo "====================="
 echo "CREATING STACK: INFRA"
 echo "====================="
 
-echo_date "Creating Infra Stack..."
+log "Creating Infra Stack..."
 
 cf_params_infra=${ARTIFACT_DIR}/cf_params_infra.json
 add_param_to_json ClusterName "${CLUSTER_NAME}" "${cf_params_infra}"
@@ -284,7 +245,7 @@ echo "========================="
 echo "CREATING STACK: SECURITY"
 echo "========================="
 
-echo_date "Creating Security Stack..."
+log "Creating Security Stack..."
 
 cf_params_security=${ARTIFACT_DIR}/cf_params_security.json
 add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_security}"
@@ -320,7 +281,7 @@ echo "========================="
 echo "CREATING STACK: BOOTSTRAP"
 echo "========================="
 
-echo_date "Creating Boostrap Stack..."
+log "Creating Boostrap Stack..."
 
 cf_params_bootstrap=${ARTIFACT_DIR}/cf_params_bootstrap.json
 add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_bootstrap}"
@@ -360,7 +321,7 @@ echo "============================="
 echo "CREATING STACK: CONTROL PLANE"
 echo "============================="
 
-echo_date "Creating Control Plane Stack..."
+log "Creating Control Plane Stack..."
 
 cf_params_control_plane=${ARTIFACT_DIR}/cf_params_control_plane.json
 add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_control_plane}"
@@ -404,7 +365,7 @@ echo "======================"
 echo "CREATING STACK:WORKERS"
 echo "======================"
 
-echo_date "Creating Worker Stack..."
+log "Creating Worker Stack..."
 
 for INDEX in 0 1 2
 do
@@ -443,7 +404,7 @@ do
   eval "${COMPUTE_VAR}=\${COMPUTE_IP}"
 done
 
-echo_date "Install done!"
+log "Install done!"
 echo -e "bootstrap: ${BOOTSTRAP_IP}"
 echo -e "control-plane: ${CONTROL_PLANE_0_IP} ${CONTROL_PLANE_1_IP} ${CONTROL_PLANE_2_IP}"
 # shellcheck disable=SC2153

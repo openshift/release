@@ -39995,7 +39995,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build04
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -67518,7 +67518,94 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-ovn-shared-vpc-phz-techpreview-cluster-profile
+      - --target=e2e-aws-ovn-shared-vpc-phz-techpreview
+      - --variant=nightly-4.14
+      command:
+      - ci-operator
       image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-ovn-shared-vpc-phz-techpreview-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 168h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/variant: nightly-4.14
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.14"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-nightly-4.14-e2e-aws-ovn-single-node
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-ovn-single-node-cluster-profile
+      - --target=e2e-aws-ovn-single-node
+      - --variant=nightly-4.14
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
       name: ""
       resources:
         requests:
@@ -76705,15 +76792,6 @@ periodics:
     job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-release-master-nightly-4.15-e2e-aws-ovn-edge-zones-manifest-validation
-  reporter_config:
-    slack:
-      channel: '#forum-ocp-splat-alerts'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -85097,8 +85175,13 @@ periodics:
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
     job-release: "4.15"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-nightly-4.15-openshift-e2e-aws-ovn-single-node-workers-upgrade-conformance
+  spec:
+    containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
@@ -86748,15 +86831,6 @@ periodics:
     job-release: "4.16"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-release-master-nightly-4.16-e2e-aws-ovn-edge-zones-manifest-validation
-  reporter_config:
-    slack:
-      channel: '#forum-ocp-splat-alerts'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -94866,36 +94940,35 @@ periodics:
   decoration_config:
     skip_cloning: true
   extra_refs:
-      - name: GOOGLE_SA_CREDENTIAL_FILE
-      - name: JOB_START_TIME
-      - name: PAYLOAD_TAG
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: release-payload-overall-analysis-all
-            steps:
-              env:
-                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
-                JOB_START_TIME: "$(JOB_START_TIME)"
-                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
-                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-overall-all"
-                TEST_GROUP: "overall"
-                JOB_CONFIGURATION: |
-                  control-plane-machine-set-operator,1,--include-job-names=control-plane-machine-set-operator
-                  parallel-techpreview,1,--include-job-names=techpreview --exclude-job-names=serial
-                  serial-techpreview,1,--include-job-names=techpreview --include-job-names=serial
-              test:
-              - ref: openshift-release-analysis-test-case-analysis
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 168h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/variant: nightly-4.16
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.16"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-nightly-4.16-openshift-e2e-aws-ovn-single-node-workers-upgrade-conformance
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/openshift-e2e-aws-ovn-single-node-workers-upgrade-conformance-cluster-profile
+      - --target=openshift-e2e-aws-ovn-single-node-workers-upgrade-conformance
+      - --variant=nightly-4.16
+      command:
+      - ci-operator
       image: ci-operator:latest
       imagePullPolicy: Always
-      name: aggregator-check-overall
+      name: ""
       resources:
         requests:
           cpu: 10m
@@ -94903,7 +94976,10 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/openshift-e2e-aws-ovn-single-node-workers-upgrade-conformance-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -94914,8 +94990,6 @@ periodics:
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
         readOnly: true
@@ -94927,25 +95001,24 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
+      secret:
+        secretName: cluster-secrets-aws-2
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
+  decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:

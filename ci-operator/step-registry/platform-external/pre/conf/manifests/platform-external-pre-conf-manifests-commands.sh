@@ -5,68 +5,71 @@ set -o errexit
 set -o pipefail
 
 # TEMP until figure out issues in deployment when declaring release:initial in workflow
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="quay.io/openshift-release-dev/ocp-release:4.15.0-rc.5-x86_64"
-
+if [[ -n "${PLATFORM_EXTERNAL_OVERRIDE_RELEASE-}" ]]; then
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${PLATFORM_EXTERNAL_OVERRIDE_RELEASE}"
+fi
 echo "Using release image ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
-CONFIG="${SHARED_DIR}/install-config.yaml"
-PATCH=/tmp/install-config-external.yaml.patch
+# CONFIG="${SHARED_DIR}/install-config.yaml"
+# PATCH=/tmp/install-config-external.yaml.patch
 
 STEP_WORKDIR=${STEP_WORKDIR:-/tmp}
 INSTALL_DIR=${STEP_WORKDIR}/install-dir
 mkdir -vp "${INSTALL_DIR}"
 
-export PATH=${PATH}:/tmp
+source "${SHARED_DIR}/init-fn.sh" || true
+install_butane
 
-function echo_date() {
-  echo "$(date -u --rfc-3339=seconds) - $*"
-}
+# export PATH=${PATH}:/tmp
 
-echo_date "Checking/installing yq..."
-if ! [ -x "$(command -v yq4)" ]; then
-  wget -q -O /tmp/yq4 https://github.com/mikefarah/yq/releases/download/v4.34.1/yq_linux_amd64
-  chmod u+x /tmp/yq4
-fi
-which yq4
+# function echo_date() {
+#   echo "$(date -u --rfc-3339=seconds) - $*"
+# }
 
-echo_date "Checking/installing butane..."
-if ! [ -x "$(command -v butane)" ]; then
-  wget -q -O /tmp/butane "https://github.com/coreos/butane/releases/download/v0.18.0/butane-x86_64-unknown-linux-gnu"
-  chmod u+x /tmp/butane
-fi
-which butane
+# echo_date "Checking/installing yq..."
+# if ! [ -x "$(command -v yq4)" ]; then
+#   wget -q -O /tmp/yq4 https://github.com/mikefarah/yq/releases/download/v4.34.1/yq_linux_amd64
+#   chmod u+x /tmp/yq4
+# fi
+# which yq4
 
-#SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
+# echo_date "Checking/installing butane..."
+# if ! [ -x "$(command -v butane)" ]; then
+#   wget -q -O /tmp/butane "https://github.com/coreos/butane/releases/download/v0.18.0/butane-x86_64-unknown-linux-gnu"
+#   chmod u+x /tmp/butane
+# fi
+# which butane
 
-echo_date "Creating install-config.yaml patch"
-cat > "${PATCH}" << EOF
-baseDomain: ${BASE_DOMAIN}
-platform:
-  external:
-    platformName: ${PROVIDER_NAME}
-compute:
-- name: worker
-  replicas: 3
-  architecture: amd64
-controlPlane:
-  name: master
-  replicas: 3
-  architecture: amd64
-publish: External
-#sshKey: |
-#  {SSH_PUB_KEY}
-EOF
+# #SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
 
-echo_date "Patching install-config.yaml"
-yq4 eval-all '. as $item ireduce ({}; . *+ $item)' "${CONFIG}" "${PATCH}" | tee "${CONFIG}.new"
-mv "${CONFIG}.new" "${CONFIG}"
+# echo_date "Creating install-config.yaml patch"
+# cat > "${PATCH}" << EOF
+# baseDomain: ${BASE_DOMAIN}
+# platform:
+#   external:
+#     platformName: ${PROVIDER_NAME}
+# compute:
+# - name: worker
+#   replicas: 3
+#   architecture: amd64
+# controlPlane:
+#   name: master
+#   replicas: 3
+#   architecture: amd64
+# publish: External
+# #sshKey: |
+# #  {SSH_PUB_KEY}
+# EOF
 
-echo_date "Copying to install dir"
-cp -vp "${CONFIG}" "${INSTALL_DIR}"/install-config.yaml
-grep -v "password\|username\|pullSecret\|{\"auths\":{" "${CONFIG}" | tee "${ARTIFACT_DIR}"/install-config.yaml || true
+# echo_date "Patching install-config.yaml"
+# yq4 eval-all '. as $item ireduce ({}; . *+ $item)' "${CONFIG}" "${PATCH}" | tee "${CONFIG}.new"
+# mv "${CONFIG}.new" "${CONFIG}"
 
+log "Copying to install dir"
+cp -vp "${SHARED_DIR}"/install-config.yaml "${INSTALL_DIR}"/install-config.yaml
+# grep -v "password\|username\|pullSecret\|{\"auths\":{" "${CONFIG}" | tee "${ARTIFACT_DIR}"/install-config.yaml || true
 
-echo_date "Creating manifests"
+log "Creating manifests"
 openshift-install create manifests --dir "${INSTALL_DIR}"
 
 function create_machineconfig_kubelet() {
@@ -99,7 +102,6 @@ storage:
             echo "Can not obtain provider-id from the metadata service."
             exit 1
         fi 
-
 
         cat > "\${NODECONF}" <<EOF
         [Service]
@@ -144,8 +146,8 @@ if [[ "${PLATFORM_EXTERNAL_CCM_ENABLED-}" == "yes" ]]; then
   process_butane "$STEP_WORKDIR/mc-kubelet-master.bu" "${INSTALL_DIR}/openshift/99_openshift-machineconfig_00-master-kubelet-providerid.yaml"
   process_butane "$STEP_WORKDIR/mc-kubelet-worker.bu" "${INSTALL_DIR}/openshift/99_openshift-machineconfig_00-worker-kubelet-providerid.yaml"
 
-  yq4 ea -i '.status.platformStatus.external.cloudControllerManager.state="External"' \
-    "${INSTALL_DIR}"/manifests/cluster-infrastructure-02-config.yml
+  # yq4 ea -i '.status.platformStatus.external.cloudControllerManager.state="External"' \
+  #   "${INSTALL_DIR}"/manifests/cluster-infrastructure-02-config.yml
 
   cp -vf "${INSTALL_DIR}"/openshift/99_openshift-machineconfig_00-*-kubelet-providerid.yaml ${ARTIFACT_DIR}/
 fi
@@ -156,7 +158,7 @@ rm -vf "${INSTALL_DIR}"/openshift/99_openshift-cluster-api_master-machines-*.yam
 rm -vf "${INSTALL_DIR}"/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 rm -vf "${INSTALL_DIR}"/openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
 
-echo_date "Creating ignition configs"
+log "Creating ignition configs"
 openshift-install --dir="${INSTALL_DIR}" create ignition-configs &
 wait "$!"
 

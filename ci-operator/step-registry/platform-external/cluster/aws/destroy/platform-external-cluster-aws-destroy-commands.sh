@@ -14,60 +14,30 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export REGION="${LEASED_RESOURCE}"
+export stacks_file="${SHARED_DIR}/aws_cfn_stacks"
 
-function echo_date() {
-  echo "$(date -u --rfc-3339=seconds) - $*"
-}
-
-# Install awscli
-function install_awscli() {
-  # Install AWS CLI
-  if ! command -v aws &> /dev/null
-  then
-      echo_date "Installing AWS cli..."
-      export PATH="${HOME}/.local/bin:${PATH}"
-      if command -v pip3 &> /dev/null
-      then
-          pip3 install --user awscli
-      else
-          if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]
-          then
-            easy_install --user 'pip<21'
-            pip install --user awscli
-          else
-            echo_date "No pip available exiting..."
-            exit 1
-          fi
-      fi
-  fi
-}
+source "${SHARED_DIR}/init-fn.sh" || true
 
 function delete_stack() {
   local stack_name
   stack_name=$1
 
   # cleaning up after ourselves
-  echo_date "[${stack_name}] Sending delete command."
+  log "[${stack_name}] Sending delete command."
   aws --region "${REGION}" cloudformation delete-stack --stack-name "${stack_name}" &
   wait "$!"
 
-  echo_date "[${stack_name}] Waiting for delete complete."
+  log "[${stack_name}] Waiting for delete complete."
   aws --region "${REGION}" cloudformation wait stack-delete-complete --stack-name "${stack_name}" &
   wait "$!"
 
-  echo_date "[${stack_name}] Stack deleted."
+  log "[${stack_name}] Stack deleted."
 }
 
 # Enqueue the CloudFormation stack names and delete each one.
 delete_stacks() {
-  local stacks_file="${SHARED_DIR}/aws_cfn_stacks"
-  if [[ ! -f "${stacks_file}" ]]; then
-    echo_date "WARNING: CloudFormation stack not found. Control file with stack names not found in path: ${stacks_file}"
-    return
-  fi
-
   # Parallel delete instances
-  echo_date "Starting parallel delete"
+  log "Starting parallel delete"
   PIDS_COMPUTE=()
   while IFS= read -r stack_name
   do
@@ -76,25 +46,30 @@ delete_stacks() {
       delete_stack "$stack_name" &
       PIDS_COMPUTE+=( "$!" )    
     ;;
-    *) echo_date "[${stack_name}] ignoring parallel delete for stack" ;
+    *) log "[${stack_name}] ignoring parallel delete for stack" ;
     esac
     sleep 1;
   done <<< "$(tac "${stacks_file}")"
-  echo_date "Waiting for parallel delete completed!"
+  log "Waiting for parallel delete completed!"
   wait "${PIDS_COMPUTE[@]}"
-  echo_date "Parallel delete completed!"
+  log "Parallel delete completed!"
 
   # Serial delete infrastructure
-  echo_date "Starting serial delete."
+  log "Starting serial delete."
   while IFS= read -r stack_name
   do
     case $stack_name in
-    *-compute-*|*-bootstrap|*-control-plane) echo_date "[${stack_name}] ignoring serial stack delete"; continue ;;
+    *-compute-*|*-bootstrap|*-control-plane) log "[${stack_name}] ignoring serial stack delete"; continue ;;
     esac
     delete_stack "$stack_name"
   done <<< "$(tac "${stacks_file}")"
-  echo_date "Serial delete completed!"
+  log "Serial delete completed!"
 }
+
+if [[ ! -f "${stacks_file}" ]]; then
+  log "WARNING: CloudFormation stack not found. Control file with stack names not found in path: ${stacks_file}"
+  exit 0
+fi
 
 install_awscli
 delete_stacks

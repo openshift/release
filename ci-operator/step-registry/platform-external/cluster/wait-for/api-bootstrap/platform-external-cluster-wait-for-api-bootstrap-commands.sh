@@ -5,11 +5,9 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-function echo_date() {
-  echo "$(date -u --rfc-3339=seconds) - $*"
-}
-
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
+
+source "${SHARED_DIR}/init-fn.sh" || true
 
 UP_COUNT=0
 
@@ -20,15 +18,15 @@ while true; do
   fi
   if oc get infrastructure >/dev/null; then
     UP_COUNT=$(( UP_COUNT + 1 ))
-    echo_date "API UP [$UP_COUNT/5]"
+    log "API UP [$UP_COUNT/5]"
     sleep 5
     continue
   fi
-  echo_date "API DOWN, waiting 30s..."
+  log "API DOWN, waiting 30s..."
   sleep 30
 done
 
-echo_date "API Healthy check done!"
+log "API Healthy check done!"
 
-echo_date "Dumping infrastructure object"
+log "Dumping infrastructure object"
 oc get infrastructure -o yaml
