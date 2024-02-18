@@ -390,6 +390,7 @@ fi
 if [[ ${val_status} -ne 0 ]]; then
     echo "Validations failed with status code $val_status"
     status=${val_status}
+    exit 1
 fi
 
 echo "Wait until number of nodes matches number of machines"
