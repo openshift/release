@@ -1,0 +1,45 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi8/ubi
+      RUN yum install -y --nodocs make git golang
+      RUN ln -s /cli/oc /usr/bin/kubectl
+images:
+- dockerfile_path: Dockerfile
+  to: model-registry
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-odh-cfo
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+    test:
+    - as: e2e-odh-mr
+      cli: latest
+      commands: |
+        echo "Testing for Model-Registry Openshift-CI will happen here."
+      from: src
+      resources:
+        requests:
+          cpu: 8000m
+          memory: 16Gi
+    workflow: hypershift-hostedcluster-workflow
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: model-registry

@@ -170,12 +170,23 @@ function mirror_optional_images () {
     ret=0
     # Running Command: oc adm catalog mirror -a "/tmp/new-dockerconfigjson" ec2-3-90-59-26.compute-1.amazonaws.com:5000/openshift-qe-optional-operators/aosqe-index:v4.12 ec2-3-90-59-26.compute-1.amazonaws.com:5000 --continue-on-error --to-manifests=/tmp/olm_mirror
     # error: unable to read image ec2-3-90-59-26.compute-1.amazonaws.com:5000/openshift-qe-optional-operators/aosqe-index:v4.12: Get "https://ec2-3-90-59-26.compute-1.amazonaws.com:5000/v2/": x509: certificate signed by unknown authority
-    run_command "oc adm catalog mirror  --insecure=true  --skip-verification=true -a \"/tmp/new-dockerconfigjson\" ${origin_index_image} ${MIRROR_REGISTRY_HOST} --to-manifests=/tmp/olm_mirror" || ret=$?
+    run_command "oc adm catalog mirror --manifests-only --insecure=true --continue-on-error=true --skip-verification=true -a \"/tmp/new-dockerconfigjson\" ${origin_index_image} ${MIRROR_REGISTRY_HOST} --to-manifests=/tmp/olm_mirror" || ret=$?
     if [[ $ret -eq 0 ]]; then
-        echo "mirror optional operators' images successfully"
+        echo "get manifests successfully"
+        # There are some images with the registry.redhat.io prefix, but they are not store there in fact, such as unreleased images, as follows,
+        # error: unable to retrieve source image registry.redhat.io/openshift-logging/cluster-logging-rhel9-operator manifest sha256:2801ca51e913273d7db6728f05cb50f18b5c0062f95e92609645b592512aed21: manifest unknown: manifest unknown
+        # so, replace registry.redhat.io with brew.registry.redhat.io.
+        run_command "sed -i 's/^registry.redhat.io/brew.registry.redhat.io/g' /tmp/olm_mirror/mapping.txt"
+        run_command "oc image mirror --insecure=true --skip-missing=true --continue-on-error=true --skip-verification=true -a \"/tmp/new-dockerconfigjson\" -f /tmp/olm_mirror/mapping.txt" || ret=$?
+        if [[ $ret -eq 0 ]]; then
+            echo "mirror optional operator images succeed!"
+        else
+            run_command "ls -l /tmp/olm_mirror/"
+            run_command "cat /tmp/olm_mirror/imageContentSourcePolicy.yaml"
+            run_command "cat /tmp/olm_mirror/mapping.txt"
+        fi
     else
-        run_command "cat /tmp/olm_mirror/imageContentSourcePolicy.yaml"
-        run_command "cat /tmp/olm_mirror/mapping.txt"
+        echo "fail to get optional operators' manifests!"
         return 1
     fi
     set_proxy

@@ -71,7 +71,7 @@ JOB_URL=$(echo "$JOB_SPEC" |  yq \
   '.decoration_config.gcs_configuration.job_url_prefix, "gs/", .decoration_config.gcs_configuration.bucket' | \
   tr -d '\n')
 
-if [ -n "${PULL_NUMBER}" ]; then
+if [ -n "${PULL_NUMBER:-}" ]; then
   JOB_URL=${JOB_URL}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}
 else
   JOB_URL=${JOB_URL}/logs/${JOB_NAME}/${BUILD_ID}
