@@ -5,26 +5,9 @@ set -o errexit
 set -o pipefail
 export REPORT_HANDLE_PATH="/usr/bin"
 
-ls -al
 pwd
 echo "Quay upgrade test..."
-skopeo -v
 oc version
-# terraform version
-# go version
-podman -v
-echo "*******"
-#Get the credentials and Email of new Quay User
-#QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-#QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
-QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
-
-echo "$QUAY_EMAIL \" $QUAY_EMAIL \" exists found"
-
-#Retrieve the Credentials of image registry "brew.registry.redhat.io"
-# OMR_BREW_USERNAME=$(cat /var/run/quay-qe-brew-secret/username)
-# OMR_BREW_PASSWORD=$(cat /var/run/quay-qe-brew-secret/password)
-# podman login brew.registry.redhat.io -u "${OMR_BREW_USERNAME}" -p "${OMR_BREW_PASSWORD}"
 
 #Deploy ODF Operator to OCP namespace 'openshift-storage'
 OO_INSTALL_NAMESPACE=openshift-storage
@@ -112,24 +95,20 @@ EOF
 echo "Waiting for NooBaa Storage to be ready..." >&2
 oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=180s
 
-# cd new-quay-operator-tests
-
-# make build
-echo "files in new-quay-operator-tests:"
-ls  ./tmp
+echo "Run extended-platform-tests"
 extended-platform-tests run all --dry-run | grep "20934"| extended-platform-tests run --timeout 150m --junit-dir="${ARTIFACT_DIR}" -f - 
 
 function handle_result {
 
-  ##correct ginkgo report numbers
-    resultfile=`ls -rt -1 ${ARTIFACT_DIR}/junit/junit_e2e_* 2>&1 || true`
+  ## Correct ginkgo report numbers
+    resultfile=`ls -rt -1 ${ARTIFACT_DIR}/junit_e2e_* 2>&1 || true`
     echo $resultfile
     if (echo $resultfile | grep -E "no matches found") || (echo $resultfile | grep -E "No such file or directory") ; then
         echo "there is no result file generated"
         return
     fi
     current_time=`date "+%Y-%m-%d-%H-%M-%S"`
-    newresultfile="${ARTIFACT_DIR}/junit/junit_e2e_${current_time}.xml"
+    newresultfile="${ARTIFACT_DIR}/junit_e2e_${current_time}.xml"
     replace_ret=0
     python3 ${REPORT_HANDLE_PATH}/handleresult.py -a replace -i ${resultfile} -o ${newresultfile} || replace_ret=$?
     if ! [ "W${replace_ret}W" == "W0W" ]; then
@@ -140,7 +119,7 @@ function handle_result {
     rm -fr ${resultfile}
     echo ${newresultfile}
 
- ##copy quay operator logs
+ ## Copy quay operator logs to ARTIFACT_DIR
     quayoperatorlogfile=`ls -rt -1 /tmp/*quayoperatorlogs.txt 2>&1 || true`
     echo $quayoperatorlogfile
 
@@ -151,7 +130,6 @@ function handle_result {
     cp $quayoperatorlogfile ${ARTIFACT_DIR}/ || true
     
 }
+
 handle_result
-
-
-sleep 10
+sleep 10m
