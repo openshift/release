@@ -53,6 +53,26 @@ tests:
   steps:
     cluster_profile: osl-gcp
     workflow: code-ready-crc-microshift
+- as: security
+  optional: true
+  steps:
+    env:
+      ORG_NAME: developer-red-hat-openshift-local
+      PROJECT_NAME: crc
+      SNYK_TOKEN_PATH: /secret/osl-snyk-token/snyk-token
+    test:
+    - as: test
+      commands: openshift-ci-security-snyk-scan-commands.sh
+      credentials:
+      - mount_path: /secret/osl-snyk-token
+        name: osl-snyk-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: crc-org
