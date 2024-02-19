@@ -96,7 +96,8 @@ echo "Waiting for NooBaa Storage to be ready..." >&2
 oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=180s
 
 echo "Run extended-platform-tests"
-extended-platform-tests run all --dry-run | grep "20934"| extended-platform-tests run --timeout 150m --junit-dir="${ARTIFACT_DIR}" -f - || true
+ret_value=0
+extended-platform-tests run all --dry-run | grep "20934"| extended-platform-tests run --timeout 150m --junit-dir="${ARTIFACT_DIR}" -f - || ret_value=$?
 
 function handle_result {
 
@@ -116,7 +117,7 @@ function handle_result {
         rm -fr ${resultfile}
         return
     fi 
-    # rm -fr ${resultfile}
+    rm -fr ${resultfile}
     echo ${newresultfile}
 
  ## Copy quay operator logs to ARTIFACT_DIR
@@ -124,7 +125,7 @@ function handle_result {
     echo $quayoperatorlogfile
 
     if (echo $quayoperatorlogfile | grep -E "no matches found") || (echo $quayoperatorlogfile | grep -E "No such file or directory") ; then
-        echo "there is no result file generated"
+        echo "there is no operator log file generated"
         return
     fi
     cp $quayoperatorlogfile ${ARTIFACT_DIR}/ || true
@@ -132,4 +133,5 @@ function handle_result {
 }
 
 handle_result
+[ "W${ret_value}W" == "W0W" ] && echo "success" || echo "fail"
 sleep 10m
