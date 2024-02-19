@@ -18,9 +18,23 @@ export pull_secret
 set -e
 echo "Installing required CLI tools"
 mkdir /tmp/bin
+echo "Installing jq...."
 curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/bin/jq && chmod +x /tmp/bin/jq
 PATH=$PATH:/tmp/bin
 export PATH
+echo "Installing pip...."
+wget -O $HOME/get-pip.py https://bootstrap.pypa.io/get-pip.py
+python3 $HOME/get-pip.py
+PATH=/output/.local/bin:$PATH
+export PATH
+echo "Installing nmstate...."
+pip install nmstate
+which nmstatectl
+if [ $? -eq 0 ]; then
+  echo "nmstatectl is installed successfully."
+else
+  echo "nmstatectl installation is not successful."
+  exit 1
 set +e
 echo "Checking if ibmcloud CLI is installed."
 ibmcloud -v
