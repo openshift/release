@@ -162,6 +162,14 @@ cat << EOF > ~/ocp-install.yml
     delay: 60
     ignore_errors: true
 
+  - name: Run oc command to check if cluster is ready
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'
+    register: oc_status
+    until: "'True' in oc_status.stdout"
+    retries: 30
+    delay: 60
+    ignore_errors: true
+
   - name: Grab the log from HV to artifacts
     fetch:
       src: "{{ item.src }}"
@@ -182,7 +190,7 @@ cat << EOF > ~/ocp-install.yml
     set_fact:
       deploy_failed: true
     when:
-      - (job_result.failed | bool) or (sno_deploy.failed | bool)
+      - (sno_deploy.failed | bool) or (oc_status.failed | bool)
 
   - name: Show last logs from cloud init if failed
     shell: tail -100 /tmp/${CLUSTER_NAME}_sno_ag.log
@@ -192,7 +200,7 @@ cat << EOF > ~/ocp-install.yml
   - name: Fail if deployment did not finish
     fail:
       msg: Installation not finished yet
-    when: job_result.failed | bool
+    when: oc_status.failed | bool
 
   - name: Fail if deployment failed
     fail:

@@ -67,6 +67,12 @@ label_filter='(Critical,High)&&(day1-post,day2)&&!Exclude'
 if [ ! -z "$CASE_LABEL_FILTER" ]; then
     label_filter="$CASE_LABEL_FILTER"
 fi
+
+timeout='2h'
+if [ ! -z "$TIMEOUT" ]; then
+    timeout="$TIMEOUT"
+fi
+
 echo ">>> CI run label filter is: $label_filter. Cases match label will be filtered."
 
 # Below step will skip gcc checking
@@ -74,7 +80,7 @@ export CGO_ENABLED=0
 
 ginkgo run \
     --label-filter $label_filter \
-    --timeout 2h \
+    --timeout $timeout \
     --output-dir ${SHARED_DIR} \
     --junit-report $junitFileName \
     -r \
