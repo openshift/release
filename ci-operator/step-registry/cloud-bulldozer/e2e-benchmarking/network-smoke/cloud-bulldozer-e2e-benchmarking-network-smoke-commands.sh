@@ -16,7 +16,7 @@ if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] &
     git switch ${PULL_NUMBER}
     pushd workloads/network-perf-v2
     oc delete ns netperf --wait=true --ignore-not-found=true
-    ./run.sh
+    ES_SERVER="" LOCAL=true ./run.sh
 else
     echo "We are sorry, this job is only meant for cloud-bulldozer/e2e-benchmarking repo PR testing"
 fi
