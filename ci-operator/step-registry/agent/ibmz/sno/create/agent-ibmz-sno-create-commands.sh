@@ -22,13 +22,9 @@ echo "Installing jq...."
 curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/bin/jq && chmod +x /tmp/bin/jq
 PATH=$PATH:/tmp/bin
 export PATH
-echo "Installing pip...."
-wget -O $HOME/get-pip.py https://bootstrap.pypa.io/get-pip.py
-python3 $HOME/get-pip.py
-PATH=/output/.local/bin:$PATH
-export PATH
-echo "Installing nmstate...."
-pip install nmstate
+echo "Installing nmstatectl...."
+wget -O $HOME/nmstatectl-linux-x64.zip https://github.com/nmstate/nmstate/releases/download/v2.2.23/nmstatectl-linux-x64.zip
+unzip $HOME/nmstatectl-linux-x64.zip -d /tmp/bin/ && chmod +x /tmp/bin/nmstatectl
 which nmstatectl
 if [ $? -eq 0 ]; then
   echo "nmstatectl is installed successfully."
@@ -36,14 +32,24 @@ else
   echo "nmstatectl installation is not successful."
   exit 1
 fi
-echo "ibmcloud CLI is not installed. Installing it now..."
+echo "Installing oc...."
+wget -O $HOME/openshift-client-linux.tar.gz https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz
+tar -xzf $HOME/openshift-client-linux.tar.gz -C /tmp/bin
+which oc
+if [ $? -eq 0 ]; then
+  echo "oc is installed successfully."
+else
+  echo "oc installation is not successful."
+  exit 1
+fi
+echo "Installing ibmcloud...."
 mkdir /tmp/ibm_cloud_cli
 curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/${IC_CLI_VERSION}/IBM_Cloud_CLI_${IC_CLI_VERSION}_amd64.tar.gz
-tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
+tar -xzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
 export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
 which ibmcloud
 if [ $? -eq 0 ]; then
-  echo "ibmcloud CLI is installed successfully."
+  echo "ibmcloud is installed successfully."
 else
   echo "ibmcloud installation is not successful."
   exit 1
@@ -238,7 +244,7 @@ sed -i "s|MACHINE_CIDR|$sn_cidr|" $HOME/$CLUSTER_NAME/install-config.yaml
 echo "Fetching openshift-install binary"
 release_version=$(echo "$JOB_SPEC" | jq -r '.extra_refs|.[].base_ref' | cut -d '-' -f 2)
 wget -O $HOME/openshift-install.tar.gz https://mirror.openshift.com/pub/openshift-v4/s390x/clients/ocp/candidate-${release_version}/openshift-install-linux-amd64.tar.gz
-tar -xvf $HOME/openshift-install.tar.gz -C $HOME/
+tar -xzf $HOME/openshift-install.tar.gz -C $HOME/
 
 # version=$(oc adm release info -o template --template '{{.metadata.version}}' --insecure=true ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} -a "${AGENT_IBMZ_CREDENTIALS}/registry-secret")
 # echo "Patching the image and version for the installer"
