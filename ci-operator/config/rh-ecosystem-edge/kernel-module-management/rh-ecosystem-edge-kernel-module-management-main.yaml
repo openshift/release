@@ -49,6 +49,14 @@ images:
       chmod +x /usr/bin/yq
   from: src
   to: e2e-hub-yq
+- dockerfile_literal: |
+    FROM ubi9
+    RUN curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_x86_64.tar.gz && \
+      tar -xvzf grpcurl_1.8.9_linux_x86_64.tar.gz -C /tmp/ && \
+      chmod +x /tmp/grpcurl && \
+      mv /tmp/grpcurl /usr/local/bin/ && \
+      rm grpcurl_1.8.9_linux_x86_64.tar.gz
+  to: ubi9-grpcurl
 operator:
   bundles:
   - as: operator-bundle
@@ -71,6 +79,7 @@ promotion:
   - excluded_images:
     - ubi9-minimal-entitled
     - e2e-hub-yq
+    - ubi9-grpcurl
     namespace: edge-infrastructure
     tag: latest
     tag_by_commit: true
@@ -208,6 +217,31 @@ tests:
       - env: HUB_IMG
         name: kernel-module-management-operator-hub
       from: e2e-hub-yq
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: generic-claim
+- as: operator-upgrade
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  optional: true
+  steps:
+    test:
+    - as: run-test
+      cli: latest
+      commands: |
+        oc create namespace openshift-kmm
+        ./ci/prow/operator-upgrade
+      dependencies:
+      - env: OO_BUNDLE
+        name: operator-bundle
+      from: ubi9-grpcurl
       resources:
         requests:
           cpu: 1000m
