@@ -61,10 +61,16 @@ tests:
       cli: latest
       commands: |
         set -x
+        oc create --kustomize https://github.com/securesign/sigstore-ocp/keycloak/operator/base
         oc create ns openshift-rhtas-operator
         operator-sdk run bundle -n openshift-rhtas-operator "$OO_BUNDLE" --timeout 5m0s
         oc get deployments -n openshift-rhtas-operator -o yaml
         oc wait --for condition=Available -n openshift-rhtas-operator deployment rhtas-operator-controller-manager
+        curl -so cosign https://github.com/sigstore/cosign/releases/download/v2.2.2/cosign-linux-amd64
+        chmod +x cosign
+        mv cosign /usr/local/bin
+        kubectl create --kustomize https://github.com/securesign/sigstore-ocp/keycloak/resources/base
+        until [ ! -z "$(kubectl get pod -l name=rhsso-operator -n keycloak-system 2>/dev/null)" ]; do echo "Waiting for keycloak operator. Pods in keycloak-system namespace:"; kubectl get pods -n keycloak-system; sleep 10; done
       dependencies:
       - env: OO_BUNDLE
         name: securesign-bundle
