@@ -40,6 +40,18 @@ images:
 - dockerfile_path: Dockerfile.azure-disk.test
   from: src
   to: azure-disk-csi-driver-operator-test
+- dockerfile_path: Dockerfile.azure-file
+  inputs:
+    ocp_4.16_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: azure-file-csi-driver-operator
+- dockerfile_path: Dockerfile.azure-file.test
+  from: src
+  to: azure-file-csi-driver-operator-test
 promotion:
   to:
   - name: 4.17-priv
@@ -119,6 +131,21 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- as: e2e-azure-file-csi
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-csi-file
+- as: e2e-azure-file-nfs-csi
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-csi-file-nfs
+- as: e2e-azure-file-csi-extended
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_SCENARIOS: \[CSI-Driver\]|\[Azure-File-CSI-Driver\]|\[Azure-File-CSI-Driver-Operator\]
+    workflow: openshift-e2e-azure-csi-extended
 - as: verify-deps
   steps:
     test:
