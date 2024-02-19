@@ -1,16 +1,12 @@
 base_images:
   cli:
-    name: "4.11"
+    name: "4.12"
     namespace: ocp
     tag: cli
   observability-operator-test-harness:
     name: observability-operator-test-harness
     namespace: ci
     tag: latest
-  upi-installer:
-    name: "4.11"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -21,7 +17,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.11"
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -31,23 +27,25 @@ resources:
       memory: 200Mi
 tests:
 - as: qeindex
-  cron: 0 8 * * 5
+  cron: 0 8 * * 4
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: aws-qe
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
       OPERATORS: |
         [
-            {"name": "cluster-observability-operator", "source": "qe-app-registry", "channel": "development", "install_namespace": "openshift-coo", "target_namespaces": "", "operator_group":"openshift-coo-og"}
+            {"name": "cluster-observability-operator", "source": "qe-app-registry", "channel": "development", "install_namespace": "openshift-coo-production", "target_namespaces": "", "operator_group":"openshift-coo-production-og"}
         ]
     test:
     - ref: install-operators
     - ref: rhobs-obo-test-harness
-    workflow: cucushift-installer-rehearse-gcp-upi
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 - as: stage
-  cron: 0 6 1 12 *
+  cron: 0 6 1 11 *
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: aws-qe
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "cluster-observability-operator", "source": "dt-catalogsource", "channel": "development", "install_namespace": "openshift-coo", "target_namespaces": "", "operator_group":"openshift-coo-og"}
@@ -56,9 +54,9 @@ tests:
     - ref: enable-stage-catalogsource
     - ref: install-operators
     - ref: rhobs-obo-test-harness
-    workflow: cucushift-installer-rehearse-gcp-upi
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 zz_generated_metadata:
   branch: main
   org: rhobs
   repo: observability-operator
-  variant: ocp411-coo
+  variant: ocp-4.12-coo
