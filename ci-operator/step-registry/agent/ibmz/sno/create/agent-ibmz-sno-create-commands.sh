@@ -35,7 +35,7 @@ if [ $? -eq 0 ]; then
 else
   echo "nmstatectl installation is not successful."
   exit 1
-set +e
+fi
 echo "Checking if ibmcloud CLI is installed."
 ibmcloud -v
 if [ $? -eq 0 ]; then
@@ -51,7 +51,6 @@ else
 fi 
 
 # Login to the IBM Cloud
-set -e
 echo "Logging into IBM Cloud by targetting the $IC_REGION region"
 ibmcloud config --check-version=false                               # To avoid manual prompt for updating CLI version
 ibmcloud login --apikey $IC_API_KEY -r $IC_REGION
@@ -236,6 +235,7 @@ sed -i "s|BASE_DOMAIN|$BASEDOMAIN|" $HOME/$CLUSTER_NAME/install-config.yaml
 sed -i "s|CLUSTER_NAME|$CLUSTER_NAME|" $HOME/$CLUSTER_NAME/install-config.yaml
 sed -i "s|MACHINE_CIDR|$sn_cidr|" $HOME/$CLUSTER_NAME/install-config.yaml
 
+# Openshift Install binary
 echo "Fetching openshift-install binary"
 release_version=$(echo "$JOB_SPEC" | jq -r '.extra_refs|.[].base_ref' | cut -d '-' -f 2)
 wget -O $HOME/openshift-install.tar.gz https://mirror.openshift.com/pub/openshift-v4/s390x/clients/ocp/candidate-${release_version}/openshift-install-linux-amd64.tar.gz
@@ -263,6 +263,7 @@ tar -xvf $HOME/openshift-install.tar.gz -C $HOME/
 #     echo "Image already patched"
 # fi
 
+# Generate PXE artifacts
 echo "Generating pxe-boot artifacts for SNO cluster"
 $HOME/openshift-install agent create pxe-files --dir $HOME/$CLUSTER_NAME/ --log-level debug
 
