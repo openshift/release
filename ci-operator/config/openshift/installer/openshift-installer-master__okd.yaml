@@ -25,14 +25,13 @@ images:
 - build_args:
   - name: TAGS
     value: fcos
-  dockerfile_path: images/installer/Dockerfile.ci
+  - name: OPENSHIFT_INSTALL_CLUSTER_API
+    value: "true"
+  dockerfile_path: images/installer-altinfra/Dockerfile.ci
   inputs:
     ocp_4.16_base:
       as:
       - registry.ci.openshift.org/ocp/4.16:base
-    ocp_4.16_installer-terraform-providers:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
@@ -187,35 +186,53 @@ tests:
   run_if_changed: (fcos|okd)
   steps:
     cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-gcp
   optional: true
   steps:
     cluster_profile: gcp
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-aws-ovn-upgrade
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-gcp-ovn-upgrade
   optional: true
   steps:
     cluster_profile: gcp
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-upgrade-gcp
 - always_run: false
   as: e2e-vsphere
   optional: true
   steps:
     cluster_profile: vsphere-2
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-vsphere
 - as: e2e-aws-ovn-testing-stream
   cron: 30 0 * * *
   steps:
     cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     pre:
     - chain: ipi-conf-aws
     - ref: ipi-conf-aws-fcos-ami
