@@ -161,7 +161,7 @@ CONFIG = {
         'usgovtexas': 5
     },
     'equinix-ocp-metal-quota-slice': {
-        'default': 50,
+        'default': 70,
     },
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
@@ -379,7 +379,10 @@ CONFIG = {
         'us-west-2': 5,
     },
     'odf-aws-quota-slice': {
-        'us-east-1': 10,
+        'us-east-1': 25,
+        'us-east-2': 25,
+        'us-west-1': 25,
+        'us-west-2': 25,
     }
 }
 

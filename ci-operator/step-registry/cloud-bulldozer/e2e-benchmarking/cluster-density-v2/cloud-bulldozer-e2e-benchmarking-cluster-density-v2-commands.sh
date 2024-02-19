@@ -6,6 +6,8 @@ set -x
 cat /etc/os-release
 oc config view
 oc projects
+pushd /tmp
+
 
 if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] && [[ "$REPO_NAME" = "e2e-benchmarking" ]]; then
     git clone https://github.com/${REPO_OWNER}/${REPO_NAME}
