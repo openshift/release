@@ -292,6 +292,8 @@ if [[ ! -d "${CNF_REPO_DIR}" ]]; then
 fi
 
 pushd $CNF_REPO_DIR
+echo "******** Checking out pull request for repository cnf-features-deploy if exists"
+check_for_pr "openshift-kni" "cnf-features-deploy"
 if [[ "$T5CI_VERSION" == "4.15" ]] || [[ "$T5CI_VERSION" == "4.16" ]]; then
     echo "Updating all submodules for >=4.15 versions"
     # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
@@ -299,8 +301,6 @@ if [[ "$T5CI_VERSION" == "4.15" ]] || [[ "$T5CI_VERSION" == "4.16" ]]; then
     git submodule update --init --force --recursive --remote
     git submodule foreach --recursive 'echo $path `git config --get remote.origin.url` `git rev-parse HEAD`' | grep -v Entering > ${ARTIFACT_DIR}/hashes.txt || true
 fi
-echo "******** Checking out pull request for repository cnf-features-deploy if exists"
-check_for_pr "openshift-kni" "cnf-features-deploy"
 popd
 
 echo "******** Patching OperatorHub to disable all default sources"
