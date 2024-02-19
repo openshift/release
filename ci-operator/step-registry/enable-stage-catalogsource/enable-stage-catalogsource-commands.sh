@@ -94,8 +94,8 @@ function update_global_auth () {
 # create ICSP for connected env.
 function create_icsp_connected () {
     #Delete any existing ImageContentSourcePolicy
-    oc delete imagecontentsourcepolicies brew-registry
-    oc delete catalogsource qe-app-registry -n openshift-marketplace
+    oc delete imagecontentsourcepolicies brew-registry --ignore-not-found=true
+    oc delete catalogsource qe-app-registry -n openshift-marketplace --ignore-not-found=true
 
     cat <<EOF | oc create -f -
     apiVersion: operator.openshift.io/v1alpha1
