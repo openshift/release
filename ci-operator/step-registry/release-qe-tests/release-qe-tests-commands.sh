@@ -12,6 +12,7 @@ export GITHUB_TOKEN=${github_token}
 
 pip3 list
 python3 -V
+cat `which jobctl`
 #VALID_RELEASES="4.11 4.12 4.13 4.14 4.15 4.16"
 VALID_RELEASES="4.16"
 for release in $VALID_RELEASES
