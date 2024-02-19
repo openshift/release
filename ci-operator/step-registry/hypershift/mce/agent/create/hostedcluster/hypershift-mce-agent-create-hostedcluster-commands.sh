@@ -32,9 +32,8 @@ echo "check HYPERSHIFT_HC_RELEASE_IMAGE, if not set, use mgmt-cluster playload i
 PLAYLOADIMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
 RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$PLAYLOADIMAGE}
 
-EXTRA_ARGS=""
 if [[ "${IP_STACK}" == "v4v6" ]]; then
-  EXTRA_ARGS+="--default-dual "
+  EXTRA_ARGS+=" --default-dual "
 fi
 
 /tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
