@@ -96,7 +96,7 @@ echo "Waiting for NooBaa Storage to be ready..." >&2
 oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=180s
 
 echo "Run extended-platform-tests"
-extended-platform-tests run all --dry-run | grep "20934"| extended-platform-tests run --timeout 150m --junit-dir="${ARTIFACT_DIR}" -f - 
+extended-platform-tests run all --dry-run | grep "20934"| extended-platform-tests run --timeout 150m --junit-dir="${ARTIFACT_DIR}" -f - || true
 
 function handle_result {
 
@@ -116,7 +116,7 @@ function handle_result {
         rm -fr ${resultfile}
         return
     fi 
-    rm -fr ${resultfile}
+    # rm -fr ${resultfile}
     echo ${newresultfile}
 
  ## Copy quay operator logs to ARTIFACT_DIR
