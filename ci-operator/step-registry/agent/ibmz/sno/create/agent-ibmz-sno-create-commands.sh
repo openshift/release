@@ -37,7 +37,7 @@ else
   exit 1
 fi
 echo "Checking if ibmcloud CLI is installed."
-ibmcloud -v
+which ibmcloud
 if [ $? -eq 0 ]; then
   echo "ibmcloud CLI is already installed."
 else
