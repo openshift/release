@@ -35,3 +35,4 @@ rm -f ${SHARED_DIR}/index.json
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
+# Fixing my repo
