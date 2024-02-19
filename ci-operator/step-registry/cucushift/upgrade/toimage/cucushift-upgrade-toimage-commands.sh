@@ -136,15 +136,26 @@ function update_cloud_credentials_oidc(){
     fi
 }
 
-# Add cloudcredential.openshift.io/upgradeable-to: <version_number> to cloudcredential cluster when cco mode is manual
+# Add cloudcredential.openshift.io/upgradeable-to: <version_number> to cloudcredential cluster when cco mode is manual or the case in OCPQE-19413
 function cco_annotation(){
     if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )); then
         echo "CCO annotation change is not required in either z-stream upgrade or 4.7 and earlier" && return
     fi
 
     local cco_mode; cco_mode="$(oc get cloudcredential cluster -o jsonpath='{.spec.credentialsMode}')"
-    if [[ ${cco_mode} != "Manual" ]]; then
-        echo "CCO annotation change is not required in non-manual mode" && return
+    local platform; platform="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')"
+    if [[ ${cco_mode} == "Manual" ]]; then
+        echo "CCO annotation change is required in Manual mode"
+    elif [[ -z "${cco_mode}" || ${cco_mode} == "Mint" ]]; then
+        if [[ "${SOURCE_MINOR_VERSION}" == "14" && ${platform} == "GCP" ]] ; then
+            echo "CCO annotation change is required in default or Mint mode on 4.14 GCP cluster"
+        else
+            echo "CCO annotation change is not required in default or Mint mode on 4.${SOURCE_MINOR_VERSION} ${platform} cluster"
+            return 0
+        fi
+    else
+        echo "CCO annotation change is not required in ${cco_mode} mode"
+        return 0
     fi
 
     echo "Require CCO annotation change"
