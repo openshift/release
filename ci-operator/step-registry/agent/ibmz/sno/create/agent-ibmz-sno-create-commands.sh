@@ -36,19 +36,18 @@ else
   echo "nmstatectl installation is not successful."
   exit 1
 fi
-echo "Checking if ibmcloud CLI is installed."
+echo "ibmcloud CLI is not installed. Installing it now..."
+mkdir /tmp/ibm_cloud_cli
+curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/${IC_CLI_VERSION}/IBM_Cloud_CLI_${IC_CLI_VERSION}_amd64.tar.gz
+tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
+export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
 which ibmcloud
 if [ $? -eq 0 ]; then
-  echo "ibmcloud CLI is already installed."
+  echo "ibmcloud CLI is installed successfully."
 else
-  set -e
-  echo "ibmcloud CLI is not installed. Installing it now..."
-  mkdir /tmp/ibm_cloud_cli
-  curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/${IC_CLI_VERSION}/IBM_Cloud_CLI_${IC_CLI_VERSION}_amd64.tar.gz
-  tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
-  export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
-  set +e
-fi 
+  echo "ibmcloud installation is not successful."
+  exit 1
+fi
 
 # Login to the IBM Cloud
 echo "Logging into IBM Cloud by targetting the $IC_REGION region"
