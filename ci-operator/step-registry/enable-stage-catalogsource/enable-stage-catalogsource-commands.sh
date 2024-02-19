@@ -1,197 +1,205 @@
 #!/bin/bash
 
-set -e
-set -u
-set -o pipefail
+set -eu -o pipefail
+# Define the paths to the JSON files
+declare -r MASTER_JSON="/var/run/vault/dt-secrets/99-master-it-ca.json"
+declare -r WORKER_JSON="/var/run/vault/dt-secrets/99-worker-it-ca.json"
+declare -r STAGE_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.json"
 
-function set_proxy () {
-    if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
-        echo "setting the proxy"
-        echo "source ${SHARED_DIR}/proxy-conf.sh"
-        source "${SHARED_DIR}/proxy-conf.sh"
-    else
-        echo "no proxy setting."
-    fi
+declare ICSP_NAME=${ICSP_NAME:-"dt-registry"}
+declare CATALOG_SOURCE=${CATALOG_SOURCE:-"dt-catalogsource"}
+
+set_proxy() {
+	[[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && {
+		echo "setting the proxy"
+		echo "source ${SHARED_DIR}/proxy-conf.sh"
+		source "${SHARED_DIR}/proxy-conf.sh"
+	}
+	echo "no proxy setting. skipping this step"
+	return 0
 }
 
-function run_command() {
-    local CMD="$1"
-    echo "Running Command: ${CMD}"
-    eval "${CMD}"
+run() {
+	local cmd="$1"
+	echo "running command: $cmd"
+	eval "$cmd"
 }
 
-function apply_mcp_config() {
+apply_mcp_config() {
+	# Create the machineconfigs from the JSON files
+	oc create -f "$MASTER_JSON"
+	oc create -f "$WORKER_JSON"
 
-    # Define the paths to the JSON files
-    MASTER_JSON="/var/run/vault/dt-secrets/99-master-it-ca.json"
-    WORKER_JSON="/var/run/vault/dt-secrets/99-worker-it-ca.json"
+	echo "sleeping for 10s"
+	sleep 10
 
-    # Create the machineconfigs from the JSON files
-    oc create -f "$MASTER_JSON"
-    oc create -f "$WORKER_JSON"
-
-    sleep 10
-
-    machineCount=$(oc get mcp worker -o=jsonpath='{.status.machineCount}')
-    COUNTER=0
-    while [ $COUNTER -lt 1200 ]
-    do
-        sleep 20
-        COUNTER=`expr $COUNTER + 20`
-        echo "waiting ${COUNTER}s"
-        updatedMachineCount=$(oc get mcp worker -o=jsonpath='{.status.updatedMachineCount}')
-        if [[ ${updatedMachineCount} = "${machineCount}" ]]; then
-            echo "MCP updated successfully"
-            break
-        fi
-    done
-    if [[ ${updatedMachineCount} != "${machineCount}" ]]; then
-        run_command "oc get mcp,node"
-        run_command "oc get mcp worker -o yaml"
-        return 1
-    fi
+	local machineCount=0
+	local counter=0
+	local updatedMachineCount=0
+	machineCount=$(oc get mcp worker -o=jsonpath='{.status.machineCount}')
+	while [ "$counter" -lt 1200 ]; do
+		sleep 20
+		counter+=20
+		echo "waiting ${counter}s"
+		updatedMachineCount=$(oc get mcp worker -o=jsonpath='{.status.updatedMachineCount}')
+		[[ "$updatedMachineCount" -eq "$machineCount" ]] && {
+			echo "MCP updated successfully"
+			break
+		}
+	done
+	[[ "$updatedMachineCount" != "$machineCount" ]] && {
+		run "oc get mcp,node"
+		run "oc get mcp worker -o yaml"
+		return 1
+	}
+	return 0
 }
 
-function update_global_auth () {
-  # get the current global auth
-  run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
-  if [[ $ret -ne 0 ]]; then
-      echo "!!! fail to get the cluster global auth."
-      return 1
-  fi
+update_global_auth() {
+	# Define the new dockerconfig path
+	local new_dockerconfig="/tmp/new-dockerconfigjson"
+	local stage_auth_user
+	local stage_auth_password
+	local stage_registry_auth
 
-  # Define the new dockerconfig path
-  new_dockerconfig="/tmp/new-dockerconfigjson"
+	# get the current global auth
+	run "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp" || {
+		echo "!!! fail to get the cluster global auth."
+		return 1
+	}
 
-  # Read the stage registry credentials from the JSON file
-  stage_auth_user=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.user')
-  stage_auth_password=$(cat "/var/run/vault/mirror-registry/registry_stage.json" | jq -r '.password')
-  stage_registry_auth=$(echo -n "${stage_auth_user}:${stage_auth_password}" | base64 -w 0)
+	# Read the stage registry credentials from the JSON file
+	stage_auth_user=$(jq -r '.user' $STAGE_REGISTRY_PATH)
+	stage_auth_password=$(jq -r '.password' $STAGE_REGISTRY_PATH)
+	stage_registry_auth=$(echo -n " " "$stage_auth_user":"$stage_auth_password" | base64 -w 0)
 
-  # Create a new dockerconfig with the stage registry credentials without the "email" field
-  jq --argjson a "{\"https://registry.stage.redhat.io\": {\"auth\": \"${stage_registry_auth}\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > "${new_dockerconfig}"
+	# Create a new dockerconfig with the stage registry credentials without the "email" field
+	jq --argjson a "{\"https://registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" >"$new_dockerconfig"
 
-  # update global auth
-  ret=0
-  run_command "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}" || ret=$?
-  if [[ $ret -eq 0 ]]; then
-      apply_mcp_config
-      echo "update the cluster global auth successfully."
-  else
-      echo "!!! fail to add QE optional registry auth, retry and enable log..."
-      sleep 1
-      ret=0
-      run_command "oc --loglevel=10 set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}" || ret=$?
-      if [[ $ret -eq 0 ]]; then
-        echo "update the cluster global auth successfully after retry."
-      else
-        echo "!!! still fail to add QE optional registry auth after retry"
-        return 1
-      fi
-  fi
+	# update global auth
+	local -i ret=0
+	run "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=$new_dockerconfig" || ret=$?
+	if [[ $ret -eq 0 ]]; then
+		apply_mcp_config
+		echo "update the cluster global auth successfully."
+	else
+		echo "failed to add QE optional registry auth, retry and enable log..."
+		sleep 1
+		ret=0
+		run "oc --loglevel=10 set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}" || ret=$?
+		if [[ $ret -eq 0 ]]; then
+			echo "update the cluster global auth successfully after retry."
+		else
+			echo "still fail to add QE optional registry auth after retry"
+			return 1
+		fi
+	fi
+	return 0
 }
 
 # create ICSP for connected env.
-function create_icsp_connected () {
-    #Delete any existing ImageContentSourcePolicy
-    oc delete imagecontentsourcepolicies brew-registry --ignore-not-found=true
-    oc delete catalogsource qe-app-registry -n openshift-marketplace --ignore-not-found=true
+create_icsp_connected() {
 
-    cat <<EOF | oc create -f -
-    apiVersion: operator.openshift.io/v1alpha1
-    kind: ImageContentSourcePolicy
-    metadata:
-      name: dt-registry
-    spec:
-      repositoryDigestMirrors:
-      - mirrors:
-        - registry.stage.redhat.io
-        source: registry.redhat.io
+	#Delete any existing ImageContentSourcePolicy
+	oc delete imagecontentsourcepolicies brew-registry --ignore-not-found=true || {
+		echo "failed to delete existing imagecontentsourcepolicies"
+		return 1
+	}
+	oc delete catalogsource qe-app-registry -n openshift-marketplace --ignore-not-found=true || {
+		echo "failed to delete existing catalogsource"
+		return 1
+	}
+
+	cat <<EOF | oc create -f - || {
+  apiVersion: operator.openshift.io/v1alpha1
+  kind: ImageContentSourcePolicy
+  metadata:
+    name: $ICSP_NAME
+  spec:
+    repositoryDigestMirrors:
+    - mirrors:
+      - registry.stage.redhat.io
+      source: registry.redhat.io
 EOF
-    if [ $? == 0 ]; then
-        echo "create the ICSP successfully" 
-    else
-        echo "!!! fail to create the ICSP"
-        return 1
-    fi
+		echo "!!! fail to create the ICSP"
+		return 1
+	}
+
+	echo "ICSP $ICSP_NAME created successfully"
+	return 0
 }
 
-function create_catalog_sources()
-{
-    # get cluster Major.Minor version
-    ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
-    index_image="registry.stage.redhat.io/redhat/redhat-operator-index:v${ocp_version}"
+create_catalog_sources() {
+	local ocp_version=""
+	local index_image=""
+	local node_name
 
-    echo "create Distributed Tracing  catalogsource: dt-catalogsource"
-    cat <<EOF | oc create -f -
+	# get cluster Major.Minor version
+	ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+	index_image="registry.stage.redhat.io/redhat/redhat-operator-index:v$ocp_version"
+
+	echo "creating catalogsource: $CATALOG_SOURCE"
+
+	cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: dt-catalogsource
+  name: $CATALOG_SOURCE
   namespace: openshift-marketplace
 spec:
   displayName: Production Operators
-  image: ${index_image}
+  image: $index_image
   publisher: OpenShift QE
   sourceType: grpc
   updateStrategy:
     registryPoll:
       interval: 15m
 EOF
-    set +e 
-    COUNTER=0
-    while [ $COUNTER -lt 600 ]
-    do
-        sleep 20
-        COUNTER=`expr $COUNTER + 20`
-        echo "waiting ${COUNTER}s"
-        STATUS=`oc -n openshift-marketplace get catalogsource dt-catalogsource -o=jsonpath="{.status.connectionState.lastObservedState}"`
-        if [[ $STATUS = "READY" ]]; then
-            echo "create the QE CatalogSource successfully"
-            break
-        fi
-    done
-    if [[ $STATUS != "READY" ]]; then
-        echo "!!! fail to create QE CatalogSource"
-        # ImagePullBackOff nothing with the imagePullSecrets 
-        # run_command "oc get operatorgroup -n openshift-marketplace"
-        # run_command "oc get sa dt-catalogsource -n openshift-marketplace -o yaml"
-        # run_command "oc -n openshift-marketplace get secret $(oc -n openshift-marketplace get sa dt-catalogsource -o=jsonpath='{.secrets[0].name}') -o yaml"
-        
-        run_command "oc get pods -o wide -n openshift-marketplace"
-        run_command "oc -n openshift-marketplace get catalogsource dt-catalogsource -o yaml"
-        run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=dt-catalogsource -o yaml"
-        node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource=dt-catalogsource -o=jsonpath='{.items[0].spec.nodeName}')
-        run_command "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
-        run_command "oc -n debug-qe debug node/${node_name} -- chroot /host podman pull --authfile /var/lib/kubelet/config.json ${index_image}"
-        
-        run_command "oc get mcp,node"
-        run_command "oc get mcp worker -o yaml"
-        run_command "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
+	local -i counter=0
+	local status=""
+	while [ $counter -lt 600 ]; do
+		counter+=20
+		echo "waiting ${counter}s"
+		sleep 20
+		status=$(oc -n openshift-marketplace get catalogsource "$CATALOG_SOURCE" -o=jsonpath="{.status.connectionState.lastObservedState}")
+		[[ $status = "READY" ]] && {
+			echo "$CATALOG_SOURCE CatalogSource created successfully"
+			break
+		}
+	done
+	[[ $status != "READY" ]] && {
+		echo "!!! fail to create QE CatalogSource"
+		run "oc get pods -o wide -n openshift-marketplace"
+		run "oc -n openshift-marketplace get catalogsource $CATALOG_SOURCE -o yaml"
+		run "oc -n openshift-marketplace get pods -l olm.catalogSource=$CATALOG_SOURCE -o yaml"
+		node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource="$CATALOG_SOURCE" -o=jsonpath='{.items[0].spec.nodeName}')
+		run "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false \
+      pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
+		run "oc -n debug-qe debug node/$node_name -- chroot /host podman pull --authfile /var/lib/kubelet/config.json $index_image"
 
-        return 1
-    fi
-    set -e 
+		run "oc get mcp,node"
+		run "oc get mcp worker -o yaml"
+		run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
+
+		return 1
+	}
+	return 0
 }
 
 # From 4.11 on, the marketplace is optional.
 # That means, once the marketplace disabled, its "openshift-marketplace" project will NOT be created as default.
 # But, for OLM, its global namespace still is "openshift-marketplace"(details: https://bugzilla.redhat.com/show_bug.cgi?id=2076878),
 # so we need to create it manually so that optional operator teams' test cases can be run smoothly.
-function check_marketplace () {
-    # caps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
-    # if [[ ${caps} =~ "marketplace" ]]; then
-    #     echo "marketplace installed, skip..."
-    #     return 0
-    # fi
-    ret=0
-    run_command "oc get ns openshift-marketplace" || ret=$?
-    if [[ $ret -eq 0 ]]; then
-        echo "openshift-marketplace project AlreadyExists, skip creating."
-        return 0
-    fi
-    
-    cat <<EOF | oc create -f -
+check_marketplace() {
+	local -i ret=0
+	run "oc get ns openshift-marketplace" || ret=1
+
+	[[ $ret -eq 0 ]] && {
+		echo "openshift-marketplace project AlreadyExists, skip creating."
+		return 0
+	}
+
+	cat <<EOF | oc create -f -
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -202,17 +210,37 @@ metadata:
     pod-security.kubernetes.io/warn: baseline
   name: openshift-marketplace
 EOF
-
+	return 0
 }
 
-set_proxy
-run_command "oc whoami"
-run_command "oc version -o yaml"
-update_global_auth
-sleep 5
-create_icsp_connected
-check_marketplace
-create_catalog_sources
+main() {
+	echo "Enabling stage catalogsource"
+	set_proxy
 
-#support hypershift config guest cluster's icsp
-oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_iscp.yaml && yq-go r /tmp/mgmt_iscp.yaml 'items[*].spec.repositoryDigestMirrors' -  | sed  '/---*/d' > ${SHARED_DIR}/mgmt_iscp.yaml
+	run "oc whoami"
+	run "oc version -o yaml"
+
+	update_global_auth || {
+		echo "failed to update global auth. resolve the above errors"
+		return 1
+	}
+	echo "sleeping for 5s"
+	sleep 5
+	create_icsp_connected || {
+		echo "failed to create imagecontentsourcepolicies. resolve the above errors"
+		return 1
+	}
+	check_marketplace || {
+		echo "failed to check marketplace. resolve the above errors"
+		return 1
+	}
+	create_catalog_sources || {
+		echo "failed to create catalogsource. resolve the above errors"
+		return 1
+	}
+
+	#support hypershift config guest cluster's icsp
+	oc get imagecontentsourcepolicy -oyaml >/tmp/mgmt_iscp.yaml && yq-go r /tmp/mgmt_iscp.yaml 'items[*].spec.repositoryDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_iscp.yaml
+
+}
+main
