@@ -114,7 +114,7 @@ spec:
   template:
     spec:
       taints:
-        - key: node-role.kubernetes.io/edge
+        - key: node-role.kubernetes.io/outposts
           effect: NoSchedule
 EOF
   yq-go m -x -i "${edge_node_machineset}" "${schedulable_patch}"
