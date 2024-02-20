@@ -3,6 +3,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Temp debug
+trap 'sleep 4h' EXIT TERM SIGINT INT
+
 echo "Applying StorageSystem after operator installation completed"
 
 cat <<EOF | oc apply -f -
