@@ -28,17 +28,15 @@ tests:
     - as: e2e-test-odh-kueue
       cli: latest
       commands: |
-        oc apply --server-side -k "github.com/opendatahub-io/kueue//config/default?ref=test"
+        oc apply --server-side -k "github.com/opendatahub-io/kueue/config/rhoai?ref=test"
         echo "Adding label on worker node ..."
         oc label node --selector=node-role.kubernetes.io/worker instance-type=on-demand
-        echo "Enabling Visibility Feature Gate ..."
-        oc patch deployment kueue-controller-manager -n kueue-system --type=json -p '[{"op" : "add" ,"path" : "/spec/template/spec/containers/0/args/-" ,"value" : "--feature-gates=VisibilityOnDemand=true"}]'
         go version
         echo "Installing ginkgo ..."
         go install github.com/onsi/ginkgo/v2/ginkgo
         ginkgo version
+        export NAMESPACE='opendatahub'
         ginkgo --focus-file=e2e_test.go -v ./test/e2e/singlecluster/
-        ginkgo --focus-file=visibility_test.go -v ./test/e2e/singlecluster/
       from: src
       resources:
         requests:
