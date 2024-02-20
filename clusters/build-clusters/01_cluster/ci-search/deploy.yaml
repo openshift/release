@@ -8,6 +8,7 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: ci-search
+  namespace: ci-search
 spec:
   tls:
     insecureEdgeTerminationPolicy: Redirect
@@ -18,11 +19,12 @@ spec:
 
 ---
 apiVersion: v1
-data:
-  default.conf: "server {\n  listen 8080;\n  return 302 https://search.dptools.openshift.org$request_uri;\n}\n"
 kind: ConfigMap
 metadata:
   name: ci-search-redirect-config
+  namespace: ci-search
+data:
+  default.conf: "server {\n  listen 8080;\n  return 302 https://search.dptools.openshift.org$request_uri;\n}\n"
 
 ---
 apiVersion: apps/v1
@@ -31,6 +33,7 @@ metadata:
   labels:
     app: ci-search-redirect
   name: ci-search-redirect
+  namespace: ci-search
 spec:
   replicas: 1
   selector:
@@ -61,6 +64,7 @@ metadata:
     app: prow
     component: ci-search-redirect
   name: ci-search-redirect
+  namespace: ci-search
 spec:
   ports:
   - name: main
