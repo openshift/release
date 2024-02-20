@@ -1,0 +1,23 @@
+workflow:
+  as: assisted-oci-opct
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    pre:
+      - ref: assisted-oci-setup
+      - chain: assisted-common-pre
+      - ref: assisted-common-setup-image-registry
+      - ref: provider-certification-tool-conf-dedicated
+      - ref: provider-certification-tool-conf-setup
+      - ref: provider-certification-tool-wait-ready
+    test:
+      - ref: provider-certification-tool-run
+      - ref: provider-certification-tool-results
+    post:
+      - ref: assisted-common-gather
+      - ref: provider-certification-tool-destroy
+      - ref: assisted-oci-teardown
+    env:
+      OPCT_DEV_EXTRA_CMD: --plugins-image=openshift-tests-provider-cert:v0.4.1
+  documentation: |-
+    This workflow installs an OCP cluster by running assisted-installer on Oracle cloud and runs the OPCT on it.
