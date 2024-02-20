@@ -13,12 +13,6 @@ else
     echo "no proxy setting."
 fi
 
-#operator_name="odf-operator"
-#operator_target_namespaces="openshift-storage"
-#operator_channel="stable-4.14"
-trap 'sleep 4h' EXIT TERM SIGINT INT
-
-
 # Read each operator in the JSON provided to an item in a BASH array.
 readarray -t OPERATOR_ARRAY < <(jq --compact-output '.[]' <<< "$OPERATORS")
 
@@ -32,30 +26,22 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     operator_group=$(jq --raw-output '.operator_group // ""' <<< "$operator_obj")
     operator_target_namespaces=$(jq --raw-output '.target_namespaces // ""' <<< "$operator_obj")
 
+    # If install_namespace not defined, exit.
+    if [[ -z "${operator_install_namespace}" ]]; then
+        echo "ERROR: install_namespace is not defined"
+        exit 1
+    fi
+
     # If name not defined, exit.
     if [[ -z "${operator_name}" ]]; then
         echo "ERROR: name is not defined"
         exit 1
     fi
 
-    # If install_namespace not defined, and USE_DEFAULTS is set to false: exit.
-    if [[ -z "${operator_install_namespace}" ]]; then
-        if [[ "${USE_DEFAULTS}" == "true" ]]; then
-            operator_install_namespace="openshift-operators"
-        else
-            echo "ERROR: install_namespace is not defined"
-            exit 1
-        fi
-    fi
-
-    # If channel is not defined, and USE_DEFAULTS is set to false: exit.
+    # If channel is not defined, exit.
     if [[ -z "${operator_channel}" ]]; then
-        if [[ "${USE_DEFAULTS}" == "true" ]]; then
-            operator_channel="!default"
-        else
-            echo "ERROR: channel is not defined"
-            exit 1
-        fi
+        echo "ERROR: channel is not defined"
+        exit 1
     fi
 
     # If the channel is "!default", find the default channel of the operator
@@ -66,13 +52,6 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
             exit 1
         else
             echo "INFO: Default channel is ${operator_channel}"
-        fi
-    fi
-
-    # If source is not defined, and USE_DEFAULTS is set: use "redhat-operators".
-    if [[ -z "${operator_source}" ]]; then
-        if [[ "${USE_DEFAULTS}" == "true" ]]; then
-            operator_source="redhat-operators"
         fi
     fi
 
