@@ -317,7 +317,7 @@ EOF
     ign_b64="$(cat ${bastion_ignition_file} | base64 -w0)"
     run_command "az deployment group create --resource-group ${bastion_rg} --name ${arm_deployment_name} --template-file '${bastion_vm_arm_template}' --parameters ignitionContent='${ign_b64}' --parameters vmName=${bastion_name} --parameters vnetName=${bastion_vnet_name} --parameters subnetName=${bastion_subnet} --parameters vmSize=Standard_DS1_v2 --parameters vmImageId=${bastion_image_id}"
 else
-    run_command "az vm create --resource-group ${bastion_rg} --name ${bastion_name} --admin-username core --admin-password 'NotActuallyApplied!' --image '${bastion_image_id}' --os-disk-size-gb 199 --subnet ${bastion_subnet} --vnet-name ${bastion_vnet_name} --nsg '' --size 'Standard_DS1_v2' --debug --custom-data '${bastion_ignition_file}' | tee '${SHARED_DIR}/${bastion_name}_output.json'" 
+    run_command "az vm create --resource-group ${bastion_rg} --name ${bastion_name} --admin-username core --admin-password 'NotActuallyApplied!' --image '${bastion_image_id}' --public-ip-sku 'Standard' --os-disk-size-gb 199 --subnet ${bastion_subnet} --vnet-name ${bastion_vnet_name} --nsg '' --size 'Standard_DS1_v2' --debug --custom-data '${bastion_ignition_file}' | tee '${SHARED_DIR}/${bastion_name}_output.json'"
 fi
 
 # sleep for a while to wait registry/proxy image get pulled and services boot up after vm is running
