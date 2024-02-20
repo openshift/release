@@ -8,7 +8,7 @@ REGION="${LEASED_RESOURCE}"
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 
-MACHINE_ROLE="worker"
+MACHINE_ROLE="outposts"
 if [[ ${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP} == "yes" ]]; then
   subnet_id=$(head -n 1 "${SHARED_DIR}/outpost_public_id")
 else
@@ -105,6 +105,19 @@ spec:
           publicIp: true
 EOF
   yq-go m -x -i "${edge_node_machineset}" "${ip_patch}"
+fi
+
+if [[ "${EDGE_NODE_WORKER_SCHEDULABLE}" == "no" ]]; then
+  schedulable_patch=`mktemp`
+  cat <<EOF > ${schedulable_patch}
+spec:
+  template:
+    spec:
+      taints:
+        - key: node-role.kubernetes.io/edge
+          effect: NoSchedule
+EOF
+  yq-go m -x -i "${edge_node_machineset}" "${schedulable_patch}"
 fi
 
 cp "${edge_node_machineset}" "${ARTIFACT_DIR}/"
