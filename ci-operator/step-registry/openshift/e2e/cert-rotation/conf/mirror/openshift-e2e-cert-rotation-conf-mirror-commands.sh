@@ -263,8 +263,12 @@ kubectl -n assisted-installer exec ${POD_NAME} -- cp -r /etc/pki/ca-trust/extrac
 # Point assisted service to mirror first
 MIRRORED_RELEASE_IMAGE=$(grep -oP "Update image:\s*\K.+" /tmp/oc-mirror.output)
 MIRRORED_DIGEST=$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" -o template --template='{{.digest}}' )
+MUST_GATHER_DIGEST=$( oc adm release -a ~/pull-secret info "${MIRRORED_RELEASE_IMAGE}" --image-for=must-gather | cut -f 2 -d '@' )
+MIRRORED_MUST_GATHER_IMAGE="${LOCAL_REG}/${LOCAL_REPO}@${MUST_GATHER_DIGEST}"
+
 echo "export RELEASE_IMAGE_LATEST=${LOCAL_REG}/${LOCAL_REPO}@${MIRRORED_DIGEST}" >> ~/config.sh
 echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${LOCAL_REG}/${LOCAL_REPO}@${MIRRORED_DIGEST}" >> ~/config.sh
+echo "export MUST_GATHER_IMAGE=${MIRRORED_MUST_GATHER_IMAGE}" >> ~/config.sh
 #TODO: Fix assisted-test-infra to pass CA bundle in skipper
 echo "export OPENSHIFT_VERSION=4.14" >> ~/config.sh
 
