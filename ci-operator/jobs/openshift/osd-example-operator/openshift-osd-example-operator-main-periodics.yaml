@@ -1,0 +1,34 @@
+periodics:
+- agent: kubernetes
+  cluster: build03
+  cron: '*/10 * * * *'
+  decorate: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-openshift-osd-example-operator-fast-forward
+  spec:
+    containers:
+    - args:
+      - --config-dir=./ci-operator/config/openshift/osd-example-operator
+      - --current-release=4.15
+      - --future-release=4.15
+      - --fast-forward
+      - --confirm
+      - --username=sre-platform-bot
+      - --token-path=/usr/local/osde2e-github/token
+      command:
+      - repo-brancher
+      image: repo-brancher:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-github
+        name: osde2e-github
+        readOnly: true
+    volumes:
+    - name: osde2e-github
+      secret:
+        secretName: osde2e-github
