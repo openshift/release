@@ -61,6 +61,7 @@ run-on-all-nodes "
         sos report --case-id "\$HOSTNAME" --batch \
           -o container_log,filesys,logs,networkmanager,podman,processor,sar \
           -k podman.all -k podman.logs \
+          --log-size=50 \
           --tmp-dir ${NODE_ARTIFACT_DIR}
   tar -czf ${NODE_ARTIFACT_DIR}/etc-kubernetes-\$HOSTNAME.tar.gz -C /etc/kubernetes /etc/kubernetes
 "
