@@ -1,8 +1,4 @@
 base_images:
-  cli:
-    name: "4.14"
-    namespace: ocp
-    tag: cli
   tools:
     name: "4.14"
     namespace: ocp
@@ -22,10 +18,13 @@ images:
   from: root
   to: oar-python3
 - dockerfile_path: prow/Dockerfile
+  from: tools
   to: job-python3
 - dockerfile_path: Dockerfile
   from: oar-python3
   to: oar
+- dockerfile_path: prow/Dockerfile
+  to: jobctl-python3
 - dockerfile_path: prow/Dockerfile.k8sgpt
   from: root
   to: k8sgpt
@@ -33,6 +32,12 @@ promotion:
   to:
   - namespace: ci
     tag: master
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
 resources:
   '*':
     limits:
