@@ -15,6 +15,14 @@ base_images:
     name: 4.16-priv
     namespace: ocp-private
     tag: cloud-provider-aws-rpms
+  cloud-provider-azure-rpms:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: cloud-provider-azure-rpms
+  cloud-provider-gcp-rpms:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: cloud-provider-gcp-rpms
   commitchecker:
     name: commitchecker
     namespace: ci
@@ -31,18 +39,26 @@ base_images:
     name: 4.16-priv
     namespace: ocp-private
     tag: oc-rpms
-  ocp_4.13_tools:
-    name: "4.13"
-    namespace: ocp
-    tag: tools
-  ocp_4.14_base:
-    name: "4.14"
-    namespace: ocp
+  ocp_4.16_base:
+    name: 4.16-priv
+    namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_4.16_base-rhel9:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_4.16_tools:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: tools
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.21-openshift-4.16
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.16
   rhel-coreos-base:
     name: 4.16-priv
     namespace: ocp-private
@@ -58,21 +74,21 @@ canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   inputs:
-    ocp_4.14_base:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.14:base
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   inputs:
-    ocp_4.13_tools:
+    ocp_4.16_tools:
       as:
-      - registry.svc.ci.openshift.org/ocp/4.13:tools
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      - registry.ci.openshift.org/ocp/4.16:tools
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: kubernetes-tests
 - context_dir: openshift-hack/images/os/
   inputs:
@@ -106,14 +122,24 @@ images:
 - context_dir: build/pause
   dockerfile_path: Dockerfile.Rhel
   inputs:
-    ocp_4.14_base:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.14:base
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: pod
 - dockerfile_path: openshift-hack/images/installer-kube-apiserver-artifacts/Dockerfile.rhel
+  inputs:
+    ocp_4.16_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base
+    ocp_4.16_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: installer-kube-apiserver-artifacts
 promotion:
   to:
@@ -127,7 +153,7 @@ promotion:
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7 \nCOPY --from=bin /go/src/k8s.io/kubernetes/_output/local/releases /srv/zips/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/SOURCES/* /srv/zips/ \nCOPY --from=rpms /go/src/k8s.io/kubernetes/_output/local/releases/rpms/* /srv/repo/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/RPMS/x86_64/* /srv/repo/ \nCOPY --from=cloud-provider-aws-rpms /go/src/k8s.io/cloud-provider-aws/_output/RPMS/x86_64/* /srv/repo/ ' > _output/local/releases/Dockerfile; openshift-hack/build-go.sh;
+      mkdir -p _output/local/releases; touch _output/local/releases/CHECKSUM; echo $'FROM bin AS bin\nFROM rpms AS rpms\nFROM centos:7 \nCOPY --from=bin /go/src/k8s.io/kubernetes/_output/local/releases /srv/zips/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/SOURCES/* /srv/zips/ \nCOPY --from=rpms /go/src/k8s.io/kubernetes/_output/local/releases/rpms/* /srv/repo/ \nCOPY --from=oc-rpms /go/src/github.com/openshift/oc/_rpmbuild/RPMS/x86_64/* /srv/repo/ \nCOPY --from=cloud-provider-aws-rpms /go/src/k8s.io/cloud-provider-aws/_output/RPMS/x86_64/* /srv/repo/ \nCOPY --from=cloud-provider-azure-rpms /go/src/github.com/kubernetes-sigs/cloud-provider-azure/_output/RPMS/x86_64/* /srv/repo/ \nCOPY --from=cloud-provider-gcp-rpms /go/src/k8s.io/cloud-provider-gcp/_output/RPMS/x86_64/* /srv/repo/ ' > _output/local/releases/Dockerfile; openshift-hack/build-go.sh;
     from: bin
     to: bin-cross
 - project_directory_image_build_step:
@@ -142,6 +168,12 @@ raw_steps:
       cloud-provider-aws-rpms:
         as:
         - cloud-provider-aws-rpms
+      cloud-provider-azure-rpms:
+        as:
+        - cloud-provider-azure-rpms
+      cloud-provider-gcp-rpms:
+        as:
+        - cloud-provider-gcp-rpms
       oc-rpms:
         as:
         - oc-rpms
