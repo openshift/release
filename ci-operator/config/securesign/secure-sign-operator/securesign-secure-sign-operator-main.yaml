@@ -94,6 +94,14 @@ tests:
         oc wait --for=condition=available deployment/ctlog -n securesign --timeout=60s
         oc wait --for=condition=available deployment/rekor-redis -n securesign --timeout=60s
         oc wait --for=condition=available deployment/rekor-server -n securesign --timeout=60s
+        podman pull docker.io/library/busybox:latest
+        podman tag docker.io/library/busybox:latest ttl.sh/busy:1h
+        podman push ttl.sh/busy:1h
+        TOKEN=$(curl -k -X POST -H "Content-Type: application/x-www-form-urlencoded" -d "username=jdoe" -d "password=secure" -d "grant_type=password" -d "scope=openid" -d "client_id=sigstore" $OIDC_ISSUER/protocol/openid-connect/token |  sed -E 's/.*"access_token":"([^"]*).*/\1/')
+        FULCIO_URL=https://$(oc get route  -n securesign -l app.kubernetes.io/component=fulcio | tail -n 1 | awk '{print $2}')
+        REKOR_URL=https://$(oc get route  -n securesign -l app.kubernetes.io/component=rekor-server | tail -n 1 | awk '{print $2}')
+        TUF_URL=https://$(oc get route  -n securesign -l app.kubernetes.io/component=tuf | tail -n 1 | awk '{print $2}')
+        cosign sign -y --fulcio-url=$FULCIO_URL --rekor-url=$REKOR_URL --oidc-issuer=$OIDC_ISSUER_URL --identity-token=$TOKEN ttl.sh/busy:1h
         oc logs -n openshift-rhtas-operator deployment/rhtas-operator-controller-manager
       from: src-oc
       resources:
