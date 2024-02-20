@@ -1,8 +1,6 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
-set -o pipefail
 export REPORT_HANDLE_PATH="/usr/bin"
 
 pwd
@@ -96,8 +94,8 @@ echo "Waiting for NooBaa Storage to be ready..." >&2
 oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=180s
 
 echo "Run extended-platform-tests"
-ret_value=0
-extended-platform-tests run all --dry-run | grep "20934"| extended-platform-tests run --timeout 150m --junit-dir="${ARTIFACT_DIR}" -f - || ret_value=$?
+ 
+extended-platform-tests run all --dry-run | grep "20934"| extended-platform-tests run --timeout 150m --junit-dir="${ARTIFACT_DIR}" -f - 
 
 function handle_result {
 
@@ -133,5 +131,3 @@ function handle_result {
 }
 
 handle_result
-[ "W${ret_value}W" == "W0W" ] && echo "success" || echo "fail"
-sleep 10m
