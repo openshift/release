@@ -7,14 +7,14 @@ metadata:
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: release-controller-ocp
+  name: ci-search
 spec:
   tls:
     insecureEdgeTerminationPolicy: Redirect
     termination: edge
   to:
     kind: Service
-    name: release-controller-ocp-redirect
+    name: ci-search-redirect
 
 ---
 apiVersion: v1
@@ -22,25 +22,25 @@ data:
   default.conf: "server {\n  listen 8080;\n  return 302 https://search.dptools.openshift.org$request_uri;\n}\n"
 kind: ConfigMap
 metadata:
-  name: release-controller-ocp-redirect-config
+  name: ci-search-redirect-config
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: release-controller-ocp-redirect
-  name: release-controller-ocp-redirect
+    app: ci-search-redirect
+  name: ci-search-redirect
 spec:
   replicas: 1
   selector:
     matchLabels:
-      component: release-controller-ocp-redirect
+      component: ci-search-redirect
   template:
     metadata:
       labels:
         app: prow
-        component: release-controller-ocp-redirect
+        component: ci-search-redirect
     spec:
       containers:
         - image: nginxinc/nginx-unprivileged
@@ -50,7 +50,7 @@ spec:
             name: config
       volumes:
         - configMap:
-            name: release-controller-ocp-redirect-config
+            name: ci-search-redirect-config
           name: config
 
 ---
@@ -59,8 +59,8 @@ kind: Service
 metadata:
   labels:
     app: prow
-    component: release-controller-ocp-redirect
-  name: release-controller-ocp-redirect
+    component: ci-search-redirect
+  name: ci-search-redirect
 spec:
   ports:
   - name: main
@@ -68,6 +68,6 @@ spec:
     protocol: TCP
     targetPort: 8080
   selector:
-    component: release-controller-ocp-redirect
+    component: ci-search-redirect
   sessionAffinity: None
   type: ClusterIP
