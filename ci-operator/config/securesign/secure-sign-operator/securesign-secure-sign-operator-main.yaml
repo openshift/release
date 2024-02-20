@@ -102,7 +102,7 @@ tests:
         TUF_URL=https://$(oc get route  -n securesign -l app.kubernetes.io/component=tuf | tail -n 1 | awk '{print $2}')
         kubectl get -n default cm kube-root-ca.crt -o jsonpath='{.data.ca\.crt}' > /tmp/ca.crt
         awk -v RS='-----BEGIN CERTIFICATE-----' 'NF > 1 { print "-----BEGIN CERTIFICATE-----" $0 }' /tmp/ca.crt > /tmp/cert-
-        for f in "/tmp/cert-"*; do COMMON_NAME=$(openssl x509 -subject -noout -nameopt multiline -in "$f" | grep commonName | awk '{ print $3 }'); sudo trust anchor --store "$f"; echo "'${COMMON_NAME}' added to system certificates"; done
+        for f in "/tmp/cert-"*; do COMMON_NAME=$(openssl x509 -subject -noout -nameopt multiline -in "$f" | grep commonName | awk '{ print $3 }'); trust anchor --store "$f"; echo "'${COMMON_NAME}' added to system certificates"; done
         TOKEN=$(curl -X POST -H "Content-Type: application/x-www-form-urlencoded" -d "username=jdoe" -d "password=secure" -d "grant_type=password" -d "scope=openid" -d "client_id=sigstore" $OIDC_ISSUER/protocol/openid-connect/token |  sed -E 's/.*"access_token":"([^"]*).*/\1/')
         cosign initialize --mirror=$TUF_URL --root=$TUF_URL/root.json
         cosign sign -y --fulcio-url=$FULCIO_URL --rekor-url=$REKOR_URL --oidc-issuer=$OIDC_ISSUER --identity-token=$TOKEN ttl.sh/sigstore-test:5m
