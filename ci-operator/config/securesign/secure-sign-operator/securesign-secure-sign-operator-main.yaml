@@ -79,7 +79,11 @@ tests:
         ./ci/openshift/tas-keycloak-install.sh
         set -x
         go install github.com/sigstore/cosign/v2/cmd/cosign@v2.2.2
-        #make integration-test
+        OIDC_ISSUER=https://$(oc get route keycloak -n keycloak-system | tail -n 1 | awk '{print $2}')/auth/realms/sigstore
+        sed "s|https://your-oidc-issuer-url|$OIDC_ISSUER|g" config/samples/rhtas_v1alpha1_securesign.yaml
+        sed 's|ClientID: "trusted-artifact-signer"|ClientID: "sigstore"|g' config/samples/rhtas_v1alpha1_securesign.yaml
+        oc create ns securesign
+        oc apply -f config/samples/rhtas_v1alpha1_securesign.yaml -n securesign
         oc logs -n openshift-rhtas-operator deployment/rhtas-operator-controller-manager
       from: src-oc
       resources:
