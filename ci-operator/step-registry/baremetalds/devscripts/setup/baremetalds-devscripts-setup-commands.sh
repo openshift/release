@@ -373,7 +373,7 @@ echo 'export KUBECONFIG=\$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root
 # squid needs to be restarted after network changes
 podman restart --time 1 external-squid || true
 
-timeout -s 9 105m make ${DEVSCRIPTS_TARGET}
+timeout -s 9 130m make ${DEVSCRIPTS_TARGET}
 
 # Add extra CI specific rules to the libvirt zone, this can't be done earlier because the zone only now exists
 # TODO: In reality the bridges should be in the public zone
