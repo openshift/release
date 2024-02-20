@@ -60,7 +60,10 @@ spec:
         machine.openshift.io/cluster-api-machine-type: ${MACHINE_ROLE}
         machine.openshift.io/cluster-api-machineset: PLACEHOLDER_INFRA_ID-${MACHINE_ROLE}-${zone_name}${machineset_name_postfix}
     spec:
-      metadata: {}
+      metadata:
+        labels:
+          node-role.kubernetes.io/outposts: ""
+          location: outposts
       providerSpec:
         value:
           ami:
