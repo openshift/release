@@ -89,6 +89,7 @@ tests:
         oc wait --for=condition=available deployment/trillian-logserver -n securesign --timeout=60s
         oc wait --for=condition=available deployment/trillian-logsigner -n securesign --timeout=60s
         oc wait --for=condition=available deployment/fulcio-server -n securesign --timeout=60s
+        oc set env -n securesign deployment/fulcio-server SSL_CERT_DIR=/var/run/fulcio
         for i in tuf ctlog rekor-redis rekor-server; do until [ ! -z "$(oc get deployment $i -n securesign 2>/dev/null)" ]; do echo "Waiting for $i deployment to be created. Pods in securesign namespace:"; oc get pods -n securesign; sleep 3; done; done
         oc wait --for=condition=available deployment/tuf -n securesign --timeout=60s
         oc wait --for=condition=available deployment/ctlog -n securesign --timeout=60s
@@ -96,10 +97,14 @@ tests:
         oc wait --for=condition=available deployment/rekor-server -n securesign --timeout=60s
         oc apply -f ci/openshift/job.yaml -n default
         oc wait --for=condition=complete job/trusted-artifact-signer-test-sign-verify --timeout=5m -n default
-        TOKEN=$(curl -k -X POST -H "Content-Type: application/x-www-form-urlencoded" -d "username=jdoe" -d "password=secure" -d "grant_type=password" -d "scope=openid" -d "client_id=sigstore" $OIDC_ISSUER/protocol/openid-connect/token |  sed -E 's/.*"access_token":"([^"]*).*/\1/')
         FULCIO_URL=https://$(oc get route  -n securesign -l app.kubernetes.io/component=fulcio | tail -n 1 | awk '{print $2}')
         REKOR_URL=https://$(oc get route  -n securesign -l app.kubernetes.io/component=rekor-server | tail -n 1 | awk '{print $2}')
         TUF_URL=https://$(oc get route  -n securesign -l app.kubernetes.io/component=tuf | tail -n 1 | awk '{print $2}')
+        kubectl get -n default cm kube-root-ca.crt -o jsonpath='{.data.ca\.crt}' > /tmp/ca.crt
+        awk -v RS='-----BEGIN CERTIFICATE-----' 'NF > 1 { print "-----BEGIN CERTIFICATE-----" $0 }' /tmp/ca.crt > /tmp/cert-
+        for f in "/tmp/cert-"*; do COMMON_NAME=$(openssl x509 -subject -noout -nameopt multiline -in "$f" | grep commonName | awk '{ print $3 }'); sudo trust anchor --store "$f"; echo "'${COMMON_NAME}' added to system certificates"; done
+        TOKEN=$(curl -X POST -H "Content-Type: application/x-www-form-urlencoded" -d "username=jdoe" -d "password=secure" -d "grant_type=password" -d "scope=openid" -d "client_id=sigstore" $OIDC_ISSUER/protocol/openid-connect/token |  sed -E 's/.*"access_token":"([^"]*).*/\1/')
+        cosign initialize --mirror=$TUF_URL --root=$TUF_URL/root.json
         cosign sign -y --fulcio-url=$FULCIO_URL --rekor-url=$REKOR_URL --oidc-issuer=$OIDC_ISSUER --identity-token=$TOKEN ttl.sh/sigstore-test:5m
         oc logs -n openshift-rhtas-operator deployment/rhtas-operator-controller-manager
       from: src-oc
