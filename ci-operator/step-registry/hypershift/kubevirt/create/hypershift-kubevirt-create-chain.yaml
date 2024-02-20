@@ -27,6 +27,10 @@ chain:
       default: ""
       documentation: |-
         The storage class that will be used for etcd on the hosted control plane.
+    - name: ENABLE_ICSP
+      default: "false"
+      documentation: |-
+        if true, add image content sources config(path=${SHARED_DIR}/mgmt_iscp.yaml)
     commands: |-
       set -exuo pipefail
 
@@ -56,6 +60,14 @@ chain:
       then
         EXTRA_ARGS="${EXTRA_ARGS} --etcd-storage-class=${ETCD_STORAGE_CLASS}"
       fi
+      
+      PULL_SECRET_PATH="/etc/ci-pull-credentials/.dockerconfigjson"
+      if [[ $ENABLE_ICSP == "true" ]]; then
+        EXTRA_ARGS="${EXTRA_ARGS} --image-content-sources ${SHARED_DIR}/mgmt_iscp.yaml"
+        echo "extract secret/pull-secret"
+        oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+        PULL_SECRET_PATH="/tmp/.dockerconfigjson"
+      fi
 
       # Enable wildcard routes on the management cluster
       oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p \
@@ -71,8 +83,7 @@ chain:
         --memory ${HYPERSHIFT_NODE_MEMORY}Gi \
         --cores ${HYPERSHIFT_NODE_CPU_CORES} \
         --root-volume-size 64 \
-        --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-        --release-image ${RELEASE_IMAGE_LATEST} \
+        --pull-secret ${PULL_SECRET_PATH} \
         ${EXTRA_ARGS}
 
       echo "Waiting for cluster to become available"
