@@ -26,22 +26,20 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     operator_group=$(jq --raw-output '.operator_group // ""' <<< "$operator_obj")
     operator_target_namespaces=$(jq --raw-output '.target_namespaces // ""' <<< "$operator_obj")
 
-    # If install_namespace not defined, exit.
-    if [[ -z "${operator_install_namespace}" ]]; then
-        echo "ERROR: install_namespace is not defined"
-        exit 1
-    fi
-
     # If name not defined, exit.
     if [[ -z "${operator_name}" ]]; then
         echo "ERROR: name is not defined"
         exit 1
     fi
 
-    # If channel is not defined, exit.
+    # If install_namespace not defined, use DEFAULT_OPERATOR_INSTALL_NAMESPACE.
+    if [[ -z "${operator_install_namespace}" ]]; then
+        operator_install_namespace="${DEFAULT_OPERATOR_INSTALL_NAMESPACE}"
+    fi
+
+    # If channel is not defined, use DEFAULT_OPERATOR_CHANNEL.
     if [[ -z "${operator_channel}" ]]; then
-        echo "ERROR: channel is not defined"
-        exit 1
+        operator_channel="${DEFAULT_OPERATOR_CHANNEL}"
     fi
 
     # If the channel is "!default", find the default channel of the operator
@@ -53,6 +51,11 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
         else
             echo "INFO: Default channel is ${operator_channel}"
         fi
+    fi
+
+    # If source is not defined, use DEFAULT_OPERATOR_SOURCE.
+    if [[ -z "${operator_source}" ]]; then
+        operator_source="${DEFAULT_OPERATOR_SOURCE}"
     fi
 
     # If "!install" in target_namespaces, use the install namespace
