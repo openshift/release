@@ -95,7 +95,7 @@ tests:
         oc wait --for=condition=available deployment/rekor-redis -n securesign --timeout=60s
         oc wait --for=condition=available deployment/rekor-server -n securesign --timeout=60s
         oc apply -f ci/openshift/job.yaml -n default
-        oc wait --for=condition=complete job/trusted-artifact-signer-test-sign-verify --timeout=5m -n securesign
+        oc wait --for=condition=complete job/trusted-artifact-signer-test-sign-verify --timeout=5m -n default
         TOKEN=$(curl -k -X POST -H "Content-Type: application/x-www-form-urlencoded" -d "username=jdoe" -d "password=secure" -d "grant_type=password" -d "scope=openid" -d "client_id=sigstore" $OIDC_ISSUER/protocol/openid-connect/token |  sed -E 's/.*"access_token":"([^"]*).*/\1/')
         FULCIO_URL=https://$(oc get route  -n securesign -l app.kubernetes.io/component=fulcio | tail -n 1 | awk '{print $2}')
         REKOR_URL=https://$(oc get route  -n securesign -l app.kubernetes.io/component=rekor-server | tail -n 1 | awk '{print $2}')
