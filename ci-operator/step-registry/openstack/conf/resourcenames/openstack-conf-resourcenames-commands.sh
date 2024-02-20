@@ -49,7 +49,7 @@ declare -A compute_azs=(
 	['openstack-vh-mecha-az0']='nova'
 	['openstack-nfv']=''
 	['openstack-hwoffload']=''
-	['openstack-nerc-dev']=''
+	['openstack-nerc-dev']='nova'
 	)
 
 declare -A bastion_flavor=(

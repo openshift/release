@@ -23,12 +23,12 @@ else
   mkdir /tmp/hs-cli
   brew_registry_auth=$(echo -n "${BREW_IMAGE_REGISTRY_USERNAME}:$(<$BREW_IMAGE_REGISTRY_TOKEN_PATH)" | base64 -w 0)
   echo '{}' | jq --arg auth "$brew_registry_auth" '.auths += {"brew.registry.redhat.io": {"auth": $auth}}' > /tmp/brew_configjson
-  oc image extract "brew.${HO_IMAGE}" --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/brew_configjson
-  chmod +x /tmp/hs-cli/hypershift
+  oc image extract "brew.${HO_IMAGE}" --path /usr/bin/hypershift-no-cgo:/tmp/hs-cli --registry-config=/tmp/brew_configjson
+  chmod +x /tmp/hs-cli/hypershift-no-cgo
 fi
 
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-/tmp/hs-cli/hypershift dump cluster --artifact-dir=$ARTIFACT_DIR \
+/tmp/hs-cli/hypershift-no-cgo dump cluster --artifact-dir=$ARTIFACT_DIR \
 --namespace local-cluster \
 --dump-guest-cluster=true \
 --name="${CLUSTER_NAME}"
