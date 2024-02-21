@@ -178,19 +178,26 @@ function check_mcp() {
 
 function wait_mcp_continous_success() {
     local try=0 continous_successful_check=0 passed_criteria=5 max_retries=30 ret=0
+    local continous_degraded_check=0 degraded_criteria=5
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
         ret=0
         check_mcp || ret=$?
         if [[ "$ret" == "0" ]]; then
+            continous_degraded_check=0
             echo "Passed #${continous_successful_check}"
             (( continous_successful_check += 1 ))
         elif [[ "$ret" == "1" ]]; then
             echo "Some machines are updating..."
             continous_successful_check=0
+            continous_degraded_check=0
         else
-            echo "Some machines are degraded..."
-            break
+            continous_successful_check=0
+            echo "Some machines are degraded #${continous_degraded_check}..."
+            (( continous_degraded_check += 1 ))
+            if (( continous_degraded_check >= degraded_criteria )); then
+                break
+            fi
         fi
         echo "wait and retry..."
         sleep 60
