@@ -159,6 +159,55 @@ function post-OCP-47197(){
     return 0
 }
 
+function post-OCP-53921(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    local arch version
+    arch=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "ReleaseAccepted")|.message')
+    if [[ "${arch}" != *"Multi"* ]]; then
+        echo "The architecture info: ${arch} is not expected!"
+        return 1
+    fi
+    version="$(oc get clusterversion --no-headers | awk '{print $2}')"
+    if [ -z "${version}" ] ; then
+        echo "Fail to get cluster version!"
+        return 1
+    fi
+    x_ver=$( echo "${version}" | cut -f1 -d. )
+    y_ver=$( echo "${version}" | cut -f2 -d. )
+    y_ver=$((y_ver+1))
+    ver="${x_ver}.${y_ver}"
+    if ! oc adm upgrade channel candidate-${ver}; then
+        echo "Fail to change channel to candidate-${ver}!"
+        return 1
+    fi
+    recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates')
+    if [[ "${recommends}" == "null" ]]; then
+        echo "No recommended update available!"
+        return 1
+    fi
+    mapfile -t images < <(echo ${recommends}|jq -r '.[].image')
+    if [ -z "${images[*]}" ]; then
+        echo "No image extracted from recommended update!"
+        return 1
+    fi
+    for image in ${images[*]}; do
+        if [[ "${image}" == "null" ]] ; then
+            echo "No image info!"
+            return 1
+        fi
+        metadata=$(oc adm release info ${image} -ojson|jq .metadata.metadata)
+        if [[ "${metadata}" == "null" ]]; then
+            echo "No metadata for recommended update ${image}!"
+            continue
+        fi
+        if [[ "${metadata}" != *"multi"* ]]; then
+            echo "The architecture info ${metadata} of recommended update ${image} is not expected!"
+            return 1
+        fi
+    done
+    return 0
+}
+
 # This func run all test cases with with checkpoints which will not break other cases,
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be ran or not

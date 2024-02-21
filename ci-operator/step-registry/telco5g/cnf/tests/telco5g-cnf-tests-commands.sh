@@ -277,6 +277,8 @@ if [[ "$T5CI_VERSION" == "4.16" ]]; then
     export CNF_TESTS_IMAGE="cnf-tests:4.15"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
+    # TARGET_RELEASE is used by cnf-features-deploy. If not set, it defaults to the main branch
+    export TARGET_RELEASE=$CNF_BRANCH
     export CNF_TESTS_IMAGE="cnf-tests:${T5CI_VERSION}"
 fi
 
@@ -292,15 +294,15 @@ if [[ ! -d "${CNF_REPO_DIR}" ]]; then
 fi
 
 pushd $CNF_REPO_DIR
+echo "******** Checking out pull request for repository cnf-features-deploy if exists"
+check_for_pr "openshift-kni" "cnf-features-deploy"
 if [[ "$T5CI_VERSION" == "4.15" ]] || [[ "$T5CI_VERSION" == "4.16" ]]; then
     echo "Updating all submodules for >=4.15 versions"
     # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
     sed -i "s@https://github.com/openshift/metallb-operator.git@https://github.com/openshift/metallb-operator.git\n        branch = main@" .gitmodules
-    git submodule update --init --force --recursive --remote
+    make init-git-submodules
     git submodule foreach --recursive 'echo $path `git config --get remote.origin.url` `git rev-parse HEAD`' | grep -v Entering > ${ARTIFACT_DIR}/hashes.txt || true
 fi
-echo "******** Checking out pull request for repository cnf-features-deploy if exists"
-check_for_pr "openshift-kni" "cnf-features-deploy"
 popd
 
 echo "******** Patching OperatorHub to disable all default sources"

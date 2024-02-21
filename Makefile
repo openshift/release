@@ -67,7 +67,7 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20240205-8f023a0da6 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20240214-e08ed13174 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
@@ -303,7 +303,7 @@ openshift-image-mirror-mappings:
 .PHONY: openshift-image-mirror-mappings
 
 config_updater_vault_secret: build_farm_credentials_folder
-	@[[ $$cluster ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
+	@[[ $$CLUSTER ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/applyconfig:latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) \
 		--rm \
@@ -311,11 +311,11 @@ config_updater_vault_secret: build_farm_credentials_folder
 		-v "$(kubeconfig_path):/_kubeconfig$(VOLUME_MOUNT_FLAGS)" \
 		registry.ci.openshift.org/ci/applyconfig:latest \
 		--config-dir=/manifests \
-		--context=$(cluster) \
+		--context=$(CLUSTER) \
 		--confirm \
 		--kubeconfig=/_kubeconfig
 
-	./clusters/psi/create_kubeconfig.sh "$(build_farm_credentials_folder)/sa.config-updater.${cluster}.config" ${cluster} config-updater ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
+	./clusters/psi/create_kubeconfig.sh "$(build_farm_credentials_folder)/sa.config-updater.${CLUSTER}.config" ${CLUSTER} config-updater ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
 
 	ls $(build_farm_credentials_folder)
 
@@ -394,7 +394,7 @@ refresh-token-version:
 
 DRY_RUN ?= server
 CLUSTER ?= app.ci
-API_SERVER_URL ?= "https://api.ci.l2s4.p1.openshiftapps.com:6443"
+API_SERVER_URL ?= $(shell oc --context ${CLUSTER} config view --minify --output jsonpath="{.clusters[*].cluster.server}")
 TMPDIR ?= /tmp
 
 expire-token-version:
@@ -417,7 +417,6 @@ config-updater-kubeconfig:
 secret-config-updater:
 	oc --context app.ci -n ci create secret generic config-updater \
 	--from-file=sa.config-updater.app.ci.config=$(TMPDIR)/sa.config-updater.app.ci.config \
-	--from-file=sa.config-updater.arm01.config=$(TMPDIR)/sa.config-updater.arm01.config \
 	--from-file=sa.config-updater.build01.config=$(TMPDIR)/sa.config-updater.build01.config \
 	--from-file=sa.config-updater.build02.config=$(TMPDIR)/sa.config-updater.build02.config \
 	--from-file=sa.config-updater.build03.config=$(TMPDIR)/sa.config-updater.build03.config \
@@ -425,7 +424,6 @@ secret-config-updater:
 	--from-file=sa.config-updater.build05.config=$(TMPDIR)/sa.config-updater.build05.config \
 	--from-file=sa.config-updater.build09.config=$(TMPDIR)/sa.config-updater.build09.config \
 	--from-file=sa.config-updater.hive.config=$(TMPDIR)/sa.config-updater.hive.config \
-	--from-file=sa.config-updater.multi01.config=$(TMPDIR)/sa.config-updater.multi01.config \
 	--from-file=sa.config-updater.vsphere02.config=$(TMPDIR)/sa.config-updater.vsphere02.config \
 	--dry-run=client -o json | oc --context app.ci apply --dry-run=${DRY_RUN} --as system:admin -f -
 .PHONY: secret-config-updater

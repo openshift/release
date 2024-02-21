@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
+  cluster: build01
   cron: 0 8 */2 * *
   decorate: true
   extra_refs:
@@ -15,6 +15,17 @@ periodics:
     job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-redhat-chaos-prow-scripts-main-4.14-nightly-arm-krkn-hub-tests-arm
+  reporter_config:
+    slack:
+      channel: '#chaos-ci-results'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
   spec:
     containers:
     - args:
@@ -79,7 +90,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build01
   cron: 0 6 */7 * MON
   decorate: true
   extra_refs:
@@ -94,6 +105,17 @@ periodics:
     job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-redhat-chaos-prow-scripts-main-4.14-nightly-krkn-hub-cloud-api-tests
+  reporter_config:
+    slack:
+      channel: '#chaos-ci-results'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
   spec:
     containers:
     - args:
@@ -158,7 +180,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build01
   cron: 0 8 * * 1
   decorate: true
   extra_refs:
@@ -173,6 +195,17 @@ periodics:
     job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-redhat-chaos-prow-scripts-main-4.14-nightly-krkn-hub-tests-414
+  reporter_config:
+    slack:
+      channel: '#chaos-ci-results'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
   spec:
     containers:
     - args:
@@ -237,7 +270,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build01
   cron: 0 4 * * 1
   decorate: true
   extra_refs:
@@ -252,6 +285,17 @@ periodics:
     job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-redhat-chaos-prow-scripts-main-4.15-nightly-krkn-hub-tests-415
+  reporter_config:
+    slack:
+      channel: '#chaos-ci-results'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
   spec:
     containers:
     - args:
@@ -316,7 +360,97 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build04
+  cron: 29 5 * * 2
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: redhat-chaos
+    repo: prow-scripts
+  labels:
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
+    ci-operator.openshift.io/variant: 4.15-nightly
+    ci.openshift.io/generator: prowgen
+    job-release: "4.15"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-redhat-chaos-prow-scripts-main-4.15-nightly-krkn-hub-tests-415-gcp
+  reporter_config:
+    slack:
+      channel: '#chaos-ci-results'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/krkn-hub-tests-415-gcp-cluster-profile
+      - --target=krkn-hub-tests-415-gcp
+      - --variant=4.15-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/krkn-hub-tests-415-gcp-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-gcp-qe
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
   cron: 0 4 * * 1
   decorate: true
   extra_refs:
@@ -331,6 +465,17 @@ periodics:
     job-release: "4.16"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-redhat-chaos-prow-scripts-main-4.16-nightly-krkn-hub-tests-416
+  reporter_config:
+    slack:
+      channel: '#chaos-ci-results'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
   spec:
     containers:
     - args:
@@ -395,7 +540,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build01
   cron: 0 17 * * 2
   decorate: true
   decoration_config:
@@ -412,6 +557,17 @@ periodics:
     job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-redhat-chaos-prow-scripts-main-rosa-4.14-nightly-ocp-qe-perfscale-ci-tests-rosa
+  reporter_config:
+    slack:
+      channel: '#chaos-ci-results'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
   spec:
     containers:
     - args:
@@ -476,7 +632,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build01
   cron: 0 14 * * 2
   decorate: true
   decoration_config:
@@ -493,6 +649,17 @@ periodics:
     job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-redhat-chaos-prow-scripts-main-rosa-4.14-nightly-ocp-qe-perfscale-ci-tests-rosa-hog
+  reporter_config:
+    slack:
+      channel: '#chaos-ci-results'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
   spec:
     containers:
     - args:
@@ -557,7 +724,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build01
   cron: 0 3 * * 2
   decorate: true
   decoration_config:
@@ -574,6 +741,17 @@ periodics:
     job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-redhat-chaos-prow-scripts-main-rosa-4.15-nightly-ocp-qe-perfscale-ci-tests-rosa
+  reporter_config:
+    slack:
+      channel: '#chaos-ci-results'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
   spec:
     containers:
     - args:
@@ -638,7 +816,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build01
   cron: 0 1 * * 2
   decorate: true
   decoration_config:
@@ -655,6 +833,17 @@ periodics:
     job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-redhat-chaos-prow-scripts-main-rosa-4.15-nightly-ocp-qe-perfscale-ci-tests-rosa-hog
+  reporter_config:
+    slack:
+      channel: '#chaos-ci-results'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
   spec:
     containers:
     - args:

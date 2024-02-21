@@ -137,6 +137,18 @@ platform:
   fi
 fi
 
+echo "[INFO] Looking for patches to the install-config.yaml..."
+
+shopt -s nullglob
+for f in "${SHARED_DIR}"/*_patch_install_config.yaml;
+do
+  if test -f "${f}"
+  then
+      echo "[INFO] Applying patch file: $f"
+      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" $f
+  fi
+done
+
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
 

@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
 set -o pipefail
 
 # IBM Cloud CLI login
@@ -28,7 +27,6 @@ CLUSTER_FILTER="${NAMESPACE}-${UNIQUE_HASH}"
 hasError=0
 
 resource_group=$(${IBMCLOUD_CLI} resource groups | awk '(NR>3) {print $1}' | grep ${CLUSTER_FILTER})
-
 echo "Resource group: $resource_group"
 
 if [ ! -z ${resource_group} ]; then

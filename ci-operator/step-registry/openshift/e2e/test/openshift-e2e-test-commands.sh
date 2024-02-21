@@ -11,6 +11,8 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
+echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
+
 # HACK: HyperShift clusters use their own profile type, but the cluster type
 # underneath is actually AWS and the type identifier is derived from the profile
 # type. For now, just treat the `hypershift` type the same as `aws` until
