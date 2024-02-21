@@ -13,6 +13,13 @@ export GITHUB_TOKEN=$github_token
 release_payload_modifier_token=$(cat /var/run/vault/release-payload-modifier-token/token)
 export RELEASE_PAYLOAD_MODIFIER_TOKEN=$release_payload_modifier_token
 
+echo "Login cluster app.ci"
+oc login api.ci.l2s4.p1.openshiftapps.com:6443 --token=$RELEASE_PAYLOAD_MODIFIER_TOKEN
+oc whoami
+
+echo "Test whehter releasepayload can be accessed"
+oc get releasepayload/4.16.0-0.nightly-2024-02-03-221256 -n ocp
+
 python3 -V
 
 #VALID_RELEASES="4.11 4.12 4.13 4.14 4.15 4.16"
@@ -25,7 +32,3 @@ do
 done
 
 jobctl start-aggregator
-
-echo $RELEASE_PAYLOAD_MODIFIER_TOKEN
-oc login api.ci.l2s4.p1.openshiftapps.com:6443 --token=$RELEASE_PAYLOAD_MODIFIER_TOKEN
-oc get releasepayload/4.16.0-0.nightly-2024-02-03-221256 -n ocp
