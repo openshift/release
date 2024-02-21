@@ -6,18 +6,30 @@ set -o pipefail
 # Temp debug
 trap 'sleep 4h' EXIT TERM SIGINT INT
 
+ODF_INSTALL_NAMESPACE="openshift-storage"
+
+echo "Creating the ODF installation namespace"
+oc apply -f - <<EOF
+  apiVersion: v1
+  kind: Namespace
+  metadata:
+      labels:
+        openshift.io/cluster-monitoring: "true"
+      name: "${ODF_INSTALL_NAMESPACE}"
+EOF
+
 echo "Applying StorageSystem after operator installation completed"
 
 cat <<EOF | oc apply -f -
-apiVersion: odf.openshift.io/v1alpha1
-kind: StorageSystem
-metadata:
-  name: ocs-storagecluster-storagesystem
-  namespace: "${ODF_INSTALL_NAMESPACE}"
-spec:
-  kind: storagecluster.ocs.openshift.io/v1
-  name: ocs-storagecluster
-  namespace: "${ODF_INSTALL_NAMESPACE}"
+  apiVersion: odf.openshift.io/v1alpha1
+  kind: StorageSystem
+  metadata:
+    name: ocs-storagecluster-storagesystem
+    namespace: "${ODF_INSTALL_NAMESPACE}"
+  spec:
+    kind: storagecluster.ocs.openshift.io/v1
+    name: ocs-storagecluster
+    namespace: "${ODF_INSTALL_NAMESPACE}"
 EOF
 
 sleep 120
