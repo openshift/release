@@ -166,9 +166,6 @@ oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=30m
 
 if [[ "\$(hostname)" != "${NEW_HOSTNAME}" ]]
 then
-  echo "Deleting node object before changing the hostname..."
-  oc delete node "\$(oc get nodes -ojsonpath='{.items[?(@.metadata.name == "'"\$(hostname)"'")].metadata.name}')"
-
   systemctl stop kubelet.service
   # Forcefully remove all pods rather than just stop them, because a different hostname
   # requires new pods to be created by kubelet.
