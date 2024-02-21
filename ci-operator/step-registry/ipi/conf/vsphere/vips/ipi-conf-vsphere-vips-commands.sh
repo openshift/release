@@ -73,4 +73,5 @@ echo "Contents of vips.txt..."
 cat "${SHARED_DIR}"/vips.txt
 echo "Contents of machinecidr.txt..."
 cat "${SHARED_DIR}"/machinecidr.txt
-exit 1
+echo "Contents of vsphere_env.txt..."
+cat "${SHARED_DIR}"/vsphere_env.txt
