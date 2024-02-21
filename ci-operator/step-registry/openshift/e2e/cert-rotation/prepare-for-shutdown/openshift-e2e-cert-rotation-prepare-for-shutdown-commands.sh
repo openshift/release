@@ -160,7 +160,7 @@ spec:
               echo "Gather info..."
               echo "---------------------------------"
               # context
-              intapi=$(${OC} get infrastructures.config.openshift.io cluster -o "jsonpath={.status.apiServerInternalURI}")
+              intapi=$(${OC} --kubeconfig=/etc/kubernetes/kubeconfig get infrastructures.config.openshift.io cluster -o "jsonpath={.status.apiServerInternalURI}")
               context="$(${OC} --kubeconfig=/etc/kubernetes/kubeconfig config current-context)"
               # cluster
               cluster="$(${OC} --kubeconfig=/etc/kubernetes/kubeconfig config view -o "jsonpath={.contexts[?(@.name==\"$context\")].context.cluster}")"
