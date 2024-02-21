@@ -52,7 +52,7 @@ copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
 # Set date for host
 sudo timedatectl status
-sudo timedatectl set-time ${SKEW}
+sudo timedatectl set-time +${SKEW}
 sudo timedatectl status
 
 # Skew clock on every node
