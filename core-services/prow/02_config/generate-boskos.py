@@ -75,8 +75,8 @@ CONFIG = {
         'us-east-2': 5,
     },
     'aws-local-zones-quota-slice': {
-        'us-east-1': 2,
-        'us-west-2': 2
+        'us-east-1': 5,
+        'us-west-2': 5
     },
     'aws-perf-qe-quota-slice': {
         'us-west-2': 3,
