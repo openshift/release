@@ -500,8 +500,7 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   echo "    SAHRED_VPC_BASE_DOMAIN: ${SAHRED_VPC_BASE_DOMAIN}"
 fi
 
-echo -e "
-rosa create cluster -y \
+echo -e "rosa create cluster -y \
 ${STS_SWITCH} \
 --mode auto \
 --cluster-name ${CLUSTER_NAME} \
