@@ -11,7 +11,7 @@ github_token=$(cat "/var/run/vault/tests-private-account/token-git")
 export GITHUB_TOKEN=$github_token
 
 release_payload_modifier_token=$(cat /var/run/vault/release-payload-modifier-token)
-export RELEASE_PAYLOAD_MODIFIER_TOKEN=$releasepayload_token
+export RELEASE_PAYLOAD_MODIFIER_TOKEN=$release_payload_modifier_token
 
 python3 -V
 
