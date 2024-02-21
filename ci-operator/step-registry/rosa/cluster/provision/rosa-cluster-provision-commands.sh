@@ -605,6 +605,15 @@ while true; do
 done
 rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}"
 
+# Verify the subnets of the cluster to remove the 'Inflight Checks' warning
+if [[ "$ENABLE_BYOVPC" == "true" ]]; then
+  verify_cmd=$(rosa verify network -c ${CLUSTER_ID} | grep 'rosa verify network' || true)
+  if [[ ! -z "$verify_cmd" ]]; then
+    echo -e "Force verifying the network of the cluster to remove the 'Inflight Checks' warning\n$verify_cmd"
+    eval $verify_cmd
+  fi
+fi
+
 # Output
 # Print console.url and api.url
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
