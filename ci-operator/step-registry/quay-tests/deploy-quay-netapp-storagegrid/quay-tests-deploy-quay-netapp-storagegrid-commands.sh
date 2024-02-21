@@ -81,13 +81,14 @@ DISTRIBUTED_STORAGE_PREFERENCE:
   - default
 DISTRIBUTED_STORAGE_CONFIG:
   default:
-    - S3Storage
-    - s3_bucket: $QUAY_NETAPP_STORAGEGRID_BUCKET
-      storage_path: /quay
-      s3_access_key: $QUAY_NETAPP_STORAGEGRID_ACCESS_KEY
-      s3_secret_key: $QUAY_NETAPP_STORAGEGRID_SECRET_KEY
-      host: $QUAY_NETAPP_STORAGEGRID_HOSTNAME
-      s3_region: us-east-1
+    - RadosGWStorage
+    - access_key: $QUAY_NETAPP_STORAGEGRID_ACCESS_KEY
+      bucket_name: $QUAY_NETAPP_STORAGEGRID_BUCKET
+      hostname: $QUAY_NETAPP_STORAGEGRID_HOSTNAME
+      is_secure: true
+      port: 443
+      secret_key: $QUAY_NETAPP_STORAGEGRID_SECRET_KEY
+      storage_path: /datastorage/registry
 EOF
 
 oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
