@@ -148,9 +148,9 @@ function capi_envtest_monitor() {
 
   mkdir -p "${ARTIFACT_DIR}/envtest"
 
-  while true 
-  do 
-    apiresources=$(KUBECONFIG="${dir}/auth/envtest.kubeconfig" oc api-resources --verbs=list -o name)
+  while true
+  do
+    apiresources=$(KUBECONFIG="${dir}/auth/envtest.kubeconfig" oc api-resources --verbs=list -o name | grep -v 'secrets\|customresourcedefinitions')
 
     for api in ${apiresources}; do
       filename=$(echo "$api" | awk -F. '{print $1}')
