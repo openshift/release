@@ -20,10 +20,11 @@ SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'Stri
 SCP=${SCP:-scp ${SSH_OPTS}}
 SSH=${SSH:-ssh ${SSH_OPTS}}
 COMMAND_TIMEOUT=15m
+OC=${OC:-oc --insecure-skip-tls-verify --request-timeout=5s}
 
-mapfile -d ' ' -t control_nodes < <( oc get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
+mapfile -d ' ' -t control_nodes < <( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
-mapfile -d ' ' -t compute_nodes < <( oc get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
+mapfile -d ' ' -t compute_nodes < <( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
 ssh-keyscan -H ${control_nodes[@]} ${compute_nodes[@]} >> ~/.ssh/known_hosts
 
@@ -52,26 +53,26 @@ function copy-file-from-first-master {
 function wait-for-nodes-to-be-ready {
   run-on-first-master-silent "
     export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
-    until oc get nodes; do sleep 30; done
-    mapfile -d ' ' -t nodes < <( oc get nodes -o name )
+    until ${OC} get nodes; do sleep 30; done
+    mapfile -d ' ' -t nodes < <( ${OC} get nodes -o name )
     for nodename in \${nodes[@]}; do
       echo -n \"Waiting for \${nodename} to become Ready\"
       while true; do
-        STATUS=\$(oc get \${nodename} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}')
-        TIME_DIFF=\$((\$(date +%s)-\$(date -d \$(oc get \${nodename} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].lastHeartbeatTime}') +%s)))
+        STATUS=\$(${OC} get \${nodename} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}')
+        TIME_DIFF=\$((\$(date +%s)-\$(date -d \$(${OC} get \${nodename} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].lastHeartbeatTime}') +%s)))
         if [[ \${TIME_DIFF} -le 100 ]] && [[ \${STATUS} == True ]]; then
           break
         fi
-        oc get csr | grep Pending | cut -f1 -d' ' | xargs -r oc adm certificate approve || true
+        ${OC} get csr | grep Pending | cut -f1 -d' ' | xargs -r ${OC} adm certificate approve || true
         echo -n \".\"
         sleep 15
       done
       echo \"\"
     done
     sleep 30
-    oc get nodes
+    ${OC} get nodes
     echo \"Approving serving certificates\"
-    oc get csr | grep Pending | cut -f1 -d' ' | xargs -r oc adm certificate approve || true
+    ${OC}get csr | grep Pending | cut -f1 -d' ' | xargs -r ${OC} adm certificate approve || true
     echo \"Done\"
   "
 }
@@ -79,9 +80,9 @@ function wait-for-nodes-to-be-ready {
 function pod-restart-workarounds {
   # Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
   # Restart OVN / Multus before proceeding
-  retry "oc -n openshift-multus delete pod -l app=multus --force --grace-period=0"
-  retry "oc -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0"
-  retry "oc -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0"
+  ${OC} -n openshift-multus delete pod -l app=multus --force --grace-period=0
+  ${OC} -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0
+  ${OC} -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0
 }
 
 function prepull-tools-image-for-gather-step {
@@ -94,9 +95,9 @@ function prepull-tools-image-for-gather-step {
 function wait-for-operators-to-stabilize {
   # Wait for operators to stabilize
   if
-    ! oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m; then
-      oc get nodes
-      oc get co | grep -v "True\s\+False\s\+False"
+    ! ${OC} adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m; then
+      ${OC} get nodes
+      ${OC} get co | grep -v "True\s\+False\s\+False"
       exit 1
   fi
 }
@@ -121,8 +122,8 @@ fi
 source /usr/local/share/cert-rotation-functions.sh
 prepull-tools-image-for-gather-step
 
-oc -n openshift-machine-config-operator create serviceaccount kubelet-bootstrap-cred-manager
-oc -n openshift-machine-config-operator adm policy add-cluster-role-to-user cluster-admin -z kubelet-bootstrap-cred-manager
+${OC} -n openshift-machine-config-operator create serviceaccount kubelet-bootstrap-cred-manager
+${OC} -n openshift-machine-config-operator adm policy add-cluster-role-to-user cluster-admin -z kubelet-bootstrap-cred-manager
 cat << 'EOZ' > /tmp/kubelet-bootstrap-cred-manager-ds.yaml
 apiVersion: apps/v1
 kind: DaemonSet
@@ -151,6 +152,7 @@ spec:
 
             set -eoux pipefail
 
+            OC=${OC:-oc --insecure-skip-tls-verify --request-timeout=5s}
             while true; do
               unset KUBECONFIG
 
@@ -158,15 +160,15 @@ spec:
               echo "Gather info..."
               echo "---------------------------------"
               # context
-              intapi=$(oc get infrastructures.config.openshift.io cluster -o "jsonpath={.status.apiServerInternalURI}")
-              context="$(oc --kubeconfig=/etc/kubernetes/kubeconfig config current-context)"
+              intapi=$(${OC} get infrastructures.config.openshift.io cluster -o "jsonpath={.status.apiServerInternalURI}")
+              context="$(${OC} --kubeconfig=/etc/kubernetes/kubeconfig config current-context)"
               # cluster
-              cluster="$(oc --kubeconfig=/etc/kubernetes/kubeconfig config view -o "jsonpath={.contexts[?(@.name==\"$context\")].context.cluster}")"
-              server="$(oc --kubeconfig=/etc/kubernetes/kubeconfig config view -o "jsonpath={.clusters[?(@.name==\"$cluster\")].cluster.server}")"
+              cluster="$(${OC} --kubeconfig=/etc/kubernetes/kubeconfig config view -o "jsonpath={.contexts[?(@.name==\"$context\")].context.cluster}")"
+              server="$(${OC} --kubeconfig=/etc/kubernetes/kubeconfig config view -o "jsonpath={.clusters[?(@.name==\"$cluster\")].cluster.server}")"
               # token
-              ca_crt_data="$(oc get secret -n openshift-machine-config-operator node-bootstrapper-token -o "jsonpath={.data.ca\.crt}" | base64 --decode)"
-              namespace="$(oc get secret -n openshift-machine-config-operator node-bootstrapper-token  -o "jsonpath={.data.namespace}" | base64 --decode)"
-              token="$(oc get secret -n openshift-machine-config-operator node-bootstrapper-token -o "jsonpath={.data.token}" | base64 --decode)"
+              ca_crt_data="$(${OC} get secret -n openshift-machine-config-operator node-bootstrapper-token -o "jsonpath={.data.ca\.crt}" | base64 --decode)"
+              namespace="$(${OC} get secret -n openshift-machine-config-operator node-bootstrapper-token  -o "jsonpath={.data.namespace}" | base64 --decode)"
+              token="$(${OC} get secret -n openshift-machine-config-operator node-bootstrapper-token -o "jsonpath={.data.token}" | base64 --decode)"
 
               echo "---------------------------------"
               echo "Generate kubeconfig"
@@ -187,7 +189,7 @@ spec:
               echo "---------------------------------"
               echo "Whoami?"
               echo "---------------------------------"
-              oc whoami
+              ${OC} whoami
               whoami
 
               echo "---------------------------------"
@@ -234,11 +236,11 @@ spec:
             type: Directory
           name: kubelet-dir
 EOZ
-oc create -f /tmp/kubelet-bootstrap-cred-manager-ds.yaml
-oc -n openshift-machine-config-operator wait pods -l k8s-app=kubelet-bootstrap-cred-manager --for condition=Ready --timeout=300s
-oc -n openshift-kube-controller-manager-operator delete secrets/csr-signer-signer secrets/csr-signer
-oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=30m
-oc -n openshift-machine-config-operator delete ds kubelet-bootstrap-cred-manager
+${OC} create -f /tmp/kubelet-bootstrap-cred-manager-ds.yaml
+${OC} -n openshift-machine-config-operator wait pods -l k8s-app=kubelet-bootstrap-cred-manager --for condition=Ready --timeout=300s
+${OC} -n openshift-kube-controller-manager-operator delete secrets/csr-signer-signer secrets/csr-signer
+${OC} adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=30m
+${OC} -n openshift-machine-config-operator delete ds kubelet-bootstrap-cred-manager
 
 EOF
 chmod +x "${SHARED_DIR}"/prepare-nodes-for-shutdown.sh
