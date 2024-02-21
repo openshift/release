@@ -15,20 +15,16 @@ export RELEASE_PAYLOAD_MODIFIER_TOKEN=$release_payload_modifier_token
 
 echo "Login cluster app.ci"
 oc login api.ci.l2s4.p1.openshiftapps.com:6443 --token=$RELEASE_PAYLOAD_MODIFIER_TOKEN
-oc whoami
 
-echo "Test whehter releasepayload can be accessed"
-oc get releasepayload/4.16.0-0.nightly-2024-02-20-014802 -n ocp
-
-python3 -V
-
+echo "\n********* Start job controller *********\n"
 #VALID_RELEASES="4.11 4.12 4.13 4.14 4.15 4.16"
 VALID_RELEASES="4.16"
 for release in $VALID_RELEASES
 do
-  echo "start job controller for $release"
+  echo "\nstart job controller for $release"
   jobctl start-controller -r $release
   jobctl start-controller -r $release --no-nightly
 done
 
+echo "\n********* Start test result aggregator *********\n"
 jobctl start-aggregator
