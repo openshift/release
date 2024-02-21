@@ -18,21 +18,25 @@ tests:
 - as: checklinks-pr
   commands: |
     ARTIFACT_DIR="${ARTIFACTS:-/tmp/artifacts}"
-    LOG_FILE="$ARTIFACT_DIR/build-log.log"
     mkdir -p "$ARTIFACT_DIR"
     TEMP_FILE=$(mktemp -p "$ARTIFACT_DIR" broken_links_XXXXXX)
-    grep -rEo "(http|https)://[a-zA-Z0-9./?=_-]*" . | sort -u | while IFS= read -r URL; do
-        status=$(curl -o /dev/null --silent --head --write-out '%{http_code}\n' "$URL")
-        if [[ "$status" != "200" ]]; then
-            echo "$URL" >> "$TEMP_FILE"
+    for file in $(find . -type f -print); do
+      grep -shEo "(http|https)://[a-zA-Z0-9./?=_-]*" $file | sort -u | while IFS= read -r URL; do
+        #  remove trailing "." before curl. This shouldn't exist but is allowed.
+        cleanurl=${URL%.}
+        s=$(curl "$cleanurl" --head --silent --write-out '%{response_code}' -o /dev/null)
+        if [[ "$s" == "404" ]]; then
+          echo "Path: $file" >> "$TEMP_FILE"
+          echo "URL: $URL" >> "$TEMP_FILE"
         fi
+      done
     done
     if [ -s "$TEMP_FILE" ]; then
-        echo "Broken links detected:" | tee -a "$LOG_FILE"
-        cat "$TEMP_FILE" | tee -a "$LOG_FILE"
+        echo "Broken links detected:"
+        cat "$TEMP_FILE"
         exit 1
     else
-        echo "No broken links detected." | tee -a "$LOG_FILE"
+        echo "No broken links detected."
         exit 0
     fi
   container:
@@ -40,21 +44,24 @@ tests:
 - as: checklinks-weekly
   commands: |
     ARTIFACT_DIR="${ARTIFACTS:-/tmp/artifacts}"
-    LOG_FILE="$ARTIFACT_DIR/build-log.log"
     mkdir -p "$ARTIFACT_DIR"
     TEMP_FILE=$(mktemp -p "$ARTIFACT_DIR" broken_links_XXXXXX)
-    grep -rEo "(http|https)://[a-zA-Z0-9./?=_-]*" . | sort -u | while IFS= read -r URL; do
-        status=$(curl -o /dev/null --silent --head --write-out '%{http_code}\n' "$URL")
-        if [[ "$status" != "200" ]]; then
-            echo "$URL" >> "$TEMP_FILE"
+    for file in $(find . -type f -print); do
+      grep -shEo "(http|https)://[a-zA-Z0-9./?=_-]*" $file | sort -u | while IFS= read -r URL; do
+        cleanurl=${URL%.}
+        s=$(curl "$cleanurl" --head --silent --write-out '%{response_code}' -o /dev/null)
+        if [[ "$s" == "404" ]]; then
+          echo "Path: $file" >> "$TEMP_FILE"
+          echo "URL: $URL" >> "$TEMP_FILE"
         fi
+      done
     done
     if [ -s "$TEMP_FILE" ]; then
-        echo "Broken links detected:" | tee -a "$LOG_FILE"
-        cat "$TEMP_FILE" | tee -a "$LOG_FILE"
+        echo "Broken links detected:"
+        cat "$TEMP_FILE"
         exit 1
     else
-        echo "No broken links detected." | tee -a "$LOG_FILE"
+        echo "No broken links detected."
         exit 0
     fi
   container:
