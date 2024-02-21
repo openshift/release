@@ -44,6 +44,7 @@ read -a vsphere_basedomains_list <<< "${VSPHERE_ADDITIONAL_BASEDOMAINS}"
 num_vips=$((2 + 2*${#vsphere_basedomains_list[@]}))
 
 if [[ ${vsphere_portgroup} == *"segment"* ]]; then
+  echo "Using segment"
   third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
   echo "192.168.${third_octet}.0/25" >>"${SHARED_DIR}"/machinecidr.txt
@@ -53,6 +54,7 @@ if [[ ${vsphere_portgroup} == *"segment"* ]]; then
       grab_vip_seg "${third_octet}" $((i+2))
     done
 else
+  echo "Non-segment"
   if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
     echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
     exit 1
@@ -69,3 +71,6 @@ jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID
 
 echo "Contents of vips.txt..."
 cat "${SHARED_DIR}"/vips.txt
+echo "Contents of machinecidr.txt..."
+cat "${SHARED_DIR}"/machinecidr.txt
+exit 1
