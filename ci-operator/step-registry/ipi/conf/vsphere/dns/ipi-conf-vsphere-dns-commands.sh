@@ -126,7 +126,7 @@ for ((i = 0; i < ${#HOSTNAMES[@]}; i++)); do
 done
 # Snowflake for the default api-int, which shares a vip with the default api.
 echo "Adding "api-int.$cluster_domain" to batch files"
-dns_reserve_and_defer_cleanup 0 "api-int.$cluster_domain"
+dns_reserve_and_defer_cleanup 0 "api-int.$cluster_domain."
 
 echo "Contents of dns-create.json..."
 cat "${SHARED_DIR}"/dns-create.json
