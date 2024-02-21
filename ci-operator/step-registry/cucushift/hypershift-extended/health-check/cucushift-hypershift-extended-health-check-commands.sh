@@ -137,5 +137,10 @@ export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 echo "check guest cluster"
 print_clusterversion
 check_node_status || exit 1
-retry check_cluster_operators || exit 1
+
+# ignore co check in hypershift disaster recover mode
+hypershift_dr_mode=$(cat "${SHARED_DIR}/hypershift-dr-mode")
+if [[ "${hypershift_dr_mode}" != "true" ]] ; then
+  retry check_cluster_operators || exit 1
+fi
 retry check_pod_status || exit 1
