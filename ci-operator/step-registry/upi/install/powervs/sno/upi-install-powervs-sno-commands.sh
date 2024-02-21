@@ -638,8 +638,9 @@ cat > "/tmp/powervs-config.json" << EOF
 {"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${POWERVS_RESOURCE_GROUP}"}
 EOF
 cp "/tmp/powervs-config.json" "${SHARED_DIR}/"
+cp "/etc/sno-power-credentials/ssh-privatekey" "${SHARED_DIR}/"
 #Copy the auth artifacts to shared dir for the next steps
-scp -r "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/* ${SHARED_DIR}/.
+scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/* "${SHARED_DIR}/"
 echo "Finished prepare_next_steps"
 
 echo "Test cluster accessiblity"
