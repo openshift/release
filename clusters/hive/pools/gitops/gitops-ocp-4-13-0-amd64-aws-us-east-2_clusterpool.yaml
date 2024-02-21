@@ -1,27 +1,30 @@
 apiVersion: hive.openshift.io/v1
 kind: ClusterPool
 metadata:
-  name: gitops-cluster-pool
-  namespace: gitops-cluster-pools
+  creationTimestamp: null
   labels:
     architecture: amd64
     cloud: aws
-    product: ocp
     owner: gitops
+    product: ocp
     region: us-east-2
     version: "4.13"
-    version_lower: "4.13.0-0"
-    version_upper: "4.14.0-0"
+    version_lower: 4.13.0-0
+    version_upper: 4.14.0-0
+  name: gitops-cluster-pool
+  namespace: gitops-cluster-pools
 spec:
   baseDomain: ocp-gitops-qe.com
   hibernationConfig:
     resumeTimeout: 20m0s
   imageSetRef:
-    name: ocp-4.13.0-amd64
+    name: ocp-release-4.13.34-x86-64-for-4.13.0-0-to-4.14.0-0
   installAttemptsLimit: 1
   installConfigSecretTemplateRef:
     name: gitops-install-config
-  skipMachinePools: true
+  labels:
+    tp.openshift.io/owner: gitops
+  maxSize: 6
   platform:
     aws:
       credentialsSecretRef:
@@ -29,6 +32,9 @@ spec:
       region: us-east-2
   pullSecretRef:
     name: pull-secret
-  runningCount: 0
   size: 0
-  maxSize: 6
+  skipMachinePools: true
+status:
+  ready: 0
+  size: 0
+  standby: 0
