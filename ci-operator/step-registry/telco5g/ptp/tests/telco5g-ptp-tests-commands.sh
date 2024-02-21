@@ -64,6 +64,10 @@ spec:
           rm -rf /usr/local/go && tar -C /usr/local -xzf go1.20.4.linux-amd64.tar.gz
           export PATH=$PATH:/usr/local/go/bin
           go version
+
+          # set +x here to hide pass from log
+          set +xe
+          echo "podman login with serviceaccount"
           pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".password /var/run/secrets/openshift.io/push/.dockercfg )
           podman login -u serviceaccount -p ${pass:1:-1} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
 
@@ -193,8 +197,16 @@ fi
 
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
+# always use the latest test code
 export TEST_BRANCH="master"
-export PTP_UNDER_TEST_BRANCH="master"
+
+if [[ "$T5CI_VERSION" == "4.16" ]]; then
+  export PTP_UNDER_TEST_BRANCH="master"
+  export IMG_VERSION="latest"
+else
+  export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
+  export IMG_VERSION="release-${T5CI_VERSION}"
+fi
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
 temp_dir=$(mktemp -d -t cnf-XXXXX)
@@ -205,7 +217,7 @@ cd "$temp_dir" || exit 1
 echo "deploying ptp-operator on branch ${PTP_UNDER_TEST_BRANCH}"
 
 # build ptp operator and create catalog
-export IMG=image-registry.openshift-image-registry.svc:5000/openshift-ptp/ptp-operator:latest
+export IMG=image-registry.openshift-image-registry.svc:5000/openshift-ptp/ptp-operator:${T5CI_VERSION}
 build_images
 
 # deploy ptp-operator
@@ -265,7 +277,7 @@ soaktest:
       duration: 5
       failure_threshold: 3
       custom_params:
-        prometheus_rate_time_window: "60s"
+        prometheus_rate_time_window: "70s"
         node:
           cpu_threshold_mcores: 100
         pod:
