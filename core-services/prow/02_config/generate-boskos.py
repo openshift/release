@@ -87,6 +87,10 @@ CONFIG = {
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
+    'aws-serverless-quota-slice': {
+        'us-east-1': 5,
+        'us-east-2': 5,
+    },
     'aws-rhtap-qe-quota-slice': {
         'us-west-2': 10
     },

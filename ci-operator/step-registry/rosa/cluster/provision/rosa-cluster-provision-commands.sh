@@ -500,8 +500,7 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   echo "    SAHRED_VPC_BASE_DOMAIN: ${SAHRED_VPC_BASE_DOMAIN}"
 fi
 
-echo -e "
-rosa create cluster -y \
+echo -e "rosa create cluster -y \
 ${STS_SWITCH} \
 --mode auto \
 --cluster-name ${CLUSTER_NAME} \
@@ -605,6 +604,15 @@ while true; do
   fi
 done
 rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}"
+
+# Verify the subnets of the cluster to remove the 'Inflight Checks' warning
+if [[ "$ENABLE_BYOVPC" == "true" ]]; then
+  verify_cmd=$(rosa verify network -c ${CLUSTER_ID} | grep 'rosa verify network' || true)
+  if [[ ! -z "$verify_cmd" ]]; then
+    echo -e "Force verifying the network of the cluster to remove the 'Inflight Checks' warning\n$verify_cmd"
+    eval $verify_cmd
+  fi
+fi
 
 # Output
 # Print console.url and api.url
