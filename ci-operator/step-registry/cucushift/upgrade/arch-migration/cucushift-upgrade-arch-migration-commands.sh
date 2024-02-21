@@ -216,19 +216,26 @@ function wait_mcp_continous_success() {
     num=$(oc get node --no-headers | wc -l)
     max_retries=$(expr $num \* 20 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
     passed_criteria=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
+    local continous_degraded_check=0 degraded_criteria=5
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
         ret=0
         check_mcp || ret=$?
         if [[ "$ret" == "0" ]]; then
+            continous_degraded_check=0
             echo "Passed #${continous_successful_check}"
             (( continous_successful_check += 1 ))
         elif [[ "$ret" == "1" ]]; then
             echo "Some machines are updating..."
             continous_successful_check=0
+            continous_degraded_check=0
         else
-            echo "Some machines are degraded..."
-            break
+            continous_successful_check=0
+            echo "Some machines are degraded #${continous_degraded_check}..."
+            (( continous_degraded_check += 1 ))
+            if (( continous_degraded_check >= degraded_criteria )); then
+                break
+            fi
         fi
         echo "wait and retry..."
         sleep ${interval}
