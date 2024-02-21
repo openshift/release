@@ -22,7 +22,8 @@ tests:
     mkdir -p "$ARTIFACT_DIR"
     TEMP_FILE=$(mktemp -p "$ARTIFACT_DIR" broken_links_XXXXXX)
     grep -rEo "(http|https)://[a-zA-Z0-9./?=_-]*" . | sort -u | while IFS= read -r URL; do
-        if [ "$(curl -o /dev/null -s -w '%{http_code}' "$URL")" != "200" ]; then
+        status=$(curl -o /dev/null --silent --head --write-out '%{http_code}\n' "$URL")
+        if [[ "$status" != "200" ]]; then
             echo "$URL" >> "$TEMP_FILE"
         fi
     done
@@ -43,7 +44,8 @@ tests:
     mkdir -p "$ARTIFACT_DIR"
     TEMP_FILE=$(mktemp -p "$ARTIFACT_DIR" broken_links_XXXXXX)
     grep -rEo "(http|https)://[a-zA-Z0-9./?=_-]*" . | sort -u | while IFS= read -r URL; do
-        if [ "$(curl -o /dev/null -s -w '%{http_code}' "$URL")" != "200" ]; then
+        status=$(curl -o /dev/null --silent --head --write-out '%{http_code}\n' "$URL")
+        if [[ "$status" != "200" ]]; then
             echo "$URL" >> "$TEMP_FILE"
         fi
     done
