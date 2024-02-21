@@ -239,6 +239,26 @@ function pre-OCP-53921(){
     return 0
 }
 
+function pre-OCP-69968(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    local spec testurl="http://examplefortest.com"
+    spec=$(oc get clusterversion version -ojson|jq -r '.spec')
+    if [[ "${spec}" == *"signatureStores"* ]]; then
+        echo "There should not be signatureStores by default!"
+        return 1
+    fi
+    if ! oc patch clusterversion version --type merge -p "{\"spec\": {\"signatureStores\": [{\"url\": \"${testurl}\"}]}}"; then
+        echo "Fail to patch clusterversion signatureStores!"
+        return 1
+    fi
+    signstore=$(oc get clusterversion version -ojson|jq -r '.spec.signatureStores[].url')
+    if [[ "${signstore}" != "${testurl}" ]]; then
+        echo "Fail to set clusterversion signatureStores!"
+        return 1
+    fi
+    return 0
+}
+
 # This func run all test cases with checkpoints which will not break other cases, 
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be run or not

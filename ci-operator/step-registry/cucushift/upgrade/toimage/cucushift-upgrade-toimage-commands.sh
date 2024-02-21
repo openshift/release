@@ -785,7 +785,7 @@ do
     if ! check_signed; then
         echo "You're updating to an unsigned images, you must override the verification using --force flag"
         FORCE_UPDATE="true"
-        if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358"; then
+        if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358" "OCP-69968"; then
             echo "The case need to run against a signed target image!"
             exit 1
         fi
