@@ -100,13 +100,12 @@ tests:
         FULCIO_URL=https://$(oc get route  -n securesign -l app.kubernetes.io/component=fulcio | tail -n 1 | awk '{print $2}')
         REKOR_URL=https://$(oc get route  -n securesign -l app.kubernetes.io/component=rekor-server | tail -n 1 | awk '{print $2}')
         TUF_URL=https://$(oc get route  -n securesign -l app.kubernetes.io/component=tuf | tail -n 1 | awk '{print $2}')
-        kubectl get -n default cm kube-root-ca.crt -o jsonpath='{.data.ca\.crt}' > /tmp/ca.crt
-        awk -v RS='-----BEGIN CERTIFICATE-----' 'NF > 1 { print "-----BEGIN CERTIFICATE-----" $0 }' /tmp/ca.crt > /tmp/cert-
-        for f in "/tmp/cert-"*; do COMMON_NAME=$(openssl x509 -subject -noout -nameopt multiline -in "$f" | grep commonName | awk '{ print $3 }'); mv "$f" /etc/pki/ca-trust/source ; echo "'${COMMON_NAME}' added to system certificates"; done
-        update-ca-trust
-        TOKEN=$(curl -X POST -H "Content-Type: application/x-www-form-urlencoded" -d "username=jdoe" -d "password=secure" -d "grant_type=password" -d "scope=openid" -d "client_id=sigstore" $OIDC_ISSUER/protocol/openid-connect/token |  sed -E 's/.*"access_token":"([^"]*).*/\1/')
-        cosign initialize --mirror=$TUF_URL --root=$TUF_URL/root.json
-        cosign sign -y --fulcio-url=$FULCIO_URL --rekor-url=$REKOR_URL --oidc-issuer=$OIDC_ISSUER --identity-token=$TOKEN ttl.sh/sigstore-test:5m
+        curl -o /tmp/job.yaml https://raw.githubusercontent.com/cooktheryan/hello-world/main/job.yaml
+        sed -i "s|fulcio-server-url|$FULCIO_URL|g" /tmp/job.yaml
+        sed -i "s|rekor-server-url|$REKOR_URL|g" /tmp/job.yaml
+        sed -i "s|tuf-url|$TUF_URL|g" /tmp/job.yaml
+        sed -i "s|oidc-issuer-url|$OIDC_ISSUER|g" /tmp/job.yaml
+        oc apply -f /tmp/job.yaml -n default
         oc logs -n openshift-rhtas-operator deployment/rhtas-operator-controller-manager
       from: src-oc
       resources:
