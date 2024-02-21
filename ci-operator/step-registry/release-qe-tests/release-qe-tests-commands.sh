@@ -5,10 +5,13 @@ set -u
 set -o pipefail
 
 prow_api_token=$(cat "/var/run/vault/tests-private-account/prow-api-token")
-export APITOKEN=${prow_api_token}
+export APITOKEN=$prow_api_token
 
 github_token=$(cat "/var/run/vault/tests-private-account/token-git")
-export GITHUB_TOKEN=${github_token}
+export GITHUB_TOKEN=$github_token
+
+release_payload_modifier_token=$(cat /var/run/vault/release-payload-modifier-token)
+export RELEASE_PAYLOAD_MODIFIER_TOKEN=$releasepayload_token
 
 python3 -V
 
@@ -22,3 +25,6 @@ do
 done
 
 jobctl start-aggregator
+
+oc login api-ci-l2s4-p1-openshiftapps-com:8443 --token=$RELEASE_PAYLOAD_MODIFIER_TOKEN
+oc get releasepayload/4.16.0-0.nightly-2024-02-03-221256 -n ocp
