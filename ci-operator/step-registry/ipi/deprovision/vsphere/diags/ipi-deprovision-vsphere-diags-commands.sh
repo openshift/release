@@ -296,7 +296,7 @@ function write_results_html() {
   Virtual Machines </button>
         <button class="list-group-item list-group-item-action" v-on:click="changeContent('host')">
   Hosts            </button>
-         <a href="https://github.com/elmiko/camgi.rs" class="list-group-item list-group-item-action text-center" target="_blank">
+         <a href="https://github.com/openshift/release/blob/master/ci-operator/step-registry/ipi/deprovision/vsphere/diags/ipi-deprovision-vsphere-diags-commands.sh" class="list-group-item list-group-item-action text-center" target="_blank">
          <img src="https://github.com/favicon.ico" alt="GitHub logo" title="Found a bug or issue? Visit this project's git repo.">
         </a>
        </div>
