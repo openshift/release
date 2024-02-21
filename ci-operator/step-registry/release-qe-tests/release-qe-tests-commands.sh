@@ -18,7 +18,7 @@ oc login api.ci.l2s4.p1.openshiftapps.com:6443 --token=$RELEASE_PAYLOAD_MODIFIER
 oc whoami
 
 echo "Test whehter releasepayload can be accessed"
-oc get releasepayload/4.16.0-0.nightly-2024-02-03-221256 -n ocp
+oc get releasepayload/4.16.0-0.nightly-2024-02-20-014802 -n ocp
 
 python3 -V
 
