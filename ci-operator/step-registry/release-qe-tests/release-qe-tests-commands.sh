@@ -26,5 +26,6 @@ done
 
 jobctl start-aggregator
 
+echo $RELEASE_PAYLOAD_MODIFIER_TOKEN
 oc login api.ci.l2s4.p1.openshiftapps.com:6443 --token=$RELEASE_PAYLOAD_MODIFIER_TOKEN
 oc get releasepayload/4.16.0-0.nightly-2024-02-03-221256 -n ocp
