@@ -10,6 +10,27 @@ log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
 }
 
+# Record Cluster Configurations
+cluster_config_file="${SHARED_DIR}/cluster-config"
+function record_cluster() {
+  if [ $# -eq 2 ]; then
+    location="."
+    key=$1
+    value=$2
+  else
+    location=".$1"
+    key=$2
+    value=$3
+  fi
+
+  payload=$(cat $cluster_config_file)
+  if [[ "$value" == "true" ]] || [[ "$value" == "false" ]]; then
+    echo $payload | jq "$location += {\"$key\":$value}" > $cluster_config_file
+  else
+    echo $payload | jq "$location += {\"$key\":\"$value\"}" > $cluster_config_file
+  fi
+}
+
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
         echo "setting the proxy"
@@ -22,7 +43,7 @@ function set_proxy () {
 }
 set_proxy
 
-# Display only node details 
+# Display only node details
 function listNodeDetails() {
     echo "List node details"
     # Get current machine pools and status of nodes
@@ -44,7 +65,7 @@ function listNodeDetails() {
 # Display details of machinesets and nodes for Classic Rosa cluster
 function listMachineAndNodeDetails() {
     echo "List machine details"
-    # Get current machinesets and machines 
+    # Get current machinesets and machines
     log "$(date) - List of machinesets"
     echo "oc get machinesets -n openshift-machine-api"
     oc get machinesets -n openshift-machine-api
@@ -58,8 +79,8 @@ function listMachineAndNodeDetails() {
       oc describe machine "$machine" -n openshift-machine-api
     done
     echo
-    
-    # Get details of all nodes 
+
+    # Get details of all nodes
     listNodeDetails
 }
 
@@ -84,68 +105,70 @@ function listDetails() {
 
 # Function introducing sleep and wait for worker nodes to become Ready state
 function waitForReady() {
-    echo "Wait for all nodes to be Ready"
-
-    # Query the node state until all of the nodes are ready
-    FINAL_NODE_STATE="Pass"
-    max_attempts=60 # Max of 60 attempts with 30 sec wait time in between, for total of 60 min
-    retry_api_count=0
-    max_retry_api_attempts=5
-    # Nodes can cycle and may be all "Ready" during a check but not a moment later
-    # We look for X number of successful attempts in a row
-    successful_attempts=0
-    desired_successful_attempts=3
-    for i in $( seq $max_attempts ); do
-        NODE_STATE="$(oc get nodes || echo "ERROR")"
-        if [[ ${NODE_STATE} == *"NotReady"*  || ${NODE_STATE} == *"SchedulingDisabled"* ]]; then
-            FINAL_NODE_STATE="Fail"
-            echo "Not all nodes have finished restarting - waiting for 30 seconds, attempt ${i}"
-	    successful_attempts=0
-        elif [[ ${NODE_STATE} == "ERROR" ]]; then
-     	    retry_api_count=$((retry_api_count+1))
-	    successful_attempts=0
-            if [[ "$retry_api_count" -gt "$max_retry_api_attempts" ]]; then
-                FINAL_NODE_STATE="Fail"
-                break
-            fi
+  echo "Wait for all nodes to be Ready"
+  # Query the node state until all of the nodes are ready
+  FINAL_NODE_STATE="Pass"
+  max_attempts=60 # Max of 60 attempts with 30 sec wait time in between, for total of 60 min
+  retry_api_count=0
+  max_retry_api_attempts=5
+  # Nodes can cycle and may be all "Ready" during a check but not a moment later
+  # We look for X number of successful attempts in a row
+  successful_attempts=0
+  desired_successful_attempts=3
+  start_time=$(date +"%s")
+  for i in $( seq $max_attempts ); do
+    NODE_STATE="$(oc get nodes || echo "ERROR")"
+    if [[ ${NODE_STATE} == *"NotReady"*  || ${NODE_STATE} == *"SchedulingDisabled"* ]]; then
+      FINAL_NODE_STATE="Fail"
+      echo "Not all nodes have finished restarting - waiting for 60 seconds, attempt ${i}"
+      successful_attempts=0
+    elif [[ ${NODE_STATE} == "ERROR" ]]; then
+   	  retry_api_count=$((retry_api_count+1))
+      successful_attempts=0
+      if [[ "$retry_api_count" -gt "$max_retry_api_attempts" ]]; then
+        FINAL_NODE_STATE="Fail"
+        break
+      fi
+    else
+      # Infra are not counted for non-HCP clusters
+      if [[ "$HOSTED_CP" == "false" ]]; then
+	      node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/infra!=,node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
+      else
+	      node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
+      fi
+      if [[ "$node_count" -ge "$1" ]]; then
+        if [[ "$successful_attempts" -lt "$desired_successful_attempts" ]]; then
+ 		      successful_attempts=$((successful_attempts+1))
+          echo "Successful attempts at Nodes being Ready in a row: $successful_attempts Want: $desired_successful_attempts"
         else
-	    # Infra are not counted for non-HCP clusters
-	    if [[ "$HOSTED_CP" == "false" ]]; then
-		node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/infra!=,node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
-	    else
-		node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
-            fi
-            if [[ "$node_count" -ge "$1" ]]; then
-	        if [[ "$successful_attempts" -lt "$desired_successful_attempts" ]]; then
-   		    successful_attempts=$((successful_attempts+1))
-	            echo "Successful attempts at Nodes being Ready in a row: $successful_attempts Want: $desired_successful_attempts"
-	        else
-                    echo "All nodes are ready to run workloads."
-                    FINAL_NODE_STATE="Pass"
-                    break
-	        fi
-            else
-                echo "Only $node_count/$1 worker nodes are ready."
-	        successful_attempts=0
-            fi
+          current_time=$(date +"%s")
+          record_cluster "timers" "nodes_ready" $(( "${current_time}" - "${start_time}" ))
+          echo "All nodes are ready to run workloads after $(( ${current_time} - ${start_time} )) seconds"
+          FINAL_NODE_STATE="Pass"
+          break
         fi
-        export FINAL_NODE_STATE
-        sleep 60
-    done
-
-    if [[ ${FINAL_NODE_STATE} == *"Fail"* ]]; then
-        echo "Waited for 30 min for nodes to become Ready. Some or all nodes are NotReady or have SchedulingDisabled. Exiting test case execution!"
-        listDetails
-        exit 1
+      else
+        echo "Only $node_count/$1 worker nodes are ready."
+        successful_attempts=0
+      fi
     fi
+    export FINAL_NODE_STATE
+    sleep 60
+  done
+
+  if [[ ${FINAL_NODE_STATE} == *"Fail"* ]]; then
+    echo "Waited for 30 min for nodes to become Ready. Some or all nodes are NotReady or have SchedulingDisabled. Exiting test case execution!"
+    listDetails
+    exit 1
+  fi
 }
 
 # Determine count of desired compute node count
 function getDesiredComputeCount {
   compute_count=$(rosa describe cluster -c "$CLUSTER_ID"  -o json  |jq -r '.nodes.compute')
-  if [[ "$compute_count" = "null" ]]; then 
+  if [[ "$compute_count" = "null" ]]; then
     echo "--auto-scaling enabled, retrieving min_replicas count desired"
-    desired_compute_count=$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r '.nodes.autoscale_compute.min_replicas') 
+    desired_compute_count=$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r '.nodes.autoscale_compute.min_replicas')
   else
     echo "--auto-scaling disabled, --replicas set, retrieving replica count desired"
     desired_compute_count=$(rosa describe cluster -c "$CLUSTER_ID"  -o json  |jq -r '.nodes.compute')
@@ -168,7 +191,7 @@ function fixNodeScaling {
   fi
 }
 
-# Get cluster 
+# Get cluster
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 echo "CLUSTER_ID is $CLUSTER_ID"
 
@@ -208,6 +231,7 @@ fixNodeScaling
 # Get desired compute node count
 getDesiredComputeCount
 
+cat "${SHARED_DIR}/cluster-config"
 ret=0
 echo "Wait for all nodes to be ready and schedulable."
 waitForReady "$desired_compute_count" || ret=$?
@@ -216,16 +240,17 @@ if [[ "$ret" == 0 ]]; then
     # Get count of worker only nodes in Ready state
     node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/worker,node-role.kubernetes.io/infra!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
     echo "Count of worker only nodes in Ready state: $node_count"
-    
+
     # Check worker node count matches requested replica count
     if (( "$node_count" >= "$desired_compute_count" )); then
         echo "$(date): All $node_count worker nodes are ready and match desired $desired_compute_count node count."
     else
         echo "$(date): $node_count worker nodes are ready but does not match desired $desired_compute_count node count."
-    fi        
+    fi
     listDetails
 else
     echo "Failed to execute script, waitForReady, to check node status. Return code: $ret."
     echo "Exiting test!"
     exit 1
 fi
+cat "${SHARED_DIR}/cluster-config"
