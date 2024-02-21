@@ -46,7 +46,6 @@ num_vips=$((2 + 2*${#vsphere_basedomains_list[@]}))
 if [[ ${vsphere_portgroup} == *"segment"* ]]; then
   third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
-  # IBMC devqe do not support using 192.168.*.1 or 2 as vips
   echo "192.168.${third_octet}.0/25" >>"${SHARED_DIR}"/machinecidr.txt
 
   # IBMC devqe do not support using 192.168.*.1 or 2 as vips. Start at .3 and .4
@@ -68,4 +67,5 @@ jq -r --argjson N 2 --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.
 jq -r --argjson N 3 --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/vips.txt
 jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/machinecidr.txt
 
+echo "Contents of vips.txt..."
 cat "${SHARED_DIR}"/vips.txt
