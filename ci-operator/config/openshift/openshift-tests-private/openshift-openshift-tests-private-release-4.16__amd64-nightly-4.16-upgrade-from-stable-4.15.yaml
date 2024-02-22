@@ -576,31 +576,31 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-upi
-- as: ibmcloud-ipi-f28
-  cron: 45 4 12 * *
+- as: ibmcloud-ipi-disc-priv-f28
+  cron: 16 23 18 * *
   steps:
-    cluster_profile: ibmcloud-qe
+    cluster_profile: ibmcloud-qe-2
     env:
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @ibmcloud-ipi and not
-        @fips'
+        @fips and @disconnected'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @ibmcloud-ipi and not
-        @fips'
+        @fips and @disconnected'
     test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi
-- as: ibmcloud-ipi-private-fips-f14
-  cron: 55 14 9,25 * *
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+- as: ibmcloud-ipi-proxy-private-fips-rt-f14
+  cron: 23 0 13,27 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:
       FIPS_ENABLED: "true"
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @ibmcloud-ipi and not
-        @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @ibmcloud-ipi and not
-        @fips'
+      RT_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @ibmcloud-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @ibmcloud-ipi'
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
 - as: ibmcloud-ipi-workers-rhel8-f14
   cron: 53 7 8,24 * *
   steps:
