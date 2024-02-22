@@ -4,11 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-function read_shared_dir() {
-  local key="$1"
-  yq r "${SHARED_DIR}/cluster-config.yaml" "$key"
-}
-
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
@@ -88,7 +83,7 @@ function collect_bootstrap() {
 
 	echo "collect_bootstrap: ssh ${BOOTSTRAP_HOSTNAME}:${BASTION_SSH_PORTS[${RESOURCE_ID}]}"
 	set +e
-	ssh \
+	mock-nss.sh ssh \
 		-o 'ConnectTimeout=1' \
 		-o 'StrictHostKeyChecking=no' \
 		-i ${CLUSTER_PROFILE_DIR}/ssh-privatekey \
@@ -101,7 +96,7 @@ function collect_bootstrap() {
 		FROM="/var/home/core/log-bundle-${ID}.tar.gz"
 		TO="/logs/artifacts/bootstrap-log-bundle-${ID}.tar.gz"
 		echo "collect_bootstrap: scp ${BOOTSTRAP_HOSTNAME}:${BASTION_SSH_PORTS[${RESOURCE_ID}]}"
-		scp \
+		mock-nss.sh scp \
 			-o 'ConnectTimeout=1' \
 			-o 'StrictHostKeyChecking=no' \
 			-i ${CLUSTER_PROFILE_DIR}/ssh-privatekey \
@@ -191,26 +186,6 @@ RCFILE=$(mktemp)
 	printf "RC0=%s\nRC1=%s\n" "${PIPESTATUS[0]}" "${PIPESTATUS[1]}" > ${RCFILE};
 } &
 openshift_install="$!"
-
-# While openshift-install is running...
-# Block for injecting DNS below release 4.8
-# TO-DO Remove after 4.7 EOL
-if [ "${BRANCH}" == "4.7" ] || [ "${BRANCH}" == "4.6" ]; then
-  REMOTE_LIBVIRT_URI=$(read_shared_dir 'REMOTE_LIBVIRT_URI')
-  CLUSTER_NAME=$(read_shared_dir 'CLUSTER_NAME')
-
-  i=0
-  while kill -0 ${openshift_install} 2> /dev/null; do
-    sleep 60
-    echo "Polling libvirt for network, attempt #$((++i))"
-    LIBVIRT_NETWORK=$(mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}" net-list --name | grep "${CLUSTER_NAME::21}" || true)
-    if [[ -n "${LIBVIRT_NETWORK}" ]]; then
-      echo "Libvirt network found. Injecting worker DNS records."
-      mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}" net-update --network "${LIBVIRT_NETWORK}" --command add-last --section dns-host --xml "$(< ${SHARED_DIR}/worker-hostrecords.xml)"
-      break
-    fi
-  done
-fi
 
 init_bootstrap ${dir}
 
