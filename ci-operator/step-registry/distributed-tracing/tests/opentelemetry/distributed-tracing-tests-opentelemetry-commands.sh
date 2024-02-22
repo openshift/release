@@ -86,7 +86,6 @@ else
 
   #Set parameters for running the test cases on OpenShift
   unset NAMESPACE
-  sed -i 's/- -duration=1m/- -duration=6m/' tests/e2e-autoscale/autoscale/02-install.yaml
   oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | xargs -I {} oc label nodes {} ingress-ready=true
 
   # Remove test cases to be skipped from the test run
@@ -116,22 +115,19 @@ else
   oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
 
   # Execute OpenTelemetry e2e tests
-  KUBECONFIG=$KUBECONFIG kuttl test \
-    --report=xml \
-    --artifacts-dir="$ARTIFACT_DIR" \
-    --parallel="$PARALLEL_TESTS" \
-    --report-name="$REPORT_NAME" \
-    --start-kind=false \
-    --timeout="$TIMEOUT" \
-    --manifest-dir=$MANIFEST_DIR \
-    tests/e2e \
-    tests/e2e-autoscale \
-    tests/e2e-openshift \
-    tests/e2e-prometheuscr \
-    tests/e2e-instrumentation \
-    tests/e2e-pdb \
-    tests/e2e-opampbridge \
-    tests/e2e-targetallocator
+  chainsaw test \
+  --report-name "$REPORT_NAME" \
+  --report-path "$ARTIFACT_DIR" \
+  --report-format "XML" \
+  --test-dir \
+  tests/e2e \
+  tests/e2e-autoscale \
+  tests/e2e-openshift \
+  tests/e2e-prometheuscr \
+  tests/e2e-instrumentation \
+  tests/e2e-pdb \
+  tests/e2e-opampbridge \
+  tests/e2e-targetallocator
 
   # Enable required feature gates.
   OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
@@ -140,13 +136,10 @@ else
   oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
 
   # Execute OpenTelemetry e2e tests
-  KUBECONFIG=$KUBECONFIG kuttl test \
-    --report=xml \
-    --artifacts-dir="$ARTIFACT_DIR" \
-    --parallel="$PARALLEL_TESTS" \
-    --report-name="$REPORT_NAME-2" \
-    --start-kind=false \
-    --timeout="$TIMEOUT" \
-    --manifest-dir=$MANIFEST_DIR \
-    tests/e2e-multi-instrumentation
+  chainsaw test \
+  --report-name "$REPORT_NAME" \
+  --report-path "$ARTIFACT_DIR" \
+  --report-format "XML" \
+  --test-dir \
+  tests/e2e-multi-instrumentation
 fi
