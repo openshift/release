@@ -36,6 +36,8 @@ else
   echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
   exit 1
 fi
+AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
+AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
 # Support to create the account-roles with the higher version 
 VERSION_SWITCH=""
@@ -75,7 +77,8 @@ rosa create account-roles -y --mode auto \
                           ${CLUSTER_SWITCH} \
                           ${VERSION_SWITCH} \
                           ${ARN_PATH_SWITCH} \
-                          ${PERMISSIONS_BOUNDARY_SWITCH}
+                          ${PERMISSIONS_BOUNDARY_SWITCH} \
+                          | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
 
 # Store the account-role-prefix for the next pre steps and the account roles deletion
 echo "Store the account-role-prefix and the account-roles-arn ..."

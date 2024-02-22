@@ -33,6 +33,8 @@ else
   echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
   exit 1
 fi
+AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
+AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
 # Switches
 MANAGED_SWITCH="--managed=${OIDC_CONFIG_MANAGED}"
@@ -52,10 +54,10 @@ echo "Create the managed=${OIDC_CONFIG_MANAGED} oidc config ..."
 rosa create oidc-config -y --mode auto --output json\
                         ${MANAGED_SWITCH} \
                         > "${SHARED_DIR}/oidc-config"
-cat "${SHARED_DIR}/oidc-config"
+echo "Successfully create the oidc config."
 oidc_config_id=$(cat "${SHARED_DIR}/oidc-config" | jq -r '.id')
 
 # Create oidc provider
 echo "Create the oidc provider based on the byo oic config ..."
-rosa create oidc-provider -y --mode auto --oidc-config-id $oidc_config_id
-
+rosa create oidc-provider -y --mode auto --oidc-config-id $oidc_config_id | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
+echo "Successfully create the oidc provider."
