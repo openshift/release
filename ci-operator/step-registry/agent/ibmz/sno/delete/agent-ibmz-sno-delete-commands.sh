@@ -67,7 +67,7 @@ else
     echo "Successfully deleted the $infra_name-sno instance in the $infra_name-vpc VPC."
 fi
 
-# Deleting the Floating IP
+# Deleting the zVSI Floating IP
 echo "Triggering the $infra_name-sno-ip Floating IP in the $infra_name-rg resource group."
 fip_delete_status=$(ibmcloud is ipd $infra_name-sno-ip --output JSON -f | jq -r '.[]|.result')
 if [ "$fip_delete_status" = 'false' ]; then
@@ -75,6 +75,26 @@ if [ "$fip_delete_status" = 'false' ]; then
     exit 1
 else 
     echo "Successfully deleted the $infra_name-sno-ip floating IP in the $infra_name-rg resource group."
+fi
+
+# Deleting the bastion VSI
+echo "Triggering the $infra_name-bastion instance deletion in the $infra_name-vpc VPC."
+bvsi_delete_status=$(ibmcloud is instance-delete $infra_name-bastion --output JSON -f | jq -r '.[]|.result')
+if [ "$bvsi_delete_status" = 'false' ]; then
+    echo "Deletion of $infra_name-bastion instance is not successful."
+    exit 1
+else 
+    echo "Successfully deleted the $infra_name-bastion instance in the $infra_name-vpc VPC."
+fi
+
+# Deleting the bastion VSI Floating IP
+echo "Triggering the $infra_name-bastion-ip Floating IP in the $infra_name-rg resource group."
+bfip_delete_status=$(ibmcloud is ipd $infra_name-bastion-ip --output JSON -f | jq -r '.[]|.result')
+if [ "$bfip_delete_status" = 'false' ]; then
+    echo "Deletion of $infra_name-bastion-ip floating IP is not successful."
+    exit 1
+else 
+    echo "Successfully deleted the $infra_name-bastion-ip floating IP in the $infra_name-rg resource group."
 fi
 
 # Deleting the subnet

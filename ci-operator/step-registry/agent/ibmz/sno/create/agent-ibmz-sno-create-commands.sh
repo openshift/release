@@ -23,7 +23,7 @@ curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /t
 PATH=$PATH:/tmp/bin
 export PATH
 echo "Installing nmstatectl...."
-wget -O $HOME/nmstatectl-linux-x64.zip https://github.com/nmstate/nmstate/releases/download/v2.2.23/nmstatectl-linux-x64.zip
+wget -q -O $HOME/nmstatectl-linux-x64.zip https://github.com/nmstate/nmstate/releases/download/v2.2.23/nmstatectl-linux-x64.zip
 unzip $HOME/nmstatectl-linux-x64.zip -d /tmp/bin/ && chmod +x /tmp/bin/nmstatectl
 which nmstatectl
 if [ $? -eq 0 ]; then
@@ -33,7 +33,7 @@ else
   exit 1
 fi
 echo "Installing oc...."
-wget -O $HOME/openshift-client-linux.tar.gz https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz
+wget -q -O $HOME/openshift-client-linux.tar.gz https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz
 tar -xzf $HOME/openshift-client-linux.tar.gz -C /tmp/bin
 which oc
 if [ $? -eq 0 ]; then
@@ -149,6 +149,41 @@ else
   echo "Floating IP $infra_name-sno-ip is successfully assigned to the $infra_name-sno instance."
 fi
 
+# Create a bastion node in the same VPC for monitoring
+set -e
+echo "Triggering the $infra_name-bastion VSI creation on IBM Cloud in the VPC $infra_name-vpc"
+ibmcloud is instance-create $infra_name-bastion $infra_name-vpc $IC_REGION-1 bx2-2x8 $infra_name-sn --image ibm-redhat-9-2-minimal-amd64-2 --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg
+sleep 30
+set +e
+bvsi_state=$(ibmcloud is instance $infra_name-sno | awk '/Status/{print $2}')
+if [ "$bvsi_state" != "running" ]; then
+  echo "Error: Instance $infra_name-bastion is not created properly in the $infra_name-vpc VPC."
+  exit 1
+else 
+  echo "Instance $infra_name-bastion is created successfully in the $infra_name-vpc VPC."
+fi
+bsg_name=$(ibmcloud is instance $infra_name-bastion --output JSON | jq -r '.network_interfaces|.[].security_groups|.[].name')
+echo "Adding an inbound rule in the $infra_name-bastion instance security group for ssh and scp."
+ibmcloud is sg-rulec $bsg_name inbound tcp --port-min 22 --port-max 22
+if [ $? -eq 0 ]; then
+    echo "Successfully added the inbound rule."
+else
+    echo "Failure while adding the inbound rule to the $infra_name-bastion instance security group."
+    exit 1
+fi  
+bnic_name=$(ibmcloud is in-nics $infra_name-bastion -q | grep -v ID | awk '{print $2}')
+echo "Creating a Floating IP for bastion VSI"
+bvsi_fip=$(ibmcloud is ipc $infra_name-bastion-ip --zone $IC_REGION-1 --resource-group-name $infra_name-rg | awk '/Address/{print $2}')
+echo "Assigning the Floating IP for bastion VSI"
+bvsi_fip_status=$(ibmcloud is in-nic-ipc $infra_name-bastion $bnic_name $infra_name-bastion-ip | awk '/Status/{print $2}')
+if [ "$bvsi_fip_status" != "available" ]; then
+  echo "Error: Floating IP $infra_name-bastion-ip is not assigned to the $infra_name-bastion instance."
+  exit 1
+else 
+  echo "Floating IP $infra_name-bastion-ip is successfully assigned to the $infra_name-bastion instance."
+fi
+echo $bvsi_fip >> ${SHARED_DIR}/bastion-vsi-ip  # Storing to access in further steps 
+
 # Creating DNS service
 echo "Triggering the DNS Service creation on IBM Cloud in the resource group $infra_name-rg"
 dns_state=$(ibmcloud dns instance-create $infra_name-dns standard-dns -g $infra_name-rg --output JSON | jq -r '.state')
@@ -239,22 +274,23 @@ curl -k -L --output $HOME/$CLUSTER_NAME/install-config.yaml "http://$httpd_vsi_i
 sed -i "s|BASE_DOMAIN|$BASEDOMAIN|" $HOME/$CLUSTER_NAME/install-config.yaml
 sed -i "s|CLUSTER_NAME|$CLUSTER_NAME|" $HOME/$CLUSTER_NAME/install-config.yaml
 sed -i "s|MACHINE_CIDR|$sn_cidr|" $HOME/$CLUSTER_NAME/install-config.yaml
+cp $HOME/$CLUSTER_NAME/install-config.yaml $HOME/$CLUSTER_NAME/install-config.yaml.bkp
+cp $HOME/$CLUSTER_NAME/agent-config.yaml $HOME/$CLUSTER_NAME/agent-config.yaml.bkp
 
 # Openshift Install binary
 echo "Fetching openshift-install binary"
 release_version=$(echo "$JOB_SPEC" | jq -r '.extra_refs|.[].base_ref' | cut -d '-' -f 2)
-wget -O $HOME/openshift-install.tar.gz https://mirror.openshift.com/pub/openshift-v4/s390x/clients/ocp/candidate-${release_version}/openshift-install-linux-amd64.tar.gz
-tar -xzf $HOME/openshift-install.tar.gz -C $HOME/
+wget -q -O $HOME/openshift-install.tar.gz https://mirror.openshift.com/pub/openshift-v4/s390x/clients/ocp/candidate-${release_version}/openshift-install-linux-amd64.tar.gz
+tar -xzf $HOME/openshift-install.tar.gz -C $HOME/$CLUSTER_NAME/
 
 # Generate PXE artifacts
 echo "Generating pxe-boot artifacts for SNO cluster"
-$HOME/openshift-install agent create pxe-files --dir $HOME/$CLUSTER_NAME/ --log-level debug
-cp $HOME/openshift-install $HOME/$CLUSTER_NAME/
+$HOME/$CLUSTER_NAME/openshift-install agent create pxe-files --dir $HOME/$CLUSTER_NAME/ --log-level debug
 
 # Generating script for agent boot execution on zVSI
 echo "Uploading the pxe-boot artifacts to HTTPD server"
-scp -r "${ssh_options[@]}" $HOME/$CLUSTER_NAME/ root@$httpd_vsi_ip:/var/www/html/
-ssh "${ssh_options[@]}" root@$httpd_vsi_ip "mv /var/www/html/$CLUSTER_NAME/boot-artifacts/* /var/www/html/; chmod 644 /var/www/html/*"
+scp -r "${ssh_options[@]}" $HOME/$CLUSTER_NAME/boot-artifacts/ root@$httpd_vsi_ip:/var/www/html/
+ssh "${ssh_options[@]}" root@$httpd_vsi_ip "mv /var/www/html/boot-artifacts/* /var/www/html/; chmod 644 /var/www/html/*; rm -rf /var/www/html/boot-artifacts/"
 echo "Downloading the setup script for pxeboot of SNO"
 curl -k -L --output $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot.sh"
 initrd_url="http://$httpd_vsi_ip:80/agent.s390x-initrd.img"
@@ -276,6 +312,10 @@ echo "Successfully booted the zVSI $zvsi_fip with the setup script"
 # Deleting the resources in the pod
 rm -f $HOME/setup_pxeboot.sh
 
-# Wait for installation to complete
+# Wait for installation to complete --> monitoring in bastion node
+echo "Uploading the cluster artifacts directory to bastion node for monitoring"
+cp /tmp/bin/oc $HOME/$CLUSTER_NAME/
+scp -r "${ssh_options[@]}" $HOME/$CLUSTER_NAME/ root@$bvsi_fip:/root/
 echo "$(date) Waiting for the installation to complete"
-ssh "${ssh_options[@]}" root@$httpd_vsi_ip "/var/www/html/$CLUSTER_NAME/openshift-install wait-for install-complete --log-level debug"
+ssh "${ssh_options[@]}" root@$bvsi_ip "cp /root/$CLUSTER_NAME/install-config.yaml.bkp /root/$CLUSTER_NAME/install-config.yaml; cp /root/$CLUSTER_NAME/agent-config.yaml.bkp /root/$CLUSTER_NAME/agent-config.yaml"
+ssh "${ssh_options[@]}" root@$bvsi_ip "/root/$CLUSTER_NAME/openshift-install wait-for install-complete --dir /root/$CLUSTER_NAME/ --log-level debug"
