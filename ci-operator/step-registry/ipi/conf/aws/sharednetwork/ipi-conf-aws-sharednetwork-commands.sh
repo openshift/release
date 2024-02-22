@@ -257,9 +257,8 @@ create_stack_vpc
 #   those zones must be associated with the public route table with Carrier Gateway as default gateway.
 if [[ "${AWS_EDGE_POOL_ENABLED-}" == "yes" ]]; then
 
-  echo "EDGE_ZONE_TYPE=[${EDGE_ZONE_TYPE-}] EDGE_ZONE_TYPES=[${EDGE_ZONE_TYPES-}]"
-  if [[ "${EDGE_ZONE_TYPE-}" == *"wavelength-zone"* ]] ||
-    [[ "${EDGE_ZONE_TYPES-}" == *"wavelength-zone"* ]]; then
+  echo "EDGE_ZONE_TYPES=[${EDGE_ZONE_TYPES-}]"
+  if [[ "${EDGE_ZONE_TYPES-}" == *"wavelength-zone"* ]]; then
     create_stack_carrier_gateway
   fi
 

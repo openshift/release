@@ -250,7 +250,7 @@ tests:
         OLM_OPERATORS=lvm
         NUM_MASTERS=3
         NUM_WORKERS=0
-        MASTER_MEMORY=18000
+        MASTER_MEMORY=25600
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
     workflow: assisted-baremetal
@@ -263,7 +263,7 @@ tests:
         OLM_OPERATORS=lvm
         NUM_MASTERS=3
         NUM_WORKERS=0
-        MASTER_MEMORY=18000
+        MASTER_MEMORY=25600
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
       TEST_SUITE: full
@@ -888,6 +888,29 @@ tests:
     cluster_profile: oci-assisted
     workflow: assisted-oci
 - always_run: false
+  as: opct-oci-assisted
+  optional: true
+  steps:
+    cluster_profile: oci-assisted
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=3
+        WORKER_DISK=100000000000
+        WORKER_MEMORY=16384
+    workflow: assisted-oci-opct
+  timeout: 7h0m0s
+- as: opct-oci-assisted-periodic
+  cron: '@weekly'
+  steps:
+    cluster_profile: oci-assisted
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=3
+        WORKER_DISK=100000000000
+        WORKER_MEMORY=16384
+    workflow: assisted-oci-opct
+  timeout: 7h0m0s
+- always_run: false
   as: e2e-oci-assisted-4-14
   optional: true
   steps:
@@ -895,7 +918,6 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.14
-      PLATFORM: assisted-oci
     workflow: assisted-oci
 - always_run: false
   as: e2e-oci-assisted-iscsi

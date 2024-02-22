@@ -17,7 +17,7 @@ cat <<'EOF' > /tmp/time-skew.sh
 export KUBECONFIG="/tmp/kubeconfig"
 
 set -euxo pipefail
-SKEW=${1:-+30d}
+SKEW=${1:-30d}
 OC=${OC:-oc}
 SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
 SSH=${SSH:-ssh ${SSH_OPTS}}
@@ -63,7 +63,7 @@ copy-file-from-first-master "${KUBECONFIG_LOCAL}" "${KUBECONFIG_LOCAL}"
 # TODO: Suspend, resume and make it resync time from host instead?
 run-on-all-nodes "
   timedatectl status
-  timedatectl set-time ${SKEW}
+  timedatectl set-time +${SKEW}
   timedatectl status
 "
 

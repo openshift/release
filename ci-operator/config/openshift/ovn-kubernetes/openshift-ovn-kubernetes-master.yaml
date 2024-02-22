@@ -15,10 +15,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.21-openshift-4.16
-  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.16
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
@@ -41,9 +37,6 @@ images:
     ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
@@ -51,9 +44,9 @@ images:
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: ovn-kubernetes-microshift
 promotion:
   to:
@@ -75,6 +68,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-aws-ovn-clusternetwork-cidr-expansion
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-cidr-expansion
 - as: e2e-aws-ovn-local-gateway
   steps:
     cluster_profile: aws-2
@@ -317,7 +315,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SDN_LIVE_MIGRATION_OPTIONS: target-cni=OVNKubernetes
       TEST_SUITE: openshift/network/live-migration
@@ -335,7 +332,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SDN_LIVE_MIGRATION_OPTIONS: target-cni=OVNKubernetes,rollback=true
       TEST_SUITE: openshift/network/live-migration
