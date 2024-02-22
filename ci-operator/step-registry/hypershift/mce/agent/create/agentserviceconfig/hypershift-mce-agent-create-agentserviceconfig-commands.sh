@@ -188,3 +188,5 @@ oc wait --timeout=5m pod -n openshift-machine-api -l baremetal.openshift.io/clus
 
 echo "Configuration of Assisted Installer operator passed successfully!"
 EOF
+
+scp "${SSHOPTS[@]}" "root@${IP}:/root/.ssh/id_rsa.pub" "${SHARED_DIR}/id_rsa.pub"
