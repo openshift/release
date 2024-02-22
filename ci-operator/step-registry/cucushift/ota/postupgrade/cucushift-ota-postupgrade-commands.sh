@@ -208,6 +208,22 @@ function post-OCP-53921(){
     return 0
 }
 
+function post-OCP-69948(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    tmp_log=$(mktemp)
+    oc -n openshift-cluster-version logs -l k8s-app=cluster-version-operator --tail=-1|grep "Verifying release authenticity" 2>&1 | tee "${tmp_log}"
+    if test -s "${tmp_log}"; then
+        if grep -qE "falling back to default stores|https://storage.googleapis.com/openshift-release/official/signatures/openshift/release" "${tmp_log}"; then
+            echo "Default signaturestore should not be used but found in cvo log!"
+            return 1
+        fi
+    else
+        echo "Fail to get signature verify info in cvo log!"
+        return 1
+    fi
+    return 0
+}
+
 # This func run all test cases with with checkpoints which will not break other cases,
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be ran or not
