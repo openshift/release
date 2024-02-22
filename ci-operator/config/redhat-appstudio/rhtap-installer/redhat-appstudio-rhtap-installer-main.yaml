@@ -38,6 +38,24 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: github-with-pat-setup-flow
+  cron: 0 */4 * * *
+  steps:
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        ls -larth /usr/local/ci-secrets/rhtap
+        ls -larth /usr/local/ci-secrets/rhtap/rhtap-nightly-deploy
+      credentials:
+      - mount_path: /usr/local/ci-secrets/rhtap/rhtap-nightly-deploy
+        name: rhtap
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: rhtap-installer-shellcheck
   commands: |
     #!/usr/bin/env bash
