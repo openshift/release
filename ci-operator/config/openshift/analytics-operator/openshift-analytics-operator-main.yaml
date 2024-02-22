@@ -81,11 +81,14 @@ tests:
         by creating a symlink to oc.\npushd \"$CLI_DIR\"\nif [ ! -f kubectl ]\nthen\n
         \ ln -s oc kubectl\nfi\npopd\nset +e \necho \"creating temp project\"\noc
         new-project temp-osa\noc project temp-osa \necho \"Running shell script\"\nGOFLAGS=\"\"
-        sh ./tests/run-e2e.sh --no-build --image-base registry.ci.openshift.org/osa
-        --version latest\nstatus=$?\necho \"status: $status\"\necho \"delete temp
+        sh ./tests/run-e2e.sh --no-build --operator-image \"$OA_OPERATOR\" --image-base
+        \"\" --version \"\"\nstatus=$?\necho \"status: $status\"\necho \"delete temp
         project\"\noc delete project temp-osa \nif [ $status -eq 0 ] \nthen \n  echo
         \"Successfully executed E2E test script\" \nelse \n  echo \"E2E test failed\"
         \ \n  exit 1\nfi\n"
+      dependencies:
+      - env: OA_OPERATOR
+        name: observability-analytics-operator
       from: src
       resources:
         requests:
