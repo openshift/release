@@ -60,8 +60,6 @@ KMS_KEY_POLICY=$(echo -e '
         }
     ]
 }')
-echo "KMS Key Policy Template:"
-echo $KMS_KEY_POLICY | jq
 
 ACCOUNT_ROLES_ARNS_FILE="${SHARED_DIR}/account-roles-arns"
 for i in $(cat "$ACCOUNT_ROLES_ARNS_FILE"); do
@@ -85,8 +83,6 @@ key_output=${ARTIFACT_DIR}/key_output.json
 aws --region $REGION kms create-key --description "Prow CI $alias_name" \
   --output json \
   --policy "$(echo $KMS_KEY_POLICY | jq -c)" > "${key_output}" || exit 1
-
-cat $key_output
 key_arn=$(cat "${key_output}" | jq -r '.KeyMetadata.Arn')
 key_id=$(cat "${key_output}" | jq -r '.KeyMetadata.KeyId')
 
@@ -95,7 +91,7 @@ if [[ "${key_arn}" == "" ]] || [[ "${key_arn}" == "null" ]] || [[ "${key_id}" ==
   exit 1
 fi
 
-echo "Created key $key_arn"
+echo "Created key successfully"
 echo $key_arn > ${SHARED_DIR}/aws_kms_key_arn
 echo $key_id > ${SHARED_DIR}/aws_kms_key_id
 
