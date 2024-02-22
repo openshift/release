@@ -25,7 +25,7 @@ if [ "${RE_TRIGGER_ON_FAILURE}" = "true" ]; then
 
   echo "Send job re-triggering for job ${JOB_NAME}, build ${BUILD_ID} prow job ${PROW_JOB_ID}"
 
-  json_payload='"job_name":"'"$JOB_NAME"'", "build_id": "'"$BUILD_ID"'", "prow_job_id":"'"$PROW_JOB_ID"'", "token": "'"$TOKEN"'"'
+  json_payload='"job_name":"'"$JOB_NAME"'", "build_id": "'"$BUILD_ID"'", "prow_job_id":"'"$PROW_JOB_ID"'", "trigger_token": "'"$TOKEN"'"'
 
   if [ -n "$SLACK_WEBHOOK_URL" ]; then
     json_payload+=', "slack_webhook_url": "'"$SLACK_WEBHOOK_URL"'"'
