@@ -9,5 +9,7 @@ GITHUB_AUTH_TOKEN=$(cat /tmp/vault/ocp-docs-github-secret/GITHUB_AUTH_TOKEN)
 
 export GITHUB_AUTH_TOKEN
 
+vale sync
+
 ./scripts/vale-review.sh
 
