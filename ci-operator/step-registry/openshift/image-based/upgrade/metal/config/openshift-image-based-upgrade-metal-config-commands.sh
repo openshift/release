@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -x
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -30,7 +29,7 @@ ssh "${SSHOPTS[@]}" "${ssh_host_ip}" "mkdir -p ${remote_workdir}"
 
 cat <<EOF > ${SHARED_DIR}/install.sh
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
 sudo subscription-manager config --rhsm.manage_repos=1 --rhsmcertd.disable=redhat-access-insights
 
@@ -58,6 +57,7 @@ sudo systemctl enable libvirtd
 sudo usermod -a -G libvirt ec2-user
 
 git clone https://github.com/rh-ecosystem-edge/ib-orchestrate-vm.git
+cd ib-orchestrate-vm && git checkout ${IB_ORCHESTRATE_VM_REF}
 
 EOF
 

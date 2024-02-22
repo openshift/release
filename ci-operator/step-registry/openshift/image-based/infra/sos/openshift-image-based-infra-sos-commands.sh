@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -17,16 +17,12 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey")
 
 ssh "${SSHOPTS[@]}" "${INSTANCE_PREFIX}" <<'EOF'
-  set -x
   if ! hash sos ; then
     sudo touch /tmp/sosreport-command-does-not-exist
     exit 0
   fi
 
   plugin_list="container,network"
-  if ! sudo sos report --list-plugins | grep 'microshift.*inactive' ; then
-    plugin_list+=",microshift"
-  fi
 
   if sudo sos report --batch --all-logs --tmp-dir /tmp -p ${plugin_list} -o logs ; then
     sudo chmod +r /tmp/sosreport-*

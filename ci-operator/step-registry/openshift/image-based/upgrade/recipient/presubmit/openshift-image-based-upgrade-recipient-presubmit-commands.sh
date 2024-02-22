@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -x
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -33,9 +32,6 @@ cat <<EOF > ${SHARED_DIR}/upgrade_from_seed.sh
 #!/bin/bash
 set -euo pipefail
 
-# uncomment for debugging
-# set -x
-
 export PULL_SECRET='${PULL_SECRET}'
 export BACKUP_SECRET='${BACKUP_SECRET}'
 export RECIPIENT_VM_NAME="${RECIPIENT_VM_NAME}"
@@ -49,7 +45,7 @@ cd ${remote_workdir}/ib-orchestrate-vm
 echo "Making a recipient cluster..."
 make recipient
 
-echo "Upgrading recipient cluster..."
+echo "Upgrading recipient cluster from ${RECIPIENT_VERSION} to ${SEED_VERSION} using ${SEED_IMAGE}:${SEED_IMAGE_TAG}..."
 make sno-upgrade SEED_IMAGE=${SEED_IMAGE}:${SEED_IMAGE_TAG}
 EOF
 

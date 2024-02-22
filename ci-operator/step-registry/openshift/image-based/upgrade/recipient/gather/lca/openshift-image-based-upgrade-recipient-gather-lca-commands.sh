@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -23,16 +23,28 @@ cat <<EOF > ${SHARED_DIR}/gather_recipient_lca.sh
 #!/bin/bash
 set -euo pipefail
 
+# Setup directories for data
 cd ${remote_workdir}
-oc --kubeconfig ${recipient_kubeconfig} adm inspect ns/openshift-lifecycle-agent --dest-dir=./must-gather-lca-${RECIPIENT_VM_NAME}
+gather_dir=./must-gather-lca-${RECIPIENT_VM_NAME}
+gather_dir_extra=./must-gather-lca-${RECIPIENT_VM_NAME}/extra
+mkdir -p \$gather_dir_extra
 
-tar cvaf must-gather-lca-${RECIPIENT_VM_NAME}.tar.gz ./must-gather-lca-${RECIPIENT_VM_NAME}
+export KUBECONFIG=${recipient_kubeconfig}
+
+# Inspect the namespace
+oc adm inspect ns/openshift-lifecycle-agent --dest-dir=\$gather_dir
+
+# Get installation service logs and recert summary files
+node="\$(oc get nodes -oname)"
+
+oc debug \$node -qn openshift-cluster-node-tuning-operator -- chroot /host/ bash -c 'journalctl -u installation-configuration.service' > \$gather_dir_extra/installation-configuration.service.log
+
+tar cvaf must-gather-lca-${RECIPIENT_VM_NAME}.tar.gz \$gather_dir
 EOF
 
 chmod +x ${SHARED_DIR}/gather_recipient_lca.sh
 
 echo "Transfering gather LCA script..."
-echo ${SHARED_DIR}
 scp "${SSHOPTS[@]}" ${SHARED_DIR}/gather_recipient_lca.sh $ssh_host_ip:$remote_workdir
 
 echo "Gather recipient LCA..."
