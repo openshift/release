@@ -34,6 +34,7 @@ chain:
       
       if [[ "${USE_HYPERSHIFT_AZURE_CREDS:-}" == 'true' ]]; then
         export AZURE_CREDS="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+        export RELEASE_IMAGE=""
       fi
       
       
@@ -50,9 +51,10 @@ chain:
         --azure-creds=${AZURE_CREDS} \
         --location ${HYPERSHIFT_AZURE_LOCATION} \
         --release-image ${RELEASE_IMAGE} \
+        --release-stream=4.16.0-0.nightly \
         --infra-id=${CLUSTER_NAME} \
         --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
-        --annotations=hypershift.openshift.io/skip-release-image-validation=true
+        --annotations=hypershift.openshift.io/skip-release-image-validation=true, hypershift.openshift.io/image-overrides=cluster-storage-operator=quay.io/csrwng/cluster-storage-operator:azure
 
       # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
       echo "Waiting for cluster to become available"
