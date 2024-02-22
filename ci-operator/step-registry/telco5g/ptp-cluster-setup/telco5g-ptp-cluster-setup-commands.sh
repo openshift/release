@@ -301,6 +301,7 @@ log_chronyd_status() {
 status=0
 # Install posix collection so that we can use debug callback
 ansible-galaxy collection install ansible.posix
+# DZK
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
