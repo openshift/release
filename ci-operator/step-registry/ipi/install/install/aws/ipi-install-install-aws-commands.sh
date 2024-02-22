@@ -47,7 +47,9 @@ function prepare_next_steps() {
       "${dir}/auth/kubeconfig" \
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
+  echo "Required artifacts copied"
   
+  echo "Checking for private cluster"
   # For private cluster, the bootstrap address is private, installer cann't gather log-bundle directly even if proxy is set
   # the workaround is gather log-bundle from bastion host
   # copying install folder to bastion host for gathering logs
@@ -81,7 +83,10 @@ function prepare_next_steps() {
     else
       echo "ERROR: File bastion_ssh_user or bastion_public_address is empty or not exist, skip to copy install dir."
     fi
+  else
+	echo "Not a private cluster. Continuing"
   fi
+  echo "Finished prepare_next_steps"
 }
 
 function wait_router_lb_provision() {
@@ -427,5 +432,7 @@ if test "${ret}" -eq 0 ; then
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
 fi
+
+echo "Exitting with ret=$ret"
 
 exit "$ret"
