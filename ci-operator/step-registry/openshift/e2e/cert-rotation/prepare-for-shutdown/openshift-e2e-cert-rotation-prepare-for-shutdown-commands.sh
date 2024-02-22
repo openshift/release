@@ -140,6 +140,10 @@ oc patch OperatorHub cluster --type json \
 source /usr/local/share/cert-rotation-functions.sh
 prepull-tools-image-for-gather-step
 
+# Sync host and node timezones to avoid possible errors when skewing time
+HOST_TZ=$(date +"%Z %z" | cut -d' ' -f1)
+run-on-all-nodes "timedatectl set-timezone ${HOST_TZ}"
+
 oc -n openshift-machine-config-operator create serviceaccount kubelet-bootstrap-cred-manager
 oc -n openshift-machine-config-operator adm policy add-cluster-role-to-user cluster-admin -z kubelet-bootstrap-cred-manager
 cat << 'EOZ' > /tmp/kubelet-bootstrap-cred-manager-ds.yaml
