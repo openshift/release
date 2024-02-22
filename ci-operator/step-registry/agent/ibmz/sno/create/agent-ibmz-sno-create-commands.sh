@@ -246,36 +246,15 @@ release_version=$(echo "$JOB_SPEC" | jq -r '.extra_refs|.[].base_ref' | cut -d '
 wget -O $HOME/openshift-install.tar.gz https://mirror.openshift.com/pub/openshift-v4/s390x/clients/ocp/candidate-${release_version}/openshift-install-linux-amd64.tar.gz
 tar -xzf $HOME/openshift-install.tar.gz -C $HOME/
 
-# version=$(oc adm release info -o template --template '{{.metadata.version}}' --insecure=true ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} -a "${AGENT_IBMZ_CREDENTIALS}/registry-secret")
-# echo "Patching the image and version for the installer"
-# vres=$(grep -oba ._RELEASE_VERSION_LOCATION_.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX $HOME/openshift-install)
-# vlocation=${vres%%:*}
-# # If the release marker was found then it means that the version is missing
-# if [[ ! -z ${vlocation} ]]; then
-#     echo "Patching openshift-install with version ${version}"
-#     printf "${version}\0" | dd of=$HOME/openshift-install bs=1 seek=${vlocation} conv=notrunc &> /dev/null
-# else
-#     echo "Version already patched"
-# fi
-
-# ires=$(grep -oba ._RELEASE_IMAGE_LOCATION_.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX $HOME/openshift-install)
-# ilocation=${ires%%:*}
-# # If the release marker was found then it means that the image is missing
-# if [[ ! -z ${ilocation} ]]; then
-#     echo "Patching openshift-install with image ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-#     printf "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}\0" | dd of=$HOME/openshift-install bs=1 seek=${ilocation} conv=notrunc &> /dev/null
-# else
-#     echo "Image already patched"
-# fi
-
 # Generate PXE artifacts
 echo "Generating pxe-boot artifacts for SNO cluster"
 $HOME/openshift-install agent create pxe-files --dir $HOME/$CLUSTER_NAME/ --log-level debug
+cp $HOME/openshift-install $HOME/$CLUSTER_NAME/
 
 # Generating script for agent boot execution on zVSI
 echo "Uploading the pxe-boot artifacts to HTTPD server"
-scp -r "${ssh_options[@]}" $HOME/$CLUSTER_NAME/boot-artifacts/ root@$httpd_vsi_ip:/var/www/html/
-ssh "${ssh_options[@]}" root@$httpd_vsi_ip "mv /var/www/html/boot-artifacts/* /var/www/html/; chmod 644 /var/www/html/*; rm -rf /var/www/html/boot-artifacts/"
+scp -r "${ssh_options[@]}" $HOME/$CLUSTER_NAME/ root@$httpd_vsi_ip:/var/www/html/
+ssh "${ssh_options[@]}" root@$httpd_vsi_ip "mv /var/www/html/$CLUSTER_NAME/boot-artifacts/* /var/www/html/; chmod 644 /var/www/html/*"
 echo "Downloading the setup script for pxeboot of SNO"
 curl -k -L --output $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot.sh"
 initrd_url="http://$httpd_vsi_ip:80/agent.s390x-initrd.img"
@@ -297,11 +276,6 @@ echo "Successfully booted the zVSI $zvsi_fip with the setup script"
 # Deleting the resources in the pod
 rm -f $HOME/setup_pxeboot.sh
 
-# Wait for bootstrapping to complete
-echo "$(date) Waiting for the bootstrapping to complete"
-$HOME/openshift-install wait-for bootstrap-complete --dir $HOME/$CLUSTER_NAME/
-
 # Wait for installation to complete
 echo "$(date) Waiting for the installation to complete"
-$HOME/openshift-install wait-for install-complete --dir $HOME/$CLUSTER_NAME/
-cp $HOME/$CLUSTER_NAME/auth/kubeconfig ${SHARED_DIR}/$CLUSTER_NAME-kubeconfig
+ssh "${ssh_options[@]}" root@$httpd_vsi_ip "/var/www/html/$CLUSTER_NAME/openshift-install wait-for install-complete --log-level debug"
