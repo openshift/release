@@ -70,7 +70,7 @@ oc patch agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} ${item} -p '{"spec":{"approv
 done
 
 echo "scale nodepool replicas => $NUM_EXTRA_WORKERS"
-oc scale nodepool ${HOSTED_CLUSTER_NAME} -n ${HOSTED_CLUSTER_NS} --replicas ${NUM_EXTRA_WORKERS}
+oc scale nodepool ${HOSTED_CLUSTER_NAME} -n ${HOSTED_CLUSTER_NS} --replicas 2
 echo "wait agent ready"
 oc wait --all=true agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=30m
 
