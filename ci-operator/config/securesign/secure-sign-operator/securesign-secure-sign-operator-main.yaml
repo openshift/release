@@ -96,11 +96,10 @@ tests:
         oc wait --for=condition=available deployment/ctlog -n securesign --timeout=60s
         oc wait --for=condition=available deployment/rekor-redis -n securesign --timeout=60s
         oc wait --for=condition=available deployment/rekor-server -n securesign --timeout=60s
-        oc apply -f ci/openshift/job.yaml -n default
-        oc wait --for=condition=complete job/trusted-artifact-signer-test-sign-verify --timeout=5m -n default
         curl -o /tmp/job.yaml https://raw.githubusercontent.com/cooktheryan/hello-world/main/job.yaml
         sed -i "s|BASE_DOMAIN|$BASE_DOMAIN|g" /tmp/job.yaml
         oc apply -f /tmp/job.yaml -n default
+        oc wait --for=condition=complete job/tas-test-sign-verify --timeout=5m -n default
         oc logs -n openshift-rhtas-operator deployment/rhtas-operator-controller-manager
       from: src-oc
       resources:
