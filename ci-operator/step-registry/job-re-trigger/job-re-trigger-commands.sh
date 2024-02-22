@@ -12,7 +12,7 @@ if [ "${RE_TRIGGER_ON_FAILURE}" = "true" ]; then
   if [ -f "${CLUSTER_PROFILE_DIR}/openshift-ci-job-trigger-slack-webhook-url" ]; then
     SLACK_WEBHOOK_URL=$(cat "${CLUSTER_PROFILE_DIR}/openshift-ci-job-trigger-slack-webhook-url")
   fi
-    if [ -f "${CLUSTER_PROFILE_DIR}/openshift-ci-job-trigger-slack-error-webhook-url" ]; then
+  if [ -f "${CLUSTER_PROFILE_DIR}/openshift-ci-job-trigger-slack-error-webhook-url" ]; then
     SLACK_ERROR_WEBHOOK_URL=$(cat "${CLUSTER_PROFILE_DIR}/openshift-ci-job-trigger-slack-error-webhook-url")
   fi
 
