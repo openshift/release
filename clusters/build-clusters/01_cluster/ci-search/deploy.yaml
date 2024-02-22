@@ -4,164 +4,58 @@ metadata:
   name: ci-search
 
 ---
-# Import the ImageStream from CI
-kind: ImageStream
-apiVersion: image.openshift.io/v1
-metadata:
-  name: ci-search
-  namespace: ci-search
-spec:
-  lookupPolicy:
-    local: true
-  tags:
-  - from:
-      kind: DockerImage
-      name: registry.ci.openshift.org/ci/ci-search:latest
-    importPolicy:
-      scheduled: true
-    name: latest
-    referencePolicy:
-      type: Local
-
-# deploy the controller
----
-kind: Service
 apiVersion: v1
+kind: ConfigMap
 metadata:
-  name: search
+  name: ci-search-redirect-config
   namespace: ci-search
-spec:
-  selector:
-    app: search
-  ports:
-  - port: 80
-    targetPort: 8080
+data:
+  default.conf: "server {\n  listen 8080;\n  return 302 https://search.dptools.openshift.org$request_uri;\n}\n"
 
 ---
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: ci-search
-  namespace: ci-search
-spec:
-  minAvailable: 1
-  selector:
-    matchLabels:
-      app: search
----
-kind: StatefulSet
 apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: search
+  labels:
+    app: ci-search-redirect
+  name: ci-search-redirect
   namespace: ci-search
-  annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-search:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"web\")].image"}]'
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: search
-  serviceName: ""
+      component: ci-search-redirect
   template:
     metadata:
       labels:
-        app: search
+        component: ci-search-redirect
     spec:
-      affinity:
-        # Encourage replicas to be scheduled on separate nodes if more
-        # than one is available.
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: app
-                  operator: In
-                  values:
-                  - search
-              topologyKey: kubernetes.io/hostname
-            weight: 100
-      # Force the thing onto its own snowflake node so it only harms itself and not others.
-      tolerations:
-      - key: ci.openshift.io/ci-search
-        value: "true"
-        effect: NoSchedule
-        operator: Equal
-      nodeSelector:
-        ci.openshift.io/ci-search: "true"
-      automountServiceAccountToken: false
-      volumes:
-      - name: bugzilla-token
-        secret:
-          secretName: bugzilla-credentials-openshift-bugzilla-robot
-      - name: jira-token
-        secret:
-          secretName: jira-credentials-openshift-jira-robot
       containers:
-      - name: web
-        image: ci-search:latest
-        resources:
-          requests:
-            cpu: 500m
-            memory: 16Gi
-        volumeMounts:
-        - name: bugzilla-token
-          mountPath: /etc/bugzilla/
-        - name: jira-token
-          mountPath: /etc/jira/
-        - mountPath: /var/lib/ci-search/
-          name: search
-        command:
-        - /usr/bin/search
-        - --v=5
-        - --debug-listen=localhost:6060
-        - --config=/etc/ci-search/config.yaml
-        - --interval=10m
-        - --path=/var/lib/ci-search/
-        - --metric-db=/var/lib/ci-search/metric.db
-        - --metric-max-age=1440h
-        - --deck-uri=https://prow.ci.openshift.org
-        - --bugzilla-url=https://bugzilla.redhat.com/rest
-        - --bugzilla-token-file=/etc/bugzilla/api
-        - --bugzilla-search=OPEN version:4.14,4.13,4.12,4.11,4.10,4.9,4.8,4.7,4.6,4.5,4.4,4.3,4.2 product="OpenShift Container Platform" AND delta_ts>-2w
-        - --jira-url=https://issues.redhat.com
-        - --jira-token-file=/etc/jira/api
-        - --jira-search=(project=OCPBUGS&updated>='-90d'&status!='CLOSED'&affectedVersion IN versionMatch('4\\.\\d+')&level IN (null)) OR (project=TRT&updated>='-90d'&status!='CLOSED'&level IN (null))
-  updateStrategy:
-    rollingUpdate:
-      partition: 0
-    type: RollingUpdate
-  volumeClaimTemplates:
-  - metadata:
-      creationTimestamp: null
-      name: search
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 100Gi
+        - image: nginxinc/nginx-unprivileged
+          name: nginx
+          volumeMounts:
+          - mountPath: /etc/nginx/conf.d
+            name: config
+      volumes:
+        - configMap:
+            name: ci-search-redirect-config
+          name: config
+
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: v1
+kind: Service
 metadata:
-  annotations:
-    cert-manager.io/cluster-issuer: cert-issuer
-  name: ci-search
+  labels:
+    component: ci-search-redirect
+  name: ci-search-redirect
   namespace: ci-search
 spec:
-  ingressClassName: openshift-default
-  rules:
-  - host: search.ci.openshift.org
-    http:
-      paths:
-      - backend:
-          service:
-            name: search
-            port:
-              number: 80
-        pathType: ImplementationSpecific
-  tls:
-  - hosts:
-    - search.ci.openshift.org
-    secretName: ci-search-tls
+  ports:
+  - name: main
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    component: ci-search-redirect
+  sessionAffinity: None
+  type: ClusterIP
