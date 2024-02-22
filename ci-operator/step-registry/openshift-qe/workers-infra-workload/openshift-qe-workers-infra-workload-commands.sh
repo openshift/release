@@ -564,7 +564,7 @@ fi
 IF_INSTALL_INFRA_WORKLOAD=${IF_INSTALL_INFRA_WORKLOAD:=true}
 if [[ ${IF_INSTALL_INFRA_WORKLOAD} != "true" ]];then
    echo "No need to install infra and workload for this OCP cluster"
-   exit 1
+   exit 0
 fi
 
 # Download jq
