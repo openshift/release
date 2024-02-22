@@ -12,6 +12,13 @@ fi
 [ -z "${PROVISIONING_HOST}" ] && { echo "PROVISIONING_HOST is not filled. Failing."; exit 1; }
 [ -z "${PROVISIONING_NET_DEV}" ] && { echo "PROVISIONING_NET_DEV is not filled. Failing."; exit 1; }
 
+SSHOPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o LogLevel=ERROR
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
 # As the API_VIP is unique in the managed network and based on how it is reserved in the reservation steps,
 # we use the last part of it to define the VLAN ID.
 # TODO: find a similar unique value for dual stack and ipv6 single stack configurations?
@@ -21,6 +28,9 @@ CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
 SSH_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-key"
 IFS=, read -r -a SWITCH_PORTS <<< \
   "$(yq e '[.[].switch_port_v2]|@csv' < "${SHARED_DIR}"/hosts.yaml),$(<"${CLUSTER_PROFILE_DIR}/other-switch-ports")"
+
+# Copy other_switch_ports to bastion host for use in cleanup
+scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/other-switch-ports" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
 echo "[INFO] Configuring the VLAN tags on the switches' ports"
 python3 - \
