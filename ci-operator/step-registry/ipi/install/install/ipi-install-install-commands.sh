@@ -683,17 +683,11 @@ do
       kill $copy_kubeconfig_pid
     fi
 
-    if [[ -v capi_envtest_pid ]]; then
-      kill "$capi_envtest_pid"
-    fi
     rm -rf "$dir"
     cp -rfpv "$backup" "$dir"
   else
     date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
   fi
-
-  capi_envtest_monitor "${dir}" &
-  capi_envtest_pid=$!
 
   copy_kubeconfig_minimal "${dir}" &
   copy_kubeconfig_pid=$!
