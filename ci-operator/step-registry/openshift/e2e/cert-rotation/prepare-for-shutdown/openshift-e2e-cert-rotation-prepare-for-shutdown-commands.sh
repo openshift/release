@@ -41,31 +41,38 @@ function run-on-first-master {
   timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
 }
 
+function run-on-first-master-silent {
+  timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuo pipefail' <<< ${1}
+}
+
 function copy-file-from-first-master {
   timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_nodes[0]}:${1}" "${2}"
 }
 
 function wait-for-nodes-to-be-ready {
-  run-on-first-master "
+  run-on-first-master-silent "
     export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
+    function approve-csrs-with-timeout {
+      echo -n \"Approving CSRs\"
+      timeout \${1} bash -c \"while true; do oc get csr | grep Pending | cut -f1 -d\\" \\" | xargs -r oc adm certificate approve || true; echo -n '.'; sleep 5s; done\"
+      echo \"Done\"
+    }
     until oc get nodes; do sleep 30; done
-    for nodename in \$(oc get nodes -o name); do
-      echo \${nodename}
+    mapfile -d ' ' -t nodes < <( oc get nodes -o name )
+    for nodename in \${nodes[@]}; do
+      echo -n \"Waiting for \${nodename} to become Ready\"
       while true; do
         STATUS=\$(oc get \${nodename} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}')
         TIME_DIFF=\$((\$(date +%s)-\$(date -d \$(oc get \${nodename} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].lastHeartbeatTime}') +%s)))
         if [[ \${TIME_DIFF} -le 100 ]] && [[ \${STATUS} == True ]]; then
           break
         fi
-        oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
-        sleep 30
+        approve-csrs-with-timeout 15s
       done
+      echo \"\"
     done
     oc get nodes
-    for i in 1 2 3 4 5; do
-      oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
-      sleep 30
-    done
+    approve-csrs-with-timeout 30s
   "
 }
 
