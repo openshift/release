@@ -38,8 +38,7 @@ aws --region $REGION iam create-policy --description "Prow CI rosa" \
   --policy-name $iam_policy_name \
   --policy-document file://${iam_policy_payload} > "${iam_policy_output}" || exit 1
 
-echo "Create IAM policy $iam_policy_name successfully:"
-cat $iam_policy_output
+echo "Create IAM policy $iam_policy_name successfully."
 iam_policy_arn=$(cat "${iam_policy_output}" | jq -r '.Policy.Arn')
 echo $iam_policy_arn > ${SHARED_DIR}/iam_policy_arn
 
@@ -73,8 +72,7 @@ aws --region $REGION iam create-role --description "Prow CI rosa" \
   --role-name $iam_role_name \
   --assume-role-policy-document file://${trust_relationship_payload} > "${iam_role_output}" || exit 1
 
-echo "Create IAM policy $iam_role_name successfully:"
-cat $iam_role_output
+echo "Create IAM role $iam_role_name successfully."
 iam_role_arn=$(cat "${iam_role_output}" | jq -r '.Role.Arn')
 echo $iam_role_name > ${SHARED_DIR}/iam_role_name
 echo $iam_role_arn > ${SHARED_DIR}/iam_role_arn
