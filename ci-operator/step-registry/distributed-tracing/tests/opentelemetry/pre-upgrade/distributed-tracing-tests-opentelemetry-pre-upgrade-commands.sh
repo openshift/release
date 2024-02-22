@@ -41,7 +41,6 @@ KUBECONFIG=$KUBECONFIG kuttl test \
   --report-name="$REPORT_NAME" \
   --start-kind=false \
   --timeout="$TIMEOUT" \
-  --manifest-dir=$MANIFEST_DIR \
   tests/e2e \
   tests/e2e-autoscale \
   tests/e2e-openshift
