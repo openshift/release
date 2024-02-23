@@ -317,5 +317,5 @@ echo "Uploading the cluster artifacts directory to bastion node for monitoring"
 cp /tmp/bin/oc $HOME/$CLUSTER_NAME/
 scp -r "${ssh_options[@]}" $HOME/$CLUSTER_NAME/ root@$bvsi_fip:/root/
 echo "$(date) Waiting for the installation to complete"
-ssh "${ssh_options[@]}" root@$bvsi_ip "cp /root/$CLUSTER_NAME/install-config.yaml.bkp /root/$CLUSTER_NAME/install-config.yaml; cp /root/$CLUSTER_NAME/agent-config.yaml.bkp /root/$CLUSTER_NAME/agent-config.yaml"
-ssh "${ssh_options[@]}" root@$bvsi_ip "/root/$CLUSTER_NAME/openshift-install wait-for install-complete --dir /root/$CLUSTER_NAME/ --log-level debug"
+ssh "${ssh_options[@]}" root@$bvsi_fip "cp /root/$CLUSTER_NAME/install-config.yaml.bkp /root/$CLUSTER_NAME/install-config.yaml; cp /root/$CLUSTER_NAME/agent-config.yaml.bkp /root/$CLUSTER_NAME/agent-config.yaml"
+ssh "${ssh_options[@]}" root@$bvsi_fip "/root/$CLUSTER_NAME/openshift-install wait-for install-complete --dir /root/$CLUSTER_NAME/ --log-level debug"
