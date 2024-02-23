@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 export PATH=/usr/libexec/origin:$PATH
-
+echo "Test"
 # Initial check
 case "${CLUSTER_TYPE}" in
 libvirt-ppc64le|libvirt-s390x|powervs*)
