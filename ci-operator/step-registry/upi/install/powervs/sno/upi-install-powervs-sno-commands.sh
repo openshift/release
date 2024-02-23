@@ -634,13 +634,16 @@ POWERVS_SERVICE_INSTANCE_ID=$(echo ${POWERVS_INSTANCE_CRN} | cut -f8 -d":")
 POWERVS_REGION=$(echo ${POWERVS_INSTANCE_CRN} | cut -f6 -d":")
 POWERVS_ZONE=$(echo ${POWERVS_REGION} | sed 's/-*[0-9].*//')
 POWERVS_RESOURCE_GROUP=""
-cat > "/tmp/powervs-config.json" << EOF
+cat > /tmp/powervs-config.json << EOF
 {"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${POWERVS_RESOURCE_GROUP}"}
 EOF
-cp "/tmp/powervs-config.json" "${SHARED_DIR}/"
-cp "/etc/sno-power-credentials/{ssh-publickey,ssh-publickey,pull-secret}" "${SHARED_DIR}/"
+cp /tmp/powervs-config.json "${SHARED_DIR}/"
+cp /etc/sno-power-credentials/ssh-publickey "${SHARED_DIR}/"
+cp /etc/sno-power-credentials/ssh-privatekey "${SHARED_DIR}/"
+cp /etc/sno-power-credentials/pull-secret "${SHARED_DIR}/"
 #Copy the auth artifacts to shared dir for the next steps
-scp "${SSH_OPTIONS[@]}" "root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/{kubeconfig,kubeadmin-password}" "${SHARED_DIR}/"
+scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeadmin-password "${SHARED_DIR}/"
+scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeconfig "${SHARED_DIR}/"
 echo "Finished prepare_next_steps"
 
 echo "Test cluster accessiblity"
