@@ -64,7 +64,7 @@ function cleanup_ibmcloud_powervs() {
     ic pi workspace target "${CRN}"
 
     echo "Deleting the PVM Instances"
-    for INSTANCE_ID in $(ic pi instance ls --json | jq -r '.pvmInstances[].pvmInstanceID')
+    for INSTANCE_ID in $(ic pi instance ls --json | jq -r '.pvmInstances[] | .id')
     do
       echo "Deleting PVM Instance ${INSTANCE_ID}"
       ic pi instance delete "${INSTANCE_ID}" --delete-data-volumes
