@@ -24,6 +24,11 @@ OCP_VERSION=$(< "${SHARED_DIR}/OCP_VERSION")
 CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
 WORKSPACE_NAME=$(< "${SHARED_DIR}/WORKSPACE_NAME")
 VPC_NAME="${WORKSPACE_NAME}"-vpc
+if [ ! -f "${SHARED_DIR}/RESOURCE_GROUP" ]
+then
+  echo "RESOURCE_GROUP is not set, exiting cleanly"
+  exit 0
+fi
 RESOURCE_GROUP=$(< "${SHARED_DIR}/RESOURCE_GROUP")
 VPC_REGION=$(< "${SHARED_DIR}/VPC_REGION")
 echo "VPC_REGION:- ${VPC_REGION}"
@@ -149,7 +154,7 @@ function cleanup_ibmcloud_powervs() {
     retry "ic pi workspace target ${CRN}"
 
     echo "Deleting the PVM Instances"
-    for INSTANCE_ID in $(ic pi instance ls --json | jq -r '.pvmInstances[].pvmInstanceID')
+    for INSTANCE_ID in $(ic pi instance ls --json | jq -r '.pvmInstances[] | .id')
     do
       echo "Deleting PVM Instance ${INSTANCE_ID}"
       retry "ic pi instance delete ${INSTANCE_ID} --delete-data-volumes"
