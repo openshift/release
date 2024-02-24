@@ -115,7 +115,7 @@ EOF
 
 # Check connectivity
 ping ${BASTION_IP} -c 10 || true
-echo "exit" | curl telnet://${BASTION_IP}:22 && echo "SSH port is opened"|| echo "status = $?"
+echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
 ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
