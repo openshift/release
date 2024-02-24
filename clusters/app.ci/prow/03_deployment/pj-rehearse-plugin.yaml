@@ -53,6 +53,7 @@ items:
           - --dry-run=false
           - --log-level=debug
           - --prowjob-kubeconfig=/var/kubeconfigs/sa.pj-rehearse.app.ci.config
+          - --registry-config=/etc/push/.dockerconfigjson
           - --kubeconfig-dir=/var/kubeconfigs
           - --kubeconfig-suffix=config
           - --normal-limit=5
@@ -87,6 +88,8 @@ items:
             readOnly: true
           - name: cache
             mountPath: /var/tmp
+          - mountPath: /etc/push
+            name: push-credentials
           resources:
             requests:
               memory: "8Gi"
@@ -119,3 +122,6 @@ items:
             secretName: github-credentials-openshift-ci-robot
         - name: cache
           emptyDir: {}
+        - name: push-credentials
+          secret:
+            secretName: registry-push-credentials-ci-images-mirror
