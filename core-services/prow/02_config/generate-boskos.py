@@ -75,8 +75,8 @@ CONFIG = {
         'us-east-2': 5,
     },
     'aws-local-zones-quota-slice': {
-        'us-east-1': 2,
-        'us-west-2': 2
+        'us-east-1': 5,
+        'us-west-2': 5
     },
     'aws-perf-qe-quota-slice': {
         'us-west-2': 3,
@@ -86,6 +86,10 @@ CONFIG = {
     },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
+    },
+    'aws-serverless-quota-slice': {
+        'us-east-1': 5,
+        'us-east-2': 5,
     },
     'aws-rhtap-qe-quota-slice': {
         'us-west-2': 10

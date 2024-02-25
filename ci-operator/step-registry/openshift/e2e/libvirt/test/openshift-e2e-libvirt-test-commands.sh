@@ -326,6 +326,12 @@ export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
         TEST_ARGS="${TEST_ARGS:-} --from-repository=quay.io/multi-arch/community-e2e-images"
         ;;
     esac
+	# Disabling the test until https://issues.redhat.com/browse/OCPBUGS-18534 is fixed. 	
+	case "${CLUSTER_TYPE}" in
+	powervs*)
+		TEST_ARGS="${TEST_ARGS:-} --disable-monitor=service-type-load-balancer-availability"
+    	;;
+	esac
 
     VERBOSITY="" # "--v 9"
     set -x
