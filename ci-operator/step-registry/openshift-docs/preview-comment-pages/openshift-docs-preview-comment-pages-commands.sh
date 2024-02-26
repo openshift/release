@@ -11,7 +11,20 @@ export GITHUB_AUTH_TOKEN
 
 PREVIEW_URL="https://${PULL_NUMBER}--${PREVIEW_SITE}.netlify.app"
 
-COMMENT_DATA="🤖 $(date +'%a %b %d %T') - Prow CI generated the docs preview:\n${PREVIEW_URL}"
+COMMENT_DATA="🤖 $(date +'%a %b %d %T') - Prow CI generated the docs preview:\n"
+
+# If there are more than 10 preview URLs, write to a file in the CI job artifacts folder instead
+if [ -e "${SHARED_DIR}/UPDATED_PAGES" ]; then
+    num_lines=$(wc -l < "${SHARED_DIR}/UPDATED_PAGES")
+    if [ "$num_lines" -le 10 ]; then
+        while IFS= read -r updated_page; do
+            COMMENT_DATA+="\n${updated_page}"
+        done < "${SHARED_DIR}/UPDATED_PAGES"
+    else
+        cp "${SHARED_DIR}/UPDATED_PAGES" "${ARTIFACT_DIR}"/updated_preview_urls.txt
+        COMMENT_DATA+="${PREVIEW_URL}\n...[URLs list truncated]...\nThe complete list of updated URLs is in the Prow CI job artifacts/deploy-preview/openshift-docs-preview-comment/artifacts/ folder."
+    fi
+fi
 
 # Get the comments
 COMMENTS=$(curl -s -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GITHUB_AUTH_TOKEN}" "https://api.github.com/repos/openshift/openshift-docs/issues/${PULL_NUMBER}/comments")
