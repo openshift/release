@@ -54,7 +54,7 @@ function wait_for_prometheus_status() {
 
 function check_monitoring_statefulset_status()
 {
-  attempts=20
+  attempts=30
   infra_nodes=$(oc get nodes -l 'node-role.kubernetes.io/infra=' --no-headers | awk '{print $1}' |  tr '\n' '|')
   infra_nodes=${infra_nodes:0:-1}
   echo -e "\nQuery infra_nodes in check_monitoring_statefulset_status:\n[ $infra_nodes ]"
@@ -63,9 +63,14 @@ function check_monitoring_statefulset_status()
   for statefulset in $statefulset_list; do
     echo "statefulset in openshift-monitoring is $statefulset"	  
     retries=0
-    ready_replicas=$(oc get statefulsets $statefulset -n openshift-monitoring -ojsonpath='{.status.availableReplicas}')
-    wanted_replicas=$(oc get statefulsets $statefulset -n openshift-monitoring -ojsonpath='{.spec.replicas}')
+    wanted_replicas=$( ! oc -n openshift-monitoring get statefulsets $statefulset -oyaml | grep 'replicas:'>/dev/null || oc get statefulsets $statefulset -n openshift-monitoring -ojsonpath='{.spec.replicas}')
+    echo wanted_replicas is $wanted_replicas
+    sleep 30
+    #wait for 30s to make sure the .status.availableReplicas was updated
+    ready_replicas=$( ! oc -n openshift-monitoring get statefulsets $statefulset -oyaml |grep availableReplicas>/dev/null || oc get statefulsets $statefulset -n openshift-monitoring -ojsonpath='{.status.availableReplicas}')
+    echo ready_replicas is $ready_replicas
     infra_pods=$(oc get pods -n openshift-monitoring --no-headers -o wide | grep -E "$infra_nodes" | grep Running | grep "$statefulset" | wc -l  | xargs)
+    echo infra_pods is $infra_pods
     echo
     echo "-------------------------------------------------------------------------------------------"
     echo "current replicas in $statefulset: wanted--$wanted_replicas, current ready--$ready_replicas!"

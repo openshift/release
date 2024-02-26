@@ -40,7 +40,7 @@ if [[ "${CLOUD_PROVIDER}" == "AWS" ]]; then
 fi
 
 if [[ -z "$ZONE" ]] && [[ "${LOCAL_ZONE}" == "true" ]]; then
-  ZONE=$(head -n 1 "${SHARED_DIR}/edge-zone-name.txt")
+  ZONE=$(head -n 1 "${SHARED_DIR}/edge-zone-names.txt")
 fi
 if [[ ! -z "$ZONE" ]]; then
   payload=$(echo "${payload}" | jq --arg z $ZONE '.availability_zones +=[$z]')

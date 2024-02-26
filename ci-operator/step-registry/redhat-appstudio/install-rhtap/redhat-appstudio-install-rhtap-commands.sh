@@ -10,22 +10,22 @@ export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOK
     GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING GITHUB_TOKENS_LIST
 
 DEFAULT_QUAY_ORG=redhat-appstudio-qe
-DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/default-quay-org-token)
+DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/default-quay-org-token)
 GITHUB_USER=""
 GITHUB_TOKEN=""
-QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
-QUAY_OAUTH_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-user)
-QUAY_OAUTH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token)
-QUAY_OAUTH_TOKEN_RELEASE_SOURCE=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-source)
-QUAY_OAUTH_TOKEN_RELEASE_DESTINATION=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-destination)
+QUAY_TOKEN=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/quay-token)
+QUAY_OAUTH_USER=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/quay-oauth-user)
+QUAY_OAUTH_TOKEN=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/quay-oauth-token)
+QUAY_OAUTH_TOKEN_RELEASE_SOURCE=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-source)
+QUAY_OAUTH_TOKEN_RELEASE_DESTINATION=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-destination)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 PREVIOUS_RATE_REMAINING=0
-GITHUB_TOKENS_LIST="$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github_accounts)"
+GITHUB_TOKENS_LIST="$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/github_accounts)"
 
 # Chose github user with greatest rate limit remaining
 # user stored: username:token,username:token
-IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<< "$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github_accounts)"
+IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<< "$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/github_accounts)"
 for account in "${GITHUB_ACCOUNTS_ARRAY[@]}"
 do :
     IFS=':' read -r -a GITHUB_USERNAME_ARRAY <<< "$account"

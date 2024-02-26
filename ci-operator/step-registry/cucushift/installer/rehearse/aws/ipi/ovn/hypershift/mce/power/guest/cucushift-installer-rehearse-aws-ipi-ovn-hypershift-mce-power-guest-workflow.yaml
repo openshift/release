@@ -1,0 +1,32 @@
+workflow:
+  as: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-power-guest
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-ingress-nlb-provision
+    - ref: hypershift-mce-install
+    - ref: hypershift-mce-power-create
+    - chain: cucushift-hypershift-extended-enable-qe-catalogsource
+    - ref: cucushift-hypershift-extended-idp-htpasswd
+    - ref: cucushift-hypershift-extended-enable-guest
+    post:
+    - ref: cucushift-hypershift-extended-disable-guest
+    - ref: hypershift-mce-power-destroy
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    env:
+      CP_AVAILABILITY_POLICY: HighlyAvailable
+      ENABLE_ICSP: "true"
+      ZONES_COUNT: "3"
+      HYPERSHIFT_INFRA_AVAILABILITY_POLICY: HighlyAvailable
+      HYPERSHIFT_NAMESPACE: local-cluster
+      HYPERSHIFT_NODE_COUNT: "3"
+      HYPERSHIFT_BASE_DOMAIN: "hypershift.cis.ibm.net"
+      POWERVS_INSTANCE_CRN: "crn:v1:bluemix:public:power-iaas:tok04:a/c265c8cefda241ca9c107adcbbacaa84:d04e2b0c-58aa-4e64-85c1-ecb5ab00d03d::"
+      POWERVS_IMAGE: "rhcos-none"
+      POWERVS_NETWORK: "private-net"
+      CIS_INSTANCE: "hypershift.cis.ibm.net"
+      CIS_DOMAIN_ID: "2efc206d822e60cd3586d1f482ffac97"
+      BASTION: "rh-agent-ci-bastion.hypershift.cis.ibm.net"
+      BASTION_CI_SCRIPTS_DIR: "/root/agent-ci/scripts"
+
+  documentation: |-
+    This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow

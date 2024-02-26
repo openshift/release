@@ -28,6 +28,10 @@ if [[ "${CLUSTER_TYPE}" == *ocp-metal* ]]; then
   AUX_HOST="$(<"${CLUSTER_PROFILE_DIR}"/aux-host)"
 fi
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 function approve_csrs() {
   while [[ ! -f '/tmp/scale-out-complete' ]]; do
     sleep 30
@@ -138,6 +142,12 @@ echo "Cluster type is ${CLUSTER_TYPE}"
 
 case "$CLUSTER_TYPE" in
 *ocp-metal*)
+  # Extract the ignition file for additional workers if additional workers count > 0
+  oc extract -n openshift-machine-api secret/worker-user-data-managed --keys=userData --to=- > "${SHARED_DIR}"/worker.ign
+  echo -e "\nCopying ignition files into bastion host..."
+  chmod 644 "${SHARED_DIR}"/*.ign
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}"/*.ign "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/"
+
   # For Bare metal UPI clusters, we consider the reservation of the nodes, and the configuration of the boot done
   # by the baremetal-lab-pre-* steps.
   # Therefore, we only need to power on the nodes and wait for them to join the cluster.
@@ -203,7 +213,8 @@ case "$CLUSTER_TYPE" in
       echo "Removing the grub.cfg file for host with mac ${mac}..."
       rm -f "/opt/tftpboot/grub.cfg-01-${mac//:/-}" || echo "no grub.cfg for $mac."
       echo "Removing the DHCP config for ${name}/${mac}..."
-      sed -i "/^dhcp-host=$mac/d" /opt/dnsmasq/etc/dnsmasq.conf
+      sed -i "/^$mac/d" /opt/dnsmasq/hosts/hostsdir/"${CLUSTER_NAME}"
+      kill -s HUP "$(podman inspect -f '{{ .State.Pid }}' "dhcp")"
       echo "Removing the DNS config for ${name}/${mac}..."
       sed -i "/${name}.*${CLUSTER_NAME:-glob-protected-from-empty-var}/d" /opt/bind9_zones/{zone,internal_zone.rev}
       # haproxy.cfg is mounted as a volume, and we need to remove the bootstrap node from being a backup:
@@ -219,7 +230,6 @@ case "$CLUSTER_TYPE" in
       docker kill -s HUP "haproxy-${CLUSTER_NAME}"
       podman exec bind9 rndc reload
       podman exec bind9 rndc flush
-      systemctl restart dhcp
     done
 EOF
   echo "Wiping the disks and releasing the nodes for further reservations in other jobs..."

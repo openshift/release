@@ -23,13 +23,10 @@ Example of a configuration of a multi-arch cluster where (after the installation
     env:
       ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@heterogeneous and @aws-ipi and @network-ovnkubernetes and not
-        @fips'
       MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL: node-role.kubernetes.io/worker,kubernetes.io/arch=arm64
       MCO_CONF_DAY2_CUSTOM_MCP_NAME: 64k-pages
       MCO_CONF_DAY2_INSTALL_KERNEL_MCPS: 64k-pages
       MCO_CONF_DAY2_INSTALL_KERNEL_TYPE: 64k-pages
-      TAG_VERSION: '@4.15'
     test:
     - chain: ipi-install-heterogeneous-day2-kerneltype
     - chain: openshift-e2e-test-qe
