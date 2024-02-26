@@ -24,11 +24,8 @@ Example of a multi-arch cluster where a new MachineConfigPool named 'infra' has 
     env:
       ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@heterogeneous and @aws-ipi and @network-ovnkubernetes and not
-        @fips'
       MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL: node-role.kubernetes.io/worker,kubernetes.io/arch=arm64
       MCO_CONF_DAY2_CUSTOM_MCP_NAME: infra
-      TAG_VERSION: '@4.15'
     test:
     - chain: ipi-install-heterogeneous-day2-kerneltype
     - chain: openshift-e2e-test-qe

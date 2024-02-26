@@ -16,6 +16,11 @@ additionalNTPSources:
 - ${AUX_HOST}
 EOF
 
+# https://issues.redhat.com/browse/AGENT-677 - Pass BMC details to cluster if provided
+# To test this feature the using the BareMetal platform the BMC info should be added to the hosts in install-config.yaml.
+# In this case, no hosts should be defined in agent-config.yaml since these will take precedence in order to maintain backwards compatibility.
+
+if [ "${AGENT_BM_HOSTS_IN_INSTALL_CONFIG}" = "false" ]; then
 cat > "${SHARED_DIR}/agent-config.yaml" <<EOF
 apiVersion: v1beta1
 kind: AgentConfig
@@ -29,6 +34,11 @@ EOF
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+    # Do not create host config for additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
+    # on a single-arch payload migrated to a multi-arch cluster)
+    continue
+  fi
   ADAPTED_YAML="
   hostname: ${name}
   role: ${name%%-[0-9]*}
@@ -69,7 +79,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         dhcp: false
     "
   done
-  
+
   # Take care of the indentation when adding the dns and routes to the above yaml
   ADAPTED_YAML+="
     dns-resolver:
@@ -86,3 +96,15 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
     "$SHARED_DIR/agent-config.yaml" - <<< "$ADAPTED_YAML"
 done
+
+else
+
+cat > "${SHARED_DIR}/agent-config.yaml" <<EOF
+apiVersion: v1beta1
+kind: AgentConfig
+rendezvousIP: ${RENDEZVOUS_IP}
+additionalNTPSources:
+- ${AUX_HOST}
+EOF
+
+fi

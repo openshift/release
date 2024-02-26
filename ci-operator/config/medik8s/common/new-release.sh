@@ -27,9 +27,9 @@ fi
 cd ${REPO}
 
 # copy all main config files
-for file in $(ls | grep main); do
+for file in $(ls | grep main__); do
   # rename the file with branch name
-  new_file=$(echo ${file} | sed "s/main/${BRANCH}/")
+  new_file=$(echo ${file} | sed "s/main__/${BRANCH}__/")
   cp ${file} ${new_file}
   # update the branch name in the config
   sed -i "s/branch: main/branch: ${BRANCH}/g" ${new_file}
