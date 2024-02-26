@@ -38,6 +38,35 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: nightly
+  cron: 0 0 * * *
+  steps:
+    test:
+    - as: stage-environment-update
+      cli: latest
+      commands: |
+        export OPENSHIFT_LOGIN_USERNAME="$(cat /usr/local/ci-secrets/rhtap-stage-secrets/openshift_login_username)"
+        export OPENSHIFT_LOGIN_PASSWORD="$(cat /usr/local/ci-secrets/rhtap-stage-secrets/openshift_login_password)"
+        export OPENSHIFT_API_URL="$(cat /usr/local/ci-secrets/rhtap-stage-secrets/openshift_api_url)"
+        source /usr/local/ci-secrets/rhtap-stage-secrets/stage-secrets-environments
+
+        # Login to Staging Openshift Cluster
+        oc login -u "${OPENSHIFT_LOGIN_USERNAME}" -p "${OPENSHIFT_LOGIN_PASSWORD}" "${OPENSHIFT_API_URL}" --insecure-skip-tls-verify=true
+
+        # Run the installation in debug mode
+        ./bin/make.sh values
+        yq e -i '.debug.script=true' private-values.yaml
+        yq e -i '.trusted-profile-analyzer=null' private-values.yaml
+        ./bin/make.sh apply -n rhtap -- --debug --values private-values.yaml
+      credentials:
+      - mount_path: /usr/local/ci-secrets/rhtap-stage-secrets
+        name: rhtap-stage-secrets
+        namespace: test-credentials
+      from: rhtap-installer
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: rhtap-installer-shellcheck
   commands: |
     #!/usr/bin/env bash
