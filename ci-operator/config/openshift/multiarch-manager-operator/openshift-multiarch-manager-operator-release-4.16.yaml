@@ -1,0 +1,175 @@
+base_images:
+  builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+binary_build_commands: NO_DOCKER=1 make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
+images:
+- dockerfile_path: Dockerfile
+  from: ubi
+  to: multiarch-manager-operator
+- dockerfile_literal: |
+    FROM quay.io/operator-framework/operator-sdk:v1.26.0 as osdk
+    FROM src
+    COPY . /code
+    COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
+    RUN chmod -R g+rwX /code
+    WORKDIR /code
+  from: src
+  inputs:
+    builder:
+      as:
+      - golang:1.21
+  to: operator-sdk-src
+operator:
+  bundles:
+  - as: multiarch-manager-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: controller:latest
+    with: pipeline:multiarch-manager-operator
+promotion:
+  to:
+  - excluded_images:
+    - operator-sdk-src
+    namespace: origin
+    tag: release-4.16
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  sast:
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 300m
+      memory: 400Mi
+tests:
+- as: fmt
+  commands: NO_DOCKER=1 make fmt && make verify-diff
+  container:
+    from: src
+- as: vet
+  commands: NO_DOCKER=1 make vet && make verify-diff
+  container:
+    from: src
+- as: goimports
+  commands: NO_DOCKER=1 make goimports && make verify-diff
+  container:
+    from: src
+- as: lint
+  commands: NO_DOCKER=1 make lint && make verify-diff
+  container:
+    from: src
+- as: sast
+  commands: NO_DOCKER=1 make gosec && make verify-diff
+  container:
+    from: src
+- as: manifests
+  commands: NO_DOCKER=1 make manifests && make verify-diff
+  container:
+    from: src
+- as: generate
+  commands: NO_DOCKER=1 make generate && make verify-diff
+  container:
+    from: src
+- as: unit
+  commands: NO_DOCKER=1 make unit
+  container:
+    from: src
+- as: e2e-gcp-multi-operator-olm
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPERATOR_IMAGE: pipeline:multiarch-manager-operator
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+    test:
+    - ref: ipi-install-heterogeneous
+    - as: test
+      cli: latest
+      commands: USE_OLM=true ./hack/deploy-and-e2e.sh
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: pipeline:multiarch-manager-operator
+      - env: OO_BUNDLE
+        name: pipeline:multiarch-manager-operator-bundle
+      from: operator-sdk-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-multi-operator
+  optional: true
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPERATOR_IMAGE: pipeline:multiarch-manager-operator
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+    test:
+    - ref: ipi-install-heterogeneous
+    - as: test
+      cli: latest
+      commands: ./hack/deploy-and-e2e.sh
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: pipeline:multiarch-manager-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: multiarch-manager-operator
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: multiarch-manager-operator
