@@ -1,0 +1,21 @@
+chain:
+  as: rosa-aws-sts-hypershift-cilium
+  env:
+  - name: HOSTED_CP
+    default: "true"
+  - name: NO_CNI
+    default: "true"
+  steps:
+  - ref: aws-provision-vpc-shared
+  - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+  - chain: rosa-sts-oidc-config-create
+  - ref: rosa-cluster-provision
+  - ref: osd-ccs-cluster-provision-admin-kubeconfig
+  - ref: cucushift-hypershift-extended-cilium
+  - ref: rosa-cluster-notify-error
+  - ref: rosa-cluster-wait-ready-operators
+  - ref: rosa-conf-idp-htpasswd
+  - ref: aws-provision-tags-for-byo-vpc
+  documentation: >-
+    This chain installs a rosa hypershift cluster with cilium CNI. The cluster is configured
+    with the HTPasswd IDP, and provide the cluster-admin user 'rosa-admin' to login the cluser.
