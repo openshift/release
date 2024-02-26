@@ -1,6 +1,6 @@
 # CEPH QE
 
-[Document Guide to reqeust service account](https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/#how-do-i-get-a-token-for-programmatic-access-to-the-central-ci-registry)
+[Document Guide to request service account](https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/#how-do-i-get-a-token-for-programmatic-access-to-the-central-ci-registry)
 
 
 ## Generating an Image Pull Credential
