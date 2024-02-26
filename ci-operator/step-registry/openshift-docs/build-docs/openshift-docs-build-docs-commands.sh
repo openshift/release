@@ -29,7 +29,7 @@ netlify deploy --site ${PREVIEW_SITE} --auth ${NETLIFY_AUTH_TOKEN} --alias ${PUL
 # Output list of updated pages
 
 if [[ "$PREVIEW_COMMENT" == "pages" ]]; then
-    scripts/get-updated-preview-urls.sh > ${SHARED_DIR}/UPDATED_PAGES
+    scripts/get-updated-preview-urls.sh ${PULL_NUMBER} > ${SHARED_DIR}/UPDATED_PAGES
 elif [[ "$PREVIEW_COMMENT" == "site" ]]; then
     touch ${SHARED_DIR}/NETLIFY_SUCCESS
 fi
