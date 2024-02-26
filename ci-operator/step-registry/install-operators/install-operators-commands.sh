@@ -16,9 +16,9 @@ else
 fi
 
 # If not provided in the JSON, will use the following defaults.
-export DEFAULT_OPERATOR_SOURCE="redhat-operators"
-export DEFAULT_OPERATOR_CHANNEL="!default"
-export DEFAULT_OPERATOR_INSTALL_NAMESPACE="openshift-operators"
+DEFAULT_OPERATOR_SOURCE="redhat-operators"
+DEFAULT_OPERATOR_CHANNEL="!default"
+DEFAULT_OPERATOR_INSTALL_NAMESPACE="openshift-operators"
 
 # Read each operator in the JSON provided to an item in a BASH array.
 readarray -t OPERATOR_ARRAY < <(jq --compact-output '.[]' <<< "$OPERATORS")
@@ -27,9 +27,9 @@ readarray -t OPERATOR_ARRAY < <(jq --compact-output '.[]' <<< "$OPERATORS")
 for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     # Set variables for this operator.
     operator_name=$(jq --raw-output '.name' <<< "$operator_obj")
-    operator_source=$(jq --raw-output '.source' <<< "$operator_obj")
-    operator_channel=$(jq --raw-output '.channel' <<< "$operator_obj")
-    operator_install_namespace=$(jq --raw-output '.install_namespace' <<< "$operator_obj")
+    operator_source="${(jq --raw-output '.source' <<< "$operator_obj"):-DEFAULT_OPERATOR_SOURCE}"
+    operator_channel="${(jq --raw-output '.channel' <<< "$operator_obj"):-$DEFAULT_OPERATOR_CHANNEL}"
+    operator_install_namespace="${(jq --raw-output '.install_namespace' <<< "$operator_obj"):-DEFAULT_OPERATOR_INSTALL_NAMESPACE}"
     operator_group=$(jq --raw-output '.operator_group // ""' <<< "$operator_obj")
     operator_target_namespaces=$(jq --raw-output '.target_namespaces // ""' <<< "$operator_obj")
 
@@ -37,16 +37,6 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     if [[ -z "${operator_name}" ]]; then
         echo "ERROR: name is not defined"
         exit 1
-    fi
-
-    # If install_namespace not defined, use DEFAULT_OPERATOR_INSTALL_NAMESPACE.
-    if [[ -z "${operator_install_namespace}" ]]; then
-        operator_install_namespace="${DEFAULT_OPERATOR_INSTALL_NAMESPACE}"
-    fi
-
-    # If channel is not defined, use DEFAULT_OPERATOR_CHANNEL.
-    if [[ -z "${operator_channel}" ]]; then
-        operator_channel="${DEFAULT_OPERATOR_CHANNEL}"
     fi
 
     # If the channel is "!default", find the default channel of the operator
@@ -58,11 +48,6 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
         else
             echo "INFO: Default channel is ${operator_channel}"
         fi
-    fi
-
-    # If source is not defined, use DEFAULT_OPERATOR_SOURCE.
-    if [[ -z "${operator_source}" ]]; then
-        operator_source="${DEFAULT_OPERATOR_SOURCE}"
     fi
 
     # If "!install" in target_namespaces, use the install namespace
