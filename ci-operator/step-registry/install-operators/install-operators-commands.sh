@@ -27,9 +27,9 @@ readarray -t OPERATOR_ARRAY < <(jq --compact-output '.[]' <<< "$OPERATORS")
 for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     # Set variables for this operator.
     operator_name=$(jq --raw-output '.name' <<< "$operator_obj")
-    operator_source="${(jq --raw-output '.source' <<< "$operator_obj"):-DEFAULT_OPERATOR_SOURCE}"
+    operator_source="${(jq --raw-output '.source' <<< "$operator_obj"):-$DEFAULT_OPERATOR_SOURCE}"
     operator_channel="${(jq --raw-output '.channel' <<< "$operator_obj"):-$DEFAULT_OPERATOR_CHANNEL}"
-    operator_install_namespace="${(jq --raw-output '.install_namespace' <<< "$operator_obj"):-DEFAULT_OPERATOR_INSTALL_NAMESPACE}"
+    operator_install_namespace="${(jq --raw-output '.install_namespace' <<< "$operator_obj"):-$DEFAULT_OPERATOR_INSTALL_NAMESPACE}"
     operator_group=$(jq --raw-output '.operator_group // ""' <<< "$operator_obj")
     operator_target_namespaces=$(jq --raw-output '.target_namespaces // ""' <<< "$operator_obj")
 
