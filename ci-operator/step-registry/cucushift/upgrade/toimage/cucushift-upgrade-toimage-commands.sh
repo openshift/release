@@ -685,6 +685,15 @@ function upgrade() {
         clear_upgrade
         check_upgrade_status "${cluster_src_ver}"
     fi
+
+    if check_ota_case_enabled "OCP-56083"; then
+        log_file=$(mktemp)
+        echo "Testing Upgrade when channel is unset"
+        #unset the channel 
+        run_command "oc adm upgrade channel"
+        admin_ack
+    fi
+
     run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
