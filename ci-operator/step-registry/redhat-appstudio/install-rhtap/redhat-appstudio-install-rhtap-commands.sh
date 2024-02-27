@@ -67,6 +67,8 @@ EOF
 	  exit 1
   fi
 
+sleep 1h
+
 # Clone e2e-tests repo and install cluster
 git config --global user.name "redhat-appstudio-qe-bot"
 git config --global user.email redhat-appstudio-qe-bot@redhat.com
