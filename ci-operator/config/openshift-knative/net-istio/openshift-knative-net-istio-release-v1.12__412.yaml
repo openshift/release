@@ -7,23 +7,29 @@ build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 images:
-- dockerfile_path: openshift/ci-operator/knative-images/kourier/Dockerfile
+- dockerfile_path: openshift/ci-operator/knative-images/controller/Dockerfile
   inputs:
     openshift_release_golang-1.21:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.21
-  to: net-kourier-kourier
+  to: net-istio-controller
+- dockerfile_path: openshift/ci-operator/knative-images/webhook/Dockerfile
+  inputs:
+    openshift_release_golang-1.21:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.21
+  to: net-istio-webhook
 promotion:
   to:
   - additional_images:
-      net-kourier-src: src
+      net-istio-src: src
     name: knative-v1.12
     namespace: openshift
 releases:
   latest:
     release:
       channel: fast
-      version: "4.11"
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -32,5 +38,5 @@ resources:
 zz_generated_metadata:
   branch: release-v1.12
   org: openshift-knative
-  repo: net-kourier
-  variant: "411"
+  repo: net-istio
+  variant: "412"
