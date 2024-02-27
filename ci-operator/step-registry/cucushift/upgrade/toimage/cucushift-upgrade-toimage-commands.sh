@@ -699,7 +699,7 @@ function upgrade() {
         while ((wait_upgrade > 0)); do
             sleep 2m
             wait_upgrade=$(( wait_upgrade - 2 ))
-            run_command "oc get clusterversion -ojson | jq '.items[].status.conditions[]|select(.type == "ReleaseAccepted") 2>&1 | tee ${log_file}" || true
+            run_command "oc get clusterversion -ojson | jq '.items[].status.conditions[]|select(.type == \"ReleaseAccepted\") 2>&1 | tee ${log_file}" || true
             if grep -q "ReleaseAccepted" "${log_file}"; then
                 run_command "oc get clusterversion -ojson | jq .items[].status.history  2>&1 | tee ${log_file}" || true
                 if grep -q "${expected_msg}" "${log_file}"; then
