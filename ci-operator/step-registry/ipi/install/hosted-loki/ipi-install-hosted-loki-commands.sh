@@ -4,10 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ "$LOKI_ENABLED" != "true" ]];
-then
-  exit 0
-fi
+# TODO: temporarily disable all loki due to outage
+exit 0
 
 
 PROXYCFGLINE=
