@@ -25,6 +25,8 @@ cat >"${SHARED_DIR}"/time-skew-gather.sh <<'EOF'
 #!/bin/bash
 set -euxo pipefail
 
+source ~/config.sh
+
 INTERNAL_SSH_OPTS=${INTERNAL_SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
 SSH=${SSH:-ssh ${INTERNAL_SSH_OPTS}}
 SCP=${SCP:-scp ${INTERNAL_SSH_OPTS}}
@@ -59,6 +61,7 @@ run-on-all-nodes "
         sos report --case-id "\$HOSTNAME" --batch \
           -o container_log,filesys,logs,networkmanager,podman,processor,sar \
           -k podman.all -k podman.logs \
+          --log-size=50 \
           --tmp-dir ${NODE_ARTIFACT_DIR}
   tar -czf ${NODE_ARTIFACT_DIR}/etc-kubernetes-\$HOSTNAME.tar.gz -C /etc/kubernetes /etc/kubernetes
 "
@@ -76,8 +79,9 @@ run-on-first-master "
   oc get csr -o yaml > ${NODE_ARTIFACT_DIR}/csrs.yaml
   oc get co -o yaml > ${NODE_ARTIFACT_DIR}/cos.yaml
 
-  oc --insecure-skip-tls-verify adm must-gather --timeout=15m --dest-dir=${NODE_ARTIFACT_DIR}/must-gather
+  oc --insecure-skip-tls-verify adm must-gather --image=${MUST_GATHER_IMAGE} --timeout=15m --dest-dir=${NODE_ARTIFACT_DIR}/must-gather || true
   tar -czf ${NODE_ARTIFACT_DIR}/must-gather.tar.gz -C ${NODE_ARTIFACT_DIR}/must-gather ${NODE_ARTIFACT_DIR}/must-gather
+  rm -rf ${NODE_ARTIFACT_DIR}/must-gather
 "
 
 exit 0
