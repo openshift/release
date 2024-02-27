@@ -16,7 +16,7 @@ then
     exit 1
 fi
 
-if [[ ! -f "${SHARED_DIR}/kubeconfig" ]];
+if [[ -f "${SHARED_DIR}/kubeconfig" ]];
 then
    export TEST_KUBECONFIG="${SHARED_DIR}/kubeconfig"
 fi
