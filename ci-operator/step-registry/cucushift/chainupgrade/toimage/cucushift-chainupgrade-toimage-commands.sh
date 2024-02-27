@@ -283,7 +283,7 @@ function check_clusteroperators() {
 }
 
 function wait_clusteroperators_continous_success() {
-    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=20
+    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=30
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
         if check_clusteroperators; then
