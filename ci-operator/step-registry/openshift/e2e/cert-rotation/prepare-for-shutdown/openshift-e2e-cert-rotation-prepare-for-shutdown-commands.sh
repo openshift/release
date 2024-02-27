@@ -41,55 +41,74 @@ function run-on-first-master {
   timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
 }
 
+function run-on-first-master-silent {
+  timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuo pipefail' <<< ${1}
+}
+
 function copy-file-from-first-master {
   timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_nodes[0]}:${1}" "${2}"
 }
 
+cat << 'EOZ' > /tmp/approve-csrs-with-timeout.sh
+  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
+  echo -n "Approving CSRs"
+  attempts=0
+  max_attempts=10
+  while true; do
+    echo -n '.'
+    mapfile -d ' ' -t csrs < <(oc get csr | grep Pending | cut -f1 -d" ")
+    if [[ ${#csrs[@]} -gt 0 ]]; then
+      oc adm certificate approve ${csrs} && attempts=0
+    else
+      (( attempts++ ))
+    fi
+    if (( attempts > max_attempts )); then
+      echo "Timeout waiting for new CSRs"
+      break
+    fi
+    sleep 15s
+  done
+  echo "Done"
+EOZ
+chmod a+x /tmp/approve-csrs-with-timeout.sh
+timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/approve-csrs-with-timeout.sh "core@${control_nodes[0]}:/tmp/approve-csrs-with-timeout.sh"
+run-on-first-master "mv /tmp/approve-csrs-with-timeout.sh /usr/local/bin/approve-csrs-with-timeout.sh && chmod a+x /usr/local/bin/approve-csrs-with-timeout.sh"
+
+cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
+  set -x
+  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
+  echo "Waiting for API server to come up"
+  until oc get nodes; do sleep 10; done
+  mapfile -d ' ' -t nodes < <( oc get nodes -o name )
+  for nodename in ${nodes[@]}; do
+    echo -n "Waiting for ${nodename} to become Ready"
+    while true; do
+      STATUS=$(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+      TIME_DIFF=$(($(date +%s)-$(date -d $(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}') +%s)))
+      if [[ ${TIME_DIFF} -le 100 ]] && [[ ${STATUS} == True ]]; then
+        break
+      fi
+      bash /usr/local/bin/approve-csrs-with-timeout.sh
+    done
+    echo
+  done
+  oc get nodes
+  bash /usr/local/bin/approve-csrs-with-timeout.sh
+EOZ
+chmod a+x /tmp/ensure-nodes-are-ready.sh
+timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/approve-csrs-with-timeout.sh "core@${control_nodes[0]}:/tmp/ensure-nodes-are-ready.sh"
+run-on-first-master "mv /tmp/ensure-nodes-are-ready.sh /usr/local/bin/ensure-nodes-are-ready.sh && chmod a+x /usr/local/bin/ensure-nodes-are-ready.sh"
+
 function wait-for-nodes-to-be-ready {
-  run-on-first-master "
-    export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
-    until oc get nodes; do sleep 30; done
-    for nodename in \$(oc get nodes -o name); do
-      echo \${nodename}
-      while true; do
-        STATUS=\$(oc get \${nodename} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}')
-        TIME_DIFF=\$((\$(date +%s)-\$(date -d \$(oc get \${nodename} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].lastHeartbeatTime}') +%s)))
-        if [[ \${TIME_DIFF} -le 100 ]] && [[ \${STATUS} == True ]]; then
-          break
-        fi
-        oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
-        sleep 30
-      done
-    done
-    oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
-  "
-}
-
-function retry() {
-    local check_func=$1
-    local max_retries=10
-    local retry_delay=30
-    local retries=0
-
-    while (( retries < max_retries )); do
-        if $check_func; then
-            return 0
-        fi
-
-        (( retries++ ))
-        if (( retries < max_retries )); then
-            sleep $retry_delay
-        fi
-    done
-    return 1
+  run-on-first-master-silent "bash /usr/local/bin/ensure-nodes-are-ready.sh"
 }
 
 function pod-restart-workarounds {
   # Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
   # Restart OVN / Multus before proceeding
-  retry "oc -n openshift-multus delete pod -l app=multus --force --grace-period=0"
-  retry "oc -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0"
-  retry "oc -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0"
+  oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
+  oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0
+  oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0
 }
 
 function prepull-tools-image-for-gather-step {
@@ -126,8 +145,19 @@ if [ -d "$KUBECONFIG" ]; then
   done
 fi
 
+# Use emptyDir for image-registry
+oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
+
+# Disable all marketplace sources to avoid "Back-off pulling image"
+oc patch OperatorHub cluster --type json \
+    -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+
 source /usr/local/share/cert-rotation-functions.sh
 prepull-tools-image-for-gather-step
+
+# Sync host and node timezones to avoid possible errors when skewing time
+HOST_TZ=$(date +"%Z %z" | cut -d' ' -f1)
+run-on-all-nodes "timedatectl set-timezone ${HOST_TZ}"
 
 oc -n openshift-machine-config-operator create serviceaccount kubelet-bootstrap-cred-manager
 oc -n openshift-machine-config-operator adm policy add-cluster-role-to-user cluster-admin -z kubelet-bootstrap-cred-manager
