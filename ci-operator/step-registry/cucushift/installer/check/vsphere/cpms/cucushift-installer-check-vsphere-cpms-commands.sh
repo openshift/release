@@ -28,6 +28,7 @@ function checkMultizone() {
     expected_fd_name=$(echo "${zones_setting_from_config[*]}" | xargs -n1 | sort -u | xargs)
     echo "fd_name_cpms is ${fd_name_cpms}"
     echo "expected_fd_name is ${expected_fd_name}"
+
     if [[ ${fd_name_cpms} == "${expected_fd_name}" ]]; then
 	echo "INFO: The failure domain name are same between install_config and cmps"
     else

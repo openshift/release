@@ -138,13 +138,22 @@ function gather_cis {
 
 # Gather resources
 function gather_resources {
+    local hasSetTarget=false
     for resource in "${MAIN_RESOURCES[@]}"; do
         {
             echo -e "# ibmcloud is ${resource}s\n"
+            if [[ ${resource} == "image" ]] && [[ ! -z $RESOURCE_GROUP ]]; then
+                "${IBMCLOUD_CLI}" target -g ${RESOURCE_GROUP}
+                hasSetTarget=true
+            fi
             "${IBMCLOUD_CLI}" is "${resource}s" -q | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter'
             echo -e "\n\n\n# ibmcloud is ${resource} <item>\n"
             "${IBMCLOUD_CLI}" is "${resource}s" -q | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is ${resource} %"
         } > "${RESOURCE_DUMP_DIR}/${resource}s.txt"
+        
+        if [ "$hasSetTarget" = true ];  then
+            ${IBMCLOUD_CLI} target --unset-resource-group
+        fi
     done
 
     # Run any additional resource collection requiring unique commands
@@ -156,8 +165,12 @@ function gather_resources {
 
 ibmcloud_login
 
+##in order to avoid "runtime error: invalid memory address or nil pointer dereference in 'ibmcloud is images -q'"
+if [ -f ${SHARED_DIR}/metadata.json ]; then
+    RESOURCE_GROUP=$(jq -r .ibmcloud.resourceGroupName ${SHARED_DIR}/metadata.json)
+    echo "Resource group: $RESOURCE_GROUP"
+fi
 # Enable exit on error to short circuit if there are failures during gather
 
 mkdir -p "${RESOURCE_DUMP_DIR}"
-
 gather_resources
