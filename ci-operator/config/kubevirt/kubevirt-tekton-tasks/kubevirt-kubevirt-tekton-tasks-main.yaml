@@ -70,6 +70,78 @@ tests:
           cpu: "4"
           memory: 4Gi
     workflow: ipi-gcp
+- as: win10-pipeline-example-test
+  run_if_changed: (^automation/.*|^templates-pipelines/windows-bios-installer/.*|^templates-pipelines/windows-customize/.*|^modules/.*|^templates/.*)$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win10-pipeline-example-test
+      commands: TARGET=windows10 ./automation/e2e-pipelines/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: TEKTON_TASKS_IMAGE
+        name: tekton-tasks
+      - env: TEKTON_TASKS_DISK_VIRT_IMAGE
+        name: tekton-task-disk-virt
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: win11-pipeline-example-test
+  run_if_changed: (^automation/.*|^templates-pipelines/windows-efi-installer/.*|^templates-pipelines/windows-customize/.*|^modules/.*|^templates/.*)$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win11-pipeline-example-test
+      commands: TARGET=windows11 ./automation/e2e-pipelines/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: TEKTON_TASKS_IMAGE
+        name: tekton-tasks
+      - env: TEKTON_TASKS_DISK_VIRT_IMAGE
+        name: tekton-task-disk-virt
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: win2k22-pipeline-example-test
+  run_if_changed: (^automation/.*|^templates-pipelines/windows-efi-installer/.*|^templates-pipelines/windows-customize/.*|^modules/.*|^templates/.*)$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win11-pipeline-example-test
+      commands: TARGET=windows2k22 ./automation/e2e-pipelines/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: TEKTON_TASKS_IMAGE
+        name: tekton-tasks
+      - env: TEKTON_TASKS_DISK_VIRT_IMAGE
+        name: tekton-task-disk-virt
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
   org: kubevirt
