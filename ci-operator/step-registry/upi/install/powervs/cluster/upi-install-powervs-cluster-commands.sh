@@ -80,7 +80,7 @@ function retry {
     if [ $ret_code = 0 ]; then
       break
     elif [ "$i" == "$NO_OF_RETRY" ]; then
-      error "All retry attempts failed! Please try running the script again after some time" $ret_code
+      error_handler "All retry attempts failed! Please try running the script again after some time" $ret_code
     else
       sleep 30
     fi
@@ -253,7 +253,7 @@ function cleanup_ibmcloud_powervs() {
     retry "ic pi workspace target ${CRN}"
 
     echo "Deleting the PVM Instances"
-    for INSTANCE_ID in $(ic pi instance ls --json | jq -r '.pvmInstances[].pvmInstanceID')
+    for INSTANCE_ID in $(ic pi instance ls --json | jq -r '.pvmInstances[].id')
     do
       echo "Deleting PVM Instance ${INSTANCE_ID}"
       retry "ic pi instance delete ${INSTANCE_ID} --delete-data-volumes"

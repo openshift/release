@@ -45,6 +45,7 @@ fi
   --base-domain=${BASEDOMAIN} \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
   --image-content-sources "${SHARED_DIR}/mgmt_iscp.yaml" \
+  --ssh-key="${SHARED_DIR}/id_rsa.pub" \
   --release-image ${RELEASE_IMAGE}
 
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
