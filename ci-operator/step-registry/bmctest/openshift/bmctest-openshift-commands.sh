@@ -11,6 +11,7 @@ SSH_KEY="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
 SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "$SSH_KEY")
 
 SSHCMD="sudo dnf install --nobest --refresh -y git jq python3-pip epel-release;
+    echo test
     sudo python3 -m pip install yq;
     yq -y . /tmp/bmctest-openshift > /tmp/bmctest-openshift.yaml;
     DEFINT=\$(ip r | grep '^default' | awk '{print \$5}');
