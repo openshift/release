@@ -11,5 +11,5 @@ export GITHUB_AUTH_TOKEN
 
 vale sync
 
-./scripts/vale-review.sh $PULL_NUMBER
+./scripts/vale-review.sh $PULL_NUMBER $PULL_PULL_SHA
 
