@@ -31,11 +31,11 @@ EOF
 
 chmod +x ${SHARED_DIR}/gather_recipient_cluster.sh
 
-echo "Transfering upgrade script..."
+echo "Transfering gather script..."
 echo ${SHARED_DIR}
 scp "${SSHOPTS[@]}" ${SHARED_DIR}/gather_recipient_cluster.sh $ssh_host_ip:$remote_workdir
 
-echo "Upgrading recipient cluster..."
+echo "Gather recipient cluster..."
 ssh "${SSHOPTS[@]}" $ssh_host_ip "${remote_workdir}/gather_recipient_cluster.sh"
 
 echo "Pulling must gather data from the host..."

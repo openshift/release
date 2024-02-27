@@ -42,6 +42,7 @@ export RECIPIENT_VM_NAME="${RECIPIENT_VM_NAME}"
 export RECIPIENT_VERSION="${RECIPIENT_VERSION}"
 export LCA_IMAGE="${LCA_PULL_REF}"
 export SEED_VERSION="${SEED_VERSION}"
+export UPGRADE_TIMEOUT="60m"
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
