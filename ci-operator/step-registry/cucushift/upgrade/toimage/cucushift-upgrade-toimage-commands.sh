@@ -652,7 +652,7 @@ function clear_upgrade() {
 
 # Upgrade the cluster to target release
 function upgrade() {
-    local log_file history_len cluster_src_ver
+    local log_file history_len cluster_src_ver expected_msg
     if check_ota_case_enabled "OCP-21588"; then
         log_file=$(mktemp)
         echo "Testing --allow-explicit-upgrade option"
@@ -687,14 +687,37 @@ function upgrade() {
     fi
 
     if check_ota_case_enabled "OCP-56083"; then
+        wait_upgrade=10
+        log_file=$(mktemp)
         echo "Testing Upgrade when channel is unset"
         #unset the channel 
         run_command "oc adm upgrade channel"
-        admin_ack
+        #upgrade the cluster
+        run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
+        echo "Upgrading cluster to ${TARGET} gets started..."
+        expected_msg="Configured channel is unset"
+        while ((wait_upgrade > 0)); do
+            sleep 2m
+            wait_upgrade=$(( wait_upgrade - 2 ))
+            run_command "oc get clusterversion -ojson | jq '.items[].status.conditions[]|select(.type == "ReleaseAccepted") 2>&1 | tee ${log_file}" || true
+            if grep -q "ReleaseAccepted" "${log_file}"; then
+                run_command "oc get clusterversion -ojson | jq .items[].status.history  2>&1 | tee ${log_file}" || true
+                if grep -q "${expected_msg}" "${log_file}"; then
+                    echo "history.acceptedRisks complains ClusterVersion RecommendedUpdate failure with NoChannel"
+                    return 0
+                else
+                    echo "Error: history.acceptedRisks Not complains about ClusterVersion RecommendedUpdate failure with NoChannel"
+                    return 1
+                fi
+            fi
+        done 
+        if [[ ${wait_upgrade} -le 0 ]]; then
+            echo -e "Upgrade trigger timeout, Release:${TARGET} not accepted on $(date "+%F %T"), exiting\n" && return 1
+        fi
     fi
-
     run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
+
 }
 
 # Monitor the upgrade status
