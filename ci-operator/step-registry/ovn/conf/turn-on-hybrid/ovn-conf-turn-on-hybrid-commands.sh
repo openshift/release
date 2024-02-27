@@ -4,9 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-
 # patch the network operator
-oc patch Network.operator.openshift.io cluster --type='merge' --patch '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"hybridOverlayConfig":{"hybridClusterNetwork":[{"cidr": "10.132.0.0/14","hostPrefix": 23}]}}}}}'
+if [[ "${CUSTOM_VXLAN_PORT}" == "true" ]]; then
+    VXLAN_PORT=9789
+else
+    VXLAN_PORT=null
+fi
+oc patch Network.operator.openshift.io cluster --type='merge' --patch '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"hybridOverlayConfig":{"hybridOverlayVXLANPort":'"${VXLAN_PORT}"',"hybridClusterNetwork":[{"cidr": "10.132.0.0/14","hostPrefix": 23}]}}}}}'
 
 # wait for the ovnkube config map to reflect the change
 start_time=$(date +%s)
