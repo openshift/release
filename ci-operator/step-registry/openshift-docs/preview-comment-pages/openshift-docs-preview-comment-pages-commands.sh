@@ -22,7 +22,7 @@ if [ -e "${SHARED_DIR}/UPDATED_PAGES" ]; then
         done < "${SHARED_DIR}/UPDATED_PAGES"
     else
         cp "${SHARED_DIR}/UPDATED_PAGES" "${ARTIFACT_DIR}"/updated_preview_urls.txt
-        COMMENT_DATA+="${PREVIEW_URL}\n...[URLs list truncated]...\nThe complete list of updated URLs is in the Prow CI job artifacts/deploy-preview/openshift-docs-preview-comment/artifacts/ folder."
+        COMMENT_DATA+="${PREVIEW_URL}\nComplete list of updated preview URLs: [artifacts/updated_preview_urls.txt](https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/openshift_openshift-docs/${PULL_NUMBER}/pull-ci-openshift-openshift-docs-prow-test-2-deploy-preview/${BUILD_ID}/artifacts/deploy-preview/openshift-docs-preview-comment-pages/artifacts/updated_preview_urls.txt)"
     fi
 fi
 
