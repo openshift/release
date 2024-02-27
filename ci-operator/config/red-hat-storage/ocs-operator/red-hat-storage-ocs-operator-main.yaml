@@ -12,7 +12,8 @@ images:
 - build_args:
   - name: LDFLAGS
     value: -X github.com/red-hat-storage/ocs-operator/v4/version.Version=4.15.0
-  dockerfile_path: metrics/Dockerfile
+  context_dir: metrics
+  dockerfile_path: Dockerfile
   to: ocs-metrics-exporter
 operator:
   bundles:
@@ -37,7 +38,11 @@ resources:
 tests:
 - as: ocs-operator-bundle-e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: odf-aws
+    env:
+      BASE_DOMAIN: makestoragegreatagain.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      ZONES_COUNT: "3"
     test:
     - as: e2e-test
       cli: latest

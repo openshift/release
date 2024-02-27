@@ -26,7 +26,7 @@ ibmcloud plugin install power-iaas
 ibmcloud plugin install cis
 
 # Set target powervs and cis service instance
-ibmcloud pi st ${POWERVS_INSTANCE_CRN}
+ibmcloud pi ws tg ${POWERVS_INSTANCE_CRN}
 ibmcloud cis instance-set ${CIS_INSTANCE}
 
 export IBMCLOUD_TRACE=true
@@ -42,7 +42,7 @@ else
 fi
 INSTANCE_ID=()
 for instance in "${INSTANCE_NAMES[@]}"; do
-    instance_id=$(ibmcloud pi instances --json | jq -r --arg serverName $instance '.pvmInstances[] | select (.serverName == $serverName ) | .pvmInstanceID')
+    instance_id=$(ibmcloud pi ins ls --json | jq -r --arg serverName $instance '.pvmInstances[] | select (.name == $serverName ) | .id')
     if [ -z "$instance_id" ]; then
         continue
     fi
@@ -50,7 +50,7 @@ for instance in "${INSTANCE_NAMES[@]}"; do
 done
 for instance in "${INSTANCE_ID[@]}"; do
     for ((i=1; i<=15; i++)); do
-        instance_info=$(ibmcloud pi instance $instance --json)
+        instance_info=$(ibmcloud pi ins get $instance --json)
         instance_status=$(echo "$instance_info" | jq -r '.status')
         if [ "$instance_status" = "ERROR" ] || [ "$instance_status" = "ACTIVE" ];  then
           break
@@ -62,7 +62,7 @@ done
 
 # Delete VSI
 for instance in "${INSTANCE_ID[@]}"; do
-    ibmcloud pi instance-delete $instance
+    ibmcloud pi ins del $instance
 done
 
 # Cleanup cis dns records

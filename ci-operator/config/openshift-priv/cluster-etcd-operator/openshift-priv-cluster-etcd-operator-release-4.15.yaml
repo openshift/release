@@ -35,6 +35,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.15
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -159,22 +163,6 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-metal-ipi
-  cluster: build05
-  optional: true
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
-    workflow: baremetalds-e2e
-- as: e2e-metal-ipi-serial-ipv4
-  cluster: build05
-  optional: true
-  steps:
-    cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-sdn-serial-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   steps:
@@ -233,6 +221,7 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-etcd-recovery
 - as: e2e-gcp-qe-no-capabilities
+  optional: true
   steps:
     cluster_profile: gcp-qe
     env:

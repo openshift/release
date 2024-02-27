@@ -1,0 +1,40 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: caikit-tgis-serving
+promotion:
+  to:
+  - namespace: opendatahub-io
+    tag: latest-caikit-nlp-0.3.x
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: caikit-tgis-serving
+    env:
+      IMAGE_REPO: caikit-tgis-serving
+      RELEASE_VERSION: latest-caikit-nlp-0.3.x
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: caikit-nlp-0.3.x
+  org: opendatahub-io
+  repo: caikit-tgis-serving

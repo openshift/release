@@ -7,11 +7,9 @@ cat /etc/os-release
 oc config view
 oc projects
 python3 --version
-pushd /tmp
+ls
 
 ls -la /root/kraken
-git clone https://github.com/redhat-chaos/krkn-hub.git
-pushd krkn-hub/
 
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
@@ -28,9 +26,10 @@ export LABEL_SELECTOR=$LABEL_SELECTOR
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export ENABLE_ALERTS=False
 
+ls
+pwd 
 
-
-./prow/time-scenarios/prow_run.sh
+./time-scenarios/prow_run.sh
 rc=$?
 echo "Finished running time scenario"
 echo "Return code: $rc"

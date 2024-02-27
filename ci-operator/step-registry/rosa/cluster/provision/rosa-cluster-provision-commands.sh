@@ -103,7 +103,7 @@ else
   exit 1
 fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
-AWS_ACCOUNT_ID_MASK=$(echo ${AWS_ACCOUNT_ID:0:4})
+AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
 # Check whether the cluster with the same cluster name exists.
 OLD_CLUSTER=$(rosa list clusters | { grep  ${CLUSTER_NAME} || true; })
@@ -114,31 +114,33 @@ if [[ ! -z "$OLD_CLUSTER" ]]; then
 fi
 
 # Get the openshift version
+version_cmd="rosa list versions --channel-group ${CHANNEL_GROUP} -o json"
+if [[ "$HOSTED_CP" == "true" ]]; then
+  version_cmd="$version_cmd --hosted-cp"
+fi
 if [[ ${AVAILABLE_UPGRADE} == "yes" ]] ; then
-  OPENSHIFT_VERSION=$(head -n 1 "${SHARED_DIR}/available_upgrade_version.txt")
+  version_cmd="$version_cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id'"
 else
-  versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq -r '.[].raw_id')
-  if [[ "$HOSTED_CP" == "true" ]]; then
-    versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} --hosted-cp -o json | jq -r '.[].raw_id')
-  fi
-  echo -e "Available cluster versions:\n${versionList}"
+  version_cmd="$version_cmd | jq -r '.[].raw_id'"
+fi
+versionList=$(eval $version_cmd)
+echo -e "Available cluster versions:\n${versionList}"
 
-  if [[ -z "$OPENSHIFT_VERSION" ]]; then
-    if [[ "$EC_BUILD" == "true" ]]; then
-      OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
-    else
-      OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
-    fi
-  elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
-    if [[ "$EC_BUILD" == "true" ]]; then
-      OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
-    else
-      OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
-    fi
+if [[ -z "$OPENSHIFT_VERSION" ]]; then
+  if [[ "$EC_BUILD" == "true" ]]; then
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
   else
-    # Match the whole line
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
+    OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
   fi
+elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
+  if [[ "$EC_BUILD" == "true" ]]; then
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
+  else
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
+  fi
+else
+  # Match the whole line
+  OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
 fi
 
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
@@ -402,54 +404,11 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   SAHRED_VPC_HOSTED_ZONE_ID=$(head -n 1 "${SHARED_DIR}/hosted_zone_id")
   SAHRED_VPC_ROLE_ARN=$(head -n 1 "${SHARED_DIR}/hosted_zone_role_arn")
   SAHRED_VPC_BASE_DOMAIN=$(head -n 1 "${SHARED_DIR}/rosa_dns_domain")
-
-  SHARED_VPC_SWITCH=" --private-hosted-zone-id ${SAHRED_VPC_HOSTED_ZONE_ID} "
-  SHARED_VPC_SWITCH+=" --shared-vpc-role-arn ${SAHRED_VPC_ROLE_ARN} "
-  SHARED_VPC_SWITCH+=" --base-domain ${SAHRED_VPC_BASE_DOMAIN} "
+  SHARED_VPC_SWITCH="--base-domain ${SAHRED_VPC_BASE_DOMAIN} --private-hosted-zone-id ${SAHRED_VPC_HOSTED_ZONE_ID} --shared-vpc-role-arn ${SAHRED_VPC_ROLE_ARN}"
 
   record_cluster "aws.sts" "private_hosted_zone_id" ${SAHRED_VPC_HOSTED_ZONE_ID}
   record_cluster "aws.sts" "private_hosted_zone_role_arn" ${SAHRED_VPC_ROLE_ARN}
   record_cluster "dns" "base_domain" ${SAHRED_VPC_BASE_DOMAIN}
-
-  # update shared-role policy for Shared-VPC cluster
-  #
-  if [[ ! -e "${CLUSTER_PROFILE_DIR}/.awscred_shared_account" ]]; then
-    echo "No Shared VPC account found. Exit now."
-    exit 1
-  fi
-
-  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
-
-  installer_role_arn=$(grep "Installer-Role" "${SHARED_DIR}/account-roles-arns")
-  ingress_role_arn=$(grep "ingress-operator" "${SHARED_DIR}/operator-roles-arns")
-  shared_vpc_updated_trust_policy=$(mktemp)
-  cat > $shared_vpc_updated_trust_policy <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-      {
-          "Effect": "Allow",
-          "Principal": {
-              "AWS": [
-                "${installer_role_arn}",
-                "${ingress_role_arn}"
-              ]
-          },
-          "Action": "sts:AssumeRole",
-          "Condition": {}
-      }
-  ]
-}
-EOF
-  aws iam update-assume-role-policy --role-name "$(echo ${SAHRED_VPC_ROLE_ARN} | cut -d '/' -f2)"  --policy-document file://${shared_vpc_updated_trust_policy}
-  echo "Updated Shared VPC role trust policy:"
-  cat $shared_vpc_updated_trust_policy
-  
-  echo "Sleeping 120s to make sure the policy is ready."
-  sleep 120
-
-  echo "Change AWS profile back to cluster owner"
-  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 fi
 
 DRY_RUN_SWITCH=""
@@ -498,8 +457,7 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   echo "    SAHRED_VPC_BASE_DOMAIN: ${SAHRED_VPC_BASE_DOMAIN}"
 fi
 
-echo -e "
-rosa create cluster -y \
+echo -e "rosa create cluster -y \
 ${STS_SWITCH} \
 --mode auto \
 --cluster-name ${CLUSTER_NAME} \
@@ -603,6 +561,15 @@ while true; do
   fi
 done
 rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}"
+
+# Verify the subnets of the cluster to remove the 'Inflight Checks' warning
+if [[ "$ENABLE_BYOVPC" == "true" ]]; then
+  verify_cmd=$(rosa verify network -c ${CLUSTER_ID} | grep 'rosa verify network' || true)
+  if [[ ! -z "$verify_cmd" ]]; then
+    echo -e "Force verifying the network of the cluster to remove the 'Inflight Checks' warning\n$verify_cmd"
+    eval $verify_cmd
+  fi
+fi
 
 # Output
 # Print console.url and api.url

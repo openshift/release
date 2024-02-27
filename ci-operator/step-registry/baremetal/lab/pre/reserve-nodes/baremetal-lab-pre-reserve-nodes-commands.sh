@@ -27,7 +27,7 @@ CLUSTER_NAME="${NAMESPACE}"
 echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" \
-  "${ADDITIONAL_WORKERS}" "${ADDITIONAL_WORKER_ARCHITECTURE}" << 'EOF'
+  "${ADDITIONAL_WORKERS}" "${ADDITIONAL_WORKER_ARCHITECTURE}" "${VENDOR}" << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -40,6 +40,7 @@ REQUEST_BOOTSTRAP_HOST="${4}"
 ARCH="${5}"
 ADDITIONAL_WORKERS="${6:-}"
 ADDITIONAL_WORKER_ARCHITECTURE="${7:-}"
+VENDOR="${8:-}"
 
 # shellcheck disable=SC2174
 mkdir -m 755 -p {/var/builds,/opt/dnsmasq/tftpboot,/opt/html}/${BUILD_ID}
@@ -49,11 +50,11 @@ touch /etc/hosts_pool_reserved
 # The current implementation of the following scripts is different based on the auxiliary host. Keeping the script in
 # the remote aux servers temporarily.
 N_MASTERS=${N_MASTERS} N_WORKERS=${N_WORKERS} \
-  REQUEST_BOOTSTRAP_HOST=${REQUEST_BOOTSTRAP_HOST} REQUEST_VIPS=true APPEND="false" ARCH="${ARCH}" /usr/bin/reserve-hosts.sh
+  REQUEST_BOOTSTRAP_HOST=${REQUEST_BOOTSTRAP_HOST} REQUEST_VIPS=true APPEND="false" ARCH="${ARCH}" VENDOR="${VENDOR}" /usr/bin/reserve-hosts.sh
 # If the number of requested ADDITIONAL_WORKERS is greater than 0, we need to reserve the additional workers
 if [ "${ADDITIONAL_WORKERS}" -gt 0 ]; then
   N_WORKERS="${ADDITIONAL_WORKERS}" N_MASTERS=0 REQUEST_BOOTSTRAP_HOST=false \
-   ARCH="${ADDITIONAL_WORKER_ARCHITECTURE}" APPEND="true" REQUEST_VIPS=false reserve-hosts.sh
+   ARCH="${ADDITIONAL_WORKER_ARCHITECTURE}" APPEND="true" REQUEST_VIPS=false VENDOR="${VENDOR}" reserve-hosts.sh
 fi
 EOF
 
@@ -64,6 +65,20 @@ more "${SHARED_DIR}"/*.yaml |& sed 's/pass.*$/pass ** HIDDEN **/g'
 echo "${AUX_HOST}" >> "${SHARED_DIR}/bastion_public_address"
 echo "root" > "${SHARED_DIR}/bastion_ssh_user"
 
+echo "Copying the env result to the bastion host"
+env > /tmp/prow.env
+JOB_URL=$(echo "$JOB_SPEC" |  yq \
+  '.decoration_config.gcs_configuration.job_url_prefix, "gs/", .decoration_config.gcs_configuration.bucket' | \
+  tr -d '\n')
+
+if [ -n "${PULL_NUMBER:-}" ]; then
+  JOB_URL=${JOB_URL}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}
+else
+  JOB_URL=${JOB_URL}/logs/${JOB_NAME}/${BUILD_ID}
+fi
+echo "JOB_URL=${JOB_URL}" >> /tmp/prow.env
+
+scp "${SSHOPTS[@]}" /tmp/prow.env "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/prow.env"
 
 # Example host element from the list in the hosts.yaml file:
 # - mac: 34:73:5a:9d:eb:e1 # The mac address of the interface connected to the baremetal network
