@@ -34,6 +34,9 @@ telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 export AWS_DEFAULT_REGION=us-west-2
 
+
+ls node-disruptions
+
 ./power-outage/prow_run.sh
 rc=$?
 echo "Finished running power outages"
