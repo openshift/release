@@ -37,6 +37,14 @@ echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
 oc config view --flatten > /tmp/config
 
+
+ES_PASSWORD=$(cat "/secret/password")
+ES_USERNAME=$(cat "/secret/username")
+
+
+export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+export ELASTIC_INDEX=krkn_chaos_ci
+
 export KUBECONFIG=/tmp/config
 export PVC_NAME=$PVC_NAME
 export POD_NAME=$POD_NAME     
