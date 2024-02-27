@@ -687,7 +687,6 @@ function upgrade() {
     fi
 
     if check_ota_case_enabled "OCP-56083"; then
-        log_file=$(mktemp)
         echo "Testing Upgrade when channel is unset"
         #unset the channel 
         run_command "oc adm upgrade channel"
