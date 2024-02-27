@@ -39,7 +39,7 @@ fi
 openshift-tests run \
     -v 2 \
     --provider=none \
-    --monitor='node-lifecycle' \
+    --monitor='node-lifecycle,operator-state-analyzer,legacy-kube-apiserver-invariants' \
     -f /tmp/test-list \
     -o /tmp/artifacts/e2e.log \
     --junit-dir /tmp/artifacts/junit \
