@@ -3,6 +3,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
+  ocp_ubi-minimal_8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
   openshift_eventing-istio-src_knative-v1.11:
     name: eventing-istio-src
     namespace: openshift
@@ -33,6 +37,9 @@ build_root:
 images:
 - dockerfile_path: knative-operator/Dockerfile
   inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.ci.openshift.org/ocp/ubi-minimal:8
     openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
@@ -47,6 +54,9 @@ images:
   to: serverless-index
 - dockerfile_path: openshift-knative-operator/Dockerfile
   inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.ci.openshift.org/ocp/ubi-minimal:8
     openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
@@ -72,12 +82,18 @@ images:
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
   inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.ci.openshift.org/ocp/ubi-minimal:8
     openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
   to: serverless-ingress
 - dockerfile_path: serving/metadata-webhook/Dockerfile
   inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.ci.openshift.org/ocp/ubi-minimal:8
     openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
@@ -115,10 +131,15 @@ tests:
               {"step": "operator-e2e", "failure_type": "test_failure", "classification": "operator-e2e Test Failure", "jira_project": "SRVCOM", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "knative-*", "failure_type": "pod_failure", "classification": "knative Test Execution", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "operator-e2e", "failure_type": "pod_failure", "classification": "operator-e2e Test Execution", "jira_additional_labels": ["!default","interop-tests"]}
+            ],
+          "success_rules":
+            [
+              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","serverless-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       USER_TAGS: |
         scenario serverless
     test:
@@ -190,7 +211,7 @@ tests:
       from: serverless-source-image
       resources:
         limits:
-          memory: 6Gi
+          memory: 8Gi
         requests:
           cpu: 100m
           memory: 200Mi

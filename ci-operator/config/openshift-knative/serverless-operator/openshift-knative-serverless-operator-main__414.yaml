@@ -3,6 +3,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
+  ocp_ubi-minimal_8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
   openshift_eventing-istio-src_knative-v1.11:
     name: eventing-istio-src
     namespace: openshift
@@ -33,6 +37,9 @@ build_root:
 images:
 - dockerfile_path: knative-operator/Dockerfile
   inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.ci.openshift.org/ocp/ubi-minimal:8
     openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
@@ -47,6 +54,9 @@ images:
   to: serverless-index
 - dockerfile_path: openshift-knative-operator/Dockerfile
   inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.ci.openshift.org/ocp/ubi-minimal:8
     openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
@@ -72,12 +82,18 @@ images:
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
   inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.ci.openshift.org/ocp/ubi-minimal:8
     openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
   to: serverless-ingress
 - dockerfile_path: serving/metadata-webhook/Dockerfile
   inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.ci.openshift.org/ocp/ubi-minimal:8
     openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
@@ -101,7 +117,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: kitchensink-e2e-aws-ocp-414
+- as: kitchensink-e2e-aws-414
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -173,7 +189,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: kitchensink-e2e-aws-ocp-414-continuous
+- as: kitchensink-e2e-aws-414-c
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -245,7 +261,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: kitchensink-upgrade-aws-ocp-414
+- as: kitchensink-upgrade-aws-414
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -317,7 +333,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: kitchensink-upgrade-aws-ocp-414-continuous
+- as: kitchensink-upgrade-aws-414-c
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -389,7 +405,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: mesh-e2e-aws-ocp-414
+- as: mesh-e2e-aws-414
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -462,7 +478,7 @@ tests:
       timeout: 4h0m0s
     workflow: generic-claim
   timeout: 5h0m0s
-- as: mesh-e2e-aws-ocp-414-continuous
+- as: mesh-e2e-aws-414-c
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -535,7 +551,7 @@ tests:
       timeout: 4h0m0s
     workflow: generic-claim
   timeout: 5h0m0s
-- as: mesh-upgrade-aws-ocp-414
+- as: mesh-upgrade-aws-414
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -607,7 +623,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: operator-e2e-aws-ocp-414
+- as: operator-e2e-aws-414
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -678,7 +694,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: operator-e2e-aws-ocp-414-continuous
+- as: operator-e2e-aws-414-c
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -750,7 +766,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-upgrade-aws-ocp-414
+- as: test-upgrade-aws-414
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -821,7 +837,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-upgrade-aws-ocp-414-continuous
+- as: test-upgrade-aws-414-c
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -893,7 +909,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: ui-e2e-aws-ocp-414
+- as: ui-e2e-aws-414
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -966,7 +982,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: ui-e2e-aws-ocp-414-continuous
+- as: ui-e2e-aws-414-c
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -1038,7 +1054,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: upstream-e2e-aws-ocp-414
+- as: upstream-e2e-aws-414
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -1110,7 +1126,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: upstream-e2e-kafka-aws-ocp-414
+- as: upstream-e2e-kafka-aws-414
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -1182,7 +1198,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: upstream-e2e-kafka-aws-ocp-414-continuous
+- as: upstream-e2e-kafka-aws-414-c
   cluster_claim:
     architecture: amd64
     cloud: aws

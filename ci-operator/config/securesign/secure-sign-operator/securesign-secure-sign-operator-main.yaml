@@ -1,0 +1,93 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  operator-sdk:
+    name: "4.14"
+    namespace: origin
+    tag: operator-sdk
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: securesign-operator
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-oc
+operator:
+  bundles:
+  - as: securesign-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: registry.redhat.io/rhtas-tech-preview/sigstore-rhel9-operator.*
+    with: pipeline:securesign-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: tas-operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.14"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        set -x
+        oc create ns openshift-rhtas-operator
+        operator-sdk run bundle -n openshift-rhtas-operator "$OO_BUNDLE" --timeout 5m0s
+        oc get deployments -n openshift-rhtas-operator -o yaml
+        oc wait --for condition=Available -n openshift-rhtas-operator deployment rhtas-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: securesign-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        ./ci/openshift/tas-keycloak-install.sh
+        set -x
+        go install github.com/sigstore/cosign/v2/cmd/cosign@v2.2.2
+        #make integration-test
+        oc logs -n openshift-rhtas-operator deployment/rhtas-operator-controller-manager
+      from: src-oc
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: securesign
+  repo: secure-sign-operator

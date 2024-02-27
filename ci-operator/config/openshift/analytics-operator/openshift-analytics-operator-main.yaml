@@ -6,9 +6,9 @@ base_images:
 binary_build_commands: make build
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    name: release
+    namespace: openshift
+    tag: golang-1.21
 images:
 - build_args:
   - name: TARGETOS
@@ -51,6 +51,7 @@ tests:
     clone: true
     from: golangci-lint
   optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: GOFLAGS="-mod=readonly" go test ./...
   container:
@@ -58,10 +59,43 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: security
   optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
       PROJECT_NAME: analytics-operator
     workflow: openshift-ci-security
+- as: operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.14"
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: "echo \"command execution started\"\noc version\n# Make kubectl available
+        by creating a symlink to oc.\npushd \"$CLI_DIR\"\nif [ ! -f kubectl ]\nthen\n
+        \ ln -s oc kubectl\nfi\npopd\nset +e \necho \"creating temp project\"\noc
+        new-project temp-osa\noc project temp-osa \necho \"Running shell script\"\nGOFLAGS=\"\"
+        sh ./tests/run-e2e.sh --no-build --operator-image \"$OA_OPERATOR\" --image-base
+        \"\" --version \"\"\nstatus=$?\necho \"status: $status\"\necho \"delete temp
+        project\"\noc delete project temp-osa \nif [ $status -eq 0 ] \nthen \n  echo
+        \"Successfully executed E2E test script\" \nelse \n  echo \"E2E test failed\"
+        \ \n  exit 1\nfi\n"
+      dependencies:
+      - env: OA_OPERATOR
+        name: observability-analytics-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 400Mi
+    workflow: generic-claim
+  timeout: 2h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift

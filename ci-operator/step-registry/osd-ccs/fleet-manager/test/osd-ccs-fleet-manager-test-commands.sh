@@ -68,9 +68,17 @@ function confirm_labels () {
 
   echo "Confirming correct state of labels for cluster with id: '$cluster_id'"
 
+  CLUSTER_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id")
+  CLUSTER_CREATION_TIMESTAMP=$(echo "$CLUSTER_OUTPUT" | jq -r .creation_timestamp | awk -F'.' '{print $1}' | date "+%s") || true
   LABELS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels)
   LABELS_COUNT=$(echo "$LABELS_OUTPUT" | jq -r .total)
-  if [[ "$LABELS_COUNT" -gt "$count" ]]; then
+  ## validation for OCPQE-19422
+  LABELS_PAGE=$(echo "$LABELS_OUTPUT" | jq -r .page)
+  if [[ "$LABELS_PAGE" -ne 1 ]]; then
+    echo "ERROR. Expected labels starting page to be 1. Got: $LABELS_PAGE"
+    TEST_PASSED=false
+  fi
+  if [[ "$LABELS_COUNT" -ne "$count" ]]; then
     echo "ERROR. Expected labels count for $cluster_type with $cluster_id to be $count. Got: $LABELS_COUNT"
     TEST_PASSED=false
   fi
@@ -86,6 +94,15 @@ function confirm_labels () {
       echo "ERROR. Expected previously added label value: '$value' to be returned in labels, but none was found"
       TEST_PASSED=false
     fi
+    ## validation for OCPQE-19536
+    echo "[OCPQE-19536] - Confirming validity of labels' creation timestamps"
+    for ((i=0; i<"$LABELS_COUNT"; i++)); do
+      LABEL_CREATION_TIMESTAMP=$(jq -n "$LABELS_OUTPUT" | jq -r .items[$i].creation_timestamp | awk -F'.' '{print $1}' | date "+%s") || true
+      if [ "$CLUSTER_CREATION_TIMESTAMP" -ge "$LABEL_CREATION_TIMESTAMP" ]; then
+        echo "ERROR. Expected cluster creation timestamp: '$CLUSTER_CREATION_TIMESTAMP' to not be greater or equal to label creation timestamp: '$LABEL_CREATION_TIMESTAMP'"
+        TEST_PASSED=false
+      fi
+    done
   fi
 }
 

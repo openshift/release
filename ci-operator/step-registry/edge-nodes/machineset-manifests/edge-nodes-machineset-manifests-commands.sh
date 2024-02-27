@@ -14,12 +14,12 @@ source "${SHARED_DIR}/edge-zone-groups.env"
 edge_zone_group_name="${edge_zone_groups[$edge_zone_name]}"
 
 # keeping manifest_ prefix as this step can be used in manifest injection before installation 
-localzone_machineset="${SHARED_DIR}/manifest_localzone_machineset.yaml"
+edge_node_machineset="${SHARED_DIR}/manifest_edge_node_machineset.yaml"
 
 
-if [[ ${LOCALZONE_INSTANCE_TYPE} != "" ]]; then
-  instance_type=${LOCALZONE_INSTANCE_TYPE}
-  echo "instance_type: using use provided ${LOCALZONE_INSTANCE_TYPE}"
+if [[ ${EDGE_NODE_INSTANCE_TYPE} != "" ]]; then
+  instance_type=${EDGE_NODE_INSTANCE_TYPE}
+  echo "instance_type: using use provided ${EDGE_NODE_INSTANCE_TYPE}"
 else
   instance_type=$(aws --region ${REGION} ec2 describe-instance-type-offerings --location availability-zone --filters Name=location,Values=${edge_zone_name} | jq -r '.InstanceTypeOfferings[].InstanceType' | grep -E '^[rc][0-9][a-z]{0,1}\.2xlarge$' | sort | head -n 1)
   echo "instance_type: auto selected ${instance_type}"
@@ -33,7 +33,7 @@ fi
 echo "Creating machineset manifests ... "
 # PLACEHOLDER_INFRA_ID
 # PLACEHOLDER_AMI_ID
-cat <<EOF > ${localzone_machineset}
+cat <<EOF > ${edge_node_machineset}
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 metadata:
@@ -42,7 +42,7 @@ metadata:
   name: PLACEHOLDER_INFRA_ID-edge-${edge_zone_name}
   namespace: openshift-machine-api
 spec:
-  replicas: ${LOCALZONE_WORKER_NUMBER}
+  replicas: ${EDGE_NODE_WORKER_NUMBER}
   selector:
     matchLabels:
       machine.openshift.io/cluster-api-cluster: PLACEHOLDER_INFRA_ID
@@ -57,7 +57,7 @@ spec:
     spec:
       metadata:
         labels:
-          machine.openshift.io/zone-type: ${EDGE_ZONE_TYPE}
+          machine.openshift.io/zone-type: ${EDGE_ZONE_TYPES}
           machine.openshift.io/zone-group: ${edge_zone_group_name}
           node-role.kubernetes.io/edge: ""
       providerSpec:
@@ -93,7 +93,7 @@ spec:
             name: worker-user-data
 EOF
 
-if [[ "${LOCALZONE_WORKER_ASSIGN_PUBLIC_IP}" == "yes" ]]; then
+if [[ "${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP}" == "yes" ]]; then
   ip_patch=`mktemp`
   cat <<EOF > ${ip_patch}
 spec:
@@ -103,10 +103,10 @@ spec:
         value:
           publicIp: true
 EOF
-  yq-go m -x -i "${localzone_machineset}" "${ip_patch}"
+  yq-go m -x -i "${edge_node_machineset}" "${ip_patch}"
 fi
 
-if [[ "${LOCALZONE_WORKER_SCHEDULABLE}" == "no" ]]; then
+if [[ "${EDGE_NODE_WORKER_SCHEDULABLE}" == "no" ]]; then
   schedulable_patch=`mktemp`
   cat <<EOF > ${schedulable_patch}
 spec:
@@ -116,6 +116,6 @@ spec:
         - key: node-role.kubernetes.io/edge
           effect: NoSchedule
 EOF
-  yq-go m -x -i "${localzone_machineset}" "${schedulable_patch}"
+  yq-go m -x -i "${edge_node_machineset}" "${schedulable_patch}"
 fi
-cp "${localzone_machineset}" "${ARTIFACT_DIR}/"
+cp "${edge_node_machineset}" "${ARTIFACT_DIR}/"
