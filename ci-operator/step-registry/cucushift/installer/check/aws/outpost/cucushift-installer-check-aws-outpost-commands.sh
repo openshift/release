@@ -41,6 +41,37 @@ else
 fi
 
 # --------------------------------
+# Public/Internal IP
+# --------------------------------
+edge_node_day2_machineset_name=$(head -n 1 ${SHARED_DIR}/edge_node_day2_machineset_name)
+
+echo "=================== ALL machines"
+oc get machine -n openshift-machine-api -ojson
+echo "==================="
+
+MACHINES=$(oc get machine -n openshift-machine-api -ojson | jq -r --arg n "$edge_node_day2_machineset_name" '.items[] | select(.metadata.labels."machine.openshift.io/cluster-api-machineset"==$n) | .metadata.name')
+for machine in $MACHINES;
+do
+  instance_id=$(oc get machines -n openshift-machine-api ${machine} -o json | jq -r '.status.providerStatus.instanceId')
+  external_dns=$(oc get machine -n openshift-machine-api ${machine} -o json | jq -r '.status.addresses[] | select(.type=="ExternalDNS") | .address')
+  internal_dns=$(oc get machine -n openshift-machine-api ${machine} -o json | jq -r '.status.addresses[] | select(.type=="InternalDNS") | .address')
+
+  machine_info="instance_id:[${instance_id}], external_dns:[${external_dns}], internal_dns:[${internal_dns}]"
+
+  echo "MACHINE: ${machine}: ${machine_info}"
+  
+  # Checking
+  if [[ ${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP} == "yes" ]] && [[ ${external_dns} == ec2* ]]; then
+    echo "PASS: machine public ip assignment: ${machine}"
+  elif [[ ${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP} == "no" ]] && ([[ "${external_dns}" == "" ]] || [[ "${external_dns}" == "null" ]]); then
+    echo "PASS: machine public ip assignment: ${machine}"
+  else
+    echo "FAIL: machine public ip assignment: ${machine}"
+    ret=$((ret+1))
+  fi
+done
+
+# --------------------------------
 # MTU
 # --------------------------------
 echo ">>>>>> Checking MTU"

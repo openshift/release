@@ -11,14 +11,132 @@ echo "************ prepare openshift nodes for shutdown command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+# This file has commonly used functions for cert rotation steps
+cat >"${SHARED_DIR}"/cert-rotation-functions.sh <<'EOF'
+#!/bin/bash
+set -euxo pipefail
+
+SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
+SCP=${SCP:-scp ${SSH_OPTS}}
+SSH=${SSH:-ssh ${SSH_OPTS}}
+COMMAND_TIMEOUT=15m
+
+mapfile -d ' ' -t control_nodes < <( oc get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
+
+mapfile -d ' ' -t compute_nodes < <( oc get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
+
+ssh-keyscan -H ${control_nodes[@]} ${compute_nodes[@]} >> ~/.ssh/known_hosts
+
+# Save found node IPs for "gather-cert-rotation" step
+echo -n "${control_nodes[@]}" > /srv/control_node_ips
+echo -n "${compute_nodes[@]}" > /srv/compute_node_ips
+
+echo "Wrote control_node_ips: $(cat /srv/control_node_ips), compute_node_ips: $(cat /srv/compute_node_ips)"
+
+function run-on-all-nodes {
+  for n in ${control_nodes[@]} ${compute_nodes[@]}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" sudo 'bash -eEuxo pipefail' <<< ${1}; done
+}
+
+function run-on-first-master {
+  timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
+}
+
+function run-on-first-master-silent {
+  timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuo pipefail' <<< ${1}
+}
+
+function copy-file-from-first-master {
+  timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_nodes[0]}:${1}" "${2}"
+}
+
+cat << 'EOZ' > /tmp/approve-csrs-with-timeout.sh
+  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
+  echo -n "Approving CSRs"
+  attempts=0
+  max_attempts=10
+  while true; do
+    echo -n '.'
+    mapfile -d ' ' -t csrs < <(oc get csr | grep Pending | cut -f1 -d" ")
+    if [[ ${#csrs[@]} -gt 0 ]]; then
+      oc adm certificate approve ${csrs} && attempts=0
+    else
+      (( attempts++ ))
+    fi
+    if (( attempts > max_attempts )); then
+      echo "Timeout waiting for new CSRs"
+      break
+    fi
+    sleep 15s
+  done
+  echo "Done"
+EOZ
+chmod a+x /tmp/approve-csrs-with-timeout.sh
+timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/approve-csrs-with-timeout.sh "core@${control_nodes[0]}:/tmp/approve-csrs-with-timeout.sh"
+run-on-first-master "mv /tmp/approve-csrs-with-timeout.sh /usr/local/bin/approve-csrs-with-timeout.sh && chmod a+x /usr/local/bin/approve-csrs-with-timeout.sh"
+
+cat << 'EOZ' > /tmp/ensure-nodes-are-ready.sh
+  set -x
+  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
+  echo "Waiting for API server to come up"
+  until oc get nodes; do sleep 10; done
+  mapfile -d ' ' -t nodes < <( oc get nodes -o name )
+  for nodename in ${nodes[@]}; do
+    echo -n "Waiting for ${nodename} to become Ready"
+    while true; do
+      STATUS=$(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+      TIME_DIFF=$(($(date +%s)-$(date -d $(oc get ${nodename} -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastHeartbeatTime}') +%s)))
+      if [[ ${TIME_DIFF} -le 100 ]] && [[ ${STATUS} == True ]]; then
+        break
+      fi
+      bash /usr/local/bin/approve-csrs-with-timeout.sh
+    done
+    echo
+  done
+  oc get nodes
+  bash /usr/local/bin/approve-csrs-with-timeout.sh
+EOZ
+chmod a+x /tmp/ensure-nodes-are-ready.sh
+timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/approve-csrs-with-timeout.sh "core@${control_nodes[0]}:/tmp/ensure-nodes-are-ready.sh"
+run-on-first-master "mv /tmp/ensure-nodes-are-ready.sh /usr/local/bin/ensure-nodes-are-ready.sh && chmod a+x /usr/local/bin/ensure-nodes-are-ready.sh"
+
+function wait-for-nodes-to-be-ready {
+  run-on-first-master-silent "bash /usr/local/bin/ensure-nodes-are-ready.sh"
+}
+
+function pod-restart-workarounds {
+  # Workaround for https://issues.redhat.com/browse/OCPBUGS-28735
+  # Restart OVN / Multus before proceeding
+  oc --request-timeout=5s -n openshift-multus delete pod -l app=multus --force --grace-period=0
+  oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-node --force --grace-period=0
+  oc --request-timeout=5s -n openshift-ovn-kubernetes delete pod -l app=ovnkube-control-plane --force --grace-period=0
+}
+
+function prepull-tools-image-for-gather-step {
+  # Prepull tools image on the nodes. "gather-cert-rotation" step uses it to run sos report
+  # However, if time is too far in the future the pull will fail with "Trying to pull registry.redhat.io/rhel8/support-tools:latest...
+  # Error: initializing source ...: tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time ... is after <now + 6m>"
+  run-on-all-nodes "podman pull --authfile /var/lib/kubelet/config.json registry.redhat.io/rhel8/support-tools:latest"
+}
+
+function wait-for-operators-to-stabilize {
+  # Wait for operators to stabilize
+  if
+    ! oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m; then
+      oc get nodes
+      oc get co | grep -v "True\s\+False\s\+False"
+      exit 1
+  fi
+}
+
+EOF
+scp "${SSHOPTS[@]}" "${SHARED_DIR}"/cert-rotation-functions.sh "root@${IP}:/usr/local/share"
+
 # This file is scp'd to the machine where the nested libvirt cluster is running
 # It rotates node kubeconfigs so that it could be shut down earlier than 24 hours
-
 cat >"${SHARED_DIR}"/prepare-nodes-for-shutdown.sh <<'EOF'
 #!/bin/bash
 
 set -euxo pipefail
-SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
 
 # HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
 if [ -d "$KUBECONFIG" ]; then
@@ -26,6 +144,20 @@ if [ -d "$KUBECONFIG" ]; then
     export KUBECONFIG=${kubeconfig}
   done
 fi
+
+# Use emptyDir for image-registry
+oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
+
+# Disable all marketplace sources to avoid "Back-off pulling image"
+oc patch OperatorHub cluster --type json \
+    -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+
+source /usr/local/share/cert-rotation-functions.sh
+prepull-tools-image-for-gather-step
+
+# Sync host and node timezones to avoid possible errors when skewing time
+HOST_TZ=$(date +"%Z %z" | cut -d' ' -f1)
+run-on-all-nodes "timedatectl set-timezone ${HOST_TZ}"
 
 oc -n openshift-machine-config-operator create serviceaccount kubelet-bootstrap-cred-manager
 oc -n openshift-machine-config-operator adm policy add-cluster-role-to-user cluster-admin -z kubelet-bootstrap-cred-manager

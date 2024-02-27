@@ -32,7 +32,7 @@ function eval_instance_capacity() {
   # During our initial adoption of m6a, AWS has report insufficient capacity at peak hours. For cost effectiveness
   # and to ensure AWS eventual adds m6a capacity due to these errors, we want to continue to use them. However,
   # if left unchecked, these peak hour errors can derail a statistically significant number of jobs.
-  # To mitigate the capacity issues, search.ci.openshift.org can tell us if previous jobs have failed to provision
+  # To mitigate the capacity issues, search.dptools.openshift.org can tell us if previous jobs have failed to provision
   # the desired instance type - in this region - in the last x minutes.
   # If we find such an error, use the fallback instance type.
 
@@ -46,7 +46,7 @@ function eval_instance_capacity() {
   local LOOK_BACK_PERIOD="30m"
   local TARGET_TYPE="${DESIRED_TYPE}"
   for retry in {1..30}; do
-    if err_count=$(curl -L -s "https://search.ci.openshift.org/search?search=InsufficientInstanceCapacity.*${DESIRED_TYPE}.*${REGION}&maxAge=${LOOK_BACK_PERIOD}&context=0&type=build-log" | jq length); then
+    if err_count=$(curl -L -s "https://search.dptools.openshift.org/search?search=InsufficientInstanceCapacity.*${DESIRED_TYPE}.*${REGION}&maxAge=${LOOK_BACK_PERIOD}&context=0&type=build-log" | jq length); then
       if [[ "${err_count}" == "0" ]]; then
         break  # Use DESIRED_TYPE
       else
@@ -326,8 +326,16 @@ EOF
 fi
 
 if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
-  edge_zone=$(< "${SHARED_DIR}"/edge-zone-name.txt)
-  edge_zones_str="[ $edge_zone ]"
+  edge_zones=""
+  while IFS= read -r line; do
+    if [[ -z "${edge_zones}" ]]; then
+      edge_zones="$line";
+    else
+      edge_zones+=",$line";
+    fi
+  done < <(grep -v '^$' < "${SHARED_DIR}"/edge-zone-names.txt)
+
+  edge_zones_str="[ $edge_zones ]"
   patch_edge="${SHARED_DIR}/install-config-edge.yaml.patch"
   cat > "${patch_edge}" << EOF
 compute:

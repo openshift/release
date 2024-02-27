@@ -1,0 +1,25 @@
+ref:
+  as: openshift-image-based-infra-aws-ec2
+  from: upi-installer
+  grace_period: 10m
+  commands: openshift-image-based-infra-aws-ec2-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: EC2_INSTANCE_TYPE
+    default: c5n.metal
+  - name: EC2_REGION
+    default: us-west-2
+  - name: EC2_AMI
+    default: "ami-04b4d3355a2e2a403"
+    documentation: Host's AMI configuration. This defaults to us-west-2, x86_64, rhel9.3
+  documentation: |-
+    Create an EC2 instance running in a VPC with port 22 open, the public key ${CLUSTER_PROFILE_DIR}/ssh-publickey.
+    This job uses cloudformation to stand up the ec2 instance, please use `- ref: aws-deprovision-stacks` to deprovision resource.
+    
+    Output will be stored in the SHARED_DIR under:
+      ${SHARED_DIR}/public_address
+      ${SHARED_DIR}/private_address
+      ${SHARED_DIR}/ssh_user

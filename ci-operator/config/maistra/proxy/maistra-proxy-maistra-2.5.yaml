@@ -1,0 +1,166 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: maistra-builder
+    namespace: ci
+    tag: "2.5"
+  use_build_cache: true
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: maistra-proxy-unit-2-5
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      CI: "true"
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m5d.8xlarge
+      LOCAL_CPU_RESOURCES: "30"
+      LOCAL_JOBS: "30"
+      LOCAL_RAM_RESOURCES: "61440"
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.5
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-proxy-test-pod
+    test:
+    - as: maistra-proxy-unit-copy-src
+      cli: latest
+      commands: |
+        tar cf - . | oc exec -i -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" -- tar xf - -C /work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: maistra-proxy-unit-2-5
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          sh -c \
+          "export CI=${CI}; \
+           export LOCAL_CPU_RESOURCES=${LOCAL_CPU_RESOURCES}; \
+           export LOCAL_RAM_RESOURCES=${LOCAL_RAM_RESOURCES}; \
+           export LOCAL_JOBS=${LOCAL_JOBS}; \
+          ./maistra/ci/pre-submit.sh"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: CI
+      - name: LOCAL_CPU_RESOURCES
+      - name: LOCAL_RAM_RESOURCES
+      - name: LOCAL_JOBS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 8h0m0s
+    workflow: servicemesh-proxy-e2e-aws
+  timeout: 8h0m0s
+- as: copy-artifacts-gcs-2-5
+  postsubmit: true
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      ARTIFACTS_GCS_PATH: gs://maistra-prow-testing/proxy
+      CI: "true"
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m5d.8xlarge
+      GCS_PROJECT: maistra-prow-testing
+      LOCAL_CPU_RESOURCES: "30"
+      LOCAL_JOBS: "30"
+      LOCAL_RAM_RESOURCES: "61440"
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.5
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-proxy-test-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # copy source
+        tar cf - . | oc exec -i -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" -- tar xf - -C /work/
+        # copy gcs service-account
+        TARGET=$(readlink -f /maistra-secrets/service-account.json)
+        oc cp "${TARGET}" "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      credentials:
+      - mount_path: /maistra-secrets
+        name: gcs-credentials
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: copy-artifacts-gcs-2-5
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          sh -c \
+          "export CI=${CI}; \
+           export LOCAL_CPU_RESOURCES=${LOCAL_CPU_RESOURCES}; \
+           export LOCAL_RAM_RESOURCES=${LOCAL_RAM_RESOURCES}; \
+           export LOCAL_JOBS=${LOCAL_JOBS}; \
+           export GOOGLE_APPLICATION_CREDENTIALS='/work/service-account.json'; \
+          ./maistra/ci/post-submit.sh"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: CI
+      - name: LOCAL_CPU_RESOURCES
+      - name: LOCAL_RAM_RESOURCES
+      - name: LOCAL_JOBS
+      - name: GCS_PROJECT
+      - name: ARTIFACTS_GCS_PATH
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 8h0m0s
+    workflow: servicemesh-proxy-e2e-aws
+  timeout: 8h0m0s
+- as: proxy-update-istio-2-5
+  commands: |
+    # load test-infra automator.sh script
+    export ISTIO_ENVOY_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/proxy"
+    git clone https://github.com/maistra/test-infra.git
+    cd test-infra
+    ./tools/automator.sh \
+      -o maistra \
+      -r istio \
+      -f /creds-github/token \
+      "-c bin/update_proxy.sh ${PULL_BASE_SHA}" \
+      '-t [maistra-2.5] Automator: Update proxy' \
+      -m bump-proxy-2.5 \
+      -b maistra-2.5
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /creds-github
+    name: github-token
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: maistra-2.5
+  org: maistra
+  repo: proxy

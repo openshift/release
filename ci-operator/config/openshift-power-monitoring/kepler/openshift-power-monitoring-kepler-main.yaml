@@ -27,6 +27,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: security
+  steps:
+    env:
+      PROJECT_NAME: openshift-power-monitoring/kepler
+    workflow: openshift-ci-security
 - as: kepler-e2e
   cluster_claim:
     architecture: amd64
@@ -41,8 +46,11 @@ tests:
       cli: latest
       commands: |
         GOFLAGS="" make tools
-        make build-manifest OPTS="OPENSHIFT_DEPLOY"
+        GOFLAGS="" make build-manifest OPTS="OPENSHIFT_DEPLOY"
         oc apply -f _output/generated-manifest/deployment.yaml
+      dependencies:
+      - env: EXPORTER_IMG
+        name: kepler
       from: src
       resources:
         requests:

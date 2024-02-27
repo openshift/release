@@ -199,7 +199,7 @@ ln -ns /secrets/internal/config.json ${BASE_DIR}/containers/auth.json
 
 # Secret for pushing containers - openstack namespace
 PUSH_REGISTRY_SECRET=push-quay-secret
-oc create secret generic ${PUSH_REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/rdoquay/config.json --type=kubernetes.io/dockerconfigjson
+oc create secret generic ${PUSH_REGISTRY_SECRET} --from-file=.dockerconfigjson=${PUSH_REGISTRY_SECRET_PATH}/config.json --type=kubernetes.io/dockerconfigjson
 
 # Build operator
 IMAGE_TAG_BASE=${PUSH_REGISTRY}/${PUSH_ORGANIZATION}/${BASE_OP}
