@@ -28,5 +28,11 @@ sudo podman run -d --rm \
      quay.io/openshifttest/squid-proxy:multiarch
 EOF
 
+CIRFILE=$SHARED_DIR/cir
+PROXYPORT=8213
+if [ -f $CIRFILE ] ; then
+    PROXYPORT=$(jq -r .extra < $CIRFILE | jq ".ofcir_port_proxy // 8213" -r)
+fi
+
 echo "Adding proxy-url in kubeconfig"
-sed -i "/- cluster/ a\    proxy-url: http://$IP:8213/" "${SHARED_DIR}"/nested_kubeconfig
+sed -i "/- cluster/ a\    proxy-url: http://$IP:${PROXYPORT}/" "${SHARED_DIR}"/nested_kubeconfig

@@ -81,6 +81,9 @@ images:
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   inputs:
+    ocp_4.16_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:cli
     ocp_4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
@@ -786,11 +789,7 @@ tests:
   run_if_changed: /agent/
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
-        MIRROR_IMAGES=true
-    workflow: agent-e2e-generic
+    workflow: agent-e2e-ha-dualstack
   timeout: 6h0m0s
 - as: e2e-aws-ovn-public-subnets
   optional: true
