@@ -36,9 +36,11 @@ oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/mani
 oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${version}/cluster-network-06-cilium-00010-cilium-cilium-olm-clusterrolebinding.yaml
 oc apply -f https://raw.githubusercontent.com/isovalent/olm-for-cilium/main/manifests/cilium.v${version}/cluster-network-06-cilium-00011-cilium-cilium-clusterrolebinding.yaml
 
+PODCIDR=$(oc get network cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')
+HOSTPREFIX=$(oc get network cluster -o jsonpath='{.spec.clusterNetwork[0].hostPrefix}')
+export PODCIDR=$PODCIDR
+export HOSTPREFIX=$HOSTPREFIX
 
-export PODCIDR=$(oc get network cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')
-export HOSTPREFIX=$(oc get network cluster -o jsonpath='{.spec.clusterNetwork[0].hostPrefix}')
 echo '
 apiVersion: cilium.io/v1alpha1
 kind: CiliumConfig
@@ -81,6 +83,5 @@ spec:
   sessionAffinity: true
 ' | envsubst > /tmp/ciliumconfig.json
 
-cat /tmp/ciliumconfig.json
 oc apply -f /tmp/ciliumconfig.json
 oc wait --for=condition=Ready pod -n cilium --all --timeout=5m
