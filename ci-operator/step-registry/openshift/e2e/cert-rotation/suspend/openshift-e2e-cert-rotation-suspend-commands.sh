@@ -52,12 +52,12 @@ copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
 # Set date for host
 sudo timedatectl status
-sudo timedatectl set-time ${SKEW}
+sudo timedatectl set-time +${SKEW}
 sudo timedatectl status
 
 # Skew clock on every node
 # TODO: Suspend, resume and make it resync time from host instead?
-run-on-all-nodes "timedatectl set-time ${SKEW} && timedatectl status"
+run-on-all-nodes "timedatectl set-time +${SKEW} && timedatectl status"
 
 # Restart kubelet
 run-on-all-nodes "systemctl restart kubelet"

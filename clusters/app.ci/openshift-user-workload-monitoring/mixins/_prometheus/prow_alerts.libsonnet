@@ -49,6 +49,22 @@
             },
           },
           {
+            alert: 'TriggeredButPendingJobs',
+            expr: |||
+              sum by (job_name) (
+                increase(prowjob_state_transitions{state="triggered"}[15m])
+                - increase(prowjob_state_transitions{state="pending"}[15m])
+              ) > 20
+            |||,
+            'for': '10m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'There are {{ $value }} jobs that have been triggered but are still pending, indicating potential scheduling or resource constraints. Investigate pending Prow jobs. Check <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=TriggeredButPendingJobs|Prometheus>.',
+            }
+          },
+          {
             # We need this for a grafana variable, because grafana itself can only do extremely simplistic queries there
             record: 'github:identity_names',
             expr: 'count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"}) by (token_hash), "login", "$1", "token_hash", "(.*)") or github_user_info{login=~"openshift-.*"}) by (login)'
