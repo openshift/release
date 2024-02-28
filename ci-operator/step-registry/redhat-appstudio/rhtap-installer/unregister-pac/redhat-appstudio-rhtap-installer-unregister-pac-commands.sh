@@ -12,9 +12,9 @@ SPRAYPROXY_SERVER_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-serve
 webhook_url=$(cat "${SHARED_DIR}/webhook_url")
 
 unregister_pac_server(){
-  echo "Unregistering PAC server [$webhook_url] from SprayProxy server"
+  echo "Start unregistering PAC server [$webhook_url] from SprayProxy server"
   for _ in {1..5}; do
-    if curl -k -X DELETE -H "Authorization: Bearer ${SPRAYPROXY_SERVER_TOKEN}" "${SPRAYPROXY_SERVER_URL}"/backends/"$webhook_url" --data '{"url": "'"$webhook_url"'"}'; then
+    if curl -k -X DELETE -H "Authorization: Bearer ${SPRAYPROXY_SERVER_TOKEN}" "${SPRAYPROXY_SERVER_URL}"/backends --data '{"url": "'"$webhook_url"'"}'; then
       break
     fi
     sleep 5
