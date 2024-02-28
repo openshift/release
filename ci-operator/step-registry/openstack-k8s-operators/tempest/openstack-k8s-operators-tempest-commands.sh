@@ -90,11 +90,11 @@ fi
 if [ "$TEMPEST_REGEX" ]; then
     tempest run --regex $TEMPEST_REGEX "${TEMPEST_ARGS[@]}"
 else
-    curl -O https://opendev.org/openstack/openstack-tempest-skiplist/raw/branch/master/openstack-operators/tempest_allow.yml
-    curl -O https://opendev.org/openstack/openstack-tempest-skiplist/raw/branch/master/openstack-operators/tempest_skip.yml
+    curl -O https://raw.githubusercontent.com/openstack-k8s-operators/ci-framework/main/roles/tempest/files/list_allowed.yml
+    curl -O https://raw.githubusercontent.com/openstack-k8s-operators/ci-framework/main/roles/tempest/files/list_skipped.yml
 
-    tempest-skip list-allowed --file tempest_allow.yml --group ${BASE_OP} --job ${BASE_OP} -f value > allow.txt
-    tempest-skip list-skipped --file tempest_skip.yml --job ${BASE_OP} -f value > skip.txt
+    tempest-skip list-allowed --file list_allowed.yml --group ${BASE_OP} --job ${BASE_OP} -f value > allow.txt
+    tempest-skip list-skipped --file list_skipped.yml --job ${BASE_OP} -f value > skip.txt
     if [ -f allow.txt ] && [ -f skip.txt ]; then
         TEMPEST_ARGS+=( --exclude-list skip.txt --include-list allow.txt)
         cp allow.txt skip.txt ${ARTIFACT_DIR}
