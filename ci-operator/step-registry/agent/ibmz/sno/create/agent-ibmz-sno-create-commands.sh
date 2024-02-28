@@ -102,7 +102,7 @@ vpc_crn=$(ibmcloud is vpc $infra_name-vpc | awk '/CRN/{print $2}')
 # Create subnet
 set -e
 echo "Creating a subnet in the VPC $infra_name-vpc"
-ibmcloud is subnet-create $infra_name-sn $infra_name-vpc --ipv4-address-count 16 --zone "$IC_REGION-1" --resource-group-name $infra_name-rg
+ibmcloud is subnet-create $infra_name-sn $infra_name-vpc --ipv4-address-count 16 --zone "$IC_REGION-2" --resource-group-name $infra_name-rg
 sn_status=$(ibmcloud is subnet $infra_name-sn | awk '/Status/{print $2}')
 set +e
 if [ "$sn_status" != "available" ]; then
@@ -117,7 +117,7 @@ sn_cidr=$(ibmcloud is subnet $infra_name-sn --vpc $infra_name-vpc --output JSON 
 set -e
 zvsi_rip=""
 echo "Triggering the $infra_name-sno zVSI creation on IBM Cloud in the VPC $infra_name-vpc"
-ibmcloud is instance-create $infra_name-sno $infra_name-vpc $IC_REGION-1 $ZVSI_PROFILE $infra_name-sn --image $ZVSI_IMAGE --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg
+ibmcloud is instance-create $infra_name-sno $infra_name-vpc $IC_REGION-2 $ZVSI_PROFILE $infra_name-sn --image $ZVSI_IMAGE --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg
 sleep 60
 set +e
 zvsi_state=$(ibmcloud is instance $infra_name-sno | awk '/Status/{print $2}')
@@ -139,7 +139,7 @@ else
 fi  
 nic_name=$(ibmcloud is in-nics $infra_name-sno -q | grep -v ID | awk '{print $2}')
 echo "Creating a Floating IP for zVSI"
-zvsi_fip=$(ibmcloud is ipc $infra_name-sno-ip --zone $IC_REGION-1 --resource-group-name $infra_name-rg | awk '/Address/{print $2}')
+zvsi_fip=$(ibmcloud is ipc $infra_name-sno-ip --zone $IC_REGION-2 --resource-group-name $infra_name-rg | awk '/Address/{print $2}')
 echo "Assigning the Floating IP for zVSI"
 zvsi_fip_status=$(ibmcloud is in-nic-ipc $infra_name-sno $nic_name $infra_name-sno-ip | awk '/Status/{print $2}')
 if [ "$zvsi_fip_status" != "available" ]; then
@@ -152,7 +152,7 @@ fi
 # Create a bastion node in the same VPC for monitoring
 set -e
 echo "Triggering the $infra_name-bastion VSI creation on IBM Cloud in the VPC $infra_name-vpc"
-ibmcloud is instance-create $infra_name-bastion $infra_name-vpc $IC_REGION-1 bx2-2x8 $infra_name-sn --image ibm-redhat-9-2-minimal-amd64-2 --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg
+ibmcloud is instance-create $infra_name-bastion $infra_name-vpc $IC_REGION-2 bx2-2x8 $infra_name-sn --image ibm-redhat-9-2-minimal-amd64-2 --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg
 sleep 30
 set +e
 bvsi_state=$(ibmcloud is instance $infra_name-sno | awk '/Status/{print $2}')
@@ -173,7 +173,7 @@ else
 fi  
 bnic_name=$(ibmcloud is in-nics $infra_name-bastion -q | grep -v ID | awk '{print $2}')
 echo "Creating a Floating IP for bastion VSI"
-bvsi_fip=$(ibmcloud is ipc $infra_name-bastion-ip --zone $IC_REGION-1 --resource-group-name $infra_name-rg | awk '/Address/{print $2}')
+bvsi_fip=$(ibmcloud is ipc $infra_name-bastion-ip --zone $IC_REGION-2 --resource-group-name $infra_name-rg | awk '/Address/{print $2}')
 echo "Assigning the Floating IP for bastion VSI"
 bvsi_fip_status=$(ibmcloud is in-nic-ipc $infra_name-bastion $bnic_name $infra_name-bastion-ip | awk '/Status/{print $2}')
 if [ "$bvsi_fip_status" != "available" ]; then
