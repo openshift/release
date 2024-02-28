@@ -97,6 +97,8 @@ else
     echo "Successfully deleted the $infra_name-bastion-ip floating IP in the $infra_name-rg resource group."
 fi
 
+sleep 60   # Allowing all the subnet resources to get deleted
+
 # Deleting the subnet
 echo "Triggering the $infra_name-sn subnet deletion in the $infra_name-vpc VPC."
 sn_delete_status=$(ibmcloud is subnet-delete $infra_name-sn --vpc $infra_name-vpc --output JSON -f | jq -r '.[]|.result')
