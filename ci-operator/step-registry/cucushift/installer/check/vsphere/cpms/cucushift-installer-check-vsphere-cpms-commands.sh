@@ -24,7 +24,7 @@ function checkMultizone() {
 #check the name of failuredomains in cpms should be same with install-config.
     INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
     readarray -t zones_setting_from_config < <(yq-go r ${INSTALL_CONFIG} 'controlPlane.platform.vsphere.zones[*]')    
-    fd_name_cpms=$(oc get controlplanemachineset -n openshift-machine-api -ojson | jq -r '.items[].spec.template.machines_v1beta1_machine_openshift_io.failureDomains.vsphere[].name' | sort -u)
+    fd_name_cpms=$(oc get controlplanemachineset -n openshift-machine-api -ojson | jq -r '.items[].spec.template.machines_v1beta1_machine_openshift_io.failureDomains.vsphere[].name' | sort -u | xargs)
     expected_fd_name=$(echo "${zones_setting_from_config[*]}" | xargs -n1 | sort -u | xargs)
     if [[ ${fd_name_cpms} == "${expected_fd_name}" ]]; then
 	echo "INFO: The failure domain name are same between install_config and cmps"
