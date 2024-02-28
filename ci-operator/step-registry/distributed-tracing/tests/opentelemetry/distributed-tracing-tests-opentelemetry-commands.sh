@@ -18,8 +18,8 @@ if [[ -n "${DOWNSTREAM_TESTS_COMMIT}" ]]; then
 
   #Set parameters for running the test cases on OpenShift
   unset NAMESPACE
-  OPERATOROPAMPBRIDGE_IMG=ghcr.io/open-telemetry/opentelemetry-operator/operator-opamp-bridge:v0.89.0 TARGETALLOCATOR_IMG=ghcr.io/open-telemetry/opentelemetry-operator/target-allocator:v0.89.0 SED_BIN="$(which sed)" ./hack/modify-test-images.sh
-  sed -i 's/- -duration=1m/- -duration=6m/' tests/e2e-autoscale/autoscale/02-install.yaml
+  OPERATOROPAMPBRIDGE_IMG=ghcr.io/open-telemetry/opentelemetry-operator/operator-opamp-bridge:v0.93.0
+  sed -i 's/--duration=1m/--duration=6m/g' tests/e2e-autoscale/autoscale/02-install.yaml
   oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | xargs -I {} oc label nodes {} ingress-ready=true
 
   # Remove test cases to be skipped from the test run
@@ -56,12 +56,11 @@ if [[ -n "${DOWNSTREAM_TESTS_COMMIT}" ]]; then
     tests/e2e-openshift \
     tests/e2e-prometheuscr \
     tests/e2e-instrumentation \
-    tests/e2e-pdb \
-    tests/e2e-opampbridge
+    tests/e2e-pdb
 
   # Enable required feature gates.
   OTEL_CSV_NAME=$(oc get csv -n openshift-operators | grep "opentelemetry-operator" | awk '{print $1}')
-  oc -n openshift-operators patch csv $OTEL_CSV_NAME --type=json -p '[{"op":"replace","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args","value":["--metrics-addr=127.0.0.1:8080", "--enable-leader-election", "--zap-log-level=info", "--zap-time-encoding=rfc3339nano", "--feature-gates=+operator.autoinstrumentation.multi-instrumentation"]}]'
+  oc -n openshift-operators patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--feature-gates=+operator.autoinstrumentation.multi-instrumentation\"]}]"
   sleep 10
   oc wait --for condition=Available -n openshift-operators deployment opentelemetry-operator-controller-manager
 
@@ -74,6 +73,7 @@ if [[ -n "${DOWNSTREAM_TESTS_COMMIT}" ]]; then
     --start-kind=false \
     --timeout="$TIMEOUT" \
     --manifest-dir=$MANIFEST_DIR \
+    tests/e2e-opampbridge \
     tests/e2e-multi-instrumentation
 
 else
