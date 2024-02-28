@@ -294,7 +294,7 @@ function health_check() {
 
 # Monitor the migration status
 function check_migrate_status() {
-    local wait_migrate="${TIMEOUT}" out avail progress
+    local wait_migrate="${TIMEOUT}" out avail progress arch
     while (( wait_migrate > 0 )); do
         sleep 5m
         (( wait_migrate -= 5 ))
@@ -304,24 +304,14 @@ function check_migrate_status() {
         if ! out="$(oc get clusterversion --no-headers)"; then continue; fi
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
-        if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${SOURCE_VERSION}" ]]; then
+        arch=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "ReleaseAccepted")|.message')
+        if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${SOURCE_VERSION}" && ${arch} == *"architecture=\"Multi\""* ]]; then
             echo -e "Migrate succeed\n\n"
             return 0
         fi
     done
     if (( wait_migrate <= 0 )); then
         echo >&2 "Migrate timeout, exiting" && return 1
-    fi
-}
-
-# Check ClusterVersion has architecture="Multi"
-function check_arch() {
-    local msg
-    msg=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "ReleaseAccepted")|.message')
-    if [[ ${msg} == *"architecture=\"Multi\""* ]]; then
-        echo "ClusterVersion architecture check PASSED"
-    else
-        echo >&2 "ClusterVersion architecture check FAILED, exiting" && return 1
     fi
 }
 
@@ -362,5 +352,4 @@ export SOURCE_VERSION
 switch_channel
 migrate
 check_migrate_status
-check_arch
 health_check
