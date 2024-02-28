@@ -25,11 +25,8 @@ finished()
   scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/*/auth/kubeconfig" "${SHARED_DIR}/"
   scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/*/auth/kubeadmin-password" "${SHARED_DIR}/"
 
-  # ESI nodes are all using the same IP with different ports (which is forwarded to 8213)
-  PROXYPORT="$(getExtraVal ofcir_port_proxy 8213)"
-
   echo "Adding proxy-url in kubeconfig"
-  sed -i "/- cluster/ a\    proxy-url: http://$IP:$PROXYPORT/" "${SHARED_DIR}"/kubeconfig
+  sed -i "/- cluster/ a\    proxy-url: http://$IP:8213/" "${SHARED_DIR}"/kubeconfig
 
   # Get dev-scripts logs
   echo "dev-scripts setup completed, fetching logs"
@@ -77,18 +74,18 @@ do
   scp "${SSHOPTS[@]}" "${item}" "root@${IP}:manifests/${manifest##manifest_}"
 done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
 
+
 # Get env values from cir extradata
 function getExtraVal(){
-    if [ ! -f "$EXTRAFILE" ] || [ "$(stat -c %s $EXTRAFILE)" -lt 2 ] ; then
-        echo $2
-        return
-    fi
     jq -r --arg default "$2" ".$1 // \$default" $EXTRAFILE
 }
 
 # For baremetal clusters ofcir has returned details about the hardware in the cluster
 # prepare those details into a format the devscripts understands
 function prepare_bmcluster() {
+    # Get Extra data from CIR
+    jq -r .extra < $CIRFILE > $EXTRAFILE
+
     # Get BM nodes list from extra data
     jq .nodes < $EXTRAFILE > $NODESFILE
 
@@ -155,10 +152,6 @@ CIRFILE=$SHARED_DIR/cir
 EXTRAFILE=$SHARED_DIR/cir-extra
 NODESFILE=$SHARED_DIR/cir-nodes
 BMJSON=$SHARED_DIR/bm.json
-
-# Get Extra data from CIR
-jq -r .extra < $CIRFILE > $EXTRAFILE
-
 if [ -e "$CIRFILE" ] && [[ "$(cat $CIRFILE | jq -r .type)" =~ cluster.* ]] ; then
     prepare_bmcluster
 fi
