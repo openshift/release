@@ -1,0 +1,35 @@
+workflow:
+  as: redhat-appstudio-openshift-upgrade
+  steps:
+    # https://docs.ci.openshift.org/docs/architecture/step-registry/#marking-post-steps-best-effort
+    allow_best_effort_post_steps: true
+    # https://docs.ci.openshift.org/docs/architecture/step-registry/#skipping-post-steps-on-success
+    allow_skip_on_success: true
+    env:
+      # for "openshift-configure-cincinnati" step
+      CHANGE_CHANNEL_BASE: candidate
+      # for "redhat-appstudio-e2e" step
+      SKIP_BOOTSTRAP: "true"
+      E2E_TEST_SUITE_LABEL: "rhtap-demo"
+    pre:
+    - ref: ipi-install-rbac
+    - ref: openshift-configure-cincinnati
+    - ref: redhat-appstudio-health-check
+      # Do not let potential failures in this step fail the whole workflow (for now)
+      best_effort: true
+    post:
+    - chain: gather
+      optional_on_success: true
+    - ref: redhat-appstudio-gather
+      optional_on_success: true
+    - ref: redhat-appstudio-report
+      best_effort: true
+    test:
+    - ref: redhat-appstudio-install-konflux
+    - ref: redhat-appstudio-openshift-upgrade
+    - ref: redhat-appstudio-e2e
+  documentation: |-
+    This workflows perform shared pre/post actions on clusters obtained from
+    preinstalled pools (https://docs.ci.openshift.org/docs/architecture/ci-operator/#testing-with-a-cluster-from-a-cluster-pool).
+    The intent of this workflow is to mimic the `ipi-$PLATFORM` workflow behavior,
+    just without the installation/deprovision steps.
