@@ -56,7 +56,12 @@ cat > "${SHARED_DIR}/packet-conf.sh" <<-EOF
     fi
 
     IP=\$(cat "\${SHARED_DIR}/server-ip")
-    SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "\${CLUSTER_PROFILE_DIR}/packet-ssh-key")
+    PORT=22
+    if [[ -f "\${SHARED_DIR}/server-sshport" ]]; then
+        PORT=\$(<"\${SHARED_DIR}/server-sshport")
+    fi
+
+    SSHOPTS=( -o Port=\$PORT -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "\${CLUSTER_PROFILE_DIR}/packet-ssh-key")
 
     # Checkout server
     for x in \$(seq 10) ; do
@@ -74,6 +79,7 @@ function getCIR(){
     OFCIRTOKEN="$(cat ${CLUSTER_PROFILE_DIR}/ofcir-auth-token)"
     echo "Attempting to acquire a Host from OFCIR"
     IPFILE=$SHARED_DIR/server-ip
+    PORTFILE=$SHARED_DIR/server-sshport
     CIRFILE=$SHARED_DIR/cir
 
     # ofcir may be unavailable in the cluster(or the ingress machinery), retry once incase we get unlucky,
@@ -96,6 +102,7 @@ function getCIR(){
     done
 
     jq -r .ip < $CIRFILE > $IPFILE
+    jq -r .extra < $CIRFILE | jq ".ofcir_port_ssh // 22" -r > $PORTFILE
     if [ "$(cat $IPFILE)" == "" ] ; then
         exit_with_failure "Didn't get a CIR IP address"
     fi
