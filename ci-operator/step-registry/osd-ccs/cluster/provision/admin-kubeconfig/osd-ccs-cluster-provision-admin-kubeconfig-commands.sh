@@ -24,4 +24,4 @@ echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSI
 ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
-ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials | jq -r .kubeconfig > "${SHARED_DIR}/kubeconfig"
+ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials | jq -r .kubeconfig > "${SHARED_DIR}/kubeconfig.kubeadmin"

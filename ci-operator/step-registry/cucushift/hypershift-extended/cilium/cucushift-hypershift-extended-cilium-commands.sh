@@ -7,6 +7,12 @@ if [[ -f "${SHARED_DIR}/nested_kubeconfig" ]]; then
   export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 fi
 
+# for rosa kubeadmin kubeconfig
+if [[ -f "${SHARED_DIR}/kubeconfig.kubeadmin" ]]; then
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig.kubeadmin"
+fi
+
+
 cilium_ns=$(oc get ns cilium --ignore-not-found)
 if [[ -z "$cilium_ns" ]]; then
   oc create ns cilium
