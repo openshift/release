@@ -13,6 +13,11 @@ else
     echo "no proxy setting."
 fi
 
+# If not provided in the JSON, will use the following defaults.
+DEFAULT_OPERATOR_SOURCE="redhat-operators"
+DEFAULT_OPERATOR_CHANNEL="!default"
+DEFAULT_OPERATOR_INSTALL_NAMESPACE="openshift-operators"
+
 # Read each operator in the JSON provided to an item in a BASH array.
 readarray -t OPERATOR_ARRAY < <(jq --compact-output '.[]' <<< "$OPERATORS")
 
@@ -20,17 +25,11 @@ readarray -t OPERATOR_ARRAY < <(jq --compact-output '.[]' <<< "$OPERATORS")
 for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     # Set variables for this operator.
     operator_name=$(jq --raw-output '.name' <<< "$operator_obj")
-    operator_source=$(jq --raw-output '.source' <<< "$operator_obj")
-    operator_channel=$(jq --raw-output '.channel' <<< "$operator_obj")
-    operator_install_namespace=$(jq --raw-output '.install_namespace' <<< "$operator_obj")
+    operator_source=$(jq --raw-output '.source // ""' <<< "$operator_obj")
+    operator_channel=$(jq --raw-output '.channel // ""' <<< "$operator_obj")
+    operator_install_namespace=$(jq --raw-output '.install_namespace // ""' <<< "$operator_obj")
     operator_group=$(jq --raw-output '.operator_group // ""' <<< "$operator_obj")
     operator_target_namespaces=$(jq --raw-output '.target_namespaces // ""' <<< "$operator_obj")
-
-    # If install_namespace not defined, exit.
-    if [[ -z "${operator_install_namespace}" ]]; then
-        echo "ERROR: install_namespace is not defined"
-        exit 1
-    fi
 
     # If name not defined, exit.
     if [[ -z "${operator_name}" ]]; then
@@ -38,10 +37,19 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
         exit 1
     fi
 
-    # If channel is not defined, exit.
+    # If source is not defined, use DEFAULT_OPERATOR_SOURCE.
+    if [[ -z "${operator_source}" ]]; then
+        operator_source="${DEFAULT_OPERATOR_SOURCE}"
+    fi
+
+    # If install_namespace not defined, use DEFAULT_OPERATOR_INSTALL_NAMESPACE.
+    if [[ -z "${operator_install_namespace}" ]]; then
+        operator_install_namespace="${DEFAULT_OPERATOR_INSTALL_NAMESPACE}"
+    fi
+
+    # If channel is not defined, use DEFAULT_OPERATOR_CHANNEL.
     if [[ -z "${operator_channel}" ]]; then
-        echo "ERROR: channel is not defined"
-        exit 1
+        operator_channel="${DEFAULT_OPERATOR_CHANNEL}"
     fi
 
     # If the channel is "!default", find the default channel of the operator
