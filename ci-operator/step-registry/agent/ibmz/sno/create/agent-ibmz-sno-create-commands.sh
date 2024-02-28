@@ -102,7 +102,7 @@ vpc_crn=$(ibmcloud is vpc $infra_name-vpc | awk '/CRN/{print $2}')
 # Create subnet
 set -e
 echo "Creating a subnet in the VPC $infra_name-vpc"
-ibmcloud is subnet-create $infra_name-sn $infra_name-vpc --ipv4-address-count 16 --zone "$IC_REGION-2" --resource-group-name $infra_name-rg
+ibmcloud is subnet-create $infra_name-sn $infra_name-vpc --ipv4-address-count 256 --zone "$IC_REGION-2" --resource-group-name $infra_name-rg
 sn_status=$(ibmcloud is subnet $infra_name-sn | awk '/Status/{print $2}')
 set +e
 if [ "$sn_status" != "available" ]; then
