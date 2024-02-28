@@ -183,6 +183,9 @@ function copy_kubeconfig_minimal() {
   done
   echo 'kubeconfig received!'
 
+  echo "(jiwei debug) saving kubeconfig for debug..."
+  cp "${dir}/auth/kubeconfig" "${ARTIFACT_DIR}/"
+
   echo 'waiting for api to be available'
   until env KUBECONFIG="${dir}/auth/kubeconfig" oc get --raw / >/dev/null 2>&1; do
     sleep 5
