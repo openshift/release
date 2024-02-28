@@ -9,9 +9,11 @@ if [ "${RE_TRIGGER_ON_FAILURE}" = "true" ]; then
 
   SERVER_URL=$(cat "${CLUSTER_PROFILE_DIR}/openshift-ci-job-trigger-server-url")
   TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/openshift-ci-api-token")
+
   if [ -f "${CLUSTER_PROFILE_DIR}/openshift-ci-job-trigger-slack-webhook-url" ]; then
     SLACK_WEBHOOK_URL=$(cat "${CLUSTER_PROFILE_DIR}/openshift-ci-job-trigger-slack-webhook-url")
   fi
+
   if [ -f "${CLUSTER_PROFILE_DIR}/openshift-ci-job-trigger-slack-error-webhook-url" ]; then
     SLACK_ERROR_WEBHOOK_URL=$(cat "${CLUSTER_PROFILE_DIR}/openshift-ci-job-trigger-slack-error-webhook-url")
   fi
@@ -38,7 +40,7 @@ if [ "${RE_TRIGGER_ON_FAILURE}" = "true" ]; then
     json_payload+=', "slack_errors_webhook_url": "'"$SLACK_ERROR_WEBHOOK_URL"'"'
   fi
 
-  curl -X POST  "$SERVER_URL" -d "{$json_payload}" -H "Content-Type: application/json"
+  curl -X POST "$SERVER_URL" -d "{$json_payload}" -H "Content-Type: application/json"
 
 else
   echo "RE_TRIGGER_ON_FAILURE is set to false; job was not re-triggered"
