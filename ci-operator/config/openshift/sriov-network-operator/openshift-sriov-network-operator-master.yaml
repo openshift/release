@@ -129,6 +129,25 @@ tests:
       OO_PACKAGE: sriov-network-operator
       OO_TARGET_NAMESPACES: '!install'
     test:
+    - as: start-sriov-operator
+      cli: latest
+      commands: |
+        oc apply -f - <<EOF
+        apiVersion: sriovnetwork.openshift.io/v1
+        kind: SriovOperatorConfig
+        metadata:
+          name: default
+          namespace: openshift-sriov-network-operator
+        spec:
+          enableInjector: true
+          enableOperatorWebhook: true
+          logLevel: 2
+        EOF
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
     - as: e2e
       commands: make test-e2e-validation-only
       from: src
