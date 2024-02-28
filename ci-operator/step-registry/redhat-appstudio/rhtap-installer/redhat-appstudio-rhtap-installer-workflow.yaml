@@ -1,0 +1,18 @@
+workflow:
+  as: redhat-appstudio-rhtap-installer
+  steps:
+    # https://docs.ci.openshift.org/docs/architecture/step-registry/#marking-post-steps-best-effort
+    allow_best_effort_post_steps: true
+    # https://docs.ci.openshift.org/docs/architecture/step-registry/#skipping-post-steps-on-success
+    allow_skip_on_success: true
+    pre:
+    - ref: redhat-appstudio-rhtap-installer-install-rhtap
+    - ref: redhat-appstudio-rhtap-installer-register-pac
+    post:
+    - ref: redhat-appstudio-rhtap-installer-unregister-pac
+      best_effort: true
+      optional_on_success: true
+  documentation: |-
+    This workflows perform shared pre/post actions on clusters obtained from
+    preinstalled pools (https://docs.ci.openshift.org/docs/architecture/ci-operator/#testing-with-a-cluster-from-a-cluster-pool).
+    The intent of this workflow is to prepare the test environment of rhtap via rhtap-installer and register pac server to Sprayproxy.
