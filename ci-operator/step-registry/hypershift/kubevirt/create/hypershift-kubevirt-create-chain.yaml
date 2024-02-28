@@ -79,29 +79,6 @@ chain:
       oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
       echo "Cluster became available, creating kubeconfig"
       $HCP_CLI create kubeconfig --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
-      
-      if [ "$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')" == "BareMetal" ]; then
-        exit 0
-      fi
-
-      echo "Waiting for nested cluster's node count to reach the desired replicas count in the NodePool"
-      until \
-          [[ $(oc get nodepool ${CLUSTER_NAME} -n clusters -o jsonpath='{.spec.replicas}') \
-            == $(oc --kubeconfig=${SHARED_DIR}/nested_kubeconfig get nodes --no-headers | wc -l) ]]; do
-              echo "$(date --rfc-3339=seconds) Nested cluster's node count is not equal to the desired replicas in the NodePool. Retrying in 30 seconds."
-              oc get vmi -n ${CLUSTER_NAMESPACE}
-              sleep 30s
-      done
-
-      echo "Waiting for clusteroperators to be ready"
-      export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-      
-      until \
-        oc wait clusterversion/version --for='condition=Available=True' > /dev/null;  do
-          echo "$(date --rfc-3339=seconds) Cluster Operators not yet ready"
-          oc get clusteroperators 2>/dev/null || true
-          sleep 1s
-      done
 
       if [ -n "${KUBEVIRT_CSI_INFRA}" ]
       then
