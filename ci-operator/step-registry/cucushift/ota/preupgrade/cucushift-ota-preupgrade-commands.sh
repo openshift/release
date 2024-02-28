@@ -278,6 +278,23 @@ function pre-OCP-69948(){
     fi
     return 0
 }
+
+
+function pre-OCP-56083(){
+    echo "Pre Test Start: OCP-56083"
+    echo "Unset the upgrade channel"
+    local expected_warn_msg expected_info_msg tmp_log
+    tmp_log=$(mktemp)
+    expected_warn_msg="warning: Clearing channel"
+    expected_info_msg="info: Cluster channel is already clear"
+    oc adm upgrade channel --allow-explicit-channel  2>&1 | tee "${tmp_log}" 
+    if grep -qe "${expected_warn_msg}\|${expected_info_msg}" "${tmp_log}"; then
+       echo "Successfully cleared the upgrade channel"
+       return 0 
+    fi
+    echo "Failed to clear Upgrade Channel"
+    return 1
+}
 # This func run all test cases with checkpoints which will not break other cases, 
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be run or not
