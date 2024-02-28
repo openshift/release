@@ -12,7 +12,7 @@ SPRAYPROXY_SERVER_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-serve
 webhook_url=$(cat "${SHARED_DIR}/webhook_url")
 
 register_pac_server(){
-  echo "Registering PAC server to SprayProxy server"
+  echo "Start registering PAC server [$webhook_url] to SprayProxy server"
   for _ in {1..5}; do
     if curl -k -X POST -H "Authorization: Bearer ${SPRAYPROXY_SERVER_TOKEN}" "${SPRAYPROXY_SERVER_URL}"/backends --data '{"url": "'"$webhook_url"'"}'; then
       break
