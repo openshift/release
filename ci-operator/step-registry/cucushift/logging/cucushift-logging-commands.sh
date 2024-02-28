@@ -4,8 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-CUCUSHIFT_FORCE_SKIP_TAGS="customer security"
-
+function show_test_execution_time() {
+    local test_type time_used
+    test_type="$1"
+    time_used="$(( ${SECONDS}/60 ))"
+    echo "###### ${test_type} tests took ${time_used} minutes"
+}
 function set_cluster_access() {
     if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
@@ -29,94 +33,22 @@ function preparation_for_test() {
 function echo_e2e_tags() {
     echo "In function: ${FUNCNAME[1]}"
     echo "E2E_RUN_TAGS: '${E2E_RUN_TAGS}'"
-    echo "E2E_SKIP_TAGS: '${E2E_SKIP_TAGS}'"
 }
-function filter_test_by_version() {
-    local xversion yversion
-    IFS='.' read xversion yversion _ < <(oc version -o yaml | yq '.openshiftVersion')
-    if [[ -n $xversion ]] && [[ $xversion -eq 4 ]] && [[ -n $yversion ]] && [[ $yversion =~ [12][0-9] ]] ; then
-        export E2E_RUN_TAGS="${E2E_RUN_TAGS} and @${xversion}.${yversion}"
-    fi
-    echo_e2e_tags
-}
-function filter_test_by_arch() {
-    local node_archs arch_tags
-    mapfile -t node_archs < <(oc get nodes -o yaml | yq '.items[].status.nodeInfo.architecture' | sort -u)
-    arch_tags="${node_archs[*]/#/ and @}"
-    case "${#node_archs[@]}" in
-        0)
-            echo "=========================="
-            echo "Error: got unexpected arch"
-            oc get nodes -o yaml
-            echo "=========================="
-            ;;
-        1)
-            export E2E_RUN_TAGS="${E2E_RUN_TAGS} ${arch_tags[*]}"
-            ;;
-        *)
-            export E2E_RUN_TAGS="${E2E_RUN_TAGS} ${arch_tags[*]} and @heterogeneous"
-            ;;
-    esac
-    echo_e2e_tags
-}
-function filter_test_by_network() {
-    local networktype
-    networktype="$(oc get network.config/cluster -o yaml | yq '.spec.networkType')"
-    case "${networktype,,}" in
-        openshiftsdn)
-	    networktag='@network-openshiftsdn'
-	    ;;
-        ovnkubernetes)
-	    networktag='@network-ovnkubernetes'
-	    ;;
-        *)
-	    echo "######Expected network to be SDN/OVN, but got: $networktype"
-	    ;;
-    esac
-    if [[ -n $networktag ]] ; then
-        export E2E_RUN_TAGS="${E2E_RUN_TAGS} and ${networktag}"
-    fi
-    echo_e2e_tags
-}
-function filter_test_by_sno() {
-    local nodeno
-    nodeno="$(oc get nodes --no-headers | wc -l)"
-    if [[ $nodeno -eq 1 ]] ; then
-        export E2E_RUN_TAGS="${E2E_RUN_TAGS} and @singlenode"
-    fi
-    echo_e2e_tags
-}
-function filter_test_by_fips() {
-    local data
-    data="$(oc get configmap cluster-config-v1 -n kube-system -o yaml | yq '.data')"
-    if ! (grep --ignore-case --quiet 'fips' <<< "$data") ; then
-        export E2E_RUN_TAGS="${E2E_RUN_TAGS} and not @fips"
-    fi
-    echo_e2e_tags
-}
-function filter_tests() {
-    #filter_test_by_version
-    filter_test_by_arch
-    filter_test_by_network
-    filter_test_by_sno
-    filter_test_by_fips
-    # the following check should be the last one in filter_tests
-    for tag in ${CUCUSHIFT_FORCE_SKIP_TAGS} ; do
-        if ! [[ "${E2E_SKIP_TAGS}" =~ $tag ]] ; then
-            export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not $tag"
-        fi
-    done
-    echo_e2e_tags
+function test_execution_cucumber() {
+    local test_type type_tags
+    test_type="$1"
+    type_tags="$2"
+    export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/${test_type}"
+    export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
+    set -x
+    cucumber --tags "${E2E_RUN_TAGS} and ${type_tags}" -p junit || true
+    set +x
 }
 function test_execution() {
     pushd verification-tests
-    # run logging tests in serial
-    export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/logging"
-    export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
-    set -x
-    cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and not @console" -p junit || true
-    cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and @console and @smoke" -p junit || true
-    set +x
+    export E2E_RUN_TAGS="${E2E_RUN_TAGS}"
+    test_execution_cucumber 'logging1' 'not @console'
+    test_execution_cucumber 'logging2' '@console'
     popd
 }
 function summarize_test_results() {
@@ -147,11 +79,22 @@ EOF
     cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
 }
 
-
-E2E_RUN_TAGS="${E2E_RUN_TAGS:?'Wrong test filter for E2E_RUN_TAGS'}"
-E2E_SKIP_TAGS="${E2E_SKIP_TAGS:='not @default-skip-tag-not-used'}"
+CUCUSHIFT_FORCE_SKIP_TAGS="not @customer
+        and not @flaky
+        and not @inactive
+        and not @prod-only
+        and not @qeci
+        and not @security
+        and not @stage-only
+        and not @upgrade-check
+        and not @upgrade-prepare
+"
+if [[ -z "$E2E_RUN_TAGS" ]] ; then
+    export E2E_RUN_TAGS="$CUCUSHIFT_FORCE_SKIP_TAGS"
+else
+    export E2E_RUN_TAGS="$E2E_RUN_TAGS and $CUCUSHIFT_FORCE_SKIP_TAGS"
+fi
 set_cluster_access
 preparation_for_test
-filter_tests
 test_execution
 summarize_test_results
