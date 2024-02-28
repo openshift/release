@@ -34,8 +34,10 @@ mkdir -p "${LOGS_FOLDER}"
 mkdir -p "${CLUSTER_PATH}/auth"
 mkdir -p "${CLUSTER_PATH}/data"
 
-cp -v "${KUBECONFIG}"              "${CLUSTER_PATH}/auth/kubeconfig"
-cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+cp -v "${KUBECONFIG}" "${CLUSTER_PATH}/auth/kubeconfig"
+#cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
+cp -v "${SHARED_DIR}/kubeadmin-password" "${CLUSTER_PATH}/auth/kubeadmin-password"
 
 # Create ocs-tests config overwrite file
 cat > "${LOGS_CONFIG}" << __EOF__
