@@ -541,7 +541,7 @@ azure4|azuremag|azure-arm64)
         export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
     fi
     ;;
-azurestack | hypershift)
+azurestack|hypershift)
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
     if [[ "${USE_HYPERSHIFT_AZURE_CREDS:-}" == 'true' ]]; then
         export AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
