@@ -18,10 +18,10 @@ ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=n
 
 # Verifying the SNO cluster status
 echo "$(date) Checking the SNO status"
-ssh "${ssh_options[@]}" root@$bastion_vsi_ip "$HOME/$CLUSTER_NAME/oc wait no --all --for=condition=Ready=true --timeout=30m --kubeconfig /root/$CLUSTER_NAME/auth/kubeconfig"
+ssh "${ssh_options[@]}" root@$bastion_vsi_ip "/root/$CLUSTER_NAME/oc wait no --all --for=condition=Ready=true --timeout=30m --kubeconfig /root/$CLUSTER_NAME/auth/kubeconfig"
 echo "$(date) SNO cluster is ready"
 
 # Verifying the SNO cluster operators status
 echo "$(date) Verifying the cluster operators status"
-ssh "${ssh_options[@]}" root@$bastion_vsi_ip "$HOME/$CLUSTER_NAME/oc wait --all=true co --for=condition=Available=True --timeout=30m --kubeconfig /root/$CLUSTER_NAME/auth/kubeconfig"
+ssh "${ssh_options[@]}" root@$bastion_vsi_ip "/root/$CLUSTER_NAME/oc wait --all=true co --for=condition=Available=True --timeout=30m --kubeconfig /root/$CLUSTER_NAME/auth/kubeconfig"
 echo "$(date) All cluster operators are ready"
