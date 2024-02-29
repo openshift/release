@@ -299,9 +299,11 @@ log_chronyd_status() {
 
 #Set status and run playbooks
 status=0
+# DZK
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
+# DZK
 if [[ "$status" == 0 ]]; then
   #installer has issues applying machine-configs with OCP 4.10, using manual way
   KUBECONFIG=$SHARED_DIR/kubeconfig oc apply -f $SHARED_DIR/disable_ntp.yml || true
