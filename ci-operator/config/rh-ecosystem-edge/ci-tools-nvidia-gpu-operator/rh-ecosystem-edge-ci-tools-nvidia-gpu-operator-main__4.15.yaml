@@ -41,14 +41,14 @@ tests:
           cpu: 2000m
           memory: 2Gi
     - as: gpu-operator-e2e
-      commands: make master_e2e_gpu_test
+      commands: make e2e_gpu_test CHANNEL=v23.9
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
           cpu: 2000m
           memory: 2Gi
 - as: nvidia-gpu-operator-e2e-master
-  cron: 0 01 * * 5
+  cron: 0 01 * * *
   steps:
     cluster_profile: aws-edge-infra
     env:
@@ -70,6 +70,62 @@ tests:
           memory: 2Gi
     - as: gpu-operator-e2e
       commands: make master_e2e_gpu_test
+      from: ci-tools-nvidia-gpu-operator
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+- as: nvidia-gpu-operator-e2e-23-6-x
+  cron: 0 03 * * *
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: single-node-conf-aws
+    - ref: single-node-conf-e2e
+    - chain: ipi-install
+    test:
+    - as: scale-gpu-nodes
+      commands: make scale_aws_gpu_nodes
+      from: ci-tools-nvidia-gpu-operator
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    - as: gpu-operator-e2e
+      commands: make e2e_gpu_test CHANNEL=v23.6
+      from: ci-tools-nvidia-gpu-operator
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+- as: nvidia-gpu-operator-e2e-23-9-x
+  cron: 0 05 * * *
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: single-node-conf-aws
+    - ref: single-node-conf-e2e
+    - chain: ipi-install
+    test:
+    - as: scale-gpu-nodes
+      commands: make scale_aws_gpu_nodes
+      from: ci-tools-nvidia-gpu-operator
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    - as: gpu-operator-e2e
+      commands: make e2e_gpu_test CHANNEL=v23.9
       from: ci-tools-nvidia-gpu-operator
       resources:
         requests:
