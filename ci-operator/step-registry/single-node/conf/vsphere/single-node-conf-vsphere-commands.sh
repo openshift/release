@@ -79,7 +79,6 @@ source "${SHARED_DIR}/vsphere_context.sh"
 source "${SHARED_DIR}/govc.sh"
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
-export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
 declare -a vips
@@ -115,8 +114,6 @@ fi
 if [ ${Y_VERSION} -lt 15 ]; then
   echo "$(date -u --rfc-3339=seconds) - SNO VSphere is only supported starting with OpenShift 4.16"
 fi
-
-echo "$(date -u --rfc-3339=seconds) - 4.x installation is later than 4.9, will install with resource pool"
 
 RESOURCE_POOL_DEF="resourcePool: /${vsphere_datacenter}/host/${vsphere_cluster}/Resources/ipi-ci-clusters"
 
