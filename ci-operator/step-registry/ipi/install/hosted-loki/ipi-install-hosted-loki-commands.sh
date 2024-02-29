@@ -182,8 +182,9 @@ $PROXYCFGLINE
           - namespace
           - type
       relabel_configs:
+      # drop all entries for pods with no UID, unclear what this would be as static pods seem to have a uid now, but we're keeping the config because it's working so far:
       - action: drop
-        regex: ''
+        regex:  ^$
         source_labels:
         - __meta_kubernetes_pod_uid
       - source_labels:
@@ -211,6 +212,87 @@ $PROXYCFGLINE
         source_labels:
         - __meta_kubernetes_pod_label_vm_kubevirt_io_name
         target_label: vm
+      - replacement: /var/log/pods/*\$1/*.log
+        separator: /
+        source_labels:
+        - __meta_kubernetes_pod_uid
+        - __meta_kubernetes_pod_container_name
+        target_label: __path__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+    - job_name: kubernetes-pods-static
+      kubernetes_sd_configs:
+      - role: pod
+      pipeline_stages:
+      - cri: {}
+      - static_labels:
+          type: static-pod
+      # For anything that is outside an openshift- namespace, we will pack it into the entry to
+      # dramatically improve cardinality. These would typically be temporary namespaces with random
+      # names created by e2e tests. We still keep their logs, you just don't get a fast label filter
+      # to find them globally by namespace.
+      #
+      # We had to resort to a fixed list here because there are a lot of openshift-RAND namespaces created.
+      # (must-gather, debug, amq, test, etc) If you want your namespaces to get it's own indexed namespace
+      # label, add it here, in alphabetical order, and to the near identical line below with =~ instead of !~.
+      - match:
+          selector: '{namespace!~"openshift-addon-operator|openshift-apiserver|openshift-apiserver-operator|openshift-authentication|openshift-authentication-operator|openshift-cloud-controller-manager|openshift-cloud-controller-manager-operator|openshift-cloud-credential-operator|openshift-cloud-ingress-operator|openshift-cloud-network-config-controller|openshift-cluster-csi-drivers|openshift-cluster-machine-approver|openshift-cluster-node-tuning-operator|openshift-cluster-samples-operator|openshift-cluster-storage-operator|openshift-cluster-version|openshift-config|openshift-config-managed|openshift-config-operator|openshift-console|openshift-console-operator|openshift-console-user-settings|openshift-controller-manager|openshift-controller-manager-operator|openshift-custom-domains-operator|openshift-dns|openshift-dns-operator|openshift-etcd|openshift-etcd-operator|openshift-host-network|openshift-image-registry|openshift-infra|openshift-ingress|openshift-ingress-canary|openshift-ingress-operator|openshift-insights|openshift-kni-infra|openshift-kube-apiserver|openshift-kube-apiserver-operator|openshift-kube-controller-manager|openshift-kube-controller-manager-operator|openshift-kube-scheduler|openshift-kube-scheduler-operator|openshift-kube-storage-version-migrator|openshift-kube-storage-version-migrator-operator|openshift-logging|openshift-machine-api|openshift-machine-config-operator|openshift-managed-node-metadata-operator|openshift-managed-upgrade-operator|openshift-marketplace|openshift-monitoring|openshift-multus|openshift-network-diagnostics|openshift-network-operator|openshift-node|openshift-nutanix-infra|openshift-oauth-apiserver|openshift-observability-operator|openshift-ocm-agent-operator|openshift-openstack-infra|openshift-operator-lifecycle-manager|openshift-operators|openshift-operators-redhat|openshift-osd-metrics|openshift-ovirt-infra|openshift-priv|openshift-rbac-permissions|openshift-route-controller-manager|openshift-route-monitor-operator|openshift-sdn|openshift-security|openshift-service-ca|openshift-service-ca-operator|openshift-service-catalog-removed|openshift-user-workload-monitoring|openshift-validation-webhook|openshift-vsphere-infra"}'
+          stages:
+          - pack:
+              labels:
+              - namespace
+              - app
+              - container
+              - host
+              - pod
+              - vm
+      # If this entry is in an openshift- namespace, we don't pack the namespace (it remains a real label):
+      - match:
+          selector: '{namespace=~"openshift-addon-operator|openshift-apiserver|openshift-apiserver-operator|openshift-authentication|openshift-authentication-operator|openshift-cloud-controller-manager|openshift-cloud-controller-manager-operator|openshift-cloud-credential-operator|openshift-cloud-ingress-operator|openshift-cloud-network-config-controller|openshift-cluster-csi-drivers|openshift-cluster-machine-approver|openshift-cluster-node-tuning-operator|openshift-cluster-samples-operator|openshift-cluster-storage-operator|openshift-cluster-version|openshift-config|openshift-config-managed|openshift-config-operator|openshift-console|openshift-console-operator|openshift-console-user-settings|openshift-controller-manager|openshift-controller-manager-operator|openshift-custom-domains-operator|openshift-dns|openshift-dns-operator|openshift-etcd|openshift-etcd-operator|openshift-host-network|openshift-image-registry|openshift-infra|openshift-ingress|openshift-ingress-canary|openshift-ingress-operator|openshift-insights|openshift-kni-infra|openshift-kube-apiserver|openshift-kube-apiserver-operator|openshift-kube-controller-manager|openshift-kube-controller-manager-operator|openshift-kube-scheduler|openshift-kube-scheduler-operator|openshift-kube-storage-version-migrator|openshift-kube-storage-version-migrator-operator|openshift-logging|openshift-machine-api|openshift-machine-config-operator|openshift-managed-node-metadata-operator|openshift-managed-upgrade-operator|openshift-marketplace|openshift-monitoring|openshift-multus|openshift-network-diagnostics|openshift-network-operator|openshift-node|openshift-nutanix-infra|openshift-oauth-apiserver|openshift-observability-operator|openshift-ocm-agent-operator|openshift-openstack-infra|openshift-operator-lifecycle-manager|openshift-operators|openshift-operators-redhat|openshift-osd-metrics|openshift-ovirt-infra|openshift-priv|openshift-rbac-permissions|openshift-route-controller-manager|openshift-route-monitor-operator|openshift-sdn|openshift-security|openshift-service-ca|openshift-service-ca-operator|openshift-service-catalog-removed|openshift-user-workload-monitoring|openshift-validation-webhook|openshift-vsphere-infra"}'
+          stages:
+          - pack:
+              labels:
+              - app
+              - container
+              - host
+              - pod
+              - vm
+      - labelallow:
+          - invoker
+          - namespace
+          - type
+      relabel_configs:
+      # drop all entries from regular (non-static) pods, these will not have the config mirror annotation
+      - action: drop
+        regex: ^$
+        source_labels:
+        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
+      - source_labels:
+        - __meta_kubernetes_pod_label_name
+        target_label: __service__
+      - source_labels:
+        - __meta_kubernetes_pod_label_app
+        target_label: app
+      - source_labels:
+        - __meta_kubernetes_pod_node_name
+        target_label: host
+      - action: replace
+        source_labels:
+        - __meta_kubernetes_namespace
+        target_label: namespace
+      - action: replace
+        source_labels:
+        - __meta_kubernetes_pod_name
+        target_label: pod
+      - action: replace
+        source_labels:
+        - __meta_kubernetes_pod_container_name
+        target_label: container
+      - action: replace
+        source_labels:
+        - __meta_kubernetes_pod_label_vm_kubevirt_io_name
+        target_label: vm
+      # this is the critical config for static pods which use a slightly different path on disk for their logs:
       - replacement: /var/log/pods/*\$1/*.log
         separator: /
         source_labels:
