@@ -84,7 +84,7 @@ EOF
 	  exit 1
   fi
 
-export CERT_FOLDER="${HOME}/certificator"
+export CERT_FOLDER="${HOME}/certificates"
 
 # Run the command and store the result in a variable
 OPENSHIFT_CONSOLE_URL=$(oc whoami --show-console)
