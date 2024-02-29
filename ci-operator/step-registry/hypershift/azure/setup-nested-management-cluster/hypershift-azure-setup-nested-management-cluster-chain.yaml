@@ -5,8 +5,8 @@ chain:
     cli: latest
     env:
     - name: HYPERSHIFT_NODE_COUNT
-      default: "1"
-      documentation: "The number nodes for the cluster. This number will get mulitplied by three, as there are three AZs"
+      default: "3"
+      documentation: "The number nodes to automatically create and join to the cluster."
     - name: HYPERSHIFT_INSTANCE_TYPE
       default: "Standard_D4s_v4"
       documentation: "Instance type for the cluster nodes"
@@ -32,7 +32,6 @@ chain:
 
       export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
-      echo "Creating management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
       bin/hypershift create cluster azure \
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
         --azure-creds="/etc/hypershift-ci-jobs-azurecreds/credentials.json" \
@@ -45,7 +44,7 @@ chain:
         --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
         --release-stream=4.16.0-0.nightly \
         --namespace=${HYPERSHIFT_NAMESPACE} \
-        --annotations resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m, hypershift.openshift.io/image-overrides=cluster-storage-operator=quay.io/csrwng/cluster-storage-operator:azure
+        --annotations resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m
       echo "Waiting for cluster to become available"
       oc wait --timeout=10m --for=condition=Available --namespace=${HYPERSHIFT_NAMESPACE} hostedcluster/${CLUSTER_NAME}
       echo "Cluster became available, creating kubeconfig"
@@ -87,7 +86,7 @@ chain:
       namespace: test-credentials
     from_image:
       namespace: ocp
-      name: "4.15"
+      name: "4.16"
       tag: hypershift-operator
     grace_period: 1m0s
     resources:
