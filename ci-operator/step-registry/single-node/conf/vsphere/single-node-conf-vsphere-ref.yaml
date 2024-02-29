@@ -1,0 +1,40 @@
+ref:
+  as: single-node-conf-vsphere
+  from: tools
+  commands: single-node-conf-vsphere-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: PULL_THROUGH_CACHE
+    default: "enabled"
+    documentation: |-
+      Cluster images are pulled through a cache located in the CI environment when enabled.
+  - name: NETWORK_TYPE
+    default: "OVNKubernetes"
+    documentation: |-
+      Network type to use, the default OVNKubernetes
+  - name: OCP_ARCH
+    default: "amd64"
+    documentation: |-
+      The architecture of the control plane nodes (e.g., amd64, arm64).
+  credentials:
+    - namespace: test-credentials
+      name: vsphere-vmc
+      mount_path: /var/run/vault/vsphere
+    - namespace: test-credentials
+      name: vsphere-config
+      mount_path: /var/run/vault/vsphere-config
+    - namespace: test-credentials
+      name: ci-ibmcloud
+      mount_path: /var/run/vault/ibmcloud
+  dependencies:
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST_FROM_BUILD_FARM
+  documentation: |-
+    The IPI vSphere configure step generates the vSphere-specific
+    install-config.yaml contents based on the cluster profile,
+    $SHARED_DIR/vips.txt, $SHARED_DIR/basedomain.txt, and optional input files.
+
+    Modifies install-config.yaml to use a single control-plane node and without any workers.
