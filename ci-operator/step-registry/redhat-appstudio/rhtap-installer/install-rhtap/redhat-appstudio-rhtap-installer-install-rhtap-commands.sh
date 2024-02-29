@@ -119,9 +119,9 @@ sed -i -e "/^#AWS_SECRET_ACCESS_KEY/s/#//" ${CERT_FOLDER}/acme.sh/dnsapi/dns_aws
 sed -i -e "s|AWS_ACCESS_KEY_ID=\".*\"|AWS_ACCESS_KEY_ID=\"$AWS_ACCESS_KEY_ID\"|" ${CERT_FOLDER}/acme.sh/dnsapi/dns_aws.sh
 sed -i -e "s|AWS_SECRET_ACCESS_KEY=\".*\"|AWS_SECRET_ACCESS_KEY=\"$AWS_SECRET_ACCESS_KEY\"|" ${CERT_FOLDER}/acme.sh/dnsapi/dns_aws.sh
 
-"${CERT_FOLDER}"/acme.sh/acme.sh --force --register-account --server letsencrypt -m rhtap-qe-ci@stonesoupengineering.com
+"${CERT_FOLDER}"/acme.sh/acme.sh --force --register-account -m rhtap-qe-ci@stonesoupengineering.com
 
-"${CERT_FOLDER}"/acme.sh/acme.sh --debug 2 --issue -d ${LE_API} -d *.${LE_WILDCARD} --server letsencrypt --dns dns_aws
+"${CERT_FOLDER}"/acme.sh/acme.sh --debug 2 --issue -d ${LE_API} -d *.${LE_WILDCARD} --dns dns_aws
 "${CERT_FOLDER}"/acme.sh/acme.sh --debug 2 --install-cert -d ${LE_API} -d *.${LE_WILDCARD} --cert-file ${CERT_DIR}/cert.pem --key-file ${CERT_DIR}/key.pem --fullchain-file ${CERT_DIR}/fullchain.pem --ca-file ${CERT_DIR}/ca.cer
 
 oc create secret tls router-certs --cert=${CERT_DIR}/fullchain.pem --key=${CERT_DIR}/key.pem -n openshift-ingress
