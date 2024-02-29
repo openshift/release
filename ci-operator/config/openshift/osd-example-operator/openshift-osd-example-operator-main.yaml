@@ -1,3 +1,8 @@
+base_images:
+  repo-brancher:
+    name: repo-brancher
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -22,6 +27,17 @@ tests:
     make lint
   container:
     from: src
+- as: fast-forward
+  commands: |
+    git clone -b master https://github.com/openshift/release.git /tmp/release
+
+    repo-brancher --config-dir=./ci-operator/config/openshift/osd-example-operator --current-release=4.15 --future-release=4.16 --fast-forward --confirm --username=sre-platform-bot --token-path=/usr/local/osde2e-github/token
+  container:
+    from: repo-brancher
+  postsubmit: true
+  secrets:
+  - mount_path: /usr/local/osde2e-github
+    name: osde2e-github
 zz_generated_metadata:
   branch: main
   org: openshift
