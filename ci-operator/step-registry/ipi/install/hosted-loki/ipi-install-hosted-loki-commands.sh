@@ -182,10 +182,11 @@ $PROXYCFGLINE
           - namespace
           - type
       relabel_configs:
+      # drop all entries for pods with no UID, unclear what this would be as static pods seem to have a uid now, but we're keeping the config because it's working so far:
       - action: drop
-        regex: ''
+        regex:  ^$
         source_labels:
-        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
+        - __meta_kubernetes_pod_uid
       - source_labels:
         - __meta_kubernetes_pod_label_name
         target_label: __service__
@@ -261,10 +262,11 @@ $PROXYCFGLINE
           - namespace
           - type
       relabel_configs:
+      # drop all entries from regular (non-static) pods, these will not have the config mirror annotation
       - action: drop
-        regex: ''
+        regex: ^$
         source_labels:
-        - __meta_kubernetes_pod_uid
+        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
       - source_labels:
         - __meta_kubernetes_pod_label_name
         target_label: __service__
@@ -290,6 +292,7 @@ $PROXYCFGLINE
         source_labels:
         - __meta_kubernetes_pod_label_vm_kubevirt_io_name
         target_label: vm
+      # this is the critical config for static pods which use a slightly different path on disk for their logs:
       - replacement: /var/log/pods/*\$1/*.log
         separator: /
         source_labels:
