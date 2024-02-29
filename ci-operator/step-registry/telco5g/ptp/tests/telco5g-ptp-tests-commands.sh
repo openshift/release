@@ -298,7 +298,7 @@ soaktest:
           - pod_type: "linuxptp-daemon"
             container: "linuxptp-daemon-container"
             cpu_threshold_mcores: 40
-    desc: "The test measures PTP CPU usage and fails if >15mcores"
+    desc: "The test measures PTP CPU usage and fails if > cpu_threshold_mcores"
 EOF
 
 # Set output directory
