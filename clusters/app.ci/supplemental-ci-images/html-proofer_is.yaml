@@ -15,6 +15,8 @@ apiVersion: build.openshift.io/v1
 metadata:
   namespace: ci
   name: html-proofer-with-bash
+  labels:
+    ci.openshift.io/push: app.ci
 spec:
   successfulBuildsHistoryLimit: 1
   failedBuildsHistoryLimit: 2
@@ -22,6 +24,32 @@ spec:
     to:
       kind: ImageStreamTag
       name: html-proofer:bash-3.19.0
+  source:
+    dockerfile: |
+      FROM registry.ci.openshift.org/ci/html-proofer:3.19.0
+      RUN apk add --no-cache bash
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: html-proofer-with-bash-qci
+  labels:
+    ci.openshift.io/push: qci
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: DockerImage
+      name: quay-proxy.ci.openshift.org/openshift/ci:ci_html-proofer_bash-3.19.0
+    pushSecret:
+      name: registry-push-credentials-ci-central
   source:
     dockerfile: |
       FROM registry.ci.openshift.org/ci/html-proofer:3.19.0
