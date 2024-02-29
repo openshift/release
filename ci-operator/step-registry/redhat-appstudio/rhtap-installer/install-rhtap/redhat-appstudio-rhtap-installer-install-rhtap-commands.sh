@@ -2,6 +2,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -ex
 
 DEBUG_OUTPUT=/tmp/log.txt
 
