@@ -47,6 +47,10 @@ run-on-all-nodes "systemctl disable chronyd --now"
 KUBECONFIG_NODE_DIR="/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs"
 KUBECONFIG_LB_EXT="${KUBECONFIG_NODE_DIR}/lb-ext.kubeconfig"
 KUBECONFIG_REMOTE="/tmp/lb-ext.kubeconfig"
+
+# for bug verification
+run-on-first-master "md5sum /var/lib/kubelet/kubeconfig && md5sum /var/lib/kubelet/pki/kubelet-client-current.pem"
+
 run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:core ${KUBECONFIG_REMOTE}"
 copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
@@ -78,6 +82,12 @@ wait-for-nodes-to-be-ready
 pod-restart-workarounds
 
 wait-for-operators-to-stabilize
+
+oc get csr
+run-on-first-master "md5sum /var/lib/kubelet/kubeconfig && md5sum /var/lib/kubelet/pki/kubelet-client-current.pem"
+multus_pod=$(oc get pods -n openshift-multus -l app=multus --no-headers | head -1 | cut -d" " -f1)
+oc -n openshift-multus logs "$multus_pod"
+
 exit 0
 
 EOF
