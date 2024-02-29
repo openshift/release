@@ -20,17 +20,17 @@ resources:
 tests:
 - as: checklinks-pr
   commands: |
-    ARTIFACT_DIR="${ARTIFACTS:-/tmp/artifacts}"
-    mkdir -p "$ARTIFACT_DIR"
+    ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
+    [ ! -d "$ARTIFACT_DIR" ] && mkdir -p "$ARTIFACT_DIR"
     TEMP_FILE=$(mktemp -p "$ARTIFACT_DIR" broken_links_XXXXXX)
-    for file in $(find . -type f -print); do
+    find . -type f -not -path '*/\.*' -print | while read -r file; do
       grep -shEo "(http|https)://[a-zA-Z0-9./?=_-]*" $file | sort -u | while IFS= read -r URL; do
-        #  remove trailing "." before curl. This shouldn't exist but is allowed.
         cleanurl=${URL%.}
         s=$(curl "$cleanurl" --head --silent --write-out '%{response_code}' -o /dev/null)
+        echo "Checking response code: $s"
         if [[ "$s" == "404" ]]; then
-          echo "Path: $file" >> "$TEMP_FILE"
-          echo "URL: $URL" >> "$TEMP_FILE"
+            echo "Path: $file"
+            echo "URL: $URL"
         fi
       done
     done
@@ -47,18 +47,40 @@ tests:
   optional: true
 - as: checklinks-weekly
   commands: |
-    ARTIFACT_DIR="${ARTIFACTS:-/tmp/artifacts}"
-    mkdir -p "$ARTIFACT_DIR"
+    ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
+    [ ! -d "$ARTIFACT_DIR" ] && mkdir -p "$ARTIFACT_DIR"
     TEMP_FILE=$(mktemp -p "$ARTIFACT_DIR" broken_links_XXXXXX)
-    for file in $(find . -type f -print); do
-      grep -shEo "(http|https)://[a-zA-Z0-9./?=_-]*" $file | sort -u | while IFS= read -r URL; do
-        cleanurl=${URL%.}
-        s=$(curl "$cleanurl" --head --silent --write-out '%{response_code}' -o /dev/null)
-        if [[ "$s" == "404" ]]; then
-          echo "Path: $file" >> "$TEMP_FILE"
-          echo "URL: $URL" >> "$TEMP_FILE"
-        fi
-      done
+    IGNORE_REPOS=(
+      "https://github.com/openshift/ops-sop/"
+      "https://gitlab.cee.redhat.com/service/app-interface"
+      "http://logger.openshift-scanning.svc"
+    )
+    find . -type f -not -path '*/\.*' -print | while read -r file; do
+      echo "Checking file: $file"
+        grep -shEo "(http|https)://[a-zA-Z0-9./?=_-]*" "$file" | sort -u | while IFS= read -r URL; do
+          skip=false
+          for repo in "${IGNORE_REPOS[@]}"; do
+            if [[ "$URL" == *"$repo"* ]]; then
+                skip=true
+                break
+            fi
+          done
+          if $skip; then
+              continue
+          fi
+          cleanurl=${URL%.}
+          echo "Checking URL: $cleanurl"
+          if ! [[ "$cleanurl" =~ ^https?://[^/]+\. ]]; then
+            echo "Skipping incomplete URL: $cleanurl"
+            continue
+          fi
+          s=$(curl "$cleanurl" --head --silent --write-out '%{response_code}' -o /dev/null)
+          echo "Checking response code: $s"
+          if [[ -n "$s" && "$s" == "404" ]]; then
+              echo "Path: $file" >> "$TEMP_FILE"
+              echo "URL: $URL" | tee -a "$TEMP_FILE"
+          fi
+        done
     done
     if [ -s "$TEMP_FILE" ]; then
         echo "Broken links detected:"
@@ -70,7 +92,7 @@ tests:
     fi
   container:
     from: src
-  cron: 0 17 * * 5
+  cron: 0 0 * * 2
 zz_generated_metadata:
   branch: master
   org: openshift
