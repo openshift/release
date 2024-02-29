@@ -86,6 +86,18 @@ create_sno_node() {
   INSTALLATION_DISK=$(printf "/dev/disk/by-id/wwn-0x%s" "${volume_wwn,,}")
 }
 
+patch_image_registry() {
+  for i in {1..10}; do
+    count=$(oc get configs.imageregistry.operator.openshift.io/cluster --no-headers | wc -l)
+    echo "Image registry count: ${count}"
+    if [[ ${count} -gt 0 ]]; then
+      break
+    fi
+    sleep 30
+  done
+  oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"emptyDir":{}}, "managementState": "Managed"}}'
+}
+
 # Create private key with 0600 permission for ssh purpose
 SSH_PRIVATE="/tmp/ssh-privatekey"
 cp "/etc/sno-power-credentials/ssh-privatekey" ${SSH_PRIVATE}
@@ -650,7 +662,13 @@ echo "Test cluster accessiblity"
 CLUSTER_INFO="/tmp/cluster-${CLUSTER_TYPE}-${CLUSTER_NAME}.txt"
 touch ${CLUSTER_INFO}
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-oc get node -o wide >> ${CLUSTER_INFO}
+patch_image_registry
+echo "=========== oc get clusterversion ==============" >> ${CLUSTER_INFO}
 oc get clusterversion >> ${CLUSTER_INFO}
+echo "=========== oc get node -o wide ==============" >> ${CLUSTER_INFO}
+oc get node -o wide >> ${CLUSTER_INFO}
+echo "=========== oc get co -o wide ==============" >> ${CLUSTER_INFO}
+oc get co -o wide >> ${CLUSTER_INFO}
+echo "=========== oc get pod -A -o wide ==============" >> ${CLUSTER_INFO}
 oc get pod -A -o wide >> ${CLUSTER_INFO}
 cp ${CLUSTER_INFO} "${ARTIFACT_DIR}/"
