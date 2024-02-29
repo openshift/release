@@ -14,6 +14,9 @@ PROXYCFGLINE=
 PROXYLINE=
 if test -f "${SHARED_DIR}/proxy-conf.sh" && [[ "$JOB_NAME" =~ .*ipv6.* ]]
 then
+    # https://issues.redhat.com/browse/OCPBUGS-29478
+    echo "Clusters using a ipv6 are disabled temporarily"
+    exit 0
     # proxy-conf.sh holds the IPv4 address, we can't use it here
     PROXYCFGLINE="        proxy_url: http://[fd00:1101::1]:8213"
     PROXYLINE="          - name: https_proxy
