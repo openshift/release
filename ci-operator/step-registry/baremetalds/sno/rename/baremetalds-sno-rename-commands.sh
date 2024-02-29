@@ -14,7 +14,7 @@ function collect_artifacts {
 }
 trap collect_artifacts EXIT TERM
 
-cat >"${SHARED_DIR}"/run-recert-cluster-rename-hostname-change-step.sh << "EOF"
+cat >"${SHARED_DIR}"/run-recert-cluster-rename-hostname-change-step.sh <<"EOF"
 #!/usr/bin/env bash
 
 export PREVIOUS_CLUSTER_NAME="${PREVIOUS_CLUSTER_NAME:-test-infra-cluster}"
@@ -57,6 +57,13 @@ recert_script=$(cat <<IEOF
 #!/usr/bin/env bash
 
 set -euoE pipefail
+
+on_error() {
+  echo "An error occurred..."
+  touch /var/recert.failed
+}
+
+trap on_error ERR
 
 export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost.kubeconfig
 function fetch_crts_keys {
@@ -116,6 +123,7 @@ function update_etcd_member {
   echo "etcd member updated"
 }
 
+
 function recert {
   local etcd_image="\${ETCD_IMAGE}"
   local recert_image="${RECERT_IMAGE:-quay.io/edge-infrastructure/recert:latest}"
@@ -127,6 +135,7 @@ function recert {
   local new_hostname="${NEW_HOSTNAME:-another-hostname}"
   local old_ip="${SINGLE_NODE_IP:-192.168.127.10}"
   local new_ip="${ADDITIONAL_NODE_IP:-192.168.145.10}"
+
 
   podman run --authfile=/var/lib/kubelet/config.json \
       --name recert_etcd \
@@ -358,12 +367,18 @@ info "Waiting for master MachineConfigPool to have condition=updating..."
 oc wait --for=condition=updating machineconfigpools master --timeout 10m
 
 info "Waiting for recert to be completed..."
-until ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "cat /var/recert.done" &> /dev/null
-do
-  info "Waiting for recert to be completed..."
-  sleep 5
+while true; do
+  if ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} test -e /var/recert.done; then
+    info "Recert completed successfully"
+    break
+  elif ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} test -e /var/recert.failed; then
+    info "Recert failed"
+    break
+  else
+    info "Waiting for recert to be completed..."
+    sleep 5
+  fi
 done
-info "Recert completed successfully"
 
 sed -i -e "s/${PREVIOUS_CLUSTER_NAME}/${NEW_CLUSTER_NAME}/g" -e "s/${PREVIOUS_BASE_DOMAIN}/${NEW_BASE_DOMAIN}/g" ${KUBECONFIG}
 echo "${ADDITIONAL_NODE_IP} api.${NEW_CLUSTER_NAME}.${NEW_BASE_DOMAIN}" | tee --append /etc/hosts
@@ -412,9 +427,9 @@ chmod +x "${SHARED_DIR}"/run-recert-cluster-rename-hostname-change-step.sh
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/run-recert-cluster-rename-hostname-change-step.sh "root@${IP}:/usr/local/bin"
 
 timeout \
-  --kill-after 60m \
-  120m \
+  --kill-after 5s \
+  61m \
   ssh \
   "${SSHOPTS[@]}" \
   "root@${IP}" \
-  /usr/local/bin/run-recert-cluster-rename-hostname-change-step.sh \
+  timeout --kill-after 5s 60m /usr/local/bin/run-recert-cluster-rename-hostname-change-step.sh
