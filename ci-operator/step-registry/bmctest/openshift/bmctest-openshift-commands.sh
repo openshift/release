@@ -18,7 +18,6 @@ SSHCMD="sudo dnf install --nobest --refresh -y git jq python3-pip epel-release;
     yq -iy .platform.baremetal.provisioningBridge\=\\\"\$DEFINT\\\" /tmp/bmctest-openshift.yaml;
     git clone https://github.com/openshift-metal3/bmctest;
     cd bmctest;
-    sleep 3600
     ./ocpbmctest.sh -s /tmp/pull-secret -c /tmp/bmctest-openshift.yaml -r ${RELEASEV}"
 
 scp "${SSHOPTS[@]}"  /var/run/bmctest-openshift/config  "centos@${SERVER_IP}:/tmp/bmctest-openshift"
