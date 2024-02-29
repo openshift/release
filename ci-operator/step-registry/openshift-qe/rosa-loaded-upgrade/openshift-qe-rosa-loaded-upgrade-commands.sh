@@ -47,7 +47,10 @@ function check_rosa_upgrade_status()
                   echo "######################################################################"
 		  echo "ROSA cluster upgrade state has been changed to [ $UPGRADE_STATE ] sucessfully"
                   echo "######################################################################"
+		  echo
+                  echo "------------------Inside check_rosa_upgrade_status--------------------"
 		  rosa describe upgrade --region $REGION -c $CLUSTER_ID
+                  echo "----------------------------------------------------------------------"
 		  break
 	  fi
 
