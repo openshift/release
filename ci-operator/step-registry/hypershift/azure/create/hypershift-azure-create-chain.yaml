@@ -30,18 +30,19 @@ chain:
       
       RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
       
-      AZURE_CREDS=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
-      
-      if [[ "${USE_HYPERSHIFT_AZURE_CREDS:-}" == 'true' ]]; then
-        export AZURE_CREDS="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
-        export RELEASE_IMAGE=""
-      fi
-      
-      
+      AZURE_CREDS=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
       
       # We don't have the value of HYPERSHIFT_RELEASE_LATEST when we set CONTROLPLANE_OPERATOR_IMAGE so we
       # have to use a hack like this.
       [[ ${CONTROLPLANE_OPERATOR_IMAGE} = "LATEST" ]] && CONTROLPLANE_OPERATOR_IMAGE="${HYPERSHIFT_RELEASE_LATEST}"
+      
+      
+      CLUSTER_IMAGE_FLAGS="--release-image ${RELEASE_IMAGE} --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-}"
+      
+      if [[ "${USE_HYPERSHIFT_AZURE_CREDS:-}" == 'true' ]]; then
+        export AZURE_CREDS="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+        export CLUSTER_IMAGE_FLAGS="--release-stream=4.16.0-0.nightly"
+      fi
       
       /usr/bin/hypershift create cluster azure \
         --name ${CLUSTER_NAME} \
@@ -50,11 +51,8 @@ chain:
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
         --azure-creds=${AZURE_CREDS} \
         --location ${HYPERSHIFT_AZURE_LOCATION} \
-        --release-image ${RELEASE_IMAGE} \
-        --release-stream=4.16.0-0.nightly \
         --infra-id=${CLUSTER_NAME} \
-        --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
-        --annotations=hypershift.openshift.io/skip-release-image-validation=true, hypershift.openshift.io/image-overrides=cluster-storage-operator=quay.io/csrwng/cluster-storage-operator:azure
+        --annotations=hypershift.openshift.io/skip-release-image-validation=true ${CLUSTER_IMAGE_FLAGS}
 
       # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
       echo "Waiting for cluster to become available"
