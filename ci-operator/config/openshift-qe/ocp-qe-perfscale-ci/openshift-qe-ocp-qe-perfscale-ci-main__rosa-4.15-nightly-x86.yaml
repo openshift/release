@@ -31,8 +31,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: cluster-density-v2-249nodes
-  cron: 0 8 * * 3
+- as: control-plane-249nodes
+  cron: 0 8 3 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
@@ -48,7 +48,7 @@ tests:
       PROFILE_TYPE: reporting
       REPLICAS: "249"
     test:
-    - chain: openshift-qe-cluster-density-v2
+    - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts
   timeout: 8h0m0s
 - as: control-plane-120nodes
@@ -119,6 +119,44 @@ tests:
     test:
     - chain: openshift-qe-node-density-heavy
     workflow: rosa-aws-sts
+- as: node-density-cni-249nodes
+  cron: 0 12 5 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.15"
+      PODS_PER_NODE: "200"
+      PROFILE_TYPE: reporting
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "249"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
+- as: node-density-cni-120nodes
+  cron: 0 18 5 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.15"
+      PODS_PER_NODE: "200"
+      PROFILE_TYPE: reporting
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "120"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: rosa-aws-sts
+  timeout: 7h0m0s
 - as: node-density-cni-24nodes
   cron: 0 18 * * 5
   steps:
