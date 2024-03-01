@@ -2,7 +2,7 @@
 
 This folder contains configuration related to cluster profiles.
 
-The `_config.yaml` file contains a list of cluster profiles whose owners wish for them to be private; their usage restricted to specific organizations and repositories.
+The `cluster-profiles-config.yaml` file contains a list of cluster profiles whose owners wish for them to be private; their usage restricted to specific organizations and repositories.
 
 ### Intended use
 An owner in the owners list is an `org` with the option to specify `repos`.
