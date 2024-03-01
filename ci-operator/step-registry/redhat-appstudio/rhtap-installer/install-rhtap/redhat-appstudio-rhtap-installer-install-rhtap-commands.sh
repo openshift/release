@@ -27,7 +27,10 @@ export ACS__API_TOKEN \
   OPENSHIFT_API \
   OPENSHIFT_PASSWORD \
   TAS__SECURESIGN__FULCIO__ORG_EMAIL \
-  TAS__SECURESIGN__FULCIO__ORG_NAME
+  TAS__SECURESIGN__FULCIO__ORG_NAME \
+  TAS__SECURESIGN__FULCIO__OIDC__URL \
+  TAS__SECURESIGN__FULCIO__OIDC__CLIENT_ID \
+  TAS__SECURESIGN__FULCIO__OIDC__TYPE
 
 ACS__API_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-api-token)
 ACS__CENTRAL_ENDPOINT=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-central-endpoint)
