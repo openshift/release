@@ -94,8 +94,6 @@ install_rhtap(){
   ./bin/make.sh values
   # enable debug model
   yq e -i '.debug.script=true' private-values.yaml
-  #WA: disable TPA during installation to avoid bug https://issues.redhat.com/browse/RHTAPBUGS-1144 
-  yq e -i '.trusted-profile-analyzer=null' private-values.yaml
   echo "[INFO]Install RHTAP ..."
   ./bin/make.sh apply -d -n $NAMESPACE -- --values private-values.yaml
 
