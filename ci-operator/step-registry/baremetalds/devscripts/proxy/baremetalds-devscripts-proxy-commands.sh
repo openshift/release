@@ -53,7 +53,7 @@ EOF
 CIRFILE=$SHARED_DIR/cir
 PROXYPORT=8213
 if [ -f $CIRFILE ] ; then
-    PROXYPORT=$(jq -r .extra < $CIRFILE | jq ".ofcir_port_proxy // 8213" -r)
+    PROXYPORT=$(jq -r ".extra | select( . != \"\") // {}" < $CIRFILE | jq ".ofcir_port_proxy // 8213" -r)
 fi
 
 

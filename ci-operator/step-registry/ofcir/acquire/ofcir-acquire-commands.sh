@@ -102,7 +102,7 @@ function getCIR(){
     done
 
     jq -r .ip < $CIRFILE > $IPFILE
-    jq -r .extra < $CIRFILE | jq ".ofcir_port_ssh // 22" -r > $PORTFILE
+    jq -r ".extra | select( . != \"\") // {}" < $CIRFILE | jq ".ofcir_port_ssh // 22" -r > $PORTFILE
     if [ "$(cat $IPFILE)" == "" ] ; then
         exit_with_failure "Didn't get a CIR IP address"
     fi

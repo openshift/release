@@ -156,11 +156,12 @@ EXTRAFILE=$SHARED_DIR/cir-extra
 NODESFILE=$SHARED_DIR/cir-nodes
 BMJSON=$SHARED_DIR/bm.json
 
-# Get Extra data from CIR
-jq -r .extra < $CIRFILE > $EXTRAFILE
-
-if [ -e "$CIRFILE" ] && [[ "$(cat $CIRFILE | jq -r .type)" =~ cluster.* ]] ; then
-    prepare_bmcluster
+if [ -e "$CIRFILE" ] ; then
+    # Get Extra data from CIR
+    jq -r ".extra | select( . != \"\") // {}" < $CIRFILE > $EXTRAFILE
+    if [[ "$(cat $CIRFILE | jq -r .type)" =~ cluster.* ]] ; then
+        prepare_bmcluster
+    fi
 fi
 
 # Additional mechanism to inject dev-scripts additional variables directly
