@@ -45,9 +45,17 @@ function fetch_etcd_image {
 }
 
 function stop_containers {
-  systemctl stop kubelet
-  crictl ps -q | xargs crictl stop || true
-  systemctl stop crio
+  echo "Stopping kubelet.service..."
+  systemctl stop kubelet.service
+
+  echo "Stopping all containers..."
+  until crictl ps -q | xargs --no-run-if-empty --max-args 1 --max-procs 10 crictl stop --timeout 5 &> /dev/null
+  do
+    sleep 2
+  done
+
+  echo "Stopping crio.service..."
+  systemctl stop crio.service
 }
 
 function wait_for_recert_etcd {
@@ -106,8 +114,11 @@ function delete_crts_keys {
 }
 
 function start_containers {
-  systemctl start crio
-  systemctl start kubelet
+  echo "Starting crio.service..."
+  systemctl start crio.service
+
+  echo "Starting kubelet.service..."
+  systemctl start kubelet.service
 }
 
 wait_for_api
