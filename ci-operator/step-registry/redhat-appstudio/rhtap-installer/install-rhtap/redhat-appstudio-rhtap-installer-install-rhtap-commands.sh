@@ -23,7 +23,14 @@ export ACS__API_TOKEN \
   TPA__POSTGRES__TPA_PASSWORD \
   SPRAYPROXY_SERVER_URL \
   SPRAYPROXY_SERVER_TOKEN \
-  DEVELOPER_HUB__QUAY_TOKEN__ASK_THE_INSTALLER_DEV_TEAM
+  DEVELOPER_HUB__QUAY_TOKEN__ASK_THE_INSTALLER_DEV_TEAM \
+  OPENSHIFT_API \
+  OPENSHIFT_PASSWORD \
+  TAS__SECURESIGN__FULCIO__ORG_EMAIL \
+  TAS__SECURESIGN__FULCIO__ORG_NAME \
+  TAS__SECURESIGN__FULCIO__OIDC__URL \
+  TAS__SECURESIGN__FULCIO__OIDC__CLIENT_ID \
+  TAS__SECURESIGN__FULCIO__OIDC__TYPE
 
 ACS__API_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-api-token)
 ACS__CENTRAL_ENDPOINT=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-central-endpoint)
@@ -46,9 +53,27 @@ TPA__OIDC__TESTING_USER_CLIENT_SECRET="0e6bf990-43b4-4efb-95d7-b24f2b94a525" # n
 TPA__OIDC__WALKER_CLIENT_SECRET="5460cc91-4e20-4edd-881c-b15b169f8a79" # notsecret
 TPA__POSTGRES__POSTGRES_PASSWORD="postgres123456" # notsecret
 TPA__POSTGRES__TPA_PASSWORD="postgres1234" # notsecret
-
-
+OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
+TAS__SECURESIGN__FULCIO__ORG_EMAIL='rhtap-qe-ci@redhat.com'
+TAS__SECURESIGN__FULCIO__ORG_NAME='RHTAP CI Jobs'
+TAS__SECURESIGN__FULCIO__OIDC__URL='http://localhost:3030'
+TAS__SECURESIGN__FULCIO__OIDC__CLIENT_ID="fake-one"
+TAS__SECURESIGN__FULCIO__OIDC__TYPE="dex"
 NAMESPACE=rhtap
+
+yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
+OPENSHIFT_PASSWORD="$(cat $KUBEADMIN_PASSWORD_FILE)"
+
+timeout --foreground 5m bash  <<- "EOF"
+    while ! oc login "$OPENSHIFT_API" -u kubeadmin -p "$OPENSHIFT_PASSWORD" --insecure-skip-tls-verify=true; do
+            sleep 20
+    done
+EOF
+
+if [ $? -ne 0 ]; then
+  echo "Timed out waiting for login"
+  exit 1
+fi
 
 clone_repo(){
   echo "[INFO]Cloning rhtap-installer repo..."
