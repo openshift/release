@@ -34,7 +34,21 @@ tests:
   steps:
     test:
     - as: lint
-      commands: yarn install && yarn run lint
+      commands: yarn install && yarn run lint && yarn build
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: i18n
+      commands: |
+        yarn install && yarn i18n
+        GIT_STATUS="$(git status --short --untracked-files locales)"
+        if [ -n "$GIT_STATUS" ]; then
+          echo "i18n files are not up to date. Commit them to fix."
+          git diff
+          exit 1
+        fi
       from: src
       resources:
         requests:
