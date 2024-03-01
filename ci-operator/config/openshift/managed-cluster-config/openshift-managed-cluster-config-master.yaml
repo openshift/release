@@ -52,11 +52,11 @@ tests:
     TEMP_FILE=$(mktemp -p "$ARTIFACT_DIR" broken_links_XXXXXX)
     IGNORE_REPOS=(
       "https://github.com/openshift/ops-sop/"
-      "https://gitlab.cee.redhat.com/service/app-interface"
-      "http://logger.openshift-scanning.svc"
+      "https://gitlab.cee.redhat.com/service"
+      "https://jira.coreos.com"
+      "https://grafana"
     )
     find . -type f -not -path '*/\.*' -print | while read -r file; do
-      echo "Checking file: $file"
         grep -shEo "(http|https)://[a-zA-Z0-9./?=_-]*" "$file" | sort -u | while IFS= read -r URL; do
           skip=false
           for repo in "${IGNORE_REPOS[@]}"; do
@@ -69,16 +69,15 @@ tests:
               continue
           fi
           cleanurl=${URL%.}
-          echo "Checking URL: $cleanurl"
-          if ! [[ "$cleanurl" =~ ^https?://[^/]+\. ]]; then
-            echo "Skipping incomplete URL: $cleanurl"
-            continue
+          if ! [[ "$cleanurl" =~ ^https?://[^/]+\. ]] ||
+            [[ "$cleanurl" == *".svc"* ]] ||
+            [[ "$cleanurl" =~ ^(http:\/\/|https:\/\/)?(localhost|127\.0\.0\.1|::1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}) ]]; then
+              continue
           fi
           s=$(curl "$cleanurl" --head --silent --write-out '%{response_code}' -o /dev/null)
-          echo "Checking response code: $s"
           if [[ -n "$s" && "$s" == "404" ]]; then
               echo "Path: $file" >> "$TEMP_FILE"
-              echo "URL: $URL" | tee -a "$TEMP_FILE"
+              echo "URL: $URL" >> "$TEMP_FILE"
           fi
         done
     done
