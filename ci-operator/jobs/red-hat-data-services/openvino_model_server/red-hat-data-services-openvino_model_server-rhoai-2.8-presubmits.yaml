@@ -1,33 +1,27 @@
 presubmits:
-  codeready-toolchain/toolchain-e2e:
+  red-hat-data-services/openvino_model_server:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^rhoai-2\.8$
+    - ^rhoai-2\.8-
     cluster: build03
-    context: ci/prow/e2e
+    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: devsandboxci-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-codeready-toolchain-toolchain-e2e-master-e2e
-    rerun_command: /test e2e
-    skip_if_only_changed: ^doc/|\.md$|\.adoc$|^(?:.*/)?(\.gitignore|\.codecov\.ya?ml|\.yamllint|sonar-project\.properties|OWNERS|PROJECT|LICENSE)$
+    name: pull-ci-red-hat-data-services-openvino_model_server-rhoai-2.8-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-cluster-profile
-        - --target=e2e
+        - --target=[images]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -37,14 +31,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -59,18 +45,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-devsandboxci-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -80,4 +54,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
