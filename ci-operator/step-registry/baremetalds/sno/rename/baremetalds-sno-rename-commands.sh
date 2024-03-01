@@ -81,10 +81,17 @@ function fetch_etcd_image {
 }
 
 function stop_containers {
-  systemctl stop kubelet
-  crictl ps -q | xargs crictl stop || true
-  crictl rmp -a -f || true
-  systemctl stop crio
+  echo "Stopping kubelet.service..."
+  systemctl stop kubelet.service
+
+  echo "Stopping all containers..."
+  until crictl ps -q | xargs --no-run-if-empty --max-args 1 --max-procs 10 crictl stop --timeout 5 &> /dev/null
+  do
+    sleep 2
+  done
+
+  echo "Stopping crio.service..."
+  systemctl stop crio.service
 }
 
 function wait_for_recert_etcd {
@@ -154,8 +161,11 @@ function recert {
 }
 
 function start_containers {
-  systemctl start crio
-  systemctl start kubelet
+  echo "Starting crio.service..."
+  systemctl start crio.service
+
+  echo "Starting kubelet.service..."
+  systemctl start kubelet.service
 }
 
 function delete_crts_keys {
@@ -166,17 +176,12 @@ oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=30m
 
 if [[ "\$(hostname)" != "${NEW_HOSTNAME}" ]]
 then
-  systemctl stop kubelet.service
-  # Forcefully remove all pods rather than just stop them, because a different hostname
-  # requires new pods to be created by kubelet.
-  until crictl rmp --force --all &> /dev/null
-  do
-    sleep 2
-  done
-  systemctl stop crio.service
+  stop_containers
 
+  echo "Changing hostname to '${NEW_HOSTNAME}'..."
   hostnamectl hostname "${NEW_HOSTNAME}"
 
+  echo "Rebooting..."
   reboot
   exit 0
 fi
@@ -193,7 +198,7 @@ then
 
   delete_crts_keys
 
-  stable_period_minutes=2
+  stable_period_minutes=5
   start=\$(date +%s)
   start_containers
   oc adm wait-for-stable-cluster --minimum-stable-period="\${stable_period_minutes}m" --timeout=30m
@@ -353,7 +358,6 @@ do
   sleep 5
 done
 info $(ssh ${SSH_OPTS[@]} core@${SINGLE_NODE_IP} "cat /var/recert-ocp-stabilization-duration.txt")
-
 
 info "Checking for etcd, kube-apiserver, kube-controller-manager and kube-scheduler revision triggers in the respective cluster operator logs..."
 declare -a components=(
