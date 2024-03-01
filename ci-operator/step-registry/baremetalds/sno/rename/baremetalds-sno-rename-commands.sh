@@ -198,7 +198,7 @@ then
 
   delete_crts_keys
 
-  stable_period_minutes=2
+  stable_period_minutes=5
   start=\$(date +%s)
   start_containers
   oc adm wait-for-stable-cluster --minimum-stable-period="\${stable_period_minutes}m" --timeout=30m
