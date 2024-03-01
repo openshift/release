@@ -66,6 +66,10 @@ v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
 v415=" ${v414} OperatorLifecycleManager CloudCredential"
 latest_version="v415"
 
+# define capability dependency
+declare -A dependency_caps
+dependency_caps["marketplace"]="OperatorLifecycleManager"
+
 declare "v${ocp_major_version}${ocp_minor_version}"
 v_current_version="v${ocp_major_version}${ocp_minor_version}"
 
@@ -81,32 +85,49 @@ fi
 # shellcheck disable=SC2206
 vcurrent_capabilities_array=(${vcurrent_capabilities})
 echo "vcurrent_capabilities: ${vcurrent_capabilities_array[*]}"
-selected_capability_index=$((RANDOM % ${#vcurrent_capabilities_array[@]}))
-selected_capability="${vcurrent_capabilities_array[$selected_capability_index]}"
-echo "Selected capability to be disabled: ${selected_capability}"
 
 enabled_capabilities=${vcurrent_capabilities}
-case "${selected_capability}" in
-"MachineAPI")
-    echo "WARNING: MachineAPI is selected, but it requires on IPI, so no capability to be disabled!"
-    ;;
-# To be updated once OCP 4.16 is released
-"CloudCredential")
-    if [[ "${CLUSTER_TYPE}" =~ ^packet.*$|^equinix.*$ ]]; then
-        enabled_capabilities=${enabled_capabilities/${selected_capability}}
-    else
-        echo "WARNING: non-BareMetal platforms require CCO for OCP 4.15, so no capability to be disabled!"
+additional_caps_from_config=$(yq-go r "${SHARED_DIR}/install-config.yaml" "capabilities.additionalEnabledCapabilities[*]")
+selected_capability=""
+while [[ -z "${selected_capability}" ]]; do
+    selected_capability_index=$((RANDOM % ${#vcurrent_capabilities_array[@]}))
+    selected_capability="${vcurrent_capabilities_array[$selected_capability_index]}"
+    # If selected to be disabled cap has already been set to additionalEnabledCapabilities in install-config, should not be disabled
+    #shellcheck disable=SC2076
+    if [[ " ${additional_caps_from_config} " =~ " ${selected_capability} " ]]; then
+        echo "WARNING: selected cap ${selected_capability} is already configured in field additionalEnabledCapabilities in install-config, unable to be disabled!"
+        selected_capability=""
+        continue
     fi
-    ;;
-# Disable marketplace if OperatorLifecycleManager is selected to bo disabled
-"OperatorLifecycleManager")
-    echo "Capability 'marketplace' depends on Capability 'OperatorLifecycleManager', so disable marketplace along with OperatorLifecycleManager"
-    enabled_capabilities=${enabled_capabilities/${selected_capability}}
-    enabled_capabilities=${enabled_capabilities/"marketplace"}
-    ;;
-*)
-    enabled_capabilities=${enabled_capabilities/${selected_capability}}
-esac
+    case "${selected_capability}" in
+    "MachineAPI")
+        echo "WARNING: MachineAPI is selected, but it requires on IPI, could not be disabled!"
+        selected_capability=""
+        ;;
+    # To be updated once OCP 4.16 is released
+    "CloudCredential")
+        if [[ "${CLUSTER_TYPE}" =~ ^packet.*$|^equinix.*$ ]]; then
+            enabled_capabilities=${enabled_capabilities/${selected_capability}}
+        else
+            echo "WARNING: non-BareMetal platforms require CCO for OCP 4.15, could not be disabled!"
+            selected_capability=""
+        fi
+        ;;
+    *)
+        enabled_capabilities=${enabled_capabilities/${selected_capability}}
+        for key in "${!dependency_caps[@]}"; do
+            if [[ "${selected_capability}" == "${dependency_caps[$key]}" ]]; then
+                echo "capability ${key} depends on Capability ${dependency_caps[$key]}, so disable ${key} along with ${dependency_caps[$key]}"
+                enabled_capabilities=${enabled_capabilities/"$key"}
+            fi
+        done
+    esac
+done
+echo "Selected capability to be disabled: ${selected_capability}"
+
+# Append additionalEnabledCapabilities if any already configured in install-config
+enabled_capabilities=$(echo "${enabled_capabilities} ${additional_caps_from_config}" | xargs -n1 | sort -u | xargs)
+echo "enabled_capabilities: ${enabled_capabilities}"
 
 # apply patch to install-config
 CONFIG="${SHARED_DIR}/install-config.yaml"
