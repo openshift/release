@@ -258,7 +258,7 @@ EOF
             echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
         done
     fi
-    cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-upgrade-test-qe-report" || true
+    cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-upgrade-qe-test-report" || true
 }
 
 
