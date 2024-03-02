@@ -29,6 +29,7 @@ PRIVATE_SUBNET_ONLY="false"
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
 ADDITIONAL_SECURITY_GROUP=${ADDITIONAL_SECURITY_GROUP:-false}
+NO_CNI=${NO_CNI:-false}
 
 # Record Cluster Configurations
 cluster_config_file="${SHARED_DIR}/cluster-config"
@@ -416,6 +417,12 @@ if [[ "$DRY_RUN" == "true" ]]; then
   DRY_RUN_SWITCH="--dry-run"
 fi
 
+NO_CNI_SWITCH=""
+if [[ "$NO_CNI" == "true" ]]; then
+  NO_CNI_SWITCH="--no-cni"
+fi
+
+
 # Save the cluster config to ARTIFACT_DIR
 cat "${SHARED_DIR}/cluster-config" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${ARTIFACT_DIR}/cluster-config"
 
@@ -487,6 +494,7 @@ ${COMPUTER_NODE_ZONES_SWITCH} \
 ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
 ${SHARED_VPC_SWITCH} \
 ${SECURITY_GROUP_ID_SWITCH} \
+${NO_CNI_SWITCH} \
 ${DRY_RUN_SWITCH}
 " | sed -E 's/\s{2,}/ /g' > "${SHARED_DIR}/create_cluster.sh"
 cat "${SHARED_DIR}/create_cluster.sh" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${ARTIFACT_DIR}/create_cluster.sh"
@@ -527,6 +535,7 @@ rosa create cluster -y \
                     ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
                     ${SHARED_VPC_SWITCH} \
                     ${SECURITY_GROUP_ID_SWITCH} \
+                    ${NO_CNI_SWITCH} \
                     ${DRY_RUN_SWITCH} \
                     | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${CLUSTER_INFO}"
 
