@@ -27,4 +27,4 @@ do
 done
 
 echo -e "\n********* Start test result aggregator *********\n"
-jobctl start-aggregator
+jobctl start-aggregator --arch $ARCH
