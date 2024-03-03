@@ -26,5 +26,5 @@ do
   jobctl start-controller -r $release --no-nightly --arch $ARCH
 done
 
-echo -e "\n********* Start test result aggregator *********\n"
+echo -e "\n********* Start test result aggregator - $ARCH *********\n"
 jobctl start-aggregator --arch $ARCH
