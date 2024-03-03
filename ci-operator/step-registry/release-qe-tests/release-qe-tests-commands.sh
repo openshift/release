@@ -21,9 +21,9 @@ echo -e "\n********* Start job controller *********\n"
 VALID_RELEASES="4.16"
 for release in $VALID_RELEASES
 do
-  echo -e "\nstart job controller for $release"
-  jobctl start-controller -r $release
-  jobctl start-controller -r $release --no-nightly
+  echo -e "\nstart job controller for $release - $ARCH"
+  jobctl start-controller -r $release --arch $ARCH
+  jobctl start-controller -r $release --no-nightly --arch $ARCH
 done
 
 echo -e "\n********* Start test result aggregator *********\n"
