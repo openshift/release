@@ -397,7 +397,7 @@ fi
 # if RUN_VALIDATIONS set, run validations
 if $RUN_VALIDATIONS; then
     echo "************ Running validations ************"
-    FEATURES=$VALIDATIONS_FEATURES FEATURES_ENVIRONMENT="ci" stdbuf -o0 make feature-deploy-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-validations-run.log ${ARTIFACT_DIR}/saved-cnf-validations.log || val_status=$?
+    PULL_URL=$PULL_URL PR_URLS=$PR_URLS FEATURES=$VALIDATIONS_FEATURES FEATURES_ENVIRONMENT="ci" stdbuf -o0 make feature-deploy-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-validations-run.log ${ARTIFACT_DIR}/saved-cnf-validations.log || val_status=$?
 fi
 # set overall status to fail if validations failed
 if [[ ${val_status} -ne 0 ]]; then
