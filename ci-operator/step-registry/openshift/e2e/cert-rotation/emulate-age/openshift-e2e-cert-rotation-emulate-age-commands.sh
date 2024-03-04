@@ -54,6 +54,12 @@ function emulate-cluster-age {
 
   pod-restart-workarounds
 
+  # Rotate ingress certificate if necessary
+  if [[ ${1} -ge 600 ]]; then
+    oc --request-timeout=5s -n openshift-ingress delete secret router-certs-default
+    oc --request-timeout=5s -n openshift-ingress rollout restart deployment/router-default
+  fi
+
   wait-for-operators-to-stabilize
 
   oc get nodes
