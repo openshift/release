@@ -70,7 +70,7 @@ timeout --foreground 5m bash  <<- "EOF"
     done
 EOF
 
-INSTALLER_FOLDER="${HOME}/installer"
+INSTALLER_FOLDER="${HOME}/rhtap-installer"
 
 if [ $? -ne 0 ]; then
   echo "Timed out waiting for login"
