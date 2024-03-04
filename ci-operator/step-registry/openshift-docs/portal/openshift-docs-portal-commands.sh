@@ -10,7 +10,7 @@ IFS=' ' read -r -a DISTROS <<< "${DISTROS}"
 for DISTRO in "${DISTROS[@]}"; do
 
     case "${DISTRO}" in
-        "openshift-enterprise"|"openshift-acs"|"openshift-pipelines"|"openshift-serverless"|"openshift-gitops")
+        "openshift-enterprise"|"openshift-acs"|"openshift-pipelines"|"openshift-serverless"|"openshift-gitops"|"openshift-builds"|"openshift-service-mesh"|"openshift-opp")
             TOPICMAP="_topic_maps/_topic_map.yml"
             ;;
         "openshift-rosa")
@@ -21,9 +21,6 @@ for DISTRO in "${DISTROS[@]}"; do
             ;;
         "microshift")
             TOPICMAP="_topic_maps/_topic_map_ms.yml"
-            ;;
-        "openshift-opp")
-            TOPICMAP="_topic_map.yml"
             ;;
     esac
 
