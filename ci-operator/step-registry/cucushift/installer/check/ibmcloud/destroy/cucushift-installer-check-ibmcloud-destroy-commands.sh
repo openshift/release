@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -o nounset
+set -o errexit
 set -o pipefail
 
 # IBM Cloud CLI login
@@ -20,13 +21,14 @@ function run_command() {
     echo "Running Command: ${CMD}"
     eval "${CMD}"
 }
-
+set -x
 ibmcloud_login
 
 CLUSTER_FILTER="${NAMESPACE}-${UNIQUE_HASH}"
 hasError=0
-
+set +e
 resource_group=$(${IBMCLOUD_CLI} resource groups | awk '(NR>3) {print $1}' | grep ${CLUSTER_FILTER})
+set -e
 echo "Resource group: $resource_group"
 
 if [ ! -z ${resource_group} ]; then
@@ -49,8 +51,10 @@ if [ ! -z ${IBMCLOUD_DNS_INSTANCE_NAME} ] && [ ! -z ${BASE_DOMAIN} ]; then
   if [[ -z "${dns_zone_id}" ]]; then
     echo "Debug: Did not find dns_zone_id per the output of '${cmd}'"
   else
+    set +e
     cmd="${IBMCLOUD_CLI} dns resource-records ${dns_zone_id} -i ${IBMCLOUD_DNS_INSTANCE_NAME} | grep -w ${CLUSTER_FILTER}"
     count=$(eval "${cmd} -c")
+    set -e
     if [ "${count}" -gt 0 ]; then
       echo "ERROR: remaining dns resource-records..."
       run_command "${cmd}"
@@ -67,8 +71,10 @@ if [ ! -z ${BASE_DOMAIN} ] && [ ! -z ${ibmcloud_cis_instance_name} ]; then
   if [[ -z "${domain_id}" ]] ; then
     echo "Debug: Did not find the cis domain id of ${BASE_DOMAIN}"
   else
+    set +e
     cmd="${IBMCLOUD_CLI} cis dns-records ${domain_id} -i ${ibmcloud_cis_instance_name} | grep -w ${CLUSTER_FILTER}"
     count=$(eval "${cmd} -c")
+    set -e
     if [ "${count}" -gt 0 ]; then
       echo "ERROR: remaining cis dns-records..."
       run_command "${cmd}"
