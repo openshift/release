@@ -67,10 +67,34 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-agnostic-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-azure
 - as: e2e-agnostic-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
+    test:
+    - as: e2e-test
+      commands: hack/test-integration.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-agnostic-operator-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: e2e-test
       commands: hack/test-integration.sh
@@ -85,6 +109,14 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
+- always_run: false
+  as: e2e-agnostic-ovn-upgrade-into-change-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-upgrade-azure
 - as: e2e-agnostic-ovn-upgrade-out-of-change
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -92,6 +124,17 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    workflow: openshift-upgrade-azure
+- always_run: false
+  as: e2e-agnostic-ovn-upgrade-out-of-change-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-upgrade-azure
 - as: e2e-hypershift-conformance
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
