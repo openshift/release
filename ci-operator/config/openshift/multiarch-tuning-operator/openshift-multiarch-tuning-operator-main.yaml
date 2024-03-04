@@ -16,7 +16,7 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: ubi
-  to: multiarch-manager-operator
+  to: multiarch-tuning-operator
 - dockerfile_literal: |
     FROM quay.io/operator-framework/operator-sdk:v1.26.0 as osdk
     FROM src
@@ -32,11 +32,11 @@ images:
   to: operator-sdk-src
 operator:
   bundles:
-  - as: multiarch-manager-operator-bundle
+  - as: multiarch-tuning-operator-bundle
     dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: controller:latest
-    with: pipeline:multiarch-manager-operator
+    with: pipeline:multiarch-tuning-operator
 promotion:
   to:
   - excluded_images:
@@ -110,7 +110,7 @@ tests:
     cluster_profile: gcp
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
-      OPERATOR_IMAGE: pipeline:multiarch-manager-operator
+      OPERATOR_IMAGE: pipeline:multiarch-tuning-operator
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
@@ -125,9 +125,9 @@ tests:
       commands: USE_OLM=true ./hack/deploy-and-e2e.sh
       dependencies:
       - env: OPERATOR_IMAGE
-        name: pipeline:multiarch-manager-operator
+        name: pipeline:multiarch-tuning-operator
       - env: OO_BUNDLE
-        name: pipeline:multiarch-manager-operator-bundle
+        name: pipeline:multiarch-tuning-operator-bundle
       from: operator-sdk-src
       resources:
         requests:
@@ -141,7 +141,7 @@ tests:
     cluster_profile: gcp
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
-      OPERATOR_IMAGE: pipeline:multiarch-manager-operator
+      OPERATOR_IMAGE: pipeline:multiarch-tuning-operator
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
@@ -156,7 +156,7 @@ tests:
       commands: ./hack/deploy-and-e2e.sh
       dependencies:
       - env: OPERATOR_IMAGE
-        name: pipeline:multiarch-manager-operator
+        name: pipeline:multiarch-tuning-operator
       from: src
       resources:
         requests:
@@ -167,9 +167,9 @@ tests:
   optional: true
   steps:
     env:
-      PROJECT_NAME: multiarch-manager-operator
+      PROJECT_NAME: multiarch-tuning-operator
     workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: openshift
-  repo: multiarch-manager-operator
+  repo: multiarch-tuning-operator
