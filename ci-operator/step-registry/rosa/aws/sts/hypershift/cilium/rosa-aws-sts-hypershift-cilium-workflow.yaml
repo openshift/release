@@ -1,0 +1,28 @@
+workflow:
+  as: rosa-aws-sts-hypershift-cilium
+  steps:
+    env:
+      HOSTED_CP: "true"
+      ZONES_COUNT: "1"
+      COMPUTE_MACHINE_TYPE: "m5.2xlarge"
+      REPLICAS: "3"
+      DISABLE_WORKLOAD_MONITORING: "false"
+      NO_CNI: "true"
+    pre:
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+    - chain: rosa-sts-oidc-config-create
+    - ref: rosa-cluster-provision
+    - ref: osd-ccs-cluster-provision-admin-kubeconfig
+    - ref: cucushift-hypershift-extended-cilium
+    - ref: rosa-cluster-notify-error
+    - ref: rosa-cluster-wait-ready-operators
+    - ref: rosa-conf-idp-htpasswd
+    - ref: aws-provision-tags-for-byo-vpc
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-cluster-wait-ready-nodes
+    post:
+      - chain: rosa-aws-sts-hypershift-deprovision
+  documentation: |-
+    This workflow installs a rosa hypershift cluster with cilium CNI. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
+    After finish testing, the cluster will be deprovsioned.

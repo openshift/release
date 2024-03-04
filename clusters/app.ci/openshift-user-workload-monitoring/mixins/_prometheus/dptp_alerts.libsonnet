@@ -213,7 +213,7 @@
             |||,
             'for': '1m',
             labels: {
-              severity: 'critical',
+              severity: 'warning',
             },
             annotations: {
               message: 'Workload {{ $labels.workload_name }} ({{ $labels.workload_type }}) used 10x more than configured amount of {{ $labels.resource_type }} (actual: {{ $labels.determined_amount }}, configured: {{ $labels.configured_amount }}. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/pod-scaler-admission.md|SOP>.',
