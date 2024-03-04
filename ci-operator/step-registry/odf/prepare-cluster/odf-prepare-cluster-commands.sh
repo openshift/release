@@ -9,7 +9,7 @@ sleep 4h
 trap 'sleep 4h' EXIT TERM SIGINT INT
 
 ODF_INSTALL_NAMESPACE="openshift-storage"
-ODF_OPERATOR_GROUP="openshift-storage-operator-group"
+# ODF_OPERATOR_GROUP="openshift-storage-operator-group"
 
 echo "Creating the ODF installation namespace"
 oc apply -f - <<EOF
