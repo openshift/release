@@ -7,6 +7,10 @@ base_images:
     name: cli-ocm
     namespace: ci
     tag: latest
+  prow-scripts:
+    name: prow-scripts
+    namespace: chaos
+    tag: latest
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
@@ -36,7 +40,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ocp-qe-perfscale-ci-tests-rosa
+- as: krkn-tests-rosa
   cron: 0 3 * * 2
   steps:
     cluster_profile: aws-qe
@@ -52,7 +56,7 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: rosa-aws-sts
-- as: ocp-qe-perfscale-ci-tests-rosa-hog
+- as: krkn-tests-rosa-hog
   cron: 0 1 * * 2
   steps:
     cluster_profile: aws-qe
@@ -68,6 +72,58 @@ tests:
     test:
     - chain: redhat-chaos-hog-scenarios
     workflow: rosa-aws-sts
+- as: krkn-tests-rosa-hcp
+  cron: 0 1 * * 2
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      CHURN: "False"
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      GC: "False"
+      HOSTED_CP: "true"
+      ITERATION_MULTIPLIER_ENV: "4"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.15"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "3"
+      ZONES_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-pod-scenarios-prometheus-disruption
+    - ref: redhat-chaos-pod-scenarios-random-system-pods
+    - ref: redhat-chaos-service-disruption-regex
+    workflow: rosa-aws-sts-hypershift
+  timeout: 5h0m0s
+- as: krkn-rosa-hcp-hog
+  cron: 0 1 * * 2
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.15"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "3"
+      ZONES_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - chain: redhat-chaos-hog-scenarios
+    workflow: rosa-aws-sts-hypershift
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
