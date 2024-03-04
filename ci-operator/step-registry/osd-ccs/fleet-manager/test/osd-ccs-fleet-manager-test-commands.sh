@@ -68,6 +68,8 @@ function confirm_labels () {
 
   echo "Confirming correct state of labels for cluster with id: '$cluster_id'"
 
+  CLUSTER_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id")
+  CLUSTER_CREATION_TIMESTAMP=$(echo "$CLUSTER_OUTPUT" | jq -r .creation_timestamp | awk -F'.' '{print $1}' | date "+%s") || true
   LABELS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels)
   LABELS_COUNT=$(echo "$LABELS_OUTPUT" | jq -r .total)
   ## validation for OCPQE-19422
@@ -92,6 +94,15 @@ function confirm_labels () {
       echo "ERROR. Expected previously added label value: '$value' to be returned in labels, but none was found"
       TEST_PASSED=false
     fi
+    ## validation for OCPQE-19536
+    echo "[OCPQE-19536] - Confirming validity of labels' creation timestamps"
+    for ((i=0; i<"$LABELS_COUNT"; i++)); do
+      LABEL_CREATION_TIMESTAMP=$(jq -n "$LABELS_OUTPUT" | jq -r .items[$i].creation_timestamp | awk -F'.' '{print $1}' | date "+%s") || true
+      if [ "$CLUSTER_CREATION_TIMESTAMP" -ge "$LABEL_CREATION_TIMESTAMP" ]; then
+        echo "ERROR. Expected cluster creation timestamp: '$CLUSTER_CREATION_TIMESTAMP' to not be greater or equal to label creation timestamp: '$LABEL_CREATION_TIMESTAMP'"
+        TEST_PASSED=false
+      fi
+    done
   fi
 }
 
@@ -678,25 +689,28 @@ function test_machinesets_naming () {
 function test_host_prefix_podisolation () {
   echo "[OCPQE-17288] - machinesets naming"
   TEST_PASSED=true
-  echo "Getting list of management clusters in podisolation sector"
-  CLUSTERS=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters --parameter search="sector='podisolation'")
+  echo "Getting list of management clusters"
+  CLUSTERS=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters)
   CLUSTER_NUMBER=$(jq -n "$CLUSTERS" | jq -r .size)
   echo "Found $CLUSTER_NUMBER clusters"
   if [ "$CLUSTER_NUMBER" -gt 0 ]; then
     for ((i=0; i<"$CLUSTER_NUMBER"; i++)); do
       MC_CLUSTER_ID=$(jq -n "$CLUSTERS" | jq -r .items[$i].id)
       CLUSTER_STATUS=$(jq -n "$CLUSTERS" | jq -r .items[$i].status)
+      SECTOR=$(jq -n "$CLUSTERS" | jq -r .items[$i].sector)
       if [ "$CLUSTER_STATUS" != "ready" ]; then
         echo "MC with ID: $MC_CLUSTER_ID is not ready"
       else
-        MGMT_CLUSTER_ID=$(jq -n "$CLUSTERS" | jq -r .items[$i].cluster_management_reference.cluster_id)
-        MGMT_CLUSTER_HREF=$(jq -n "$CLUSTERS" | jq -r .items[$i].cluster_management_reference.href)
-        echo "Getting network configuration for MC with cluster mgmt ID: $MGMT_CLUSTER_ID"
-        HOST_PREFIX=$(ocm get "$MGMT_CLUSTER_HREF" | jq -r .network.host_prefix)
-        echo "Confirming that host_prefix of the MC is '24'"
-        if [ "$HOST_PREFIX" -ne 24 ]; then
-          echo "Expected host_prefix of the MC to be '24'. Got '$HOST_PREFIX'"
-          TEST_PASSED=false
+        if [ "$SECTOR" == "main" ] || [ "$SECTOR" = "canary" ]; then
+          MGMT_CLUSTER_ID=$(jq -n "$CLUSTERS" | jq -r .items[$i].cluster_management_reference.cluster_id)
+          MGMT_CLUSTER_HREF=$(jq -n "$CLUSTERS" | jq -r .items[$i].cluster_management_reference.href)
+          echo "Getting network configuration for MC with cluster mgmt ID: $MGMT_CLUSTER_ID in sector: $SECTOR"
+          HOST_PREFIX=$(ocm get "$MGMT_CLUSTER_HREF" | jq -r .network.host_prefix)
+          echo "Confirming that host_prefix of the MC is '24'"
+          if [ "$HOST_PREFIX" -ne 24 ]; then
+            echo "Expected host_prefix of the MC to be '24'. Got '$HOST_PREFIX'"
+            TEST_PASSED=false
+          fi
         fi
       fi
     done
@@ -713,34 +727,37 @@ function test_host_prefix_podisolation () {
 function test_obo_machine_pool () {
   echo "[OCPQE-17367] - podisolation obo machine pool"
   TEST_PASSED=true
-  echo "Getting list of management clusters in podisolation sector"
-  CLUSTERS=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters --parameter search="sector='podisolation'")
+  echo "Getting list of management clusters"
+  CLUSTERS=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters)
   CLUSTER_NUMBER=$(jq -n "$CLUSTERS" | jq -r .size)
   echo "Found $CLUSTER_NUMBER clusters"
   if [ "$CLUSTER_NUMBER" -gt 0 ]; then
     for ((i=0; i<"$CLUSTER_NUMBER"; i++)); do
       MC_CLUSTER_ID=$(jq -n "$CLUSTERS" | jq -r .items[$i].id)
       CLUSTER_STATUS=$(jq -n "$CLUSTERS" | jq -r .items[$i].status)
+      SECTOR=$(jq -n "$CLUSTERS" | jq -r .items[$i].sector)
       if [ "$CLUSTER_STATUS" != "ready" ]; then
         echo "MC with ID: $MC_CLUSTER_ID is not ready"
       else
-        MGMT_CLUSTER_ID=$(jq -n "$CLUSTERS" | jq -r .items[$i].cluster_management_reference.cluster_id)
-        MGMT_CLUSTER_MP_HREF="/api/clusters_mgmt/v1/clusters/$MGMT_CLUSTER_ID/machine_pools"
-        MGMT_CLUSTER_OBO_MP_COUNT=$(ocm get "$MGMT_CLUSTER_MP_HREF" | jq -r .items[].id | grep -c obo)
-        echo "Confirming that 'obo' machine pool count is exactly 1 for cluster with ID: $MGMT_CLUSTER_ID"
-        if [ "$MGMT_CLUSTER_OBO_MP_COUNT" -ne 1 ]; then
-          echo "ERROR: Expected count of 'obo' machine pools to be 1. Got '$MGMT_CLUSTER_OBO_MP_COUNT'"
-          TEST_PASSED=false
-        else
-          MACHINE_POOL_OUTPUT=$(ocm get "$MGMT_CLUSTER_MP_HREF"/obo-1)
-          MP_REPLICAS=$(jq -n "$MACHINE_POOL_OUTPUT" | jq -r .replicas)
-          AVAILABILITY_ZONES=$(jq -n "$MACHINE_POOL_OUTPUT" | jq -r '.availability_zones | length')
-          echo "Confirming that the number of replicas and availability zones in the obo machine pool is 3"
-          if [ "$MP_REPLICAS" -ne 3 ] || [ "$AVAILABILITY_ZONES" -ne 3 ]; then
-            echo "ERROR. Expected number of replicas and availability zones in the obo machine pool to be 3 Got:"
-            echo "replicas: $MP_REPLICAS"
-            echo "availability zones: $AVAILABILITY_ZONES"
+        if [ "$SECTOR" == "main" ] || [ "$SECTOR" = "canary" ]; then
+          MGMT_CLUSTER_ID=$(jq -n "$CLUSTERS" | jq -r .items[$i].cluster_management_reference.cluster_id)
+          MGMT_CLUSTER_MP_HREF="/api/clusters_mgmt/v1/clusters/$MGMT_CLUSTER_ID/machine_pools"
+          MGMT_CLUSTER_OBO_MP_COUNT=$(ocm get "$MGMT_CLUSTER_MP_HREF" | jq -r .items[].id | grep -c obo)
+          echo "Confirming that 'obo' machine pool count is exactly 1 for cluster with ID: $MGMT_CLUSTER_ID in sector: $SECTOR"
+          if [ "$MGMT_CLUSTER_OBO_MP_COUNT" -ne 1 ]; then
+            echo "ERROR: Expected count of 'obo' machine pools to be 1. Got '$MGMT_CLUSTER_OBO_MP_COUNT'"
             TEST_PASSED=false
+          else
+            MACHINE_POOL_OUTPUT=$(ocm get "$MGMT_CLUSTER_MP_HREF"/obo-1)
+            MP_REPLICAS=$(jq -n "$MACHINE_POOL_OUTPUT" | jq -r .replicas)
+            AVAILABILITY_ZONES=$(jq -n "$MACHINE_POOL_OUTPUT" | jq -r '.availability_zones | length')
+            echo "Confirming that the number of replicas and availability zones in the obo machine pool is 3"
+            if [ "$MP_REPLICAS" -ne 3 ] || [ "$AVAILABILITY_ZONES" -ne 3 ]; then
+              echo "ERROR. Expected number of replicas and availability zones in the obo machine pool to be 3 Got:"
+              echo "replicas: $MP_REPLICAS"
+              echo "availability zones: $AVAILABILITY_ZONES"
+              TEST_PASSED=false
+            fi
           fi
         fi
       fi

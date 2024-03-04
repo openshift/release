@@ -7,7 +7,7 @@ OPENSTACK_OPERATOR="openstack-operator"
 BASE_DIR=${HOME:-"/alabama"}
 NS_SERVICES=${NS_SERVICES:-"openstack"}
 export CEPH_HOSTNETWORK=${CEPH_HOSTNETWORK:-"true"}
-export CEPH_DATASIZE=${CEPH_DATASIZE:="2Gi"}
+export CEPH_DATASIZE=${CEPH_DATASIZE:="8Gi"}
 export CEPH_TIMEOUT=${CEPH_TIMEOUT:="90"}
 
 # We don't want to use OpenShift-CI build cluster namespace

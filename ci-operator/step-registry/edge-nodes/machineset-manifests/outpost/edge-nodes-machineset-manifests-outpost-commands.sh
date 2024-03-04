@@ -9,12 +9,7 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 
 MACHINE_ROLE="outposts"
-if [[ ${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP} == "yes" ]]; then
-  subnet_id=$(head -n 1 "${SHARED_DIR}/outpost_public_id")
-else
-  subnet_id=$(head -n 1 "${SHARED_DIR}/outpost_private_id")
-fi
-
+subnet_id=$(head -n 1 "${SHARED_DIR}/edge_zone_subnet_id")
 zone_name=$(head -n 1 "${SHARED_DIR}/outpost_availability_zone")
 machineset_name_postfix=${RANDOM:0:2}
 
@@ -60,7 +55,10 @@ spec:
         machine.openshift.io/cluster-api-machine-type: ${MACHINE_ROLE}
         machine.openshift.io/cluster-api-machineset: PLACEHOLDER_INFRA_ID-${MACHINE_ROLE}-${zone_name}${machineset_name_postfix}
     spec:
-      metadata: {}
+      metadata:
+        labels:
+          node-role.kubernetes.io/outposts: ""
+          location: outposts
       providerSpec:
         value:
           ami:

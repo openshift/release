@@ -28,7 +28,15 @@ else
 fi
 
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-/tmp/hs-cli/hypershift-no-cgo dump cluster --artifact-dir=$ARTIFACT_DIR \
+EXTRA_ARGS=""
+PLATFORM_TYPE=$(oc get hostedclusters -n local-cluster ${CLUSTER_NAME} -ojsonpath="{.spec.platform.type}")
+if [[ "${PLATFORM_TYPE}" == "Agent" ]]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --agent-namespace local-cluster-${CLUSTER_NAME}"
+fi
+
+/tmp/hs-cli/hypershift-no-cgo dump cluster ${EXTRA_ARGS} \
+--artifact-dir=$ARTIFACT_DIR \
 --namespace local-cluster \
 --dump-guest-cluster=true \
 --name="${CLUSTER_NAME}"
+
