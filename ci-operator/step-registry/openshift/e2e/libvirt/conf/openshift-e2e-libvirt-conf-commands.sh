@@ -323,6 +323,130 @@ EOF
     fi
 fi
 
+# Skip the following tests for clusters with multi-architecture compute nodes
+#
+# The list of skipped tests is the result of the following regular expression against the
+# list of all available tests for provider_none and suite openshift/conformance/parallel
+#
+# TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+#        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+#        builds should succeed\| build can reference a cluster service\| custom build
+#        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+#        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+#        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+#        extract should extract\| Image info should display\| Image layer subresource\|
+#        oc tag should change image\| when installed on the cluster should\| OpenShift
+#        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+#        pod should start\| pod sysctls\| build volumes should mount given secrets
+#        and configmaps into the build pod
+HETEROGENEOUS_CLUSTER_TYPE_REGEX="^(libvirt-s390x-amd64|libvirt-amd64-s390x)$"
+if [ "${TEST_TYPE}" == "conformance-parallel" ] && [[ "${CLUSTER_TYPE}" =~ ${HETEROGENEOUS_CLUSTER_TYPE_REGEX} ]]; then
+    echo "Adding excluded tests for multi-architecture compute clusters"
+    cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-api-machinery][Feature:ServerSideApply] Server-Side Apply should work for apps.openshift.io/v1, Resource=deploymentconfigs [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs adoption will orphan all RCs and adopt them back when recreated [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs generation should deploy based on a status version bump [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs ignores deployer and lets the config with a NewReplicationControllerCreated reason should let the deployment config with a NewReplicationControllerCreated reason [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs initially should not deploy if pods never transition to ready [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs keep the deployer pod invariant valid should deal with cancellation after deployer pod succeeded [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs keep the deployer pod invariant valid should deal with cancellation of running deployment [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs keep the deployer pod invariant valid should deal with config change in case the deployment is still running [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs paused should disable actions on deployments [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs rolled back should rollback to an older deployment [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs should adhere to Three Laws of Controllers [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs should respect image stream tag reference policy resolve the image pull spec [apigroup:apps.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs viewing rollout history should print the rollout history [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs when changing image change trigger should successfully trigger from an updated image [apigroup:apps.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs when run iteratively should immediately start a new deployment [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs when run iteratively should only deploy the last deployment [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs when tagging images should successfully tag the deployed image [apigroup:apps.openshift.io][apigroup:authorization.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with custom deployments should run the custom deployment steps [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with enhanced status should include various info in status [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with env in params referencing the configmap should expand the config map key to a value [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with failing hook should get all logs from retried hooks [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with minimum ready seconds set should not transition the deployment to Complete before satisfied [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with multiple image change triggers should run a successful deployment with a trigger used by different containers [apigroup:apps.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with multiple image change triggers should run a successful deployment with multiple triggers [apigroup:apps.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with revision history limits should never persist more old deployments than acceptable after being observed by the controller [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with test deployments should run a deployment to completion and then scale to zero [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-apps][Feature:DeploymentConfig] deploymentconfigs won't deploy RC with unresolved images when patched with empty image [apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-arch] Managed cluster should expose cluster services outside the cluster [apigroup:route.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-arch] [Conformance] FIPS TestFIPS [Suite:openshift/conformance/parallel/minimal]"
+"[sig-builds][Feature:Builds] Multi-stage image builds should succeed [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] Optimized image builds should succeed [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] build can reference a cluster service with a build being created from new-build should be able to run a build that references a cluster service [apigroup:build.openshift.io] [Skipped:Disconnected] [Skipped:Proxy] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] custom build with buildah being created from new-build should complete build with custom builder image [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] oc new-app should succeed with a --name of 58 characters [apigroup:build.openshift.io] [Skipped:Disconnected] [Skipped:Proxy] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] oc new-app should succeed with an imagestream [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] prune builds based on settings in the buildconfig buildconfigs should have a default history limit set when created via the group api [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] prune builds based on settings in the buildconfig should prune builds after a buildConfig change [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] prune builds based on settings in the buildconfig should prune canceled builds based on the failedBuildsHistoryLimit setting [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] prune builds based on settings in the buildconfig should prune completed builds based on the successfulBuildsHistoryLimit setting [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] prune builds based on settings in the buildconfig should prune errored builds based on the failedBuildsHistoryLimit setting [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] prune builds based on settings in the buildconfig should prune failed builds based on the failedBuildsHistoryLimit setting [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] s2i build with a root user image should create a root build and fail without a privileged SCC [apigroup:build.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] s2i build with a root user image should create a root build and pass with a privileged SCC [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] verify /run filesystem contents are writeable using a simple Docker Strategy Build [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds] verify /run filesystem contents do not have unexpected content using a simple Docker Strategy Build [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds][volumes] build volumes should mount given secrets and configmaps into the build pod for docker strategy builds [apigroup:image.openshift.io][apigroup:build.openshift.io][apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-builds][Feature:Builds][volumes] build volumes should mount given secrets and configmaps into the build pod for source strategy builds [apigroup:image.openshift.io][apigroup:build.openshift.io][apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc can run inside of a busybox container [apigroup:image.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc debug deployment configs from a build [apigroup:image.openshift.io][apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc debug dissect deployment config debug [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc debug does not require a real resource on the server [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc debug ensure debug does not depend on a container actually existing for the selected resource [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc debug ensure it works with image streams [apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc idle [apigroup:apps.openshift.io][apigroup:route.openshift.io][apigroup:project.openshift.io][apigroup:image.openshift.io] by all [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc idle [apigroup:apps.openshift.io][apigroup:route.openshift.io][apigroup:project.openshift.io][apigroup:image.openshift.io] by checking previous scale [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc idle [apigroup:apps.openshift.io][apigroup:route.openshift.io][apigroup:project.openshift.io][apigroup:image.openshift.io] by label [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc idle [apigroup:apps.openshift.io][apigroup:route.openshift.io][apigroup:project.openshift.io][apigroup:image.openshift.io] by name [Suite:openshift/conformance/parallel]"
+"[sig-cli] oc probe can ensure the probe command is functioning as expected on deploymentconfigs [apigroup:apps.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-cluster-lifecycle] Pods cannot access the /config/master API endpoint [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageAppend] Image append should create images by appending them [apigroup:image.openshift.io] [Skipped:Disconnected] [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageExtract] Image extract should extract content from an image [apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageInfo] Image info should display information about images [apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageLayers] Image layer subresource should identify a deleted image as missing [apigroup:image.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:ImageLayers] Image layer subresource should return layers from tagged images [apigroup:image.openshift.io][apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-imageregistry][Feature:Image] oc tag should change image reference for internal images [apigroup:build.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster should have a AlertmanagerReceiversNotConfigured alert in firing state [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster should have important platform topology metrics [apigroup:config.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster should have non-Pod host cAdvisor metrics [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster should provide ingress metrics [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster should provide named network metrics [apigroup:project.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster should start and expose a secured proxy and unsecured metrics [apigroup:config.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster shouldn't have failing rules evaluation [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation] Prometheus [apigroup:image.openshift.io] when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured [Early][apigroup:config.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation][Late] OpenShift alerting rules [apigroup:image.openshift.io] should have a runbook_url annotation if the alert is critical [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation][Late] OpenShift alerting rules [apigroup:image.openshift.io] should have a valid severity label [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation][Late] OpenShift alerting rules [apigroup:image.openshift.io] should have description and summary annotations [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation][Late] OpenShift alerting rules [apigroup:image.openshift.io] should link to a valid URL if the runbook_url annotation is defined [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation][Late] OpenShift alerting rules [apigroup:image.openshift.io] should link to an HTTP(S) location if the runbook_url annotation is defined [Suite:openshift/conformance/parallel]"
+"[sig-instrumentation][sig-builds][Feature:Builds] Prometheus when installed on the cluster should start and expose a secured proxy and verify build metrics [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it [Skipped:Disconnected] [Suite:openshift/conformance/parallel/minimal]"
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should pass the gRPC interoperability tests [apigroup:route.openshift.io][apigroup:operator.openshift.io] [Suite:openshift/conformance/parallel/minimal]"
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router][apigroup:route.openshift.io] The HAProxy router should pass the h2spec conformance tests [apigroup:authorization.openshift.io][apigroup:user.openshift.io][apigroup:security.openshift.io][apigroup:operator.openshift.io] [Suite:openshift/conformance/parallel/minimal]"
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router][apigroup:route.openshift.io][apigroup:config.openshift.io] The HAProxy router should pass the http2 tests [apigroup:image.openshift.io][apigroup:operator.openshift.io] [Suite:openshift/conformance/parallel/minimal]"
+"[sig-network][Feature:EgressRouterCNI] should ensure ipv4 egressrouter cni resources are created [apigroup:operator.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:EgressRouterCNI] when using openshift ovn-kubernetes should ensure ipv6 egressrouter cni resources are created [apigroup:operator.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should enable openshift-monitoring to pull metrics [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should expose a health check on the metrics port [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should expose prometheus metrics for a route [apigroup:route.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router] The HAProxy router should expose the profiling endpoints [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:image.openshift.io] The HAProxy router should serve a route that points to two services and respect weights [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:operator.openshift.io] The HAProxy router should respond with 503 to unrecognized hosts [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:operator.openshift.io] The HAProxy router should serve routes that were created from an ingress [apigroup:route.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:operator.openshift.io] The HAProxy router should set Forwarded headers appropriately [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:route.openshift.io] The HAProxy router should override the route host for overridden domains with a custom value [apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:route.openshift.io] The HAProxy router should override the route host with a custom value [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:route.openshift.io] The HAProxy router should run even if it has no access to update status [apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:route.openshift.io] The HAProxy router should serve the correct routes when running with the haproxy config manager [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:route.openshift.io] The HAProxy router should serve the correct routes when scoped to a single namespace and label set [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:route.openshift.io][apigroup:operator.openshift.io] The HAProxy router should support reencrypt to services backed by a serving certificate automatically [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:tuning] pod should start with all sysctl on whitelist [apigroup:k8s.cni.cncf.io] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:tuning] pod sysctls should not affect node [apigroup:k8s.cni.cncf.io] [Suite:openshift/conformance/parallel]"
+EOF
+fi
+
 if [ -f "${SHARED_DIR}/excluded_tests" ]; then
     echo "Skipping following tests from suite..."
     cat ${SHARED_DIR}/excluded_tests
