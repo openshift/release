@@ -55,6 +55,8 @@ function emulate-cluster-age {
   pod-restart-workarounds
 
   wait-for-operators-to-stabilize
+
+  oc get nodes
 }
 
 full_steps=$((${CLUSTER_AGE_DAYS}/${SKEW_STEP}))
