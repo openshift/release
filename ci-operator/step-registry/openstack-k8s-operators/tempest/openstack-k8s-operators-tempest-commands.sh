@@ -95,6 +95,9 @@ else
 
     tempest-skip list-allowed --file list_allowed.yml --group ${BASE_OP} --job ${BASE_OP} -f value > allow.txt
     tempest-skip list-skipped --file list_skipped.yml --job ${BASE_OP} -f value > skip.txt
+
+    sleep 3600
+
     if [ -f allow.txt ] && [ -f skip.txt ]; then
         TEMPEST_ARGS+=( --exclude-list skip.txt --include-list allow.txt)
         cp allow.txt skip.txt ${ARTIFACT_DIR}
