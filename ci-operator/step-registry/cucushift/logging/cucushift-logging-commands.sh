@@ -4,12 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-function show_test_execution_time() {
-    local test_type time_used
-    test_type="$1"
-    time_used="$(( ${SECONDS}/60 ))"
-    echo "###### ${test_type} tests took ${time_used} minutes"
-}
 function set_cluster_access() {
     if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
@@ -29,10 +23,6 @@ function preparation_for_test() {
     fi
     #shellcheck source=${SHARED_DIR}/runtime_env
     source "${SHARED_DIR}/runtime_env"
-}
-function echo_e2e_tags() {
-    echo "In function: ${FUNCNAME[1]}"
-    echo "E2E_RUN_TAGS: '${E2E_RUN_TAGS}'"
 }
 function test_execution_cucumber() {
     local test_type type_tags
