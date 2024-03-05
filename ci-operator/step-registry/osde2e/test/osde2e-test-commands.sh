@@ -16,6 +16,11 @@ then
     exit 1
 fi
 
+if [[ -f "${SHARED_DIR}/kubeconfig" ]];
+then
+   export TEST_KUBECONFIG="${SHARED_DIR}/kubeconfig"
+fi
+
 export REPORT_DIR="${ARTIFACT_DIR}"
 
 /osde2e test --configs "${CONFIGS}" \
