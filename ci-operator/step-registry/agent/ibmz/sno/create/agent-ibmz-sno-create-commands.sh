@@ -11,8 +11,6 @@ httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
 httpd_vsi_pub_key=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key")
 export httpd_vsi_pub_key
-pull_secret=$(cat "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret")
-export pull_secret
 
 # Installing CLI tools
 set -e
@@ -243,7 +241,7 @@ zvsi_mac=$(ssh "${ssh_options[@]}" core@$zvsi_fip "ip link show | awk '/ether/ {
 echo "Creating agent-config and install-config files"
 mkdir $HOME/$CLUSTER_NAME
 # Agent Config 
-cat <<EOF > $HOME/$CLUSTER_NAME/agent-config.yaml
+cat >> $HOME/$CLUSTER_NAME/agent-config.yaml << EOF
 apiVersion: v1alpha1
 kind: AgentConfig
 metadata:
@@ -268,16 +266,43 @@ hosts:
                 prefix-length: 24
             dhcp: true
 EOF
-
 # Install Config
-curl -k -L --output $HOME/$CLUSTER_NAME/install-config.yaml "http://$httpd_vsi_ip:80/agent-sno-install-config.yaml"
-sed -i "s|BASE_DOMAIN|$BASEDOMAIN|" $HOME/$CLUSTER_NAME/install-config.yaml
-sed -i "s|CLUSTER_NAME|$CLUSTER_NAME|" $HOME/$CLUSTER_NAME/install-config.yaml
-sed -i "s|MACHINE_CIDR|$sn_cidr|" $HOME/$CLUSTER_NAME/install-config.yaml
-cp $HOME/$CLUSTER_NAME/install-config.yaml $HOME/$CLUSTER_NAME/install-config.yaml.bkp
-cp $HOME/$CLUSTER_NAME/agent-config.yaml $HOME/$CLUSTER_NAME/agent-config.yaml.bkp
+cat >> $HOME/$CLUSTER_NAME/install-config.yaml << EOF
+apiVersion: v1
+baseDomain: $BASEDOMAIN
+controlPlane:
+  architecture: s390x
+  hyperthreading: Enabled
+  name: master
+  replicas: 1
+compute:
+- architecture: s390x
+  hyperthreading: Enabled
+  name: worker
+  replicas: 0
+metadata:
+  name: $CLUSTER_NAME
+networking:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  machineNetwork:
+  - cidr: $sn_cidr
+  networkType: OVNKubernetes 
+  serviceNetwork:
+  - 172.30.0.0/16
+platform:
+  none: {}
+EOF
+# Adding pull-secret and ssh key
+cat >> "$HOME/$CLUSTER_NAME/install-config.yaml" << EOF
+pullSecret: >
+  $(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+sshKey: |
+  $(<"${httpd_vsi_pub_key}")
+EOF
 
-# Openshift Install binary
+# Fetching the installer binary
 echo "Fetching openshift-install binary"
 wget -q -O $HOME/openshift-install.tar.gz https://mirror.openshift.com/pub/openshift-v4/s390x/clients/ocp/latest/openshift-install-linux-amd64.tar.gz
 tar -xzf $HOME/openshift-install.tar.gz -C $HOME/$CLUSTER_NAME/
@@ -316,5 +341,4 @@ echo "Uploading the cluster artifacts directory to bastion node for monitoring"
 cp /tmp/bin/oc $HOME/$CLUSTER_NAME/
 scp -r "${ssh_options[@]}" $HOME/$CLUSTER_NAME/ root@$bvsi_fip:/root/
 echo "$(date) Waiting for the installation to complete"
-ssh "${ssh_options[@]}" root@$bvsi_fip "cp /root/$CLUSTER_NAME/install-config.yaml.bkp /root/$CLUSTER_NAME/install-config.yaml; cp /root/$CLUSTER_NAME/agent-config.yaml.bkp /root/$CLUSTER_NAME/agent-config.yaml"
 ssh "${ssh_options[@]}" root@$bvsi_fip "/root/$CLUSTER_NAME/openshift-install wait-for install-complete --dir /root/$CLUSTER_NAME/ --log-level debug"
