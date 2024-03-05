@@ -228,8 +228,8 @@ function test_execution() {
     export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}"
     set -x
     cucumber --tags "${UPGRADE_CHECK_RUN_TAGS} and @upgrade-check" -p junit || true
-    CLOUD_SPECIFIC_TAGS="${CUCUSHIFT_FORCE_SKIP_TAGS/and not @destructive/}"
-    cucumber --tags "${UPGRADE_CHECK_RUN_TAGS} and @upgrade-check and ${CLOUD_SPECIFIC_TAGS} and @cloud and @destructive" -p junit || true
+    CLOUD_SPECIFIC_TAGS="${UPGRADE_CHECK_RUN_TAGS/and not @destructive/}"
+    cucumber --tags "${CLOUD_SPECIFIC_TAGS} and @upgrade-check and @cloud and @destructive" -p junit || true
     set +x
     popd
 }
