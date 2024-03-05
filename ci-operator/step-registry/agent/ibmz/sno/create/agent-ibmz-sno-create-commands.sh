@@ -299,7 +299,7 @@ cat >> "$HOME/$CLUSTER_NAME/install-config.yaml" << EOF
 pullSecret: >
   $(<"${CLUSTER_PROFILE_DIR}/pull-secret")
 sshKey: |
-  $(<"${httpd_vsi_pub_key}")
+  $(<"${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key")
 EOF
 
 # Fetching the installer binary
