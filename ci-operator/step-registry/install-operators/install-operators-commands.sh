@@ -1,10 +1,8 @@
 #!/bin/bash
 
 set -o nounset
-# set -o errexit
+set -o errexit
 set -o pipefail
-
-trap 'sleep 4h' EXIT TERM SIGINT INT
 
 # Set the cluster proxy configuration, if its present.
 if test -s "${SHARED_DIR}/proxy-conf.sh" ; then

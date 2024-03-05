@@ -3,6 +3,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Temp debug
+trap 'sleep 4h' EXIT SIGINT SIGTERM
+
 echo "Deploying a StorageCluster"
 cat <<EOF | oc apply -f -
 apiVersion: ocs.openshift.io/v1
