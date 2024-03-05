@@ -257,9 +257,9 @@ function run {
     extended-platform-tests run all --dry-run | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
-    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
+    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
     if [[ "${test_scenarios}" == *"Stagerun"* ]] && [[ "${test_scenarios}" != *"~Stagerun"* ]]; then
-        hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&"
+        hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~VMonly&;~ProdrunOnly&"
     fi
     echo "TEST_FILTERS: \"${hardcoded_filters};${TEST_FILTERS:-}\""
     echo "FILTERS_ADDITIONAL: \"${FILTERS_ADDITIONAL:-}\""
