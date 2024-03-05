@@ -279,8 +279,7 @@ cp $HOME/$CLUSTER_NAME/agent-config.yaml $HOME/$CLUSTER_NAME/agent-config.yaml.b
 
 # Openshift Install binary
 echo "Fetching openshift-install binary"
-release_version=$(echo "$JOB_SPEC" | jq -r '.extra_refs|.[].base_ref' | cut -d '-' -f 2)
-wget -q -O $HOME/openshift-install.tar.gz https://mirror.openshift.com/pub/openshift-v4/s390x/clients/ocp/latest-${release_version}/openshift-install-linux-amd64.tar.gz
+wget -q -O $HOME/openshift-install.tar.gz https://mirror.openshift.com/pub/openshift-v4/s390x/clients/ocp/latest/openshift-install-linux-amd64.tar.gz
 tar -xzf $HOME/openshift-install.tar.gz -C $HOME/$CLUSTER_NAME/
 
 # Generate PXE artifacts
