@@ -57,6 +57,87 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.14-nightly-arm-images,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/4.14-nightly-arm-krkn-hub-tests-arm
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-chaos
+      ci-operator.openshift.io/variant: 4.14-nightly-arm
+      ci.openshift.io/generator: prowgen
+      job-release: "4.14"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-4.14-nightly-arm-krkn-hub-tests-arm
+    rerun_command: /test 4.14-nightly-arm-krkn-hub-tests-arm
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/krkn-hub-tests-arm-cluster-profile
+        - --target=krkn-hub-tests-arm
+        - --variant=4.14-nightly-arm
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/krkn-hub-tests-arm-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-chaos
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.14-nightly-arm-krkn-hub-tests-arm|remaining-required),?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
@@ -113,6 +194,168 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.14-nightly-images,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/4.14-nightly-krkn-hub-cloud-api-tests
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-chaos
+      ci-operator.openshift.io/variant: 4.14-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.14"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-4.14-nightly-krkn-hub-cloud-api-tests
+    rerun_command: /test 4.14-nightly-krkn-hub-cloud-api-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/krkn-hub-cloud-api-tests-cluster-profile
+        - --target=krkn-hub-cloud-api-tests
+        - --variant=4.14-nightly
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/krkn-hub-cloud-api-tests-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-chaos
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.14-nightly-krkn-hub-cloud-api-tests|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/4.14-nightly-krkn-hub-tests-414
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-chaos
+      ci-operator.openshift.io/variant: 4.14-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.14"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-4.14-nightly-krkn-hub-tests-414
+    rerun_command: /test 4.14-nightly-krkn-hub-tests-414
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/krkn-hub-tests-414-cluster-profile
+        - --target=krkn-hub-tests-414
+        - --variant=4.14-nightly
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/krkn-hub-tests-414-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-chaos
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.14-nightly-krkn-hub-tests-414|remaining-required),?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
@@ -168,6 +411,87 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.15-nightly-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/4.15-nightly-krkn-hub-tests-415
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-chaos
+      ci-operator.openshift.io/variant: 4.15-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-4.15-nightly-krkn-hub-tests-415
+    rerun_command: /test 4.15-nightly-krkn-hub-tests-415
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/krkn-hub-tests-415-cluster-profile
+        - --target=krkn-hub-tests-415
+        - --variant=4.15-nightly
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/krkn-hub-tests-415-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-chaos
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.15-nightly-krkn-hub-tests-415|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -420,6 +744,172 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )rosa-4.14-nightly-images,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/rosa-4.14-nightly-ocp-qe-perfscale-ci-tests-rosa
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+      ci-operator.openshift.io/variant: rosa-4.14-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.14"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.14-nightly-ocp-qe-perfscale-ci-tests-rosa
+    rerun_command: /test rosa-4.14-nightly-ocp-qe-perfscale-ci-tests-rosa
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ocp-qe-perfscale-ci-tests-rosa-cluster-profile
+        - --target=ocp-qe-perfscale-ci-tests-rosa
+        - --variant=rosa-4.14-nightly
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/ocp-qe-perfscale-ci-tests-rosa-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-qe
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.14-nightly-ocp-qe-perfscale-ci-tests-rosa|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/rosa-4.14-nightly-ocp-qe-perfscale-ci-tests-rosa-hog
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+      ci-operator.openshift.io/variant: rosa-4.14-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.14"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.14-nightly-ocp-qe-perfscale-ci-tests-rosa-hog
+    rerun_command: /test rosa-4.14-nightly-ocp-qe-perfscale-ci-tests-rosa-hog
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ocp-qe-perfscale-ci-tests-rosa-hog-cluster-profile
+        - --target=ocp-qe-perfscale-ci-tests-rosa-hog
+        - --variant=rosa-4.14-nightly
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/ocp-qe-perfscale-ci-tests-rosa-hog-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-qe
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.14-nightly-ocp-qe-perfscale-ci-tests-rosa-hog|remaining-required),?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
@@ -477,3 +967,337 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )rosa-4.15-nightly-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/rosa-4.15-nightly-krkn-rosa-hcp-hog
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci-operator.openshift.io/variant: rosa-4.15-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.15-nightly-krkn-rosa-hcp-hog
+    rerun_command: /test rosa-4.15-nightly-krkn-rosa-hcp-hog
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/krkn-rosa-hcp-hog-cluster-profile
+        - --target=krkn-rosa-hcp-hog
+        - --variant=rosa-4.15-nightly
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/krkn-rosa-hcp-hog-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-perfscale-qe
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.15-nightly-krkn-rosa-hcp-hog|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/rosa-4.15-nightly-krkn-tests-rosa
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+      ci-operator.openshift.io/variant: rosa-4.15-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.15-nightly-krkn-tests-rosa
+    rerun_command: /test rosa-4.15-nightly-krkn-tests-rosa
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/krkn-tests-rosa-cluster-profile
+        - --target=krkn-tests-rosa
+        - --variant=rosa-4.15-nightly
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/krkn-tests-rosa-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-qe
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.15-nightly-krkn-tests-rosa|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/rosa-4.15-nightly-krkn-tests-rosa-hcp
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci-operator.openshift.io/variant: rosa-4.15-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.15-nightly-krkn-tests-rosa-hcp
+    rerun_command: /test rosa-4.15-nightly-krkn-tests-rosa-hcp
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/krkn-tests-rosa-hcp-cluster-profile
+        - --target=krkn-tests-rosa-hcp
+        - --variant=rosa-4.15-nightly
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/krkn-tests-rosa-hcp-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-perfscale-qe
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.15-nightly-krkn-tests-rosa-hcp|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/rosa-4.15-nightly-krkn-tests-rosa-hog
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+      ci-operator.openshift.io/variant: rosa-4.15-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.15-nightly-krkn-tests-rosa-hog
+    rerun_command: /test rosa-4.15-nightly-krkn-tests-rosa-hog
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/krkn-tests-rosa-hog-cluster-profile
+        - --target=krkn-tests-rosa-hog
+        - --variant=rosa-4.15-nightly
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/krkn-tests-rosa-hog-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-qe
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.15-nightly-krkn-tests-rosa-hog|remaining-required),?($|\s.*)
