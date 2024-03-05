@@ -50,8 +50,8 @@ tests:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
-- as: node-density-cni-3nodes
-  cron: '@monthly'
+- always_run: false
+  as: node-density-cni-3nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -60,8 +60,8 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "3"
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      COMPUTE_NODE_TYPE: m7g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m7g.xlarge
       ITERATIONS_PER_NAMESPACE: "100"
       OCP_ARCH: arm64
       ZONES_COUNT: "3"
@@ -85,6 +85,25 @@ tests:
       ZONES_COUNT: "3"
     test:
     - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: node-density-heavy-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m7g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m7g.xlarge
+      ITERATIONS_PER_NAMESPACE: "100"
+      OCP_ARCH: arm64
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-aws
   timeout: 5h0m0s
 - as: node-density-heavy-24nodes
