@@ -1,6 +1,24 @@
-chain:
-  as: openshift-e2e-test-logging-qe
+ref:
+  as: cucushift-logging
+  from_image:
+    namespace: ci
+    name: verification-tests
+    tag: latest
+  grace_period: 10m
+  timeout: 18h
+  commands: cucushift-logging-commands.sh
+  cli: latest
+  resources:
+    limits:
+      cpu: "2"
+      memory: 6Gi
+    requests:
+      cpu: 350m
+      memory: 1Gi
   env:
+  - name: E2E_RUN_TAGS
+    default: "@logging5.8"
+    documentation: "Executed cucumber tags"
   - name: E2E_TEST_TYPE
     default: "destructive"
     documentation: |-
@@ -10,12 +28,3 @@ chain:
         * 'destructive' - Test cases with destructive tag
         * 'longduration' - Test cases with long-duration tag
         * 'ui' - Test cases with console tag
-  steps:
-  - ref: idp-htpasswd
-  - ref: cucushift-pre
-  - ref: cucushift-logging
-  - ref: openshift-extended-logging-test
-  - ref: openshift-extended-logging-test-web-tests
-  - ref: openshift-e2e-test-qe-report
-  documentation: |-
-    Execute e2e tests from QE, which include golang, cucushift, ...(more to add)
