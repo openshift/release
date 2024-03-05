@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
+# set -o errexit
 set -o pipefail
 
 trap 'sleep 4h' EXIT TERM SIGINT INT

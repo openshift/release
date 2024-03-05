@@ -3,9 +3,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Temp debug
-trap 'sleep 4h' EXIT TERM SIGINT INT
-
 echo "Creating the ODF installation namespace"
 oc apply -f - <<EOF
   apiVersion: v1
