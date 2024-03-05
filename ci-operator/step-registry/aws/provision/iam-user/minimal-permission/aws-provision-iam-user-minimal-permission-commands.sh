@@ -252,6 +252,17 @@ if (( ocp_minor_version >= 11 && ocp_major_version == 4 )); then
   echo "s3:GetBucketPolicy" >> "${PERMISION_LIST}"
 fi
 
+if (( ocp_minor_version >= 12 && ocp_major_version == 4 )); then
+  echo "kms:Decrypt" >> "${PERMISION_LIST}"
+  echo "kms:Encrypt" >> "${PERMISION_LIST}"
+  echo "kms:GenerateDataKey" >> "${PERMISION_LIST}"
+  echo "kms:GenerateDataKeyWithoutPlainText" >> "${PERMISION_LIST}"
+  echo "kms:DescribeKey" >> "${PERMISION_LIST}"
+  echo "kms:RevokeGrant" >> "${PERMISION_LIST}"
+  echo "kms:CreateGrant" >> "${PERMISION_LIST}"
+  echo "kms:ListGrants" >> "${PERMISION_LIST}"
+fi
+
 # additional permisions for 4.14+
 if (( ocp_minor_version >= 14 && ocp_major_version == 4 )); then
   echo "ec2:DescribeSecurityGroupRules" >> "${PERMISION_LIST}"
