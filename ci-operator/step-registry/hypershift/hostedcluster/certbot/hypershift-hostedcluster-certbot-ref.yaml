@@ -1,0 +1,40 @@
+ref:
+  as: hypershift-hostedcluster-certbot
+  cli: latest
+  env:
+  - name: BASE_DOMAIN
+    default: "hypershift.aws-2.ci.openshift.org"
+    documentation: |-
+      A fully-qualified domain or subdomain name. The base domain of the cloud provider is used for setting baseDomain variable of the install configuration of the cluster.
+      It will be overridden by a non-empty HYPERSHIFT_BASE_DOMAIN.
+  - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
+    default: "false"
+    documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: ""
+    documentation: |-
+      A fully-qualified domain or subdomain name. The base domain of the cloud provider is used for setting baseDomain variable of the install configuration of the cluster.
+      It overrides BASE_DOMAIN if non-empty.
+  - name: CONTACT_EMAIL
+    default: "no-reply@ci.openshift.org"
+    documentation: |-
+      An email address to be used for Let's Encrypt registration and certificate expiration notifications.
+  - name: PLATFORM
+    default: "aws"
+    documentation: "The platform(AWS/PowerVS) of the HostedCluster. AWS by default"
+  commands: hypershift-hostedcluster-certbot-commands.sh
+  from_image:
+    namespace: ci
+    name: certbot
+    tag: v2.9.0
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 60m0s
+  credentials:
+  - mount_path: /var/run/hypershift-workload-credentials
+    name: hypershift-workload-credentials
+    namespace: test-credentials
+

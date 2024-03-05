@@ -1,0 +1,29 @@
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: certbot
+  namespace: ci
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: certbot-v2.9.0
+spec:
+  successfulBuildsHistoryLimit: 10
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: certbot:v2.9.0
+      namespace: ci
+  source:
+    dockerfile: |
+      FROM docker.io/certbot/certbot:v2.9.0
+      RUN apk add --no-cache bash jq aws-cli bind-tools
+      RUN wget -O /opt/manual-auth-hook.sh https://raw.githubusercontent.com/bear-redhat/tools/master/hypershift-certbot/manual-auth-hook.sh && chmod +x /opt/manual-auth-hook.sh
+
+    type: Dockerfile
+  strategy:
+    type: Docker
