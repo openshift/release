@@ -42,23 +42,31 @@ if [[ "$OS_NETWORKING_TYPE" == 'null' ]]; then
 	errexit=1
 fi
 
-yq --yaml-output "$(cat <<-EOF
-	.
-	| .all.hosts.localhost.os_subnet_range="${OS_SUBNET_RANGE}"
-	| .all.hosts.localhost.os_flavor_master="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR")"
-	| .all.hosts.localhost.os_flavor_worker="$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")"
-	| .all.hosts.localhost.os_image_rhcos="rhcos-${CLUSTER_NAME}"
-	| .all.hosts.localhost.svc_subnet_range="${SVC_SUBNET_RANGE}"
-	| .all.hosts.localhost.cluster_network_cidrs="${CLUSTER_NETWORK_CIDR}"
-	| .all.hosts.localhost.host_prefix="${HOST_PREFIX}"
-	| .all.hosts.localhost.os_networking_type="${OS_NETWORKING_TYPE}"
-	| .all.hosts.localhost.os_external_dns=$OS_EXTERNAL_DNS
-	| .all.hosts.localhost.os_external_network="$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")"
-	| .all.hosts.localhost.os_api_fip="$(<"${SHARED_DIR}/API_IP")"
-	| .all.hosts.localhost.os_ingress_fip="$(<"${SHARED_DIR}/INGRESS_IP")"
+cp /var/lib/openshift-install/upi/inventory.yaml "${SHARED_DIR}/inventory.yaml"
+
+if [[ "${CONFIG_TYPE}" == "dual-stack-upi" ]]; then
+	# Enable IPv6 part of the config by uncommenting os_subnet6
+	sed -i -re 's/^(\s*)#(os_subnet6:.*)/\1\2/' "${SHARED_DIR}/inventory.yaml"
+	yq --yaml-output --in-place ".
+		| .all.hosts.localhost.os_subnet6_range = \"${OS_SUBNET_V6_RANGE}\"
+	" "${SHARED_DIR}/inventory.yaml"
+fi
+
+yq --yaml-output --in-place ".
+	| .all.hosts.localhost.os_subnet_range = \"${OS_SUBNET_RANGE}\"
+	| .all.hosts.localhost.os_flavor_master = \"$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR")\"
+	| .all.hosts.localhost.os_flavor_worker = \"$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")\"
+	| .all.hosts.localhost.os_image_rhcos = \"rhcos-${CLUSTER_NAME}\"
+	| .all.hosts.localhost.svc_subnet_range = \"${SVC_SUBNET_RANGE}\"
+	| .all.hosts.localhost.cluster_network_cidrs = \"${CLUSTER_NETWORK_CIDR}\"
+	| .all.hosts.localhost.host_prefix = \"${HOST_PREFIX}\"
+	| .all.hosts.localhost.os_networking_type = \"${OS_NETWORKING_TYPE}\"
+	| .all.hosts.localhost.os_external_dns = $OS_EXTERNAL_DNS
+	| .all.hosts.localhost.os_external_network = \"$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")\"
+	| .all.hosts.localhost.os_api_fip = \"$(<"${SHARED_DIR}/API_IP")\"
+	| .all.hosts.localhost.os_ingress_fip = \"$(<"${SHARED_DIR}/INGRESS_IP")\"
 	| del(.all.hosts.localhost.os_bootstrap_fip)
-	EOF
-	)" '/var/lib/openshift-install/upi/inventory.yaml' > "${SHARED_DIR}/inventory.yaml"
+" "${SHARED_DIR}/inventory.yaml"
 
 cp "${SHARED_DIR}/inventory.yaml" "${ARTIFACT_DIR}/"
 

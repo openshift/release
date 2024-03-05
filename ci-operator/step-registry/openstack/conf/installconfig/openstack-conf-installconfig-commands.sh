@@ -55,7 +55,7 @@ sshKey: |-
 EOF
 
 case "$CONFIG_TYPE" in
-	minimal)
+	minimal|dual-stack-upi)
 		yq --yaml-output --in-place ".
 			| .platform.openstack.externalDNS = [\"1.1.1.1\", \"1.0.0.1\"]
 			| .platform.openstack.externalNetwork = \"${OPENSTACK_EXTERNAL_NETWORK}\"
