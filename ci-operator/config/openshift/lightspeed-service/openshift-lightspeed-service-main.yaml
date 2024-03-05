@@ -55,6 +55,30 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: ols-codecov-token
+- always_run: false
+  as: e2e-ols-azure-openai-gpt35
+  cron: '@daily'
+  presubmit: true
+  run_if_changed: ^(Containerfile.*|Makefile|manifests/.*|ols/.*|pyproject.toml|pdm.lock|scripts/.*|tests/.*)$
+  steps:
+    test:
+    - as: e2e
+      commands: |
+        export PROVIDER_KEY_PATH=/var/run/azureopenai/token
+        export PROVIDER=azure_openai
+        export PROVIDER_URL=https://ols-test.openai.azure.com/
+        export PROVIDER_DEPLOYMENT_NAME=0301-dep
+        export MODEL=gpt-3.5-turbo
+        scripts/test-e2e-standalone.sh
+      credentials:
+      - mount_path: /var/run/azureopenai
+        name: azureopenai-apitoken
+        namespace: test-credentials
+      from: src
+      grace_period: 5ns
+      resources:
+        requests:
+          cpu: 100m
 - as: e2e-ols-bam-granite13b-chat-v2
   cron: '@daily'
   presubmit: true
@@ -86,7 +110,7 @@ tests:
       commands: |
         export PROVIDER_KEY_PATH=/var/run/openai/token
         export PROVIDER=openai
-        export MODEL=gpt-3.5-turbo-1106
+        export MODEL=gpt-3.5-turbo
         scripts/test-e2e-standalone.sh
       credentials:
       - mount_path: /var/run/openai
