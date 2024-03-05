@@ -1,0 +1,47 @@
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineHealthCheck
+metadata:
+  annotations:
+  name: infra-healthcheck
+  namespace: openshift-machine-api
+spec:
+  maxUnhealthy: 2
+  selector:
+    matchExpressions:
+    - key: machine.openshift.io/cluster-api-machine-role
+      operator: In
+      values:
+      - infra
+    - key: machine.openshift.io/cluster-api-machineset
+      operator: Exists
+  unhealthyConditions:
+  - status: "False"
+    timeout: 480s
+    type: Ready
+  - status: Unknown
+    timeout: 600s
+    type: Ready
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineHealthCheck
+metadata:
+  name: worker-healthcheck
+  namespace: openshift-machine-api
+spec:
+  maxUnhealthy: 3
+  selector:
+    matchExpressions:
+    - key: machine.openshift.io/cluster-api-machine-role
+      operator: NotIn
+      values:
+      - infra
+      - master
+    - key: machine.openshift.io/cluster-api-machineset
+      operator: Exists
+  unhealthyConditions:
+  - status: "False"
+    timeout: 480s
+    type: Ready
+  - status: Unknown
+    timeout: 600s
+    type: Ready

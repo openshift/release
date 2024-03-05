@@ -284,7 +284,7 @@ spec:
         sum by (workload_name, workload_type, determined_amount, configured_amount, resource_type) (increase(pod_scaler_admission_high_determined_resource{workload_type!~"undefined|build"}[5m])) > 0
       for: 1m
       labels:
-        severity: critical
+        severity: warning
   - name: openshift-mirroring-failures
     rules:
     - alert: openshift-mirroring-failures
@@ -459,6 +459,17 @@ spec:
         message: The backlog for {{ $labels.name }} is not getting drained. Check <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=prow-job-backlog-growing|Prometheus>
       expr: workqueue_depth{name=~"crier.*|plank"} > 100
       for: 20m
+      labels:
+        severity: critical
+    - alert: TriggeredButPendingJobs
+      annotations:
+        message: There are {{ $value }} jobs that have been triggered but are still pending, indicating potential scheduling or resource constraints. Investigate pending Prow jobs. Check <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=TriggeredButPendingJobs|Prometheus>.
+      expr: |
+        sum by (job_name) (
+          increase(prowjob_state_transitions{state="triggered"}[15m])
+          - increase(prowjob_state_transitions{state="pending"}[15m])
+        ) > 20
+      for: 10m
       labels:
         severity: critical
     - expr: count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"}) by (token_hash), "login", "$1", "token_hash", "(.*)") or github_user_info{login=~"openshift-.*"}) by (login)

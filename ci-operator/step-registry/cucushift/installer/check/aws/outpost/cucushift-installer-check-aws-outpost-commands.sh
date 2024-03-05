@@ -19,6 +19,10 @@ fi
 
 ret=0
 
+# save for debugging
+oc get machinesets -n openshift-machine-api -o json > ${ARTIFACT_DIR}/machinesets.json
+oc get machine -n openshift-machine-api -o json > ${ARTIFACT_DIR}/machine.json
+oc get nodes -o json > ${ARTIFACT_DIR}/nodes.json
 
 # --------------------------------
 # Node Count
@@ -26,14 +30,10 @@ ret=0
 echo ">>>>>> Checking Outpost nodes count"
 
 outpost_id=$(jq -r '.OutpostId' ${CLUSTER_PROFILE_DIR}/aws_outpost_info.json)
-outpost_node_count=$(oc get nodes --selector='node-role.kubernetes.io/worker' --show-labels --no-headers | grep "outpost-id=${outpost_id}" | wc -l)
+outpost_node_count=$(oc get nodes --selector='node-role.kubernetes.io/outposts' --show-labels --no-headers | grep "outpost-id=${outpost_id}" | wc -l)
 echo "Outpost node count: ${outpost_node_count}, expect: ${EXPECTED_OUTPOST_NODE}"
 
 if [[ "${outpost_node_count}" != "${EXPECTED_OUTPOST_NODE}" ]]; then
-  echo "--------- MACHINES ---------"
-  oc get machine --selector machine.openshift.io/cluster-api-machine-type=worker -n openshift-machine-api -o yaml
-  echo "--------- NODES ---------"
-  oc get nodes --selector='node-role.kubernetes.io/worker' -o yaml
   echo "FAIL: Outpost nodes count"
   ret=$((ret+1))
 else
@@ -44,10 +44,6 @@ fi
 # Public/Internal IP
 # --------------------------------
 edge_node_day2_machineset_name=$(head -n 1 ${SHARED_DIR}/edge_node_day2_machineset_name)
-
-echo "=================== ALL machines"
-oc get machine -n openshift-machine-api -ojson
-echo "==================="
 
 MACHINES=$(oc get machine -n openshift-machine-api -ojson | jq -r --arg n "$edge_node_day2_machineset_name" '.items[] | select(.metadata.labels."machine.openshift.io/cluster-api-machineset"==$n) | .metadata.name')
 for machine in $MACHINES;

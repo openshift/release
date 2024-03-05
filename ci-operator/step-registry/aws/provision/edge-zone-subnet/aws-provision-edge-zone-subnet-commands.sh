@@ -197,17 +197,17 @@ Description: Template for Best Practice Subnets (Public and Private)
 
 Parameters:
   VpcId:
-    Description: VPC ID which the subnets will be part.
+    Description: VPC ID that comprises all the target subnets.
     Type: String
     AllowedPattern: ^(?:(?:vpc)(?:-[a-zA-Z0-9]+)?\b|(?:[0-9]{1,3}\.){3}[0-9]{1,3})$
     ConstraintDescription: VPC ID must be with valid name, starting with vpc-.*.
   ClusterName:
-    Description: Cluster Name or Prefix name to prepend the tag Name for each subnet.
+    Description: Cluster name or prefix name to prepend the Name tag for each subnet.
     Type: String
     AllowedPattern: ".+"
     ConstraintDescription: ClusterName parameter must be specified.
   ZoneName:
-    Description: Zone Name to create the subnets (Example us-west-2-lax-1a).
+    Description: Zone Name to create the subnets, such as us-west-2-lax-1a.
     Type: String
     AllowedPattern: ".+"
     ConstraintDescription: ZoneName parameter must be specified.
@@ -217,25 +217,37 @@ Parameters:
     AllowedPattern: ".+"
     ConstraintDescription: PublicRouteTableId parameter must be specified.
   PublicSubnetCidr:
-    # yamllint disable-line rule:line-length
     AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-4]))$
     ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-24.
     Default: 10.0.128.0/20
-    Description: CIDR block for Public Subnet
+    Description: CIDR block for public subnet.
     Type: String
-
   PrivateRouteTableId:
-    Description: Public Route Table ID to associate the Local Zone subnet
+    Description: Private Route Table ID to associate the private subnet.
     Type: String
     AllowedPattern: ".+"
-    ConstraintDescription: PublicRouteTableId parameter must be specified.
+    ConstraintDescription: PrivateRouteTableId parameter must be specified.
   PrivateSubnetCidr:
-    # yamllint disable-line rule:line-length
     AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-4]))$
     ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-24.
     Default: 10.0.128.0/20
-    Description: CIDR block for Public Subnet
+    Description: CIDR block for private subnet.
     Type: String
+  PrivateSubnetLabel:
+    Default: "private"
+    Description: Subnet label to be added when building the subnet name.
+    Type: String
+  PublicSubnetLabel:
+    Default: "public"
+    Description: Subnet label to be added when building the subnet name.
+    Type: String
+  OutpostArn:
+    Default: ""
+    Description: OutpostArn when creating subnets on AWS Outpost.
+    Type: String
+
+Conditions:
+  OutpostEnabled: !Not [!Equals [!Ref "OutpostArn", ""]]
 
 Resources:
   PublicSubnet:
@@ -244,9 +256,12 @@ Resources:
       VpcId: !Ref VpcId
       CidrBlock: !Ref PublicSubnetCidr
       AvailabilityZone: !Ref ZoneName
+      OutpostArn: !If [ OutpostEnabled, !Ref OutpostArn, !Ref "AWS::NoValue"]
       Tags:
       - Key: Name
-        Value: !Join ['-', [!Ref ClusterName, "public", !Ref ZoneName]]
+        Value: !Join ['-', [ !Ref ClusterName, !Ref PublicSubnetLabel, !Ref ZoneName]]
+      - Key: kubernetes.io/cluster/unmanaged
+        Value: true
 
   PublicSubnetRouteTableAssociation:
     Type: "AWS::EC2::SubnetRouteTableAssociation"
@@ -260,9 +275,12 @@ Resources:
       VpcId: !Ref VpcId
       CidrBlock: !Ref PrivateSubnetCidr
       AvailabilityZone: !Ref ZoneName
+      OutpostArn: !If [ OutpostEnabled, !Ref OutpostArn, !Ref "AWS::NoValue"]
       Tags:
       - Key: Name
-        Value: !Join ['-', [!Ref ClusterName, "private", !Ref ZoneName]]
+        Value: !Join ['-', [!Ref ClusterName, !Ref PrivateSubnetLabel, !Ref ZoneName]]
+      - Key: kubernetes.io/cluster/unmanaged
+        Value: true
 
   PrivateSubnetRouteTableAssociation:
     Type: "AWS::EC2::SubnetRouteTableAssociation"
@@ -378,6 +396,53 @@ elif [[ ${EDGE_ZONE_TYPES} == "wavelength-zone" ]]; then
   else
     echo $wavelengthzone_priv_subnet > $SHARED_DIR/edge_zone_subnet_id
   fi
+elif [[ ${EDGE_ZONE_TYPES} == "outpost" ]]; then
+  # Subnet
+  STACK_NAME="${CLUSTER_NAME}-outpost"
+  echo ${STACK_NAME} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
+  extra_options=" "
+  outpost_subnet_output="$ARTIFACT_DIR/outpost_subnet_output.json"
+  outpost_subnet_params="$ARTIFACT_DIR/outpost_subnet_params.json"
+
+  outpost_arn=$(jq -r '.OutpostArn' ${CLUSTER_PROFILE_DIR}/aws_outpost_info.json)
+  outpost_az=$(jq -r '.AvailabilityZone' ${CLUSTER_PROFILE_DIR}/aws_outpost_info.json)
+  echo $outpost_az > ${SHARED_DIR}/outpost_availability_zone
+
+  private_route_table_id=$(head -n 1 "${SHARED_DIR}/private_route_table_id") # TBD
+  public_route_table_id=$(head -n 1 "${SHARED_DIR}/public_route_table_id")
+
+  priv_subnet_cidr="10.0.129.0/24"
+  pub_subnet_cidr="10.0.128.0/24"
+
+  aws_add_param_to_json "VpcId" ${VPC_ID} "$outpost_subnet_params"
+  aws_add_param_to_json "ClusterName" ${CLUSTER_NAME} "$outpost_subnet_params"
+  aws_add_param_to_json "ZoneName" ${outpost_az} "$outpost_subnet_params"
+  aws_add_param_to_json "PublicRouteTableId" ${public_route_table_id} "$outpost_subnet_params"
+  aws_add_param_to_json "PublicSubnetCidr" ${pub_subnet_cidr} "$outpost_subnet_params"
+  aws_add_param_to_json "PrivateRouteTableId" ${private_route_table_id} "$outpost_subnet_params"
+  aws_add_param_to_json "PrivateSubnetCidr" ${priv_subnet_cidr} "$outpost_subnet_params"
+  aws_add_param_to_json "OutpostArn" ${outpost_arn} "$outpost_subnet_params"
+  aws_create_stack ${REGION} ${STACK_NAME} "file://${subnet_tpl}" "file://${outpost_subnet_params}" "${extra_options}" "${outpost_subnet_output}"
+  cp $outpost_subnet_output "${SHARED_DIR}"/
+
+  outpost_priv_subnet=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="PrivateSubnetId") | .OutputValue' "${outpost_subnet_output}")
+  outpost_pub_subnet=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="PublicSubnetId") | .OutputValue' "${outpost_subnet_output}")
+  echo "Outpost Zone Public Subnet ID: {outpost_pub_subnet}"
+  echo "Outpost Zone Private Subnet ID: {outpost_priv_subnet}"
+
+  if [ X"$outpost_priv_subnet" == X"" ] || [ X"$outpost_priv_subnet" == X"null" ] || [ X"$outpost_pub_subnet" == X"" ] || [ X"$outpost_pub_subnet" == X"null" ]; then
+      echo "ERROR: Outpost zone subnet is empty, exit now."
+      exit 1
+  fi
+
+  if [[ "${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP}" == "yes" ]]; then
+    echo $outpost_pub_subnet > $SHARED_DIR/edge_zone_subnet_id
+  else
+    echo $outpost_priv_subnet > $SHARED_DIR/edge_zone_subnet_id
+  fi
+
+  echo $outpost_pub_subnet > $SHARED_DIR/edge_zone_public_subnet_id
+  echo $outpost_priv_subnet > $SHARED_DIR/edge_zone_private_subnet_id
 else
   echo "ERROR: zone type ${EDGE_ZONE_TYPES} is not supported"
   exit 1
