@@ -8,8 +8,8 @@ oc config view
 oc projects
 python3 --version
 
-ES_PASSWORD=$(cat "/secret/password")
-ES_USERNAME=$(cat "/secret/username")
+ES_PASSWORD=$(cat "/secret/es/password")
+ES_USERNAME=$(cat "/secret/es/username")
 
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
