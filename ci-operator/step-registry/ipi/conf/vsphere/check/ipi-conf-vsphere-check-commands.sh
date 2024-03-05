@@ -10,6 +10,11 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
 fi
 
 declare vsphere_datacenter
+
+# only used in zonal and vsphere environments with
+# multiple datacenters
+
+declare -a vsphere_datacenters=()
 declare vsphere_datastore
 declare vsphere_cluster
 declare cloud_where_run
@@ -27,31 +32,25 @@ declare -a portgroup_list
 SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
 declare vsphere_url
 
-if [[ ${LEASED_RESOURCE} == *"segment"* ]]; then
-  # notes: jcallen: to keep backward compatiability with existing vsphere env(s)
-  vsphere_portgroup="${LEASED_RESOURCE}"
-else
-  # notes: jcallen: split the LEASED_RESOURCE e.g. bcr01a.dal10.1153
-  # into: primary router hostname, datacenter and vlan id
+# notes: jcallen: split the LEASED_RESOURCE e.g. bcr01a.dal10.1153
+# into: primary router hostname, datacenter and vlan id
 
-  router=$(awk -F. '{print $1}' <(echo "${LEASED_RESOURCE}"))
-  phydc=$(awk -F. '{print $2}' <(echo "${LEASED_RESOURCE}"))
-  vlanid=$(awk -F. '{print $3}' <(echo "${LEASED_RESOURCE}"))
-  primaryrouterhostname="${router}.${phydc}"
+router=$(awk -F. '{print $1}' <(echo "${LEASED_RESOURCE}"))
+phydc=$(awk -F. '{print $2}' <(echo "${LEASED_RESOURCE}"))
+vlanid=$(awk -F. '{print $3}' <(echo "${LEASED_RESOURCE}"))
+primaryrouterhostname="${router}.${phydc}"
 
-  # notes: jcallen: all new subnets resides on port groups named: ci-vlan-#### where #### is the vlan id.
-  vsphere_portgroup="ci-vlan-${vlanid}"
-  portgroup_list+=("${vsphere_portgroup}")
-  if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-    echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
-    exit 1
-  fi
-
-  vsphere_url=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].virtualcenter' "${SUBNETS_CONFIG}")
-
-  dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
-
+# notes: jcallen: all new subnets resides on port groups named: ci-vlan-#### where #### is the vlan id.
+vsphere_portgroup="ci-vlan-${vlanid}"
+portgroup_list+=("${vsphere_portgroup}")
+if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
+  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+  exit 1
 fi
+
+vsphere_url=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].virtualcenter' "${SUBNETS_CONFIG}")
+
+dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
 
 if [[ -n "${VSPHERE_EXTRA_LEASED_RESOURCE:-}" ]]; then
   i=0
@@ -116,12 +115,8 @@ source "${SHARED_DIR}/govc.sh"
 
 DATACENTERS=("$GOVC_DATACENTER")
 # If testing a zonal install, there are multiple datacenters that will need to be cleaned up
-# vlanid between 1287 and 1302 will use profile:vsphere-multizone-2
-if [ ${vlanid} -ge 1287 ] && [ ${vlanid} -le 1302 ]; then
-  DATACENTERS=(
-    "IBMCloud"
-    "datacenter-2"
-  )
+if [[ "${#vsphere_datacenters[@]}" -gt 0 ]]; then
+     DATACENTERS=("${vsphere_datacenters[@]}")
 fi
 
 # 1. Get the OpaqueNetwork (NSX-T port group) which is listed in LEASED_RESOURCE.
@@ -136,7 +131,7 @@ fi
 set +e
 for i in "${!DATACENTERS[@]}"; do
   echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${vsphere_portgroup} in DC ${DATACENTERS[$i]} and destroy"
-  DATACENTER=$(echo -n ${DATACENTERS[$i]} | tr -d '\n')
+  DATACENTER=$(echo -n "${DATACENTERS[$i]}" | tr -d '\n')
   for portgroup in "${portgroup_list[@]}"; do
     govc ls -json "/${DATACENTER}/network/${portgroup}" |
       jq '.elements[]?.Object.Vm[]?.Value' |
