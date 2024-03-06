@@ -271,6 +271,10 @@ fi
 HYPERSHIFT_SWITCH=""
 if [[ "$HOSTED_CP" == "true" ]]; then
   HYPERSHIFT_SWITCH="--hosted-cp"
+
+  PROVISION_SHARD_ID=0df88a56-5178-11ee-ac07-0a580a83111d
+  HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
+  record_cluster "properties" "provision_shard_id" ${PROVISION_SHARD_ID}
   if [[ "$ENABLE_SECTOR" == "true" ]]; then
     PROVISION_SHARD_ID=$(cat ${SHARED_DIR}/provision_shard_ids | head -n 1)
     if [[ -z "$PROVISION_SHARD_ID" ]]; then
