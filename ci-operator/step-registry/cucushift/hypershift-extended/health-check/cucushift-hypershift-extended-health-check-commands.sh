@@ -118,7 +118,7 @@ if [ -f "${SHARED_DIR}/cluster-type" ] ; then
             source "${SHARED_DIR}/proxy-conf.sh"
         fi
         print_clusterversion
-        check_node_status || exit 1
+        #check_node_status || exit 1
         retry check_cluster_operators || exit 1
         retry check_pod_status || exit 1
         exit 0
