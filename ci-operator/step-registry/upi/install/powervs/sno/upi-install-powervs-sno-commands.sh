@@ -402,7 +402,7 @@ fi
 
 IFS=""
 
-POWERVS_VSI_NAME="\${CLUSTER_NAME}-worker"
+export POWERVS_VSI_NAME="\${CLUSTER_NAME}-worker"
 
 set +x
 export PULL_SECRET_FILE=/root/.sno/pull-secret
@@ -468,12 +468,11 @@ LOCK_FILE="lockfile.lock"
 (
 flock 200 || exit 1
 echo "writing menuentry to grub.cfg "
-sed -i -e "/menuentry 'RHEL CoreOS (Live)' --class fedora --class gnu-linux --class gnu --class os {/r \$(printf '%s' "\$GRUB_MENU_OUTPUT_FILE")" /var/lib/tftpboot/boot/grub2/grub.cfg;
+cat /var/lib/tftpboot/boot/grub2/grub.cfg.cicd | envsubst > /var/lib/tftpboot/boot/grub2/grub.cfg
 systemctl restart tftp;
 
 eecho "writing host entries to dhcpd.conf"
-HOST_ENTRY="host \${POWERVS_VSI_NAME} { hardware ethernet \${MAC_ADDRESS}; fixed-address \${IP_ADDRESS}; }"
-sed -i "/# Static entries/a\    \$(printf '%s' "\$HOST_ENTRY")" /etc/dhcp/dhcpd.conf;
+cat /etc/dhcp/dhcpd.conf.cicd | envsubst > /etc/dhcp/dhcpd.conf
 systemctl restart dhcpd;
 
 echo "write config for haproxy"

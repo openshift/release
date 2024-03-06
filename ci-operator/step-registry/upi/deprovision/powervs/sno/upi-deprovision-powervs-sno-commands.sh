@@ -87,13 +87,11 @@ LOCK_FILE="lockfile.lock"
 (
 flock -n 200 || exit 1;
 echo "removing server host entry from dhcpd.conf"
-HOST_ENTRY="host \${POWERVS_VSI_NAME}"
-sed -i "/\$(printf '%s' "\$HOST_ENTRY")/d" /etc/dhcp/dhcpd.conf
-
+/usr/bin/cp /etc/dhcp/dhcpd.conf.orig /etc/dhcp/dhcpd.conf
 systemctl restart dhcpd;
 
 echo "removing menuentry from grub.cfg"
-sed -i "/# menuentry for \$(printf '%s' "\${CLUSTER_NAME}") start/,/# menuentry for \$(printf '%s' "\${CLUSTER_NAME}") end/d" /var/lib/tftpboot/boot/grub2/grub.cfg
+/usr/bin/cp /var/lib/tftpboot/boot/grub2/grub.cfg.orig /var/lib/tftpboot/boot/grub2/grub.cfg
 systemctl restart tftp;
 
 echo "Recover to orignal haproxy.cfg"
