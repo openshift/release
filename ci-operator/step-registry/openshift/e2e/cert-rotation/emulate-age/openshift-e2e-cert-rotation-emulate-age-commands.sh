@@ -71,7 +71,7 @@ if [[ ${full_steps} -gt 0 ]]; then
     ingress_certificate_age=$((${ingress_certificate_age} + ${CLUSTER_AGE_STEP}))
     if [[ ${ingress_certificate_age} -ge 600 ]]; then
       oc --request-timeout=5s -n openshift-ingress delete secret router-certs-default
-      oc --request-timeout=5s -n openshift-ingress rollout restart deployment/router-default
+      wait-for-operators-to-stabilize
       ingress_certificate_age=0
     fi
   done
