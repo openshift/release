@@ -27,7 +27,7 @@ EOF
 
 function exit_with_failure(){
   # TODO: update message to reflect job name/link
-  MESSAGE="ofcir: ${1:-"Failed to create ci resource: ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"}"
+  MESSAGE="${1:-"Failed to create ci resource: ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"}"
   echo $MESSAGE
   cat >"${ARTIFACT_DIR}/junit_metal_setup.xml" <<EOF
   <testsuite name="metal infra" tests="1" failures="1">
@@ -85,8 +85,13 @@ function getCIR(){
     # ofcir may be unavailable in the cluster(or the ingress machinery), retry once incase we get unlucky,
     # we don't want to overdo it on the retries incase we start leaking CIR's
     if ! timeout 70s curl --retry-all-errors --retry-delay 60 --retry 1 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o $CIRFILE ; then
-        cat "$CIRFILE"
-        return 1
+        BODY=$(cat "$CIRFILE")
+        set +x
+        echo "<==== OFCIR ERROR RESPONSE BODY ====="
+        echo "$BODY"
+        echo ">===================================="
+        set -x
+        exit_with_failure "Could not acquire CI resource: $BODY"
     fi
 
     NAME=$(jq -r .name < $CIRFILE)
@@ -104,7 +109,12 @@ function getCIR(){
     jq -r .ip < $CIRFILE > $IPFILE
     jq -r ".extra | select( . != \"\") // {}" < $CIRFILE | jq ".ofcir_port_ssh // 22" -r > $PORTFILE
     if [ "$(cat $IPFILE)" == "" ] ; then
-        exit_with_failure "Didn't get a CIR IP address"
+        set +x
+        echo "<==== OFCIR ACQUIRE ERROR ====="
+        echo "Timeout waiting for CI resource provisioning"
+        echo ">=============================="
+        set -x
+        exit_with_failure "Timeout waiting for CI resource provisioning"
     fi
 }
 
@@ -115,8 +125,5 @@ CIRTYPE=host
 [ "$CLUSTERTYPE" == "virt-arm64" ] && CIRTYPE=host_arm
 [ "$CLUSTERTYPE" == "lab-small" ] && CIRTYPE=host_lab_small
 
-if [[ ! "$RELEASE_IMAGE_LATEST" =~ build05 ]] ; then
-    echo "WARNING: Attempting to contact lab ofcir API from the wrong cluster, must be build05 to succeed"
-fi
 getCIR && exit_with_success
 exit_with_failure "Failed to create ci resource: ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"
