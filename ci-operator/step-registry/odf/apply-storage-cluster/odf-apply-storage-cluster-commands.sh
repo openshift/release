@@ -1,10 +1,10 @@
 #!/bin/bash
 set -o nounset
-# set -o errexit
+set -o errexit
 set -o pipefail
 
 ## Temp debug
-#trap 'sleep 4h' EXIT SIGINT SIGTERM
+# trap 'sleep 4h' EXIT SIGINT SIGTERM
 
 echo "Deploying a StorageCluster"
 cat <<EOF | oc apply -f -
@@ -32,8 +32,6 @@ spec:
     replica: 3
     resources: {}
 EOF
-
-sleep 4h
 
 # Need to allow some time before checking if the StorageCluster is deployed
 sleep 60
