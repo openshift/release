@@ -98,7 +98,7 @@ END
 }
 
 function deploy_mirror_config_map() {
-  oc debug node/"$(oc get node -lnode-role.kubernetes.io/worker="" -o jsonpath='{.items[0].metadata.name}')" -- chroot /host/ bash -c 'cat /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem' | awk '{ print "    " $0 }' > ca-bundle-crt
+  oc get configmap -n openshift-config user-ca-bundle -o json | jq -r '.data."ca-bundle.crt"' | awk '{ print "    " $0 }' > ca-bundle-crt
   oc apply -f - <<END
 apiVersion: v1
 kind: ConfigMap
