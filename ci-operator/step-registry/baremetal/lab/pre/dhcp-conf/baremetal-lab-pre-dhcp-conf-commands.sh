@@ -41,6 +41,9 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
 $mac,$ip,set:$CLUSTER_NAME,infinite"
 done
 
+DHCP_CONF="${DHCP_CONF}
+$(<"${SHARED_DIR}/ipi_bootstrap_mac_address"),$(<"${SHARED_DIR}/ipi_bootstrap_ip_address"),set:$CLUSTER_NAME,infinite"
+
 echo "Setting the DHCP/PXE config in the auxiliary host..."
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "'${DHCP_CONF}'" "'${DHCP_CONF_OPTS}'" "'${CLUSTER_NAME}'" <<'EOF'

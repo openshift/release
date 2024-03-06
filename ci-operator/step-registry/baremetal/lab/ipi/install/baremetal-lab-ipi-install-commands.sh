@@ -94,6 +94,7 @@ platform:
     ingressVIP: $(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")
     provisioningBridge: $(<"${SHARED_DIR}/provisioning_bridge")
     provisioningNetworkCIDR: $(<"${SHARED_DIR}/provisioning_network")
+    externalMACAddress: $(<"${SHARED_DIR}/ipi_bootstrap_mac_address")
     hosts: []
 "
 
