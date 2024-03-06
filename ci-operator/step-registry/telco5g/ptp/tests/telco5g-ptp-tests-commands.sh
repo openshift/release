@@ -209,8 +209,12 @@ else
 fi
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
-temp_dir=$(mktemp -d -t cnf-XXXXX)
+pattern="4.[0-9]+"
+if [[ "$T5CI_VERSION" =~ $pattern ]]; then
+  source $HOME/golang-1.20
+fi
 
+temp_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$temp_dir" || exit 1
 
 # deploy ptp

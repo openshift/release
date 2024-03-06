@@ -53,7 +53,7 @@ function create_sp_with_custom_role() {
 
     # create service principal with custom role at the scope of subscription
     # sometimes, failed to create sp as role assignment creation failed, retry
-    run_cmd_with_retries_save_output "az ad sp create-for-rbac --role ${custom_role_name} --name ${sp_name} --scopes /subscriptions/${subscription_id}" "${sp_output}" "5"
+    run_cmd_with_retries_save_output "az ad sp create-for-rbac --role '${custom_role_name}' --name ${sp_name} --scopes /subscriptions/${subscription_id}" "${sp_output}" "5"
 }
 
 # az should already be there
@@ -223,12 +223,15 @@ assignable_scopes="""
 \"/subscriptions/${AZURE_AUTH_SUBSCRIPTOIN_ID}\"
 """
 
-# create role definition json file
-jq --null-input \
-   --arg role_name "${CUSTOM_ROLE_NAME}" \
-   --arg description "${role_description}" \
-   --argjson assignable_scopes "[ ${assignable_scopes} ]" \
-   --argjson permission_list "[ ${required_permissions} ]" '
+if [[ -n "${AZURE_PERMISSION_FOR_CLUSTER_SP}" ]]; then
+    sp_role="${AZURE_PERMISSION_FOR_CLUSTER_SP}"
+else
+    # create role definition json file
+    jq --null-input \
+       --arg role_name "${CUSTOM_ROLE_NAME}" \
+       --arg description "${role_description}" \
+       --argjson assignable_scopes "[ ${assignable_scopes} ]" \
+       --argjson permission_list "[ ${required_permissions} ]" '
 {
   "Name": $role_name,
   "IsCustom": true,
@@ -240,13 +243,14 @@ jq --null-input \
   "notDataActions": []
 }' > "${ROLE_DEFINITION}"
 
-echo "Creating custom role..."
-create_custom_role "${ROLE_DEFINITION}" "${CUSTOM_ROLE_NAME}"
-# for destroy
-echo "${CUSTOM_ROLE_NAME}" > "${SHARED_DIR}/azure_custom_role_name"
-
+    echo "Creating custom role..."
+    create_custom_role "${ROLE_DEFINITION}" "${CUSTOM_ROLE_NAME}"
+    # for destroy
+    echo "${CUSTOM_ROLE_NAME}" > "${SHARED_DIR}/azure_custom_role_name"
+    sp_role="${CUSTOM_ROLE_NAME}"
+fi
 echo "Creating sp with custom role..."
-create_sp_with_custom_role "${SP_NAME}" "${CUSTOM_ROLE_NAME}" "${AZURE_AUTH_SUBSCRIPTOIN_ID}" "${SP_OUTPUT}"
+create_sp_with_custom_role "${SP_NAME}" "${sp_role}" "${AZURE_AUTH_SUBSCRIPTOIN_ID}" "${SP_OUTPUT}"
 
 sp_id=$(jq -r .appId "${SP_OUTPUT}")
 sp_password=$(jq -r .password "${SP_OUTPUT}")
