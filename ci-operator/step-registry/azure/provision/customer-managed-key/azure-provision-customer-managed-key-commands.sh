@@ -10,6 +10,28 @@ function run_command() {
     eval "${CMD}"
 }
 
+function run_command_with_retries()
+{
+    local try=0 cmd="$1" retries="${2:-}" ret=0
+    [[ -z ${retries} ]] && max="20" || max=${retries}
+    echo "Trying ${max} times max to run '${cmd}'"
+
+    eval "${cmd}" || ret=$?
+    while [ X"${ret}" != X"0" ] && [ ${try} -lt ${max} ]; do
+        echo "'${cmd}' did not return success, waiting 60 sec....."
+        sleep 60
+        try=$((try + 1))
+        ret=0
+        eval "${cmd}" || ret=$?
+    done
+    if [ ${try} -eq ${max} ]; then
+        echo "Never succeed or Timeout"
+        return 1
+    fi
+    echo "Succeed"
+    return 0
+}
+
 # az should already be there
 command -v az
 az --version
@@ -75,7 +97,7 @@ sp_id=$(az ad sp show --id ${AZURE_AUTH_CLIENT_ID} --query id -o tsv)
 #assign role for sp on scope keyvault
 run_command "az role assignment create --assignee ${sp_id} --role 'Key Vault Crypto Officer' --scope ${kv_id}"
 #create key
-run_command "az keyvault key create --name ${key_name} --vault-name ${keyvault_name}"
+run_command_with_retries "az keyvault key create --name ${key_name} --vault-name ${keyvault_name}" 5
 #create user-assigned managed identity and assign role on scope keyvault
 run_command "az identity create -g ${RESOURCE_GROUP} -n ${user_assinged_identity_name}"
 identity_principal_id=$(az identity show -n ${user_assinged_identity_name} -g ${RESOURCE_GROUP} --query 'principalId' -otsv)
