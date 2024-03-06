@@ -135,6 +135,9 @@ else
   sleep 10
   oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
 
+  echo "Start debugging failing case"
+  sleep 10800
+
   # Execute OpenTelemetry e2e tests
   chainsaw test \
   --report-name "$REPORT_NAME" \
