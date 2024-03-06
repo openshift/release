@@ -8,7 +8,7 @@ set -eo pipefail
 echo "Generating updated list of repos for acknowledge-critical-fixes-only..."
 
 # Manually added repos (space-separated list)
-MANUALLY_ADDED_REPOS="openshift/os"
+MANUALLY_ADDED_REPOS="openshift/os openshift-eng/ocp-build-data openshift-eng/art-tools"
 
 # Function to display usage
 usage() {
@@ -39,7 +39,7 @@ fi
 EXTRACTED_INFO=$(oc adm release info "$PAYLOAD" -o json | jq -r '.references.spec.tags[] | select(.annotations."io.openshift.build.source-location" != "") | .annotations."io.openshift.build.source-location" | capture("https://github.com/(?<org>[^/]+)/(?<repo>[^/]+)") | "\(.org)/\(.repo)"' | sort -u)
 
 # Combine manually added repos with extracted ones and remove duplicates
-COMBINED_INFO=$(echo -e "$MANUALLY_ADDED_REPOS\n$EXTRACTED_INFO" | sort -u | sed '/^$/d')
+COMBINED_INFO=$(echo -e "$(echo -e "$MANUALLY_ADDED_REPOS" | sed 's/[[:space:]]\+/\n/g')\n$EXTRACTED_INFO" | sort -u | sed '/^$/d')
 
 # Check if the extraction was successful
 if [ -z "$COMBINED_INFO" ]; then
