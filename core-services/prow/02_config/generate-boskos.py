@@ -92,7 +92,7 @@ CONFIG = {
         'us-east-2': 5,
     },
     'aws-rhtap-qe-quota-slice': {
-        'us-west-2': 10
+        'us-east-1': 10
     },
     'aws-rhtap-performance-quota-slice': {
         'eu-west-1': 10
