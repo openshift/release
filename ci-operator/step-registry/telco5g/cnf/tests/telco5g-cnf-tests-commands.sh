@@ -220,6 +220,15 @@ function get_time_left {
 }
 
 
+checkout_submodules(){
+  # Use it later to checkout submodules in cnf-features-deploy repo
+  submodule_path=$(git remote get-url origin)
+  local repo
+  local org
+  repo=$(echo "$submodule_path" | sed 's/.*\///' | sed 's/\.git//')
+  org=$(echo "$submodule_path" | cut -d'/' -f4)
+  check_for_pr $org $repo
+}
 
 [[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
 
@@ -301,6 +310,8 @@ if [[ "$T5CI_VERSION" == "4.15" ]] || [[ "$T5CI_VERSION" == "4.16" ]]; then
     # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
     sed -i "s@https://github.com/openshift/metallb-operator.git@https://github.com/openshift/metallb-operator.git\n        branch = main@" .gitmodules
     make init-git-submodules
+    export -f checkout_submodules check_for_pr checkout_pr_branch
+    git submodule foreach --recursive "checkout_submodules"
     git submodule foreach --recursive 'echo $path `git config --get remote.origin.url` `git rev-parse HEAD`' | grep -v Entering > ${ARTIFACT_DIR}/hashes.txt || true
 fi
 popd
@@ -386,7 +397,7 @@ fi
 # if RUN_VALIDATIONS set, run validations
 if $RUN_VALIDATIONS; then
     echo "************ Running validations ************"
-    FEATURES=$VALIDATIONS_FEATURES FEATURES_ENVIRONMENT="ci" stdbuf -o0 make feature-deploy-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-validations-run.log ${ARTIFACT_DIR}/saved-cnf-validations.log || val_status=$?
+    PULL_URL=$PULL_URL PR_URLS=$PR_URLS FEATURES=$VALIDATIONS_FEATURES FEATURES_ENVIRONMENT="ci" stdbuf -o0 make feature-deploy-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-validations-run.log ${ARTIFACT_DIR}/saved-cnf-validations.log || val_status=$?
 fi
 # set overall status to fail if validations failed
 if [[ ${val_status} -ne 0 ]]; then
