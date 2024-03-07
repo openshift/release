@@ -5,8 +5,8 @@ build_root:
       RUN dnf install -y --nodocs python3.9 python3-pip git
       RUN pip3.9 install --upgrade pip
 images:
-  - dockerfile_path: Dockerfile.odh
-    to: model-registry
+- dockerfile_path: Dockerfile.odh
+  to: model-registry
 releases:
   latest:
     release:
@@ -46,38 +46,38 @@ tests:
       HYPERSHIFT_AWS_REGION: us-west-2
       HYPERSHIFT_NODE_COUNT: "3"
     test:
-      - as: main
-        cli: latest
-        commands: |
-          # Print last commit of current code
-          git log --name-status HEAD^..HEAD
-          # Print image used for tests
-          echo "Using image ${ODH_MODEL_REGISTRY_IMAGE}"
-          # Install Robot Framework tests requirements
-          pip3.9 install -r test/robot/requirements.txt
-          # Install Python client for model-registry
-          pip3.9 install -e clients/python
-          # Change URL for tests
-          sed -i -e "s/localhost/model-registry-service/" test/robot/*.resource test/robot/*.py
-          # Change image of model-registry deployment
-          sed -i -e "s|image: quay.io/opendatahub/model-registry.*|image: ${ODH_MODEL_REGISTRY_IMAGE}|" manifests/kustomize/base/model-registry-deployment.yaml
-          # Create namespace for tests
-          oc create namespace kubeflow
-          # Deploy model-registry instance
-          oc apply -k manifests/kustomize/overlays/postgres
-          # Wait for model-registry deployment availability
-          oc wait -n kubeflow deployment/model-registry-deployment --for condition=Available --timeout=180s
-          # Run Robot Framework tests
-          robot model-registry/test/robot
-          # Save tests logs
-          cp output.xml log.html report.html ${ARTIFACTS_DIR}
-        dependencies:
-          - env: ODH_MODEL_REGISTRY_IMAGE
-            name: model-registry
-        from: src
-        resources:
-          requests:
-            cpu: 100m
+    - as: main
+      cli: latest
+      commands: |
+        # Print last commit of current code
+        git log --name-status HEAD^..HEAD
+        # Print image used for tests
+        echo "Using image ${ODH_MODEL_REGISTRY_IMAGE}"
+        # Install Robot Framework tests requirements
+        pip3.9 install -r test/robot/requirements.txt
+        # Install Python client for model-registry
+        pip3.9 install -e clients/python
+        # Change URL for tests
+        sed -i -e "s/localhost/model-registry-service/" test/robot/*.resource test/robot/*.py
+        # Change image of model-registry deployment
+        sed -i -e "s|image: quay.io/opendatahub/model-registry.*|image: ${ODH_MODEL_REGISTRY_IMAGE}|" manifests/kustomize/base/model-registry-deployment.yaml
+        # Create namespace for tests
+        oc create namespace kubeflow
+        # Deploy model-registry instance
+        oc apply -k manifests/kustomize/overlays/postgres
+        # Wait for model-registry deployment availability
+        oc wait -n kubeflow deployment/model-registry-deployment --for condition=Available --timeout=180s
+        # Run Robot Framework tests
+        robot model-registry/test/robot
+        # Save tests logs
+        cp output.xml log.html report.html ${ARTIFACTS_DIR}
+      dependencies:
+      - env: ODH_MODEL_REGISTRY_IMAGE
+        name: model-registry
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     workflow: hypershift-hostedcluster-workflow
   timeout: 4h0m0s
 zz_generated_metadata:
