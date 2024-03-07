@@ -158,7 +158,7 @@ EOF
             <success message="">Host #${HOST} ($HOSTNAME) should be reachable and respond on the SSH port</success>
           </testcase>
           <testcase name="install should succeed: host booted expected live image">
-            <failure message="">openshift cluster install failed with wrong live image booted</failure>
+            <failure message="">Host #${HOST} ($HOSTNAME) should boot the expected live image</failure>
           </testcase>
           <testcase name="install should succeed: overall">
             <failure message="">openshift cluster install failed overall</failure>
@@ -176,7 +176,7 @@ EOF
             <success message="">Host #${HOST} ($HOSTNAME) should boot the expected live image</success>
           </testcase>
           <testcase name="install should succeed: host installed CoreOS">
-            <failure message="">openshift cluster install failed installing CoreOS</failure>
+            <failure message="">Host #${HOST} ($HOSTNAME) should boot the installed OS from Disk</failure>
           </testcase>
           <testcase name="install should succeed: overall">
             <failure message="">openshift cluster install failed overall</failure>
