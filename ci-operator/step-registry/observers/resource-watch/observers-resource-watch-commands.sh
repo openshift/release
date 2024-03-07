@@ -15,7 +15,7 @@ function cleanup() {
     kill ${CHILDREN} && wait
   fi
 
-  tar -czC $STORE_PATH -f "${ARTIFACT_DIR}/resource-watch-store.tar.gz" .
+  tar czvf "${ARTIFACT_DIR}/resource-watch-store.tar.gz" $STORE_PATH/
   rm -rf $STORE_PATH
 
   echo "ended resource watch gracefully"
