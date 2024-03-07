@@ -87,8 +87,14 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: kubernetes-tests
 - dockerfile_literal: |
-    # This uses the new rhel-coreos base image
-    # https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
+    # We want to test the PR using the code from it. Now, this repo ships RPMs
+    # which are normally part of RHCOS. We need to make sure that RHCOS itself
+    # is updated with the freshly built RPMs from the PR run. To do this, we do a
+    # multi-stage build: the first stage downloads the RPMs that were just built
+    # (the `base-machine-with-rpms` contains the RPMs), and the second stage
+    # installs the RPMs into RHCOS (this uses the fact that RHCOS is now a native
+    # bootable container).
+    # See also: https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
     FROM quay.io/centos/centos:stream9 as build
     # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
     # in a container https://github.com/coreos/rpm-ostree/issues/4034
