@@ -78,15 +78,17 @@ if [ $? -ne 0 ]; then
   echo "Timed out waiting for login"
   exit 1
 fi
+INSTALLER_FOLDER="${HOME}/rhtap-installer"
 
 clone_repo(){
+  pwd & ls -l
   if [[ "${JOB_NAME}" == *"redhat-appstudio-rhtap-installer"* ]]; then
     echo "[INFO]Skip cloning rhtap-installer repo..."
     return
   fi
   echo "[INFO]Cloning rhtap-installer repo..."
-  git clone https://github.com/redhat-appstudio/rhtap-installer.git
-  cd rhtap-installer
+  git clone https://github.com/redhat-appstudio/rhtap-installer.git "$INSTALLER_FOLDER"
+  cd "$INSTALLER_FOLDER"
 }
 
 wait_for_pipeline() {
