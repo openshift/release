@@ -5,17 +5,16 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
-    context: ci/prow/e2e-kubevirt-aws-ovn
+    context: ci/prow/hypershift-kubevirt-conformance-baremetalds
     decorate: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-virtualization
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cloud-provider-kubevirt-release-4.17-e2e-kubevirt-aws-ovn
+    name: pull-ci-openshift-cloud-provider-kubevirt-release-4.17-hypershift-kubevirt-conformance-baremetalds
     path_alias: kubevirt.io/cloud-provider-kubevirt-cloud
-    rerun_command: /test e2e-kubevirt-aws-ovn
+    rerun_command: /test hypershift-kubevirt-conformance-baremetalds
     spec:
       containers:
       - args:
@@ -24,8 +23,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-kubevirt-aws-ovn-cluster-profile
-        - --target=e2e-kubevirt-aws-ovn
+        - --secret-dir=/usr/local/hypershift-kubevirt-conformance-baremetalds-cluster-profile
+        - --target=hypershift-kubevirt-conformance-baremetalds
         command:
         - ci-operator
         image: ci-operator:latest
@@ -41,7 +40,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-kubevirt-aws-ovn-cluster-profile
+        - mountPath: /usr/local/hypershift-kubevirt-conformance-baremetalds-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -68,7 +67,7 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
-          secretName: cluster-secrets-aws-virtualization
+          secretName: cluster-secrets-equinix-ocp-metal
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -78,7 +77,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-kubevirt-aws-ovn,?($|\s.*)
+    trigger: (?m)^/test( | .* )hypershift-kubevirt-conformance-baremetalds,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
