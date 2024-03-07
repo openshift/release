@@ -14,7 +14,9 @@ detach_nodes() {
     echo 'Deleting the nodes forcefully by patching the machines finalizers'
     machines=$(oc get machines.cluster.x-k8s.io -n $hcp_ns --no-headers | awk '{print $1}')
     machines=$(echo "$machines" | tr '\n' ' ')
+    echo "Machines : $machines"
     IFS=' ' read -ra machines_list <<< "$machines"
+    echo "Machines List : $machines_list"
     for ((i=0; i<$HYPERSHIFT_NODE_COUNT; i++)); do
         oc delete node compute-$i.$job_id-$HYPERSHIFT_BASEDOMAIN --kubeconfig "${SHARED_DIR}/nested_kubeconfig"
         oc patch machine.cluster.x-k8s.io ${machines_list[i]} -n "$hcp_ns" -p '{"metadata":{"finalizers":null}}' --type=merge
