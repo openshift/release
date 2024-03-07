@@ -34,42 +34,10 @@ function deleteDedicatedHost() {
     run_command "${IBMCLOUD_CLI} is dhgd ${dhg} -f"
 }
 
-function run_command_with_retries() {
-  cmd="$1"
-  retries="$2"
-  interval="$3"
-
-  if [ X"$retries" == X"" ]; then
-      retries=20
-  fi
-
-  if [ X"$interval" == X"" ]; then
-      interval=30
-  fi
-
-  set +o errexit
-  output=$(eval "$cmd"); ret=$?
-  try=1
-
-  # avoid exit with "del Resource groups with active or pending reclamation instances can't be deleted"
-  while [ X"$ret" != X"0" ] && [ $try -lt $retries ]; do
-      sleep $interval
-      output=$(eval "$cmd"); ret=$?
-      try=$(expr $try + 1)
-  done
-  set -o errexit
-
-  if [ X"$try" == X"$retries" ]; then
-      return 2
-  fi
-  echo "$output"
-  return 0
-}
-
 ibmcloud_login
 
 #the file which saved the resource group of the pre created dedicated host group (just created when create the pre dedicated host, and not in Default group).
-dhgRGFile=${SHARED_DIR}/ibmcloud_resource_group_dhg
+dhgRGFile="${SHARED_DIR}/ibmcloud_resource_group"
 dh_file=${SHARED_DIR}/dedicated_host
 
 dhgRG=$(cat ${dhgRGFile})
@@ -87,8 +55,3 @@ if [[ ${#dhs[@]} != 0 ]]; then
     echo "ERROR: fail to clean up the pre created dedicated host in ${dhgRG}:" "${dhs[@]}"
     exit 1
 fi
-
-delCmd="${IBMCLOUD_CLI} resource group-delete -f ${dhgRG}"
-echo ${delCmd}
-run_command_with_retries "${delCmd}" 20 20
-

@@ -22,45 +22,19 @@ function run_command() {
     eval "${CMD}"
 }
 
-function run_command_with_retries() {
-  cmd="$1"
-  retries="$2"
-  interval="$3"
+rg_file="${SHARED_DIR}/ibmcloud_resource_group"
+if [ -f "${rg_file}" ]; then
+    resource_group=$(cat "${rg_file}")
+else
+    echo "Did not found a provisoned resource group"
+    exit 1
+fi
 
-  if [ X"$retries" == X"" ]; then
-      retries=20
-  fi
-
-  if [ X"$interval" == X"" ]; then
-      interval=30
-  fi
-
-  set +o errexit
-  output=$(eval "$cmd"); ret=$?
-  try=1
-
-  # avoid exit with "del Resource groups with active or pending reclamation instances can't be deleted"
-  while [ X"$ret" != X"0" ] && [ $try -lt $retries ]; do
-      sleep $interval
-      output=$(eval "$cmd"); ret=$?
-      try=$(expr $try + 1)
-  done
-  set -o errexit
-
-  if [ X"$try" == X"$retries" ]; then
-      return 2
-  fi
-  echo "$output"
-  return 0
-}
+echo "ResourceGroup: ${resource_group}"
+ibmcloud_login ${resource_group}
 
 key_file="${SHARED_DIR}/ibmcloud_key.json"
-
-
 cat ${key_file}
-RESOURCE_GROUP=$(jq -r .resource_group ${key_file})
-echo "ResourceGroup: ${RESOURCE_GROUP}"
-ibmcloud_login ${RESOURCE_GROUP}
 
 keyTypes=("master" "worker" "default")
 for keyType in "${keyTypes[@]}"; do
@@ -74,10 +48,3 @@ for keyType in "${keyTypes[@]}"; do
         run_command "ibmcloud resource service-instance-delete ${id} -f" || true
     fi
 done
-
-delCmd="${IBMCLOUD_CLI} resource group-delete -f ${RESOURCE_GROUP}"
-echo ${delCmd}
-run_command_with_retries "${delCmd}" 20 20
-
-
-
