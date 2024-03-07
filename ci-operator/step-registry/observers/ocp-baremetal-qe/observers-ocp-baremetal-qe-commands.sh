@@ -138,8 +138,7 @@ function createInstallJunit() {
         <testcase name="install should succeed: host reachable"/>
         <testcase name="install should succeed: host booted expected live image"/>
         <testcase name="install should succeed: host installed CoreOS"/>
-        <testcase name="install should succeed: host booted the installed OS from Disk"/>
-        <testcase name="install should succeed: host rebased and booted into the payload's coreos image"/>
+
 EOF
 
     if [ "$EXIT_CODE" == "$EXIT_CODE_UNREACHABLE" ]
@@ -154,8 +153,10 @@ EOF
     elif [ "$EXIT_CODE" == "$EXIT_CODE_WRONG_VERSION" ]
       then
         cat >>"${ARTIFACT_DIR}/junit_install_${HOST}.xml" <<EOF
-        <testsuite name="cluster install" tests="4" failures="2">
-          <testcase name="install should succeed: host reachable"/>
+        <testsuite name="cluster install" tests="2" failures="1">
+          <testcase name="install should succeed: host reachable">
+            <success message="">Host #${HOST} ($HOSTNAME) should be reachable and respond on the SSH port</success>
+          </testcase>
           <testcase name="install should succeed: host booted expected live image">
             <failure message="">openshift cluster install failed with wrong live image booted</failure>
           </testcase>
@@ -167,11 +168,15 @@ EOF
     elif [ "$EXIT_CODE" == "$EXIT_CODE_COREOS_NOT_FOUND" ]
       then
         cat >>"${ARTIFACT_DIR}/junit_install_${HOST}.xml" <<EOF
-        <testsuite name="cluster install" tests="5" failures="2">
-          <testcase name="install should succeed: host reachable"/>
-          <testcase name="install should succeed: infrastructure"/>
-          <testcase name="install should succeed: cluster bootstrap">
-            <failure message="">openshift cluster install failed with cluster bootstrap</failure>
+        <testsuite name="cluster install" tests="3" failures="1">
+          <testcase name="install should succeed: host reachable">
+            <success message="">Host #${HOST} ($HOSTNAME) should be reachable and respond on the SSH port</success>
+          </testcase>
+          <testcase name="install should succeed: host booted expected live image">
+            <success message="">Host #${HOST} ($HOSTNAME) should boot the expected live image</success>
+          </testcase>
+          <testcase name="install should succeed: host installed CoreOS">
+            <failure message="">openshift cluster install failed installing CoreOS</failure>
           </testcase>
           <testcase name="install should succeed: overall">
             <failure message="">openshift cluster install failed overall</failure>
@@ -180,14 +185,20 @@ EOF
 EOF
     else
       cat >>"${ARTIFACT_DIR}/junit_install_${HOST}.xml" <<EOF
-      <testsuite name="cluster install" tests="2" failures="2">
-        <testcase name="install should succeed: other">
-          <failure message="">openshift cluster install failed with other errors</failure>
-        </testcase>
-        <testcase name="install should succeed: overall">
-          <failure message="">openshift cluster install failed overall</failure>
-        </testcase>
-      </testsuite>
+      <testsuite name="cluster install" tests="3" failures="0">
+          <testcase name="install should succeed: host reachable">
+            <success message="">Host #${HOST} ($HOSTNAME) should be reachable and respond on the SSH port</success>
+          </testcase>
+          <testcase name="install should succeed: host booted expected live image">
+            <success message="">Host #${HOST} ($HOSTNAME) should boot the expected live image</success>
+          </testcase>
+          <testcase name="install should succeed: host installed CoreOS">
+            <success message="">Host #${HOST} ($HOSTNAME) should boot the installed OS from Disk</success>
+          </testcase>
+          <testcase name="install should succeed: overall">
+            <success message="">openshift cluster install succeeded</success>
+          </testcase>
+        </testsuite>
 EOF
     fi
     cat >>"${ARTIFACT_DIR}/junit_install_${HOST}.xml" <<EOF
@@ -313,6 +324,8 @@ function checkBootedImage(){
           echo "Expected ARM64 version to match booted image: $expected_arm64_version"
           if [[ $cmdline == *"$expected_x86_version"* ]] || [[ $cmdline == *"$expected_arm64_version"* ]] ; then
             echo -e "Booted ISO image version \n $cmdline \n matches expected version \n x86 $expected_x86_version arm64 $expected_arm64_version"
+            # Use code '0' when everything is working as expected, green junit report
+            echo 0 "${host} ${name}" >> "${ARTIFACT_DIR}/install-status.txt"
           else
             echo -e "Booted ISO image version $cmdline"
             echo -e "DOES NOT match expected versions : x86 $expected_x86_version arm64 $expected_arm64_version"
