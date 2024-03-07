@@ -21,6 +21,8 @@ echo "export GIT_COMMITTER_NAME='CI User'" >> "$MAINENV"
 echo "export GIT_COMMITTER_EMAIL='cnf-devel@redhat.com'" >> "$MAINENV"
 echo "export REPO_OWNER=${REPO_OWNER:-''}" >> "$MAINENV"
 echo "export REPO_NAME=${REPO_NAME:-''}" >> "$MAINENV"
+echo "export PULL_URL=${PULL_URL:-''}" >> "$MAINENV"
+echo "export PR_URLS=${PR_URLS:-''}" >> "$MAINENV"
 echo "#######################################################" >> "$MAINENV"
 
 if [[ "$PROW_JOB_ID" = *"nightly"* ]] && [[ "$JOB_TYPE" == "periodic" ]]; then
