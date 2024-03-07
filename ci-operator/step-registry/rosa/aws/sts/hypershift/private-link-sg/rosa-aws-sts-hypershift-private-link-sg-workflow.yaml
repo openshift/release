@@ -1,5 +1,5 @@
 workflow:
-  as: rosa-aws-sts-hypershift-private-link
+  as: rosa-aws-sts-hypershift-private-link-sg
   steps:
     env:
       HOSTED_CP: "true"
@@ -13,6 +13,7 @@ workflow:
       BYO_OIDC: "true"
       OIDC_CONFIG_MANAGED: "false"
       ZONES_COUNT: "1"
+      MP_ADDITIONAL_SECURITY_GROUP: "true"
     pre:
     - ref: aws-provision-vpc-shared
     - ref: aws-provision-security-group
@@ -23,7 +24,9 @@ workflow:
     - chain: rosa-cluster-provision
     - ref: aws-provision-tags-for-byo-vpc
     - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-conf-machine-pool
     - ref: rosa-cluster-wait-ready-nodes
+    
     post:
     - chain: rosa-cluster-deprovision
     - chain: rosa-sts-oidc-config-delete
@@ -31,5 +34,5 @@ workflow:
     - ref: aws-deprovision-s3buckets
     - ref: aws-deprovision-stacks
   documentation: |-
-    This workflow installs a single AZ rosa hypershfit cluster configured to use private-link. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
+    This workflow installs a single AZ rosa hypershfit cluster configured to use private-link has an additional machinepool with security group set. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
     After finish testing, the cluster will be deprovsioned.
