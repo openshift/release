@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: cli
   operator-sdk:
-    name: "4.14"
+    name: "4.13"
     namespace: origin
     tag: operator-sdk
   shellcheck:
@@ -60,18 +60,26 @@ tests:
       PROJECT_NAME: openshift-power-monitoring/power-monitoring-operator
     workflow: openshift-ci-security
 - as: power-monitoring-operator-e2e
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
   steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "true"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
     test:
     - as: install
       cli: latest
       commands: |
+        export HOME=/tmp/home
+        export XDG_RUNTIME_DIR=/tmp/home/containers
+        mkdir -p $XDG_RUNTIME_DIR
+        OLD_KUBECONFIG=${KUBECONFIG}
+        unset KUBECONFIG
+        oc registry login
+        echo "exporting the KUBECONFIG"
+        export KUBECONFIG="${OLD_KUBECONFIG}"
         operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
       dependencies:
       - env: OO_BUNDLE
@@ -82,7 +90,7 @@ tests:
           cpu: 100m
           memory: 400Mi
     - ref: openshift-power-monitoring-tests-power-monitoring-operator
-    workflow: generic-claim
+    workflow: baremetal-lab-upi
 zz_generated_metadata:
   branch: v1alpha1
   org: openshift-power-monitoring

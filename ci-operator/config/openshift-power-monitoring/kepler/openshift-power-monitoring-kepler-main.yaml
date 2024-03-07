@@ -33,18 +33,26 @@ tests:
       PROJECT_NAME: openshift-power-monitoring/kepler
     workflow: openshift-ci-security
 - as: kepler-e2e
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
   steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "true"
+      architecture: amd64
+      masters: "3"
+      workers: "3"
     test:
     - as: deploy-kepler
       cli: latest
       commands: |
+        export HOME=/tmp/home
+        export XDG_RUNTIME_DIR=/tmp/home/containers
+        mkdir -p $XDG_RUNTIME_DIR
+        OLD_KUBECONFIG=${KUBECONFIG}
+        unset KUBECONFIG
+        oc registry login
+        echo "exporting the KUBECONFIG"
+        export KUBECONFIG="${OLD_KUBECONFIG}"
         GOFLAGS="" make tools
         GOFLAGS="" make build-manifest OPTS="OPENSHIFT_DEPLOY"
         oc apply -f _output/generated-manifest/deployment.yaml
@@ -57,7 +65,7 @@ tests:
           cpu: 100m
           memory: 400Mi
     - ref: openshift-power-monitoring-tests-kepler
-    workflow: generic-claim
+    workflow: baremetal-lab-upi
 zz_generated_metadata:
   branch: main
   org: openshift-power-monitoring
