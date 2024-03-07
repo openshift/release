@@ -34,6 +34,12 @@ do
   sleep 5;
 done
 sudo ls -la /var/lib/microshift/resources/kubeadmin/
+
+sleep 60
+sudo ls /etc/cni/net.d/ || true
+sudo cat /etc/cni/net.d/00-multus.conf || true
+sudo cat /tmp/multus || true
+
 sudo systemctl restart greenboot-healthcheck
 
 EOF
@@ -59,6 +65,12 @@ while [ ${retries} -gt 0 ] ; do
   echo "Not ready yet. Waiting 30 seconds... (${retries} retries remaining)"
   sleep 30
 done
+
+ssh "${INSTANCE_PREFIX}" "sudo ls /etc/cni/net.d/" || true
+ssh "${INSTANCE_PREFIX}" "sudo cat /etc/cni/net.d/00-multus.conf" || true
+ssh "${INSTANCE_PREFIX}" "sudo cat /tmp/multus" || true
+
+sleep 60m
 
 # All retries waiting for the cluster failed
 exit 1

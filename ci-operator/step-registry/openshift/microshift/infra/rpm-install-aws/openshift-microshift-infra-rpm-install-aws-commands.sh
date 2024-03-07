@@ -34,20 +34,26 @@ sudo subscription-manager register \
   --org="$(cat /var/run/rhsm/subscription-manager-org)" \
   --activationkey="$(cat /var/run/rhsm/subscription-manager-act-key)"
 
+for _ in \$(seq 5); do
+  if sudo dnf install git -y; then
+    break
+  fi
+  sudo dnf clean -y all
+  sleep 10
+done
+
 sudo mkdir -p /etc/microshift
 sudo mv /tmp/config.yaml /etc/microshift/config.yaml
-tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
+cd ~
+git clone --branch multus/rpm-debug https://github.com/pmtk/microshift.git
 cd ~/microshift
 ./scripts/devenv-builder/configure-vm.sh --force-firewall --pull-images /tmp/pull-secret
 EOF
 chmod +x /tmp/install.sh
 
-tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
-
 scp \
   /tmp/install.sh \
   "${CLUSTER_PROFILE_DIR}/pull-secret" \
-  /tmp/microshift.tgz \
   /tmp/config.yaml \
   "${INSTANCE_PREFIX}:/tmp"
 
