@@ -138,6 +138,8 @@ e2e_test(){
   ./bin/make.sh -n "$NAMESPACE" test
 }
 
+cd "$(mktemp -d)"
+
 clone_repo
 install_rhtap
 e2e_test
