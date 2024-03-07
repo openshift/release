@@ -22,8 +22,11 @@ GITHUB_ORGANIZATION="rhtap-rhdh-qe"
 GITHUB_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
 RED_HAT_DEVELOPER_HUB_URL=$(oc get route developer-hub -n rhtap -o jsonpath='{.spec.host}')
 
-git clone -b suites_sep https://github.com/flacatus/rhtap-e2e.git
+cd "$(mktemp -d)"
 
-/bin/bash ./rhtap-e2e/scripts/create-creds.sh "${APPLICATION_ROOT_NAMESPACE}"
+git clone -b suites_sep https://github.com/flacatus/rhtap-e2e.git
+cd rhtap-e2e
+
+/bin/bash ./scripts/create-creds.sh "${APPLICATION_ROOT_NAMESPACE}"
 
 yarn && yarn test
