@@ -16,14 +16,6 @@ function ibmcloud_login {
     ibmcloud plugin list
 }
 
-
-function create_resource_group() {
-    local rg="$1"
-    echo "create resource group ... ${rg}"
-    "${IBMCLOUD_CLI}" resource group-create ${rg} || return 1
-    "${IBMCLOUD_CLI}" target -g ${rg} || return 1
-}
-
 function createKey() {
     local instance_name=$1
     local region=$2
@@ -52,16 +44,21 @@ function createKey() {
 
 ibmcloud_login
 
+rg_file="${SHARED_DIR}/ibmcloud_resource_group"
+if [ -f "${rg_file}" ]; then
+    resource_group=$(cat "${rg_file}")
+else
+    echo "Did not found a provisoned resource group"
+    exit 1
+fi
+"${IBMCLOUD_CLI}" target -g ${resource_group}
+
 ## Create the instances for BYOK
 echo "$(date -u --rfc-3339=seconds) - Creating the instance for BYOK..."
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
-
-resource_group="${CLUSTER_NAME}-rg"
-
 key_file="${SHARED_DIR}/ibmcloud_key.json"
 
-create_resource_group ${resource_group}
 cat >${key_file} <<EOF
 {
   "resource_group": "${resource_group}"

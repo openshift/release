@@ -6,7 +6,6 @@ set -o pipefail
 
 #pre create the dedicated hosts based on the ${SHARED_DIR}/dedicated_host.yaml and update "${SHARED_DIR}/dedicated_host.yaml
 #save the dedicated host name for master nodes and worker nodes in "${SHARED_DIR}/dedicated_host"
-#save the resource group name of the dedicated host group in "${SHARED_DIR}/ibmcloud_resource_group_dhg"
 
 function run_command() {
     local CMD="$1"
@@ -73,6 +72,13 @@ function waitingStatus() {
 #####################################
 ##############Initialize#############
 #####################################
+rg_file="${SHARED_DIR}/ibmcloud_resource_group"
+if [ -f "${rg_file}" ]; then
+    resource_group=$(cat "${rg_file}")
+else
+    echo "Did not found a provisoned resource group"
+    exit 1
+fi
 
 dhProfile="bx2-host-152x608"
 masterProfile="bx2-8x32"
@@ -85,7 +91,6 @@ CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 dhName="${CLUSTER_NAME}-dh"
 
-dhgRGFile=${SHARED_DIR}/ibmcloud_resource_group_dhg
 dh_file=${SHARED_DIR}/dedicated_host
 
 #####################################
@@ -93,12 +98,7 @@ dh_file=${SHARED_DIR}/dedicated_host
 #####################################
 ibmcloud_login
 
-#create the resouce group of the dedicated host group and saved in "${SHARED_DIR}/ibmcloud_resource_group_dhg"
-rg_dhg="${CLUSTER_NAME}-dhrg"
-
-echo "create resource group ... ${rg_dhg}"
-"${IBMCLOUD_CLI}" resource group-create ${rg_dhg} || exit 1
-echo "${rg_dhg}" >  ${dhgRGFile}
+rg_dhg="${resource_group}"
 
 run_command "${IBMCLOUD_CLI} target -g $rg_dhg"
 
@@ -132,13 +132,5 @@ compute:
       dedicatedHosts:
       - name: ${dhName}
 EOF
-
-#OCPBUGS-5906 [IPI-IBMCloud] fail to retrieve the dedicated host which is not in the cluster group when provisioning the worker nodes
-cat >> "${SHARED_DIR}/dedicated_host.yaml" << EOF
-platform:
-  ibmcloud:
-    resourceGroupName: ${rg_dhg}
-EOF
-
 
 cat "${SHARED_DIR}/dedicated_host.yaml"

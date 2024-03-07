@@ -1,0 +1,25 @@
+chain:
+  as: cucushift-installer-rehearse-ibmcloud-ipi-private-byo-kms-provision
+  steps:
+  - ref: ibmcloud-provision-resourcegroup
+  - ref: ibmcloud-provision-vpc
+  - chain: ibmcloud-provision-bastionhost
+  - ref: ibmcloud-provision-kms-key
+  - ref: proxy-config-generate
+  - chain: ipi-conf-ibmcloud
+  - ref: ipi-conf-ibmcloud-provisionednetwork
+  - ref: ipi-conf-ibmcloud-kms-key
+  - ref: ipi-conf-ibmcloud-provisioned-resourcegroup
+  - ref: ipi-install-monitoringpvc
+  - chain: ipi-install
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-ibmcloud
+  - ref: cucushift-installer-check-ibmcloud-private
+  - ref: cucushift-installer-check-ibmcloud-kms-key
+  env:
+  - name: PUBLISH
+    default: "Internal"
+  documentation: |-
+    The IPI setup step contains all steps that provision an OpenShift cluster
+    with BYOK(Bring You Own Key) on IBMCloud for QE e2e tests.
