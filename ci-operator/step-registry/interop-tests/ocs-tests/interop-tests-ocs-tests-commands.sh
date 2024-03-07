@@ -18,6 +18,15 @@ LOGS_FOLDER="${ARTIFACT_DIR}/ocs-tests"
 LOGS_CONFIG="${LOGS_FOLDER}/ocs-tests-config.yaml"
 CLUSTER_PATH="${ARTIFACT_DIR}/ocs-tests"
 
+#
+# Remove the ACM Subscription to allow OCS interop tests full control of operators
+#
+OUTPUT=$(oc get subscription.apps.open-cluster-management.io -n policies openshift-plus-sub 2>/dev/null || true)
+if [[ "$OUTPUT" != "" ]]; then
+	oc get subscription.apps.open-cluster-management.io -n policies openshift-plus-sub -o yaml > /tmp/acm-policy-subscription-backup.yaml
+	oc delete subscription.apps.open-cluster-management.io -n policies openshift-plus-sub
+fi
+
 # Overwrite OCS Test data folder
 export OCSCI_DATA_DIR="${ARTIFACT_DIR}"
 
@@ -64,3 +73,11 @@ if [[ ${DIFF_TIME} -le 1800 ]]; then
 else
     echo "Finished in: ${DIFF_TIME} sec"
 fi
+
+#
+# Restore the ACM subscription
+#
+if [[ -f /tmp/acm-policy-subscription-backup.yaml ]]; then
+	oc apply -f /tmp/acm-policy-subscription-backup.yaml
+fi
+
