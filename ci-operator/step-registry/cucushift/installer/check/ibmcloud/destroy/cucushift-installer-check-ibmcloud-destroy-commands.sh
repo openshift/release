@@ -21,7 +21,7 @@ function run_command() {
     echo "Running Command: ${CMD}"
     eval "${CMD}"
 }
-set -x
+
 ibmcloud_login
 
 CLUSTER_FILTER="${NAMESPACE}-${UNIQUE_HASH}"
