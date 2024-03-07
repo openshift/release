@@ -1,0 +1,45 @@
+build_root:
+  image_stream_tag:
+    name: ubi-python-311
+    namespace: ocp
+    tag: "9"
+images:
+- dockerfile_path: Dockerfile
+  to: acm-workload
+promotion: {}
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: acm-workload
+    env:
+      IMAGE_REPO: acm-workload
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: acm-workload
+    env:
+      IMAGE_REPO: acm-workload
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: release-2.10
+    workflow: ocm-ci-fastforward
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: acm-workload
