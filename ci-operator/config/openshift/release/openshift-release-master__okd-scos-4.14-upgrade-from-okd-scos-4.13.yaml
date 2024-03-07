@@ -1,0 +1,57 @@
+releases:
+  initial:
+    candidate:
+      product: okd
+      stream: okd-scos
+      version: "4.13"
+  latest:
+    candidate:
+      product: okd
+      stream: okd-scos
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-ovn-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    workflow: openshift-upgrade-aws
+- as: e2e-gcp-ovn-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp
+- as: e2e-gcp-ovn-rt-upgrade
+  cluster: build02
+  interval: 168h
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-gcp-ovn-rt
+  timeout: 5h0m0s
+- as: e2e-gcp-ovn-rt-upgrade-test
+  cluster: build02
+  interval: 168h
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      TEST_TYPE: upgrade-rt
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-gcp-ovn-rt
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: okd-scos-4.14-upgrade-from-okd-scos-4.13
