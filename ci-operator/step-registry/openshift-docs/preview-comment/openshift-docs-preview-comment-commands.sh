@@ -10,23 +10,8 @@ GITHUB_AUTH_TOKEN=$(cat /tmp/vault/ocp-docs-github-secret/GITHUB_AUTH_TOKEN)
 export GITHUB_AUTH_TOKEN
 
 PREVIEW_URL="https://${PULL_NUMBER}--${PREVIEW_SITE}.netlify.app"
-pages=("")
 
-if [ -e "${SHARED_DIR}/NETLIFY_SUCCESS" ]; then
-    COMMENT_DATA="🤖 $(date +'%a %b %d %T') - Prow CI generated the docs preview: ${PREVIEW_URL}"
-elif [ -e "${SHARED_DIR}/UPDATED_PAGES" ]; then
-    COMMENT_DATA="🤖 $(date +'%a %b %d %T') - Prow CI generated the docs preview:"
-
-    # Get the list of URLs generated in the build step
-    while IFS= read -r updated_page; do
-        pages+=("${updated_page}")
-    done < "${SHARED_DIR}/UPDATED_PAGES"
-
-    # Append the page URLs to the comment data
-    for page in "${pages[@]}"; do
-        COMMENT_DATA+="\n${page}"
-    done
-fi
+COMMENT_DATA="🤖 $(date +'%a %b %d %T') - Prow CI generated the docs preview:\n${PREVIEW_URL}"
 
 # Get the comments
 COMMENTS=$(curl -s -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GITHUB_AUTH_TOKEN}" "https://api.github.com/repos/openshift/openshift-docs/issues/${PULL_NUMBER}/comments")

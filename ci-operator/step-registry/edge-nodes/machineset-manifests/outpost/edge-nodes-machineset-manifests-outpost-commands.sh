@@ -9,12 +9,7 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 
 MACHINE_ROLE="outposts"
-if [[ ${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP} == "yes" ]]; then
-  subnet_id=$(head -n 1 "${SHARED_DIR}/outpost_public_id")
-else
-  subnet_id=$(head -n 1 "${SHARED_DIR}/outpost_private_id")
-fi
-
+subnet_id=$(head -n 1 "${SHARED_DIR}/edge_zone_subnet_id")
 zone_name=$(head -n 1 "${SHARED_DIR}/outpost_availability_zone")
 machineset_name_postfix=${RANDOM:0:2}
 
