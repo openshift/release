@@ -12,7 +12,7 @@ job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
 export job_id
 detach_nodes() {
     echo 'Deleting the nodes forcefully by patching the machines finalizers'
-    machines=$(oc get machines.cluster.x-k8s.io -n hcp-ga-agent-hcp --no-headers | awk '{print $1}')
+    machines=$(oc get machines.cluster.x-k8s.io -n $hcp_ns --no-headers | awk '{print $1}')
     machines=$(echo "$machines" | tr '\n' ' ')
     IFS=' ' read -ra machines_list <<< "$machines"
     for ((i=0; i<$HYPERSHIFT_NODE_COUNT; i++)); do
