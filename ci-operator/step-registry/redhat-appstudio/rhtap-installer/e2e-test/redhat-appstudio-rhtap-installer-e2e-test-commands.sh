@@ -20,7 +20,7 @@ APPLICATION_ROOT_NAMESPACE="rhtap-e2e-ci"
 QUAY_IMAGE_ORG="rhtap-e2e"
 GITHUB_ORGANIZATION="rhtap-rhdh-qe"
 GITHUB_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
-RED_HAT_DEVELOPER_HUB_URL=$(oc get route developer-hub -n rhtap -o jsonpath='{.spec.host}')
+RED_HAT_DEVELOPER_HUB_URL=https://"$(oc get route developer-hub -n rhtap -o jsonpath='{.spec.host}')"
 
 cd "$(mktemp -d)"
 
