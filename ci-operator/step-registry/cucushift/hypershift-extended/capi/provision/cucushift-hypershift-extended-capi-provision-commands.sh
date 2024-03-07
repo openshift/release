@@ -145,6 +145,7 @@ echo "rosa" > $SHARED_DIR/cluster-type
 # collect rosa hcp info
 rosa logs install -c ${CLUSTER_ID} --watch
 echo "Waiting for cluster ready..."
+CLUSTER_INSTALL_LOG="${ARTIFACT_DIR}/.install.log"
 start_time=$(date +"%s")
 while true; do
   sleep 60
@@ -166,11 +167,16 @@ while true; do
 done
 rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}"
 
-# Output
-# Print console.url and api.url
+CLUSTER_STATE=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.state')
+if [[ "${CLUSTER_STATE}" != "ready" ]]; then
+    echo "error: Cluster ${CLUSTER_NAME} ${CLUSTER_ID} is not in the ready status, ${CLUSTER_STATE}"
+    exit 1
+fi
+
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
 CONSOLE_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.console.url')
 if [[ "${API_URL}" == "null" ]]; then
+  # for hosted-cp only
   port="443"
   echo "warning: API URL was null, attempting to build API URL"
   base_domain=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.dns.base_domain')
