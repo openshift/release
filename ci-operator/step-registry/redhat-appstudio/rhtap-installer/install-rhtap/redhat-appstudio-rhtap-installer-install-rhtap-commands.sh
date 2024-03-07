@@ -80,6 +80,10 @@ if [ $? -ne 0 ]; then
 fi
 
 clone_repo(){
+  if [[ "${JOB_NAME}" == *"redhat-appstudio-rhtap-installer"* ]]; then
+    echo "[INFO]Skip cloning rhtap-installer repo..."
+    return
+  fi
   echo "[INFO]Cloning rhtap-installer repo..."
   git clone https://github.com/redhat-appstudio/rhtap-installer.git
   cd rhtap-installer
@@ -145,3 +149,4 @@ e2e_test(){
 clone_repo
 install_rhtap
 e2e_test
+cd .. # after finsihing the script, go back to the init directory
