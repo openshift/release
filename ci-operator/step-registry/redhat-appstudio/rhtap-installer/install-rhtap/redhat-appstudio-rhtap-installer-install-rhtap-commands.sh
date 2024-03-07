@@ -13,6 +13,8 @@ export ACS__API_TOKEN \
   GITHUB__APP__WEBHOOK_SECRET \
   GITHUB__APP__WEBHOOK_URL \
   GITHUB__APP__PRIVATE_KEY \
+  GITOPS__GIT_TOKEN \
+  QUAY__TOKEN \
   TPA__GUAC__PASSWORD \
   TPA__KEYCLOAK__ADMIN_PASSWORD \
   TPA__MINIO__ROOT_PASSWORD \
@@ -41,6 +43,8 @@ GITHUB__APP__CLIENT_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-c
 GITHUB__APP__WEBHOOK_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-webhook-secret)
 GITHUB__APP__WEBHOOK_URL=GITHUB_APP_WEBHOOK_URL
 GITHUB__APP__PRIVATE_KEY=$(base64 -d < /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-private-key)
+GITOPS__GIT_TOKEN="dummy-token"
+QUAY__TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/quay-robot-password)
 SPRAYPROXY_SERVER_URL=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-url)
 SPRAYPROXY_SERVER_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-token)
 DEVELOPER_HUB__QUAY_TOKEN__ASK_THE_INSTALLER_DEV_TEAM=$(cat /usr/local/rhtap-ci-secrets/rhtap/quay-token)
@@ -76,6 +80,10 @@ if [ $? -ne 0 ]; then
 fi
 
 clone_repo(){
+  if [[ "${JOB_NAME}" == *"redhat-appstudio-rhtap-installer"* ]]; then
+    echo "[INFO]Skip cloning rhtap-installer repo..."
+    return
+  fi
   echo "[INFO]Cloning rhtap-installer repo..."
   git clone https://github.com/redhat-appstudio/rhtap-installer.git
   cd rhtap-installer
@@ -141,3 +149,4 @@ e2e_test(){
 clone_repo
 install_rhtap
 e2e_test
+cd .. # after finsihing the script, go back to the init directory
