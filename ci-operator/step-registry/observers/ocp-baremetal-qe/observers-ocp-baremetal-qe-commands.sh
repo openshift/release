@@ -205,9 +205,8 @@ EOF
   </testsuite>
 EOF
   done < "$input"
-  fi
-
   echo "JUnit reports created, exiting"
+  fi
   exit 0
 }
 
@@ -242,7 +241,7 @@ function isNodeAlive(){
       break
     else
       if [[ $i == $(($MAX_RETRY)) ]]; then
-          trap "handleNode '${bmhost}' '${EXIT_CODE_UNREACHABLE}'" EXIT
+          handleNode "${bmhost}" "${EXIT_CODE_UNREACHABLE}"
       else
           echo "Node ${host} is not up yet or something is wrong, retrying"
           sleep $NODE_ALIVE_SLEEP
@@ -256,8 +255,9 @@ function isNodeAlive(){
 function handleFirstReboot(){
   local bmhost="${1}"
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  echo "host $host rebooted, waiting..."
-  #sleep 120
+  echo "host $host rebooted, waiting 30s for services shutdown..."
+  # Wait for sshd to shutdown completely
+  sleep 30
   echo "$host setting ssh port"
   ssh_port=$((12000 + $host))
   echo "$host netcat check"
@@ -313,7 +313,7 @@ function checkBootedImage(){
             echo -e "Booted PXE image version \n $cmdline \n matches Prow namespace $NAMESPACE"
           else
             echo -e "Booted PXE image version \n $cmdline \n DOES NOT match Prow namespace $NAMESPACE"
-            trap "handleNode '${bmhost}' '${EXIT_CODE_WRONG_VERSION}'" EXIT
+            handleNode "${bmhost}" "${EXIT_CODE_WRONG_VERSION}"
           fi
       else
           # ISO BOOT
@@ -329,7 +329,7 @@ function checkBootedImage(){
           else
             echo -e "Booted ISO image version $cmdline"
             echo -e "DOES NOT match expected versions : x86 $expected_x86_version arm64 $expected_arm64_version"
-            trap "handleNode '${bmhost}' '${EXIT_CODE_WRONG_VERSION}'" EXIT
+            handleNode "${bmhost}" "${EXIT_CODE_WRONG_VERSION}"
           fi
       fi
   elif [[ $whatToCheck == "disk" ]]; then
@@ -339,7 +339,7 @@ function checkBootedImage(){
         echo -e "Red Hat CoreOS FOUND on disk"
       else
         echo -e "Red Hat CoreOS NOT FOUND on disk"
-        trap "handleNode '${bmhost}' '${EXIT_CODE_COREOS_NOT_FOUND}'" EXIT
+        handleNode "${bmhost}" "${EXIT_CODE_COREOS_NOT_FOUND}"
       fi
   fi
 }
