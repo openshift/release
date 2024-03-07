@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.16"
+    name: "4.15"
     namespace: ocp
     tag: cli
 build_root:
@@ -17,10 +17,12 @@ images:
   to: oc-bin-image
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.16"
+      version_bounds:
+        lower: 4.15.0-0
+        stream: 4-stable
+        upper: 4.16.0-0
 resources:
   '*':
     requests:
@@ -28,7 +30,7 @@ resources:
       memory: 200Mi
 tests:
 - as: redhat-openshift-gitops-interop-aws
-  cron: 0 6 11 2 *
+  cron: 0 6 25 10 *
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -50,7 +52,7 @@ tests:
               {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","gitops-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","gitops-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       OPERATORS: |
         [
@@ -63,7 +65,7 @@ tests:
     - ref: gitops-operator-tests
     workflow: firewatch-ipi-aws
 zz_generated_metadata:
-  branch: v1.10
+  branch: v1.11
   org: redhat-developer
   repo: gitops-operator
-  variant: gitops-ocp4.16-lp-interop
+  variant: gitops-ocp4.15-lp-interop
