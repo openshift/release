@@ -132,6 +132,8 @@ function suite() {
     fi
 
     set -x
+    echo "SLEEPING 20m to see if Granular test failures are happening because they run first. total shot in the dark"
+    sleep 1200
     openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER:-}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
