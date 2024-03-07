@@ -52,7 +52,7 @@ cat << EOF > $SHARED_DIR/bastion_inventory
 ${BASTION_IP} ansible_ssh_user=${BASTION_USER} ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
 
-ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]} --topology sno "
+ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]} --topology sno --bastion-ip ${BASTION_IP}"
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
