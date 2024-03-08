@@ -281,7 +281,7 @@ function journalRecord(){
 EOF
       # We can assume the host rebooted if the ssh connection gets closed by remote host
       # Connection to openshift-qe-metal-ci.arm.eng.rdu2.redhat.com closed by remote host
-      trap 'handleReboot ${bmhost} &' EXIT
+      trap 'handleReboot ${bmhost} &' EXIT SIGINT
 }
 
 function recordJournalctl(){
