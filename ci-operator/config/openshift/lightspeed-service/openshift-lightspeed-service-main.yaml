@@ -69,7 +69,8 @@ tests:
         export PROVIDER_URL=https://ols-test.openai.azure.com/
         export PROVIDER_DEPLOYMENT_NAME=0301-dep
         export MODEL=gpt-3.5-turbo
-        scripts/test-e2e-standalone.sh
+        # TODO remove scripts/test-e2e-standalone.sh
+        tests/scripts/test-e2e-standalone.sh || scripts/test-e2e-standalone.sh
       credentials:
       - mount_path: /var/run/azureopenai
         name: azureopenai-apitoken
@@ -90,7 +91,8 @@ tests:
         export PROVIDER_KEY_PATH=/var/run/bam/token
         export PROVIDER=bam
         export MODEL=ibm/granite-13b-chat-v2
-        scripts/test-e2e-standalone.sh
+        # TODO remove scripts/test-e2e-standalone.sh
+        tests/scripts/test-e2e-standalone.sh || scripts/test-e2e-standalone.sh
       credentials:
       - mount_path: /var/run/bam
         name: bam-apitoken
@@ -111,7 +113,8 @@ tests:
         export PROVIDER_KEY_PATH=/var/run/openai/token
         export PROVIDER=openai
         export MODEL=gpt-3.5-turbo
-        scripts/test-e2e-standalone.sh
+        # TODO remove scripts/test-e2e-standalone.sh
+        tests/scripts/test-e2e-standalone.sh || scripts/test-e2e-standalone.sh
       credentials:
       - mount_path: /var/run/openai
         name: openai-apitoken
@@ -133,7 +136,8 @@ tests:
         export PROVIDER=watsonx
         export PROVIDER_PROJECT_ID=ad629765-c373-4731-9d69-dc701724c081
         export MODEL=ibm/granite-13b-chat-v2
-        scripts/test-e2e-standalone.sh
+        # TODO remove scripts/test-e2e-standalone.sh
+        tests/scripts/test-e2e-standalone.sh || scripts/test-e2e-standalone.sh
       credentials:
       - mount_path: /var/run/watsonx
         name: watsonx-apitoken
@@ -153,13 +157,27 @@ tests:
     - as: e2e
       cli: latest
       commands: |
+        export BAM_PROVIDER_KEY_PATH=/var/run/bam/token
+        export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
+        export OPENAI_PROVIDER_KEY_PATH=/var/run/openai/token
+        export WATSONX_PROVIDER_KEY_PATH=/var/run/watsonx/token
+
         export PROVIDER_KEY_PATH=/var/run/openai/token
         export PROVIDER=openai
         export MODEL=gpt-3.5-turbo-1106
         tests/scripts/test-e2e-cluster.sh
       credentials:
+      - mount_path: /var/run/azure_openai
+        name: azureopenai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/bam
+        name: bam-apitoken
+        namespace: test-credentials
       - mount_path: /var/run/openai
         name: openai-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/watsonx
+        name: watsonx-apitoken
         namespace: test-credentials
       dependencies:
       - env: OLS_IMAGE
