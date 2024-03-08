@@ -64,7 +64,7 @@ if [[ -n "${MICROSHIFT_PR}" ]]; then
 	if grep -qw -- "--skip-dnf-update" ~/microshift/scripts/devenv-builder/configure-vm.sh; then
 		configure_args="--skip-dnf-update"
 	fi
-	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
+	~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
 
 elif [[ -n "${MICROSHIFT_GIT}" ]]; then
 	: MICROSHIFT_GIT is set - clone it, build it, run it
@@ -75,7 +75,7 @@ elif [[ -n "${MICROSHIFT_GIT}" ]]; then
 	if grep -qw -- "--skip-dnf-update" ~/microshift/scripts/devenv-builder/configure-vm.sh; then
 		configure_args="--skip-dnf-update"
 	fi
-	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
+	~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
 
 else
 	: Neither MICROSHIFT_PR nor MICROSHIFT_GIT are set - use release-OCP_VERSION to checkout right scripts and install MicroShift from repositories
@@ -100,7 +100,7 @@ else
 
     if [[ -z "${version+x}" ]] || [[ "${version}" == "" ]]; then
         : version is empty - no RPMs for the release yet - build from source
-        bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
+        ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
         exit 0
     fi
 

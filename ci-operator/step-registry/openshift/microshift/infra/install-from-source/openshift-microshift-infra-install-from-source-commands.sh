@@ -50,6 +50,7 @@ if ! hash git ; then
 fi
 #git clone https://github.com/openshift/microshift -b ${BRANCH} \${HOME}/microshift
 
+echo "Cloning ggiguash repo"
 git clone https://github.com/ggiguash/microshift -b disable_ci_tracing \${HOME}/microshift
 
 cd \${HOME}/microshift
