@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -x
+#set -x
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -34,7 +34,7 @@ case $SEED_IMAGE_TAG_FORMAT in
     SEED_IMAGE_TAG="nightly-${SEED_VERSION}-$(date +%F)"
     ;;
   "presubmit")
-    SEED_IMAGE_TAG="pre-${PROW_JOB_ID}"
+    SEED_IMAGE_TAG="pre-${PULL_PULL_SHA}"
     ;;
   *)
     echo "Unknown image tag format specified ${SEED_IMAGE_TAG_FORMAT}"
@@ -42,13 +42,12 @@ case $SEED_IMAGE_TAG_FORMAT in
     ;;
 esac
 
+echo "${SEED_VM_NAME}" > "${SHARED_DIR}/seed_vm_name"
+
 echo "Creating seed script..."
 cat <<EOF > ${SHARED_DIR}/create_seed.sh
 #!/bin/bash
 set -euo pipefail
-
-# uncomment for debugging
-# set -x
 
 export PULL_SECRET='${PULL_SECRET}'
 export BACKUP_SECRET='${BACKUP_SECRET}'
@@ -59,19 +58,20 @@ export LCA_IMAGE="${LCA_PULL_REF}"
 cd ${remote_workdir}/ib-orchestrate-vm
 
 # Create the seed vm
-make seed
+make seed-vm-create wait-for-seed dnsmasq-workaround seed-cluster-prepare
 
 # Create and push the seed image
+echo "Generating the seed image using OCP ${SEED_VERSION} as ${SEED_IMAGE}:${SEED_IMAGE_TAG}"
 make trigger-seed-image-create SEED_IMAGE=${SEED_IMAGE}:${SEED_IMAGE_TAG}
 
-echo "Waiting for seed creation to finish"
+echo "Waiting 10 minutes for seed creation to finish"
+# These timings are specific to this CI setup and subvert a bug that causes oc wait to never return
+# This results in a timeout on the job even though the process may finish successfully
+sleep 10m
 until oc --kubeconfig ${seed_kubeconfig} wait --timeout 5m seedgenerator seedimage --for=condition=SeedGenCompleted=true; do \
   echo "Cluster unavailable. Waiting 5 minutes and then trying again..."; \
-  sleep 5m; \
+  sleep 1m; \
 done;
-
-echo "Removing seed VM"
-make seed-vm-remove
 
 EOF
 
