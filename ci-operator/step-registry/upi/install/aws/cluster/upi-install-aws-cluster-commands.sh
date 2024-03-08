@@ -135,7 +135,9 @@ CONTROL_PLANE_STACK_NAME=${CLUSTER_NAME}-control-plane
 COMPUTE_STACK_NAME_PREFIX=${CLUSTER_NAME}-compute
 
 # Create s3 bucket for bootstrap and proxy ignition configs
-aws s3 mb s3://"${INFRA_STACK_NAME}"
+S3_BUCKET_URI="s3://${INFRA_STACK_NAME}"
+aws s3 mb "${S3_BUCKET_URI}"
+echo ${S3_BUCKET_URI} > ${SHARED_DIR}/s3_bucket_uri
 
 # If we are using a proxy, create a 'black-hole' private subnet vpc TODO
 # For now this is just a placeholder...
@@ -227,7 +229,7 @@ WORKER_INSTANCE_PROFILE="$(echo "${SECURITY_JSON}" | jq -r '.[] | select(.Output
 
 if [[ -d "${SHARED_DIR}/CA" ]]; then
   # host proxy ignition on s3
-  S3_PROXY_URI="s3://${INFRA_STACK_NAME}/proxy.ign"
+  S3_PROXY_URI="${S3_BUCKET_URI}/proxy.ign"
   aws s3 cp ${SHARED_DIR}/proxy.ign "$S3_PROXY_URI"
 
   PROXY_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/proxy.ign"
@@ -271,7 +273,7 @@ if [[ -d "${SHARED_DIR}/CA" ]]; then
   echo ${PROXY_IP} > ${ARTIFACT_DIR}/installer/proxyip
 fi
 
-S3_BOOTSTRAP_URI="s3://${INFRA_STACK_NAME}/bootstrap.ign"
+S3_BOOTSTRAP_URI="${S3_BUCKET_URI}/bootstrap.ign"
 aws s3 cp ${ARTIFACT_DIR}/installer/bootstrap.ign "$S3_BOOTSTRAP_URI"
 
 cf_params_bootstrap=${ARTIFACT_DIR}/cf_params_bootstrap.json
