@@ -57,8 +57,6 @@ tests:
         pip3.9 install -r test/robot/requirements.txt
         # Install Python client for model-registry
         pip3.9 install -e clients/python
-        # Change URL for tests
-        sed -i -e "s/localhost/model-registry-service/" test/robot/*.resource test/robot/*.py
         # Change image of model-registry deployment
         sed -i -e "s|image: quay.io/opendatahub/model-registry.*|image: ${ODH_MODEL_REGISTRY_IMAGE}|" manifests/kustomize/base/model-registry-deployment.yaml
         # Create namespace for tests
@@ -67,6 +65,12 @@ tests:
         oc apply -k manifests/kustomize/overlays/postgres
         # Wait for model-registry deployment availability
         oc wait -n kubeflow deployment/model-registry-deployment --for condition=Available --timeout=180s
+        # Expose model-registry service externally as route
+        oc expose service/model-registry-service
+        # Save host of exposed service
+        MR_HOST=$(oc get route model-registry-service -o jsonpath={.spec.host})
+        # Change host for tests
+        sed -i -e "s/localhost/${MR_HOST}/" test/robot/*.resource test/robot/*.py
         # Run Robot Framework tests
         python3.9 -m robot test/robot
         # Save tests logs
