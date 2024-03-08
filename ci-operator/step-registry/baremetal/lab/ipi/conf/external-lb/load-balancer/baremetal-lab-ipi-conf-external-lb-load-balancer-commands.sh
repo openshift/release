@@ -10,6 +10,8 @@ MC=""
 APISRV=""
 INGRESS80=""
 INGRESS443=""
+IRONICSRV=""
+INSPECTORSRV=""
 echo "Filling the load balancer targets..."
 num_workers="$(yq e '[.[] | select(.name|test("worker"))]|length' "$SHARED_DIR/hosts.yaml")"
 # shellcheck disable=SC2154
@@ -21,6 +23,10 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
       server $name $ip:22623 check inter 1s"
     APISRV="$APISRV
       server $name $ip:6443 check inter 1s"
+    IRONICSRV="$IRONICSRV
+      server $name $ip:6385 check inter 1s"
+    INSPECTORSRV="$INSPECTORSRV
+      server $name $ip:5050 check inter 1s"
   fi
   if [ "$num_workers" -eq 0 ] || [[ "$name" =~ worker* ]]; then
     INGRESS80="$INGRESS80
@@ -29,6 +35,15 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
       server $name $ip:443 check inter 1s"
   fi
 done
+### FIXME temporary
+MC="${MC}
+      server bootstrap $(<"${SHARED_DIR}/ipi_bootstrap_ip_address"):22623 check inter 1s"
+APISRV="${APISRV}
+      server bootstrap $(<"${SHARED_DIR}/ipi_bootstrap_ip_address"):6443 check inter 1s"
+IRONICSRV="${IRONICSRV}
+      server bootstrap $(<"${SHARED_DIR}/ipi_bootstrap_ip_address"):6385 check inter 1s"
+INSPECTORSRV="${INSPECTORSRV}
+      server bootstrap $(<"${SHARED_DIR}/ipi_bootstrap_ip_address"):5050 check inter 1s"
 echo "Generating the template..."
 
 cat > "$SHARED_DIR/haproxy.cfg" <<EOF
@@ -82,8 +97,18 @@ listen ingress-router-443
     mode tcp
     balance source
 $INGRESS443
+listen ironic-api-6385
+    bind *:6385
+    mode tcp
+    balance source
+$IRONICSRV
+listen inspector-api-5050
+    bind *:5050
+    mode tcp
+    balance source
+$INSPECTORSRV
 EOF
 
 echo "Templating for HAProxy done..."
 
-cat "${SHARED_DIR}/haproxy.cfg"
+cat "$SHARED_DIR/haproxy.cfg"

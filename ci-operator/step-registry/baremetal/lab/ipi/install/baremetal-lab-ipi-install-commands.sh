@@ -19,6 +19,13 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+SSHOPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o LogLevel=ERROR
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
 export TF_LOG=DEBUG
 
 function oinst() {
@@ -47,7 +54,7 @@ echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
 # based on the runner architecture. We might need to change this in the future if we want to ship different versions of
 # the installer for different architectures in the same single-arch payload (and then support using a remote libvirt uri
 # for the provisioning host).
-oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+oc adm release extract -a "$PULL_SECRET_PATH" "${MULTI_RELEASE_IMAGE}" \
   --command=openshift-baremetal-install --to=/tmp
 
 # We change the payload image to the one in the mirror registry only when the mirroring happens.
@@ -87,6 +94,7 @@ platform:
     ingressVIP: $(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")
     provisioningBridge: $(<"${SHARED_DIR}/provisioning_bridge")
     provisioningNetworkCIDR: $(<"${SHARED_DIR}/provisioning_network")
+    externalMACAddress: $(<"${SHARED_DIR}/ipi_bootstrap_mac_address")
     hosts: []
 "
 
@@ -139,6 +147,15 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     "$SHARED_DIR/install-config.yaml" - <<< "$ADAPTED_YAML"
   echo "Power off #${host} (${name}) and prepare host bmc conf for installation..."
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe" "no_power_on"
+done
+
+echo "[INFO] Looking for patches to the install-config.yaml..."
+
+shopt -s nullglob
+for f in "${SHARED_DIR}"/*_patch_install_config.yaml;
+do
+  echo "[INFO] Applying patch file: $f"
+  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
 done
 
 mkdir -p "${INSTALL_DIR}"
