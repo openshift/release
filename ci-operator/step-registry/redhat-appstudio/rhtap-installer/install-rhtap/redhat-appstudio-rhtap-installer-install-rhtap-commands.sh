@@ -146,7 +146,9 @@ e2e_test(){
   ./bin/make.sh -n "$NAMESPACE" test
 }
 
+cd "$(mktemp -d)"
+
 clone_repo
 install_rhtap
 e2e_test
-cd .. # after finsihing the script, go back to the init directory
+#cd .. # after finsihing the script, go back to the init directory
