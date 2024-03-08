@@ -1,23 +1,8 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
+  project_image:
+    dockerfile_path: ci/Dockerfile
 images:
-- dockerfile_literal: |-
-    FROM src
-    ENV SHELLCHECK_VERSION=0.7.1
-    ENV YQ_VERSION=v4.25.2
-    ENV TEKTONCD_CLI_VERSION="v0.33.0"
-
-    # Install yamllint, shellcheck, yq, heml
-    RUN pip3 install --upgrade setuptools pip && \
-        pip3 install yamllint && yamllint --version && \
-        curl --fail -sSL  https://github.com/koalaman/shellcheck/releases/download/v$SHELLCHECK_VERSION/shellcheck-v$SHELLCHECK_VERSION.linux.x86_64.tar.xz | tar -xJvf - shellcheck-v$SHELLCHECK_VERSION/shellcheck && \
-        mv shellcheck-v$SHELLCHECK_VERSION/shellcheck /usr/local/bin/shellcheck && chmod 755 /usr/local/bin/shellcheck && rm -rf "shellcheck-v$SHELLCHECK_VERSION" && \
-        curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64 && chmod +x /usr/local/bin/yq && \
-        curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh && rm -rf get_helm.sh && \
-        curl -fsSL -o tkn.tgz "https://github.com/tektoncd/cli/releases/download/${TEKTONCD_CLI_VERSION}/tkn_${TEKTONCD_CLI_VERSION:1}_Linux_x86_64.tar.gz" && tar -C "/usr/local/bin" --no-same-owner -xzf "tkn.tgz" tkn && rm -rf "tkn.tgz"
+- dockerfile_path: ci/Dockerfile
   from: src
   to: rhtap-installer
 promotion:
@@ -55,7 +40,7 @@ tests:
         oc login -u "${OPENSHIFT_LOGIN_USERNAME}" -p "${OPENSHIFT_LOGIN_PASSWORD}" "${OPENSHIFT_API_URL}" --insecure-skip-tls-verify=true
 
         # Remove previous installation
-        oc delete namespace rhtap
+        oc delete namespace rhtap || true
 
         # Run the installation in debug mode
         ./bin/make.sh values
