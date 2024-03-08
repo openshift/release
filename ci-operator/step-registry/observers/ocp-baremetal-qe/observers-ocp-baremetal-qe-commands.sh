@@ -252,7 +252,7 @@ function isNodeAlive(){
   echo "Ending isNodeAlive for ${host}"
 }
 
-function handleFirstReboot(){
+function handleReboot(){
   local bmhost="${1}"
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   echo "host $host rebooted, waiting 30s for services shutdown..."
@@ -281,7 +281,7 @@ function journalRecord(){
 EOF
       # We can assume the host rebooted if the ssh connection gets closed by remote host
       # Connection to openshift-qe-metal-ci.arm.eng.rdu2.redhat.com closed by remote host
-      trap 'handleFirstReboot ${bmhost} &' EXIT
+      trap 'handleReboot ${bmhost} &' EXIT
 }
 
 function recordJournalctl(){
@@ -337,6 +337,7 @@ function checkBootedImage(){
       # BOOT_IMAGE=(hd0,gpt3)/ostree/rhcos-8979e
       if [[ $cmdline == *"ostree/rhcos"* ]]; then
         echo -e "Red Hat CoreOS FOUND on disk"
+        journalRecord "${bmhost}" &
       else
         echo -e "Red Hat CoreOS NOT FOUND on disk"
         handleNode "${bmhost}" "${EXIT_CODE_COREOS_NOT_FOUND}"
