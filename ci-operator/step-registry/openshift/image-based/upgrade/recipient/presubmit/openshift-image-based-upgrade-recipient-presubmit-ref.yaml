@@ -1,0 +1,37 @@
+ref:
+  as: openshift-image-based-upgrade-recipient-presubmit
+  grace_period: 10m
+  commands: openshift-image-based-upgrade-recipient-presubmit-commands.sh
+  from_image:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.16
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - name: ibu-backup-secret
+    namespace: test-credentials
+    mount_path: /var/run/ibu-backup-secret
+  - name: registry-pull-credentials
+    mount_path: /var/run/pull-secret
+    namespace: test-credentials
+  env:
+  - name: SEED_IMAGE
+    default: quay.io/openshift-kni/image-based-seeds
+    documentation: The repo where the seed image will be uploaded. The backup secret needs to have access to this repo
+  - name: SEED_VERSION
+    default: 4.14.10
+    documentation: The OCP version of the seed used for upgrade
+  - name: RECIPIENT_VERSION
+    default: 4.14.1
+    documentation: The OCP version that the recipient should start at
+  dependencies:
+  - name: lca-operator
+    env: LCA_PULL_REF
+  documentation: |-
+    This will startup a VM with the base OCP version specified by RECIPIENT_VERSION and do an image based upgrade.
+
+    In order to do a cluster upgrade, this step will use the configured EC2 host to setup a VM, install Openshift in the VM with the lifecycle agent operator.
+    The resulting cluster will be upgraded using the specified seed image.
