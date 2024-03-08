@@ -51,17 +51,16 @@ if [[ -f "${SHARED_DIR}/mgmt_kubeconfig" ]]; then
 fi
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-export AWS_REGION=${HYPERSHIFT_AWS_REGION}
+export AWS_REGION=${REGION}
 export AWS_PAGER=""
 
-# currently, only support stage env
-
-if [[ "${OCM_LOGIN_ENV}" != "staging" ]] ; then
-  echo "only support rosa stage env now"
-  exit 1
-fi
-
+# default stage api url
 ocm_api_url="https://api.stage.openshift.com"
+if [[ "${OCM_LOGIN_ENV}" == "production" ]] ; then
+  ocm_api_url="https://api.openshift.com"
+elif [[ "${OCM_LOGIN_ENV}" == "integration" ]] ; then
+  ocm_api_url="https://api.integration.openshift.com"
+fi
 
 ROSA_VERSION=$(rosa version)
 ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
@@ -91,10 +90,10 @@ EOF
 # prepare env variables
 export OPENSHIFT_VERSION=${OPENSHIFT_VERSION}
 export CLUSTER_NAME=${CLUSTER_NAME}
-export AWS_REGION=${HYPERSHIFT_AWS_REGION}
+export AWS_REGION=${REGION}
 
 if [[ ! -z "$AVAILABILITY_ZONES" ]]; then
-  AVAILABILITY_ZONES=$(echo $AVAILABILITY_ZONES | sed -E "s|(\w+)|${HYPERSHIFT_AWS_REGION}&|g")
+  AVAILABILITY_ZONES=$(echo $AVAILABILITY_ZONES | sed -E "s|(\w+)|${REGION}&|g")
 fi
 export AWS_AVAILABILITY_ZONE=${AVAILABILITY_ZONES}
 

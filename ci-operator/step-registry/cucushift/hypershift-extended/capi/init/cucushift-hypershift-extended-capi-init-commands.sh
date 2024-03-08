@@ -3,7 +3,7 @@
 set -xeuo pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-export AWS_REGION=${HYPERSHIFT_AWS_REGION}
+export AWS_REGION=${REGION}
 export AWS_PAGER=""
 
 # use an existing ocp as management cluster for test
