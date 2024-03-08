@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 export PS4='+ $(date "+%T.%N") \011'
 
 IP_ADDRESS="$(cat "${SHARED_DIR}/public_address")"
@@ -21,7 +21,7 @@ chmod 0600 "${HOME}/.ssh/config"
 
 cat <<EOF > /tmp/iso.sh
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
 if ! sudo subscription-manager status >&/dev/null; then
     sudo subscription-manager register \

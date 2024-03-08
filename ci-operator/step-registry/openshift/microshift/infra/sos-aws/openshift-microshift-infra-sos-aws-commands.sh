@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -21,7 +21,6 @@ EOF
 chmod 0600 "${HOME}/.ssh/config"
 
 ssh "${INSTANCE_PREFIX}" <<'EOF'
-  set -x
   if ! hash sos ; then
     sudo touch /tmp/sosreport-command-does-not-exist
     exit 0

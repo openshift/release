@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -28,7 +28,7 @@ EOF
 
 cat <<EOF > /tmp/install.sh
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
 sudo subscription-manager register \
   --org="$(cat /var/run/rhsm/subscription-manager-org)" \

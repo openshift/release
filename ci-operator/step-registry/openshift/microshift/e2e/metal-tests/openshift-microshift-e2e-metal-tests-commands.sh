@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-set -xeuo pipefail
+set -euo pipefail
 export PS4='+ $(date "+%T.%N") \011'
 
 finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
 
-  set +x
   STEP_NAME="${HOSTNAME##${JOB_NAME_SAFE}-}"
   REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
   JOB_URL_PATH="logs"
@@ -60,7 +59,6 @@ EOF
 </body>
 </html>
 EOF
-  set -x
 }
 
 IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
 IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
 HOST_USER="$(cat "${SHARED_DIR}"/ssh_user)"

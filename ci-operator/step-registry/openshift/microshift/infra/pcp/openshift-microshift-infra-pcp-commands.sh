@@ -1,6 +1,5 @@
 #!/bin/bash
-
-set -eux
+set -eu
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 export PS4='+ $(date "+%T.%N") \011'
 
 finalize() {

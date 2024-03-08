@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
 if [[ "$JOB_NAME" == rehearse* ]]; then
     echo "INFO: \$JOB_NAME starts with rehearse - running in DRY RUN mode"

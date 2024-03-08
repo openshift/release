@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -xeuo pipefail
+set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -23,7 +23,7 @@ chmod 0600 "${HOME}/.ssh/config"
 
 cat > "${HOME}"/start_microshift.sh <<'EOF'
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
 sudo systemctl enable microshift --now
 sudo systemctl status microshift
@@ -47,7 +47,6 @@ ssh "${INSTANCE_PREFIX}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_
 
 # Disable exit-on-error and enable command logging with a timestamp
 set +e
-set -x
 PS4='+ $(date "+%T.%N")\011'
 
 retries=10

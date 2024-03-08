@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -28,7 +28,7 @@ EOF2
 
 cat <<EOF > /tmp/install.sh
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
 if ! sudo subscription-manager status >&/dev/null; then
     sudo subscription-manager register \
@@ -48,11 +48,13 @@ if ! hash git ; then
   chmod 755 "\${DNF_RETRY}"
   "\${DNF_RETRY}" "install" "git-core"
 fi
-git clone https://github.com/openshift/microshift -b ${BRANCH} \${HOME}/microshift
+#git clone https://github.com/openshift/microshift -b ${BRANCH} \${HOME}/microshift
+
+git clone https://github.com/ggiguash/microshift -b disable_ci_tracing \${HOME}/microshift
 
 cd \${HOME}/microshift
 chmod 0755 \${HOME}
-bash -x ./scripts/devenv-builder/configure-vm.sh --force-firewall "\${PULL_SECRET}"
+./scripts/devenv-builder/configure-vm.sh --force-firewall "\${PULL_SECRET}"
 EOF
 chmod +x /tmp/install.sh
 

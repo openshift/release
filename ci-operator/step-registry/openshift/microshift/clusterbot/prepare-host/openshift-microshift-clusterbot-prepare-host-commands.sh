@@ -88,7 +88,7 @@ else
 	fi
 
     : Install oc, set up firewall, etc.
-	bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall --no-build --no-build-deps ${configure_args} /tmp/pull-secret
+	~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall --no-build --no-build-deps ${configure_args} /tmp/pull-secret
 
     : Fetch get_rel_version_repo.sh from o/microshift main so it is up to date - some release-4.Y might not have it
     curl https://raw.githubusercontent.com/openshift/microshift/main/test/bin/get_rel_version_repo.sh -o /tmp/get_rel_version_repo.sh

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -xeuo pipefail
+set -euo pipefail
 
 IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
 HOST_USER="$(cat "${SHARED_DIR}"/ssh_user)"
@@ -21,7 +21,7 @@ EOF
 chmod 0600 "${HOME}/.ssh/config"
 
 cat > /tmp/run.sh << EOF
-set -xe
+set -e
 if [[ "$JOB_TYPE" == "presubmit" ]]; then
     export MICROSHIFT_SKIP_MONITOR_TESTS=true
 fi
@@ -38,4 +38,4 @@ chmod +x /tmp/run.sh
 
 scp /tmp/run.sh "${INSTANCE_PREFIX}":/tmp
 trap 'scp -r "${INSTANCE_PREFIX}":"${DEST_DIR}" "${ARTIFACT_DIR}"' EXIT
-ssh "${INSTANCE_PREFIX}" "bash -x /tmp/run.sh" 
+ssh "${INSTANCE_PREFIX}" "/tmp/run.sh" 
