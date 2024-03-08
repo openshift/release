@@ -1,3 +1,8 @@
+base_images:
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   project_image:
     dockerfile_path: ci/Dockerfile
@@ -56,6 +61,16 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: nightly-disconnected
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws-rhtap-qe
+    env:
+      BASE_DOMAIN: ci.stonesoupengineering.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+    test:
+    - ref: redhat-appstudio-rhtap-installer-install-rhtap
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: rhtap-installer-shellcheck
   commands: |
     #!/usr/bin/env bash
