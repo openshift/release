@@ -83,7 +83,7 @@ metadata:
   name: qci-appci
   namespace: ci
 spec:
-  replicas: 2
+  replicas: 5
   selector:
     matchLabels:
       app: qci-appci
@@ -114,10 +114,21 @@ spec:
         - -tls-key-file=/var/run/serving-cert/tls.key
         - -robot-username-file=/etc/qci-robot-credentials/username
         - -robot-password-file=/etc/qci-robot-credentials/password
+        - -token-secret-file=/etc/qci-appci-credentials/token
         - -exposed-host=quay-proxy.ci.openshift.org
         ports:
         - name: http
           containerPort: 8400
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8400
+            scheme: HTTPS
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8400
+            scheme: HTTPS
         resources:
           requests:
             memory: "1Gi"
@@ -127,6 +138,8 @@ spec:
           mountPath: /var/run/serving-cert
         - name: qci-robot-credentials
           mountPath: /etc/qci-robot-credentials
+        - name: qci-appci-credentials
+          mountPath: /etc/qci-appci-credentials
       serviceAccountName: qci-appci
       volumes:
       - name: serving-cert
@@ -135,3 +148,6 @@ spec:
       - name: qci-robot-credentials
         secret:
           secretName: qci-robot-credentials
+      - name: qci-appci-credentials
+        secret:
+          secretName: qci-appci-credentials

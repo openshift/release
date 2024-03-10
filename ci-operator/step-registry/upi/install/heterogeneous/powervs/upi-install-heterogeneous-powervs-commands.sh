@@ -34,7 +34,12 @@ function cleanup_ibmcloud_powervs() {
     if [ -n "${VALID_GW}" ]
     then
       TG_CRN=$(echo "${VALID_GW}" | jq -r '.crn')
-      TAGS=$(ic resource search "crn:\"${TG_CRN}\"" --output json | jq -r '.items[].tags[]' | grep "mac-cicd-${version}" || true )
+      if [ -z "${WORKFLOW_TYPE}" ]; then
+        CUCUSHIFT_TAG="cucushift-"
+      else
+        CUCUSHIFT_TAG=""
+      fi
+      TAGS=$(ic resource search "crn:\"${TG_CRN}\"" --output json | jq -r '.items[].tags[]' | grep "mac-cicd-${CUCUSHIFT_TAG}${version}" || true )
       if [ -n "${TAGS}" ]
       then
         for CS in $(ic tg connections "${GW}" --output json | jq -r '.[].id')
@@ -63,7 +68,7 @@ function cleanup_ibmcloud_powervs() {
     ic pi workspace target "${CRN}"
 
     echo "Deleting the PVM Instances"
-    for INSTANCE_ID in $(ic pi instance ls --json | jq -r '.pvmInstances[].pvmInstanceID')
+    for INSTANCE_ID in $(ic pi instance ls --json | jq -r '.pvmInstances[] | .id')
     do
       echo "Deleting PVM Instance ${INSTANCE_ID}"
       ic pi instance delete "${INSTANCE_ID}" --delete-data-volumes
@@ -173,7 +178,12 @@ case "$CLUSTER_TYPE" in
       # Generates a workspace name like rdr-mac-4-14-au-syd-n1
       # this keeps the workspace unique
       CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
-      WORKSPACE_NAME=rdr-mac-${CLEAN_VERSION}-${REGION}-n1
+      if [ -z "${WORKFLOW_TYPE}" ]; then
+         CUCUSHIFT="-cucushift"
+      else
+        CUCUSHIFT=""
+      fi
+      WORKSPACE_NAME=rdr-mac-${CLEAN_VERSION}-${REGION}${CUCUSHIFT}-n1
 
       PATH=${PATH}:/tmp
       mkdir -p ${IBMCLOUD_HOME_FOLDER}

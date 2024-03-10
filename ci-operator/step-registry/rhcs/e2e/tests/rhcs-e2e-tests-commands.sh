@@ -56,6 +56,12 @@ export CHANNEL_GROUP=${CHANNEL_GROUP}
 export RHCS_ENV=${RHCS_ENV}
 export VERSION=${VERSION}
 export REGION=${REGION}
+if [ ! -z "$RHCS_SOURCE" ];then
+    export RHCS_SOURCS=$RHCS_SOURCE
+fi
+if [ ! -z "$RHCS_VERSION" ]; then
+    export RHCS_VERSION=$RHCS_VERSION
+fi
 
 # Define the junit name
 junitFileName="result.xml"

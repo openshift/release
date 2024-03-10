@@ -108,17 +108,65 @@ function populate_artifact_dir() {
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-$(date +%s).log"
-  sed -i '
-    s/password: .*/password: REDACTED/;
-    s/X-Auth-Token.*/X-Auth-Token REDACTED/;
-    s/UserData:.*,/UserData: REDACTED,/;
-    ' "${dir}/terraform.txt"
-  tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt"
+
+  # terraform may not exist now
+  if [ -f "${dir}/terraform.txt" ]; then
+    sed -i '
+      s/password: .*/password: REDACTED/;
+      s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+      s/UserData:.*,/UserData: REDACTED,/;
+      ' "${dir}/terraform.txt"
+    tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt"
+  fi
   case "${CLUSTER_TYPE}" in
     alibabacloud)
       awk -F'id=' '/alicloud_instance.*Creation complete/ && /master/{ print $2 }' "${dir}/.openshift_install.log" | tr -d ']"' > "${SHARED_DIR}/alibaba-instance-ids.txt";;
   *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
   esac
+}
+
+
+function capi_envtest_monitor() {
+  set +e
+  local dir=${1}
+  echo "waiting for ${dir}/auth/envtest.kubeconfig to exist"
+  while [ ! -s  "${dir}/auth/envtest.kubeconfig" ]
+  do
+    if [ -f "${dir}/terraform.txt" ]; then
+      echo "installation is terraform-based not capi, exit capi envtest monitor"
+      return 0
+    fi
+    sleep 5
+  done
+  echo 'envtest kubeconfig received!'
+
+  echo 'waiting for envtest api to be available'
+  until env KUBECONFIG="${dir}/auth/envtest.kubeconfig" oc get --raw / >/dev/null 2>&1; do
+    sleep 5
+  done
+  echo 'envtest api available'
+
+  mkdir -p "${ARTIFACT_DIR}/envtest"
+
+  while true
+  do
+    apiresources=$(KUBECONFIG="${dir}/auth/envtest.kubeconfig" oc api-resources --verbs=list -o name | grep -v 'secrets\|customresourcedefinitions')
+
+    for api in ${apiresources}; do
+      filename=$(echo "$api" | awk -F. '{print $1}')
+      KUBECONFIG="${dir}/auth/envtest.kubeconfig" oc get "${api}" -A -o yaml > "${ARTIFACT_DIR}/envtest/${filename}.yaml"
+    done
+
+    sleep 60
+
+    # Is the envtest api still avaible?
+    KUBECONFIG="${dir}/auth/envtest.kubeconfig" oc get --raw / >/dev/null 2>&1
+    ret=$?
+    if [ $ret -ne 0 ]; then
+      break
+    fi
+  done
+  set -e
 }
 
 # copy_kubeconfig_minimal runs in the background to monitor kubeconfig file
@@ -510,6 +558,9 @@ gcp)
     elif [ -f "${SHARED_DIR}/xpn_min_perm_passthrough.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_min_perm_passthrough.json"
+    elif [ -f "${SHARED_DIR}/xpn_byo-hosted-zone_min_perm_passthrough.json" ]; then
+      echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC using BYO hosted zone..."
+      export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_byo-hosted-zone_min_perm_passthrough.json"
     fi
     ;;
 ibmcloud*)
@@ -550,8 +601,15 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
+set +o errexit
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
+ret="$?"
+if test "${ret}" -ne 0 ; then
+	echo "Create manifests exit code: $ret"
+	exit "${ret}"
+fi
+set -o errexit
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
@@ -587,9 +645,16 @@ do
 done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -print0)
 
 if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
+  set +o errexit
   # Inject promtail in bootstrap.ign
   openshift-install --dir="${dir}" create ignition-configs &
   wait "$!"
+  ret="$?"
+  if test "${ret}" -ne 0 ; then
+	  echo "Create ignition-configs exit code: $ret"
+	  exit "${ret}"
+  fi
+  set -o errexit
   inject_promtail_service
 fi
 
@@ -634,6 +699,7 @@ do
     if [[ -v copy_kubeconfig_pid ]]; then
       kill $copy_kubeconfig_pid
     fi
+
     rm -rf "$dir"
     cp -rfpv "$backup" "$dir"
   else
@@ -642,6 +708,7 @@ do
 
   copy_kubeconfig_minimal "${dir}" &
   copy_kubeconfig_pid=$!
+
   openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
   wait "$!"
   ret="$?"

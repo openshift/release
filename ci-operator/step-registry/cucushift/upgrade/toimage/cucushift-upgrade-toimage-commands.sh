@@ -468,19 +468,26 @@ function wait_mcp_continous_success() {
     num=$(oc get node --no-headers | wc -l)
     max_retries=$(expr $num \* 20 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
     passed_criteria=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
+    local continous_degraded_check=0 degraded_criteria=5
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
         ret=0
         check_mcp || ret=$?
         if [[ "$ret" == "0" ]]; then
+            continous_degraded_check=0
             echo "Passed #${continous_successful_check}"
             (( continous_successful_check += 1 ))
         elif [[ "$ret" == "1" ]]; then
             echo "Some machines are updating..."
             continous_successful_check=0
+            continous_degraded_check=0
         else
-            echo "Some machines are degraded..."
-            break
+            continous_successful_check=0
+            echo "Some machines are degraded #${continous_degraded_check}..."
+            (( continous_degraded_check += 1 ))
+            if (( continous_degraded_check >= degraded_criteria )); then
+                break
+            fi
         fi
         echo "wait and retry..."
         sleep ${interval}
@@ -785,7 +792,7 @@ do
     if ! check_signed; then
         echo "You're updating to an unsigned images, you must override the verification using --force flag"
         FORCE_UPDATE="true"
-        if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358"; then
+        if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358" "OCP-69968"; then
             echo "The case need to run against a signed target image!"
             exit 1
         fi

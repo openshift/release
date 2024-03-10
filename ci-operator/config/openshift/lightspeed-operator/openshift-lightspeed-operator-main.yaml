@@ -1,3 +1,8 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.54.2
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -36,6 +41,15 @@ tests:
   commands: make test --warn-undefined-variables
   container:
     from: src
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
+  container:
+    clone: true
+    from: golangci-lint
 zz_generated_metadata:
   branch: main
   org: openshift
