@@ -24,7 +24,10 @@ RED_HAT_DEVELOPER_HUB_URL=https://"$(oc get route developer-hub -n rhtap -o json
 
 cd "$(mktemp -d)"
 
-git clone -b https://github.com/redhat-appstudio/rhtap-e2e.git .
+oc create namespace openshift-gitops || true
+oc label namespace openshift-gitops argocd.argoproj.io/managed-by=openshift-gitops || true
+
+git clone https://github.com/redhat-appstudio/rhtap-e2e.git .
 
 /bin/bash ./scripts/create-creds.sh "${APPLICATION_ROOT_NAMESPACE}"
 
