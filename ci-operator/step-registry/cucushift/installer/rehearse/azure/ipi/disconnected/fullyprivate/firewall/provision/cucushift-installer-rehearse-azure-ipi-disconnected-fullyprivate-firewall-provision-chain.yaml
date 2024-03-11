@@ -1,0 +1,37 @@
+chain:
+  as: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate-firewall-provision
+  steps:
+  - ref: azure-provision-resourcegroup
+  - ref: azure-provision-vnet
+  - ref: azure-provision-vnet-firewall-route
+  - chain: azure-provision-bastionhost
+  - ref: proxy-config-generate
+  - ref: openshift-cluster-bot-rbac
+  - chain: mirror-images-by-oc-adm
+  - chain: ipi-conf-azure
+  - ref: ipi-conf-mirror
+  - ref: ipi-conf-azure-provisionednetwork
+  - ref: ipi-install-install
+  - ref: ipi-install-times-collection
+  - ref: enable-qe-catalogsource-disconnected
+  - ref: mirror-images-tag-images
+  - ref: set-sample-operator-disconnected
+  - chain: cucushift-installer-check
+  - chain: cucushift-installer-check-azure-fullyprivate
+  env:
+  - name: OUTBOUND_TYPE
+    default:  "UserDefinedRouting"
+    documentation: "Routing strategy"
+  - name: PUBLISH
+    default:  "Internal"
+    documentation: "How to expose the user-facing endpoints like the Kubernetes API"
+  - name: RESTRICTED_NETWORK
+    default:  "yes"
+  - name: REGISTER_MIRROR_REGISTRY_DNS
+    default: "yes"
+  - name: ENABLE_FIREWALL_FULLLIST
+    default: "no"
+    documentation: |-
+      Enable firewall full list or not, by default, it only enables minimal firewall list
+  documentation: |-
+    Create a fullyprivate Azure IPI cluster via image mirroring in a restricted network for QE e2e tests.
