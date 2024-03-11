@@ -17,7 +17,10 @@ echo "exit" | curl "telnet://$BASTION_IP_ADDR:22" && echo "SSH port is opened"||
 cp $SSH_KEY_PATH $SSH_KEY
 chmod 600 $SSH_KEY
 
-git clone https://github.com/shaior/eco-gosystem.git --depth=1 -b telco-ci-init ${SHARED_DIR}/eco-gosystem
-cd ${SHARED_DIR}/eco-gosystem/telco-ci/ 
-ansible-playbook playbook.yml -i inventory -vvvv
+# git clone https://github.com/shaior/eco-gosystem.git --depth=1 -b telco-ci-init ${SHARED_DIR}/eco-gosystem
+# cd ${SHARED_DIR}/eco-gosystem/telco-ci/ 
+# ansible-playbook playbook.yml -i inventory -vvvv
 
+git clone https://github.com/shaior/eco-gosystem.git --depth=1 -b telco-ci-jenkins-job ${SHARED_DIR}/eco-gosystem-jenkins
+cd ${SHARED_DIR}/eco-gosystem-jenkins/telco-ci/ 
+ansible-playbook playbook-jenkins.yml -i inventory  -vv
