@@ -20,6 +20,12 @@ mkdir /tmp/bin
 curl -o /tmp/bin/yq -L "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_amd64" && chmod u+x /tmp/bin/yq
 curl -o /tmp/bin/jq -L "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-amd64" && chmod u+x /tmp/bin/jq
 
+if [ -n "${OPENSHIFT_CLIENT_VERSION_OVERRIDE}" ]; then
+  echo "Downloading openshift client ${OPENSHIFT_CLIENT_VERSION_OVERRIDE}"
+  curl -o /tmp/openshift-client-linux.tar.gz -L https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/${OPENSHIFT_CLIENT_VERSION_OVERRIDE}/amd64/openshift-client-linux.tar.gz
+  tar -xzvf /tmp/openshift-client-linux.tar.gz -C /tmp/bin oc && chmod u+x /tmp/bin/oc
+fi
+
 OCPINSTALL=openshift-install
 
 export PATH=/tmp/bin:$PATH
