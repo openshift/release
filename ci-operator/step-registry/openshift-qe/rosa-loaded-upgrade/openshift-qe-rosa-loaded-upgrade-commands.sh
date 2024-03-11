@@ -59,6 +59,8 @@ function check_rosa_upgrade_status()
                   echo "######################################################################"
 		  echo "The upgrade state fail to  change to [ $UPGRADE_STATE ] in limited time, please check rosa cluster"
 		  rosa describe upgrade --region $REGION -c $CLUSTER_ID
+                  echo "----------------------------------------------------------------------"
+		  rosa list upgrade -c $CLUSTER_ID --region $REGION
                   echo "######################################################################"
 		  echo "End Date Tiime: `date`"
 		  exit 1
