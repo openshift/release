@@ -1491,6 +1491,51 @@ function test_serving_machine_pools () {
 
 ###### end of test serving machine_pools verification (OCPQE-18337) ######
 
+function wait_for_cluster_status() {
+  CLUSTER_ID=$1
+  CLUSTER_TYPE=$2
+  EXPECTED_CLUSTER_STATUS=$3
+  TIMEOUT_COUNTER=$4 # TIMEOUT = 5s * TIMEOUT_COUNTER
+  echo "Waiting for cluster with ID: '$CLUSTER_ID' ($CLUSTER_TYPE) to reach status '$EXPECTED_CLUSTER_STATUS' within $TIMEOUT_COUNTER retries (every 5 seconds)"
+  STATUS_OBSERVED=false
+  for ((i=0; i<TIMEOUT_COUNTER; i+=1)); do
+    CURRENT_CLUSTER_STATUS=$(ocm get /api/osd_fleet_mgmt/v1/"$CLUSTER_TYPE"/"$CLUSTER_ID" | jq -r '.status') || true
+    if [ "$CURRENT_CLUSTER_STATUS" == "$EXPECTED_CLUSTER_STATUS" ]; then
+      STATUS_OBSERVED=true
+      break
+    fi
+    echo "Expected status: '$EXPECTED_CLUSTER_STATUS' for cluster: '$CLUSTER_TYPE' with cluster ID: '$CLUSTER_ID' not reached yet. Currently at: '$CURRENT_CLUSTER_STATUS'. Sleep for 5 seconds"
+    sleep 5
+  done
+  if [ "$STATUS_OBSERVED" = true ]; then
+    echo "Expected status: '$EXPECTED_CLUSTER_STATUS' for cluster: '$CLUSTER_TYPE' with cluster ID: '$CLUSTER_ID' reached."
+  else
+    TEST_PASSED=false
+    echo "[ERROR]: Expected status: '$EXPECTED_CLUSTER_STATUS' for cluster: '$CLUSTER_TYPE' with cluster ID: '$CLUSTER_ID' not reached within '$TIMEOUT_COUNTER' retries"
+  fi
+}
+
+##################################################################
+
+###### test: fix: Clusters deleted before OCM cluster is created get stuck in cleanup_account (OCPQE-19976) ######
+
+function test_delete_sc () {
+  echo "[OCPQE-19976] - fix: Clusters deleted before OCM cluster is created get stuck in cleanup_account"
+  TEST_PASSED=true
+  OSDFM_REGION=${LEASED_RESOURCE}
+  echo "Creating a service cluster in the '$OSDFM_REGION' region"
+  SC_CLUSTER_ID=$(echo '{"region": "'"${OSDFM_REGION}"'", "cloud_provider": "aws"}' | ocm post /api/osd_fleet_mgmt/v1/service_clusters | jq -r '.id')
+  wait_for_cluster_status "$SC_CLUSTER_ID" "service_clusters" "cluster_account_provisioned" 360
+  echo "Deleting service cluster with ID: '$SC_CLUSTER_ID'"
+  ocm delete /api/osd_fleet_mgmt/v1/service_clusters/"$SC_CLUSTER_ID"
+  wait_for_cluster_status "$SC_CLUSTER_ID" "service_clusters" "cleanup_ack_pending" 120
+  ocm delete /api/osd_fleet_mgmt/v1/service_clusters/"$SC_CLUSTER_ID"/ack
+  wait_for_cluster_status "$SC_CLUSTER_ID" "service_clusters" "" 120 # empty status means cluster deleted
+  update_results "OCPQE-19976" $TEST_PASSED
+}
+
+###### end of test: fix: Clusters deleted before OCM cluster is created get stuck in cleanup_account (OCPQE-19976) ######
+
 # Test all cases and print results
 
 test_monitoring_disabled
@@ -1535,6 +1580,8 @@ test_awsendpointservices_status_output_populated
 test_serving_machine_pools
 
 test_mc_request_serving_pool_autoscaling
+
+test_delete_sc
 
 printf "\nPassed tests:\n"
 for p in "${PASSED[@]}"; do
