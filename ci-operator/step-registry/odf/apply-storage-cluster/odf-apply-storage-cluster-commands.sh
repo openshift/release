@@ -33,6 +33,8 @@ spec:
     resources: {}
 EOF
 
+sleep 4h
+
 # Need to allow some time before checking if the StorageCluster is deployed
 sleep 60
 
