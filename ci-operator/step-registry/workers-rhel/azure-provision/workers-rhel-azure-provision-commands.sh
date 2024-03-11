@@ -21,11 +21,12 @@ export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 export SSH_PUB_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-publickey
 
-infra_id=$(oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster)
+infra_id=$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}')
+cluster_rg=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')
 
 # Get bastion RG info
 vnet_RG=$(cat ${SHARED_DIR}/resourcegroup)
-echo "${vnet_RG}"
+echo "vnet resource group: ${vnet_RG}; cluster resource group: ${cluster_rg}"
 
 # Get existing vnet info
 if [ -f "${SHARED_DIR}/customer_vnet_subnets.yaml" ]; then
@@ -47,7 +48,7 @@ for count in $(seq 1 ${RHEL_WORKER_COUNT}); do
 
   # az command to create RHEL VM and append --zone when the region has AZ
   # add --assign-identity in the vm creation command to add cluster identity to the RHEL vm
-  cmd="az vm create --resource-group '${infra_id}-rg' --name '${infra_id}-rhel-${count}' --image '${RHEL_IMAGE}' --ssh-key-values '${SSH_PUB_KEY_PATH}' --admin-user '${RHEL_USER}' --public-ip-address '' --size '${RHEL_VM_SIZE}' --os-disk-size-gb '${RHEL_VM_DISK_SIZE}' --nsg '' --subnet '${computeSubnetID}' --assign-identity '${infra_id}-identity'"
+  cmd="az vm create --resource-group '${cluster_rg}' --name '${infra_id}-rhel-${count}' --image '${RHEL_IMAGE}' --ssh-key-values '${SSH_PUB_KEY_PATH}' --admin-user '${RHEL_USER}' --public-ip-address '' --size '${RHEL_VM_SIZE}' --os-disk-size-gb '${RHEL_VM_DISK_SIZE}' --nsg '' --subnet '${computeSubnetID}' --assign-identity '${infra_id}-identity'"
 
   if [ "${az_num}" != "0" ]; then
     cmd="${cmd} --zone $((${count} % ${az_num} + 1))"
