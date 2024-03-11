@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -o nounset
-set -x
 
 error_handler() {
   echo "Error: ($1) occurred on $2"

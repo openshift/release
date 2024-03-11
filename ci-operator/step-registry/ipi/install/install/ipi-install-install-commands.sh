@@ -601,8 +601,15 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
+set +o errexit
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
+ret="$?"
+if test "${ret}" -ne 0 ; then
+	echo "Create manifests exit code: $ret"
+	exit "${ret}"
+fi
+set -o errexit
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
@@ -638,9 +645,16 @@ do
 done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -print0)
 
 if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
+  set +o errexit
   # Inject promtail in bootstrap.ign
   openshift-install --dir="${dir}" create ignition-configs &
   wait "$!"
+  ret="$?"
+  if test "${ret}" -ne 0 ; then
+	  echo "Create ignition-configs exit code: $ret"
+	  exit "${ret}"
+  fi
+  set -o errexit
   inject_promtail_service
 fi
 
