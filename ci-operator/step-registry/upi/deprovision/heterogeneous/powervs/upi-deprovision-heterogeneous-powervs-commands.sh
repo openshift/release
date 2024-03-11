@@ -5,12 +5,13 @@
 OCP_VERSION=$(cat "${SHARED_DIR}/OCP_VERSION")
 REGION="${LEASED_RESOURCE}"
 CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
-if [ -z "${WORKFLOW_TYPE}" ]; then
+if [ ! -z "${WORKFLOW_TYPE}" ]
+then
   CUCUSHIFT="-cucushift"
 else
   CUCUSHIFT=""
 fi
- WORKSPACE_NAME=rdr-mac-${CLEAN_VERSION}-${REGION}${CUCUSHIFT}-n1
+WORKSPACE_NAME=rdr-mac-${CLEAN_VERSION}-${REGION}${CUCUSHIFT}-n1
 
 # Cleans up the failed prior jobs
 function cleanup_ibmcloud_powervs() {
@@ -30,7 +31,9 @@ function cleanup_ibmcloud_powervs() {
     if [ -n "${VALID_GW}" ]
     then
       TG_CRN=$(echo "${VALID_GW}" | jq -r '.crn')
-      if [ -z "${WORKFLOW_TYPE}" ]; then
+      echo "WORKFLOW_TYPE: ${WORKFLOW_TYPE}"
+      if [ ! -z "${WORKFLOW_TYPE}" ]
+      then
         CUCUSHIFT_TAG="cucushift-"
       else
         CUCUSHIFT_TAG=""
