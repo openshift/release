@@ -116,8 +116,11 @@ export PUBLIC_SUBNET_ID=${PUBLIC_SUBNET_ID}
 PRIVATE_SUBNET_ID=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']")
 export PRIVATE_SUBNET_ID=${PRIVATE_SUBNET_ID}
 
-curl -LJ https://raw.githubusercontent.com/kubernetes-sigs/cluster-api-provider-aws/main/templates/cluster-template-rosa.yaml -o /tmp/cluster-template-rosa.yaml
-cat /tmp/cluster-template-rosa.yaml | /tmp/bin/envsubst > /tmp/rosa-capi-cluster.yaml
+template_file_name="cluster-template-rosa-machinepool.yaml"
+template_file="/tmp/${template_file_name}"
+render_file="/tmp/cluster-rosa-machinepool.yaml"
+curl -LJ https://raw.githubusercontent.com/kubernetes-sigs/cluster-api-provider-aws/main/templates/${template_file_name} -o ${template_file}
+cat ${template_file} | /tmp/bin/envsubst > ${render_file}
 
 # replace the operator roles with the real ones.
 OPERATOR_ROLES_ARNS_FILE="${SHARED_DIR}/operator-roles-arns"
@@ -125,11 +128,11 @@ imageRegistryARN=$(cat "${OPERATOR_ROLES_ARNS_FILE}" | grep "image-registry")
 storageARN=$(cat "${OPERATOR_ROLES_ARNS_FILE}" | grep "csi-drivers")
 networkARN=$(cat "${OPERATOR_ROLES_ARNS_FILE}" | grep "network-config")
 
-sed -i 's#^    storageARN: .*#    storageARN: "'"$storageARN"'"#' /tmp/rosa-capi-cluster.yaml
-sed -i 's#^    imageRegistryARN: .*#    imageRegistryARN: "'"$imageRegistryARN"'"#' /tmp/rosa-capi-cluster.yaml
-sed -i 's#^    networkARN: .*#    networkARN: "'"$networkARN"'"#' /tmp/rosa-capi-cluster.yaml
+sed -i 's#^    storageARN: .*#    storageARN: "'"$storageARN"'"#' ${render_file}
+sed -i 's#^    imageRegistryARN: .*#    imageRegistryARN: "'"$imageRegistryARN"'"#' ${render_file}
+sed -i 's#^    networkARN: .*#    networkARN: "'"$networkARN"'"#' ${render_file}
 
-cat /tmp/rosa-capi-cluster.yaml > "${SHARED_DIR}/rosa-capi-cluster.yaml"
+cat ${render_file} > "${SHARED_DIR}/rosa-capi-cluster.yaml"
 cat "${SHARED_DIR}/rosa-capi-cluster.yaml"
 oc apply -f "${SHARED_DIR}/rosa-capi-cluster.yaml" -n default
 oc patch rosacontrolplane -n default ${CLUSTER_NAME}-control-plane -p '{"spec":{"credentialsSecretRef":{"name":"rosa-creds-secret"}}}' --type=merge

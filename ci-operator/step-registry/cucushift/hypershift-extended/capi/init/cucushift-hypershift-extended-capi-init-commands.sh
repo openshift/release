@@ -6,9 +6,6 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_REGION=${REGION}
 export AWS_PAGER=""
 
-# use an existing ocp as management cluster for test
-aws s3 cp s3://heli-test-02/mgmt_kubeconfig ${SHARED_DIR}/mgmt_kubeconfig
-
 # download clusterctl and clusterawsadm
 mkdir -p /tmp/bin
 export PATH=/tmp/bin:$PATH
@@ -50,8 +47,4 @@ clusterctl init --infrastructure aws
 oc wait --for=condition=Ready pod -n capi-system --all --timeout=2m
 oc wait --for=condition=Ready pod -n capi-kubeadm-bootstrap-system --all --timeout=2m
 oc wait --for=condition=Ready pod -n capi-kubeadm-control-plane-system --all --timeout=2m
-
-## use custom capa image to fix some existing failures
-#oc -n capa-system patch deploy capa-controller-manager --type='json' -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value":"quay.io/heli/cluster-api-aws-controller:dev"}]'
-
 oc wait --for=condition=Ready pod -n capa-system --all --timeout=5m
