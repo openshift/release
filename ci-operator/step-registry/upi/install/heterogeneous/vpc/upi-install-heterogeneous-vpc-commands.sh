@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -o nounset
-set -x
 
 error_handler() {
   echo "Error: ($1) occurred on $2"
@@ -73,7 +72,7 @@ function retry {
     if [ $ret_code = 0 ]; then
       break
     elif [ "$i" == "$NO_OF_RETRY" ]; then
-      error "All retry attempts failed! Please try running the script again after some time" $ret_code
+      error_handler "All retry attempts failed! Please try running the script again after some time" $ret_code
     else
       sleep 30
     fi

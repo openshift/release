@@ -34,7 +34,9 @@ function cleanup_ibmcloud_powervs() {
     if [ -n "${VALID_GW}" ]
     then
       TG_CRN=$(echo "${VALID_GW}" | jq -r '.crn')
-      if [ -z "${WORKFLOW_TYPE}" ]; then
+      echo "WORKFLOW_TYPE: ${WORKFLOW_TYPE}"
+      if [ ! -z "${WORKFLOW_TYPE}" ]
+      then
         CUCUSHIFT_TAG="cucushift-"
       else
         CUCUSHIFT_TAG=""
@@ -178,7 +180,9 @@ case "$CLUSTER_TYPE" in
       # Generates a workspace name like rdr-mac-4-14-au-syd-n1
       # this keeps the workspace unique
       CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
-      if [ -z "${WORKFLOW_TYPE}" ]; then
+      echo "WORKFLOW_TYPE: ${WORKFLOW_TYPE}"
+      if [ ! -z "${WORKFLOW_TYPE}" ]
+      then
          CUCUSHIFT="-cucushift"
       else
         CUCUSHIFT=""
@@ -343,7 +347,7 @@ case "$CLUSTER_TYPE" in
       # Invoke create-var-file.sh to generate var.tfvars file
       echo "Creating the var file"
       cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs \
-        && bash scripts/create-var-file.sh /tmp/ibmcloud "${ADDITIONAL_WORKERS}" "${CLEAN_VERSION}"
+        && bash scripts/create-var-file.sh /tmp/ibmcloud "${ADDITIONAL_WORKERS}" "${CUCUSHIFT_TAG}${CLEAN_VERSION}"
 
       # TODO:MAC check if the var.tfvars file is populated
       VARFILE_OUTPUT=$(cat "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars)
