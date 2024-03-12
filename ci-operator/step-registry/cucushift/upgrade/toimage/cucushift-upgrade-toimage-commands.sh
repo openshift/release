@@ -689,6 +689,16 @@ function upgrade() {
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
+function upgrade_with_tolatest(){
+    echo "Upgrade cluster to the latest recommended update with --to-latest"
+    recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates')
+    if [[ "${recommends}" == "null" ]]; then
+        echo "No recommended update available!"
+        exit 1
+    fi
+    run_command "oc adm upgrade --to-latest"
+}
+
 # Monitor the upgrade status
 function check_upgrade_status() {
     local wait_upgrade="${TIMEOUT}" out avail progress cluster_version
@@ -806,7 +816,11 @@ do
     if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
         update_cloud_credentials_oidc
     fi
-    upgrade
+    if check_ota_case_enabled "OCP-53907"; then
+        upgrade_with_tolatest
+    else
+        upgrade
+    fi
     check_upgrade_status
     check_history
 

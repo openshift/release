@@ -239,6 +239,61 @@ function pre-OCP-53921(){
     return 0
 }
 
+function pre-OCP-53907(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    local version
+    version="$(oc get clusterversion --no-headers | awk '{print $2}')"
+    if [ -z "${version}" ] ; then
+        echo "Fail to get cluster version!"
+        return 1
+    fi
+    x_ver=$( echo "${version}" | cut -f1 -d. )
+    y_ver=$( echo "${version}" | cut -f2 -d. )
+    y_ver=$((y_ver+1))
+    ver="${x_ver}.${y_ver}"
+    if ! oc adm upgrade channel candidate-${ver}; then
+        echo "Fail to change channel to candidate-${ver}!"
+        return 1
+    fi
+    local retry=3
+    while (( retry > 0 ));do
+        recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates')
+        if [[ "${recommends}" == "null" ]]; then
+            (( retry -= 1 ))
+            sleep 60
+            echo "No recommended update available! Retry..."
+        else
+            echo "Recommencded update: ${recommends}"
+            break
+        fi
+    done
+    if (( retry == 0 )); then
+        echo "Timeout to get recommended update!" 
+        return 1
+    fi
+    mapfile -t images < <(echo ${recommends}|jq -r '.[].image')
+    if [ -z "${images[*]}" ]; then
+        echo "No image extracted from recommended update!"
+        return 1
+    fi
+    for image in ${images[*]}; do
+        if [[ "${image}" == "null" ]] ; then
+            echo "No image info!"
+            return 1
+        fi
+        metadata=$(oc adm release info ${image} -ojson|jq .metadata.metadata)
+        if [[ "${metadata}" == "null" ]]; then
+            echo "No metadata for recommended update ${image}!"
+            continue
+        fi
+        if [[ "${metadata}" != *"multi"* ]]; then
+            echo "The architecture info ${metadata} of recommended update ${image} is not expected!"
+            return 1
+        fi
+    done
+    return 0
+}
+
 function pre-OCP-69968(){
     echo "Test Start: ${FUNCNAME[0]}"
     local spec testurl="http://examplefortest.com"
