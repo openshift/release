@@ -227,11 +227,11 @@ function post-OCP-69948(){
 function post-OCP-56083(){
     echo "Post Test Start: OCP-56083"
     echo "Upgrade cluster when channel is unset"
-    local expected_msg expected_msg
+    local tmp_log expected_msg result
     tmp_log=$(mktemp)
     expected_msg='\"acceptedRisks\": \"Precondition \\\"ClusterVersionRecommendedUpdate\\\" failed because of \\\"NoChannel\\\": Configured channel is unset, so the recommended status of updating from'
-    oc get clusterversion -ojson | jq -r '.items[].status.conditions[]|select(.type == "ReleaseAccepted")' 2>&1 | tee "${tmp_log}" 
-    if grep -q '"status": "True"' "${tmp_log}"; then
+    result=$(oc get clusterversion -ojson | jq -r '.items[].status.conditions[]|select(.type == "ReleaseAccepted").status')
+    if  [[ "${result}" == "True" ]]; then
         oc get clusterversion -ojson | jq .items[].status.history  2>&1 | tee ${tmp_log} || true
         if grep -q "${expected_msg}" "${tmp_log}"; then
             echo "history.acceptedRisks complains ClusterVersion RecommendedUpdate failure with NoChannel"
