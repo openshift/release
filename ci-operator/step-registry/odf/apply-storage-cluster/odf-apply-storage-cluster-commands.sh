@@ -3,8 +3,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+
+# ACM must-gather
+function must_gather() {
+    oc adm must-gather --image=registry.redhat.io/odf4/odf-must-gather-rhel9:v4.14.5-1 --dest-dir="${ARTIFACT_DIR}" #TEMP
+    oc adm must_gather --image=registry.redhat.io/odf4/odf-must-gather-rhel9:v"$(oc get csv -n ${ODF_INSTALL_NAMESPACE} -l operators.coreos.com/odf-operator.${ODF_INSTALL_NAMESPACE}= -o=jsonpath='{.items[].spec.version}')" --dest-dir="${ARTIFACT_DIR}"
+}
+
 ## Temp debug
-# trap 'sleep 4h' EXIT SIGINT SIGTERM
+trap 'must_gather' EXIT SIGINT SIGTERM
 
 echo "Deploying a StorageCluster"
 cat <<EOF | oc apply -f -
@@ -32,8 +40,6 @@ spec:
     replica: 3
     resources: {}
 EOF
-
-sleep 4h
 
 # Need to allow some time before checking if the StorageCluster is deployed
 sleep 60
