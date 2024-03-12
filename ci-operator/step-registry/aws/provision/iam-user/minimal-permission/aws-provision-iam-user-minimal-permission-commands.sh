@@ -218,7 +218,6 @@ s3:GetBucketLocation
 s3:GetBucketLogging
 s3:GetBucketObjectLockConfiguration
 s3:GetBucketPublicAccessBlock
-s3:GetBucketReplication
 s3:GetBucketRequestPayment
 s3:GetBucketTagging
 s3:GetBucketVersioning
@@ -230,7 +229,6 @@ s3:GetObjectAcl
 s3:GetObjectTagging
 s3:GetObjectVersion
 s3:GetReplicationConfiguration
-s3:HeadBucket
 s3:ListBucket
 s3:ListBucketMultipartUploads
 s3:ListBucketVersions
