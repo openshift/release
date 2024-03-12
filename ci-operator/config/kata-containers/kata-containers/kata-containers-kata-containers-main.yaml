@@ -4,8 +4,6 @@ binary_build_commands: |
   # ensured the tools are searcheable.
   export GOPATH=/go
   export PATH="${GOPATH}/bin:/usr/local/go/bin/:$PATH"
-  source ci/lib.sh
-  clone_tests_repo
 build_root:
   project_image:
     dockerfile_path: ci/openshift-ci/images/Dockerfile.buildroot
@@ -49,6 +47,20 @@ tests:
     - as: kata-containers-e2e-pre
       cli: latest
       commands: |
+        pwd
+        echo
+        ls -al
+        echo
+        echo "$SHARED_DIR"
+        echo
+        ls "$SHARED_DIR"
+        echo
+        ls -al / || true
+        echo
+        ls -al /go || true
+        echo
+        ls -al /go/src/github.com || true
+        echo
         # oc is made available to this script via cli configuration, but
         # kubectl is not. Since kubectl is used by kata-webhook scripts,
         # thus it is created a symlink to oc.
@@ -61,17 +73,14 @@ tests:
         # which causes openshift-tests to fail.
         export AZURE_AUTH_LOCATION=${SHARED_DIR}/metadata.json
 
-        KATA_WORKDIR=/go/src/github.com/kata-containers/tests
-        cd $KATA_WORKDIR
-
         # Set environment variables for the ci test.sh script
         export KATA_RUNTIME="kata-qemu"
         # Install Kata Containers and run a smoke test.
-        .ci/openshift-ci/test.sh
+        ci/openshift-ci/test.sh
 
         # Deploy the kata-webhook so that the tests ran on next step of the
         # workflow will use the kata runtime.
-        .ci/openshift-ci/cluster/deploy_webhook.sh
+        ci/openshift-ci/cluster/deploy_webhook.sh
       from: with-deps
       resources:
         requests:

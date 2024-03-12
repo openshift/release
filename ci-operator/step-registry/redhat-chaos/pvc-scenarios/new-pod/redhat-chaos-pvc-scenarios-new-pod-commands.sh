@@ -10,7 +10,7 @@ python3 --version
 ls -la /root/kraken
 
 
-wget -O volume_scenario.yaml https://raw.githubusercontent.com/redhat-chaos/krkn/main/CI/scenarios/volume_scenario.yaml
+wget -O volume_scenario.yaml https://raw.githubusercontent.com/krkn-chaos/krkn/main/CI/legacy/scenarios/volume_scenario.yaml
 
 oc create -f volume_scenario.yaml  
 

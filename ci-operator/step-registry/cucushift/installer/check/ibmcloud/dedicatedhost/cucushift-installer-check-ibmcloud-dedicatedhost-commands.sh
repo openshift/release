@@ -18,8 +18,8 @@ function ibmcloud_login {
 ibmcloud_login
 
 #the file which saved the resource group of the pre created dedicated host group (just created when create the pre dedicated host, and not in Default group).
-dhgRGFile="${SHARED_DIR}/ibmcloud_resource_group_dhg"
-dh_file=${SHARED_DIR}/dedicated_host
+dhgRGFile="${SHARED_DIR}/ibmcloud_resource_group"
+dh_file="${SHARED_DIR}/dedicated_host"
 
 if [ -f ${dh_file} ]; then
     dh=$(cat ${dh_file})

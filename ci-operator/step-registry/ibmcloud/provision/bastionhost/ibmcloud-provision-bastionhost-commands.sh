@@ -48,16 +48,11 @@ if [[ ! -f "${bastion_ignition_file}" ]]; then
   echo "'${bastion_ignition_file}' not found, ignition-bastionhost step is required, abort." && exit 1
 fi
 
-VPC_CONFIG="${SHARED_DIR}/customer_vpc_subnets.yaml"
-if [[ ! -f "${VPC_CONFIG}" ]]; then
-  echo "Fail to find of VPC info file ${VPC_CONFIG}, abort." && exit 1
-fi
-echo "Reading variables from ${VPC_CONFIG}..."
-vpcName=$(yq-go r "${VPC_CONFIG}" 'platform.ibmcloud.vpcName')
+echo "Reading variables from ibmcloud_vpc_name and ibmcloud_resource_group files..."
+vpcName=$(<"${SHARED_DIR}/ibmcloud_vpc_name")
+resource_group=$(<"${SHARED_DIR}/ibmcloud_resource_group")
 
-resource_group=$(yq-go r "${VPC_CONFIG}" 'platform.ibmcloud.resourceGroupName')
 echo "Using region: ${region}  resource_group: ${resource_group} vpc: ${vpcName}"
-
 ${IBMCLOUD_CLI} target -g ${resource_group}
 
 vpc_info_file=$(mktemp)
