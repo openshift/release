@@ -1,9 +1,9 @@
 #!/bin/bash
 
-set -o nounset
-set -o errexit
-set -o pipefail
-set -o verbose
+# set -o nounset
+# set -o errexit
+# set -o pipefail
+# set -o verbose
 
 GITHUB_AUTH_TOKEN=$(cat /tmp/vault/ocp-docs-github-secret/GITHUB_AUTH_TOKEN)
 
