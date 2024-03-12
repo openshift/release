@@ -14,6 +14,15 @@ images:
 - context_dir: .
   dockerfile_path: ./tests/e2e-openshift/Dockerfile
   to: opentelemetry-tests-runner
+- context_dir: ./cmd/otel-allocator/
+  dockerfile_path: Dockerfile
+  from: src
+  inputs:
+    bin:
+      paths:
+      - destination_dir: ./bin
+        source_path: /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/otel-allocator/bin/targetallocator_amd64
+  to: opentelemetry-target-allocator
 - context_dir: ./cmd/operator-opamp-bridge/
   dockerfile_path: Dockerfile
   from: src
@@ -50,7 +59,7 @@ tests:
       DOWNSTREAM_TESTS_COMMIT: 16c712c5a4fbbeb8e428f0af962277d762228961
       JAEGER_SOURCE: dt-catalogsource
       OTEL_SOURCE: dt-catalogsource
-      SKIP_TESTS: tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
+      SKIP_TESTS: tests/e2e-targetallocator/targetallocator-features tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
       TEMPO_SOURCE: dt-catalogsource
     test:
     - ref: enable-stage-catalogsource
