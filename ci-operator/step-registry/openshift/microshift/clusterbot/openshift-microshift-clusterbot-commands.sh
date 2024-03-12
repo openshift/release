@@ -1,6 +1,5 @@
 #!/bin/bash
-set -xeuo pipefail
-export PS4='+ $(date "+%T.%N") \011'
+set -euo pipefail
 
 # TODO:
 # - Handle MICROSHIFT_GIT=PR_URL

@@ -45,10 +45,6 @@ ssh "${INSTANCE_PREFIX}" "/home/${HOST_USER}/start_microshift.sh"
 
 ssh "${INSTANCE_PREFIX}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" > "${SHARED_DIR}/kubeconfig"
 
-# Disable exit-on-error and enable command logging with a timestamp
-set +e
-PS4='+ $(date "+%T.%N")\011'
-
 retries=10
 while [ ${retries} -gt 0 ] ; do
   ((retries-=1))

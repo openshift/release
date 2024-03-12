@@ -1,6 +1,5 @@
 #!/bin/bash
-set -xeuo pipefail
-export PS4='+ $(date "+%T.%N") \011'
+set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -31,8 +30,7 @@ MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
 
 cat <<'EOF' >/tmp/install.sh
 #!/bin/bash
-set -xeuo pipefail
-export PS4='+ $(date "+%T.%N") ${BASH_SOURCE#$HOME/}:$LINENO \011'
+set -euo pipefail
 
 DNF_RETRY=$(mktemp /tmp/dnf_retry.XXXXXXXX.sh)
 curl -s https://raw.githubusercontent.com/openshift/microshift/main/scripts/dnf_retry.sh -o "${DNF_RETRY}"

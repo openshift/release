@@ -1,6 +1,5 @@
 #!/bin/bash
 set -euo pipefail
-export PS4='+ $(date "+%T.%N") \011'
 
 IP_ADDRESS="$(cat "${SHARED_DIR}/public_address")"
 HOST_USER="$(cat "${SHARED_DIR}/ssh_user")"
