@@ -6,20 +6,6 @@ set -o pipefail
 
 echo "************ baremetalds assisted operator publish command ************"
 
-# Check for postsubmit job type
-if [[ ! ("$JOB_TYPE" = "postsubmit" ) ]]; then
-    echo "ERROR Cannot update the manifest from a $JOB_TYPE job"
-    exit 1
-fi
-
-# Skip if no changes
-echo "## Detect if there are changes in the olm related manifests."
-echo "## Exit if no changes."
-set +o errexit
-if git diff HEAD~1 --exit-code "deploy/olm-catalog" >/dev/null 2>&1; then
-    echo "   no changes detected"
-    exit 0
-fi
 set -o errexit
 echo "   changes detected in deploy/olm-catalog"
 
