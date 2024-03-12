@@ -2,23 +2,23 @@ base_images:
   cert-manager-cainjector:
     name: cert-manager-cainjector
     namespace: ci
-    tag: v1.14.2
+    tag: v1.13.2
   cert-manager-controller:
     name: cert-manager-controller
     namespace: ci
-    tag: v1.14.2
+    tag: v1.13.2
   cert-manager-webhook:
     name: cert-manager-webhook
     namespace: ci
-    tag: v1.14.2
+    tag: v1.13.2
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.30.0
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.20-openshift-4.15
   ubi:
     name: ubi
     namespace: ocp
@@ -30,9 +30,9 @@ images:
 - dockerfile_path: images/ci/Dockerfile
   from: ubi
   inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: cert-manager-operator
 operator:
   bundles:
@@ -41,21 +41,21 @@ operator:
   substitutions:
   - pullspec: openshift.io/cert-manager-operator:latest
     with: pipeline:cert-manager-operator
-  - pullspec: quay.io/jetstack/cert-manager-controller:v1.14.2
+  - pullspec: quay.io/jetstack/cert-manager-controller:v1.12.4
     with: cert-manager-controller
-  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.14.2
+  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.12.4
     with: cert-manager-webhook
-  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.14.2
+  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.12.4
     with: cert-manager-cainjector
 releases:
   initial:
     integration:
-      name: "4.16"
+      name: "4.15"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
+      name: "4.15"
       namespace: ocp
 resources:
   '*':
@@ -105,6 +105,6 @@ tests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
-  branch: master
+  branch: cert-manager-1.13
   org: openshift
   repo: cert-manager-operator
