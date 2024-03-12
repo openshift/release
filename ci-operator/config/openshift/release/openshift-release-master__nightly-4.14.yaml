@@ -98,7 +98,7 @@ releases:
   oldest-supported-z-rollback:
     release:
       channel: candidate
-      version: 4.14.0-rc.0
+      version: 4.14.0
 resources:
   '*':
     requests:
@@ -547,18 +547,31 @@ tests:
     - chain: ipi-gcp-pre
     - ref: fips-check
     workflow: openshift-e2e-gcp-sdn
-- as: e2e-aws-ovn-upgrade-rollback-oldest-supported
+- as: aws-ovn-upgrade-rollback-oldest-supported
   interval: 48h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      TEST_TYPE: upgrade-conformance
-      TEST_UPGRADE_OPTIONS: abort-at=100
-    workflow: openshift-upgrade-aws
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_LATEST},${RELEASE_IMAGE_Z_ROLLBACK}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_Z_ROLLBACK
+        name: release:oldest-supported-z-rollback
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
   timeout: 6h0m0s
 - as: console-aws
   interval: 168h
