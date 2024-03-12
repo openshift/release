@@ -14,7 +14,7 @@ export ACS__API_TOKEN \
   GITHUB__APP__WEBHOOK_URL \
   GITHUB__APP__PRIVATE_KEY \
   GITOPS__GIT_TOKEN \
-  QUAY__TOKEN \
+  QUAY__DOCKERCONFIGJSON \
   TPA__GUAC__PASSWORD \
   TPA__KEYCLOAK__ADMIN_PASSWORD \
   TPA__MINIO__ROOT_PASSWORD \
@@ -56,8 +56,8 @@ GITHUB__APP__CLIENT_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-c
 GITHUB__APP__WEBHOOK_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-webhook-secret)
 GITHUB__APP__WEBHOOK_URL=GITHUB_APP_WEBHOOK_URL
 GITHUB__APP__PRIVATE_KEY=$(base64 -d < /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-private-key)
-GITOPS__GIT_TOKEN="dummy-token"
-QUAY__TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/quay-robot-password)
+GITOPS__GIT_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
+QUAY__DOCKERCONFIGJSON=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhtap_quay_ci_token)
 SPRAYPROXY_SERVER_URL=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-url)
 SPRAYPROXY_SERVER_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-token)
 DEVELOPER_HUB__QUAY_TOKEN__ASK_THE_INSTALLER_DEV_TEAM=$(cat /usr/local/rhtap-ci-secrets/rhtap/quay-token)
@@ -78,7 +78,7 @@ TAS__SECURESIGN__FULCIO__OIDC__CLIENT_ID="fake-one"
 TAS__SECURESIGN__FULCIO__OIDC__TYPE="dex"
 NAMESPACE=rhtap
 
-yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
+yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' "$KUBECONFIG"
 OPENSHIFT_PASSWORD="$(cat $KUBEADMIN_PASSWORD_FILE)"
 
 timeout --foreground 5m bash  <<- "EOF"
@@ -149,9 +149,9 @@ EOF
   callback_url=$(grep "callback-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
   webhook_url=$(grep "webhook-url" < "$DEBUG_OUTPUT"  | sed 's/.*: //g') 
 
-  echo "$homepage_url" > "${SHARED_DIR}/homepage_url"
-  echo "$callback_url" > "${SHARED_DIR}/callback_url"
-  echo "$webhook_url" > "${SHARED_DIR}/webhook_url"
+  echo "$homepage_url" | tee "${SHARED_DIR}/homepage_url"
+  echo "$callback_url" | tee "${SHARED_DIR}/callback_url"
+  echo "$webhook_url" | tee "${SHARED_DIR}/webhook_url"
 }
 
 e2e_test(){
