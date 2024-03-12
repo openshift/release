@@ -3,15 +3,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export KUBECONFIG=${SHARED_DIR}/kubeconfig
-
-# ODF must-gather
-function must_gather() {
-    oc adm must-gather --image=registry.redhat.io/odf4/odf-must-gather-rhel9:v"$(oc get csv -n ${ODF_INSTALL_NAMESPACE} -l operators.coreos.com/odf-operator.${ODF_INSTALL_NAMESPACE}= -o=jsonpath='{.items[].spec.version}')" --dest-dir="${ARTIFACT_DIR}"
-}
-
-trap 'must_gather' EXIT SIGINT SIGTERM
-
 echo "Deploying a StorageCluster"
 cat <<EOF | oc apply -f -
 apiVersion: ocs.openshift.io/v1
