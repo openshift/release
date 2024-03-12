@@ -239,6 +239,7 @@ function post-OCP-56083(){
             return 0 
         else
             echo "Error: history.acceptedRisks Not complains about ClusterVersion RecommendedUpdate failure with NoChannel"
+            cat ${tmp_log}
         fi
     else
         echo "Error: Release Not Accepted"
