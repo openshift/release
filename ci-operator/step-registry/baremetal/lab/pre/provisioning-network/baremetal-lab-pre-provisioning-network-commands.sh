@@ -116,6 +116,10 @@ PROVISIONING_BRIDGE="br-${CLUSTER_NAME: -12}"
 echo "${PROVISIONING_BRIDGE}" > "${SHARED_DIR}/provisioning_bridge"
 PROVISIONING_NETWORK="172.22.${VLAN_ID}.0/24"
 echo "${PROVISIONING_NETWORK}" > "${SHARED_DIR}/provisioning_network"
+
+# Copy provisioning_network to bastion host for use in cleanup
+scp "${SSHOPTS[@]}" "${SHARED_DIR}/provisioning_network" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
+
 NMSTATE_CONFIG="
 interfaces:
 - name: ${PROVISIONING_BRIDGE}
