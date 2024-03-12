@@ -31,7 +31,7 @@ fi
 sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
 
 chmod 0755 ~
-tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
+tar -xf /tmp/microshift.tgz -C ~ --strip-components 2
 
 cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
 cp /tmp/ssh-privatekey ~/.ssh/id_rsa
