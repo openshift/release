@@ -80,7 +80,10 @@ fi
 EOF
 chmod +x /tmp/iso.sh
 
-tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
+#tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
+
+git clone https://github.com/ggiguash/microshift -b disable_ci_tracing "${HOME}/microshift"
+tar czf /tmp/microshift.tgz "${HOME}/microshift"
 
 scp \
     /tmp/iso.sh \
