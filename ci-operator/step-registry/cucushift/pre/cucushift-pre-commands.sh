@@ -11,6 +11,7 @@ cp -Lrvf "${KUBECONFIG}" /tmp/kubeconfig
 
 if [ -f "${SHARED_DIR}/runtime_env" ] ; then
     source "${SHARED_DIR}/runtime_env"
+    cp "${SHARED_DIR}/runtime_env" "${ARTIFACT_DIR}" || true
 fi
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
