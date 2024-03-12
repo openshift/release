@@ -37,6 +37,12 @@ echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
 oc config view --flatten > /tmp/config
 
+ES_PASSWORD=$(cat "/secret/es/password")
+ES_USERNAME=$(cat "/secret/es/username")
+
+export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+export ELASTIC_INDEX=krkn_chaos_ci
+
 export KUBECONFIG=/tmp/config
 export PVC_NAME=$PVC_NAME
 export POD_NAME=$POD_NAME     
@@ -45,6 +51,9 @@ export DURATION=$DURATION
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export NAMESPACE=$TARGET_NAMESPACE
 export ENABLE_ALERTS=False
+telemetry_password=$(cat "/secret/telemetry/telemetry_password")
+export TELEMETRY_PASSWORD=$telemetry_password
+
 
 ./pvc-scenario/prow_run.sh
 rc=$?
