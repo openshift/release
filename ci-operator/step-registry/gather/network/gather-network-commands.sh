@@ -24,7 +24,7 @@ mkdir -p "${ARTIFACT_DIR}/links"
 oc --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' >/tmp/nodes
 while IFS= read -r NAME; do
 	echo "Gathering /host/etc/systemd/network/*.link from ${NAME}..."
-	oc --request-timeout=60s debug "node/${NAME}" -- sh -c 'ls -l /host/etc/systemd && ls -l /host/etc/systemd/network && head -n1000 /host/etc/systemd/network/*.link' > "${ARTIFACT_DIR}/links/${NAME}.txt"
+	oc -v=6 --request-timeout=60s debug "node/${NAME}" -- sh -c 'ls -l /host/etc/systemd && ls -l /host/etc/systemd/network && head -n1000 /host/etc/systemd/network/*.link' > "${ARTIFACT_DIR}/links/${NAME}.txt" || true
 done </tmp/nodes
 
 mkdir -p ${ARTIFACT_DIR}/network
