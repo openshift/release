@@ -233,7 +233,7 @@ function post-OCP-56083(){
     if  [[ "${result}" == "True" ]]; then
         accepted_risk_result=$(oc get clusterversion/version -ojson | jq -r '.status.history[0].acceptedRisks')
         echo "${accepted_risk_result}"
-        if [[ "${accepted_risk_result}" =~ "${expected_msg}" ]]; then
+        if [[ "${accepted_risk_result}" =~ ${expected_msg} ]]; then
             echo "history.acceptedRisks complains ClusterVersion RecommendedUpdate failure with NoChannel"
             echo "Test Passed: OCP-56083"
             return 0 
