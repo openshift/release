@@ -227,22 +227,22 @@ function post-OCP-69948(){
 function post-OCP-56083(){
     echo "Post Test Start: OCP-56083"
     echo "Upgrade cluster when channel is unset"
-    local tmp_log expected_msg result
-    tmp_log=$(mktemp)
-    expected_msg='\"acceptedRisks\": \"Precondition \\\"ClusterVersionRecommendedUpdate\\\" failed because of \\\"NoChannel\\\": Configured channel is unset, so the recommended status of updating from'
+    local  expected_msg result accepted_risk_result
+    expected_msg='Precondition "ClusterVersionRecommendedUpdate" failed because of "NoChannel": Configured channel is unset, so the recommended status of updating from'
     result=$(oc get clusterversion/version -ojson | jq -r '.status.conditions[]|select(.type == "ReleaseAccepted").status')
     if  [[ "${result}" == "True" ]]; then
-        oc get clusterversion -ojson | jq -r '.items[].status.history[0]'  2>&1 | tee ${tmp_log} || true
-        if grep -q "${expected_msg}" "${tmp_log}"; then
+        accepted_risk_result=$(oc get clusterversion -ojson | jq -r '.items[0].status.history[0].acceptedRisks')
+        echo "${accepted_risk_result}"
+        if [[ "${accepted_risk_result}" =~ "${expected_msg}" ]]; then
             echo "history.acceptedRisks complains ClusterVersion RecommendedUpdate failure with NoChannel"
             echo "Test Passed: OCP-56083"
             return 0 
         else
             echo "Error: history.acceptedRisks Not complains about ClusterVersion RecommendedUpdate failure with NoChannel"
-            cat ${tmp_log}
         fi
     else
         echo "Error: Release Not Accepted"
+        echo "clusterversion release accepted status value: ${result}"
     fi
     echo "Test Failed: OCP-56083"
     return 1
