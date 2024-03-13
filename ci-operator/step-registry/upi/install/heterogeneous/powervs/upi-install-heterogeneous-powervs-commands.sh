@@ -275,8 +275,22 @@ case "$CLUSTER_TYPE" in
       echo "VPC Region is ${REGION}"
       echo "PowerVS region is ${POWERVS_REGION}"
       echo "Resource Group is ${RESOURCE_GROUP}"
-      ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_REGION}" -g "${RESOURCE_GROUP}" --allow-cleanup 2>&1 \
-        | tee /tmp/instance.id
+
+      ##Create a Workspace on a Power Edge Router enabled PowerVS zone
+      # Dev Note: uses a custom loop since we want to redirect errors
+      for i in {1..5}
+      do
+        echo "Attempt: $i/5"
+        ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_REGION}" -g "${RESOURCE_GROUP}" --allow-cleanup > /tmp/instance.id
+        if [ $? = 0 ]; then
+          break
+        elif [ "$i" == "5" ]; then
+          echo "All retry attempts failed! Please try running the script again after some time"
+        else
+          sleep 30
+        fi
+        [ -f /tmp/instance.id ] && cat /tmp/instance.id
+      done
 
       # Process the CRN into a variable
       CRN=$(cat /tmp/instance.id | grep crn | awk '{print $NF}')
@@ -346,6 +360,12 @@ case "$CLUSTER_TYPE" in
 
       # Invoke create-var-file.sh to generate var.tfvars file
       echo "Creating the var file"
+      if [ ! -z "${WORKFLOW_TYPE}" ]
+      then
+        CUCUSHIFT_TAG="cucushift-"
+      else
+        CUCUSHIFT_TAG=""
+      fi
       cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs \
         && bash scripts/create-var-file.sh /tmp/ibmcloud "${ADDITIONAL_WORKERS}" "${CUCUSHIFT_TAG}${CLEAN_VERSION}"
 
