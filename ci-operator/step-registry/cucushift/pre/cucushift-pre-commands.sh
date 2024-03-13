@@ -11,15 +11,14 @@ cp -Lrvf "${KUBECONFIG}" /tmp/kubeconfig
 
 if [ -f "${SHARED_DIR}/runtime_env" ] ; then
     source "${SHARED_DIR}/runtime_env"
-    cp "${SHARED_DIR}/runtime_env" "${ARTIFACT_DIR}" || true
 fi
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
 # configure cucushift runtime environment variables
-hosts=$(grep server "${KUBECONFIG}" | cut -d '/' -f 3 | cut -d ':' -f 1)
-api_port=$(grep server "${KUBECONFIG}" | cut -d '/' -f 3 | cut -d ':' -f 2)
+server="$(yq '.clusters[-1].cluster.server' "${KUBECONFIG}")"
+IFS=':' read hosts api_port < <(echo ${server#*://})
 ver_cli=$(oc version --client | grep -i client | cut -d ' ' -f 3 | cut -d '.' -f1,2)
 
 runtime_env=${SHARED_DIR}/runtime_env
@@ -51,4 +50,5 @@ EOF
 export BUSHSLICER_CONFIG="{'global': {'browser': 'chrome'}, 'environments': {'ocp4': {'api_port': '${api_port}', 'version': '${ver_cli}'}}}"
 EOF
     fi
+    cp "${runtime_env}" "${ARTIFACT_DIR}" || true
 fi
