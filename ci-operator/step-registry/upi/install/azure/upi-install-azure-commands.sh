@@ -59,6 +59,10 @@ echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 cp ${SHARED_DIR}/install-config.yaml ${ARTIFACT_DIR}/installer/install-config.yaml
 export PATH=${HOME}/.local/bin:${PATH}
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
+  echo "Setting AZURE credential with minimal permissions to install UPI"
+  AZURE_AUTH_LOCATION="${SHARED_DIR}/azure_minimal_permission"
+fi
 export AZURE_AUTH_LOCATION
 
 pushd ${ARTIFACT_DIR}/installer
