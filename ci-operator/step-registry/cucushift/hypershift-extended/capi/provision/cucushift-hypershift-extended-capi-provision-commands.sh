@@ -203,3 +203,6 @@ if [[ "${INFRA_ID}" == "null" ]]; then
 fi
 echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"
 
+# backup mgmt cluster kubeconfig
+mv $KUBECONFIG "${SHARED_DIR}/mgmt_kubeconfig"
+
