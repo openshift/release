@@ -3,7 +3,7 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+  ocp_builder_volsync:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
@@ -54,7 +54,7 @@ images:
 - context_dir: .
   from: ubi_minimal
   inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp_builder_volsync:
       as:
       - golang:1.21
   to: volsync
@@ -110,7 +110,7 @@ tests:
       CLUSTERPOOL_GROUP_NAME: AppLifecycle
       CLUSTERPOOL_HOST_NAMESPACE: app
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-app-clusterpool
-      CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-small-aws-414
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-small-aws
       SKIP_COMPONENT_INSTALL: "true"
     test:
     - as: e2e-install-operator
@@ -149,7 +149,7 @@ tests:
           sleep $sleeptime
         done
 
-        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout 5m0s
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout 15m0s
         oc wait --for condition=Available -n openshift-operators deployment volsync-controller-manager
       dependencies:
       - env: OO_BUNDLE
@@ -201,7 +201,7 @@ tests:
       CLUSTERPOOL_GROUP_NAME: AppLifecycle
       CLUSTERPOOL_HOST_NAMESPACE: app
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-app-clusterpool
-      CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-small-fips-aws-414
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-small-fips-aws
       SKIP_COMPONENT_INSTALL: "true"
     test:
     - as: e2e-install-operator
@@ -240,7 +240,7 @@ tests:
           sleep $sleeptime
         done
 
-        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout 5m0s
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout 15m0s
         oc wait --for condition=Available -n openshift-operators deployment volsync-controller-manager
       dependencies:
       - env: OO_BUNDLE
@@ -292,7 +292,7 @@ tests:
       CLUSTERPOOL_GROUP_NAME: AppLifecycle
       CLUSTERPOOL_HOST_NAMESPACE: app
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-app-clusterpool
-      CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-small-aws-414
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: app-prow-small-aws
       SKIP_COMPONENT_INSTALL: "true"
     test:
     - as: e2e
@@ -349,7 +349,7 @@ tests:
           --set rsync-tls.image=${VOLSYNC_OPERATOR} \
           --set syncthing.image=${VOLSYNC_OPERATOR} \
           --set metrics.disableAuth=true \
-          --wait --timeout=5m \
+          --wait --timeout=15m \
           volsync ./helm/volsync
 
         oc -n volsync-system get deploy

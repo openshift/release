@@ -72,7 +72,7 @@ function filter_test_by_platform() {
     extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            none)
+            none|powervs)
                 export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
                 eval "$extrainfoCmd"
                 ;;
@@ -126,6 +126,14 @@ function filter_test_by_proxy() {
     proxy="$(oc get proxies.config.openshift.io cluster -o yaml | yq '.spec|(.httpProxy,.httpsProxy)' | uniq)"
     if [[ -n "$proxy" ]] && [[ "$proxy" != 'null' ]] ; then
         export E2E_RUN_TAGS="@proxy and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags
+}
+function filter_test_by_hypershift() {
+    local masterno
+    masterno="$(oc get nodes --no-headers -l node-role.kubernetes.io/master= | wc -l)"
+    if [[ $masterno -eq 0 ]] ; then
+        export E2E_RUN_TAGS="@hypershift-hosted and ${E2E_RUN_TAGS}"
     fi
     echo_e2e_tags
 }
@@ -207,6 +215,7 @@ function filter_test_by_capability() {
 function filter_tests() {
     filter_test_by_capability
     filter_test_by_fips
+    filter_test_by_hypershift
     filter_test_by_proxy
     filter_test_by_sno
     filter_test_by_network

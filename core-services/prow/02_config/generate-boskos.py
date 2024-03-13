@@ -5,13 +5,6 @@ import yaml
 
 CONFIG = {
 
-    'aws-arm64-quota-slice': {
-        # Wild guesses.  We'll see when we hit quota issues
-        'us-east-1': 10,
-        'us-east-2': 8,
-        'us-west-1': 8,
-        'us-west-2': 8,
-    },
     'aws-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'us-east-1': 50,
@@ -42,6 +35,9 @@ CONFIG = {
     'aws-qe-quota-slice': {
         'us-east-1': 25,
         'ap-northeast-1': 5,
+    },
+    'aws-autorelease-qe-quota-slice': {
+        'us-east-1': 2,
     },
     'aws-terraform-qe-quota-slice': {
         'ap-northeast-1': 2,
