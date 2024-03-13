@@ -33,25 +33,23 @@ done
 KUBEAPISERVER_ENCRYPTED=""
 # Due to bug 1943804, etcd encryption on AWS takes much longer time, especially UPI install
 # The total cost time of etcd encrytpion depends on many factors, including storage performance, data size, so give a bigger enough waiting time here.
-echo "WARN - Below need wait about 1h (max) for the encryption to complete. First, sleeping long 20m ..."
-sleep 20m
-echo "INFO - Then querying 22 times (max) ..."
+wait_time=20m
+nodes_num=$(oc get nodes --no-headers | wc -l)
+# For SNO, reduce the wait time
+if [[ ${nodes_num} -eq 1 ]]; then
+    wait_time=8m
+fi
+echo "WARN - Below need wait about 1h (max) for the encryption to complete. First, sleeping long ${wait_time} ..."
+sleep ${wait_time}
+
+echo "INFO - Then querying 10 times (max) ..."
 N=0
-while [ $N -lt 22 ]
+while [ $N -lt 20 ]
 do
   date -u "+%Y-%m-%dT%H:%M:%SZ"
   KUBEAPISERVER_ENCRYPTED=$(oc get kubeapiserver cluster -o=jsonpath='{.status.conditions[?(@.type=="Encrypted")].reason}{"\n"}')
   if [ "$KUBEAPISERVER_ENCRYPTED" == "EncryptionCompleted" ]; then
-    timeout 700s bash -c '
-    while true; do
-      if oc get co kube-apiserver | grep -q "True.*False.*False"; then
-        sleep 120
-        if oc get co kube-apiserver|grep -q "True.*False.*False"; then
-          break
-        fi
-      fi
-    done
-    '
+    oc adm wait-for-stable-cluster --minimum-stable-period=30s --timeout=12m
     if [ "$?" == "0" ]; then
       echo "INFO - After encryption completed and enough waiting time elapsed, observed co/kube-apiserver is in stable healthy True False False status!"
       break
@@ -61,8 +59,8 @@ do
     fi
   fi
   let N+=1
-  echo "INFO - The $N time of sleeping another 2m ..."
-  sleep 2m
+  echo "INFO - The $N time of sleeping another 1m ..."
+  sleep 1m
 done
 
 OPENSHIFTAPISERVER_ENCRYPTED=$(oc get openshiftapiserver cluster -o=jsonpath='{.status.conditions[?(@.type=="Encrypted")].reason}{"\n"}')

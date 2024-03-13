@@ -37,7 +37,6 @@ presubmits:
         - --ignore=redhat-openshift-ecosystem/certified-operators-prod
         - --ignore=redhat-openshift-ecosystem/preflight
         - --ignore=redhat-openshift-ecosystem/cvp
-        - --ignore=redhat-openshift-ecosystem/cvp-fips
         - --ignore=insights-qe/iqe-cost-management-plugin
         - --ignore=ansible/tower-qa
         - --ignore=rh-openjdk/jdkContainerOcpTests
@@ -99,7 +98,6 @@ presubmits:
         - --ignore=redhat-openshift-ecosystem/certified-operators-prod
         - --ignore=redhat-openshift-ecosystem/preflight
         - --ignore=redhat-openshift-ecosystem/cvp
-        - --ignore=redhat-openshift-ecosystem/cvp-fips
         - --ignore=insights-qe/iqe-cost-management-plugin
         - --ignore=ansible/tower-qa
         - --ignore=rh-openjdk/jdkContainerOcpTests
@@ -248,7 +246,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20240212-5972d0c
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20240306-786da16
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -290,7 +288,6 @@ presubmits:
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-master-build-clusters
-    optional: true
     rerun_command: /test build-clusters
     spec:
       containers:
@@ -690,7 +687,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-master-ci-operator-config
     rerun_command: /test ci-operator-config
-    run_if_changed: ^ci-operator/(config/|step-registry/).*|^core-services/cluster-profiles/_config.yaml$
+    run_if_changed: ^ci-operator/(config/|step-registry/).*
     spec:
       containers:
       - args:
@@ -699,7 +696,9 @@ presubmits:
         - --registry
         - ./ci-operator/step-registry/
         - --cluster-profiles-config
-        - ./core-services/cluster-profiles/_config.yaml
+        - ./ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
+        - --cluster-claim-owners-config
+        - ./core-services/cluster-pools/_config.yaml
         command:
         - ci-operator-checkconfig
         image: ci-operator-checkconfig:latest
@@ -839,7 +838,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20240220-1c9ab5cbae
+        image: gcr.io/k8s-prow/checkconfig:v20240306-0b904de3b3
         imagePullPolicy: IfNotPresent
         name: ""
         resources:

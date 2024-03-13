@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -o nounset
-set -x
 
 error_handler() {
   echo "Error: ($1) occurred on $2"
@@ -24,6 +23,11 @@ OCP_VERSION=$(< "${SHARED_DIR}/OCP_VERSION")
 CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
 WORKSPACE_NAME=$(< "${SHARED_DIR}/WORKSPACE_NAME")
 VPC_NAME="${WORKSPACE_NAME}"-vpc
+if [ ! -f "${SHARED_DIR}/RESOURCE_GROUP" ]
+then
+  echo "RESOURCE_GROUP is not set, exiting cleanly"
+  exit 0
+fi
 RESOURCE_GROUP=$(< "${SHARED_DIR}/RESOURCE_GROUP")
 VPC_REGION=$(< "${SHARED_DIR}/VPC_REGION")
 echo "VPC_REGION:- ${VPC_REGION}"
@@ -40,7 +44,7 @@ function retry {
     if [ $ret_code = 0 ]; then
       break
     elif [ "$i" == "$NO_OF_RETRY" ]; then
-      error "All retry attempts failed! Please try running the script again after some time" $ret_code
+      error_handler "All retry attempts failed! Please try running the script again after some time" $ret_code
     else
       sleep 30
     fi
@@ -149,7 +153,7 @@ function cleanup_ibmcloud_powervs() {
     retry "ic pi workspace target ${CRN}"
 
     echo "Deleting the PVM Instances"
-    for INSTANCE_ID in $(ic pi instance ls --json | jq -r '.pvmInstances[].pvmInstanceID')
+    for INSTANCE_ID in $(ic pi instance ls --json | jq -r '.pvmInstances[] | .id')
     do
       echo "Deleting PVM Instance ${INSTANCE_ID}"
       retry "ic pi instance delete ${INSTANCE_ID} --delete-data-volumes"
@@ -190,13 +194,34 @@ function cleanup_ibmcloud_powervs() {
     echo "Done Deleting the ${CRN}"
   done
 
+  echo "Cleaning up the VPC Instances"
+  for RESOURCE_TGT in $(ic is subnets --output json | jq -r '.[].id')
+  do
+    VALID_SUB=$(ic is subnet "${RESOURCE_TGT}" --output json | jq -r '. | select(.vpc.name | contains("'${VPC_NAME}'"))')
+    if [ -n "${VALID_SUB}" ]
+    then
+        # Searches the VSIs and LBs to delete them
+        for VSI in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.instances[].name')
+        do
+            ic is instance-delete "${VSI}" --force || true
+        done
+
+        for LB in $(ic is subnet "${SUB}" --vpc "${VPC_NAME}" --output json --show-attached | jq -r '.load_balancers[].name')
+        do
+            ic is load-balancer-delete "${LB}" --force --vpc "${VPC_NAME}" || true
+        done
+        sleep 60
+    fi
+  done
+
   echo "Cleaning up the Subnets"
   for SUB in $(ic is subnets --output json | jq -r '.[].id')
   do
     VALID_SUB=$(ic is subnet "${SUB}" --output json | jq -r '. | select(.vpc.name | contains("'${VPC_NAME}'"))')
     if [ -n "${VALID_SUB}" ]
     then
-      retry "ic is subnetd ${SUB} --force"
+      # Load Balancers might be still attached from PowerVS UPI cluster setup.
+      ic is subnetd "${SUB}" --force || true
       echo "waiting up a minute while the Subnets are removed"
       sleep 60
     fi
@@ -210,7 +235,6 @@ function cleanup_ibmcloud_powervs() {
     then
       retry "ic is pubgwd ${PGW} --force"
       echo "waiting up a minute while the Public Gateways are removed"
-      sleep 60
     fi
   done
 
@@ -220,7 +244,6 @@ function cleanup_ibmcloud_powervs() {
   then
     retry "ic is vpc-delete ${vpc_name} --force"
     echo "waiting up a minute while the vpc is deleted"
-    sleep 60
   fi
 
   echo "Done cleaning up prior runs"
