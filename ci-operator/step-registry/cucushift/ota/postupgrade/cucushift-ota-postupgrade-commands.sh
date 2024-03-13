@@ -230,7 +230,7 @@ function post-OCP-56083(){
     local tmp_log expected_msg result
     tmp_log=$(mktemp)
     expected_msg='\"acceptedRisks\": \"Precondition \\\"ClusterVersionRecommendedUpdate\\\" failed because of \\\"NoChannel\\\": Configured channel is unset, so the recommended status of updating from'
-    result=$(oc get clusterversion -ojson | jq -r '.items[].status.conditions[]|select(.type == "ReleaseAccepted").status')
+    result=$(oc get clusterversion/version -ojson | jq -r '.status.conditions[]|select(.type == "ReleaseAccepted").status')
     if  [[ "${result}" == "True" ]]; then
         oc get clusterversion -ojson | jq -r '.items[].status.history[0]'  2>&1 | tee ${tmp_log} || true
         if grep -q "${expected_msg}" "${tmp_log}"; then
