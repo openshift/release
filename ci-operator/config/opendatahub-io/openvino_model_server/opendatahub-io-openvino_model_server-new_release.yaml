@@ -17,53 +17,59 @@ images:
   - name: BASE_OS
     value: redhat
   - name: PROJECT_VERSION
-    value: 2023.3.0
+    value: 2024.4.0
   - name: ov_source_branch
-    value: releases/2023/3
+    value: new_release
   - name: ov_source_org
-    value: openvinotoolkit
+    value: opendatahub-io
   - name: ov_contrib_branch
-    value: releases/2023/3
+    value: new_release
   - name: ov_contrib_org
-    value: openvinotoolkit
+    value: opendatahub-io
   - name: ov_use_binary
     value: "0"
   - name: sentencepiece
     value: "1"
   - name: CHECK_COVERAGE
-    value: "1"
+    value: "0"
   - name: RUN_TESTS
     value: "1"
   - name: debug_bazel_flags
-    value: --strip=always
+    value: --strip=always --define MEDIAPIPE_DISABLE=0 --define PYTHON_DISABLE=0 --//:distro=redhat
+  - name: CAPI_FLAGS
+    value: --strip=always --define MEDIAPIPE_DISABLE=1 --define PYTHON_DISABLE=1 --//:distro=redhat
+  - name: INSTALL_DRIVER_VERSION
+    value: 23.22.26516
   - name: CMAKE_BUILD_TYPE
     value: Release
   - name: GPU
     value: "1"
+  - name: JOBS
+    value: "16"
   dockerfile_path: Dockerfile.redhat
-  to: model-server-release-cuda-intel-gpu
+  to: model-server-main-cuda-intel-gpu
 promotion:
   to:
-  - name: model-server-release-cuda-intel-gpu
+  - name: model-server-main-cuda-intel-gpu
     namespace: opendatahub-io
 resources:
   '*':
     requests:
       cpu: 200m
       memory: 200Mi
-  model-server-release-cuda-intel-gpu:
+  model-server-main-cuda-intel-gpu:
     limits:
-      cpu: "12"
+      cpu: "16"
       memory: 24Gi
     requests:
-      cpu: "6"
-      memory: 12Gi
+      cpu: "16"
+      memory: 24Gi
 tests:
 - as: pr-image-mirror
   run_if_changed: ^(Dockerfile.redhat)
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: model-server-release-cuda-intel-gpu
+      SOURCE_IMAGE_REF: model-server-main-cuda-intel-gpu
     env:
       IMAGE_REPO: openvino_model_server
     workflow: opendatahub-io-ci-image-mirror
@@ -72,21 +78,21 @@ tests:
   run_if_changed: ^(Dockerfile.redhat)
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: model-server-release-cuda-intel-gpu
+      SOURCE_IMAGE_REF: model-server-main-cuda-intel-gpu
     env:
       IMAGE_REPO: openvino_model_server
-      RELEASE_VERSION: stable
+      RELEASE_VERSION: fast
     workflow: opendatahub-io-ci-image-mirror
 - as: nightly-image-mirror
   cron: 0 0 * * 0
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: model-server-release-cuda-intel-gpu
+      SOURCE_IMAGE_REF: model-server-main-cuda-intel-gpu
     env:
       IMAGE_REPO: openvino_model_server
-      RELEASE_VERSION: stable
+      RELEASE_VERSION: fast
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
-  branch: 2023.3-release
+  branch: new_release
   org: opendatahub-io
   repo: openvino_model_server
