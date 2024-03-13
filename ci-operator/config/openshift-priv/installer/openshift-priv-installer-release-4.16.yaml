@@ -413,7 +413,7 @@ tests:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp-latestinstaller
   timeout: 6h0m0s
-- as: e2e-metal-ipi-sdn
+- as: e2e-metal-ipi-ovn
   cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
@@ -422,10 +422,10 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
+        NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
   timeout: 6h0m0s
-- as: e2e-metal-ipi-sdn-swapped-hosts
+- as: e2e-metal-ipi-ovn-swapped-hosts
   cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
@@ -434,7 +434,7 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
+        NETWORK_TYPE=OVNKubernetes
         HOSTS_SWAP_DEFINITION=true
     workflow: baremetalds-e2e
   timeout: 6h0m0s
@@ -495,19 +495,6 @@ tests:
         function for pod-Service
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-upi
-  timeout: 6h0m0s
-- as: e2e-openstack-sdn-parallel
-  optional: true
-  run_if_changed: openstack
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: OpenShiftSDN
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_SUITE: openshift/conformance/parallel
-    workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
 - as: e2e-openstack-proxy
   optional: true
@@ -699,16 +686,6 @@ tests:
   steps:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix-ovn
-  timeout: 6h0m0s
-- as: e2e-nutanix-sdn
-  cluster: build01
-  optional: true
-  run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
-  steps:
-    cluster_profile: nutanix
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    workflow: openshift-e2e-nutanix-sdn
   timeout: 6h0m0s
 - as: agent-integration-tests
   commands: hack/go-integration-test.sh
