@@ -286,8 +286,8 @@ function pre-OCP-56083(){
     local  tmp_log result
     tmp_log=$(mktemp)
     oc adm upgrade channel --allow-explicit-channel  2>&1 | tee "${tmp_log}" 
-    result=$(oc get clusterversion/version -ojson | jq .spec.channel)
-    if [[ "${result}" == "\"\"" ]] || [[ "${result}" == null ]] || [[ -z "${result}"  ]] || [[ "${result}" == "" ]]; then
+    result=$(oc get clusterversion/version -ojson | jq -r '.spec.channel')
+    if [[ "${result}" == null ]] || [[ -z "${result}" ]]; then
        echo "Successfully cleared the upgrade channel"
        return 0 
     fi
