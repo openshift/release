@@ -82,6 +82,7 @@ function handleWrongVersionBooted(){
 function handleOSNotFound(){
     local bmhost="${1}"
     echo "Base operating system not found"
+    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
     echo "$EXIT_CODE_COREOS_NOT_FOUND" "${host} ${name}" >> "${ARTIFACT_DIR}/install-status.txt"
     exit 2
 }
