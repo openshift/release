@@ -113,6 +113,7 @@ function reset_node(){
     local boot_from="${2}"
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
     echo "Setting boot device for host $host to : $boot_from"
+    # Working on HPe ARM with latest firmware ?
     ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" -U "$bmc_user" -P "$bmc_pass" chassis bootdev "$boot_from" options=efiboot
     echo "Rebooting $host..."
     ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" -U "$bmc_user" -P "$bmc_pass" power cycle
