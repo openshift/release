@@ -88,7 +88,6 @@ required_permissions="""
 \"Microsoft.Authorization/roleAssignments/read\",
 \"Microsoft.Authorization/roleAssignments/write\",
 \"Microsoft.Compute/availabilitySets/read\",
-\"Microsoft.Compute/availabilitySets/write\",
 \"Microsoft.Compute/disks/beginGetAccess/action\",
 \"Microsoft.Compute/disks/delete\",
 \"Microsoft.Compute/disks/read\",
@@ -191,6 +190,29 @@ required_permissions="""
 \"Microsoft.Storage/storageAccounts/delete\",
 \"Microsoft.Storage/storageAccounts/listKeys/action\"
 """
+
+if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "IPI" ]]; then
+    required_permissions="""
+\"Microsoft.Compute/availabilitySets/write\",
+${required_permissions}
+"""
+elif [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "UPI" ]]; then
+    required_permissions="""
+\"Microsoft.Compute/images/read\",
+\"Microsoft.Compute/images/write\",
+\"Microsoft.Compute/images/delete\",
+\"Microsoft.Compute/virtualMachines/deallocate/action\",
+\"Microsoft.Storage/storageAccounts/blobServices/containers/read\",
+\"Microsoft.Resources/deployments/read\",
+\"Microsoft.Resources/deployments/write\",
+\"Microsoft.Resources/deployments/validate/action\",
+\"Microsoft.Resources/deployments/operationstatuses/read\",
+${required_permissions}
+"""
+else
+    echo "Unsupported cluster type ${CLUSTER_TYPE_MIN_PERMISSOIN}!"
+    exit 1
+fi
 
 if [[ "${ENABLE_MIN_PERMISSION_FOR_MARKETPLACE}" == "true" ]]; then
     required_permissions="""
