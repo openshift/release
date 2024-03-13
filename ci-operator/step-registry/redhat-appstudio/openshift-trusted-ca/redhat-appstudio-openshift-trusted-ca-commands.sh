@@ -62,7 +62,7 @@ sed -i -e "s|AWS_SECRET_ACCESS_KEY=\".*\"|AWS_SECRET_ACCESS_KEY=\"$AWS_SECRET_AC
 
 "${CERT_FOLDER}"/acme.sh/acme.sh --register-account -m rhtap-qe-ci@ci.stonesoupengineering.com
 
-"${CERT_FOLDER}"/acme.sh/acme.sh --issue -d ${LE_API} -d *.${LE_WILDCARD} --server letsencrypt --dns dns_aws
+"${CERT_FOLDER}"/acme.sh/acme.sh --issue -d ${LE_API}  -d *.${LE_WILDCARD} --server letsencrypt --dns dns_aws
 "${CERT_FOLDER}"/acme.sh/acme.sh --install-cert -d ${LE_API} -d *.${LE_WILDCARD} --cert-file ${CERT_DIR}/cert.pem --key-file ${CERT_DIR}/key.pem --fullchain-file ${CERT_DIR}/fullchain.pem --ca-file ${CERT_DIR}/ca.cer
 
 oc create secret tls router-certs --cert=${CERT_DIR}/fullchain.pem --key=${CERT_DIR}/key.pem -n openshift-ingress
