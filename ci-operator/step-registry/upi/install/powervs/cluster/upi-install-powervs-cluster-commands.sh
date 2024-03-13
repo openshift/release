@@ -128,7 +128,7 @@ function create_upi_tf_varfile(){
 ibmcloud_region     = "${POWERVS_REGION}"
 ibmcloud_zone       = "${POWERVS_ZONE}"
 service_instance_id = "${POWERVS_SERVICE_INSTANCE_ID}"
-rhel_image_name     = "CentOS-Stream-8"
+rhel_image_name     = "CentOS-Stream-9"
 rhcos_import_image              = true
 rhcos_import_image_filename     = "${COREOS_NAME}"
 rhcos_import_image_storage_type = "tier1"
@@ -162,8 +162,9 @@ function create_upi_powervs_cluster() {
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate "${SHARED_DIR}"/terraform-mac-upi.tfstate
   ./openshift-install-powervs output > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
   ./openshift-install-powervs access-info > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
-  cat "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
-  cat "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
+  # Dev Note: the following two lines may be causing the redaction routine to remove the log
+  # cat "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
+  # cat "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
   ./openshift-install-powervs output bastion_private_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
   ./openshift-install-powervs output bastion_public_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
 
@@ -173,7 +174,7 @@ function create_upi_powervs_cluster() {
   echo "BASTION_PRIVATE_IP:- $BASTION_PRIVATE_IP"
 
   export BASTION_PUBLIC_IP
-  scp -v -i "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/id_rsa root@"${BASTION_PUBLIC_IP}":~/openstack-upi/auth/kubeconfig  "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/
+  scp -i "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/id_rsa root@"${BASTION_PUBLIC_IP}":~/openstack-upi/auth/kubeconfig  "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/kubeconfig "${SHARED_DIR}"/kubeconfig
 }
 
@@ -338,8 +339,22 @@ function create_powervs_workspace() {
   echo "${RESOURCE_GROUP_ID}" > "${SHARED_DIR}"/RESOURCE_GROUP_ID
 
   ##Create a Workspace on a Power Edge Router enabled PowerVS zone
-  retry "ic pi workspace create ${workspace_name} --datacenter ${POWERVS_ZONE} --group ${RESOURCE_GROUP_ID} --plan public"
-  sleep 60
+  # Dev Note: uses a custom loop since we want to redirect errors
+  for i in $(seq 1 "$NO_OF_RETRY"); do
+    echo "Attempt: $i/$NO_OF_RETRY"
+    ret_code=0
+    ic pi workspace create "${workspace_name}" --datacenter "${POWERVS_ZONE}" --group "${RESOURCE_GROUP_ID}" --plan public 2>&1 || ret_code=$?
+    if [ $ret_code = 0 ]; then
+      break
+    elif [ "$i" == "$NO_OF_RETRY" ]; then
+      error_handler "All retry attempts failed! Please try running the script again after some time" $ret_code
+    else
+      sleep 30
+    fi
+  done
+
+  echo "Waiting for the workspace to come active"
+  sleep 120
   ic pi workspace list 2>&1 | grep "${workspace_name}" | tee /tmp/instance.id
 
   ##Get the CRN
