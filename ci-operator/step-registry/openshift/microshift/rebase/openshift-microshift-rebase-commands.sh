@@ -12,7 +12,7 @@ pip3 install setuptools-rust cryptography pyyaml pygithub gitpython
 
 # Set up pull secrets for later downloading of containers.
 mkdir -p ${HOME}/.docker
-cp /secrets/ci-pull-secret ${HOME}/.docker/config.json
+cp /tmp/pull-secret/.dockerconfigjson ${HOME}/.docker/config.json
 
 cd /go/src/github.com/openshift/microshift/
 DEST_DIR=${HOME}/.local/bin ./scripts/fetch_tools.sh yq
