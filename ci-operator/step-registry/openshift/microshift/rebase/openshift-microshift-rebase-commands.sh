@@ -11,8 +11,10 @@ python3 -m ensurepip --upgrade
 pip3 install setuptools-rust cryptography pyyaml pygithub gitpython
 
 # Set up pull secrets for later downloading of containers.
-mkdir -p ${HOME}/.docker
-cp /tmp/pull-secret/.dockerconfigjson ${HOME}/.docker/config.json
+cp /tmp/import-secret/.dockerconfigjson ${HOME}/.pull-secret.json
+
+mkdir /tmp/tmp; cd /tmp/tmp
+oc image extract --registry-config ${HOME}/.pull-secret.json --path /manifests/:. registry.redhat.io/lvms4/lvms-operator-bundle:v4.15.0
 
 cd /go/src/github.com/openshift/microshift/
 DEST_DIR=${HOME}/.local/bin ./scripts/fetch_tools.sh yq
