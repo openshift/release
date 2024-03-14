@@ -7,6 +7,14 @@ base_images:
     name: flowlogs-pipeline
     namespace: netobserv
     tag: ci
+  netobserv-ebpf-agent:
+    name: netobserv-ebpf-agent
+    namespace: netobserv
+    tag: ci
+  network-observability-console-plugin:
+    name: network-observability-console-plugin
+    namespace: netobserv
+    tag: ci
   ubi:
     name: ubi
     namespace: ocp
@@ -29,6 +37,10 @@ operator:
     with: network-observability-operator
   - pullspec: quay.io/netobserv/flowlogs-pipeline:.*
     with: pipeline:flowlogs-pipeline
+  - pullspec: quay.io/netobserv/netobserv-ebpf-agent:.*
+    with: pipeline:netobserv-ebpf-agent
+  - pullspec: quay.io/netobserv/network-observability-console-plugin:.*
+    with: pipeline:network-observability-console-plugin
 promotion:
   to:
   - namespace: netobserv
@@ -71,8 +83,6 @@ tests:
         fi
 
         export CSV=$(oc get csv -n openshift-netobserv-operator | grep -E "net.*observ" | awk '{print $1}')
-        USER=netobserv VERSION=main make set-agent-image
-        USER=netobserv VERSION=main make set-plugin-image
         make set-release-kind-downstream
         PORT_FWD=false NAMESPACE=netobserv make deploy-loki
         oc apply -f /go/src/github.com/netobserv/network-observability-operator/config/samples/flows_v1beta2_flowcollector.yaml
