@@ -37,12 +37,12 @@ tests:
         {
           "failure_rules":
             [
-              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster"},
-              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other"},
+              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
-              {"step": "openshift-*", "failure_type": "all", "classification": "Other"},
-              {"step": "dotnet-deploy-and-test", "failure_type": "pod_failure", "classification": "Test Execution"},
-              {"step": "dotnet-deploy-and-test", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "DOTNET"}
+              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "dotnet-deploy-and-test", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "dotnet-deploy-and-test", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "DOTNET", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]}
             ],
           "success_rules":
             [
@@ -52,6 +52,8 @@ tests:
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.14-lp","self-managed-lp","dotnet-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      USER_TAGS: |
+        scenario dotnet
     test:
     - ref: dotnet-deploy-and-test
     workflow: firewatch-ipi-aws
