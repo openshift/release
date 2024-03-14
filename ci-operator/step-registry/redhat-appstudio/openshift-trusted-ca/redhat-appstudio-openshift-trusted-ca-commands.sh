@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ "$RHTAP_ENABLE_TPA" = "false" ]; then
+    echo "RHTPA is disabled, skipping certificates creation..."
+    exit 0
+fi
+
 export CERT_FOLDER AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY OPENSHIFT_CONSOLE_URL \
     LE_API LE_WILDCARD CERT_DIR OPENSHIFT_PASSWORD OPENSHIFT_API
 
