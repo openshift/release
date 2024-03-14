@@ -1,4 +1,12 @@
 base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
+  flowlogs-pipeline:
+    name: flowlogs-pipeline
+    namespace: netobserv
+    tag: ci
   ubi:
     name: ubi
     namespace: ocp
@@ -19,6 +27,8 @@ operator:
   substitutions:
   - pullspec: quay.io/netobserv/network-observability-operator:.*
     with: network-observability-operator
+  - pullspec: quay.io/netobserv/flowlogs-pipeline:.*
+    with: pipeline:flowlogs-pipeline
 promotion:
   to:
   - namespace: netobserv
@@ -46,12 +56,10 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      OO_INDEX: ci-index-noo-bundle
+      OO_BUNDLE: noo-bundle
     env:
-      OO_CHANNEL: latest
+      OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: openshift-netobserv-operator
-      OO_PACKAGE: netobserv-operator
-      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: e2e-operator
       cli: latest
@@ -64,7 +72,6 @@ tests:
 
         export CSV=$(oc get csv -n openshift-netobserv-operator | grep -E "net.*observ" | awk '{print $1}')
         USER=netobserv VERSION=main make set-agent-image
-        USER=netobserv VERSION=main make set-flp-image
         USER=netobserv VERSION=main make set-plugin-image
         make set-release-kind-downstream
         PORT_FWD=false NAMESPACE=netobserv make deploy-loki
@@ -75,14 +82,11 @@ tests:
         oc wait -n netobserv --timeout=60s --for condition=Available=True deployment netobserv-plugin
         oc wait pods --timeout=120s --for=condition=ready -l app=netobserv-ebpf-agent -n netobserv-privileged
         oc wait flowcollector/cluster --timeout=120s --for=condition=ready
-      dependencies:
-      - env: OO_BUNDLE
-        name: noo-bundle
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: netobserv

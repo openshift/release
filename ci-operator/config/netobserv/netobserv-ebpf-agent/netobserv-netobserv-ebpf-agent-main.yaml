@@ -1,0 +1,44 @@
+base_images:
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+images:
+- dockerfile_path: Dockerfile
+  from: ubi
+  to: netobserv-ebpf-agent
+promotion:
+  to:
+  - namespace: netobserv
+    tag: ci
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: netobserv
+  repo: netobserv-ebpf-agent
