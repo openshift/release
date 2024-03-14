@@ -8,7 +8,7 @@ export PATH=/usr/libexec/origin:$PATH
 
 # Initial check
 case "${CLUSTER_TYPE}" in
-libvirt-ppc64le|libvirt-s390x|powervs*)
+libvirt-ppc64le|libvirt-s390x*|powervs*)
     ;;
 *)
     >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"

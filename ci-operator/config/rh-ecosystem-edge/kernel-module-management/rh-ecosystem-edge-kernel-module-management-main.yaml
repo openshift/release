@@ -36,6 +36,8 @@ images:
   to: kernel-module-management-signimage
 - dockerfile_path: Dockerfile.must-gather
   to: kernel-module-management-must-gather
+- dockerfile_path: Dockerfile.webhook
+  to: kernel-module-management-webhook-server
 - dockerfile_path: Dockerfile.worker
   to: kernel-module-management-worker
 - dockerfile_literal: |
@@ -50,13 +52,14 @@ images:
   from: src
   to: e2e-hub-yq
 - dockerfile_literal: |
-    FROM ubi9
+    FROM src
     RUN curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_x86_64.tar.gz && \
       tar -xvzf grpcurl_1.8.9_linux_x86_64.tar.gz -C /tmp/ && \
       chmod +x /tmp/grpcurl && \
       mv /tmp/grpcurl /usr/local/bin/ && \
       rm grpcurl_1.8.9_linux_x86_64.tar.gz
-  to: ubi9-grpcurl
+  from: src
+  to: src-grpcurl
 operator:
   bundles:
   - as: operator-bundle
@@ -72,6 +75,8 @@ operator:
     with: pipeline:kernel-module-management-operator-hub
   - pullspec: quay.io/edge-infrastructure/kernel-module-management-signimage:latest
     with: pipeline:kernel-module-management-signimage
+  - pullspec: quay.io/edge-infrastructure/kernel-module-management-webhook-server:latest
+    with: pipeline:kernel-module-management-webhook-server
   - pullspec: quay.io/edge-infrastructure/kernel-module-management-worker:latest
     with: pipeline:kernel-module-management-worker
 promotion:
@@ -79,7 +84,7 @@ promotion:
   - excluded_images:
     - ubi9-minimal-entitled
     - e2e-hub-yq
-    - ubi9-grpcurl
+    - src-grpcurl
     namespace: edge-infrastructure
     tag: latest
     tag_by_commit: true
@@ -216,6 +221,8 @@ tests:
         name: kernel-module-management-operator
       - env: HUB_IMG
         name: kernel-module-management-operator-hub
+      - env: WEBHOOK_IMG
+        name: kernel-module-management-webhook-server
       from: e2e-hub-yq
       resources:
         requests:
@@ -235,13 +242,11 @@ tests:
     test:
     - as: run-test
       cli: latest
-      commands: |
-        oc create namespace openshift-kmm
-        ./ci/prow/operator-upgrade
+      commands: ./ci/prow/operator-upgrade
       dependencies:
       - env: OO_BUNDLE
         name: operator-bundle
-      from: ubi9-grpcurl
+      from: src-grpcurl
       resources:
         requests:
           cpu: 1000m
