@@ -110,6 +110,18 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-ubi9-python-3.9
   to: runtime-cuda-tensorflow-ubi9-python-3.9
+- context_dir: intel/base/gpu/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: base-ubi9-python-3.9
+  to: intel-base-gpu-ubi9-python-3.9
+- context_dir: intel/runtimes/pytorch/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: intel-base-gpu-ubi9-python-3.9
+  to: intel-runtime-pytorch-ubi9-python-3.9
+- context_dir: jupyter/intel/pytorch/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: intel-runtime-pytorch-ubi9-python-3.9
+  to: jupyter-intel-pytorch-ubi9-python-3.9
 - context_dir: base/c9s-python-3.9
   dockerfile_path: Dockerfile
   to: base-c9s-python-3.9
@@ -415,6 +427,24 @@ tests:
       IMAGE_REPO: workbench-images
       RELEASE_VERSION: runtime-cuda-tensorflow-ubi8-python-3.8
     workflow: opendatahub-io-ci-image-mirror
+- as: runtime-intel-pyt-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (base\/ubi9-python-3.9\/*)|(intel\/base\/gpu\/ubi9-python-3.9\/*)|(intel\/runtimes\/pytorch\/ubi9-python-3.9\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: intel-runtime-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      RELEASE_VERSION: intel-runtime-pytorch-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: runtime-intel-pyt-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: intel-runtime-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      RELEASE_VERSION: intel-runtime-pytorch-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
 - as: runtime-cuda-tensorflow-ubi8-python-3-8-pr-image-mirror
   run_if_changed: (base\/ubi8-python-3.8\/*)|(cuda\/ubi8-python-3.8\/*)|(runtimes\/tensorflow\/ubi8-python-3.8\/*)
   steps:
@@ -582,6 +612,26 @@ tests:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: cuda-jupyter-tensorflow-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-intel-pyt-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-intel-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: jupyter-intel-pytorch-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-intel-pyt-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (base\/ubi9-python-3.9\/*)|(intel\/base\/gpu\/ubi9-python-3.9\/*)|(intel\/runtimes\/pytorch\/ubi9-python-3.9\/*)|(jupyter\/intel\/pytorch\/ubi9-python-3.9\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-intel-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: jupyter-intel-pytorch-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: notebook-jupyter-trustyai-ubi9-python-3-9-image-mirror
   postsubmit: true
@@ -921,6 +971,40 @@ tests:
       dependencies:
       - env: RUNTIME_TENSORFLOW_IMAGE
         name: runtime-cuda-tensorflow-ubi8-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: intel-runtimes-pyt-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project intel-runtimes-pytorch-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_INTEL_PYTORCH_IMAGE}"
+        make deploy9-intel-runtimes-pytorch-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make validate-runtime-image image=intel-runtime-pytorch-ubi9-python-3.9
+        make undeploy9-intel-runtimes-pytorch-ubi9-python-3.9
+      dependencies:
+      - env: RUNTIME_INTEL_PYTORCH_IMAGE
+        name: intel-runtime-pytorch-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: jupyter-intel-pyt-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-intel-pytorch-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_INTEL_PYTORCH_IMAGE}"
+        make deploy9-jupyter-intel-pytorch-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-intel-pytorch-ubi9-python-3.9
+        make undeploy9-jupyter-intel-pytorch-ubi9-python-3.9
+      dependencies:
+      - env: RUNTIME_INTEL_PYTORCH_IMAGE
+        name: intel-runtime-pytorch-ubi9-python-3.9
       from: src
       resources:
         requests:
