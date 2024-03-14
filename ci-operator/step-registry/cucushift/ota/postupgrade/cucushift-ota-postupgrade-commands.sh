@@ -224,6 +224,30 @@ function post-OCP-69948(){
     return 0
 }
 
+function post-OCP-56083(){
+    echo "Post Test Start: OCP-56083"
+    echo "Upgrade cluster when channel is unset"
+    local  expected_msg result accepted_risk_result
+    expected_msg='Precondition "ClusterVersionRecommendedUpdate" failed because of "NoChannel": Configured channel is unset, so the recommended status of updating from'
+    result=$(oc get clusterversion/version -ojson | jq -r '.status.conditions[]|select(.type == "ReleaseAccepted").status')
+    if  [[ "${result}" == "True" ]]; then
+        accepted_risk_result=$(oc get clusterversion/version -ojson | jq -r '.status.history[0].acceptedRisks')
+        echo "${accepted_risk_result}"
+        if [[ "${accepted_risk_result}" =~ ${expected_msg} ]]; then
+            echo "history.acceptedRisks complains ClusterVersion RecommendedUpdate failure with NoChannel"
+            echo "Test Passed: OCP-56083"
+            return 0 
+        else
+            echo "Error: history.acceptedRisks Not complains about ClusterVersion RecommendedUpdate failure with NoChannel"
+        fi
+    else
+        echo "Error: Release Not Accepted"
+        echo "clusterversion release accepted status value: ${result}"
+    fi
+    echo "Test Failed: OCP-56083"
+    return 1
+}
+
 # This func run all test cases with with checkpoints which will not break other cases,
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be ran or not
