@@ -4,7 +4,7 @@ set -o nounset
 set -o pipefail
 
 export OPENSHIFT_PASSWORD OPENSHIFT_API RED_HAT_DEVELOPER_HUB_URL GITHUB_TOKEN \
-    GITHUB_ORGANIZATION QUAY_IMAGE_ORG APPLICATION_ROOT_NAMESPACE
+    GITHUB_ORGANIZATION QUAY_IMAGE_ORG APPLICATION_ROOT_NAMESPACE NODE_TLS_REJECT_UNAUTHORIZED
 
 echo "start rhtap-installer e2e test"
 
@@ -28,4 +28,5 @@ git clone https://github.com/redhat-appstudio/rhtap-e2e.git .
 
 /bin/bash ./scripts/create-creds.sh "${APPLICATION_ROOT_NAMESPACE}"
 
+NODE_TLS_REJECT_UNAUTHORIZED=0
 yarn && yarn test
