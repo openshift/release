@@ -51,7 +51,7 @@ function retry {
     $cmd || ret_code=$?
     if [ $ret_code = 0 ]; then
       break
-    elif [ "$i" == "$retry" ]; then
+    elif [ "$retry" == "$NO_OF_RETRY" ]; then
       error_handler "All retry attempts failed! Please try running the script again after some time" $ret_code
     else
       sleep 30
