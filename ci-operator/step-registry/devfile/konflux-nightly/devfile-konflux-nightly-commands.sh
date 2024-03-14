@@ -11,4 +11,4 @@ git clone https://github.com/devfile/registry.git -b main
 cd registry
 
 # Run tests
-/bin/bash tests/check_rhtap_nightly.sh
+/bin/bash tests/check_konflux_nightly.sh
