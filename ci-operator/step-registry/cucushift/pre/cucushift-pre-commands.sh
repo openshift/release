@@ -17,7 +17,9 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 # configure cucushift runtime environment variables
-server="$(yq '.clusters[-1].cluster.server' "${KUBECONFIG}")"
+context="$(oc config current-context)"
+cluster="$(oc config view -o jsonpath="{.contexts[?(@.name==\"$context\")].context.cluster}")"
+server="$(oc config view -o jsonpath="{.clusters[?(@.name==\"$cluster\")].cluster.server}")"
 IFS=':' read hosts api_port < <(echo ${server#*://})
 ver_cli=$(oc version --client | grep -i client | cut -d ' ' -f 3 | cut -d '.' -f1,2)
 
