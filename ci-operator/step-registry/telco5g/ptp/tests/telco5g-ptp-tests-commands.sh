@@ -209,8 +209,12 @@ else
 fi
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
-temp_dir=$(mktemp -d -t cnf-XXXXX)
+pattern="4.[0-9]+"
+if [[ "$T5CI_VERSION" =~ $pattern ]]; then
+  source $HOME/golang-1.20
+fi
 
+temp_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$temp_dir" || exit 1
 
 # deploy ptp
@@ -236,7 +240,7 @@ make deploy
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
 
 # patching to add events
-oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "storageType":"emptyDir"}}}' --type=merge
+oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "storageType":"emptyDir"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
 
 # wait for the linuxptp-daemon to be deployed
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp

@@ -132,13 +132,57 @@ def _add_release_controller_developers_cluster_role_bindings(gendoc, namespace):
     })
 
 
+def _release_payload_modifiers_cluster_role(gendoc):
+    gendoc.append({
+        'apiVersion': 'authorization.openshift.io/v1',
+        'kind': 'ClusterRole',
+        'metadata': {
+            'name': 'openshift-release-payload-modifiers'
+        },
+        'rules': [
+            {
+                'apiGroups': ['release.openshift.io'],
+                'resources': ['releasepayloads'],
+                'verbs': ['get',
+                          'list',
+                          'watch',
+                          'update',
+                          'patch']
+            }
+        ]
+    })
+
+
+def _add_release_payload_modifiers_cluster_role_bindings(gendoc, namespace):
+    gendoc.append({
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'openshift-release-payload-modifiers-binding',
+            'namespace': namespace,
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'ClusterRole',
+            'name': 'openshift-release-payload-modifiers'
+        },
+        'subjects': [{
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'Group',
+            'name': 'openshift-release-payload-modifiers'
+        }]
+    })
+
+
 def generate_release_admin_rbac(config):
     with genlib.GenDoc(config.paths.path_crt_resources.joinpath('admin_generated_rbac.yaml')) as gendoc:
         _release_admins_cluster_role(gendoc)
         _release_controller_developers_cluster_role(gendoc)
+        _release_payload_modifiers_cluster_role(gendoc)
 
         for private in (False, True):
             for arch in config.arches:
                 context = Context(config, arch, private)
                 _add_release_admin_cluster_role_bindings(gendoc, context.is_namespace)
                 _add_release_controller_developers_cluster_role_bindings(gendoc, context.is_namespace)
+                _add_release_payload_modifiers_cluster_role_bindings(gendoc, context.is_namespace)

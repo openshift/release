@@ -558,6 +558,9 @@ gcp)
     elif [ -f "${SHARED_DIR}/xpn_min_perm_passthrough.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_min_perm_passthrough.json"
+    elif [ -f "${SHARED_DIR}/xpn_byo-hosted-zone_min_perm_passthrough.json" ]; then
+      echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC using BYO hosted zone..."
+      export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_byo-hosted-zone_min_perm_passthrough.json"
     fi
     ;;
 ibmcloud*)
@@ -598,8 +601,15 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
+set +o errexit
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
+ret="$?"
+if test "${ret}" -ne 0 ; then
+	echo "Create manifests exit code: $ret"
+	exit "${ret}"
+fi
+set -o errexit
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
@@ -635,9 +645,16 @@ do
 done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -print0)
 
 if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
+  set +o errexit
   # Inject promtail in bootstrap.ign
   openshift-install --dir="${dir}" create ignition-configs &
   wait "$!"
+  ret="$?"
+  if test "${ret}" -ne 0 ; then
+	  echo "Create ignition-configs exit code: $ret"
+	  exit "${ret}"
+  fi
+  set -o errexit
   inject_promtail_service
 fi
 
@@ -683,17 +700,11 @@ do
       kill $copy_kubeconfig_pid
     fi
 
-    if [[ -v capi_envtest_pid ]]; then
-      kill "$capi_envtest_pid"
-    fi
     rm -rf "$dir"
     cp -rfpv "$backup" "$dir"
   else
     date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
   fi
-
-  capi_envtest_monitor "${dir}" &
-  capi_envtest_pid=$!
 
   copy_kubeconfig_minimal "${dir}" &
   copy_kubeconfig_pid=$!
