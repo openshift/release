@@ -16,6 +16,7 @@ LOGS_FOLDER="${ARTIFACT_DIR}/ocs-tests"
 LOGS_CONFIG="${LOGS_FOLDER}/ocs-tests-config.yaml"
 CLUSTER_PATH="${ARTIFACT_DIR}/ocs-tests"
 
+sleep 4h
 #
 # Remove the ACM Subscription to allow OCS interop tests full control of operators
 #
