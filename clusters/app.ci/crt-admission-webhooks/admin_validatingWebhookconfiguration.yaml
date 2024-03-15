@@ -1,0 +1,26 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+  name: crt-validation-webhooks
+webhooks:
+- name: releasepayloadmodifiers.admission.release.openshift.io
+  clientConfig:
+    service:
+      namespace: default
+      name: kubernetes
+      path: /apis/admission.release.openshift.io/v1alpha1/releasepayloadmodifiers
+  rules:
+  - operations:
+    - UPDATE
+    apiGroups:
+    - release.openshift.io
+    apiVersions:
+    - "*"
+    resources:
+    - releasepayloads
+  sideEffects: None
+  admissionReviewVersions:
+  - v1beta1
+  failurePolicy: Fail
