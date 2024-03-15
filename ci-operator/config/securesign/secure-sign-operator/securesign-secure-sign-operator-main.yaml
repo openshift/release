@@ -33,7 +33,9 @@ operator:
     context_dir: .
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: registry.redhat.io/rhtas-tech-preview/sigstore-rhel9-operator.*
+  - pullspec: registry.redhat.io/rhtas/rhtas-rhel9-operator.*
+    with: pipeline:securesign-operator
+  - pullspec: quay.io/redhat-user-workloads/rhtas-tenant/operator/rhtas-operator.*
     with: pipeline:securesign-operator
 releases:
   latest:
@@ -79,7 +81,6 @@ tests:
         ./ci/openshift/tas-keycloak-install.sh
         set -x
         go install github.com/sigstore/cosign/v2/cmd/cosign@v2.2.2
-        #./ci/openshift/sign-test.sh
         ./ci/openshift/sign-test.sh
         oc logs -n openshift-rhtas-operator deployment/rhtas-operator-controller-manager
       from: src-oc

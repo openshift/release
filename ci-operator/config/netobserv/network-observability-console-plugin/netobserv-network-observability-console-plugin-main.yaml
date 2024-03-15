@@ -1,0 +1,63 @@
+base_images:
+  go-builder-base:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+  use_build_cache: true
+images:
+- dockerfile_path: Dockerfile
+  from: ubi
+  inputs:
+    go-builder-base:
+      as:
+      - docker.io/library/golang:1.21
+  to: network-observability-console-plugin
+- build_args:
+  - name: BUILDSCRIPT
+    value: :standalone
+  dockerfile_path: Dockerfile.cypress
+  inputs:
+    go-builder-base:
+      as:
+      - docker.io/library/golang:1.21
+  to: plugin-cypress-tests
+promotion:
+  to:
+  - namespace: netobserv
+    tag: ci
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: plugin-cypress
+  commands: |
+    ./cypress.sh
+  container:
+    from: plugin-cypress-tests
+zz_generated_metadata:
+  branch: main
+  org: netobserv
+  repo: network-observability-console-plugin
