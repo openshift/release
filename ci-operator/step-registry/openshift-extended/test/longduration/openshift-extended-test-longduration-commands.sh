@@ -3,6 +3,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export PATH=/tmp/:$PATH
+which extended-platform-tests
+
+echo "WAITING FOR DEBUG..."
+while [ ! -f "/tmp/continue" ]
+do
+    sleep 10
+done
+
+
 function warn_0_case_executed {
     local count
     count="$(ls ${ARTIFACT_DIR} | wc -l)"
@@ -345,8 +355,6 @@ function run {
     create_must-gather_dir_for_case
     ret_value=0
     set -x
-
-    sleep 28800
 
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
         extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
