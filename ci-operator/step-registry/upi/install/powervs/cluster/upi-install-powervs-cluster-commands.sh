@@ -54,10 +54,11 @@ echo "${POWERVS_REGION}" > "${SHARED_DIR}"/POWERVS_REGION
 echo "${POWERVS_ZONE}" > "${SHARED_DIR}"/POWERVS_ZONE
 echo "${VPC_REGION}" > "${SHARED_DIR}"/VPC_REGION
 echo "${VPC_ZONE}" > "${SHARED_DIR}"/VPC_ZONE
-echo "POWERVS_REGION:- ${POWERVS_REGION}"
-echo "POWERVS_ZONE:- ${POWERVS_ZONE}"
-echo "VPC_REGION:- ${VPC_REGION}"
-echo "VPC_ZONE:- ${VPC_ZONE}"
+# Dev Note: this may be triggering redaction.
+# echo "POWERVS_REGION:- ${POWERVS_REGION}"
+# echo "POWERVS_ZONE:- ${POWERVS_ZONE}"
+# echo "VPC_REGION:- ${VPC_REGION}"
+# echo "VPC_ZONE:- ${VPC_ZONE}"
 export POWERVS_REGION
 export POWERVS_ZONE
 export VPC_REGION
@@ -72,13 +73,13 @@ NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 
 function retry {
   cmd=$1
-  for i in $(seq 1 "$NO_OF_RETRY"); do
-    echo "Attempt: $i/$NO_OF_RETRY"
+  for retry in $(seq 1 "$NO_OF_RETRY"); do
+    echo "Attempt: $retry/$NO_OF_RETRY"
     ret_code=0
     $cmd || ret_code=$?
     if [ $ret_code = 0 ]; then
       break
-    elif [ "$i" == "$NO_OF_RETRY" ]; then
+    elif [ "$retry" == "$NO_OF_RETRY" ]; then
       error_handler "All retry attempts failed! Please try running the script again after some time" $ret_code
     else
       sleep 30
@@ -158,13 +159,13 @@ EOF
 
 function create_upi_powervs_cluster() {
   cd "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/ || true
-  ./openshift-install-powervs create -var-file var-mac-upi.tfvars -verbose || true
+  # Dev Note: https://github.com/ocp-power-automation/openshift-install-power/blob/devel/openshift-install-powervs#L767C1-L767C145
+  # May trigger the redaction
+  ./openshift-install-powervs create -var-file var-mac-upi.tfvars -verbose | sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d' || true
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate "${SHARED_DIR}"/terraform-mac-upi.tfstate
   ./openshift-install-powervs output > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
   ./openshift-install-powervs access-info > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
   # Dev Note: the following two lines may be causing the redaction routine to remove the log
-  # cat "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
-  # cat "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
   ./openshift-install-powervs output bastion_private_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
   ./openshift-install-powervs output bastion_public_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
 
@@ -282,7 +283,6 @@ function cleanup_ibmcloud_powervs() {
     for COUNT in $(seq 0 5)
     do
       FIND=$(ic pi workspace ls 2> /dev/null | grep "${CRN}" || true)
-      echo "FIND: ${FIND}"
       if [ -z "${FIND}" ]
       then
         echo "service-instance is deprovisioned"
@@ -340,13 +340,13 @@ function create_powervs_workspace() {
 
   ##Create a Workspace on a Power Edge Router enabled PowerVS zone
   # Dev Note: uses a custom loop since we want to redirect errors
-  for i in $(seq 1 "$NO_OF_RETRY"); do
-    echo "Attempt: $i/$NO_OF_RETRY"
+  for retry in $(seq 1 "$NO_OF_RETRY"); do
+    echo "Attempt: $retry/$NO_OF_RETRY"
     ret_code=0
     ic pi workspace create "${workspace_name}" --datacenter "${POWERVS_ZONE}" --group "${RESOURCE_GROUP_ID}" --plan public 2>&1 || ret_code=$?
     if [ $ret_code = 0 ]; then
       break
-    elif [ "$i" == "$NO_OF_RETRY" ]; then
+    elif [ "$retry" == "$NO_OF_RETRY" ]; then
       error_handler "All retry attempts failed! Please try running the script again after some time" $ret_code
     else
       sleep 30
@@ -377,7 +377,7 @@ function create_powervs_workspace() {
   do
   WS_COUNTER=$((WS_COUNTER+1)) 
   TEMP_STATE="$(ic pi workspace get "${POWERVS_SERVICE_INSTANCE_ID}" --json 2> /dev/null | jq -r '.status')"
-  echo "Current State is: ${TEMP_STATE}"
+  echo "pvs workspace state: ${TEMP_STATE}"
   echo ""
   if [ "${TEMP_STATE}" == "active" ]
   then
@@ -439,7 +439,7 @@ function create_transit_gateway() {
   do
   TGW_COUNTER=$((TGW_COUNTER+1)) 
   TEMP_STATE="$(ic tg gw "${TGW_ID}" --output json 2> /dev/null | jq -r '.status')"
-  echo "Current State is: ${TEMP_STATE}"
+  echo "tg state: ${TEMP_STATE}"
   echo ""
   if [ "${TEMP_STATE}" == "available" ]
   then
@@ -470,7 +470,7 @@ function create_vpc() {
   do
   VPC_COUNTER=$((VPC_COUNTER+1)) 
   TEMP_STATE="$(ic is vpc "${vpc_name}" --output json 2> /dev/null | jq -r '.status')"
-  echo "Current State is: ${TEMP_STATE}"
+  echo "vpc state: ${TEMP_STATE}"
   echo ""
   if [ "${TEMP_STATE}" == "available" ]
   then
@@ -513,7 +513,7 @@ function create_vpc() {
   do
   TGW_PER_COUNTER=$((TGW_PER_COUNTER+1)) 
   TEMP_STATE="$(ic tg connection "${TGW_ID}" "${TGW_PER_ID}" --output json 2> /dev/null | jq -r '.status')"
-  echo "Current State is: ${TEMP_STATE}"
+  echo "tg connection state: ${TEMP_STATE}"
   echo ""
   if [ "${TEMP_STATE}" == "attached" ]
   then
@@ -542,7 +542,7 @@ function create_vpc() {
   do
   TGW_VPC_COUNTER=$((TGW_VPC_COUNTER+1)) 
   TEMP_STATE="$(ic tg connection "${TGW_ID}" "${TGW_VPC_ID}" --output json 2> /dev/null | jq -r '.status')"
-  echo "Current State is: ${TEMP_STATE}"
+  echo "tg connection state: ${TEMP_STATE}"
   echo ""
   if [ "${TEMP_STATE}" == "attached" ]
   then
