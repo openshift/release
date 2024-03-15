@@ -69,7 +69,13 @@ function check_monitoring_statefulset_status()
     #wait for 30s to make sure the .status.availableReplicas was updated
     ready_replicas=$( ! oc -n openshift-monitoring get statefulsets $statefulset -oyaml |grep availableReplicas>/dev/null || oc get statefulsets $statefulset -n openshift-monitoring -ojsonpath='{.status.availableReplicas}')
     echo ready_replicas is $ready_replicas
-    infra_pods=$(oc get pods -n openshift-monitoring --no-headers -o wide | grep -E "$infra_nodes" | grep Running | grep "$statefulset" | wc -l  | xargs)
+
+    if ! oc get pods -n openshift-monitoring --no-headers -o wide | grep -E "$infra_nodes" | grep Running | grep "$statefulset" ;then
+	    infra_pods=0
+    else
+            infra_pods=$(oc get pods -n openshift-monitoring --no-headers -o wide | grep -E "$infra_nodes" | grep Running | grep "$statefulset" | wc -l  | xargs)
+    fi
+
     echo infra_pods is $infra_pods
     echo
     echo "-------------------------------------------------------------------------------------------"
@@ -78,10 +84,14 @@ function check_monitoring_statefulset_status()
     while [[ $ready_replicas != "$wanted_replicas" || $infra_pods != "$wanted_replicas" ]]; do
         sleep 30
         ((retries += 1))
-        ready_replicas=$(oc get statefulsets $statefulset -n openshift-monitoring -o jsonpath='{.status.availableReplicas}')
+        ready_replicas=$( ! oc -n openshift-monitoring get statefulsets $statefulset -oyaml |grep availableReplicas>/dev/null || oc get statefulsets $statefulset -n openshift-monitoring -ojsonpath='{.status.availableReplicas}')
         echo "retries printing: $retries"
 
-        infra_pods=$(oc get pods -n openshift-monitoring --no-headers -o wide | grep -E "$infra_nodes" | grep Running| grep "$statefulset" | wc -l |xargs )
+        if ! oc get pods -n openshift-monitoring --no-headers -o wide | grep -E "$infra_nodes" | grep Running | grep "$statefulset" ;then
+	    infra_pods=0
+        else
+            infra_pods=$(oc get pods -n openshift-monitoring --no-headers -o wide | grep -E "$infra_nodes" | grep Running| grep "$statefulset" | wc -l |xargs )
+        fi
         echo
         echo "-------------------------------------------------------------------------------------------"
         echo "current replicas in $statefulset: wanted--$wanted_replicas, current ready--$ready_replicas!"
