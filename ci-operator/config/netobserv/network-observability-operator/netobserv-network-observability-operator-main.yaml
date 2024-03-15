@@ -18,12 +18,12 @@ base_images:
   ubi:
     name: ubi
     namespace: ocp
-    tag: "8"
+    tag: "9"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.20
+    tag: golang-1.21
 images:
 - dockerfile_path: Dockerfile
   from: ubi
@@ -91,7 +91,6 @@ tests:
     - as: e2e-operator
       cli: latest
       commands: |
-        set +e
         export PATH=$PATH:$HOME
 
         if ! which kubectl; then
@@ -105,10 +104,8 @@ tests:
 
         echo "====> Waiting for netobserv-privileged pod to be ready"
         while : ; do oc get ds netobserv-ebpf-agent -n netobserv-privileged && break; sleep 1; done
-        sleep 5
 
         oc wait pods --timeout=120s --for=condition=ready -l app=netobserv-ebpf-agent -n netobserv-privileged
-        sleep 600
 
         echo "====> Waiting for flowlogs-pipeline pod to be ready"
         oc wait pods --timeout=120s --for=condition=ready -l app=flowlogs-pipeline -n netobserv
