@@ -104,18 +104,17 @@ MC_UPGRADE_COMPLETE=false
 #   fi
 # }
 
-### check MC status in four subsequent functions
 function check_cluster_operators_upgraded () {
   printf "Checking cluster operators upgraded to: %s" "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
-
   UPGRADING_CO_COUNT=-1 # there might be an issue with executing oc commands during upgrade, so for safety this is set to -1
-  echo "UPGRADING_CO_COUNT: $UPGRADING_CO_COUNT" 
   CLUSTER_OPERATORS_COUNT=0
-  echo "CLUSTER_OPERATORS_COUNT: $CLUSTER_OPERATORS_COUNT" 
-  CLUSTER_OPERATORS_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get co -A | tail -n +2) || true # failed execution just results in operators count being 0
-  echo "CLUSTER_OPERATORS_COUNT (2): $CLUSTER_OPERATORS_COUNT" 
-  CLUSTER_OPERATORS_COUNT=$(echo "$CLUSTER_OPERATORS_INFO" | wc -l) || true # failed execution just results in operators count being 0
-  
+  CLUSTER_OPERATORS_INFO=""
+  CLUSTER_OPERATORS_INFO=$(oc --kubeconfig hs-mc.kubeconfig get co -A | tail -n +2) || true # failed execution just results in operators count being 0
+  echo "$CLUSTER_OPERATORS_INFO"
+  if [ "$CLUSTER_OPERATORS_INFO" != "" ]; then
+    CLUSTER_OPERATORS_COUNT=$(echo "$CLUSTER_OPERATORS_INFO" | wc -l) || true # failed execution just results in operators count being 0
+  fi
+
   for ((i=1; i<="$CLUSTER_OPERATORS_COUNT"; i++)); do
     UPGRADING_CO_COUNT=0
     CO_INFO=$(echo "$CLUSTER_OPERATORS_INFO" | head -n $i | tail -n +$i)
@@ -128,10 +127,8 @@ function check_cluster_operators_upgraded () {
   done
   if [ "$UPGRADING_CO_COUNT" -eq 0 ]; then
     printf " ✅\n"
-    MC_CO_UPGRADED=true
   else
     printf " ❌\n"
-    MC_CO_UPGRADED=false
   fi
 }
 
