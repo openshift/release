@@ -394,7 +394,7 @@ function initObserverPod(){
   waitFor $KUBECONFIG
   waitFor $COREOS_STREAM_FILE
   isPxeJob
-  recordIPMILog &
+  recordIPMILog
   checkNodes
 }
 
