@@ -95,7 +95,17 @@ patch_image_registry() {
     fi
     sleep 30
   done
+  echo "Patch image registry"
   oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"emptyDir":{}}, "managementState": "Managed"}}'
+  for i in {1..10}; do
+    count=$(oc get co -n default --no-headers | awk '{ print $3 $4 $5 }' | grep -w -v TrueFalseFalse | wc -l)
+    echo "Not ready co count: ${count}"
+    if [[ ${count} -eq 0 ]]; then
+      break
+    fi
+    sleep 30
+  done
+  echo "Done of image registry patch"
 }
 
 # Create private key with 0600 permission for ssh purpose
@@ -356,6 +366,33 @@ sshKey: |
   \${SSH_PUB_KEY}
 EOF
 
+cat > ${BASTION_CI_SCRIPTS_DIR}/agent-config-template.yaml << EOF
+apiVersion: v1alpha1
+metadata:
+  name: \${CLUSTER_NAME}
+rendezvousIP: \${IP_ADDRESS}
+hosts:
+  - hostname: \${CLUSTER_NAME}
+    rootDeviceHints: 
+      deviceName: \${INSTALLATION_DISK}
+    role: master
+    interfaces:
+       - name: eth0
+         macAddress: \${MAC_ADDRESS}
+    networkConfig:
+      interfaces:
+        - name: eth0
+          type: ethernet
+          state: up
+          mac-address: \${MAC_ADDRESS}
+          ipv4:
+            enabled: true
+            address:
+              - ip: \${IP_ADDRESS}
+                prefix-length: \${NETWORK_PREFIX}
+            dhcp: true
+
+EOF
 
 cat > ${BASTION_CI_SCRIPTS_DIR}/grub-menu.template << EOF
     if [ \${GRUB_MAC_CONFIG} = "\${MAC_ADDRESS}" ]; then
@@ -419,16 +456,39 @@ WWW_DIR="/var/www/html/\${CLUSTER_NAME}"
 
 mkdir -p \$IMAGES_DIR \$WWW_DIR \$CONFIG_DIR
 
-# Download the openshift-install
 if [[ \${INSTALL_TYPE} != "sno" ]]; then
     # install required package for agent based installer
     dnf install -y /usr/bin/nmstatectl coreos-installer jq
 fi
 
+download_installer() {
+    echo "Dowmload openshift-install"
+    install_tar_file="openshift-install-linux.tar.gz"
+    if [[ ! -z \${INSTALLER_URL} ]]; then
+        curl \${INSTALLER_URL} -o \${install_tar_file}
+    else
+      root_path="https://mirror.openshift.com/pub/openshift-v4/ppc64le/clients"
+      install_path="\${root_path}/ocp/latest-\${OCP_VERSION}/\${install_tar_file}"
+      rc_install_path="\${root_path}/ocp/candidate-\${OCP_VERSION}/\${install_tar_file}"
+      echo "Download GA release"
+      curl -s \${install_path} -o \${install_tar_file}
+      if grep -q "File not found" "./\${install_tar_file}" ; then
+          echo "Download RC release"
+          curl -s \${rc_install_path} -o \${install_tar_file}
+      fi
+      if grep -q "File not found" "./\${install_tar_file}" ; then
+          echo "could not down load \${install_tar_file}"
+          exit -1
+      fi
+    fi
+    tar xzvf \${install_tar_file}
+}
+
 sno_prepare_cluster() {
+    download_installer
     cat install-config-template.yaml | envsubst > \${CONFIG_DIR}/install-config.yaml
 
-    openshift-install --dir=\${CONFIG_DIR} create single-node-ignition-config
+    ./openshift-install --dir=\${CONFIG_DIR} create single-node-ignition-config
 
     cp \${CONFIG_DIR}/bootstrap-in-place-for-live-iso.ign \${WWW_DIR}/bootstrap.ign
     chmod 644 \${WWW_DIR}/bootstrap.ign
@@ -438,10 +498,34 @@ sno_prepare_cluster() {
     curl \${KERNEL_URL} -o \${IMAGES_DIR}/kernel
 }
 
+agent_prepare_cluster() {
+    download_installer
+    export NETWORK_PREFIX=\$(echo \${MACHINE_NETWORK}|awk -F'/' '{print \$2}')
+    cat install-config-template.yaml | envsubst > \${CONFIG_DIR}/install-config.yaml
+    cat agent-config-template.yaml | envsubst > \${CONFIG_DIR}/agent-config.yaml
+    cp \${CONFIG_DIR}/agent-config.yaml \${CONFIG_DIR}/agent-config.yaml.backup
+    cp \${CONFIG_DIR}/install-config.yaml \${CONFIG_DIR}/install-config.yaml.backup
+
+    ./openshift-install --dir=\${CONFIG_DIR} agent create image
+
+    mkdir -p \${CONFIG_DIR}/pxe
+    coreos-installer iso ignition show \${CONFIG_DIR}/agent.ppc64le.iso > \${CONFIG_DIR}/pxe/agent.ign
+    coreos-installer iso extract pxe -o \${CONFIG_DIR}/pxe \${CONFIG_DIR}/agent.ppc64le.iso
+    cp \${CONFIG_DIR}/pxe/agent.ppc64le-initrd.img \${IMAGES_DIR}/initramfs.img
+    cp \${CONFIG_DIR}/pxe/agent.ppc64le-vmlinuz \${IMAGES_DIR}/kernel
+    chmod +x \${IMAGES_DIR}/*
+    cp \${CONFIG_DIR}/pxe/agent.ppc64le-rootfs.img \${WWW_DIR}/rootfs.img
+    chmod +x \${WWW_DIR}/rootfs.img
+    cp \${CONFIG_DIR}/pxe/agent.ign \${WWW_DIR}/bootstrap.ign
+}
+
 if [[ \${INSTALL_TYPE} == "assisted" ]]; then
     echo "call to ai_prepare_cluster"
     . assisted-sno.sh
     ai_prepare_cluster
+elif [[ \${INSTALL_TYPE} == "agent" ]]; then
+    echo "call to agent_prepare_cluster"
+    agent_prepare_cluster
 else
     echo "call to sno_prepare_cluster"
     sno_prepare_cluster
@@ -586,8 +670,16 @@ wait_to_install() {
 ###################################
 
 sno_wait() {
-    openshift-install --dir="\${CONFIG_DIR}" wait-for bootstrap-complete
-    openshift-install --dir="\${CONFIG_DIR}" wait-for install-complete
+    ./openshift-install --dir="\${CONFIG_DIR}" wait-for bootstrap-complete
+    ./openshift-install --dir="\${CONFIG_DIR}" wait-for install-complete
+}
+
+agent_wait() {
+    IP_ADDRESS=\$(cat \${CONFIG_DIR}/rendezvousIP)
+    API_URL="http://\${IP_ADDRESS}:8090/api/assisted-install/v2"
+    wait_to_install
+    ./openshift-install --dir="\${CONFIG_DIR}" agent wait-for bootstrap-complete
+    ./openshift-install --dir="\${CONFIG_DIR}" agent wait-for install-complete
 }
 
 assisted_wait() {
