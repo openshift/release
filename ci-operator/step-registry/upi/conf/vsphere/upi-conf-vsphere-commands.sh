@@ -53,7 +53,12 @@ printf "***** DEBUG %s %s %s %s ******\n" "$dns_server" "$lb_ip_address" "$boots
 control_plane_idx=0
 control_plane_addrs=()
 control_plane_hostnames=()
-for n in {4..6}; do
+start_master_num=4
+end_master_num=$((start_master_num + MASTER_REPLICAS - 1))
+start_worker_num=$((end_master_num + 1))
+end_worker_num=$((start_worker_num + WORKER_REPLICAS - 1))
+
+for n in $(seq "$start_master_num" "$end_master_num"); do
   control_plane_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
   control_plane_hostnames+=("control-plane-$((control_plane_idx++))")
 done
@@ -66,7 +71,7 @@ control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
 compute_idx=0
 compute_addrs=()
 compute_hostnames=()
-for n in {7..9}; do
+for n in $(seq "$start_worker_num" "$end_worker_num"); do
   compute_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
   compute_hostnames+=("compute-$((compute_idx++))")
 done
@@ -302,13 +307,13 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 
 \$control_plane_memory = 16384
 \$control_plane_num_cpus = 4
-\$control_plane_count = 3
+\$control_plane_count = ${MASTER_REPLICAS}
 \$control_plane_ip_addresses = $(echo ${control_plane_ip_addresses} | tr -d [])
 \$control_plane_hostnames = $(printf "\"%s\"," "${control_plane_hostnames[@]}" | sed 's/,$//')
 
 \$compute_memory = 16384
 \$compute_num_cpus = 4
-\$compute_count = 3
+\$compute_count = ${WORKER_REPLICAS}
 \$compute_ip_addresses = $(echo ${compute_ip_addresses} | tr -d [])
 \$compute_hostnames = $(printf "\"%s\"," "${compute_hostnames[@]}" | sed 's/,$//')
 EOF
