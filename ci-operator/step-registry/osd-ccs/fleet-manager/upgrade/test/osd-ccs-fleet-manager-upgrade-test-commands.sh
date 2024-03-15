@@ -21,65 +21,67 @@ else
   exit 1
 fi
 
+ocm get /api/clusters_mgmt/v1/clusters/29rq266fckkvev9fi3j093a58gd2m6mn/credentials | jq -r .kubeconfig > "${SHARED_DIR}/hs-mc.kubeconfig"
+
 # MC details
-mc_ocm_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
+mc_ocm_cluster_id="29rq266fckkvev9fi3j093a58gd2m6mn"
 MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 
-# HC details
-HC_KUBECONFIG="${SHARED_DIR}/hc-kubeconfig"
-HC_VERSION=""
+# # HC details
+# HC_KUBECONFIG="${SHARED_DIR}/hc-kubeconfig"
+# HC_VERSION=""
 
-function get_hc_details () {
-  HC_KUBEADMIN_SECRET_NAME=$(oc --kubeconfig $MC_KUBECONFIG get hc -A | tail -1 | awk '{print $4}')
-  HC_NS_NAME=$(oc --kubeconfig $MC_KUBECONFIG get hc -A | tail -1 | awk '{print $1}')
-  ## save HC kubeconfig
-  oc --kubeconfig "$MC_KUBECONFIG" get secret "$HC_KUBEADMIN_SECRET_NAME" -n "$HC_NS_NAME" -o json | jq -r '.data.kubeconfig | @base64d' > "$HC_KUBECONFIG"
-  HC_VERSION=$(oc --kubeconfig "$HC_KUBECONFIG" get co -A | head -2 | tail -1 | awk '{print $2}') || true
-  echo "HC cluster operators version is: $HC_VERSION"
-}
+# function get_hc_details () {
+#   HC_KUBEADMIN_SECRET_NAME=$(oc --kubeconfig $MC_KUBECONFIG get hc -A | tail -1 | awk '{print $4}')
+#   HC_NS_NAME=$(oc --kubeconfig $MC_KUBECONFIG get hc -A | tail -1 | awk '{print $1}')
+#   ## save HC kubeconfig
+#   oc --kubeconfig "$MC_KUBECONFIG" get secret "$HC_KUBEADMIN_SECRET_NAME" -n "$HC_NS_NAME" -o json | jq -r '.data.kubeconfig | @base64d' > "$HC_KUBECONFIG"
+#   HC_VERSION=$(oc --kubeconfig "$HC_KUBECONFIG" get co -A | head -2 | tail -1 | awk '{print $2}') || true
+#   echo "HC cluster operators version is: $HC_VERSION"
+# }
 
-get_hc_details
+# get_hc_details
 
-function get_highest_z_version_upgrade () {
-  AVAILABLE_UPGRADE_VERSIONS=$1
-  CURRENT_V=$2
-  VERSIONS_SIZE=$3
-  IFS='.' read -r -a CURRENT_SEPARATED <<< "$CURRENT_V"
-  CURRENT_HIGHEST_PATCH=${CURRENT_SEPARATED[2]}
-  CURRENT_HIGHEST_MINOR=${CURRENT_SEPARATED[1]}
-  CURRENT_HIGHEST_MAJOR=${CURRENT_SEPARATED[0]}
-  for ((i=0; i<"$VERSIONS_SIZE"; i++)); do
-    VERSION=$(jq -n "$AVAILABLE_UPGRADE_VERSIONS" | jq -r .[$i])
-    echo "version to check: $VERSION"
-    IFS='.' read -r -a CURRENT_SEPARATED_UPGRADE_VERSION <<< "${VERSION}"
-    if [ "${CURRENT_SEPARATED_UPGRADE_VERSION[0]}" -eq "$CURRENT_HIGHEST_MAJOR" ] && [ "${CURRENT_SEPARATED_UPGRADE_VERSION[1]}" -eq "$CURRENT_HIGHEST_MINOR" ] && [ "${CURRENT_SEPARATED_UPGRADE_VERSION[2]}" -gt "$CURRENT_HIGHEST_PATCH" ]; then
-      CURRENT_HIGHEST_PATCH=${CURRENT_SEPARATED_UPGRADE_VERSION[2]}
-      CURRENT_HIGHEST_MINOR=${CURRENT_SEPARATED_UPGRADE_VERSION[1]}
-      CURRENT_HIGHEST_MAJOR=${CURRENT_SEPARATED_UPGRADE_VERSION[0]}
-      HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION="$VERSION"
-    fi
-  done
-}
+# function get_highest_z_version_upgrade () {
+#   AVAILABLE_UPGRADE_VERSIONS=$1
+#   CURRENT_V=$2
+#   VERSIONS_SIZE=$3
+#   IFS='.' read -r -a CURRENT_SEPARATED <<< "$CURRENT_V"
+#   CURRENT_HIGHEST_PATCH=${CURRENT_SEPARATED[2]}
+#   CURRENT_HIGHEST_MINOR=${CURRENT_SEPARATED[1]}
+#   CURRENT_HIGHEST_MAJOR=${CURRENT_SEPARATED[0]}
+#   for ((i=0; i<"$VERSIONS_SIZE"; i++)); do
+#     VERSION=$(jq -n "$AVAILABLE_UPGRADE_VERSIONS" | jq -r .[$i])
+#     echo "version to check: $VERSION"
+#     IFS='.' read -r -a CURRENT_SEPARATED_UPGRADE_VERSION <<< "${VERSION}"
+#     if [ "${CURRENT_SEPARATED_UPGRADE_VERSION[0]}" -eq "$CURRENT_HIGHEST_MAJOR" ] && [ "${CURRENT_SEPARATED_UPGRADE_VERSION[1]}" -eq "$CURRENT_HIGHEST_MINOR" ] && [ "${CURRENT_SEPARATED_UPGRADE_VERSION[2]}" -gt "$CURRENT_HIGHEST_PATCH" ]; then
+#       CURRENT_HIGHEST_PATCH=${CURRENT_SEPARATED_UPGRADE_VERSION[2]}
+#       CURRENT_HIGHEST_MINOR=${CURRENT_SEPARATED_UPGRADE_VERSION[1]}
+#       CURRENT_HIGHEST_MAJOR=${CURRENT_SEPARATED_UPGRADE_VERSION[0]}
+#       HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION="$VERSION"
+#     fi
+#   done
+# }
 
-echo "Checking current openshift version of MC with ocm API cluster ID: $mc_ocm_cluster_id"
-CURRENT_VERSION=$(ocm get /api/clusters_mgmt/v1/clusters/"$mc_ocm_cluster_id" | jq -r .version.raw_id)
-echo "Current openshift version of MC with ocm API cluster ID: $mc_ocm_cluster_id is: $CURRENT_VERSION"
-echo "Checking available upgrades of MC with ocm API cluster ID: $mc_ocm_cluster_id"
-AVAILABLE_UPGRADES=$(ocm get /api/clusters_mgmt/v1/clusters/"$mc_ocm_cluster_id" | jq -r .version.available_upgrades)
-NO_OF_VERSIONS=$(jq -n "$AVAILABLE_UPGRADES" | jq '. | length')
+# echo "Checking current openshift version of MC with ocm API cluster ID: $mc_ocm_cluster_id"
+# CURRENT_VERSION=$(ocm get /api/clusters_mgmt/v1/clusters/"$mc_ocm_cluster_id" | jq -r .version.raw_id)
+# echo "Current openshift version of MC with ocm API cluster ID: $mc_ocm_cluster_id is: $CURRENT_VERSION"
+# echo "Checking available upgrades of MC with ocm API cluster ID: $mc_ocm_cluster_id"
+# AVAILABLE_UPGRADES=$(ocm get /api/clusters_mgmt/v1/clusters/"$mc_ocm_cluster_id" | jq -r .version.available_upgrades)
+# NO_OF_VERSIONS=$(jq -n "$AVAILABLE_UPGRADES" | jq '. | length')
 HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION=""
 
-get_highest_z_version_upgrade "${AVAILABLE_UPGRADES[@]}" "$CURRENT_VERSION" "$NO_OF_VERSIONS"
-echo "Highest available patch upgrade is: $HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
-if [ "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" == "" ]; then
-  echo "No available upgrades found"
-else
-  echo "Available version upgrades are: $AVAILABLE_UPGRADES"
-  echo "Upgrading openshift version of MC with ocm API cluster ID: $mc_ocm_cluster_id to version: $HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
-  oc --kubeconfig "$MC_KUBECONFIG" adm upgrade --to="$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
-  echo "Sleep for 5 minutes to give time for the upgrade to start"
-  sleep 300
-fi
+# get_highest_z_version_upgrade "${AVAILABLE_UPGRADES[@]}" "$CURRENT_VERSION" "$NO_OF_VERSIONS"
+# echo "Highest available patch upgrade is: $HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
+# if [ "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" == "" ]; then
+#   echo "No available upgrades found"
+# else
+#   echo "Available version upgrades are: $AVAILABLE_UPGRADES"
+#   echo "Upgrading openshift version of MC with ocm API cluster ID: $mc_ocm_cluster_id to version: $HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
+#   oc --kubeconfig "$MC_KUBECONFIG" adm upgrade --to="$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
+#   echo "Sleep for 5 minutes to give time for the upgrade to start"
+#   sleep 300
+# fi
 
 ## upgrade progress checks
 
@@ -88,20 +90,20 @@ MC_MCP_UPDATED=false
 MC_NODES_UPDATED=false
 MC_UPGRADE_COMPLETE=false
 
-### check HC status
-FAILED_HC_INFO_CHECK_COUNTER=0
-function check_cluster_operators_info () {
-  printf "Checking HC operators info available"
+# ### check HC status
+# FAILED_HC_INFO_CHECK_COUNTER=0
+# function check_cluster_operators_info () {
+#   printf "Checking HC operators info available"
   
-  CLUSTER_OPERATORS_INFO=""
-  CLUSTER_OPERATORS_INFO=$(oc --request-timeout=5s --kubeconfig "$HC_KUBECONFIG" get co -A --insecure-skip-tls-verify | tail -n +2) || true
-  if [ "$CLUSTER_OPERATORS_INFO" == "" ]; then
-    ((FAILED_HC_INFO_CHECK_COUNTER++))
-    printf "\nFailed to get co status. Total number of failed requests: %s ❌ \n" "$FAILED_HC_INFO_CHECK_COUNTER"
-  else
-    printf " ✅\n"
-  fi
-}
+#   CLUSTER_OPERATORS_INFO=""
+#   CLUSTER_OPERATORS_INFO=$(oc --request-timeout=5s --kubeconfig "$HC_KUBECONFIG" get co -A --insecure-skip-tls-verify | tail -n +2) || true
+#   if [ "$CLUSTER_OPERATORS_INFO" == "" ]; then
+#     ((FAILED_HC_INFO_CHECK_COUNTER++))
+#     printf "\nFailed to get co status. Total number of failed requests: %s ❌ \n" "$FAILED_HC_INFO_CHECK_COUNTER"
+#   else
+#     printf " ✅\n"
+#   fi
+# }
 
 ### check MC status in four subsequent functions
 function check_cluster_operators_upgraded () {
@@ -210,7 +212,7 @@ function check_upgrade_complete () {
 while [ "$MC_CO_UPGRADED" = false ] || [ "$MC_MCP_UPDATED" = false ] || [ "$MC_NODES_UPDATED" = false ] || [ "$MC_UPGRADE_COMPLETE" = false ]; do
   TIMESTAMP=$(date +"%Y-%m-%d %T")
   echo "------ $TIMESTAMP ------"
-  check_cluster_operators_info
+  # check_cluster_operators_info
 
   check_cluster_operators_upgraded
 
@@ -230,4 +232,4 @@ while [ "$MC_CO_UPGRADED" = false ] || [ "$MC_MCP_UPDATED" = false ] || [ "$MC_N
   sleep 10
 done
 
-echo "✅ Upgrade complete! Failed HC checks: $FAILED_HC_INFO_CHECK_COUNTER"
+# echo "✅ Upgrade complete! Failed HC checks: $FAILED_HC_INFO_CHECK_COUNTER"
