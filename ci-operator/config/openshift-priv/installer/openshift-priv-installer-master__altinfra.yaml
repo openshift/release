@@ -75,14 +75,20 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-custom-security-groups
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn
   optional: true
+  run_if_changed: aws
   steps:
     cluster_profile: aws
     env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
       USER_TAGS: |
         keyA valueA
         keyB valueB
@@ -95,6 +101,8 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/parallel
     pre:
@@ -111,6 +119,8 @@ tests:
     cluster_profile: aws
     env:
       AWS_METADATA_SERVICE_AUTH: Required
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - always_run: false
@@ -118,10 +128,13 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-proxy
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-aws-ovn-public-ipv4-pool-capi
+  as: e2e-aws-ovn-public-ipv4-pool
   optional: true
   steps:
     cluster_profile: aws
@@ -139,6 +152,9 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-sharednetwork
   timeout: 6h0m0s
 - always_run: false
@@ -146,6 +162,9 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-single-node
   timeout: 6h0m0s
 - always_run: false
@@ -155,6 +174,8 @@ tests:
     cluster_profile: aws
     env:
       EDGE_ZONE_TYPES: local-zone
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-edge-zones
   timeout: 6h0m0s
 - always_run: false
@@ -164,28 +185,19 @@ tests:
     cluster_profile: aws
     env:
       EDGE_ZONE_TYPES: wavelength-zone
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-edge-zones
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-shared-vpc-edge-zones
   optional: true
-  run_if_changed: aws
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-edge-zones-byo-vpc
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-capi-ovn
   steps:
     cluster_profile: aws
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
-      USER_TAGS: |
-        keyA valueA
-        keyB valueB
-        keyC valueC
-    workflow: openshift-e2e-aws
+    workflow: openshift-e2e-aws-edge-zones-byo-vpc
   timeout: 6h0m0s
 - always_run: false
   as: e2e-azure-capi-ovn
