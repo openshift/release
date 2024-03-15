@@ -302,10 +302,11 @@ status=0
 # Install posix collection so that we can use debug callback
 ansible-galaxy collection install ansible.posix
 # DZK
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
+# ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
-if [[ "$status" == 0 ]]; then
+#DZK if [[ "$status" == 0 ]]; then
+if [[ "$status" == 999 ]]; then
   #installer has issues applying machine-configs with OCP 4.10, using manual way
   KUBECONFIG=$SHARED_DIR/kubeconfig oc apply -f $SHARED_DIR/disable_ntp.yml || true
   wait_for_mcp "2700s" || true
