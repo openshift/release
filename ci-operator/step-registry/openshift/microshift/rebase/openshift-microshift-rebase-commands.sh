@@ -14,4 +14,7 @@ cp /secrets/import-secret/.dockerconfigjson ${HOME}/.pull-secret.json
 
 cd /go/src/github.com/openshift/microshift/
 DEST_DIR=${HOME}/.local/bin ./scripts/fetch_tools.sh yq
+#./scripts/auto-rebase/rebase_job_entrypoint.sh
+./scripts/auto-rebase/rebase-lvms.sh to registry.redhat.io/lvms4/lvms-operator-bundle:v4.15.0
+sed -i 's|pullspec_release_lvms.*|pullspec_release_lvms="registry.redhat.io/lvms4/lvms-operator-bundle:v4.15.0"|g' ./scripts/auto-rebase/rebase_job_entrypoint.sh
 ./scripts/auto-rebase/rebase_job_entrypoint.sh
