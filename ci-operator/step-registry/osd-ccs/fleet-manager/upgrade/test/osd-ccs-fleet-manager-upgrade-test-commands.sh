@@ -232,4 +232,6 @@ function check_upgrade_complete () {
   sleep 10
 # done
 
+echo "MC_CO_UPGRADED: $MC_CO_UPGRADED, MC_MCP_UPDATED: $MC_MCP_UPDATED, MC_NODES_UPDATED: $MC_NODES_UPDATED, MC_UPGRADE_COMPLETE: $MC_UPGRADE_COMPLETE"
+
 # echo "✅ Upgrade complete! Failed HC checks: $FAILED_HC_INFO_CHECK_COUNTER"
