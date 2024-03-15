@@ -162,4 +162,3 @@ e2e_test(){
 clone_repo
 install_rhtap
 e2e_test
-cd .. # after finsihing the script, go back to the init directory
