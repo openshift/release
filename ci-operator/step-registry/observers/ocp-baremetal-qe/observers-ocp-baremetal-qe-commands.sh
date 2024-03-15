@@ -355,7 +355,7 @@ function checkNodes(){
 }
 
 function isPxeJob(){
-  if [[ $JOB_NAME == *"pxe"* ]]; then
+  if [[ $JOB_NAME == *"-pxe-"* ]]; then
       IS_PXE_JOB=true
   fi
   echo "Job name is $JOB_NAME , pxe? $IS_PXE_JOB"
