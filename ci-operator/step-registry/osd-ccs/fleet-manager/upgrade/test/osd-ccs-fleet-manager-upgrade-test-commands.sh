@@ -40,6 +40,7 @@ fi
 ###### test OSDFM should set label with 60% of node memory limit as label (OCM-6666) ######
 
 function test_memory_node_limit_labels () {
+  ulimit -s
   TEST_PASSED=true
   # TODO - run it against ap-northeast-1 once this configuration is enabled by default
   echo "Getting list of management clusters with various mp sizes configuration"
