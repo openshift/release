@@ -1,10 +1,10 @@
 base_images:
   base:
-    name: "4.14"
+    name: "4.16"
     namespace: ocp
     tag: base
-  ocp_4.14_cli:
-    name: "4.14"
+  ocp_4.16_cli:
+    name: "4.16"
     namespace: ocp
     tag: cli
   openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
@@ -19,6 +19,13 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
+- dockerfile_path: go/crt-admission-webhook-server/images/Dockerfile
+  from: base
+  inputs:
+    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
+  to: crt-admission-webhook-server
 - dockerfile_path: go/dpcr-bugzilla-updater/Dockerfile
   from: base
   inputs:
@@ -29,16 +36,24 @@ images:
 - dockerfile_path: images/base/Dockerfile
   from: os
   inputs:
-    ocp_4.14_cli:
+    ocp_4.16_cli:
       as:
-      - registry.ci.openshift.org/ocp/4.14:cli
+      - registry.ci.openshift.org/ocp/4.16:cli
   to: continuous-release-jobs
 - dockerfile_path: images/cluster-apply/Dockerfile
   from: continuous-release-jobs
   to: cluster-apply
 promotion:
   to:
-  - namespace: continuous-release-jobs
+  - excluded_images:
+    - crt-admission-webhook-server
+    namespace: continuous-release-jobs
+    tag: latest
+  - excluded_images:
+    - dpcr-bugzilla-updater
+    - cluster-apply
+    - continuous-release-jobs
+    namespace: crt-admission-webhooks
     tag: latest
 resources:
   '*':
