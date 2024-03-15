@@ -109,7 +109,7 @@ function check_cluster_operators_upgraded () {
   UPGRADING_CO_COUNT=-1 # there might be an issue with executing oc commands during upgrade, so for safety this is set to -1
   CLUSTER_OPERATORS_COUNT=0
   CLUSTER_OPERATORS_INFO=""
-  CLUSTER_OPERATORS_INFO=$(oc --kubeconfig hs-mc.kubeconfig get co -A | tail -n +2) || true # failed execution just results in operators count being 0
+  CLUSTER_OPERATORS_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get co -A | tail -n +2) || true # failed execution just results in operators count being 0
   echo "$CLUSTER_OPERATORS_INFO"
   if [ "$CLUSTER_OPERATORS_INFO" != "" ]; then
     CLUSTER_OPERATORS_COUNT=$(echo "$CLUSTER_OPERATORS_INFO" | wc -l) || true # failed execution just results in operators count being 0
@@ -209,7 +209,7 @@ function check_upgrade_complete () {
   fi
 }
 
-while [ "$MC_CO_UPGRADED" = false ] || [ "$MC_MCP_UPDATED" = false ] || [ "$MC_NODES_UPDATED" = false ] || [ "$MC_UPGRADE_COMPLETE" = false ]; do
+# while [ "$MC_CO_UPGRADED" = false ] || [ "$MC_MCP_UPDATED" = false ] || [ "$MC_NODES_UPDATED" = false ] || [ "$MC_UPGRADE_COMPLETE" = false ]; do
   TIMESTAMP=$(date +"%Y-%m-%d %T")
   echo "------ $TIMESTAMP ------"
   # check_cluster_operators_info
@@ -222,14 +222,14 @@ while [ "$MC_CO_UPGRADED" = false ] || [ "$MC_MCP_UPDATED" = false ] || [ "$MC_N
 
   check_upgrade_complete
 
-  ## break the loop if highest available version is empty
-  if [ "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" == "" ]; then
-    MC_UPGRADE_COMPLETE=true
-    MC_CO_UPGRADED=true
-  fi
+  # ## break the loop if highest available version is empty
+  # if [ "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" == "" ]; then
+  #   MC_UPGRADE_COMPLETE=true
+  #   MC_CO_UPGRADED=true
+  # fi
 
   printf "Sleep for 10 seconds\n"
   sleep 10
-done
+# done
 
 # echo "✅ Upgrade complete! Failed HC checks: $FAILED_HC_INFO_CHECK_COUNTER"
