@@ -69,7 +69,6 @@ function check_monitoring_statefulset_status()
     #wait for 30s to make sure the .status.availableReplicas was updated
     ready_replicas=$( ! oc -n openshift-monitoring get statefulsets $statefulset -oyaml |grep availableReplicas>/dev/null || oc get statefulsets $statefulset -n openshift-monitoring -ojsonpath='{.status.availableReplicas}')
     echo ready_replicas is $ready_replicas
-    #infra_pods=$(oc get pods -n openshift-monitoring --no-headers -o wide | grep -E "$infra_nodes" | grep Running | grep "$statefulset" | wc -l  | xargs)
 
     if ! oc get pods -n openshift-monitoring --no-headers -o wide | grep -E "$infra_nodes" | grep Running | grep "$statefulset" ;then
 	    infra_pods=0
