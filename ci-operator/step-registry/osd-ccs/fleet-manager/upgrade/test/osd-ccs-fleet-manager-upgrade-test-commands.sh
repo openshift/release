@@ -11,7 +11,7 @@ OCM_VERSION=$(ocm version)
 OSDFM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/fleetmanager-token")
 if [[ ! -z "${OSDFM_TOKEN}" ]]; then
   echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
-  ocm login --url "${OCM_LOGIN_ENV}" --token "${OSDFM_TOKEN}"
+  ocm login --url https://api.integration.openshift.com --token "${OSDFM_TOKEN}"
   if [ $? -ne 0 ]; then
     echo "Login failed"
     exit 1
@@ -24,7 +24,6 @@ fi
 ocm get /api/clusters_mgmt/v1/clusters/29rq266fckkvev9fi3j093a58gd2m6mn/credentials | jq -r .kubeconfig > "${SHARED_DIR}/hs-mc.kubeconfig"
 
 # MC details
-mc_ocm_cluster_id="29rq266fckkvev9fi3j093a58gd2m6mn"
 MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 
 # # HC details
