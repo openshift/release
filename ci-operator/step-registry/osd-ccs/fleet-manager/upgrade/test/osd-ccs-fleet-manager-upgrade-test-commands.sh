@@ -68,7 +68,7 @@ MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 # echo "Checking available upgrades of MC with ocm API cluster ID: $mc_ocm_cluster_id"
 # AVAILABLE_UPGRADES=$(ocm get /api/clusters_mgmt/v1/clusters/"$mc_ocm_cluster_id" | jq -r .version.available_upgrades)
 # NO_OF_VERSIONS=$(jq -n "$AVAILABLE_UPGRADES" | jq '. | length')
-HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION=""
+HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION="4.14.11"
 
 # get_highest_z_version_upgrade "${AVAILABLE_UPGRADES[@]}" "$CURRENT_VERSION" "$NO_OF_VERSIONS"
 # echo "Highest available patch upgrade is: $HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
@@ -107,9 +107,13 @@ MC_UPGRADE_COMPLETE=false
 ### check MC status in four subsequent functions
 function check_cluster_operators_upgraded () {
   printf "Checking cluster operators upgraded to: %s" "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
+
   UPGRADING_CO_COUNT=-1 # there might be an issue with executing oc commands during upgrade, so for safety this is set to -1
+  echo "UPGRADING_CO_COUNT: $UPGRADING_CO_COUNT" 
   CLUSTER_OPERATORS_COUNT=0
+  echo "CLUSTER_OPERATORS_COUNT: $CLUSTER_OPERATORS_COUNT" 
   CLUSTER_OPERATORS_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get co -A | tail -n +2) || true # failed execution just results in operators count being 0
+  echo "CLUSTER_OPERATORS_COUNT (2): $CLUSTER_OPERATORS_COUNT" 
   CLUSTER_OPERATORS_COUNT=$(echo "$CLUSTER_OPERATORS_INFO" | wc -l) || true # failed execution just results in operators count being 0
   
   for ((i=1; i<="$CLUSTER_OPERATORS_COUNT"; i++)); do
