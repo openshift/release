@@ -45,13 +45,13 @@ NO_OF_RETRY=${NO_OF_RETRY:-"3"}
 
 function retry {
   cmd=$1
-  for i in $(seq 1 "$NO_OF_RETRY"); do
-    echo "Attempt: $i/$NO_OF_RETRY"
+  for retry in $(seq 1 "$NO_OF_RETRY"); do
+    echo "Attempt: $retry/$NO_OF_RETRY"
     ret_code=0
     $cmd || ret_code=$?
     if [ $ret_code = 0 ]; then
       break
-    elif [ "$i" == "$NO_OF_RETRY" ]; then
+    elif [ "$retry" == "$NO_OF_RETRY" ]; then
       error_handler "All retry attempts failed! Please try running the script again after some time" $ret_code
     else
       sleep 30
