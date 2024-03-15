@@ -6,6 +6,22 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+# two arrays used at the end of the script to print out failed/ passed test cases
+PASSED=("")
+FAILED=("")
+
+# add failed/ passed test cases
+function update_results ()
+{
+  test_case=$1
+  result=$2
+  if [ "$result" = true ]; then
+    PASSED+=("$test_case")
+  else
+    FAILED+=("$test_case")
+  fi
+}
+
 # Log in with OSDFM token
 OCM_VERSION=$(ocm version)
 OSDFM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/fleetmanager-token")
@@ -104,3 +120,13 @@ function test_memory_node_limit_labels () {
 ###### end of test OSDFM should set label with 60% of node memory limit as label (OCM-6666) ######
 
 test_memory_node_limit_labels
+
+printf "\nPassed tests:\n"
+for p in "${PASSED[@]}"; do
+  echo "$p"
+done
+
+printf "\nFailed tests:\n"
+for f in "${FAILED[@]}"; do
+  echo "$f"
+done
