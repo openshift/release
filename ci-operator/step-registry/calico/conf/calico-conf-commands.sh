@@ -17,7 +17,7 @@ curl --silent --location --fail --show-error "${OLM_URL}" --output /tmp/calico-o
 tar -C /tmp -xf /tmp/calico-ocp.tgz
 
 # the tar file from tigera is called ocp when uncompressed
-pushd ocp
+pushd /tmp/ocp
 for manifest in *.yaml ; do
   cp "${manifest}" "${SHARED_DIR}/manifest_${manifest}"
 done
