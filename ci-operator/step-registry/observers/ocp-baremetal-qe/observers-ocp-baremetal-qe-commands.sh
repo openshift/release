@@ -365,9 +365,7 @@ function ipmiRecord(){
       local bmhost="${1}"
       . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
       echo "SoL recording on ${bmc_address}"
-      ssh "${SSHOPTS[@]}" -t "root@${AUX_HOST}" << EOF > "${ARTIFACT_DIR}/${ip}_${name}_ipmi.txt"
-      ipmitool -I lanplus -H "$bmc_address" -U "$bmc_user" -P "$bmc_pass" -z 8196 sol activate usesolkeepalive &
-EOF
+      ssh "${SSHOPTS[@]}" -tt -q "root@${AUX_HOST}" "ipmitool -I lanplus -H "$bmc_address" -U "$bmc_user" -P "$bmc_pass" -z 8196 sol activate usesolkeepalive" >> "${ARTIFACT_DIR}/${ip}_${name}_ipmi.txt" &
 }
 
 
