@@ -19,14 +19,7 @@ if [ "${SELF_MANAGED_NETWORK}" != "true" ]; then
   exit 0
 fi
 
-echo "Disabling the PXE server in the baremetal network..."
-DHCP_CONF="#DO NOT EDIT; BEGIN ${CLUSTER_NAME}
-dhcp-boot=tag:${CLUSTER_NAME},pxe.disabled
-# DO NOT EDIT; END ${CLUSTER_NAME}"
-
-echo "Restart the DHCP/PXE container in the auxiliary host..."
-
-timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "'${DHCP_CONF}'" "'${CLUSTER_NAME}'" <<'EOF'
-  echo -e "${1}" >> /opt/dnsmasq/hosts/optsdir/"{2}"
+echo "Disabling the PXE server in the baremetal network for the hosts with tag ${CLUSTER_NAME}..."
+timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "'${CLUSTER_NAME}'" <<'EOF'
+  echo "tag:${1},67,pxe.disabled" >> "/opt/dnsmasq/hosts/optsdir/${1}"
 EOF
