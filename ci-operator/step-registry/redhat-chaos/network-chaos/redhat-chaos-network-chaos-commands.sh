@@ -33,7 +33,7 @@ export TARGET_NODE_AND_INTERFACE=$TARGET_NODE_AND_INTERFACE
 export NETWORK_PARAMS=$NETWORK_PARAMS
 export WAIT_DURATION=$WAIT_DURATION
 
-./prow/network-chaos/prow_run.sh
+./network-chaos/prow_run.sh
 rc=$?
 echo "Finished running network chaos"
 echo "Return code: $rc"
