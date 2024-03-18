@@ -33,7 +33,7 @@ telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 export TARGET_NODE_AND_INTERFACE=$TARGET_NODE_AND_INTERFACE
 
-./prow/pod-network-chaos/prow_run.sh
+./pod-network-chaos/prow_run.sh
 rc=$?
 echo "Finished running pod-network chaos"
 echo "Return code: $rc"
