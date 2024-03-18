@@ -13,14 +13,15 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.21
+canonical_go_repository: github.com/jaegertracing/jaeger-operator
 images:
 - build_args:
   - name: VERSION
-    value: 1.51.0
+    value: 1.54.0
   - name: JAEGER_VERSION
-    value: 1.51.0
+    value: 1.54.0
   - name: VERSION_DATE
-    value: "2023-11-20T02:01:34Z"
+    value: "2024-03-18T04:38:01Z"
   - name: VERSION_PKG
     value: github.com/jaegertracing/jaeger-operator/pkg/version
   context_dir: .
@@ -52,6 +53,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: security
+  cron: 0 3 * * 0
+  steps:
+    env:
+      PROJECT_NAME: jaeger-operator
+      SNYK_PRE_EXECUTION_HOOK_CMD: go mod vendor
+    workflow: openshift-ci-security
 - as: jaeger-e2e-tests
   cluster_claim:
     architecture: amd64
@@ -60,15 +68,11 @@ tests:
     product: ocp
     timeout: 3h0m0s
     version: "4.14"
-  cron: 0 6 * * 2
   steps:
     env:
       EO_SUB_CHANNEL: stable-5.8
       EO_SUB_SOURCE: redhat-operators
     test:
-    - ref: operatorhub-subscribe-elasticsearch-operator
-    - ref: operatorhub-subscribe-amq-streams
-    - ref: distributed-tracing-install-opentelemetry-product
     - as: install
       cli: latest
       commands: |
@@ -83,10 +87,12 @@ tests:
         requests:
           cpu: 1000m
           memory: 400Mi
+    - ref: operatorhub-subscribe-elasticsearch-operator
+    - ref: operatorhub-subscribe-amq-streams
+    - ref: distributed-tracing-install-opentelemetry-product
     - ref: distributed-tracing-tests-jaeger
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
-  org: jaegertracing
-  repo: jaeger-operator
-  variant: ocp-4.14-amd64
+  org: openshift
+  repo: jaegertracing-jaeger-operator
