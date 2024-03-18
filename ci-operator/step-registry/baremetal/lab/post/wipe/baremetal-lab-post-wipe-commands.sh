@@ -95,22 +95,18 @@ EOF
 # can happen safely, i.e., a concurrent reservation job has to wait until the disk of host X is wiped before being allowed
 # to reserve X
 touch /tmp/failed
-if [ ! -f "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME" ]; then
-  echo "Skipping the wipe step as not needed"
-else
-  for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
-    # shellcheck disable=SC1090
-    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-    # shellcheck disable=SC2154
-    if [ ${#bmc_forwarded_port} -eq 0 ] || [ ${#bmc_user} -eq 0 ] || [ ${#bmc_pass} -eq 0 ] \
-      || [ ${#ipxe_via_vmedia} -eq 0 ]; then
-      echo "Error while unmarshalling hosts entries"
-      exit 1
-    fi
-    reset_host "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${vendor}" "${ipxe_via_vmedia}" \
-      "${pdu_uri:-}" &
-  done
-fi
+for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  # shellcheck disable=SC2154
+  if [ ${#bmc_forwarded_port} -eq 0 ] || [ ${#bmc_user} -eq 0 ] || [ ${#bmc_pass} -eq 0 ] \
+    || [ ${#ipxe_via_vmedia} -eq 0 ]; then
+    echo "Error while unmarshalling hosts entries"
+    exit 1
+  fi
+  reset_host "${bmc_address}" "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${vendor}" "${ipxe_via_vmedia}" \
+    "${pdu_uri:-}" &
+done
 wait
 echo "All children terminated."
 
