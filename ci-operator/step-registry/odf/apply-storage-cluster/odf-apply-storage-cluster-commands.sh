@@ -35,6 +35,12 @@ sleep 60
 
 echo "⏳ Wait for StorageCluster to be deployed"
 oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
-    -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='180m'
+    -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='10m'
+
+echo "Remove is-default-class annotation from all the storage classes"
+oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class-
+
+echo "Make ocs-storagecluster-ceph-rbd the default storage class"
+oc annotate storageclass ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class=true
 
 echo "ODF Operator is deployed successfully"
