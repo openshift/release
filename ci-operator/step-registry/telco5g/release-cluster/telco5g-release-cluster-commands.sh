@@ -5,8 +5,6 @@ set -o errexit
 set -o pipefail
 
 echo "************ telco cluster release command ************"
-# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
-~/fix_uid.sh
 
 SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
