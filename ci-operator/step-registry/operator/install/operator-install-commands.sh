@@ -5,6 +5,9 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
+AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
+AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
+
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py --action install --kubeconfig ${KUBECONFIG} "
@@ -24,5 +27,24 @@ if [ "${ADDONS_OPERATORS_RUN_IN_PARALLEL}" = "true" ]; then
 fi
 
 echo "$RUN_COMMAND" | sed -r "s/token [=A-Za-z0-9\.\-]+/token hashed-token /g"
+
+if [ "${INSTALL_FROM_IIB}" = "true" ]; then
+  if [ -z "$S3_BUCKET_OPERATORS_LATEST_IIB_PATH" ]; then
+    echo "S3_BUCKET_OPERATORS_LATEST_IIB_PATH is mandatory for iib installation"
+    exit 1
+  fi
+
+  if [ -z "$AWS_REGION" ]; then
+    echo "AWS_REGION is mandatory for iib installation"
+    exit 1
+  fi
+
+  RUN_COMMAND+=" --s3-bucket-operators-latest-iib-path ${S3_BUCKET_OPERATORS_LATEST_IIB_PATH} \
+                --iib-region ${AWS_REGION} \
+                --aws-region ${AWS_REGION} \
+                --aws-access-key-id ${AWS_ACCESS_KEY_ID} \
+                --aws-secret-access-key ${AWS_SECRET_ACCESS_KEY}
+              "
+fi
 
 ${RUN_COMMAND}
