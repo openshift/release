@@ -16,9 +16,6 @@ LOGS_FOLDER="${ARTIFACT_DIR}/ocs-tests"
 LOGS_CONFIG="${LOGS_FOLDER}/ocs-tests-config.yaml"
 CLUSTER_PATH="${ARTIFACT_DIR}/ocs-tests"
 
-sleep 4h
-#oc patch -n openshift-storage storagecluster ocs-storagecluster --type merge --patch '{"spec": {"multiCloudGateway": {"endpoints": {"minCount": 2,"maxCount": 2}}}}'
-#oc get pods -l app=noobaa -n openshift-storage --watch
 #
 # Remove the ACM Subscription to allow OCS interop tests full control of operators
 #
