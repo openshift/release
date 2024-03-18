@@ -21,7 +21,7 @@ else
 fi
 
 output=$(mktemp)
-rosa create dnsdomain | tee $output 
+rosa create dnsdomain | tee $output
 grep -oE "[0-9A-Za-z]{4}\.[0-9A-Za-z\.]+{4}" ${output} > "${SHARED_DIR}/rosa_dns_domain"
 
 dns_domain=$(head -n 1 "${SHARED_DIR}/rosa_dns_domain")

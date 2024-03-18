@@ -56,6 +56,12 @@ export CHANNEL_GROUP=${CHANNEL_GROUP}
 export RHCS_ENV=${RHCS_ENV}
 export VERSION=${VERSION}
 export REGION=${REGION}
+if [ ! -z "$RHCS_SOURCE" ];then
+    export RHCS_SOURCS=$RHCS_SOURCE
+fi
+if [ ! -z "$RHCS_VERSION" ]; then
+    export RHCS_VERSION=$RHCS_VERSION
+fi
 
 # Define the junit name
 junitFileName="result.xml"
@@ -67,6 +73,12 @@ label_filter='(Critical,High)&&(day1-post,day2)&&!Exclude'
 if [ ! -z "$CASE_LABEL_FILTER" ]; then
     label_filter="$CASE_LABEL_FILTER"
 fi
+
+timeout='2h'
+if [ ! -z "$TIMEOUT" ]; then
+    timeout="$TIMEOUT"
+fi
+
 echo ">>> CI run label filter is: $label_filter. Cases match label will be filtered."
 
 # Below step will skip gcc checking
@@ -74,7 +86,7 @@ export CGO_ENABLED=0
 
 ginkgo run \
     --label-filter $label_filter \
-    --timeout 2h \
+    --timeout $timeout \
     --output-dir ${SHARED_DIR} \
     --junit-report $junitFileName \
     -r \

@@ -25,8 +25,11 @@ finished()
   scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/*/auth/kubeconfig" "${SHARED_DIR}/"
   scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/*/auth/kubeadmin-password" "${SHARED_DIR}/"
 
+  # ESI nodes are all using the same IP with different ports (which is forwarded to 8213)
+  PROXYPORT="$(getExtraVal ofcir_port_proxy 8213)"
+
   echo "Adding proxy-url in kubeconfig"
-  sed -i "/- cluster/ a\    proxy-url: http://$IP:8213/" "${SHARED_DIR}"/kubeconfig
+  sed -i "/- cluster/ a\    proxy-url: http://$IP:$PROXYPORT/" "${SHARED_DIR}"/kubeconfig
 
   # Get dev-scripts logs
   echo "dev-scripts setup completed, fetching logs"
@@ -74,18 +77,18 @@ do
   scp "${SSHOPTS[@]}" "${item}" "root@${IP}:manifests/${manifest##manifest_}"
 done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
 
-
 # Get env values from cir extradata
 function getExtraVal(){
+    if [ ! -f "$EXTRAFILE" ] || [ "$(stat -c %s $EXTRAFILE)" -lt 2 ] ; then
+        echo $2
+        return
+    fi
     jq -r --arg default "$2" ".$1 // \$default" $EXTRAFILE
 }
 
 # For baremetal clusters ofcir has returned details about the hardware in the cluster
 # prepare those details into a format the devscripts understands
 function prepare_bmcluster() {
-    # Get Extra data from CIR
-    jq -r .extra < $CIRFILE > $EXTRAFILE
-
     # Get BM nodes list from extra data
     jq .nodes < $EXTRAFILE > $NODESFILE
 
@@ -152,8 +155,13 @@ CIRFILE=$SHARED_DIR/cir
 EXTRAFILE=$SHARED_DIR/cir-extra
 NODESFILE=$SHARED_DIR/cir-nodes
 BMJSON=$SHARED_DIR/bm.json
-if [ -e "$CIRFILE" ] && [[ "$(cat $CIRFILE | jq -r .type)" =~ cluster.* ]] ; then
-    prepare_bmcluster
+
+if [ -e "$CIRFILE" ] ; then
+    # Get Extra data from CIR
+    jq -r ".extra | select( . != \"\") // {}" < $CIRFILE > $EXTRAFILE
+    if [[ "$(cat $CIRFILE | jq -r .type)" =~ cluster.* ]] ; then
+        prepare_bmcluster
+    fi
 fi
 
 # Additional mechanism to inject dev-scripts additional variables directly
@@ -373,9 +381,13 @@ echo 'export KUBECONFIG=\$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root
 # squid needs to be restarted after network changes
 podman restart --time 1 external-squid || true
 
-timeout -s 9 105m make ${DEVSCRIPTS_TARGET}
+set +e
+timeout -s 9 130m make ${DEVSCRIPTS_TARGET}
+rv=\$?
+
 
 # Add extra CI specific rules to the libvirt zone, this can't be done earlier because the zone only now exists
+# This needs to happen even if dev-scripts fails so that the cluster can be accessed via the proxy
 # TODO: In reality the bridges should be in the public zone
 sudo firewall-cmd --add-port=8213/tcp --zone=libvirt
 if [ -e /root/bm.json ] ; then
@@ -383,6 +395,9 @@ if [ -e /root/bm.json ] ; then
     sudo firewall-cmd --add-service=ntp --zone libvirt
     sudo firewall-cmd --add-service=ntp --zone public
 fi
+
+exit \$rv
+
 EOF
 
 # Copy dev-scripts variables to be shared with the test step

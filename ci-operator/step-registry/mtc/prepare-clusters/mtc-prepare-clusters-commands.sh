@@ -6,10 +6,13 @@ set -o pipefail
 echo "Extracting cluster data"
 tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=/tmp/clusters-data
 
-SOURCE_KUBEADMIN_PASSWORD_FILE="/tmp/clusters-data/${TEST_PLATFORM}/${SOURCE_CLUSTER_NAME}/auth/kubeadmin-password"
-SOURCE_KUBECONFIG="/tmp/clusters-data/${TEST_PLATFORM}/${SOURCE_CLUSTER_NAME}/auth/kubeconfig"
+SOURCE_CLUSTER_DIR=$(find tmp/clusters-data/${TEST_PLATFORM} -type d -name "${SOURCE_CLUSTER_PREFIX}*")
+TARGET_CLUSTER_DIR=$(find tmp/clusters-data/${TEST_PLATFORM} -type d -name "${TARGET_CLUSTER_PREFIX}*")
+
+SOURCE_KUBEADMIN_PASSWORD_FILE="/${SOURCE_CLUSTER_DIR}/auth/kubeadmin-password"
+SOURCE_KUBECONFIG="/${SOURCE_CLUSTER_DIR}/auth/kubeconfig"
 SOURCE_KUBEADMIN_PASSWORD=$(cat $SOURCE_KUBEADMIN_PASSWORD_FILE)
-TARGET_KUBECONFIG="/tmp/clusters-data/${TEST_PLATFORM}/${TARGET_CLUSTER_NAME}/auth/kubeconfig"
+TARGET_KUBECONFIG="/${TARGET_CLUSTER_DIR}/auth/kubeconfig"
 
 # Install the Operator on both clusters
 echo "Installing the MTC operator on the source cluster"

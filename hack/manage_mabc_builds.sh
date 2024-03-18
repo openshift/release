@@ -5,8 +5,8 @@ set -o nounset
 set -o pipefail
 
 declare -A mabcs
-mabcs["managed-clonerefs"]="clusters/build-clusters/multi01/supplemental-ci-images/001_managed-clonerefs_mabc.yaml"
-mabcs["ci-tools-build-root"]="clusters/build-clusters/multi01/supplemental-ci-images/002_ci-tools-build-root-mabc.yaml"
+mabcs["managed-clonerefs"]="clusters/build-clusters/build10/supplemental-ci-images/001_managed-clonerefs_mabc.yaml"
+mabcs["ci-tools-build-root"]="clusters/build-clusters/build10/supplemental-ci-images/002_ci-tools-build-root-mabc.yaml"
 
 for mabc in "${!mabcs[@]}"; do
   mabc_name="$mabc"

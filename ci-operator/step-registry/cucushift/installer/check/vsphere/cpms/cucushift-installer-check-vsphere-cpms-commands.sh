@@ -24,7 +24,7 @@ function checkMultizone() {
 #check the name of failuredomains in cpms should be same with install-config.
     INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
     readarray -t zones_setting_from_config < <(yq-go r ${INSTALL_CONFIG} 'controlPlane.platform.vsphere.zones[*]')    
-    fd_name_cpms=$(oc get controlplanemachineset -n openshift-machine-api -ojson | jq -r '.items[].spec.template.machines_v1beta1_machine_openshift_io.failureDomains.vsphere[].name' | sort -u)
+    fd_name_cpms=$(oc get controlplanemachineset -n openshift-machine-api -ojson | jq -r '.items[].spec.template.machines_v1beta1_machine_openshift_io.failureDomains.vsphere[].name' | sort -u | xargs)
     expected_fd_name=$(echo "${zones_setting_from_config[*]}" | xargs -n1 | sort -u | xargs)
     if [[ ${fd_name_cpms} == "${expected_fd_name}" ]]; then
 	echo "INFO: The failure domain name are same between install_config and cmps"
@@ -39,9 +39,9 @@ function checkMultizone() {
 function checkSinglezone() {
         check_result=0
 	node_name=$(oc get machines.machine.openshift.io -n openshift-machine-api --selector machine.openshift.io/cluster-api-machine-type=master --no-headers | awk '{print $1}' | head -n1)
-	machine_workspace=$(oc get machine ${node_name} -n openshift-machine-api -ojson | jq -r '.spec.providerSpec.value.workspace')
-	machine_template=$(oc get machine ${node_name} -n openshift-machine-api -ojson | jq -r '.spec.providerSpec.value.template')
-	machine_network=$(oc get machine ${node_name} -n openshift-machine-api -ojson | jq -r '.spec.providerSpec.value.network.devices[].networkName')
+	machine_workspace=$(oc get machines.machine.openshift.io ${node_name} -n openshift-machine-api -ojson | jq -r '.spec.providerSpec.value.workspace')
+	machine_template=$(oc get machines.machine.openshift.io ${node_name} -n openshift-machine-api -ojson | jq -r '.spec.providerSpec.value.template')
+	machine_network=$(oc get machines.machine.openshift.io ${node_name} -n openshift-machine-api -ojson | jq -r '.spec.providerSpec.value.network.devices[].networkName')
         
 	cpms_network=$(oc get controlplanemachineset -n openshift-machine-api -ojson | jq -r '.items[].spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.network.devices[].networkName')
 	cpms_workspace=$(oc get controlplanemachineset -n openshift-machine-api -ojson | jq -r '.items[].spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.workspace')

@@ -36,8 +36,8 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   CLUSTER_NAME="${1}"; shift
   MAC_ARRAY=("$@")
   echo "Removing the DHCP/PXE config..."
-  sed -i "/; BEGIN ${CLUSTER_NAME}/,/; END ${CLUSTER_NAME}$/d" /opt/dnsmasq/etc/dnsmasq.conf
-  systemctl restart dhcp
+  rm -f /opt/dnsmasq/hosts/{hostsdir,optsdir}/"${CLUSTER_NAME}"
+  kill -s HUP "$(podman inspect -f '{{ .State.Pid }}' "dhcp")"
   echo "Removing the grub config..."
   for mac in "${MAC_ARRAY[@]}"; do
     rm -f "/opt/dnsmasq/tftpboot/grub.cfg-01-$(echo "$mac" | tr ':' '-')" || echo "no grub.cfg for $mac."

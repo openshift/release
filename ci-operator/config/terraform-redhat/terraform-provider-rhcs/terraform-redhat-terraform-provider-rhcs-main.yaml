@@ -37,13 +37,13 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!NonClassicCluster&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-ad
       QE_USAGE: rosa-sts-advanced-critical-high-f3
       REGION: ap-northeast-1
       RHCS_ENV: staging
-      WAIT_OPERATORS: "true"
+      WAIT_OPERATORS: "false"
     test:
     - ref: rhcs-e2e-tests
     workflow: rhcs-aws-sts
@@ -52,7 +52,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&(day1-post,day2)&&!NonClassicCluster&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
       QE_USAGE: rosa-sts-private-critical-high-f3
@@ -67,7 +67,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!Exclude
+      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!NonClassicCluster&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-ad
       QE_USAGE: rosa-sts-advanced-medium-low-f7
@@ -82,7 +82,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!Exclude
+      CASE_LABEL_FILTER: (Medium,Low)&&(day1-post,day2)&&!NonClassicCluster&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
       QE_USAGE: rosa-sts-private-medium-low-f7
@@ -97,7 +97,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: day1-negative&&!Exclude
+      CASE_LABEL_FILTER: day1-negative&&!NonClassicCluster&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-ad
       QE_USAGE: rosa-sts-advanced-day1-negative-f7
@@ -111,7 +111,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: day1-negative&&!Exclude
+      CASE_LABEL_FILTER: day1-negative&&!NonClassicCluster&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
       QE_USAGE: rosa-sts-private-day1-negative-f7
@@ -120,12 +120,44 @@ tests:
       WAIT_OPERATORS: "false"
     test:
     - ref: rhcs-e2e-general-tests
+- as: rosa-sts-upgrade-y-f7
+  cron: 38 8 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: upgrade&&!NonClassicCluster&&!Exclude
+      CHANNEL_GROUP: stable
+      CLUSTER_PROFILE: rosa-up-y
+      QE_USAGE: rosa-sts-upgrade-y-f7
+      REGION: ap-northeast-1
+      RHCS_ENV: stable
+      TIMEOUT: 4h
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
+- as: rosa-sts-upgrade-z-f7
+  cron: 38 14 2,9,16,23,30 * *
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      CASE_LABEL_FILTER: upgrade&&!NonClassicCluster&&!Exclude
+      CHANNEL_GROUP: stable
+      CLUSTER_PROFILE: rosa-up-z
+      QE_USAGE: rosa-sts-upgrade-z-f7
+      REGION: ap-northeast-1
+      RHCS_ENV: stable
+      TIMEOUT: 4h
+      WAIT_OPERATORS: "true"
+    test:
+    - ref: rhcs-e2e-tests
+    workflow: rhcs-aws-sts
 - as: rosa-sts-advanced-critical-high-presubmit
   skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!NonClassicCluster&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-ad
       QE_USAGE: rosa-sts-advanced-critical-high-presubmit
@@ -140,7 +172,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!Exclude
+      CASE_LABEL_FILTER: (Critical,High)&&day1-post&&!NonClassicCluster&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
       QE_USAGE: rosa-sts-private-critical-high-presubmit
@@ -155,7 +187,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (day1-post,day2)&&!Exclude
+      CASE_LABEL_FILTER: (day1-post,day2)&&!NonClassicCluster&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-ad
       QE_USAGE: rosa-sts-advanced-optional-presubmit
@@ -170,7 +202,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: (day1-post,day2)&&!Exclude
+      CASE_LABEL_FILTER: (day1-post,day2)&&!NonClassicCluster&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
       QE_USAGE: rosa-sts-private-optional-presubmit
@@ -185,7 +217,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: day1-negative&&!Exclude
+      CASE_LABEL_FILTER: day1-negative&&!NonClassicCluster&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-ad
       QE_USAGE: rosa-sts-advanced-day1-negative-optional-presubmit
@@ -199,7 +231,7 @@ tests:
   steps:
     cluster_profile: aws-terraform-qe
     env:
-      CASE_LABEL_FILTER: day1-negative&&!Exclude
+      CASE_LABEL_FILTER: day1-negative&&!NonClassicCluster&&!Exclude
       CHANNEL_GROUP: candidate
       CLUSTER_PROFILE: rosa-sts-pl
       QE_USAGE: rosa-sts-private-day1-negative-optional-presubmit

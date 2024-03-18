@@ -27,7 +27,7 @@ function run_ssh_cmd() {
     local host=$3
     local remote_cmd=$4
 
-    options=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
+    options=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=300 -o ServerAliveCountMax=10 "
     cmd="ssh ${options} -i \"${sshkey}\" ${user}@${host} \"${remote_cmd}\""
     run_command "$cmd" || return 2
     return 0
@@ -146,7 +146,7 @@ azure4|azuremag|azure-arm64)
     run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${AZURE_AUTH_LOCATION}" "${REMOTE_DIR}/osServicePrincipal.json"
     echo "export AZURE_AUTH_LOCATION='${REMOTE_DIR}/osServicePrincipal.json'" >> "${REMOTE_ENV_FILE}"
     ;;
-*) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
+*) >&2 echo "No need to upload any credential files into bastion host for cluster type '${CLUSTER_TYPE}'"
 esac
 
 echo "install-config.yaml"
@@ -201,7 +201,7 @@ echo "export TF_LOG_PATH='${REMOTE_INSTALL_DIR}/terraform.txt'" >> ${REMOTE_ENV_
 run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${REMOTE_ENV_FILE}" "${REMOTE_DIR}"
 
 set +o errexit
-run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "source ${REMOTE_ENV_FILE}; ${REMOTE_DIR}/openshift-install --dir='${REMOTE_INSTALL_DIR}' create cluster --log-level debug 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'" &
+run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "source ${REMOTE_ENV_FILE}; ${REMOTE_DIR}/openshift-install --dir='${REMOTE_INSTALL_DIR}' create cluster --log-level debug 2>&1" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 wait "$!"
 ret="$?"
 echo "Installer exit with code $ret"

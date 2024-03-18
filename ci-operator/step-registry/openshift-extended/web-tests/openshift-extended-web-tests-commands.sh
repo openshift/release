@@ -25,9 +25,9 @@ else
   if [[ $E2E_RUN_TAGS =~ @osd_ccs|@rosa ]] ; then
     echo "Testing against online cluster"
     ./console-test-managed-service.sh || true
-  # if the TAGS contains @console, then it's a job specific for UI, run full tests
+  # if the TYPE is ui, then it's a job specific for UI, run full tests
   # or else, we run smoke tests to balance coverage and cost
-  elif [[ $E2E_RUN_TAGS =~ @console ]]; then
+  elif [[ "X${E2E_TEST_TYPE}X" == 'XuiX' ]]; then
     echo "Testing on normal cluster"
     ./console-test-frontend.sh || true
   else

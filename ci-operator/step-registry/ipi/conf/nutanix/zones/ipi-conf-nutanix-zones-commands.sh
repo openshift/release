@@ -19,6 +19,10 @@ declare prism_element2_host
 declare prism_element2_port
 declare prism_element2_uuid
 declare prism_element2_subnet
+declare prism_element3_host
+declare prism_element3_port
+declare prism_element3_uuid
+declare prism_element3_subnet
 # shellcheck source=/dev/null
 source "${NUTANIX_AUTH_PATH}"
 
@@ -29,6 +33,7 @@ platform:
       failureDomains:
         - failure-domain-1
         - failure-domain-2
+        - failure-domain-3
     failureDomains:
     - name: failure-domain-1
       prismElement:
@@ -47,6 +52,15 @@ platform:
           port: $prism_element2_port
       subnetUUIDs:
       - $prism_element2_subnet
+
+    - name: failure-domain-3
+      prismElement:
+        uuid: $prism_element3_uuid
+        endpoint:
+          address: $prism_element3_host
+          port: $prism_element3_port
+      subnetUUIDs:
+      - $prism_element3_subnet
 EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"

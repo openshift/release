@@ -136,15 +136,26 @@ function update_cloud_credentials_oidc(){
     fi
 }
 
-# Add cloudcredential.openshift.io/upgradeable-to: <version_number> to cloudcredential cluster when cco mode is manual
+# Add cloudcredential.openshift.io/upgradeable-to: <version_number> to cloudcredential cluster when cco mode is manual or the case in OCPQE-19413
 function cco_annotation(){
     if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )); then
         echo "CCO annotation change is not required in either z-stream upgrade or 4.7 and earlier" && return
     fi
 
     local cco_mode; cco_mode="$(oc get cloudcredential cluster -o jsonpath='{.spec.credentialsMode}')"
-    if [[ ${cco_mode} != "Manual" ]]; then
-        echo "CCO annotation change is not required in non-manual mode" && return
+    local platform; platform="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')"
+    if [[ ${cco_mode} == "Manual" ]]; then
+        echo "CCO annotation change is required in Manual mode"
+    elif [[ -z "${cco_mode}" || ${cco_mode} == "Mint" ]]; then
+        if [[ "${SOURCE_MINOR_VERSION}" == "14" && ${platform} == "GCP" ]] ; then
+            echo "CCO annotation change is required in default or Mint mode on 4.14 GCP cluster"
+        else
+            echo "CCO annotation change is not required in default or Mint mode on 4.${SOURCE_MINOR_VERSION} ${platform} cluster"
+            return 0
+        fi
+    else
+        echo "CCO annotation change is not required in ${cco_mode} mode"
+        return 0
     fi
 
     echo "Require CCO annotation change"
@@ -457,19 +468,26 @@ function wait_mcp_continous_success() {
     num=$(oc get node --no-headers | wc -l)
     max_retries=$(expr $num \* 20 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
     passed_criteria=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
+    local continous_degraded_check=0 degraded_criteria=5
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
         ret=0
         check_mcp || ret=$?
         if [[ "$ret" == "0" ]]; then
+            continous_degraded_check=0
             echo "Passed #${continous_successful_check}"
             (( continous_successful_check += 1 ))
         elif [[ "$ret" == "1" ]]; then
             echo "Some machines are updating..."
             continous_successful_check=0
+            continous_degraded_check=0
         else
-            echo "Some machines are degraded..."
-            break
+            continous_successful_check=0
+            echo "Some machines are degraded #${continous_degraded_check}..."
+            (( continous_degraded_check += 1 ))
+            if (( continous_degraded_check >= degraded_criteria )); then
+                break
+            fi
         fi
         echo "wait and retry..."
         sleep ${interval}
@@ -774,7 +792,7 @@ do
     if ! check_signed; then
         echo "You're updating to an unsigned images, you must override the verification using --force flag"
         FORCE_UPDATE="true"
-        if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358"; then
+        if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358" "OCP-69968" "OCP-56083"; then
             echo "The case need to run against a signed target image!"
             exit 1
         fi

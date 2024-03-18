@@ -72,7 +72,7 @@ function filter_test_by_platform() {
     extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            none)
+            none|powervs)
                 export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
                 eval "$extrainfoCmd"
                 ;;
@@ -126,6 +126,14 @@ function filter_test_by_proxy() {
     proxy="$(oc get proxies.config.openshift.io cluster -o yaml | yq '.spec|(.httpProxy,.httpsProxy)' | uniq)"
     if [[ -n "$proxy" ]] && [[ "$proxy" != 'null' ]] ; then
         export E2E_RUN_TAGS="@proxy and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags
+}
+function filter_test_by_hypershift() {
+    local topo
+    topo="$(oc get infrastructures.config.openshift.io cluster -o yaml | yq '.status.controlPlaneTopology')"
+    if [[ "_${topo}_" = '_External_' ]] ; then
+        export E2E_RUN_TAGS="@hypershift-hosted and ${E2E_RUN_TAGS}"
     fi
     echo_e2e_tags
 }
@@ -207,6 +215,7 @@ function filter_test_by_capability() {
 function filter_tests() {
     filter_test_by_capability
     filter_test_by_fips
+    filter_test_by_hypershift
     filter_test_by_proxy
     filter_test_by_sno
     filter_test_by_network
@@ -216,8 +225,17 @@ function filter_tests() {
 
     echo_e2e_tags
 }
-function test_execution() {
-    pushd verification-tests
+function test_execution_cucumber() {
+    local test_type type_tags
+    test_type="$1"
+    type_tags="$2"
+    export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/${test_type}"
+    export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
+    set -x
+    cucumber --tags "${E2E_RUN_TAGS} and ${type_tags}" -p junit || true
+    set +x
+}
+function test_execution_default() {
     # run normal tests in parallel
     export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-normal"
     SECONDS=0
@@ -237,13 +255,45 @@ function test_execution() {
     show_test_execution_time 'admin'
 
     # run the rest tests in serial
-    export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/serial"
-    export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
     SECONDS=0
-    set -x
-    cucumber --tags "${E2E_RUN_TAGS} and ((@console and @smoke) or @serial)" -p junit || true
-    set +x
+    test_execution_cucumber 'serial' '((@console and @smoke) or @serial)'
     show_test_execution_time 'smoke console or serial'
+}
+function test_execution_destructive() {
+    test_execution_cucumber 'destructive1' 'not @console'
+    test_execution_cucumber 'destructive2' '@console and @smoke'
+}
+function test_execution_longduration() {
+    test_execution_cucumber 'longduration1' 'not @destructive'
+    test_execution_cucumber 'longduration2' '@destructive'
+}
+function test_execution_ui() {
+    test_execution_cucumber 'ui1' 'not @destructive'
+    test_execution_cucumber 'ui2' '@destructive'
+}
+function test_execution() {
+    pushd verification-tests
+    case "$E2E_TEST_TYPE" in
+        default)
+            export E2E_RUN_TAGS="${E2E_RUN_TAGS} and not @destructive and not @long-duration"
+            test_execution_default
+            ;;
+        destructive)
+            export E2E_RUN_TAGS="${E2E_RUN_TAGS} and @destructive"
+            test_execution_destructive
+            ;;
+        longduration)
+            export E2E_RUN_TAGS="${E2E_RUN_TAGS} and @long-duration"
+            test_execution_longduration
+            ;;
+        ui)
+            export E2E_RUN_TAGS="${E2E_RUN_TAGS} and @console"
+            test_execution_ui
+            ;;
+        *)
+            echo "Got unexpected test type: $E2E_TEST_TYPE"
+            ;;
+    esac
     popd
 }
 function summarize_test_results() {
@@ -277,10 +327,8 @@ EOF
 
 PARALLEL_CUCUMBER_OPTIONS='--verbose-process-command --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number'
 CUCUSHIFT_FORCE_SKIP_TAGS="not @customer
-        and not @destructive
         and not @flaky
         and not @inactive
-        and not @long-duration
         and not @prod-only
         and not @qeci
         and not @security

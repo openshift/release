@@ -3,10 +3,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-TARGET_KUBEADMIN_PASSWORD_FILE="/tmp/clusters-data/${TEST_PLATFORM}/${TARGET_CLUSTER_NAME}/auth/kubeadmin-password"
-TARGET_KUBECONFIG="/tmp/clusters-data/${TEST_PLATFORM}/${TARGET_CLUSTER_NAME}/auth/kubeconfig"
-RESULTS_FILE="${TEST_REPOSITORY_DIR}/junit-report.xml"
-
 # Move the oc binary
 echo "Moving oc binary to /usr/bin/oc"
 cp ${TEST_REPOSITORY_DIR}/oc /usr/bin/oc
@@ -27,6 +23,11 @@ echo "Installing mtc-apps-deployer and mtc-python-client."
 python3 -m pip install -r $TEST_REPOSITORY_DIR/requirements.txt --ignore-installed
 python3 -m pip install $MTC_APPS_DEPLOYER_DIR
 python3 -m pip install $MTC_PYTHON_CLIENT_DIR
+
+TARGET_CLUSTER_DIR=$(find tmp/clusters-data/${TEST_PLATFORM} -type d -name "${TARGET_CLUSTER_PREFIX}*")
+TARGET_KUBEADMIN_PASSWORD_FILE="/${TARGET_CLUSTER_DIR}/auth/kubeadmin-password"
+TARGET_KUBECONFIG="/${TARGET_CLUSTER_DIR}/auth/kubeconfig"
+RESULTS_FILE="${TEST_REPOSITORY_DIR}/junit-report.xml"
 
 # Login to the cluster
 echo "Logging into source cluster."
