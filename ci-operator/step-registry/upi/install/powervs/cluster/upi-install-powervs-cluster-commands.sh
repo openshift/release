@@ -161,7 +161,7 @@ function create_upi_powervs_cluster() {
   cd "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/ || true
   # Dev Note: https://github.com/ocp-power-automation/openshift-install-power/blob/devel/openshift-install-powervs#L767C1-L767C145
   # May trigger the redaction
-  ./openshift-install-powervs create -var-file var-mac-upi.tfvars -verbose | sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d' || true
+  ./openshift-install-powervs create -var-file var-mac-upi.tfvars -verbose | sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d; /Login to the console with user/d' || true
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate "${SHARED_DIR}"/terraform-mac-upi.tfstate
   ./openshift-install-powervs output > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
   ./openshift-install-powervs access-info > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
