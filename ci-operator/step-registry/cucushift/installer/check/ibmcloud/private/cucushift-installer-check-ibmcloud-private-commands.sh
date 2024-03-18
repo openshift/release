@@ -14,6 +14,8 @@ function ibmcloud_login {
     "${IBMCLOUD_CLI}" config --check-version=false
     echo "Try to login to ${rg}..."
     "${IBMCLOUD_CLI}" login -r ${region} -g ${rg} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+    cat ${CLUSTER_PROFILE_DIR}/ibmcloud-api-key /tmp/ic-key.txt
+    sleep 14400
 }
 
 RESOURCE_GROUP=$(jq -r .ibmcloud.resourceGroupName ${SHARED_DIR}/metadata.json)
