@@ -29,8 +29,7 @@ BASEDOMAIN=$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")
 echo "extract secret/pull-secret"
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 echo "check HYPERSHIFT_HC_RELEASE_IMAGE, if not set, use mgmt-cluster playload image"
-PLAYLOADIMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
-RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$PLAYLOADIMAGE}
+RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 
 EXTRA_ARGS=""
 if [[ "${IP_STACK}" == "v4v6" ]]; then
