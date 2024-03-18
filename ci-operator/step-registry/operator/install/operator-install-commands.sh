@@ -43,8 +43,7 @@ if [ "${INSTALL_FROM_IIB}" = "true" ]; then
                 --iib-region ${AWS_REGION} \
                 --aws-region ${AWS_REGION} \
                 --aws-access-key-id ${AWS_ACCESS_KEY_ID} \
-                --aws-secret-access-key ${AWS_SECRET_ACCESS_KEY}
-              "
+                --aws-secret-access-key ${AWS_SECRET_ACCESS_KEY} "
 fi
 
 ${RUN_COMMAND}
