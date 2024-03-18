@@ -29,7 +29,6 @@ export KRKN_KUBE_CONFIG=$KUBECONFIG
 export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
-export TARGET_NODE_AND_INTERFACE=$TARGET_NODE_AND_INTERFACE
 export NETWORK_PARAMS=$NETWORK_PARAMS
 export WAIT_DURATION=$WAIT_DURATION
 
