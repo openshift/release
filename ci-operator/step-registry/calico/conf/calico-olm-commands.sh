@@ -37,5 +37,5 @@ spec:
 EOF
 
 install_plan_name=$(oc get installplan -n tigera-operator -o=jsonpath='{items[0].metadata.name}')
-oc patch installplan $install_plan_name --namespace tigera-operator --type merge --patch '{"spec":{"approved":true}}'
+oc patch installplan "$install_plan_name" --namespace tigera-operator --type merge --patch '{"spec":{"approved":true}}'
 
