@@ -276,6 +276,7 @@ function pre-OCP-53907(){
         echo "No image extracted from recommended update!"
         return 1
     fi
+    bad_metadata="true"
     for image in ${images[*]}; do
         if [[ "${image}" == "null" ]] ; then
             echo "No image info!"
@@ -286,11 +287,17 @@ function pre-OCP-53907(){
             echo "No metadata for recommended update ${image}!"
             continue
         fi
-        if [[ "${metadata}" != *"multi"* ]]; then
-            echo "The architecture info ${metadata} of recommended update ${image} is not expected!"
+        bad_metadata="false"
+        arch=$(oc adm release info ${image} -ojson|jq -r '.metadata.metadata."release.openshift.io/architecture"')
+        if [[ "${arch}" != "multi" ]]; then
+            echo "The architecture info ${arch} of recommended update ${image} is not expected!"
             return 1
         fi
     done
+    if [[ "${bad_metadata}" == "true" ]]; then
+        echo "All images' metadata is null in available update!"
+        return 1
+    fi
     return 0
 }
 

@@ -42,12 +42,10 @@ build_root:
     tag: golang-1.18
 releases:
   latest:
-    prerelease:
+    release:
       architecture: multi
-      product: ocp
-      version_bounds:
-        lower: 4.14.0-0
-        upper: 4.15.0-0
+      channel: fast
+      version: "4.14"
   target:
     prerelease:
       architecture: multi
@@ -61,27 +59,26 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-ovn-ipsec-amd-mixarch-day2-f14
-  cron: 1 2 11,27 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-    test:
-    - chain: openshift-upgrade-qe-sanity-heterogeneous
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-ovn-ipsec-amd-mixarch-f14
+- as: azure-ipi-amd-mixarch-f28
   cron: 54 6 14,28 * *
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: azure-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      ENABLE_OTA_TEST: OCP-53907
     test:
     - ref: ipi-install-heterogeneous
-    - chain: openshift-upgrade-qe-sanity
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+    - ref: cucushift-upgrade-healthcheck
+    - ref: cucushift-ota-preupgrade
+    - ref: cucushift-upgrade-toversion
+    - chain: cucushift-installer-check-cluster-health
+    - ref: cucushift-ota-postupgrade
+    workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
-  branch: release-4.15
+  branch: master
   org: openshift
-  repo: openshift-tests-private
-  variant: multi-stable-4.15-upgrade-from-stable-4.14
+  repo: verification-tests
+  variant: ota-multi-stable-4.15-upgrade-from-stable-4.14

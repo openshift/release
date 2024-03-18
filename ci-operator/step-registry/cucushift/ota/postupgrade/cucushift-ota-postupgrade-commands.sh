@@ -137,7 +137,7 @@ function post-OCP-53907(){
     echo "Test Start: ${FUNCNAME[0]}"
     local arch 
     arch=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "ReleaseAccepted")|.message')
-    if [[ "${arch}" != *"Multi"* ]]; then
+    if [[ "${arch}" != *"architecture=\"Multi\""* ]]; then
         echo "The architecture info: ${arch} is not expected!"
         return 1
     fi
