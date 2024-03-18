@@ -130,9 +130,9 @@ function filter_test_by_proxy() {
     echo_e2e_tags
 }
 function filter_test_by_hypershift() {
-    local masterno
-    masterno="$(oc get nodes --no-headers -l node-role.kubernetes.io/master= | wc -l)"
-    if [[ $masterno -eq 0 ]] ; then
+    local topo
+    topo="$(oc get infrastructures.config.openshift.io cluster -o yaml | yq '.status.controlPlaneTopology')"
+    if [[ "_${topo}_" = '_External_' ]] ; then
         export E2E_RUN_TAGS="@hypershift-hosted and ${E2E_RUN_TAGS}"
     fi
     echo_e2e_tags

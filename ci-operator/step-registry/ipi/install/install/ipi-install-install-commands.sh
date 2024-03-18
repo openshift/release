@@ -271,14 +271,18 @@ function prepare_next_steps() {
 }
 
 function inject_promtail_service() {
-  GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
   export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
   export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
   export PROMTAIL_VERSION="v2.4.1"
+  export LOKI_ENDPOINT=https://logging-loki-openshift-operators-redhat.apps.cr.j7t7.p1.openshiftapps.com/api/logs/v1/openshift-trt/loki/api/v1
 
   config_dir=/tmp/promtail
   mkdir "${config_dir}"
-  cp /var/run/loki-grafanacloud-secret/client-secret "${config_dir}/grafanacom-secrets-password"
+  cat >> "${config_dir}/promtail-prod-creds" << EOF
+AUDIENCE=$(cat /var/run/loki-secret/audience)
+CLIENT_ID=$(cat /var/run/loki-secret/client-id)
+CLIENT_SECRET=$(cat /var/run/loki-secret/client-secret)
+EOF
   cat >> "${config_dir}/promtail_config.yml" << EOF
 clients:
   - backoff_config:
@@ -287,68 +291,41 @@ clients:
       min_period: 1s
     batchsize: 102400
     batchwait: 10s
-    basic_auth:
-      username: ${GRAFANACLOUND_USERNAME}
-      password_file: /etc/promtail/grafanacom-secrets-password
+    bearer_token_file: /tmp/shared/prod_bearer_token
     timeout: 10s
-    url: https://logs-prod3.grafana.net/api/prom/push
+    url: ${LOKI_ENDPOINT}/push
 positions:
   filename: "/run/promtail/positions.yaml"
 scrape_configs:
 - job_name: kubernetes-pods-static
   pipeline_stages:
   - cri: {}
+  - static_labels:
+      type: static-pod
+  - match:
+      selector: '{type="static-pod"}'
+      stages:
+      - regex:
+          source: filename
+          expression: "/var/log/pods/(?P<namespace>\\\S+?)_(?P<pod>\\\S+)_(?P<uid>\\\S+)/(?P<container>\\\S+)/.*"
+  - labels:
+      namespace:
+      pod:
+      container:
   - labeldrop:
     - filename
   - pack:
       labels:
       - namespace
-      - pod_name
-      - container_name
-      - app
-  - labelallow:
+      - pod
       - host
+  - labelallow:
       - invoker
-  kubernetes_sd_configs:
-  - role: pod
-  relabel_configs:
-  - action: drop
-    regex: ''
-    source_labels:
-    - __meta_kubernetes_pod_uid
-  - source_labels:
-    - __meta_kubernetes_pod_label_name
-    target_label: __service__
-  - source_labels:
-    - __meta_kubernetes_pod_node_name
-    target_label: __host__
-  - action: replace
-    replacement:
-    separator: "/"
-    source_labels:
-    - __meta_kubernetes_namespace
-    - __service__
-    target_label: job
-  - action: replace
-    source_labels:
-    - __meta_kubernetes_namespace
-    target_label: namespace
-  - action: replace
-    source_labels:
-    - __meta_kubernetes_pod_name
-    target_label: pod_name
-  - action: replace
-    source_labels:
-    - __meta_kubernetes_pod_container_name
-    target_label: container_name
-  - replacement: /var/log/pods/*\$1/*.log
-    separator: /
-    source_labels:
-    - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
-    - __meta_kubernetes_pod_container_name
-    target_label: __path__
-  - action: labelmap
-    regex: __meta_kubernetes_pod_label_(.+)
+      - type
+  static_configs:
+  - labels:
+      type: static-pod
+      __path__: /var/log/pods/**/*.log
 - job_name: journal
   journal:
     path: /var/log/journal
@@ -362,9 +339,12 @@ scrape_configs:
       labels:
       - boot_id
       - systemd_unit
-  - labelallow:
       - host
+  - labelallow:
       - invoker
+      - systemd_unit
+  - static_labels:
+      type: systemd-journal
   relabel_configs:
   - action: labelmap
     regex: __journal__(.+)
@@ -383,9 +363,9 @@ ignition:
       - local: bootstrap_initial.ign
 storage:
   files:
-    - path: /etc/promtail/grafanacom-secrets-password
+    - path: /etc/promtail/promtail-prod-creds
       contents:
-        local: grafanacom-secrets-password
+        local: promtail-prod-creds
       mode: 0644
     - path: /etc/promtail/config.yaml
       contents:
@@ -398,13 +378,34 @@ systemd:
       contents: |
         [Unit]
         Description=promtail
+        Wants=network-online.target prod-bearer-token.service
+        After=network-online.target prod-bearer-token.service
+
+        [Service]
+        ExecStartPre=/bin/mkdir -p /run/promtail /var/log/pods
+        ExecStartPre=/usr/bin/podman create --rm --name=promtail -v /var/log/journal/:/var/log/journal/:z -v /var/log/pods/:/var/log/pods/:z -v /etc/machine-id:/etc/machine-id -v /run/promtail:/run/promtail:z -v /etc/promtail:/etc/promtail:z -v /tmp/shared:/tmp/shared:z ${PROMTAIL_IMAGE}:${PROMTAIL_VERSION} -config.file=/etc/promtail/config.yaml -client.external-labels=invoker='${OPENSHIFT_INSTALL_INVOKER},host=%H'
+        ExecStart=/usr/bin/podman start -a promtail
+        ExecStop=-/usr/bin/podman stop -t 10 promtail
+        Restart=always
+        RestartSec=60
+
+        [Install]
+        WantedBy=multi-user.target
+    - name: prod-bearer-token.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=prod-bearer-token
         Wants=network-online.target
         After=network-online.target
 
         [Service]
-        ExecStartPre=/usr/bin/podman create --rm --name=promtail -v /var/log/journal/:/var/log/journal/:z -v /etc/machine-id:/etc/machine-id -v /etc/promtail:/etc/promtail ${PROMTAIL_IMAGE}:${PROMTAIL_VERSION} -config.file=/etc/promtail/config.yaml -client.external-labels=host=%H,invoker='${OPENSHIFT_INSTALL_INVOKER}'
-        ExecStart=/usr/bin/podman start -a promtail
-        ExecStop=-/usr/bin/podman stop -t 10 promtail
+        EnvironmentFile=/etc/promtail/promtail-prod-creds
+        ExecStartPre=/bin/mkdir /tmp/shared
+        ExecStartPre=/bin/chmod 777 /tmp/shared
+        ExecStartPre=/usr/bin/podman create --rm --name=prod-bearer-token -v /tmp/shared:/tmp/shared:z quay.io/observatorium/token-refresher --oidc.audience=\${AUDIENCE} --oidc.client-id=\${CLIENT_ID} --oidc.client-secret=\${CLIENT_SECRET} --oidc.issuer-url=https://sso.redhat.com/auth/realms/redhat-external --margin=10m --file=/tmp/shared/prod_bearer_token
+        ExecStart=/usr/bin/podman start -a prod-bearer-token
+        ExecStop=-/usr/bin/podman stop -t 10 prod-bearer-token
         Restart=always
         RestartSec=60
 
