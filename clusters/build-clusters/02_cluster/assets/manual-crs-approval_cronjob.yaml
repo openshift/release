@@ -1,0 +1,24 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: manual-crs-approval
+  namespace: openshift-cluster-machine-approver
+spec:
+  schedule: "*/30 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: machine-approver-sa
+          containers:
+          - name: manual-crs-approval
+            image: registry.ci.openshift.org/ocp/4.15:cli
+            imagePullPolicy: Always
+            args:
+            - -c
+            - |
+              set -euo pipefail
+              oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' | xargs --no-run-if-empty oc adm certificate approve
+            command:
+            - /bin/bash
+          restartPolicy: OnFailure
