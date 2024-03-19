@@ -98,7 +98,16 @@ patch_image_registry() {
   done
   echo "Patch image registry"
   oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"emptyDir":{}}, "managementState": "Managed"}}'
-  sleep 180
+  set +e
+  for i in {1..30}; do
+    count=$(oc get co -n default --no-headers | awk '{ print $3 $4 $5 }' | grep -w -v TrueFalseFalse | wc -l)
+    echo "Not ready co count: ${count}"
+    if [[ ${count} -eq 0 ]]; then
+      break
+    fi
+    sleep 120
+  done
+  set -e
   echo "Done of image registry patch"
 }
 
