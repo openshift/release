@@ -7,6 +7,7 @@ POWERVS_VSI_NAME="${CLUSTER_NAME}-worker"
 BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
 
 setup_env() {
+  set +x
   # Installing required tools
   echo "$(date) Installing required tools"
   mkdir /tmp/ibm_cloud_cli
@@ -19,7 +20,7 @@ setup_env() {
 
   # IBM cloud login
   ibmcloud config --check-version=false
-  echo | ibmcloud login --apikey @"/etc/sno-power-credentials/.powercreds"
+  echo | ibmcloud login --apikey @"/etc/sno-power-credentials/.powercreds" --no-region
 
   # Installing required ibmcloud plugins
   echo "$(date) Installing required ibmcloud plugins"
@@ -108,6 +109,7 @@ patch_image_registry() {
   echo "Done of image registry patch"
 }
 
+set +x
 # Create private key with 0600 permission for ssh purpose
 SSH_PRIVATE="/tmp/ssh-privatekey"
 cp "/etc/sno-power-credentials/ssh-privatekey" ${SSH_PRIVATE}
@@ -615,6 +617,8 @@ set +e
 CLUSTER_NAME=\$1
 INSTALL_TYPE=\$2
 
+set +x
+
 export OFFLINE_TOKEN_FILE=/root/.sno/offline-token
 export CONFIG_DIR="/tmp/\${CLUSTER_NAME}-config"
 
@@ -689,6 +693,8 @@ assisted_wait() {
 
 if [[ \${INSTALL_TYPE} == "assisted" ]]; then
     assisted_wait
+elif [[ \${INSTALL_TYPE} == "agent" ]]; then
+    agent_wait
 else
     sno_wait
 fi
@@ -726,9 +732,7 @@ fi
 # Run wait-sno-complete
 ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./wait-sno-complete.sh ${CLUSTER_NAME} ${INSTALL_TYPE}"
 
-# Run wait-sno-complete
-ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./wait-sno-complete.sh ${CLUSTER_NAME} ${INSTALL_TYPE}"
-
+set +x
 ################################################################
 echo "If installation completed successfully Copying required artifacts to shared dir"
 # Powervs requires config.json
