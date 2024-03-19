@@ -82,8 +82,8 @@ function reset_host() {
 olReboot $pdu_socket
 quit
 EOF
-  if ! wait_for_power_down "$bmc_host" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"; then
-    echo "$bmc_host:$bmc_forwarded_port" >> /tmp/failed
+  if ! wait_for_power_down "$bmc_address" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"; then
+    echo "$bmc_address:$bmc_forwarded_port" >> /tmp/failed
   fi
 }
 
