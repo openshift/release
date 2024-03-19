@@ -153,11 +153,11 @@ function filter_test_by_capability() {
     # the second `console` is the tag name in verification-tests
     declare -A tagmaps
     tagmaps=([baremetal]=xxx
-             [Build]=xxx
+             [Build]=workloads
              [CloudCredential]=xxx
              [Console]=console
              [CSISnapshot]=storage
-             [DeploymentConfig]=xxx
+             [DeploymentConfig]=workloads
              [ImageRegistry]=xxx
              [Insights]=xxx
              [MachineAPI]=xxx

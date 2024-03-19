@@ -54,7 +54,6 @@ GITHUB__APP__APP_ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-app-id)
 GITHUB__APP__CLIENT_ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-id)
 GITHUB__APP__CLIENT_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-secret)
 GITHUB__APP__WEBHOOK_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-webhook-secret)
-GITHUB__APP__WEBHOOK_URL=GITHUB_APP_WEBHOOK_URL
 GITHUB__APP__PRIVATE_KEY=$(base64 -d < /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-private-key)
 GITOPS__GIT_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
 QUAY__DOCKERCONFIGJSON=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhtap_quay_ci_token)
@@ -113,8 +112,7 @@ wait_for_pipeline() {
 install_rhtap(){
   echo "[INFO]Generate private-values.yaml file ..."
   ./bin/make.sh values
-  # enable debug model
-  yq e -i '.debug.script=true' private-values.yaml
+  
   echo "[INFO]Install RHTAP ..."
   ./bin/make.sh apply -d -n $NAMESPACE -- --values private-values.yaml
 

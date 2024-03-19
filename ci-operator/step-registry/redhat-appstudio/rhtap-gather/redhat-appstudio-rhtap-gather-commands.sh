@@ -135,6 +135,9 @@ queue ${ARTIFACT_DIR}/triggertemplates.json  oc --insecure-skip-tls-verify --req
 
 FILTER=gzip queue ${ARTIFACT_DIR}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 
+# RHTAP installer related resources
+queue ${ARTIFACT_DIR}/oc_cmds/jobs oc --insecure-skip-tls-verify --request-timeout=5s get jobs --all-namespaces
+
 # gather nodes first in parallel since they may contain the most relevant debugging info
 while IFS= read -r i; do
   mkdir -p ${ARTIFACT_DIR}/nodes/$i
