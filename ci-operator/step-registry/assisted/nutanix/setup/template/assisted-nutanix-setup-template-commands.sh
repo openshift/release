@@ -65,6 +65,13 @@ ssh_public_key = "/var/run/vault/sshkeys/ssh_public_key"
 ssh_private_key_file = "/var/run/vault/sshkeys/ssh_private_key"
 EOF
 
+echo "Debug job"
+set -x
+ls -la /var/run/vault/sshkeys
+cat nutanix-params.hcl
+
+
+
 export PACKER_CONFIG_DIR=/home/assisted-test-infra/build/packer/config
 export PACKER_CACHE_DIR=$PACKER_CONFIG_DIR/cache
 packer.io init .
