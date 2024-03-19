@@ -198,7 +198,7 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 # always use the latest test code
-export TEST_BRANCH="master"
+export TEST_BRANCH="CNF-10686"
 
 if [[ "$T5CI_VERSION" == "4.16" ]]; then
   export PTP_UNDER_TEST_BRANCH="master"
@@ -248,7 +248,7 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 # Run ptp conformance test
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
-git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+git clone https://github.com/nishant-parekh/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 
