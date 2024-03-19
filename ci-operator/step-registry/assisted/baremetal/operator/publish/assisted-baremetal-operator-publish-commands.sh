@@ -138,25 +138,6 @@ fi
 echo "   operator version: ${OPERATOR_VERSION} will replace version ${PREV_OPERATOR_VERSION}"
 
 echo
-echo "## Determine operator versions we skip"
-if [[ "${BUNDLE_CHANNELS}" == *"alpha"* ]]; then
-    echo "   since we are updating alpha channel we will skip every operator version"
-    skips=$(find "${CO_OPERATOR_DIR}"/* -maxdepth 1 -type d)
-    OPERATOR_SKIPS=""
-    for version in ${skips}; do
-        OPERATOR_SKIPS="${OPERATOR_SKIPS} assisted-service-operator.v${version##*\/}"
-    done
-else
-    echo "   use previous version to determine the versions we skip"
-    OPERATOR_SKIPS=$(yq eval ".spec.skips | .[]" "${CO_OPERATOR_DIR}/${PREV_OPERATOR_VERSION}/${CSV}")
-    OPERATOR_SKIPS="${OPERATOR_SKIPS} assisted-service-operator.v${PREV_OPERATOR_VERSION}"
-fi
-echo "   skipping these operator versions: "
-for version in ${OPERATOR_SKIPS}; do
-    echo "    - ${version}"
-done
-
-echo
 echo "## Update operator manifests and metadata"
 mkdir "${CO_OPERATOR_DIR}/${OPERATOR_VERSION}/"
 cp -rv "${OPERATOR_MANIFESTS}" "${OPERATOR_METADATA}" "${CO_OPERATOR_DIR}/${OPERATOR_VERSION}/"
@@ -206,13 +187,6 @@ echo "   adding replaces"
 v="assisted-service-operator.v${PREV_OPERATOR_VERSION}" \
     yq eval --exit-status --inplace \
     '.spec.replaces |= strenv(v)' "${CO_CSV}"
-
-echo "   adding spec.skips"
-for version in ${OPERATOR_SKIPS}; do
-    v="${version}" \
-        yq eval --exit-status --inplace \
-        '.spec.skips |= . + [strenv(v)]' "${CO_CSV}"
-done
 
 echo
 echo "## Submit PR to community operators"
