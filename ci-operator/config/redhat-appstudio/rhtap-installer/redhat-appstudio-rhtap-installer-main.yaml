@@ -33,6 +33,7 @@ tests:
         export OPENSHIFT_LOGIN_USERNAME="$(cat /usr/local/ci-secrets/rhtap-stage-secrets/openshift_login_username)"
         export OPENSHIFT_LOGIN_PASSWORD="$(cat /usr/local/ci-secrets/rhtap-stage-secrets/openshift_login_password)"
         export OPENSHIFT_API_URL="$(cat /usr/local/ci-secrets/rhtap-stage-secrets/openshift_api_url)"
+        export RHTAP_ENABLE_TAS='false'
         source /usr/local/ci-secrets/rhtap-stage-secrets/stage-secrets-environments
         unset KUBECONFIG
 
@@ -40,12 +41,14 @@ tests:
         oc login -u "${OPENSHIFT_LOGIN_USERNAME}" -p "${OPENSHIFT_LOGIN_PASSWORD}" "${OPENSHIFT_API_URL}" --insecure-skip-tls-verify=true
 
         # Remove previous installation
-        oc delete namespace rhtap || true
+        helm uninstall developer-hub -n rhtap || true
+        helm uninstall installer -n rhtap || true
+        helm uninstall tpa -n rhtap || true
+        helm uninstall tpa-infrastructure -n rhtap || true
 
         # Run the installation in debug mode
         ./bin/make.sh values
         yq e -i '.debug.script=true' private-values.yaml
-        yq e -i '.trusted-profile-analyzer=null' private-values.yaml
         ./bin/make.sh apply -n rhtap -- --debug --values private-values.yaml
       credentials:
       - mount_path: /usr/local/ci-secrets/rhtap-stage-secrets
