@@ -60,7 +60,6 @@ nutanix_port = "${NUTANIX_PORT}"
 nutanix_cluster = "${NUTANIX_CLUSTER_NAME}"
 nutanix_subnet = "${NUTANIX_SUBNET_NAME}"
 centos_iso_image_name = "CentOS-Stream-8-x86_64-20230830"
-disk_size = 40960
 image_name = "assisted-test-infra-machine-template"
 ssh_public_key = "/var/run/vault/sshkeys/ssh_public_key"
 ssh_private_key_file = "/var/run/vault/sshkeys/ssh_private_key"
