@@ -1553,15 +1553,14 @@ function test_memory_node_limit_labels () {
       echo "Getting kubeconfig of MC with ocm cluster ID: $MC_OCM_CLUSTER_ID"
       ocm get /api/clusters_mgmt/v1/clusters/"$MC_OCM_CLUSTER_ID"/credentials | jq -r .kubeconfig > "$SHARED_DIR/mc"
       echo "Getting machinesets of MC with ocm cluster ID: $MC_OCM_CLUSTER_ID"
-      MS_OUTPUT=$(oc --kubeconfig "$SHARED_DIR/mc" get machinesets.machine.openshift.io -A -o json | jq -r)
-      MS_COUNT=$(jq -n "$MS_OUTPUT" | jq -r '.items | length')
-      for ((c=0; c<$((MS_COUNT)); c+=1)); do
-        MACHINE_SET_NAME=$(jq -n "$MS_OUTPUT" | jq -r .items[$c].metadata.name)
+      MS_OUTPUT=$(oc --kubeconfig "$SHARED_DIR/mc" get machinesets.machine.openshift.io -A -o json | jq -r .items[].metadata.name)
+      echo "$MS_OUTPUT" | while read -r MACHINE_SET_NAME; do
+        MACHINE_SET_OUTPUT=$(oc --kubeconfig "$SHARED_DIR/mc" get machinesets.machine.openshift.io "$MACHINE_SET_NAME" -n openshift-machine-api -o json)
         echo "Checking $MACHINE_SET_NAME machineset label values"
-        MACHINE_SET_REQUEST_SERVING_COMPONENT_LABEL_VALUE=$(jq -n "$MS_OUTPUT" | jq -r .items[$c].spec.template.spec.metadata.labels | jq  '."hypershift.openshift.io/request-serving-component" // empty' | xargs)
-        MACHINE_SET_REQUEST_SERVING_GOMEMLIMIT_LABEL_VALUE=$(jq -n "$MS_OUTPUT" | jq -r .items[$c].spec.template.spec.metadata.labels | jq '."hypershift.openshift.io/request-serving-gomemlimit" // empty' | xargs)
-        MACHINE_SET_OSD_FLEET_MANAGER_VALUE=$(jq -n "$MS_OUTPUT" | jq -r .items[$c].spec.template.spec.metadata.labels | jq '."osd-fleet-manager" // empty' | xargs)
-        MACHINE_SET_CLUSTER_SIZE_VALUE=$(jq -n "$MS_OUTPUT" | jq -r .items[$c].spec.template.spec.metadata.labels | jq '."hypershift.openshift.io/cluster-size" // empty' | xargs)
+        MACHINE_SET_REQUEST_SERVING_COMPONENT_LABEL_VALUE=$(jq -n "$MACHINE_SET_OUTPUT" | jq -r .spec.template.spec.metadata.labels | jq  '."hypershift.openshift.io/request-serving-component" // empty' | xargs)
+        MACHINE_SET_REQUEST_SERVING_GOMEMLIMIT_LABEL_VALUE=$(jq -n "$MACHINE_SET_OUTPUT" | jq -r .spec.template.spec.metadata.labels | jq '."hypershift.openshift.io/request-serving-gomemlimit" // empty' | xargs)
+        MACHINE_SET_OSD_FLEET_MANAGER_VALUE=$(jq -n "$MACHINE_SET_OUTPUT" | jq -r .spec.template.spec.metadata.labels | jq '."osd-fleet-manager" // empty' | xargs)
+        MACHINE_SET_CLUSTER_SIZE_VALUE=$(jq -n "$MACHINE_SET_OUTPUT" | jq -r .spec.template.spec.metadata.labels | jq '."hypershift.openshift.io/cluster-size" // empty' | xargs)
         echo "Label 'hypershift.openshift.io/request-serving-component': $MACHINE_SET_REQUEST_SERVING_COMPONENT_LABEL_VALUE"
         echo "label 'hypershift.openshift.io/request-serving-gomemlimit': $MACHINE_SET_REQUEST_SERVING_GOMEMLIMIT_LABEL_VALUE"
         echo "label 'osd-fleet-manager': $MACHINE_SET_OSD_FLEET_MANAGER_VALUE"
