@@ -10,8 +10,11 @@ python3 --version
 pushd /tmp
 
 ls -la /root/kraken
-git clone https://github.com/redhat-chaos/krkn-hub.git
-pushd krkn-hub/
+ES_PASSWORD=$(cat "/secret/es/password")
+ES_USERNAME=$(cat "/secret/es/username")
+
+export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+export ELASTIC_INDEX=krkn_chaos_ci
 
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
