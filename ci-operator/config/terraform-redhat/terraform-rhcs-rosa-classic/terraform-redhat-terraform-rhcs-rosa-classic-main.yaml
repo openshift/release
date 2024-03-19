@@ -24,8 +24,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: verify-format
+- always_run: true
+  as: verify-format
   commands: make verify
+  container:
+    from: terraform-rhcs-rosa-clients
+- always_run: true
+  as: verify-gen
+  commands: make verify-gen
   container:
     from: terraform-rhcs-rosa-clients
 - always_run: true
@@ -44,7 +50,7 @@ tests:
       EXAMPLE_NAME: rosa-classic-public-with-unmanaged-oidc
     test:
     - ref: rhcs-module-run-example
-- always_run: true
+- always_run: false
   as: rosa-classic-public-with-shared-vpc
   steps:
     cluster_profile: aws-terraform-qe
@@ -74,6 +80,22 @@ tests:
     cluster_profile: aws-terraform-qe
     env:
       EXAMPLE_NAME: rosa-classic-public-with-byo-vpc-byo-iam-byo-oidc
+    test:
+    - ref: rhcs-module-run-example
+- always_run: false
+  as: rosa-classic-public-with-multiple-machinepools-and-idps
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-public-with-multiple-machinepools-and-idps
+    test:
+    - ref: rhcs-module-run-example
+- always_run: true
+  as: rosa-classic-private-with-autoscaler-unmanaged-oidc-byo-vpc
+  steps:
+    cluster_profile: aws-terraform-qe
+    env:
+      EXAMPLE_NAME: rosa-classic-private-with-autoscaler-unmanaged-oidc-byo-vpc
     test:
     - ref: rhcs-module-run-example
 zz_generated_metadata:

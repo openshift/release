@@ -187,7 +187,7 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-disc-priv-sno-arm-f14
+- as: aws-ipi-sno-etcd-encryption-arm-f14
   cron: 27 18 4,18 * *
   steps:
     cluster_profile: aws-qe
@@ -197,14 +197,11 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.2xlarge
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
       OCP_ARCH: arm64
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
-- as: aws-ipi-disc-priv-sno-amd-f28-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-sno-etcd-encryption
+- as: aws-ipi-sno-etcd-encryption-amd-f28-destructive
   cron: 13 0 16 * *
   steps:
     cluster_profile: aws-qe
@@ -212,12 +209,9 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@disconnected'
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
+    workflow: cucushift-installer-rehearse-aws-ipi-sno-etcd-encryption
 - as: aws-ipi-disc-priv-sts-basecap-none-arm-f28
   cron: 40 18 8 * *
   steps:
@@ -470,10 +464,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      UPGRADE_CHECK_RUN_TAGS: '@4.14 and @aws-ipi and @upgrade-check and @network-openshiftsdn
-        and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@4.14 and @aws-ipi and @upgrade-prepare and @network-ovnkubernetes
-        and not @fips'
     test:
     - chain: cucushift-ovn-migration-sdn
     workflow: cucushift-installer-rehearse-aws-ipi-ovn
@@ -488,10 +478,6 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @4.14 and @aws-ipi and @upgrade-check and
-        @network-openshiftsdn and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@arm64 and @4.14 and @aws-ipi and @upgrade-prepare and
-        @network-ovnkubernetes and not @fips'
     test:
     - chain: cucushift-ovn-migration-sdn
     workflow: cucushift-installer-rehearse-aws-ipi-ovn
@@ -556,10 +542,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      UPGRADE_CHECK_RUN_TAGS: '@4.14 and @aws-ipi and @upgrade-check and @network-ovnkubernetes
-        and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@4.14 and @aws-ipi and @upgrade-prepare and @network-openshiftsdn
-        and not @fips'
     test:
     - chain: cucushift-sdn-migration-ovn
     workflow: cucushift-installer-rehearse-aws-ipi-sdn
@@ -574,10 +556,6 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @4.14 and @aws-ipi and @upgrade-check and
-        @network-ovnkubernetes and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@arm64 and @4.14 and @aws-ipi and @upgrade-prepare and
-        @network-openshiftsdn and not @fips'
     test:
     - chain: cucushift-sdn-migration-ovn
     workflow: cucushift-installer-rehearse-aws-ipi-sdn
@@ -1088,10 +1066,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      UPGRADE_CHECK_RUN_TAGS: '@4.14 and @azure-ipi and @upgrade-check and @network-ovnkubernetes
-        and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@4.14 and @azure-ipi and @upgrade-prepare and @network-openshiftsdn
-        and not @fips'
     test:
     - chain: cucushift-sdn-migration-ovn
     workflow: cucushift-installer-rehearse-azure-ipi-sdn
@@ -1105,14 +1079,10 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @4.14 and @azure-ipi and @upgrade-check
-        and @network-ovnkubernetes and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@arm64 and @4.14 and @azure-ipi and @upgrade-prepare
-        and @network-openshiftsdn and not @fips'
     test:
     - chain: cucushift-sdn-migration-ovn
     workflow: cucushift-installer-rehearse-azure-ipi-sdn
-- as: azure-ipi-sno-arm-f28
+- as: azure-ipi-sno-etcd-encryption-arm-f28
   cron: 13 6 12 * *
   steps:
     cluster_profile: azure-qe
@@ -1125,8 +1095,8 @@ tests:
       SINGLE_NODE_AZURE_INSTANCE_TYPE: Standard_D32ps_v5
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-sno
-- as: azure-ipi-sno-amd-f28-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-sno-etcd-encryption
+- as: azure-ipi-sno-etcd-encryption-amd-f28-destructive
   cron: 9 17 19 * *
   steps:
     cluster_profile: azure-qe
@@ -1137,7 +1107,36 @@ tests:
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi-sno
+    workflow: cucushift-installer-rehearse-azure-ipi-sno-etcd-encryption
+- as: azure-ipi-private-spec-net-type-spec-perm-amd-f28-destructive
+  cron: 13 21 15 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_COMPUTE_NETWORKING_TYPE: Basic
+      AZURE_DEFAULT_MACHINE_NETWORKING_TYPE: Accelerated
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D8s_v3
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8s_v3
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-private-networking-type-minimal-permission
+- as: azure-ipi-private-spec-net-type-spec-perm-arm-f14
+  cron: 31 12 4,18 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      AZURE_COMPUTE_NETWORKING_TYPE: Basic
+      AZURE_DEFAULT_MACHINE_NETWORKING_TYPE: Accelerated
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8ps_v5
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-private-networking-type-minimal-permission
 - as: azure-ipi-usertags-arm-f28
   cron: 4 22 22 * *
   steps:
@@ -1162,8 +1161,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-usertags
-- as: azure-upi-arm-f28
-  cron: 16 2 5 * *
+- as: azure-upi-minimal-permission-arm-f28
+  cron: 6 0 2 * *
   steps:
     cluster_profile: azure-arm64-qe
     dependencies:
@@ -1176,9 +1175,9 @@ tests:
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-upi
-- as: azure-upi-amd-f28-destructive
-  cron: 52 22 5 * *
+    workflow: cucushift-installer-rehearse-azure-upi-minimal-permission
+- as: azure-upi-minimal-permission-amd-f28-destructive
+  cron: 55 10 15 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1187,7 +1186,7 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-upi
+    workflow: cucushift-installer-rehearse-azure-upi-minimal-permission
 - as: gcp-ipi-basecap-none-additionalcaps-amd-f28-destructive
   cron: 31 22 5 * *
   steps:
@@ -1473,11 +1472,6 @@ tests:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      UPGRADE_CHECK_RUN_TAGS: '@4.14 and @gcp-ipi and @upgrade-check and @network-ovnkubernetes
-        and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@4.14 and @gcp-ipi and @upgrade-prepare and @network-openshiftsdn
-        and not @fips'
     test:
     - chain: cucushift-sdn-migration-ovn
     workflow: cucushift-installer-rehearse-gcp-ipi-sdn
@@ -1490,14 +1484,10 @@ tests:
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @4.14 and @gcp-ipi and @upgrade-check and
-        @network-ovnkubernetes and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@arm64 and @4.14 and @gcp-ipi and @upgrade-prepare and
-        @network-openshiftsdn and not @fips'
     test:
     - chain: cucushift-sdn-migration-ovn
     workflow: cucushift-installer-rehearse-gcp-ipi-sdn
-- as: gcp-ipi-sno-amd-f28-destructive
+- as: gcp-ipi-sno-etcd-encryption-amd-f28-destructive
   cron: 3 18 27 * *
   steps:
     cluster_profile: gcp-qe
@@ -1505,8 +1495,8 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-gcp-ipi-sno
-- as: gcp-ipi-sno-arm-f14
+    workflow: cucushift-installer-rehearse-gcp-ipi-sno-etcd-encryption
+- as: gcp-ipi-sno-etcd-encryption-arm-f14
   cron: 32 13 6,16 * *
   steps:
     cluster_profile: gcp-qe
@@ -1517,7 +1507,7 @@ tests:
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-sno
+    workflow: cucushift-installer-rehearse-gcp-ipi-sno-etcd-encryption
 - as: gcp-ipi-user-labels-tags-filestore-csi-tp-amd-f28-destructive
   cron: 42 2 19 * *
   steps:
