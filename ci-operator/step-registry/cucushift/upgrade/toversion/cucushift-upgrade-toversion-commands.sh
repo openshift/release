@@ -186,7 +186,7 @@ function extract_oc(){
     echo -e "Extracting oc\n"
     local retry=5 tmp_oc="/tmp/client-2"
     mkdir -p ${tmp_oc}
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
+    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${DUMMY_TARGET});
     do
         echo >&2 "Failed to extract oc binary, retry..."
         (( retry -= 1 ))
@@ -302,46 +302,6 @@ function admin_ack() {
     fi
 }
 
-# check if any of cases is enabled via ENABLE_OTA_TEST
-function check_ota_case_enabled() {
-    local case_id
-    local cases_array=("$@")
-    for case_id in "${cases_array[@]}"; do
-        # shellcheck disable=SC2076
-        if [[ " ${ENABLE_OTA_TEST} " =~ " ${case_id} " ]]; then
-            echo "${case_id} is enabled via ENABLE_OTA_TEST on this job."
-            return 0
-        fi
-    done
-    return 1
-}
-
-function set_channel(){
-    x_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f1 -d. )
-    y_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f2 -d. )
-    ver="${x_ver}.${y_ver}"
-    if ! oc adm upgrade channel candidate-${ver}; then
-        echo "Fail to change channel to candidate-${ver}!"
-        return 1
-    fi
-    local retry=3
-    while (( retry > 0 ));do
-        recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates')
-        if [[ "${recommends}" == "null" ]]; then
-            (( retry -= 1 ))
-            sleep 60
-            echo "No recommended update available! Retry..."
-        else
-            echo "Recommencded update: ${recommends}"
-            break
-        fi
-    done
-    if (( retry == 0 )); then
-        echo "Timeout to get recommended update!" 
-        return 1
-    fi
-}
-
 # judge if upgrade with --to or --to-latest cmd
 # set correct target_version for the upgrade
 function set_target_and_upgrade_cmd(){
@@ -350,21 +310,20 @@ function set_target_and_upgrade_cmd(){
         echo "No recommended update available!"
         exit 1
     fi
-    # for "oc adm upgrade --to x.y.z" and "oc adm upgrade --to $latest_version_in_available_update"
-    upgrade_cmd="oc adm upgrade --to ${TARGET_VERSION}"
     # x.y.z: run upgrade with "oc adm upgrade --to x.y.z";
-    if [[ -n "${UPGRAGE_TO_VERSION}" ]] && [[ "${UPGRAGE_TO_VERSION}" != "latest" ]]; then
+    if [[ -n "${UPGRADE_TO_VERSION}" ]] && [[ "${UPGRADE_TO_VERSION}" != "latest" ]]; then
         valid_target="false"
         # check if x.y.z is in available_versions, if not, it's invalid target with --to.
         for version in ${available_versions[*]}; do
-            if [[ "${UPGRAGE_TO_VERSION}" == "${version}" ]]; then
-                TARGET_VERSION="${UPGRAGE_TO_VERSION}"
+            if [[ "${UPGRADE_TO_VERSION}" == "${version}" ]]; then
+                TARGET_VERSION="${UPGRADE_TO_VERSION}"
                 valid_target="true"
+                upgrade_cmd="oc adm upgrade --to ${TARGET_VERSION}"
                 break
             fi
         done
         if [[ "${valid_target}" == "false" ]]; then
-            echo "Specified target version ${UPGRAGE_TO_VERSION} is not in recommended update, upgrade will not continue!"
+            echo "Specified target version ${UPGRADE_TO_VERSION} is not in recommended update, upgrade will not continue!"
             exit 1
         fi
     # get target_version from available updates
@@ -376,7 +335,7 @@ function set_target_and_upgrade_cmd(){
         # when there is both 4.15.0-rc1 and 4.15.0-ec1, sort will return 4.15.0-rc1 as latest(expected),
         # there will not be 4.15.0 and 4.15.0-ec1 only, ignore
         # so here we need correct unexpected latest with 4.15.0
-        if [[ "${TARGET_VERSION}" =~ "-rc" ]]; then
+        if [[ "${TARGET_VERSION}" =~ "-" ]]; then
             expected_target="${TARGET_VERSION%-*}"
             for version in ${available_versions[*]}; do
                 if [[ "${version}" == "${expected_target}" ]]; then
@@ -386,14 +345,24 @@ function set_target_and_upgrade_cmd(){
             done
         fi
         # latest: run upgrade with "oc adm upgrade --to-latest";
-        if [[ "${UPGRAGE_TO_VERSION}" == "latest" ]]; then
+        if [[ "${UPGRADE_TO_VERSION}" == "latest" ]]; then
             upgrade_cmd="oc adm upgrade --to-latest"
+        # "": run upgrade with "oc adm upgrade --to $latest_version_in_available_update"
+        else
+            upgrade_cmd="oc adm upgrade --to ${TARGET_VERSION}"
         fi
     fi
+
     TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
+    TARGET=$(oc get clusterversion version -o json| jq -r --arg z "${TARGET_VERSION}" '.status.availableUpdates[]? | select(.version==$z).image')
+    if [[ "${TARGET}" == null ]] || [[ -z "${TARGET}" ]]; then
+        echo "The target version ${TARGET_VERSION} is a bad update without image!"
+        exit 1
+    fi
     export TARGET_MINOR_VERSION
     export TARGET_VERSION
-    echo "Target release version is: ${TARGET_VERSION}\n"
+    export TARGET
+    echo "Target release version is: ${TARGET_VERSION}"
 }
 
 # Monitor the upgrade status
@@ -449,21 +418,18 @@ mkdir -p /tmp/client
 export OC_DIR="/tmp/client"
 export PATH=${OC_DIR}:$PATH
 
-export TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+export DUMMY_TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
 # we need this DUMMY_TARGET_VERSION from ci config to download oc and do some pre-check
-DUMMY_TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
-echo "Target version of ci config is: ${DUMMY_TARGET_VERSION}\n"
+DUMMY_TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${DUMMY_TARGET}" --output=json | jq -r '.metadata.version')"
+echo "Target version of ci config is: ${DUMMY_TARGET_VERSION}"
 extract_oc
 
 SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
 SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
 export SOURCE_VERSION
 export SOURCE_MINOR_VERSION
-echo "Source release version is: ${SOURCE_VERSION}\n"
+echo "Source release version is: ${SOURCE_VERSION}"
 
-if ! check_ota_case_enabled "OCP-53907"; then
-    set_channel
-fi
 set_target_and_upgrade_cmd
 export FORCE_UPDATE="false"
 if ! check_signed; then
