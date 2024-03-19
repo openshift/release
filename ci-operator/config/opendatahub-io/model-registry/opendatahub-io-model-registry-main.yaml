@@ -21,7 +21,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-odh-cfo
+- as: e2e-odh-cfo-cron
+  cron: 0 1 * * *
   steps:
     cluster_profile: aws-opendatahub
     env:
@@ -32,7 +33,25 @@ tests:
     - as: e2e-odh-mr
       cli: latest
       commands: |
-        echo "Testing for Model-Registry Openshift-CI will happen here."
+        ./openshift-ci/scripts/oci-model-registry-deploy.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
+- as: e2e-odh-cfo-optional
+  optional: true
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+    test:
+    - as: e2e-odh-mr
+      cli: latest
+      commands: |
+        ./openshift-ci/scripts/oci-model-registry-deploy.sh
       from: src
       resources:
         requests:
