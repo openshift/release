@@ -1,26 +1,25 @@
 postsubmits:
-  openshift/assisted-test-infra:
+  maistra/api:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build02
+    - ^maistra-2\.6$
+    cluster: build03
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-      job-release: "4.16"
     max_concurrency: 1
-    name: branch-ci-openshift-assisted-test-infra-master-images
+    name: branch-ci-maistra-api-maistra-2.6-update-istio
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
+        - --secret-dir=/secrets/github-token
+        - --target=update-istio
         command:
         - ci-operator
         image: ci-operator:latest
@@ -33,29 +32,29 @@ postsubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/github-token
+          name: github-token
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-token
+        secret:
+          secretName: github-token
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
