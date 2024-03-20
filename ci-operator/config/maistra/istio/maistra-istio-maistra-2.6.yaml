@@ -10,6 +10,11 @@ build_root:
     tag: "2.6"
   use_build_cache: true
 releases:
+  arm64-latest:
+    release:
+      architecture: arm64
+      channel: stable
+      version: "4.14"
   latest:
     release:
       channel: stable
@@ -175,6 +180,52 @@ tests:
           prow/integ-suite-kind.sh \
           test.integration.pilot.kube.presubmit
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: integ-basic-2-6-arm64
+  steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:arm64-latest
+    env:
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.6
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      OCP_ARCH: arm64
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: integ-basic-2-6-arm64
+      cli: latest
+      commands: "# prow/integ-suite-kind.sh test.integration.kube.environment will
+        run pilot and security test with flag = TestReachability|TestTraffic. \n#
+        This is the same way as upstream does\noc rsh -n \"${MAISTRA_NAMESPACE}\"
+        \"${MAISTRA_SC_POD}\" \\\n  entrypoint \\\n  prow/integ-suite-kind.sh \\\n
+        \ test.integration.kube.environment\noc cp \"${MAISTRA_NAMESPACE}\"/\"${MAISTRA_SC_POD}\":\"${ARTIFACT_DIR}\"/.
+        \"${ARTIFACT_DIR}\"\n"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
