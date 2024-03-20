@@ -245,6 +245,42 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
+  cron: '@hourly'
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-ci-stackrox-stackrox-master-hourly-retest
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=is:pr
+        repo:stackrox/stackrox
+        label:auto-merge
+        state:open
+        status:failure
+      - --token=/etc/oauth/oauth
+      - --updated=0
+      - --comment=/retest
+      - --ceiling=1
+      - --confirm
+      command:
+      - /ko-app/commenter
+      image: gcr.io/k8s-prow/commenter:v20240313-0b91835e3c
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: build05
   cron: 0 6 25 12 *
   decorate: true
   decoration_config:
