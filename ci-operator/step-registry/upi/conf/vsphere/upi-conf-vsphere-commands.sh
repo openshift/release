@@ -359,6 +359,10 @@ rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 echo "Removing compute machinesets..."
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 
+
+### Remove CPMS manifests
+rm -f openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml || true
+
 ### Make control-plane nodes unschedulable
 echo "Making control-plane nodes unschedulable..."
 sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" manifests/cluster-scheduler-02-config.yml
