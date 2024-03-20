@@ -26,6 +26,8 @@ HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION="4.14.1"
 
 # MC details
 mc_ocm_cluster_id="2a3g9nfcpeuv5okgoo7f22a0u199nprp"
+# REMOVE
+ocm get /api/clusters_mgmt/v1/clusters/"$mc_ocm_cluster_id"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/hs-mc.kubeconfig"
 MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 
 # HC details
