@@ -16,7 +16,14 @@ fi
 
 SAHRED_VPC_ROLE_ARN=$(head -n 1 "${SHARED_DIR}/hosted_zone_role_arn")
 installer_role_arn=$(grep "Installer-Role" "${SHARED_DIR}/account-roles-arns")
-ingress_role_arn=$(grep "ingress-operator" "${SHARED_DIR}/operator-roles-arns")
+
+principal_string="\"${installer_role_arn}\""
+
+if [[ ${BYO_OIDC} == "true" ]]; then
+  ingress_role_arn=$(grep "ingress-operator" "${SHARED_DIR}/operator-roles-arns")
+  principal_string+=",\"${ingress_role_arn}\""
+fi
+
 shared_vpc_updated_trust_policy=$(mktemp)
 cat > $shared_vpc_updated_trust_policy <<EOF
 {
@@ -25,10 +32,7 @@ cat > $shared_vpc_updated_trust_policy <<EOF
       {
           "Effect": "Allow",
           "Principal": {
-              "AWS": [
-                "${installer_role_arn}",
-                "${ingress_role_arn}"
-              ]
+              "AWS": [${principal_string}]
           },
           "Action": "sts:AssumeRole",
           "Condition": {}
@@ -36,6 +40,10 @@ cat > $shared_vpc_updated_trust_policy <<EOF
   ]
 }
 EOF
+
+echo "trust policy:"
+cat $shared_vpc_updated_trust_policy
+
 aws iam update-assume-role-policy --role-name "$(echo ${SAHRED_VPC_ROLE_ARN} | cut -d '/' -f2)"  --policy-document file://${shared_vpc_updated_trust_policy}
 echo "Updated Shared VPC role trust policy successfully"
   
