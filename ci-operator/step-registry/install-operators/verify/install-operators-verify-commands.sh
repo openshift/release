@@ -7,7 +7,6 @@ set -o pipefail
 # If not provided in the JSON, will use the following defaults.
 DEFAULT_OPERATOR_SOURCE="redhat-operators"
 DEFAULT_OPERATOR_CHANNEL="!default"
-DEFAULT_OPERATOR_INSTALL_NAMESPACE="openshift-operators"
 
 # Read each operator in the JSON provided to an item in a BASH array.
 readarray -t OPERATOR_ARRAY < <(jq --compact-output '.[]' <<< "$OPERATORS")
