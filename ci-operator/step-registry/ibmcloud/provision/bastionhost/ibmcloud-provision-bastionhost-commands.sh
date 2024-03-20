@@ -20,6 +20,8 @@ function ibmcloud_login {
   echo "Try to login..."
   "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
   "${IBMCLOUD_CLI}" plugin list
+  "${IBMCLOUD_CLI}" plugin update -f
+  "${IBMCLOUD_CLI}" plugin list
 }
 
 function check_vpc() {
@@ -99,8 +101,7 @@ fip="${cluster_name}-fip"
 ${IBMCLOUD_CLI} is floating-ip-reserve ${fip} --nic-id $nic --output JSON > "${workdir}/${bastion_name}_reserve.json"
 bastion_public_ip=$(jq -r '.address' "${workdir}/${bastion_name}_reserve.json")
 echo "bastion_public_ip: $bastion_public_ip"
-sleep "waiting debug ...."
-sleep 2h
+echo "test succeed ..."
 if [ X"${bastion_public_ip}" == X"" ] || [ X"${bastion_private_ip}" == X"" ] ; then
     echo "ERROR" "Failed to find bastion's public and private IP!"
     exit 1
