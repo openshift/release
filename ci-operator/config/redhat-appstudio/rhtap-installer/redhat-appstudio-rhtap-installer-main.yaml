@@ -33,7 +33,6 @@ tests:
         export OPENSHIFT_LOGIN_USERNAME="$(cat /usr/local/ci-secrets/rhtap-stage-secrets/openshift_login_username)"
         export OPENSHIFT_LOGIN_PASSWORD="$(cat /usr/local/ci-secrets/rhtap-stage-secrets/openshift_login_password)"
         export OPENSHIFT_API_URL="$(cat /usr/local/ci-secrets/rhtap-stage-secrets/openshift_api_url)"
-        export RHTAP_ENABLE_TAS='false'
         source /usr/local/ci-secrets/rhtap-stage-secrets/stage-secrets-environments
         unset KUBECONFIG
 
@@ -45,6 +44,16 @@ tests:
         helm uninstall installer -n rhtap || true
         helm uninstall tpa -n rhtap || true
         helm uninstall tpa-infrastructure -n rhtap || true
+
+        resource_names=$(oc get applications -n rhtap -o jsonpath='{.items[*].metadata.name}')
+
+        # Loop through each resource and remove finalizers
+        for resource_name in $resource_names; do
+            oc patch application $resource_name -n rhtap --type merge -p '{"metadata":{"finalizers":null}}'
+            oc delete application $resource_name -n rhtap
+        done
+
+        oc delete namespace rhtap || true
 
         # Run the installation in debug mode
         ./bin/make.sh values
