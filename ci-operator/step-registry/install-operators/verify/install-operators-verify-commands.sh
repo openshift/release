@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+sleep 4h
+
 # If not provided in the JSON, will use the following defaults.
 DEFAULT_OPERATOR_SOURCE="redhat-operators"
 DEFAULT_OPERATOR_CHANNEL="!default"
