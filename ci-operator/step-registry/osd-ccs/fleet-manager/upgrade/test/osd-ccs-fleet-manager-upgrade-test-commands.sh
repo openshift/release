@@ -176,20 +176,21 @@ function check_nodes () {
   NODES_COUNT=0
   NODES_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get NODES | tail -n +2) || true # failed execution just results in node count being 0
   NODES_COUNT=$(echo "$NODES_INFO" | wc -l) || true # failed execution just results in node count being 0
-  
-  for ((i=1; i<="$NODES_COUNT"; i++)); do
-    NOT_READY_NODES_COUNT=0
-    NODE_INFO=$(echo "$NODES_INFO" | head -n $i | tail -n +$i) || true
-    NODE_ADDRESS=$(echo "$NODE_INFO" | awk '{print $1}') || true
-    NODE_STATUS=""
-    NODE_STATUS=$(echo "$NODE_INFO" | awk '{print $2}') || true
-    NODE_TYPE=$(echo "$NODE_INFO" | awk '{print $3}') || true
-    if [ "${NODE_STATUS}" != "Ready" ]; then
-      ((NOT_READY_NODES_COUNT++))
-      echo "Node(s) are still upgrading. '$NODE_ADDRESS' ($NODE_TYPE) status is: '$NODE_STATUS'"
-      break
-    fi
-  done
+  if [ "$NODES_COUNT" != "" ]; then
+    for ((i=1; i<="$NODES_COUNT"; i++)); do
+      NOT_READY_NODES_COUNT=0
+      NODE_INFO=$(echo "$NODES_INFO" | head -n $i | tail -n +$i) || true
+      NODE_ADDRESS=$(echo "$NODE_INFO" | awk '{print $1}') || true
+      NODE_STATUS=""
+      NODE_STATUS=$(echo "$NODE_INFO" | awk '{print $2}') || true
+      NODE_TYPE=$(echo "$NODE_INFO" | awk '{print $3}') || true
+      if [ "${NODE_STATUS}" != "Ready" ]; then
+        ((NOT_READY_NODES_COUNT++))
+        echo "Node(s) are still upgrading. '$NODE_ADDRESS' ($NODE_TYPE) status is: '$NODE_STATUS'"
+        break
+      fi
+    done
+  fi
   if [ "$NOT_READY_NODES_COUNT" -eq 0 ]; then
     echo "Nodes updated"
     MC_NODES_UPDATED=true
