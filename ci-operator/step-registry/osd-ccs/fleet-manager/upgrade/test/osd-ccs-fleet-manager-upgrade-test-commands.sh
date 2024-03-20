@@ -130,6 +130,7 @@ function check_cluster_operators_upgraded () {
     fi
   done
   if [ "$UPGRADING_CO_COUNT" -eq 0 ]; then
+    MC_CO_UPGRADED=true
     printf " ✅\n"
   else
     printf " ❌\n"
