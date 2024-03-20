@@ -162,7 +162,7 @@ cat > ${BASTION_CI_SCRIPTS_DIR}/assisted-sno.sh << EOF
 #
 # This script contains all the function calls for using with assisted installer.
 
-set -x
+set +x
 set +e
 
 API_URL="https://api.openshift.com/api/assisted-install/v2"
@@ -172,6 +172,8 @@ SSH_PUB_KEY_FILE="\${PUBLIC_KEY_FILE:-/root/.sno/id_rsa.pub}"
 OFFLINE_TOKEN=\$(cat \${OFFLINE_TOKEN_FILE})
 PULL_SECRET=\$(cat \${PULL_SECRET_FILE} | tr -d '\n' | jq -R .)
 SSH_PUB_KEY=\$(cat \${SSH_PUB_KEY_FILE})
+
+set -x 
 
 CONFIG_DIR="/tmp/\${CLUSTER_NAME}-config"
 IMAGES_DIR="/var/lib/tftpboot/images/\${CLUSTER_NAME}"
@@ -184,6 +186,7 @@ CLUSTER_NAME="\${CLUSTER_NAME:-sno}"
 #SUBNET="\${MACHINE_NETWORK}"
 
 refresh_api_token() {
+  set +x
   echo "Refresh API token"
   export API_TOKEN=\$( \
     curl \
@@ -196,6 +199,7 @@ refresh_api_token() {
     "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token" \
     | jq --raw-output ".access_token" \
   )
+  set -x
 }
 
 create_cluster() {
@@ -284,6 +288,7 @@ download_kubeconfig() {
 }
 
 wait_to_install() {
+  set -e
   echo "wait to install"
   refresh_api_token
   for i in {1..15}; do
@@ -299,9 +304,11 @@ wait_to_install() {
     fi
     sleep 60
   done
+  set +e
 }
 
 wait_install_complete() {
+  set +e
   echo "wait the installation completed"
   pre_status=""
   for count in {1..10}; do
@@ -324,6 +331,7 @@ wait_install_complete() {
       break
     fi
   done
+  set -e
 }
 
 ai_prepare_cluster() {
@@ -619,7 +627,6 @@ set +e
 CLUSTER_NAME=\$1
 INSTALL_TYPE=\$2
 
-set +x
 
 export OFFLINE_TOKEN_FILE=/root/.sno/offline-token
 export CONFIG_DIR="/tmp/\${CLUSTER_NAME}-config"
@@ -677,6 +684,7 @@ wait_to_install() {
 
 sno_wait() {
     ./openshift-install --dir="\${CONFIG_DIR}" wait-for bootstrap-complete
+    set -e
     ./openshift-install --dir="\${CONFIG_DIR}" wait-for install-complete
 }
 
@@ -685,6 +693,7 @@ agent_wait() {
     API_URL="http://\${IP_ADDRESS}:8090/api/assisted-install/v2"
     wait_to_install
     ./openshift-install --dir="\${CONFIG_DIR}" agent wait-for bootstrap-complete
+    set -e
     ./openshift-install --dir="\${CONFIG_DIR}" agent wait-for install-complete
 }
 
