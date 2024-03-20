@@ -6,7 +6,7 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-Log in with OSDFM token
+# Log in with OSDFM token
 OCM_VERSION=$(ocm version)
 OSDFM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/fleetmanager-token")
 if [[ ! -z "${OSDFM_TOKEN}" ]]; then
