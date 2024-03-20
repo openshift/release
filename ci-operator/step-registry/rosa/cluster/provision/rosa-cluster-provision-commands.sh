@@ -167,7 +167,8 @@ cat > ${cluster_config_file} << EOF
   "region": "${CLOUD_PROVIDER_REGION}",
   "version": {
     "channel_group": "${CHANNEL_GROUP}",
-    "raw_id": "${OPENSHIFT_VERSION}"
+    "raw_id": "${OPENSHIFT_VERSION}",
+    "major_version": "$(echo ${OPENSHIFT_VERSION} | awk -F. '{print $1"."$2}')"
   },
   "tags": "${TAGS}",
   "multi_az": ${MULTI_AZ},
@@ -243,9 +244,9 @@ if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   if [[ ${MIN_REPLICAS} -ge 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
     MIN_REPLICAS=3
   fi
-  COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"  
-  record_cluster "nodes" "max_replicas" ${MIN_REPLICAS}
-  record_cluster "nodes" "min_replicas" ${MAX_REPLICAS}
+  COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"
+  record_cluster "nodes" "max_replicas" ${MAX_REPLICAS}
+  record_cluster "nodes" "min_replicas" ${MIN_REPLICAS}
 else
   COMPUTE_NODES_SWITCH="--replicas ${REPLICAS}"
   record_cluster "nodes" "replicas" ${REPLICAS}
@@ -324,7 +325,7 @@ if [[ "$ENABLE_PROXY" == "true" ]]; then
   record_cluster "proxy" "enabled" ${ENABLE_PROXY}
   record_cluster "proxy" "http" $proxy_private_url
   record_cluster "proxy" "https" $proxy_private_url
-  record_cluster "proxy" "trust_bundle_file" $trust_bundle_file  
+  record_cluster "proxy" "trust_bundle_file" $trust_bundle_file
 fi
 
 SUBNET_ID_SWITCH=""
@@ -335,7 +336,7 @@ if [[ "$ENABLE_BYOVPC" == "true" ]]; then
     echo -e "The private_subnet_ids are mandatory."
     exit 1
   fi
-  
+
   if [[ "${PRIVATE_SUBNET_ONLY}" == "true" ]] ; then
     SUBNET_ID_SWITCH="--subnet-ids ${PRIVATE_SUBNET_IDs}"
     record_cluster "subnets" "private_subnet_ids" ${PRIVATE_SUBNET_IDs}
@@ -375,7 +376,7 @@ if [[ "$STS" == "true" ]]; then
   if [[ -z "${account_intaller_role_arn}" ]] || [[ -z "${account_support_role_arn}" ]] || [[ -z "${account_worker_role_arn}" ]]; then
     echo -e "One or more account roles with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
     exit 1
-  fi  
+  fi
   ACCOUNT_ROLES_SWITCH="--role-arn ${account_intaller_role_arn} --support-role-arn ${account_support_role_arn} --worker-iam-role ${account_worker_role_arn}"
   record_cluster "aws.sts" "role_arn" $account_intaller_role_arn
   record_cluster "aws.sts" "support_role_arn" $account_support_role_arn
@@ -386,7 +387,7 @@ if [[ "$STS" == "true" ]]; then
     if [[ -z "${account_control_plane_role_arn}" ]]; then
       echo -e "The control plane account role with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
       exit 1
-    fi      
+    fi
     ACCOUNT_ROLES_SWITCH="${ACCOUNT_ROLES_SWITCH} --controlplane-iam-role ${account_control_plane_role_arn}"
     record_cluster "aws.sts" "control_plane_role_arn" $account_control_plane_role_arn
   fi
@@ -450,9 +451,9 @@ echo "  Enable audit log: ${ENABLE_AUDIT_LOG}"
 echo "  Cluster Tags: ${TAGS}"
 echo "  Additional Security groups: ${ADDITIONAL_SECURITY_GROUP}"
 echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
-if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then 
+if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Min replicas: ${MIN_REPLICAS}"
-  echo "  Min replicas: ${MAX_REPLICAS}"  
+  echo "  Max replicas: ${MAX_REPLICAS}"
 else
   echo "  Replicas: ${REPLICAS}"
 fi
@@ -503,6 +504,7 @@ mkdir -p "${SHARED_DIR}"
 CLUSTER_ID_FILE="${SHARED_DIR}/cluster-id"
 CLUSTER_INFO="${ARTIFACT_DIR}/cluster.txt"
 CLUSTER_INSTALL_LOG="${ARTIFACT_DIR}/.install.log"
+record_cluster "timers.install" "status" "not started"
 
 # The default cluster mode is sts now
 rosa create cluster -y \
@@ -544,32 +546,50 @@ CLUSTER_ID=$(cat "${CLUSTER_INFO}" | grep '^ID:' | tr -d '[:space:]' | cut -d ':
 echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
 echo -n "${CLUSTER_ID}" > "${CLUSTER_ID_FILE}"
 
-# Watch the hypershift install log
-if [[ "$HOSTED_CP" == "true" ]]; then
-  rosa logs install -c ${CLUSTER_ID} --watch
-fi
-
-echo "Waiting for cluster ready..."
+echo "Capturing installation timers"
 start_time=$(date +"%s")
+dyn_start_time=${start_time}
+CLUSTER_PREVIOUS_STATE=""
+record_cluster "timers.install" "status" "empty"
 while true; do
-  sleep 60
   CLUSTER_STATE=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.state')
   echo "Cluster state: ${CLUSTER_STATE}"
-  if [[ "${CLUSTER_STATE}" == "ready" ]]; then
-    echo "Cluster is reported as ready"
-    break
-  fi
-  if (( $(date +"%s") - $start_time >= $CLUSTER_TIMEOUT )); then
-    echo "error: Timed out while waiting for cluster to be ready"
+  current_time=$(date +"%s")
+  if (( "${current_time}" - "${start_time}" >= "${CLUSTER_TIMEOUT}" )); then
+    echo "error: Cluster not ready after ${CLUSTER_TIMEOUT} seconds. State: ${CLUSTER_STATE}"
+    record_cluster "timers.install" "status" "${CLUSTER_STATE}"
     exit 1
+  else
+    if [[ "${CLUSTER_STATE}" == "error" ]]; then
+      record_cluster "timers.install" "status" "${CLUSTER_STATE}"
+      echo "Cluster installation failed after $(( ${current_time} - ${start_time} )) seconds, exiting"
+      exit 1
+    elif [[ "${CLUSTER_STATE}" == "ready" ]]; then
+      record_cluster "timers.install" "${CLUSTER_PREVIOUS_STATE}" $(( "${current_time}" - "${dyn_start_time}" ))
+      record_cluster "timers.install" "status" "${CLUSTER_STATE}"
+      echo "Cluster Ready after $(( ${current_time} - ${start_time} )) seconds, exiting"
+      break
+    elif [[ "${CLUSTER_STATE}" != "${CLUSTER_PREVIOUS_STATE}" && "${CLUSTER_PREVIOUS_STATE}" != "" ]]; then
+      record_cluster "timers.install" "${CLUSTER_PREVIOUS_STATE}" $(( "${current_time}" - "${dyn_start_time}" ))
+      record_cluster "timers.install" "status" "${CLUSTER_STATE}"
+      echo "Cluster transitioned from ${CLUSTER_PREVIOUS_STATE} to ${CLUSTER_STATE} after $(( ${current_time} - ${dyn_start_time} )) seconds"
+      dyn_start_time=$(date +"%s")
+    else
+      if [[ ${CLUSTER_STATE} == "installing" ]]; then
+      	echo "Cluster on ${CLUSTER_STATE} state, waiting 60 second for the next check..."
+      	sleep 60
+      else
+        echo "Cluster on ${CLUSTER_STATE} state, waiting 1 second for the next check..."
+        sleep 1
+      fi
+    fi
   fi
-  if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" && "${CLUSTER_STATE}" != "waiting" && "${CLUSTER_STATE}" != "validating" ]]; then
-    rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}" || echo "error: Unable to pull installation log."
-    echo "error: Cluster reported invalid state: ${CLUSTER_STATE}"
-    exit 0
-  fi
+  CLUSTER_PREVIOUS_STATE="${CLUSTER_STATE}"
 done
-rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}"
+record_cluster "timers.install" "total_install" $(( "${current_time}" - "${start_time}" ))
+cat "${SHARED_DIR}/cluster-config"
+rosa logs install -c "${CLUSTER_ID}" > "${CLUSTER_INSTALL_LOG}"
+
 
 # Verify the subnets of the cluster to remove the 'Inflight Checks' warning
 if [[ "$ENABLE_BYOVPC" == "true" ]]; then
