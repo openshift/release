@@ -96,15 +96,12 @@ MC_UPGRADE_COMPLETE=false
 ### check HC status
 FAILED_HC_INFO_CHECK_COUNTER=0
 function check_cluster_operators_info () {
-  printf "Checking HC operators info available"
+  echo "Checking HC operators info available"
   
   CLUSTER_OPERATORS_INFO=""
   CLUSTER_OPERATORS_INFO=$(oc --request-timeout=5s --kubeconfig "$HC_KUBECONFIG" get co -A --insecure-skip-tls-verify | tail -n +2) || true
   if [ "$CLUSTER_OPERATORS_INFO" == "" ]; then
     ((FAILED_HC_INFO_CHECK_COUNTER++))
-    printf "\nFailed to get co status. Total number of failed requests: %s ❌ \n" "$FAILED_HC_INFO_CHECK_COUNTER"
-  else
-    printf " ✅\n"
   fi
 }
 
@@ -143,7 +140,7 @@ function check_cluster_operators_info () {
 # }
 
 function check_mcp_status () {
-  printf "Checking mps are updated, not updating and not degraded"
+  echo "Checking mps are updated, not updating and not degraded"
   function check_mcp() {
     MCP_NAME=$1
     MCP_STATUS=$(oc --kubeconfig "$MC_KUBECONFIG" get "$MCP_NAME" | tail -n +2) || true
@@ -151,7 +148,7 @@ function check_mcp_status () {
     MCP_UPDATING=$(echo "$MCP_STATUS" | awk '{print $4}') || true
     MCP_DEGRADED=$(echo "$MCP_STATUS" | awk '{print $5}') || true
     if [ "${MCP_UPDATED}" != "True" ] || [ "$MCP_UPDATING" == "True" ] || [ "$MCP_DEGRADED" == "True" ]; then
-      printf "\nMCP: '%s' updated: '%s', updating: '%s', degraded: '%s' ❌" "$MCP_NAME" "$MCP_UPDATED" "$MCP_UPDATING" "$MCP_DEGRADED"
+      echo "MCP: '$MCP_NAME' updated: '$MCP_UPDATED', updating: '$MCP_UPDATING', degraded: '$MCP_DEGRADED'"
     else
       if [ "$MCP_NAME" == "mcp/master" ]; then
         MCP_MASTER_UPDATED=true
@@ -166,7 +163,7 @@ function check_mcp_status () {
   check_mcp "mcp/master"
   check_mcp "mcp/worker"
   if [ "$MCP_WORKER_UPDATED" = true ] && [ "$MCP_MASTER_UPDATED" = true ]; then
-    printf " ✅"
+    echo "mcps updated"
     MC_MCP_UPDATED=true
   else
     MC_MCP_UPDATED=false
@@ -174,7 +171,7 @@ function check_mcp_status () {
 }
 
 function check_nodes () {
-  printf "\nChecking nodes are ready"
+  echo "Checking nodes are ready"
   NOT_READY_NODES_COUNT=-1 # there might be an issue with executing oc commands during upgrade, so for safety this is set to -1
   NODES_COUNT=0
   NODES_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get NODES | tail -n +2) || true # failed execution just results in node count being 0
@@ -189,12 +186,12 @@ function check_nodes () {
     NODE_TYPE=$(echo "$NODE_INFO" | awk '{print $3}') || true
     if [ "${NODE_STATUS}" != "Ready" ]; then
       ((NOT_READY_NODES_COUNT++))
-      printf "\nNode(s) are still upgrading. '%s' (%s) status is: '%s' ❌\n" "$NODE_ADDRESS" "$NODE_TYPE" "$NODE_STATUS"
+      echo "Node(s) are still upgrading. '$NODE_ADDRESS' ($NODE_TYPE) status is: '$NODE_STATUS'"
       break
     fi
   done
   if [ "$NOT_READY_NODES_COUNT" -eq 0 ]; then
-    printf " ✅\n"
+    echo "Nodes updated"
     MC_NODES_UPDATED=true
   else
     MC_NODES_UPDATED=false
@@ -202,19 +199,18 @@ function check_nodes () {
 }
 
 function check_upgrade_complete () {
-  printf "Checking openshift version on MC is upgraded to '%s'" "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
+  echo "Checking openshift version on MC is upgraded to '$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION'"
   CLUSTER_VERSION_INFO=""
   CLUSTER_VERSION_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get clusterversion | tail -1) || true
   if [ "$CLUSTER_VERSION_INFO" == "" ]; then
-    printf "\nUnable to get clusterversion. Skipping this time ❌\n"
+    echo "Unable to get clusterversion. Skipping this time"
   else
     CURRENT_VERSION=$(echo "$CLUSTER_VERSION_INFO" | awk '{print $2}') || true
     UPGRADE_PROGRESSING=$(echo "$CLUSTER_VERSION_INFO" | awk '{print $4}') || true
     if [ "${CURRENT_VERSION}" == "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" ] && [ "$UPGRADE_PROGRESSING" != "True" ]; then
-      printf " ✅\n"
+      echo "Clusterversion at correct version" 
       MC_UPGRADE_COMPLETE=true
     else
-      printf " ❌\n"
       MC_UPGRADE_COMPLETE=false
     fi 
   fi
@@ -239,8 +235,8 @@ while [ "$MC_MCP_UPDATED" = false ] || [ "$MC_NODES_UPDATED" = false ] || [ "$MC
     # MC_CO_UPGRADED=true
   fi
 
-  printf "Sleep for 10 seconds\n"
+  echo "Sleep for 10 seconds"
   sleep 10
 done
 
-echo "✅ Upgrade complete! Failed HC checks: $FAILED_HC_INFO_CHECK_COUNTER"
+echo "Upgrade complete! Failed HC checks: $FAILED_HC_INFO_CHECK_COUNTER"
