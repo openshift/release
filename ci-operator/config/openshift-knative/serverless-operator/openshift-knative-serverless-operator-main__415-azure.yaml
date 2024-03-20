@@ -1,8 +1,4 @@
 base_images:
-  hypershift-operator:
-    name: "4.14"
-    namespace: ocp
-    tag: hypershift-operator
   ocp_4.15_cli:
     name: "4.15"
     namespace: ocp
@@ -35,10 +31,6 @@ base_images:
     name: "4.15"
     namespace: origin
     tag: operator-registry
-  upi-installer:
-    name: "4.14"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -108,10 +100,9 @@ images:
   to: serverless-metadata-webhook
 releases:
   latest:
-    integration:
-      include_built_images: true
-      name: "4.14"
-      namespace: ocp
+    release:
+      channel: fast
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -120,17 +111,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-hypershift-continuous
+- as: e2e-azure-continuous
   cron: 0 0 * * 0
   steps:
-    cluster_profile: aws-cspi-qe
-    env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      HYPERSHIFT_BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      HYPERSHIFT_NODE_COUNT: "5"
+    cluster_profile: azure4
     test:
     - as: operator-e2e
-      commands: make USER_MANAGEMENT_ALLOWED=false test-e2e-with-kafka
+      commands: make test-e2e-with-kafka
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -201,10 +188,10 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+    workflow: openshift-e2e-azure
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: 414-hypershift
+  variant: 415-azure
