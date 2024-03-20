@@ -52,6 +52,6 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
         echo "ERROR: Default channel not found."
         exit 1
     fi
-    echo "Installing ${operator_name} from ${operator_source} channel ${operator_channel} into ${operator_install_namespace}${operator_target_namespaces:+, targeting $operator_target_namespaces}"
+    echo "Installing ${operator_name} from ${operator_source} channel ${operator_channel}"
 
 done
