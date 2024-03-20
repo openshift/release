@@ -239,6 +239,39 @@ function pre-OCP-53921(){
     return 0
 }
 
+function pre-OCP-53907(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates')
+    mapfile -t images < <(echo ${recommends}|jq -r '.[].image')
+    if [ -z "${images[*]}" ]; then
+        echo "No image extracted from recommended update!"
+        return 1
+    fi
+    bad_metadata="true"
+    for image in ${images[*]}; do
+        if [[ "${image}" == "null" ]] ; then
+            echo "No image info!"
+            return 1
+        fi
+        metadata=$(oc adm release info ${image} -ojson|jq .metadata.metadata)
+        if [[ "${metadata}" == "null" ]]; then
+            echo "No metadata for recommended update ${image}!"
+            continue
+        fi
+        bad_metadata="false"
+        arch=$(oc adm release info ${image} -ojson|jq -r '.metadata.metadata."release.openshift.io/architecture"')
+        if [[ "${arch}" != "multi" ]]; then
+            echo "The architecture info ${arch} of recommended update ${image} is not expected!"
+            return 1
+        fi
+    done
+    if [[ "${bad_metadata}" == "true" ]]; then
+        echo "All images' metadata is null in available update!"
+        return 1
+    fi
+    return 0
+}
+
 function pre-OCP-69968(){
     echo "Test Start: ${FUNCNAME[0]}"
     local spec testurl="http://examplefortest.com"

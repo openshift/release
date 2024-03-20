@@ -40,12 +40,24 @@ tests:
         oc login -u "${OPENSHIFT_LOGIN_USERNAME}" -p "${OPENSHIFT_LOGIN_PASSWORD}" "${OPENSHIFT_API_URL}" --insecure-skip-tls-verify=true
 
         # Remove previous installation
+        helm uninstall developer-hub -n rhtap || true
+        helm uninstall installer -n rhtap || true
+        helm uninstall tpa -n rhtap || true
+        helm uninstall tpa-infrastructure -n rhtap || true
+
+        resource_names=$(oc get applications -n rhtap -o jsonpath='{.items[*].metadata.name}')
+
+        # Loop through each resource and remove finalizers
+        for resource_name in $resource_names; do
+            oc patch application $resource_name -n rhtap --type merge -p '{"metadata":{"finalizers":null}}'
+            oc delete application $resource_name -n rhtap
+        done
+
         oc delete namespace rhtap || true
 
         # Run the installation in debug mode
         ./bin/make.sh values
         yq e -i '.debug.script=true' private-values.yaml
-        yq e -i '.trusted-profile-analyzer=null' private-values.yaml
         ./bin/make.sh apply -n rhtap -- --debug --values private-values.yaml
       credentials:
       - mount_path: /usr/local/ci-secrets/rhtap-stage-secrets
