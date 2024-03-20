@@ -256,6 +256,8 @@ export TEST_RUN_FEATURES="${TEST_RUN_FEATURES:-$FEATURES}"
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
 export XT_U32TEST_HAS_NON_CNF_WORKERS="${XT_U32TEST_HAS_NON_CNF_WORKERS:-false}"
+export RESERVED_CPU_SET="0,56"
+export ISOLATED_CPU_SET="1-55,57-111"
 
 export CNF_REPO="${CNF_REPO:-https://github.com/openshift-kni/cnf-features-deploy.git}"
 export CNF_BRANCH="${CNF_BRANCH:-master}"
