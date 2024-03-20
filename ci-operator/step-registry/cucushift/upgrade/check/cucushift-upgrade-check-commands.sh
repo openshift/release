@@ -77,7 +77,7 @@ function filter_test_by_platform() {
     extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            none)
+            none|powervs)
                 export UPGRADE_CHECK_RUN_TAGS="@baremetal-upi and ${UPGRADE_CHECK_RUN_TAGS}"
                 eval "$extrainfoCmd"
                 ;;
@@ -158,11 +158,11 @@ function filter_test_by_capability() {
     # the second `console` is the tag name in verification-tests
     declare -A tagmaps
     tagmaps=([baremetal]=xxx
-             [Build]=xxx
+             [Build]=workloads
              [CloudCredential]=xxx
              [Console]=console
              [CSISnapshot]=storage
-             [DeploymentConfig]=xxx
+             [DeploymentConfig]=workloads
              [ImageRegistry]=xxx
              [Insights]=xxx
              [MachineAPI]=xxx
@@ -228,8 +228,8 @@ function test_execution() {
     export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}"
     set -x
     cucumber --tags "${UPGRADE_CHECK_RUN_TAGS} and @upgrade-check" -p junit || true
-    CLOUD_SPECIFIC_TAGS="${CUCUSHIFT_FORCE_SKIP_TAGS/and not @destructive/}"
-    cucumber --tags "${UPGRADE_CHECK_RUN_TAGS} and @upgrade-check and ${CLOUD_SPECIFIC_TAGS} and @cloud and @destructive" -p junit || true
+    CLOUD_SPECIFIC_TAGS="${UPGRADE_CHECK_RUN_TAGS/and not @destructive/}"
+    cucumber --tags "${CLOUD_SPECIFIC_TAGS} and @upgrade-check and @cloud and @destructive" -p junit || true
     set +x
     popd
 }
