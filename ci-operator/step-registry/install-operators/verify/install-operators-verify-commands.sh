@@ -5,6 +5,10 @@ set -o errexit
 set -o pipefail
 
 sleep 4h
+operator_name="redhat-oadp-operator"
+operator_name="advanced-cluster-management"
+operator_source="redhat-operators"
+operator_channel="!default"
 
 # If not provided in the JSON, will use the following defaults.
 DEFAULT_OPERATOR_SOURCE="redhat-operators"
@@ -47,11 +51,14 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
         fi
     fi
 
-    is_available=$(oc get packagemanifest -l catalog=${operator_source} -ojson |jq -c '.items[] | select(.metadata.name | contains("advanced-cluster-management"))' |jq -rc '.status.channels[] | "\(.name):\(.currentCSV)"')
+    # V
+    is_available=$(oc get packagemanifest "${operator_name}" -l catalog=${operator_source} -ojson |jq -rc '.status.channels[] | "\(.name):\(.currentCSV)"')
+    # VV
+    is_available=$(oc get packagemanifest -l catalog=${operator_source} -ojson |jq -c '.items[] | select(.metadata.name | contains("${operator_name}"))' |jq -rc '.status.channels[] | "\(.name):\(.currentCSV)"')
+    ## WITH CHANNEL:
+    is_available=$(oc get packagemanifest "${operator_name}" -l catalog=${operator_source} -ojson |jq -rc '.status.channels[] | "\(.name):\(.currentCSV)"' | grep ${operator_channel})
     if [[ -z "${is_available}" ]]; then
-        echo "ERROR: Default channel not found."
+        echo "ERROR: Operator ${operator_name} from ${operator_source} channel ${operator_channel} not found."
         exit 1
     fi
-    echo "Installing ${operator_name} from ${operator_source} channel ${operator_channel}"
-
 done
