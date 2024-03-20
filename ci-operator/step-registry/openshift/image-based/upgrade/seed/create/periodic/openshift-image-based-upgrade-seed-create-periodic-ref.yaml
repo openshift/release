@@ -1,0 +1,34 @@
+ref:
+  as: openshift-image-based-upgrade-seed-create-periodic
+  grace_period: 10m
+  commands: openshift-image-based-upgrade-seed-create-periodic-commands.sh
+  from_image:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.16
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: ibu-backup-secret
+    mount_path: /var/run/ibu-backup-secret
+  env:
+  - name: SEED_IMAGE
+    default: quay.io/openshift-kni/image-based-seeds
+    documentation: The repo where the seed image will be uploaded. The backup secret needs to have access to this repo
+  - name: SEED_IMAGE_TAG_FORMAT
+    default: latest
+    documentation: The tag format to apply to the seed image (latest, presubmit, nightly)
+  - name: SEED_VERSION
+    default: 4.14.10
+    documentation: The OCP version that the seed should use
+  - name: LCA_PULL_REF
+    default: quay.io/openshift-kni/lifecycle-agent-operator:latest
+    documentation: The LCA Operator image to use for IBU
+  documentation: |-
+    This will create the seed image for use with IBU.
+
+    In order to create the seed image, this step will use the configured EC2 host to setup a VM, install Openshift in the VM and generate the seed image.
+    The resulting image will be pushed to quay and can be used to upgrade another cluster

@@ -77,7 +77,7 @@ function filter_test_by_platform() {
     extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            none)
+            none|powervs)
                 export UPGRADE_PRE_RUN_TAGS="@baremetal-upi and ${UPGRADE_PRE_RUN_TAGS}"
                 eval "$extrainfoCmd"
                 ;;
@@ -158,11 +158,11 @@ function filter_test_by_capability() {
     # the second `console` is the tag name in verification-tests
     declare -A tagmaps
     tagmaps=([baremetal]=xxx
-             [Build]=xxx
+             [Build]=workloads
              [CloudCredential]=xxx
              [Console]=console
              [CSISnapshot]=storage
-             [DeploymentConfig]=xxx
+             [DeploymentConfig]=workloads
              [ImageRegistry]=xxx
              [Insights]=xxx
              [MachineAPI]=xxx
