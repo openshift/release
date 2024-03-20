@@ -25,6 +25,14 @@ export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+function cleanup() {
+    echo "Requesting risk analysis for test failures in this job run from sippy:"
+    openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
+
+    echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"
+}
+trap cleanup EXIT
+
 # prepare for the future usage on the kubeconfig generation of different workflow
 test -n "${KUBECONFIG:-}" && echo "${KUBECONFIG}" || echo "no KUBECONFIG is defined"
 test -f "${KUBECONFIG}" && (ls -l "${KUBECONFIG}" || true) || echo "kubeconfig file does not exist"
