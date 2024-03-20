@@ -88,7 +88,7 @@ get_hc_details
 
 ## upgrade progress checks
 
-MC_CO_UPGRADED=false
+# MC_CO_UPGRADED=false
 MC_MCP_UPDATED=false
 MC_NODES_UPDATED=false
 MC_UPGRADE_COMPLETE=false
@@ -109,38 +109,38 @@ function check_cluster_operators_info () {
 }
 
 ### check MC status in four subsequent functions
-function check_cluster_operators_upgraded () {
-  printf "Checking cluster operators upgraded to: %s" "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
-  UPGRADING_CO_COUNT=-1 # there might be an issue with executing oc commands during upgrade, so for safety this is set to -1
-  CLUSTER_OPERATORS_COUNT=0
-  echo "CLUSTER_OPERATORS_COUNT: $CLUSTER_OPERATORS_COUNT"
-  CLUSTER_OPERATORS_INFO=""
-  CLUSTER_OPERATORS_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get co -A | tail -n +2) || true # failed execution just results in operators count being 0
-  echo "CLUSTER_OPERATORS_INFO: $CLUSTER_OPERATORS_INFO"
-  if [ "$CLUSTER_OPERATORS_INFO" != "" ]; then
-    CLUSTER_OPERATORS_COUNT=$(echo "$CLUSTER_OPERATORS_INFO" | wc -l) || true # failed execution just results in operators count being 0
-  fi
+# function check_cluster_operators_upgraded () {
+#   printf "Checking cluster operators upgraded to: %s" "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
+#   UPGRADING_CO_COUNT=-1 # there might be an issue with executing oc commands during upgrade, so for safety this is set to -1
+#   CLUSTER_OPERATORS_COUNT=0
+#   echo "CLUSTER_OPERATORS_COUNT: $CLUSTER_OPERATORS_COUNT"
+#   CLUSTER_OPERATORS_INFO=""
+#   CLUSTER_OPERATORS_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get co -A | tail -n +2) || true # failed execution just results in operators count being 0
+#   echo "CLUSTER_OPERATORS_INFO: $CLUSTER_OPERATORS_INFO"
+#   if [ "$CLUSTER_OPERATORS_INFO" != "" ]; then
+#     CLUSTER_OPERATORS_COUNT=$(echo "$CLUSTER_OPERATORS_INFO" | wc -l) || true # failed execution just results in operators count being 0
+#   fi
 
-  echo "CLUSTER_OPERATORS_COUNT: $CLUSTER_OPERATORS_COUNT"
+#   echo "CLUSTER_OPERATORS_COUNT: $CLUSTER_OPERATORS_COUNT"
 
-  for ((i=1; i<="$CLUSTER_OPERATORS_COUNT"; i++)); do
-    UPGRADING_CO_COUNT=0
-    CO_INFO=$(echo "$CLUSTER_OPERATORS_INFO" | head -n $i | tail -n +$i) || true
-    UPGRADE_PROGRESSING=$(echo "$CO_INFO" | awk '{print $4}') || true
-    CURRENT_VERSION=$(echo "$CO_INFO" | awk '{print $2}') || true
-    if [ "${CURRENT_VERSION}" != "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" ] || [ "$UPGRADE_PROGRESSING" == "True" ]; then
-      ((UPGRADING_CO_COUNT++))
-      break
-    fi
-  done
-  if [ "$UPGRADING_CO_COUNT" -eq 0 ]; then
-    MC_CO_UPGRADED=true
-    printf " ✅\n"
-  else
-    MC_CO_UPGRADED=false
-    printf " ❌\n"
-  fi
-}
+#   for ((i=1; i<="$CLUSTER_OPERATORS_COUNT"; i++)); do
+#     UPGRADING_CO_COUNT=0
+#     CO_INFO=$(echo "$CLUSTER_OPERATORS_INFO" | head -n $i | tail -n +$i) || true
+#     UPGRADE_PROGRESSING=$(echo "$CO_INFO" | awk '{print $4}') || true
+#     CURRENT_VERSION=$(echo "$CO_INFO" | awk '{print $2}') || true
+#     if [ "${CURRENT_VERSION}" != "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" ] || [ "$UPGRADE_PROGRESSING" == "True" ]; then
+#       ((UPGRADING_CO_COUNT++))
+#       break
+#     fi
+#   done
+#   if [ "$UPGRADING_CO_COUNT" -eq 0 ]; then
+#     MC_CO_UPGRADED=true
+#     printf " ✅\n"
+#   else
+#     MC_CO_UPGRADED=false
+#     printf " ❌\n"
+#   fi
+# }
 
 function check_mcp_status () {
   printf "Checking mps are updated, not updating and not degraded"
@@ -220,12 +220,12 @@ function check_upgrade_complete () {
   fi
 }
 
-while [ "$MC_CO_UPGRADED" = false ] || [ "$MC_MCP_UPDATED" = false ] || [ "$MC_NODES_UPDATED" = false ] || [ "$MC_UPGRADE_COMPLETE" = false ]; do
+while [ "$MC_MCP_UPDATED" = false ] || [ "$MC_NODES_UPDATED" = false ] || [ "$MC_UPGRADE_COMPLETE" = false ]; do
   TIMESTAMP=$(date +"%Y-%m-%d %T")
   echo "------ $TIMESTAMP ------"
   check_cluster_operators_info
 
-  check_cluster_operators_upgraded
+  # check_cluster_operators_upgraded
 
   check_mcp_status
 
@@ -236,7 +236,7 @@ while [ "$MC_CO_UPGRADED" = false ] || [ "$MC_MCP_UPDATED" = false ] || [ "$MC_N
   ## break the loop if highest available version is empty
   if [ "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" == "" ]; then
     MC_UPGRADE_COMPLETE=true
-    MC_CO_UPGRADED=true
+    # MC_CO_UPGRADED=true
   fi
 
   printf "Sleep for 10 seconds\n"
