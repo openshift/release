@@ -22,7 +22,7 @@ else
 fi
 
 # REMOVE
-HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION="4.14.1"
+HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION="4.14.17"
 
 # MC details
 mc_ocm_cluster_id="2a3g9nfcpeuv5okgoo7f22a0u199nprp"
@@ -133,6 +133,7 @@ function check_cluster_operators_upgraded () {
     MC_CO_UPGRADED=true
     printf " ✅\n"
   else
+    MC_CO_UPGRADED=false
     printf " ❌\n"
   fi
 }
