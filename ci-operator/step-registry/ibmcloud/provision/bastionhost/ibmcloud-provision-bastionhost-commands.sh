@@ -20,7 +20,7 @@ function ibmcloud_login {
   echo "Try to login..."
   "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
   "${IBMCLOUD_CLI}" plugin list
-  "${IBMCLOUD_CLI}" plugin update --all -f
+  "${IBMCLOUD_CLI}" plugin install vpc-infrastructure -v 10.0.0 -f
   "${IBMCLOUD_CLI}" plugin list
 }
 
