@@ -113,11 +113,15 @@ function check_cluster_operators_upgraded () {
   printf "Checking cluster operators upgraded to: %s" "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
   UPGRADING_CO_COUNT=-1 # there might be an issue with executing oc commands during upgrade, so for safety this is set to -1
   CLUSTER_OPERATORS_COUNT=0
+  echo "CLUSTER_OPERATORS_COUNT: $CLUSTER_OPERATORS_COUNT"
   CLUSTER_OPERATORS_INFO=""
   CLUSTER_OPERATORS_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get co -A | tail -n +2) || true # failed execution just results in operators count being 0
+  echo "CLUSTER_OPERATORS_INFO: $CLUSTER_OPERATORS_INFO"
   if [ "$CLUSTER_OPERATORS_INFO" != "" ]; then
     CLUSTER_OPERATORS_COUNT=$(echo "$CLUSTER_OPERATORS_INFO" | wc -l) || true # failed execution just results in operators count being 0
   fi
+
+  echo "CLUSTER_OPERATORS_COUNT: $CLUSTER_OPERATORS_COUNT"
 
   for ((i=1; i<="$CLUSTER_OPERATORS_COUNT"; i++)); do
     UPGRADING_CO_COUNT=0
