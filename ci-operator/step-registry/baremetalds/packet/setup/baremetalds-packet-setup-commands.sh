@@ -43,7 +43,6 @@ cat > packet-config.yaml <<-EOF
 - name: Create Config for host
   hosts: localhost
   collections:
-   - equinix.cloud
    - community.general
   gather_facts: no
   tasks:
@@ -93,11 +92,11 @@ cat > packet-config.yaml <<-EOF
         done
       dest: "${SHARED_DIR}/packet-conf.sh"
 EOF
-
 ansible-playbook packet-config.yaml |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
+
 # Avoid requesting a bunch of servers at the same time so they
-# don't race each other for available resources in a metro
+# don't race each other for available resources in a facility
 SLEEPTIME=$(( RANDOM % 120 ))
 echo "Sleeping for $SLEEPTIME seconds"
 sleep $SLEEPTIME
@@ -107,7 +106,6 @@ cat > packet-setup.yaml <<-EOF
 - name: setup Packet host
   hosts: localhost
   collections:
-   - equinix.cloud
    - community.general
   gather_facts: no
   vars:
@@ -129,14 +127,13 @@ cat > packet-setup.yaml <<-EOF
   - name: create Packet host with error handling
     block:
     - name: create Packet host {{ packet_hostname }}
-      equinix.cloud.metal_device:
-        metal_api_token: "{{ packet_auth_token }}"
+      packet_device:
+        auth_token: "{{ packet_auth_token }}"
         project_id: "{{ packet_project_id }}"
-        hostname: "{{ packet_hostname }}"
+        hostnames: "{{ packet_hostname }}"
         operating_system: ${PACKET_OS}
         plan: ${PACKET_PLAN}
-        metro: ${PACKET_METRO}
-        provisioning_wait_seconds: ${PACKET_PROVISION_WAIT}
+        facility: ${PACKET_FACILITY}
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME')[:77], 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
         user_data: "{{ user_data | default(omit) }}"
       register: hosts
@@ -149,7 +146,7 @@ EOF
 
 ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
-DEVICEID=$(jq -r .id < ${SHARED_DIR}/hosts.json)
+DEVICEID=$(jq -r .devices[0].id < ${SHARED_DIR}/hosts.json)
 
 function refresh_device_info(){
     curl -H "X-Auth-Token: $(cat ${CLUSTER_PROFILE_DIR}/packet-auth-token)"  "https://api.equinix.com/metal/v1/devices/$DEVICEID" > /tmp/device.json
