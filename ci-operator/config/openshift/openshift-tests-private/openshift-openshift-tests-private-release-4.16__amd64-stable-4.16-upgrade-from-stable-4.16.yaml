@@ -1,0 +1,107 @@
+base_images:
+  ansible:
+    name: "4.16"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tools:
+    name: "4.16"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.16"
+  target:
+    release:
+      channel: candidate
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-ipi-disc-priv-tp-f28
+  cron: 35 3 25 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-69968
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - chain: openshift-upgrade-qe-sanity-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
+- as: azure-ipi-proxy-tp-f28
+  cron: 44 21 25 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_OTA_TEST: OCP-69948
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-azure-ipi-proxy
+- as: azure-mag-ipi-fullyprivate-f14
+  cron: 50 15 2,18 * *
+  steps:
+    cluster_profile: azuremag-qe
+    env:
+      BASE_DOMAIN: qemag.azure.devcluster.openshift.com
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
+- as: nutanix-ipi-proxy-fips-f28
+  cluster: build01
+  cron: 8 10 10 * *
+  steps:
+    cluster_profile: nutanix-qe-dis
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-stable-4.16-upgrade-from-stable-4.16

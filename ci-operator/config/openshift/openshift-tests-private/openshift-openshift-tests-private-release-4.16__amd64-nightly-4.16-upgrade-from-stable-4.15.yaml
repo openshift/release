@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: ansible
   cli:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: cli
   dev-scripts:
@@ -46,12 +46,10 @@ build_root:
     tag: golang-1.18
 releases:
   latest:
-    prerelease:
+    release:
       architecture: amd64
-      product: ocp
-      version_bounds:
-        lower: 4.15.0-0
-        upper: 4.16.0-0
+      channel: fast
+      version: "4.15"
   target:
     candidate:
       architecture: amd64
@@ -224,6 +222,15 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-network-mtu-edge-zone
+- as: aws-ipi-outpost-day2-f14
+  cron: 19 23 3,19 * *
+  steps:
+    cluster_profile: aws-outpost-qe
+    env:
+      BASE_DOMAIN: outpost-dev.devcluster.openshift.com
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-outpost-day2
 - as: aws-ipi-ovn-hypershift-replace-f7
   cron: 46 21 1,10,17,24 * *
   steps:
