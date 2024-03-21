@@ -33,6 +33,7 @@ setup_env() {
 
   # Setting IBMCLOUD_TRACE to true to enable debug logs for pi and cis operations
   export IBMCLOUD_TRACE=true
+  set -x
 }
 
 create_sno_node() {
@@ -88,6 +89,7 @@ create_sno_node() {
 }
 
 patch_image_registry() {
+  set +e
   for i in {1..10}; do
     count=$(oc get configs.imageregistry.operator.openshift.io/cluster --no-headers | wc -l)
     echo "Image registry count: ${count}"
@@ -98,20 +100,30 @@ patch_image_registry() {
   done
   echo "Patch image registry"
   oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"emptyDir":{}}, "managementState": "Managed"}}'
-  set +e
   for i in {1..30}; do
     count=$(oc get co -n default --no-headers | awk '{ print $3 $4 $5 }' | grep -w -v TrueFalseFalse | wc -l)
     echo "Not ready co count: ${count}"
     if [[ ${count} -eq 0 ]]; then
+      echo "Done of image registry patch"
       break
     fi
     sleep 120
   done
+
+  echo "Wait for cluster state to be good."
+  for i in {1..30}; do
+    count=$(oc get clusterversions --no-headers | grep "Error" | wc -l)
+    echo "Cluster error state count: ${count}"
+    if [[ ${count} -eq 0 ]]; then
+      echo "Cluster state is good."
+      break
+    fi
+    sleep 120
+  done
+
   set -e
-  echo "Done of image registry patch"
 }
 
-set +x
 # Create private key with 0600 permission for ssh purpose
 SSH_PRIVATE="/tmp/ssh-privatekey"
 cp "/etc/sno-power-credentials/ssh-privatekey" ${SSH_PRIVATE}
@@ -122,6 +134,8 @@ ssh "${SSH_OPTIONS[@]}" root@${BASTION} "mkdir -p ~/.sno"
 scp "${SSH_OPTIONS[@]}" /etc/sno-power-credentials/{ssh-publickey,pull-secret,offline-token} root@${BASTION}:~/.sno/.
 # set the default INSTALL_TYPE to sno
 INSTALL_TYPE=${INSTALL_TYPE:-sno}
+
+set +x
 
 #############################
 rm -rf ${BASTION_CI_SCRIPTS_DIR}
@@ -173,8 +187,6 @@ OFFLINE_TOKEN=\$(cat \${OFFLINE_TOKEN_FILE})
 PULL_SECRET=\$(cat \${PULL_SECRET_FILE} | tr -d '\n' | jq -R .)
 SSH_PUB_KEY=\$(cat \${SSH_PUB_KEY_FILE})
 
-set -x 
-
 CONFIG_DIR="/tmp/\${CLUSTER_NAME}-config"
 IMAGES_DIR="/var/lib/tftpboot/images/\${CLUSTER_NAME}"
 WWW_DIR="/var/www/html/\${CLUSTER_NAME}"
@@ -186,7 +198,6 @@ CLUSTER_NAME="\${CLUSTER_NAME:-sno}"
 #SUBNET="\${MACHINE_NETWORK}"
 
 refresh_api_token() {
-  set +x
   echo "Refresh API token"
   export API_TOKEN=\$( \
     curl \
@@ -199,7 +210,6 @@ refresh_api_token() {
     "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token" \
     | jq --raw-output ".access_token" \
   )
-  set -x
 }
 
 create_cluster() {
@@ -288,7 +298,6 @@ download_kubeconfig() {
 }
 
 wait_to_install() {
-  set -e
   echo "wait to install"
   refresh_api_token
   for i in {1..15}; do
@@ -304,11 +313,9 @@ wait_to_install() {
     fi
     sleep 60
   done
-  set +e
 }
 
 wait_install_complete() {
-  set +e
   echo "wait the installation completed"
   pre_status=""
   for count in {1..10}; do
@@ -331,7 +338,6 @@ wait_install_complete() {
       break
     fi
   done
-  set -e
 }
 
 ai_prepare_cluster() {
@@ -711,6 +717,8 @@ else
 fi
 
 EOF
+
+set -x
 
 chmod +x ${BASTION_CI_SCRIPTS_DIR}/*.sh
 ssh  "${SSH_OPTIONS[@]}" root@${BASTION} "rm -rf ${BASTION_CI_SCRIPTS_DIR}; mkdir -p ${BASTION_CI_SCRIPTS_DIR}/{scripts,auth}; touch ${BASTION_CI_SCRIPTS_DIR}/scripts/lockfile.lock"
