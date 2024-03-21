@@ -156,7 +156,7 @@ ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal|equinix-ocp-metal-qe|powervs-1)
+equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
