@@ -7,9 +7,7 @@ cat /etc/os-release
 oc config view
 oc projects
 python3 --version
-pushd /tmp
 
-ls -la /root/kraken
 ES_PASSWORD=$(cat "/secret/es/password")
 ES_USERNAME=$(cat "/secret/es/username")
 
