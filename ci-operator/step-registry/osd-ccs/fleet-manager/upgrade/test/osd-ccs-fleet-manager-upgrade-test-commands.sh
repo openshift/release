@@ -30,7 +30,7 @@ mc_ocm_cluster_id="2a4qben6sk0u168g7dae3kpvmtmvfgln"
 ocm get /api/clusters_mgmt/v1/clusters/"$mc_ocm_cluster_id"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/hs-mc.kubeconfig"
 MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 
-for ((i=0; i<360; i+=1)); do
+for ((i=0; i<1080; i+=1)); do
   oc --kubeconfig "$MC_KUBECONFIG" get mcp/master || true
   oc --kubeconfig "$MC_KUBECONFIG" get mcp/worker || true
   oc --kubeconfig "$MC_KUBECONFIG" get co -A || true
