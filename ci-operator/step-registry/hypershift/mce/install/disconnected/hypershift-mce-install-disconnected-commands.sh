@@ -51,7 +51,13 @@ skopeo copy "docker://\${MCE_INDEX_IMAGE}" "oci:///home/mce-local-catalog" --rem
 echo "4: get oc-mirror from stable clients"
 if [[ ! -f /home/oc-mirror ]]; then
     MIRROR2URL="https://mirror2.openshift.com/pub/openshift-v4"
-    CLIENTURL="\${MIRROR2URL}"/x86_64/clients/ocp/stable
+    # TODO: as for https://issues.redhat.com/browse/OCPBUGS-30859
+    # the oc-mirror lost rhel8 compatibility with OCP 4.15.3 release
+    # choose the appropriate rhel8/rhel9 binary at runtime once available.
+    # Now let's stick the the 4.14 binary as a temporary workaround
+    # CLIENTURL="\${MIRROR2URL}"/x86_64/clients/ocp/stable
+    CLIENTURL="\${MIRROR2URL}"/x86_64/clients/ocp/stable-4.14
+    ###
     curl -s -k -L "\${CLIENTURL}/oc-mirror.tar.gz" -o om.tar.gz && tar -C /home -xzvf om.tar.gz && rm -f om.tar.gz
     if ls /home/oc-mirror > /dev/null ; then
         chmod +x /home/oc-mirror
