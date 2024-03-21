@@ -14,7 +14,7 @@ for node in $nodes_list; do
     node_check_result=1
     node_ip=$(oc get nodes "$node" -o=jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
     for static_ip in $static_ips; do
-        if [ "$static_ip" == "$node_ip" ]; then
+        if [[ "$static_ip" == "$node_ip" ]]; then
             echo "Pass: passed to check static IP: $node_ip on node: ${node}"
             node_check_result=0
             break
