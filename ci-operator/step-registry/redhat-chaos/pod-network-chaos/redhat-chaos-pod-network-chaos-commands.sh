@@ -33,7 +33,7 @@ export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 
-./pod-network-chaos/prow_run.sh
+chmod +x ./pod-network-chaos/prow_run.sh
 rc=$?
 echo "Finished running pod-network chaos"
 echo "Return code: $rc"
