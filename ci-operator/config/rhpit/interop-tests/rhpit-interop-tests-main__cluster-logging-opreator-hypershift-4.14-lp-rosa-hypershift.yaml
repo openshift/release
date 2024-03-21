@@ -1,0 +1,117 @@
+base_images:
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.14"
+  tools:
+    name: "4.14"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: cluster-logging-operator-rosa-hypershift
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      CLO_SUB_CHANNEL: stable-5.8
+      CLO_SUB_SOURCE: redhat-operators
+      E2E_RUN_TAGS: '@level0'
+      EO_SUB_CHANNEL: stable
+      EO_SUB_SOURCE: redhat-operators
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure provisioning", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "aws-provision*", "failure_type": "all", "classification": "Infrastructure Provisioning - AWS", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "aws-deprovision*", "failure_type": "all", "classification": "Infrastructure Deprovisioning - AWS", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "cucushift-hypershift-*", "failure_type": "all", "classification": "Health Check - Cluster", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Must Gather - Cluster", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["!default"]},
+              {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+              {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "osd-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["!default"]},
+              {"step": "rosa-cluster-deprovision", "failure_type": "all", "classification": "Infrastructure Deprovisioning - Cluster", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "rosa-cluster-provision", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "rosa-cluster-wait*", "failure_type": "all", "classification": "Infrastructure Provisioning - Rosa Cluster Operators", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "rosa-sts-account-roles-create", "failure_type": "all", "classification": "Account Roles Creation - AWS", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "rosa-sts-account-roles-delete", "failure_type": "all", "classification": "Account Roles Deletion - AWS", "group": {"name": "cluster", "priority": 3}, "jira_additional_labels": ["!default"]},
+              {"step": "rosa-conf-idp-htpasswd", "failure_type": "all", "classification": "Admin Access - Cluster", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]}
+            ],
+            "success_rules":
+            [
+              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
+            ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.14-lp","rosa-hypershift-lp","cluster-logging-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      FORCE_SUCCESS_EXIT: "yes"
+      LO_SUB_CHANNEL: stable-5.8
+      LO_SUB_SOURCE: redhat-operators
+      MODULE_FILTERS: ""
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.14"
+      OPERATORS: |
+        [
+            {"name": "elasticsearch-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators-redhat","target_namespace": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespace": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-5.8", "install_namespace": "openshift-logging","target_namespace": "!install", "operator_group": "openshift-logging"}
+        ]
+      REGION: us-west-2
+      TEST_ADDITIONAL: ""
+      TEST_FILTERS: LEVEL0
+      TEST_IMPORTANCE: ""
+      TEST_PARALLEL: "1"
+      TEST_ROSA_LOGIN_ENV: ""
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: ipi-install-rbac
+    - ref: cucushift-hypershift-extended-health-check
+    - ref: install-operators
+    - ref: openshift-extended-logging-test
+    - ref: openshift-extended-logging-test-web-tests
+    workflow: firewatch-rosa-aws-sts-hypershift
+zz_generated_metadata:
+  branch: main
+  org: rhpit
+  repo: interop-tests
+  variant: cluster-logging-opreator-hypershift-4.14-lp-rosa-hypershift
