@@ -1,0 +1,20 @@
+workflow:
+  as: redhat-appstudio-rhtap-installer-cluster-bot
+  steps:
+    # https://docs.ci.openshift.org/docs/architecture/step-registry/#marking-post-steps-best-effort
+    allow_best_effort_post_steps: true
+    # https://docs.ci.openshift.org/docs/architecture/step-registry/#skipping-post-steps-on-success
+    allow_skip_on_success: true
+    pre:
+    - ref: redhat-appstudio-openshift-trusted-ca
+    - ref: redhat-appstudio-rhtap-installer-install-rhtap
+    - ref: redhat-appstudio-rhtap-installer-register-pac
+    post:
+    - ref: redhat-appstudio-rhtap-installer-unregister-pac
+    - ref: redhat-appstudio-rhtap-gather
+    test:
+    - ref: wait
+      best_effort: true
+      optional_on_success: true
+  documentation: |-
+    This workflow is meant to be run by cluster-bot to not just give us a cluster but a cluster with RHTAP deployed for quick testing purposes.
