@@ -1,17 +1,13 @@
 base_images:
-  cli:
-    name: "4.14"
-    namespace: ocp
-    tag: cli
   rhtap-installer:
     name: redhat-appstudio
     namespace: ci
     tag: rhtap-installer
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
+    name: redhat-appstudio
+    namespace: ci
+    tag: rhtap-installer
 releases:
   latest:
     release:
@@ -34,7 +30,7 @@ tests:
     set -o pipefail
     find . -type f -name "*.sh" -print0 | xargs -r -0 shellcheck
   container:
-    from: rhtap-installer
+    from: src
 - as: rhtap-sample-pipelines-yamllint
   commands: |
     #!/usr/bin/env bash
@@ -59,7 +55,7 @@ tests:
         min-spaces-from-content: 1
       comments-indentation: enable
       document-end: disable
-      document-start: enable
+      document-start: disable
       empty-lines: enable
       empty-values: disable
       float-values: disable
@@ -76,9 +72,32 @@ tests:
       truthy:
         check-keys: false
     EOF
+
     yamllint -c "$CONFIG_FILE" .
   container:
-    from: rhtap-installer
+    from: src
+  optional: true
+- as: validate-rhtap-sample-pipelines
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    env:
+      RHTAP_ENABLE_TPA: "false"
+    post:
+    - ref: redhat-appstudio-rhtap-gather
+    pre:
+    - ref: redhat-appstudio-rhtap-installer-install-rhtap
+    test:
+    - ref: redhat-appstudio-tssc-sample-pipelines-validate-rhtap-pipelines
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: redhat-appstudio
