@@ -176,13 +176,12 @@ promotion:
   to:
   - additional_images:
       knative-eventing-src: src
+    name: knative-v1.10
     namespace: openshift
-    tag: knative-v1.10
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: fast
       version: "4.15"
 resources:
   '*':
@@ -191,12 +190,16 @@ resources:
       memory: 1Gi
 tests:
 - as: test-conformance-aws-415
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -232,7 +235,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -299,14 +301,18 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: test-e2e-aws-415
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -342,7 +348,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -409,14 +414,18 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: test-reconciler-aws-415
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -452,7 +461,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -519,7 +527,7 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: release-v1.10
   org: openshift-knative

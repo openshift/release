@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build04
+  cluster: build05
   cron: 23 1 * * 2,6
   decorate: true
   decoration_config:
@@ -10,6 +10,8 @@ periodics:
     org: openshift-knative
     repo: eventing-kafka-broker
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
     ci-operator.openshift.io/variant: "412"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -29,10 +31,11 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/test-conformance-aws-412-c-cluster-profile
       - --target=test-conformance-aws-412-c
       - --variant=412
       command:
@@ -44,14 +47,16 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
+      - mountPath: /usr/local/test-conformance-aws-412-c-cluster-profile
+        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -64,12 +69,18 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: hive-hive-credentials
+    - name: cluster-profile
       secret:
-        secretName: hive-hive-credentials
+        secretName: cluster-secrets-aws-serverless
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -80,7 +91,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build05
   cron: 43 1 * * 2,6
   decorate: true
   decoration_config:
@@ -90,6 +101,8 @@ periodics:
     org: openshift-knative
     repo: eventing-kafka-broker
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
     ci-operator.openshift.io/variant: "412"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -109,10 +122,11 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/test-e2e-aws-412-c-cluster-profile
       - --target=test-e2e-aws-412-c
       - --variant=412
       command:
@@ -124,14 +138,16 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
+      - mountPath: /usr/local/test-e2e-aws-412-c-cluster-profile
+        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -144,12 +160,18 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: hive-hive-credentials
+    - name: cluster-profile
       secret:
-        secretName: hive-hive-credentials
+        secretName: cluster-secrets-aws-serverless
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -160,7 +182,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build05
   cron: 4 1 * * 2,6
   decorate: true
   decoration_config:
@@ -170,6 +192,8 @@ periodics:
     org: openshift-knative
     repo: eventing-kafka-broker
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
     ci-operator.openshift.io/variant: "412"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -189,10 +213,11 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/test-reconciler-aws-412-c-cluster-profile
       - --target=test-reconciler-aws-412-c
       - --variant=412
       command:
@@ -204,14 +229,16 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
+      - mountPath: /usr/local/test-reconciler-aws-412-c-cluster-profile
+        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -224,12 +251,18 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: hive-hive-credentials
+    - name: cluster-profile
       secret:
-        secretName: hive-hive-credentials
+        secretName: cluster-secrets-aws-serverless
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -240,7 +273,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build05
   cron: 16 5 * * 2,6
   decorate: true
   decoration_config:
@@ -250,6 +283,8 @@ periodics:
     org: openshift-knative
     repo: eventing-kafka-broker
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
     ci-operator.openshift.io/variant: "412"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -269,10 +304,11 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/test-reconciler-encryption-auth-aws-412-c-cluster-profile
       - --target=test-reconciler-encryption-auth-aws-412-c
       - --variant=412
       command:
@@ -284,14 +320,16 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
+      - mountPath: /usr/local/test-reconciler-encryption-auth-aws-412-c-cluster-profile
+        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -304,12 +342,18 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: hive-hive-credentials
+    - name: cluster-profile
       secret:
-        secretName: hive-hive-credentials
+        secretName: cluster-secrets-aws-serverless
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -320,7 +364,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build05
   cron: 41 0 * * 2,6
   decorate: true
   decoration_config:
@@ -330,6 +374,8 @@ periodics:
     org: openshift-knative
     repo: eventing-kafka-broker
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
     ci-operator.openshift.io/variant: "412"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -349,10 +395,11 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/test-reconciler-keda-aws-412-c-cluster-profile
       - --target=test-reconciler-keda-aws-412-c
       - --variant=412
       command:
@@ -364,14 +411,16 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
+      - mountPath: /usr/local/test-reconciler-keda-aws-412-c-cluster-profile
+        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -384,12 +433,18 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: hive-hive-credentials
+    - name: cluster-profile
       secret:
-        secretName: hive-hive-credentials
+        secretName: cluster-secrets-aws-serverless
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -410,10 +465,10 @@ periodics:
     org: openshift-knative
     repo: eventing-kafka-broker
   labels:
-    ci-operator.openshift.io/variant: "414"
+    ci-operator.openshift.io/variant: "415"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-eventing-kafka-broker-release-next-414-test-conformance-aws-414-c
+  name: periodic-ci-openshift-knative-eventing-kafka-broker-release-next-415-test-conformance-aws-415-c
   reporter_config:
     slack:
       channel: '#knative-eventing-ci'
@@ -433,8 +488,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=test-conformance-aws-414-c
-      - --variant=414
+      - --target=test-conformance-aws-415-c
+      - --variant=415
       command:
       - ci-operator
       image: ci-operator:latest
@@ -490,10 +545,10 @@ periodics:
     org: openshift-knative
     repo: eventing-kafka-broker
   labels:
-    ci-operator.openshift.io/variant: "414"
+    ci-operator.openshift.io/variant: "415"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-eventing-kafka-broker-release-next-414-test-e2e-aws-414-c
+  name: periodic-ci-openshift-knative-eventing-kafka-broker-release-next-415-test-e2e-aws-415-c
   reporter_config:
     slack:
       channel: '#knative-eventing-ci'
@@ -513,8 +568,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=test-e2e-aws-414-c
-      - --variant=414
+      - --target=test-e2e-aws-415-c
+      - --variant=415
       command:
       - ci-operator
       image: ci-operator:latest
@@ -570,10 +625,10 @@ periodics:
     org: openshift-knative
     repo: eventing-kafka-broker
   labels:
-    ci-operator.openshift.io/variant: "414"
+    ci-operator.openshift.io/variant: "415"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-eventing-kafka-broker-release-next-414-test-reconciler-aws-414-c
+  name: periodic-ci-openshift-knative-eventing-kafka-broker-release-next-415-test-reconciler-aws-415-c
   reporter_config:
     slack:
       channel: '#knative-eventing-ci'
@@ -593,8 +648,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=test-reconciler-aws-414-c
-      - --variant=414
+      - --target=test-reconciler-aws-415-c
+      - --variant=415
       command:
       - ci-operator
       image: ci-operator:latest
@@ -650,10 +705,10 @@ periodics:
     org: openshift-knative
     repo: eventing-kafka-broker
   labels:
-    ci-operator.openshift.io/variant: "414"
+    ci-operator.openshift.io/variant: "415"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-eventing-kafka-broker-release-next-414-test-reconciler-encryption-auth-aws-414-c
+  name: periodic-ci-openshift-knative-eventing-kafka-broker-release-next-415-test-reconciler-encryption-auth-aws-415-c
   reporter_config:
     slack:
       channel: '#knative-eventing-ci'
@@ -673,8 +728,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=test-reconciler-encryption-auth-aws-414-c
-      - --variant=414
+      - --target=test-reconciler-encryption-auth-aws-415-c
+      - --variant=415
       command:
       - ci-operator
       image: ci-operator:latest
@@ -730,10 +785,10 @@ periodics:
     org: openshift-knative
     repo: eventing-kafka-broker
   labels:
-    ci-operator.openshift.io/variant: "414"
+    ci-operator.openshift.io/variant: "415"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-eventing-kafka-broker-release-next-414-test-reconciler-keda-aws-414-c
+  name: periodic-ci-openshift-knative-eventing-kafka-broker-release-next-415-test-reconciler-keda-aws-415-c
   reporter_config:
     slack:
       channel: '#knative-eventing-ci'
@@ -753,8 +808,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=test-reconciler-keda-aws-414-c
-      - --variant=414
+      - --target=test-reconciler-keda-aws-415-c
+      - --variant=415
       command:
       - ci-operator
       image: ci-operator:latest
