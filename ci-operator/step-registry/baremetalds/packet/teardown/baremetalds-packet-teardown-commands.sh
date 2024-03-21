@@ -20,8 +20,6 @@ cd
 cat > packet-teardown.yaml <<-EOF
 - name: teardown Packet host
   hosts: localhost
-  collections:
-   - equinix.cloud
   gather_facts: no
   vars:
     - cluster_type: "{{ lookup('env', 'CLUSTER_TYPE') }}"
@@ -37,10 +35,10 @@ cat > packet-teardown.yaml <<-EOF
   - name: remove Packet host with error handling
     block:
     - name: remove Packet host {{ packet_hostname }}
-      equinix.cloud.metal_device:
-        metal_api_token: "{{ packet_auth_token }}"
+      packet_device:
+        auth_token: "{{ packet_auth_token }}"
         project_id: "{{ packet_project_id }}"
-        hostname: "{{ packet_hostname }}"
+        hostnames: "{{ packet_hostname }}"
         state: absent
       retries: 5
       delay: 120
