@@ -1,0 +1,29 @@
+workflow:
+  as: hypershift-aws-e2e-cluster
+  documentation: |-
+    The HyperShift aws e2e cluster workflow provides pre- and post- steps that provision and
+    deprovision a a new ephemeral HyperShift cluster.
+    Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    pre:
+      - ref: ipi-install-rbac
+      - chain: hypershift-aws-setup-nested-management-cluster
+      - ref: hypershift-install
+      - chain: hypershift-aws-create
+    post:
+      - chain: hypershift-dump
+      - chain: hypershift-aws-destroy
+      - chain: hypershift-aws-destroy-nested-management-cluster
+
