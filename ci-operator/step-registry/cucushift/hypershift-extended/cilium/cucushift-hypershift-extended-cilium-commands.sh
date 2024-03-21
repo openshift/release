@@ -2,6 +2,19 @@
 
 set -xeuo pipefail
 
+function set_proxy () {
+    if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
+        echo "setting the proxy"
+        # cat "${SHARED_DIR}/proxy-conf.sh"
+        echo "source ${SHARED_DIR}/proxy-conf.sh"
+        source "${SHARED_DIR}/proxy-conf.sh"
+    else
+        echo "no proxy setting."
+    fi
+}
+
+set_proxy
+
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 if [[ -f "${SHARED_DIR}/nested_kubeconfig" ]]; then
   export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
