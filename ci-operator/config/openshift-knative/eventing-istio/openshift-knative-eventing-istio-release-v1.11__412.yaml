@@ -34,16 +34,12 @@ resources:
       memory: 1Gi
 tests:
 - as: e2e-tests-aws-412
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -79,6 +75,7 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -93,7 +90,7 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-v1.11
   org: openshift-knative
