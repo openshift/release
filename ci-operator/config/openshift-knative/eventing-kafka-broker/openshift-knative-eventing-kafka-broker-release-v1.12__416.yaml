@@ -146,34 +146,25 @@ images:
   to: knative-eventing-kafka-broker-dispatcher
 - dockerfile_path: openshift/ci-operator/static-images/receiver/Dockerfile
   to: knative-eventing-kafka-broker-receiver
-promotion:
-  to:
-  - additional_images:
-      eventing-kafka-broker-src: src
-    namespace: openshift
-    tag: knative-v1.11
 releases:
   latest:
-    release:
-      channel: fast
-      version: "4.14"
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
 resources:
   '*':
     requests:
       cpu: 500m
       memory: 1Gi
 tests:
-- as: test-conformance-aws-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
+- as: test-conformance-aws-416
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -209,6 +200,7 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -269,18 +261,14 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
-- as: test-e2e-aws-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
+    workflow: ipi-aws
+- as: test-e2e-aws-416
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -316,6 +304,7 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -376,18 +365,14 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
-- as: test-reconciler-aws-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
+    workflow: ipi-aws
+- as: test-reconciler-aws-416
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -423,6 +408,7 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -483,18 +469,14 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
-- as: test-reconciler-encryption-auth-aws-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
+    workflow: ipi-aws
+- as: test-reconciler-encryption-auth-aws-416
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -530,6 +512,7 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -590,18 +573,14 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
-- as: test-reconciler-keda-aws-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
+    workflow: ipi-aws
+- as: test-reconciler-keda-aws-416
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -637,6 +616,7 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -697,9 +677,9 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
+    workflow: ipi-aws
 zz_generated_metadata:
-  branch: release-v1.11
+  branch: release-v1.12
   org: openshift-knative
   repo: eventing-kafka-broker
-  variant: "414"
+  variant: "416"
