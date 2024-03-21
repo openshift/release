@@ -12,6 +12,13 @@ fi
 [ -z "${PROVISIONING_HOST}" ] && { echo "PROVISIONING_HOST is not filled. Failing."; exit 1; }
 [ -z "${PROVISIONING_NET_DEV}" ] && { echo "PROVISIONING_NET_DEV is not filled. Failing."; exit 1; }
 
+SSHOPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o LogLevel=ERROR
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
 # As the API_VIP is unique in the managed network and based on how it is reserved in the reservation steps,
 # we use the last part of it to define the VLAN ID.
 # TODO: find a similar unique value for dual stack and ipv6 single stack configurations?
@@ -21,6 +28,9 @@ CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
 SSH_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-key"
 IFS=, read -r -a SWITCH_PORTS <<< \
   "$(yq e '[.[].switch_port_v2]|@csv' < "${SHARED_DIR}"/hosts.yaml),$(<"${CLUSTER_PROFILE_DIR}/other-switch-ports")"
+
+# Copy other_switch_ports to bastion host for use in cleanup
+scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/other-switch-ports" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
 echo "[INFO] Configuring the VLAN tags on the switches' ports"
 python3 - \
@@ -44,6 +54,10 @@ ports = sys.argv[4:]
 # However, the rollback mechanism of the tests in Prow will take care of reverting the changes in the post steps.
 # and we can safely change the configuration of each switch independently.
 
+if not vlan_id.isdigit():
+  print(f"The vlan_id is not an integer: {vlan_id}. Verify that the reservation step allocated VIPs for the cluster (use RESERVE_BOOTSTRAP: 'false' in your test config)")
+  sys.exit(1)
+
 # Let's group the ports by switch stack in a dictionary
 switches = {}
 for port in ports:
@@ -62,6 +76,7 @@ for switch_address in switches:
     switch_port = switch_address.split(":")[1]
     with Device(host=switch_hostname, port=switch_port, user='admin', ssh_private_key_file=ssh_key_path) as dev:
         with Config(dev, mode="private") as cu:
+            print(f"Create the vlan {vlan_name} vlan-id {vlan_id}")
             # Create the vlan
             cu.load(f"set vlans {vlan_name} vlan-id {vlan_id}")
             for port in switches[switch_address]:
@@ -127,9 +142,9 @@ interfaces:
       stp:
         enabled: false
     port:
-    - name: ${PROVISIONING_NET_DEV}.${VLAN_ID}
+    - name: prov.${VLAN_ID}
     # TODO verify
-- name: ${PROVISIONING_NET_DEV}.${VLAN_ID}
+- name: prov.${VLAN_ID}
   type: vlan
   state: up
   vlan:
@@ -137,16 +152,8 @@ interfaces:
     id: ${VLAN_ID}
 "
 
-
 echo "[INFO] Configuring the provisioning network in the provisioning host via the NMState specs: "
 echo "${NMSTATE_CONFIG}" | tee "${ARTIFACT_DIR}/nmstate-provisioning-net-config.yaml"
-
-SSHOPTS=(-o 'ConnectTimeout=5'
-  -o 'StrictHostKeyChecking=no'
-  -o 'UserKnownHostsFile=/dev/null'
-  -o 'ServerAliveInterval=90'
-  -o LogLevel=ERROR
-  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "'${NMSTATE_CONFIG}'" "br-${CLUSTER_NAME: -12}"  << 'EOF'

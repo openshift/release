@@ -22,40 +22,6 @@ function ibmcloud_login {
   "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
 }
 
-function run_command_with_retries() {
-  cmd="$1"
-  retries="$2"
-  interval="$3"
-
-  if [ X"$retries" == X"" ]; then
-      retries=20
-  fi
-
-  if [ X"$interval" == X"" ]; then
-      interval=30
-  fi
-
-  set +o errexit
-  
-  output=$(eval "$cmd"); ret=$?
-  try=1
-
-  # avoid exit with "del Resource groups with active or pending reclamation instances can't be deleted"
-  while [ X"$ret" != X"0" ] && [ $try -lt $retries ]; do
-      sleep $interval
-      output=$(eval "$cmd"); ret=$?
-      try=$(expr $try + 1)
-  done
-  set -o errexit
-
-  if [ X"$try" == X"$retries" ]; then
-      return 2
-  fi
-  echo "$output"
-  return 0
-}
-
-
 function check_vpc() {
   local vpcName="$1" vpc_info_file="$2"
 
@@ -107,7 +73,3 @@ if [[ $("${IBMCLOUD_CLI}" resource reclamations -q) == "No reclamation found" ]]
 else
   ${IBMCLOUD_CLI} resource reclamations -q |  awk '(NR>1) {print $1}' | xargs -n1 ibmcloud resource reclamation-delete -f
 fi
-
-echo "DEBUG" "Removing the resource group ${resource_group}"
-delCmd="${IBMCLOUD_CLI} resource group-delete -f ${resource_group}"
-run_command_with_retries "${delCmd}" 20 20

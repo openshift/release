@@ -77,7 +77,7 @@ function filter_test_by_platform() {
     extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            none)
+            none|powervs)
                 export UPGRADE_PRE_RUN_TAGS="@baremetal-upi and ${UPGRADE_PRE_RUN_TAGS}"
                 eval "$extrainfoCmd"
                 ;;
@@ -134,6 +134,14 @@ function filter_test_by_proxy() {
     fi
     echo_upgrade_tags
 }
+function filter_test_by_hypershift() {
+    local topo
+    topo="$(oc get infrastructures.config.openshift.io cluster -o yaml | yq '.status.controlPlaneTopology')"
+    if [[ "_${topo}_" = '_External_' ]] ; then
+        export UPGRADE_PRE_RUN_TAGS="@hypershift-hosted and ${UPGRADE_PRE_RUN_TAGS}"
+    fi
+    echo_upgrade_tags
+}
 function filter_test_by_fips() {
     local data
     data="$(oc get configmap cluster-config-v1 -n kube-system -o yaml | yq '.data')"
@@ -158,11 +166,11 @@ function filter_test_by_capability() {
     # the second `console` is the tag name in verification-tests
     declare -A tagmaps
     tagmaps=([baremetal]=xxx
-             [Build]=xxx
+             [Build]=workloads
              [CloudCredential]=xxx
              [Console]=console
              [CSISnapshot]=storage
-             [DeploymentConfig]=xxx
+             [DeploymentConfig]=workloads
              [ImageRegistry]=xxx
              [Insights]=xxx
              [MachineAPI]=xxx
@@ -212,6 +220,7 @@ function filter_test_by_capability() {
 function filter_tests() {
     filter_test_by_capability
     filter_test_by_fips
+    filter_test_by_hypershift
     filter_test_by_proxy
     filter_test_by_sno
     filter_test_by_network

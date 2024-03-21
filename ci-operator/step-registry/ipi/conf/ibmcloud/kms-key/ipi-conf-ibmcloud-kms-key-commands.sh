@@ -14,8 +14,6 @@ key_file="${SHARED_DIR}/ibmcloud_key.json"
 
 cat ${key_file}
 
-resource_group=$(jq -r .resource_group ${key_file})
-
 # Set EncryptionKey for control plane nodes
 CONFIG_PATCH="${SHARED_DIR}/install-config-ibmcloud-kpkey.yaml.patch"
 if [[ "${IBMCLOUD_CONTROL_PLANE_ENCRYPTION_KEY}" == "true" ]]; then
@@ -64,12 +62,6 @@ platform:
         encryptionKey: "${crn_default}"
 EOF
 fi
-
-cat >> "${CONFIG_PATCH}" << EOF
-platform:
-  ibmcloud:
-    resourceGroupName: ${resource_group}
-EOF
 
 cat ${CONFIG_PATCH}
 yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"
