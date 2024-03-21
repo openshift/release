@@ -67,7 +67,7 @@ hack/build/prepare-build-resources.sh || status="$?" || :
 
 echo "Apply the rhtap tasks and pipelines in the test namspace $NAMESPACE..."
 oc apply -f "${ROOT_DIR}/pac/tasks"
-oc apply -f "${ROOT_DIR}/pac/pipelines"
+oc apply -f "${ROOT_DIR}/pac/pipelines/docker-build-rhtap.yaml"
 
 echo "Run the rhtap sample build pipeline..."
 hack/build/run-build.sh || status="$?" || :
