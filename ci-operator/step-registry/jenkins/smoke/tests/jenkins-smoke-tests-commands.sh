@@ -17,8 +17,16 @@ if ! [[ -f ${KUBECONFIG} ]]; then
     exit 1
 fi
 
-cp $KUBECONFIG /go/kubeconfig
-export KUBECONFIG=/go/kubeconfig
+# Login for Interop
+if test -f ${SHARED_DIR}/kubeadmin-password
+then
+  cp $KUBECONFIG /go/kubeconfig
+  export KUBECONFIG=/go/kubeconfig
+
+#Login for ROSA Classic and Hypershift platforms
+else
+  eval "$(cat "${SHARED_DIR}/api.login")"
+fi
 
 status=0
 
