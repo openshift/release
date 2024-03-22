@@ -2669,10 +2669,11 @@ periodics:
       kubernetes.io/arch: amd64
     serviceAccountName: mabc-updater
 - agent: kubernetes
-  cluster: app.ci
+  cluster: build02
   cron: '@every 5m'
   decorate: true
   labels:
+    ci-operator.openshift.io/cluster: build02
     ci.openshift.io/role: infra
   name: periodic-etcd-defragger
   spec:
@@ -2722,7 +2723,7 @@ periodics:
         #   }
         # ]
         endpoints_info=$(jq '[.[]|{ep: (.Endpoint), lead: (if .Status.leader==.Status.header.member_id then 1 else 0 end), ratio: ((.Status.dbSize-.Status.dbSizeInUse)/.Status.dbSize*100|round), size: (.Status.dbSize)}]' <<<"$endpoint_statuses")
-        printf "$endpoints_info\n\n"
+        printf "endpoints info:\n$endpoints_info\n\n"
 
         # Create "etcd_host to related_podname" map:
         # { "10.0.0.5": "etcd_pod_name", ... }
@@ -2740,6 +2741,7 @@ periodics:
             fragmentation_ratio=$(cut -d'|' -f2 <<<"$endpoint_info")
             dbsize=$(cut -d'|' -f3 <<<"$endpoint_info")
             if [[ $fragmentation_ratio -lt $FRAGMENTATION_RATIO_THRESHOLD || $dbsize -lt $DB_SIZE_THRESHOLD ]]; then
+                echo "endpoint $endpoint_info is not fragmented, skipping."
                 continue
             fi
 
