@@ -255,7 +255,7 @@ function pre-OCP-53907(){
     while (( retry > 0 ));do
         versions=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates[]?.version'| xargs)
         if [[ "${versions}" == "null" ]] || [[ "${versions}" != *"${ver}"* ]]; then
-            (( retry -= 1 ))
+	    retry=$((retry - 1))
             sleep 60
             echo "No recommended update available! Retry..."
         else

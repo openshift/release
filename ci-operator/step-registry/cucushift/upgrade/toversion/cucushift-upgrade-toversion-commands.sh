@@ -437,7 +437,7 @@ retry=3
 while (( retry > 0 ));do
     recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates[]?.version'| xargs)
     if [[ "${recommends}" == "null" ]] || [[ "${recommends}" != *"${ver}"* ]]; then
-        (( retry -= 1 ))
+	retry=$((retry - 1))
         sleep 60
         echo "No recommended update available! Retry..."
     else
