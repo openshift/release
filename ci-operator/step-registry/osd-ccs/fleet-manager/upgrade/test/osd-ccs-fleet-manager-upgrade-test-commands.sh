@@ -121,7 +121,6 @@ for ((i=0; i<720; i+=1)); do
   NODES_COUNT=$(echo "$NODES_INFO" | wc -l) || true # failed execution just results in node count being 0
   if [ "$NODES_COUNT" != "" ]; then
     for ((k=1; k<="$NODES_COUNT"; k++)); do
-      NOT_READY_NODES_COUNT=0
       NODE_INFO=$(echo "$NODES_INFO" | head -n $k | tail -n +${k}) || true
       NODE_ADDRESS=$(echo "$NODE_INFO" | awk '{print $1}') || true
       NODE_STATUS=""
@@ -129,6 +128,7 @@ for ((i=0; i<720; i+=1)); do
       NODE_TYPE=$(echo "$NODE_INFO" | awk '{print $3}') || true
       if [ "${NODE_STATUS}" != "Ready" ]; then
         echo "Node(s) are still upgrading. '$NODE_ADDRESS' ($NODE_TYPE) status is: '$NODE_STATUS'"
+        MC_NODES_UPDATED=false
         break
       fi
     done
