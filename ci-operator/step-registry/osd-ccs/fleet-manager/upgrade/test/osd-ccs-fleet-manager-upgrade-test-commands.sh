@@ -29,13 +29,123 @@ mc_ocm_cluster_id="2a4qben6sk0u168g7dae3kpvmtmvfgln"
 # REMOVE
 ocm get /api/clusters_mgmt/v1/clusters/"$mc_ocm_cluster_id"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/hs-mc.kubeconfig"
 MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION="4.14.3"
 
-for ((i=0; i<1080; i+=1)); do
-  oc --kubeconfig "$MC_KUBECONFIG" get mcp/master || true
-  oc --kubeconfig "$MC_KUBECONFIG" get mcp/worker || true
-  oc --kubeconfig "$MC_KUBECONFIG" get co -A || true
-  oc --kubeconfig "$MC_KUBECONFIG" get nodes -A || true
-  oc --kubeconfig "$MC_KUBECONFIG" get clusterversion || true
+UPGRADE_FINISHED=false
+MC_CO_UPGRADED=false
+MC_MCP_UPDATED=false
+MC_NODES_UPDATED=false
+MC_UPGRADE_COMPLETE=false
+
+for ((i=0; i<720; i+=1)); do
+  UPGRADE_FINISHED=false
+  echo "Checking cluster operators upgraded to: $HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
+  UPGRADING_CO_COUNT=-1 # there might be an issue with executing oc commands during upgrade, so for safety this is set to -1
+  CLUSTER_OPERATORS_COUNT=0
+  CLUSTER_OPERATORS_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get co -A | tail -n +2) || true # failed execution just results in operators count being 0
+  CLUSTER_OPERATORS_COUNT=$(echo "$CLUSTER_OPERATORS_INFO" | wc -l) || true # failed execution just results in operators count being 0
+  
+  for ((j=1; j<="$CLUSTER_OPERATORS_COUNT"; j++)); do
+    UPGRADING_CO_COUNT=0
+    CO_INFO=$(echo "$CLUSTER_OPERATORS_INFO" | head -n $j | tail -n +$j)
+    UPGRADE_PROGRESSING=$(echo "$CO_INFO" | awk '{print $4}')
+    CURRENT_VERSION=$(echo "$CO_INFO" | awk '{print $2}')
+    if [ "${CURRENT_VERSION}" != "$TARGET_VERSION" ] || [ "$UPGRADE_PROGRESSING" == "True" ]; then
+      ((UPGRADING_CO_COUNT++))
+      break
+    fi
+  done
+  if [ "$UPGRADING_CO_COUNT" -eq 0 ]; then
+    MC_CO_UPGRADED=true
+  else
+    MC_CO_UPGRADED=false
+  fi
+  ####
+  echo "Checking mps are updated, not updating and not degraded"
+  function check_mcp() {
+    MCP_NAME=$1
+    MCP_STATUS=$(oc --kubeconfig "$MC_KUBECONFIG" get "$MCP_NAME" | tail -n +2) || true
+    MCP_UPDATED=$(echo "$MCP_STATUS" | awk '{print $3}') || true
+    MCP_UPDATING=$(echo "$MCP_STATUS" | awk '{print $4}') || true
+    MCP_DEGRADED=$(echo "$MCP_STATUS" | awk '{print $5}') || true
+    if [ "${MCP_UPDATED}" != "True" ] || [ "$MCP_UPDATING" == "True" ] || [ "$MCP_DEGRADED" == "True" ]; then
+      echo "MCP: '$MCP_NAME' updated: '$MCP_UPDATED', updating: '$MCP_UPDATING', degraded: '$MCP_DEGRADED'"
+    else
+      if [ "$MCP_NAME" == "mcp/master" ]; then
+        MCP_MASTER_UPDATED=true
+      else
+        MCP_WORKER_UPDATED=true
+      fi
+    fi
+  }
+
+  MCP_WORKER_UPDATED=false
+  MCP_MASTER_UPDATED=false
+  check_mcp "mcp/master"
+  check_mcp "mcp/worker"
+  if [ "$MCP_WORKER_UPDATED" = true ] && [ "$MCP_MASTER_UPDATED" = true ]; then
+    echo "mcps updated"
+    MC_MCP_UPDATED=true
+  else
+    MC_MCP_UPDATED=false
+  fi
+  ####
+  echo "Checking nodes are ready"
+  NOT_READY_NODES_COUNT=-1 # there might be an issue with executing oc commands during upgrade, so for safety this is set to -1
+  NODES_COUNT=0
+  NOT_READY_NODES_COUNT=-1
+  NODES_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get nodes | tail -n +2) || true # failed execution just results in node count being 0
+  NODES_COUNT=$(echo "$NODES_INFO" | wc -l) || true # failed execution just results in node count being 0
+  if [ "$NODES_COUNT" != "" ]; then
+    for ((k=1; k<="$NODES_COUNT"; k++)); do
+      NOT_READY_NODES_COUNT=0
+      NODE_INFO=$(echo "$NODES_INFO" | head -n $k | tail -n +$k) || true
+      NODE_ADDRESS=$(echo "$NODE_INFO" | awk '{print $1}') || true
+      NODE_STATUS=""
+      NODE_STATUS=$(echo "$NODE_INFO" | awk '{print $2}') || true
+      NODE_TYPE=$(echo "$NODE_INFO" | awk '{print $3}') || true
+      if [ "${NODE_STATUS}" != "Ready" ]; then
+        ((NOT_READY_NODES_COUNT++))
+        echo "Node(s) are still upgrading. '$NODE_ADDRESS' ($NODE_TYPE) status is: '$NODE_STATUS'"
+        break
+      fi
+    done
+  fi
+  if [ "$NOT_READY_NODES_COUNT" -eq 0 ]; then
+    echo "Nodes updated"
+    MC_NODES_UPDATED=true
+  else
+    MC_NODES_UPDATED=false
+  fi
+  ####
+  echo "Checking openshift version on MC is upgraded to '$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION'"
+  CLUSTER_VERSION_INFO=""
+  CLUSTER_VERSION_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get clusterversion | tail -1) || true
+  if [ "$CLUSTER_VERSION_INFO" == "" ]; then
+    echo "Unable to get clusterversion. Skipping this time"
+  else
+    CURRENT_VERSION=$(echo "$CLUSTER_VERSION_INFO" | awk '{print $2}') || true
+    UPGRADE_PROGRESSING=$(echo "$CLUSTER_VERSION_INFO" | awk '{print $4}') || true
+    if [ "${CURRENT_VERSION}" == "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" ] && [ "$UPGRADE_PROGRESSING" != "True" ]; then
+      echo "Clusterversion at correct version" 
+      MC_UPGRADE_COMPLETE=true
+    else
+      MC_UPGRADE_COMPLETE=false
+    fi 
+  fi
+  ####
+  if [ "$MC_MCP_UPDATED" = true ] && [ "$MC_NODES_UPDATED" = true ] && [ "$MC_UPGRADE_COMPLETE" = true ] && [ "$MC_CO_UPGRADED" = true ]; then
+    UPGRADE_FINISHED=true
+    echo "UPGRADE_FINISHED: $UPGRADE_FINISHED"
+  else
+    echo "UPGRADE_FINISHED: $UPGRADE_FINISHED"
+  fi
+  # oc --kubeconfig "$MC_KUBECONFIG" get mcp/master || true
+  # oc --kubeconfig "$MC_KUBECONFIG" get mcp/worker || true
+  # oc --kubeconfig "$MC_KUBECONFIG" get co -A || true
+  # oc --kubeconfig "$MC_KUBECONFIG" get nodes -A || true
+  # oc --kubeconfig "$MC_KUBECONFIG" get clusterversion || true
+  
   sleep 10
 done
 
