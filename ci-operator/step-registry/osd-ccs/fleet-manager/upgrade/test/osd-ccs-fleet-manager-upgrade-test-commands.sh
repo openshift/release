@@ -31,11 +31,27 @@ ocm get /api/clusters_mgmt/v1/clusters/"$mc_ocm_cluster_id"/credentials | jq -r 
 MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION="4.14.3"
 
+# HC details
+HC_KUBECONFIG="${SHARED_DIR}/hc-kubeconfig"
+HC_VERSION=""
+
+function get_hc_details () {
+  HC_KUBEADMIN_SECRET_NAME=$(oc --kubeconfig "$MC_KUBECONFIG" get hc -A | tail -1 | awk '{print $4}')
+  HC_NS_NAME=$(oc --kubeconfig "$MC_KUBECONFIG" get hc -A | tail -1 | awk '{print $1}')
+  ## save HC kubeconfig
+  oc --kubeconfig "$MC_KUBECONFIG" get secret "$HC_KUBEADMIN_SECRET_NAME" -n "$HC_NS_NAME" -o json | jq -r '.data.kubeconfig | @base64d' > "$HC_KUBECONFIG"
+  HC_VERSION=$(oc --kubeconfig "$HC_KUBECONFIG" get co -A | head -2 | tail -1 | awk '{print $2}') || true
+  echo "HC cluster operators version is: $HC_VERSION"
+}
+
+get_hc_details
+
 UPGRADE_FINISHED=false
 MC_CO_UPGRADED=false
 MC_MCP_UPDATED=false
 MC_NODES_UPDATED=false
 MC_UPGRADE_COMPLETE=false
+FAILED_HC_INFO_CHECK_COUNTER=0
 
 for ((i=0; i<720; i+=1)); do
   UPGRADE_FINISHED=false
@@ -60,6 +76,13 @@ for ((i=0; i<720; i+=1)); do
   # else
   #   MC_CO_UPGRADED=false
   # fi
+  echo "Checking HC operators info available"
+  CLUSTER_OPERATORS_INFO=""
+  CLUSTER_OPERATORS_INFO=$(oc --request-timeout=5s --kubeconfig "$HC_KUBECONFIG" get co -A --insecure-skip-tls-verify | tail -n +2) || true
+  if [ "$CLUSTER_OPERATORS_INFO" == "" ]; then
+    ((FAILED_HC_INFO_CHECK_COUNTER++))
+    echo "Failed to get co status. Total number of failed requests: %s $FAILED_HC_INFO_CHECK_COUNTER"
+  fi
   ####
   echo "Checking mps are updated, not updating and not degraded"
   function check_mcp() {
@@ -99,13 +122,12 @@ for ((i=0; i<720; i+=1)); do
   if [ "$NODES_COUNT" != "" ]; then
     for ((k=1; k<="$NODES_COUNT"; k++)); do
       NOT_READY_NODES_COUNT=0
-      NODE_INFO=$(echo "$NODES_INFO" | head -n $k | tail -n +$k) || true
+      NODE_INFO=$(echo "$NODES_INFO" | head -n $k | tail -n +${k}) || true
       NODE_ADDRESS=$(echo "$NODE_INFO" | awk '{print $1}') || true
       NODE_STATUS=""
       NODE_STATUS=$(echo "$NODE_INFO" | awk '{print $2}') || true
       NODE_TYPE=$(echo "$NODE_INFO" | awk '{print $3}') || true
       if [ "${NODE_STATUS}" != "Ready" ]; then
-        ((NOT_READY_NODES_COUNT++))
         echo "Node(s) are still upgrading. '$NODE_ADDRESS' ($NODE_TYPE) status is: '$NODE_STATUS'"
         break
       fi
