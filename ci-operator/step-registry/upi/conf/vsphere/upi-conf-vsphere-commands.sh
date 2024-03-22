@@ -53,7 +53,12 @@ printf "***** DEBUG %s %s %s %s ******\n" "$dns_server" "$lb_ip_address" "$boots
 control_plane_idx=0
 control_plane_addrs=()
 control_plane_hostnames=()
-for n in {4..6}; do
+start_master_num=4
+end_master_num=$((start_master_num + CONTROL_PLANE_REPLICAS - 1))
+start_worker_num=$((end_master_num + 1))
+end_worker_num=$((start_worker_num + COMPUTE_NODE_REPLICAS - 1))
+
+for n in $(seq "$start_master_num" "$end_master_num"); do
   control_plane_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
   control_plane_hostnames+=("control-plane-$((control_plane_idx++))")
 done
@@ -66,7 +71,7 @@ control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
 compute_idx=0
 compute_addrs=()
 compute_hostnames=()
-for n in {7..9}; do
+for n in $(seq "$start_worker_num" "$end_worker_num"); do
   compute_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
   compute_hostnames+=("compute-$((compute_idx++))")
 done
@@ -178,7 +183,7 @@ then
   }'
 
   # Generate control plane DNS entries
-  for (( node=0; node < 3; node++)); do
+  for (( node=0; node < ${CONTROL_PLANE_REPLICAS}; node++)); do
     echo "Creating DNS entry for ${control_plane_hostnames[$node]}"
     node_record=$(echo "${DNS_RECORD}" |
       jq -r --arg ACTION "CREATE" \
@@ -195,7 +200,7 @@ then
     ROUTE53_DELETE_JSON=$(echo "${ROUTE53_DELETE_JSON}" | jq --argjson DNS_RECORD "$node_record" -r '.Changes[.Changes|length] |= .+ $DNS_RECORD')
   done
   # Generate compute DNS entries
-  for (( node=0; node < 3; node++)); do
+  for (( node=0; node < ${COMPUTE_NODE_REPLICAS}; node++)); do
     echo "Creating DNS entry for ${compute_hostnames[$node]}"
     node_record=$(echo "${DNS_RECORD}" |
       jq -r --arg ACTION "CREATE" \
@@ -223,7 +228,7 @@ ${platform_required} && cat >>"${install_config}" <<EOF
 baseDomain: $base_domain
 controlPlane:
   name: "master"
-  replicas: 3
+  replicas: ${CONTROL_PLANE_REPLICAS}
 compute:
 - name: "worker"
   replicas: 0
@@ -270,6 +275,8 @@ vm_dns_addresses = ["${dns_server}"]
 bootstrap_ip_address = "${bootstrap_ip_address}"
 lb_ip_address = "${lb_ip_address}"
 
+control_plane_count = ${CONTROL_PLANE_REPLICAS}
+compute_count = ${COMPUTE_NODE_REPLICAS}
 compute_ip_addresses = ${compute_ip_addresses}
 control_plane_ip_addresses = ${control_plane_ip_addresses}
 EOF
@@ -302,13 +309,13 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 
 \$control_plane_memory = 16384
 \$control_plane_num_cpus = 4
-\$control_plane_count = 3
+\$control_plane_count = ${CONTROL_PLANE_REPLICAS}
 \$control_plane_ip_addresses = $(echo ${control_plane_ip_addresses} | tr -d [])
 \$control_plane_hostnames = $(printf "\"%s\"," "${control_plane_hostnames[@]}" | sed 's/,$//')
 
 \$compute_memory = 16384
 \$compute_num_cpus = 4
-\$compute_count = 3
+\$compute_count = ${COMPUTE_NODE_REPLICAS}
 \$compute_ip_addresses = $(echo ${compute_ip_addresses} | tr -d [])
 \$compute_hostnames = $(printf "\"%s\"," "${compute_hostnames[@]}" | sed 's/,$//')
 EOF
@@ -358,7 +365,6 @@ rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 ### Remove compute machinesets (optional)
 echo "Removing compute machinesets..."
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
-
 
 ### Remove CPMS manifests
 rm -f openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml || true
