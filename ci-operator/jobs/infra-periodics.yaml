@@ -2668,3 +2668,105 @@ periodics:
     nodeSelector:
       kubernetes.io/arch: amd64
     serviceAccountName: mabc-updater
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@every 5m'
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-etcd-defragger
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        #!/bin/bash
+        set -euo pipefail
+
+        # Inspired by:
+        # https://github.com/openshift/cluster-etcd-operator/blob/fd67e610d5b01b8326a10bb92286877130dc1451/pkg/operator/defragcontroller/defragcontroller.go
+
+        FRAGMENTATION_RATIO_THRESHOLD=45
+        DB_SIZE_THRESHOLD=$((100 * 1024 * 1024)) # 100MB
+
+        # Get a pod to issue queries against
+        etcd_pod=$(oc -n openshift-etcd get pods -letcd -oname | head -1)
+
+        # endpoint_statuses JSON schema:
+        #
+        # [
+        #   {
+        #     "Endpoint": "https://10.0.0.3:2379",
+        #     "Status": {
+        #       "header": {
+        #         "member_id": 14942490142531888693,
+        #         ...
+        #       },
+        #       "leader": 11239076790641432752,
+        #       "dbSize": 2851442688,
+        #       "dbSizeInUse": 1183555584
+        #       ...
+        #     }
+        #   }
+        # ]
+        endpoint_statuses=$(oc -n openshift-etcd exec "$etcd_pod" -- etcdctl endpoint status --cluster -w json)
+
+        # Transform endpoint_statuses into:
+        #
+        # [
+        #   {
+        #     "ep": "https://10.0.0.3:2379",
+        #     "lead": 0,                        <- whether is leader or not
+        #     "ratio": 60,                      <- fragmentation ratio
+        #     "size": 2851442688                <- db size in bytes
+        #   }
+        # ]
+        endpoints_info=$(jq '[.[]|{ep: (.Endpoint), lead: (if .Status.leader==.Status.header.member_id then 1 else 0 end), ratio: ((.Status.dbSize-.Status.dbSizeInUse)/.Status.dbSize*100|round), size: (.Status.dbSize)}]' <<<"$endpoint_statuses")
+        printf "$endpoints_info\n\n"
+
+        # Create "etcd_host to related_podname" map:
+        # { "10.0.0.5": "etcd_pod_name", ... }
+        declare -A etcd_pods
+        for etcd_pod in $(oc -n openshift-etcd get pods -letcd -ojson | jq -r '.items[]|.metadata.name + "|" + .status.podIP'); do
+            name="$(cut -d'|' -f1 <<<"$etcd_pod")"
+            ip="$(cut -d'|' -f2 <<<"$etcd_pod")"
+            etcd_pods["$ip"]="$name"
+        done
+
+        # Defragment an endpoint only if needed, leader must be the last one
+        for endpoint_info in $(jq -r 'sort_by(.lead)[]| .ep + "|" + (.ratio|tostring) + "|" + (.size|tostring)' <<<"$endpoints_info"); do
+            printf '\n***\n'
+            # Skip if this endpoint is not fragmented
+            fragmentation_ratio=$(cut -d'|' -f2 <<<"$endpoint_info")
+            dbsize=$(cut -d'|' -f3 <<<"$endpoint_info")
+            if [[ $fragmentation_ratio -lt $FRAGMENTATION_RATIO_THRESHOLD || $dbsize -lt $DB_SIZE_THRESHOLD ]]; then
+                continue
+            fi
+
+            ip=$(cut -d' ' -f1 <<<"$endpoint_info" | sed 's|https://||g' | cut -d':' -f1)
+            pod_name="${etcd_pods[$ip]}"
+
+            # Defragment
+            echo "Defragmenting $pod_name - $ip"
+            oc -n openshift-etcd exec pod/"$pod_name" -- sh -c 'unset ETCDCTL_ENDPOINTS;
+            etcdctl --command-timeout=30s --endpoints=https://localhost:2379 defrag;
+            etcdctl endpoint status -w table --cluster;'
+
+            # Wait for the etcd cluster to become healthy
+            for i in $(seq 1 20); do
+                if [[ $(oc -n openshift-etcd exec pod/"$pod_name" -- etcdctl endpoint --cluster health | grep -ic healthy ) -eq 3 ]]; then
+                    break
+                fi
+                echo "Cluster is not healthy yet. Waiting 6s ($i/20)"
+                sleep 6s
+            done
+        done
+      command:
+      - /bin/bash
+      image: image-registry.openshift-image-registry.svc:5000/ocp/cli-jq:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 100m
+    serviceAccountName: etcd-defragger
