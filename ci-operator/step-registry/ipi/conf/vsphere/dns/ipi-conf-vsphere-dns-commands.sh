@@ -16,6 +16,8 @@ export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
 export HOME=/tmp
 
+echo "HELLO?!?"
+
 
 which python || true
 whereis python || true
