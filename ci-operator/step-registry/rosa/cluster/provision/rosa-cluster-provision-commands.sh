@@ -106,6 +106,20 @@ fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+  if [[ ! -e "${CLUSTER_PROFILE_DIR}/.awscred_shared_account" ]]; then
+    echo "Error: Shared VPC is enabled, but not find .awscred_shared_account, exit now"
+    exit 1
+  fi
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+
+  SHARED_VPC_AWS_ACCOUNT_ID=$(aws sts get-caller-identity --output text | awk '{print $1}')
+  SHARED_VPC_AWS_ACCOUNT_ID_MASK=$(echo "${SHARED_VPC_AWS_ACCOUNT_ID:0:4}***")
+
+  # reset
+  export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
+fi
+
 # Check whether the cluster with the same cluster name exists.
 OLD_CLUSTER=$(rosa list clusters | { grep  ${CLUSTER_NAME} || true; })
 if [[ ! -z "$OLD_CLUSTER" ]]; then
@@ -460,7 +474,7 @@ fi
 echo "  Enable Shared VPC: ${ENABLE_SHARED_VPC}"
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   echo "    SAHRED_VPC_HOSTED_ZONE_ID: ${SAHRED_VPC_HOSTED_ZONE_ID}"
-  echo "    SAHRED_VPC_ROLE_ARN: ${SAHRED_VPC_ROLE_ARN}"
+  echo "    SAHRED_VPC_ROLE_ARN: ${SAHRED_VPC_ROLE_ARN}" | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g"
   echo "    SAHRED_VPC_BASE_DOMAIN: ${SAHRED_VPC_BASE_DOMAIN}"
 fi
 
@@ -502,6 +516,7 @@ cat "${SHARED_DIR}/create_cluster.sh" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_M
 mkdir -p "${SHARED_DIR}"
 CLUSTER_ID_FILE="${SHARED_DIR}/cluster-id"
 CLUSTER_INFO="${ARTIFACT_DIR}/cluster.txt"
+CLUSTER_INFO_WITHOUT_MASK="$(mktemp)"
 CLUSTER_INSTALL_LOG="${ARTIFACT_DIR}/.install.log"
 
 # The default cluster mode is sts now
@@ -536,8 +551,12 @@ rosa create cluster -y \
                     ${SHARED_VPC_SWITCH} \
                     ${SECURITY_GROUP_ID_SWITCH} \
                     ${NO_CNI_SWITCH} \
-                    ${DRY_RUN_SWITCH} \
-                    | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${CLUSTER_INFO}"
+                    ${DRY_RUN_SWITCH} > "${CLUSTER_INFO_WITHOUT_MASK}"
+
+cat ${CLUSTER_INFO_WITHOUT_MASK} | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${CLUSTER_INFO}"
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+  sed -i "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g" "${CLUSTER_INFO}"
+fi
 
 # Store the cluster ID for the post steps and the cluster deprovision
 CLUSTER_ID=$(cat "${CLUSTER_INFO}" | grep '^ID:' | tr -d '[:space:]' | cut -d ':' -f 2)
@@ -551,9 +570,11 @@ fi
 
 echo "Waiting for cluster ready..."
 start_time=$(date +"%s")
+cluster_info_json=$(mktemp)
 while true; do
   sleep 60
-  CLUSTER_STATE=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.state')
+  rosa describe cluster -c "${CLUSTER_ID}" -o json > ${cluster_info_json}
+  CLUSTER_STATE=$(cat ${cluster_info_json} | jq -r '.state')
   echo "Cluster state: ${CLUSTER_STATE}"
   if [[ "${CLUSTER_STATE}" == "ready" ]]; then
     echo "Cluster is reported as ready"
@@ -563,6 +584,61 @@ while true; do
     echo "error: Timed out while waiting for cluster to be ready"
     exit 1
   fi
+
+  # Adding ingress role to trust policy
+  if [[ "${ENABLE_SHARED_VPC}" == "yes" ]] && [[ "${BYO_OIDC}" == "false" ]] && [[ "${CLUSTER_STATE}" == "waiting" ]]; then
+
+    echo "Shared-VPC: Auto mode is enabled, adding ingress operator arn to shrared-role's trust policy"
+    status_description=$(cat $cluster_info_json | jq -r '.status.description')
+    # Failed to verify ingress operator for shared VPC: Failed to assume role with ARN 'arn:aws:iam::641733028092:role/yunjiang-ttb-shared-vpc-rol1': operation error STS: AssumeRole, https response error StatusCode: 403, RequestID: fa394d54-ad9f-42e8-bb48-b4751f2a5715, api error AccessDenied: User: arn:aws:sts::301721915996:assumed-role/yunjiang-ttb-c0i5-openshift-ingress-operator-cloud-credentials/OCM is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::641733028092:role/yunjiang-ttb-shared-vpc-rol1
+    match=$(echo ${status_description} | grep -E "^Failed to verify ingress operator for shared VPC:.*OCM is not authorized to perform: sts:AssumeRole on resource:.*" || true)
+    echo "Shared-VPC: cluster status: ${status_description}" \
+      | sed "s/${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID_MASK}/g" | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g"
+
+    if [[ ${match} != "" ]]; then
+      echo "Shared-VPC: Status match, waiting for 2 mins to make sure operator role is ready."
+      sleep 120
+
+      ingress_operator_arn=$(cat "${CLUSTER_INFO_WITHOUT_MASK}" | grep -E '\- arn.*openshift-ingress-operator' | cut -d ' ' -f 3)
+      shared_role_name=$(cat "${CLUSTER_INFO_WITHOUT_MASK}" | grep -E '\- Role ARN:' | cut -d '/' -f 2)
+
+      echo "Shared-VPC: ingress: ${ingress_operator_arn}, shared_role: ${shared_role_name}, installer: ${account_intaller_role_arn}" \
+        | sed "s/${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID_MASK}/g" \
+        | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g"
+
+      export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+      trust_policy=$(mktemp)
+      cat > ${trust_policy} <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+      {
+          "Effect": "Allow",
+          "Principal": {
+              "AWS": [
+                "${account_intaller_role_arn}",
+                "${ingress_operator_arn}"
+              ]
+          },
+          "Action": "sts:AssumeRole",
+          "Condition": {}
+      }
+  ]
+}
+EOF
+      aws iam update-assume-role-policy --role-name ${shared_role_name} --policy-document file://${trust_policy}
+      echo "Shared-VPC: Applied new policy."
+
+      echo "Shared-VPC: waiting for 2 mins to make sure the cluster status is up to date."
+      sleep 120
+
+      # reset
+      export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
+    else
+      echo "Shared-VPC: Status not match, continuing"
+    fi
+  fi
+
   if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" && "${CLUSTER_STATE}" != "waiting" && "${CLUSTER_STATE}" != "validating" ]]; then
     rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}" || echo "error: Unable to pull installation log."
     echo "error: Cluster reported invalid state: ${CLUSTER_STATE}"
