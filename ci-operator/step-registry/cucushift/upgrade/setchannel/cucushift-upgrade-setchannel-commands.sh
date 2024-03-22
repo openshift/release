@@ -72,20 +72,4 @@ if ! oc adm upgrade channel ${target_channel}; then
     echo "Fail to change channel to ${target_channel}!"
     exit 1
 fi
-retry=3
-while (( retry > 0 ));do
-    recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates[]?.version'| xargs)
-    if [[ "${recommends}" == "null" ]] || [[ "${recommends}" != *"${ver}"* ]]; then
-        (( retry -= 1 ))
-        sleep 60
-        echo "No recommended update available! Retry..."
-    else
-        echo "Recommencded update: ${recommends}"
-        break
-    fi
-done
-if (( retry == 0 )); then
-    echo "Timeout to get recommended update!" 
-    exit 1
-fi
 
