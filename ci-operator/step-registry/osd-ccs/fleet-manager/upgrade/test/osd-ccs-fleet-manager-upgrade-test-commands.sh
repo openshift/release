@@ -47,7 +47,7 @@ function get_hc_details () {
 get_hc_details
 
 UPGRADE_FINISHED=false
-MC_CO_UPGRADED=false
+# MC_CO_UPGRADED=false
 MC_MCP_UPDATED=false
 MC_NODES_UPDATED=false
 MC_UPGRADE_COMPLETE=false
