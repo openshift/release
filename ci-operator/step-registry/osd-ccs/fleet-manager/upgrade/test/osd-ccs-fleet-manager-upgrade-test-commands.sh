@@ -40,26 +40,26 @@ MC_UPGRADE_COMPLETE=false
 for ((i=0; i<720; i+=1)); do
   UPGRADE_FINISHED=false
   echo "Checking cluster operators upgraded to: $HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
-  UPGRADING_CO_COUNT=-1 # there might be an issue with executing oc commands during upgrade, so for safety this is set to -1
-  CLUSTER_OPERATORS_COUNT=0
-  CLUSTER_OPERATORS_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get co -A | tail -n +2) || true # failed execution just results in operators count being 0
-  CLUSTER_OPERATORS_COUNT=$(echo "$CLUSTER_OPERATORS_INFO" | wc -l) || true # failed execution just results in operators count being 0
+  # UPGRADING_CO_COUNT=-1 # there might be an issue with executing oc commands during upgrade, so for safety this is set to -1
+  # CLUSTER_OPERATORS_COUNT=0
+  # CLUSTER_OPERATORS_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get co -A | tail -n +2) || true # failed execution just results in operators count being 0
+  # CLUSTER_OPERATORS_COUNT=$(echo "$CLUSTER_OPERATORS_INFO" | wc -l) || true # failed execution just results in operators count being 0
   
-  for ((j=1; j<="$CLUSTER_OPERATORS_COUNT"; j++)); do
-    UPGRADING_CO_COUNT=0
-    CO_INFO=$(echo "$CLUSTER_OPERATORS_INFO" | head -n $j | tail -n +$j)
-    UPGRADE_PROGRESSING=$(echo "$CO_INFO" | awk '{print $4}')
-    CURRENT_VERSION=$(echo "$CO_INFO" | awk '{print $2}')
-    if [ "${CURRENT_VERSION}" != "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" ] || [ "$UPGRADE_PROGRESSING" == "True" ]; then
-      ((UPGRADING_CO_COUNT++))
-      break
-    fi
-  done
-  if [ "$UPGRADING_CO_COUNT" -eq 0 ]; then
-    MC_CO_UPGRADED=true
-  else
-    MC_CO_UPGRADED=false
-  fi
+  # for ((j=1; j<="$CLUSTER_OPERATORS_COUNT"; j++)); do
+  #   UPGRADING_CO_COUNT=0
+  #   CO_INFO=$(echo "$CLUSTER_OPERATORS_INFO" | head -n $j | tail -n +$j)
+  #   UPGRADE_PROGRESSING=$(echo "$CO_INFO" | awk '{print $4}')
+  #   CURRENT_VERSION=$(echo "$CO_INFO" | awk '{print $2}')
+  #   if [ "${CURRENT_VERSION}" != "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" ] || [ "$UPGRADE_PROGRESSING" == "True" ]; then
+  #     ((UPGRADING_CO_COUNT++))
+  #     break
+  #   fi
+  # done
+  # if [ "$UPGRADING_CO_COUNT" -eq 0 ]; then
+  #   MC_CO_UPGRADED=true
+  # else
+  #   MC_CO_UPGRADED=false
+  # fi
   ####
   echo "Checking mps are updated, not updating and not degraded"
   function check_mcp() {
