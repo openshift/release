@@ -3009,6 +3009,45 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-upi-zones
+- as: aws-rosa-sts-advanced-f360-content
+  cron: 9 21 2,9,16,25 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_SECURITY_GROUP: "true"
+      CHANNEL_GROUP: nightly
+      OCM_LOGIN_ENV: integration
+      OPENSHIFT_VERSION: "4.15"
+    test:
+    - as: test-pci-dss
+      cli: latest
+      commands: |
+        export PROFILE=pci-dss
+        export PRODUCT=ocp4
+        export CONTENT_IMAGE=ghcr.io/complianceascode/k8scontent:latest
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-ocp4-pci-dss-node
+      cli: latest
+      commands: |
+        export PROFILE=pci-dss-node
+        export PRODUCT=ocp4
+        export CONTENT_IMAGE=ghcr.io/complianceascode/k8scontent:latest
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: rosa-aws-sts-advanced
 zz_generated_metadata:
   branch: release-4.15
   org: openshift
