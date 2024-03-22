@@ -50,7 +50,7 @@ for ((i=0; i<720; i+=1)); do
     CO_INFO=$(echo "$CLUSTER_OPERATORS_INFO" | head -n $j | tail -n +$j)
     UPGRADE_PROGRESSING=$(echo "$CO_INFO" | awk '{print $4}')
     CURRENT_VERSION=$(echo "$CO_INFO" | awk '{print $2}')
-    if [ "${CURRENT_VERSION}" != "$TARGET_VERSION" ] || [ "$UPGRADE_PROGRESSING" == "True" ]; then
+    if [ "${CURRENT_VERSION}" != "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" ] || [ "$UPGRADE_PROGRESSING" == "True" ]; then
       ((UPGRADING_CO_COUNT++))
       break
     fi
