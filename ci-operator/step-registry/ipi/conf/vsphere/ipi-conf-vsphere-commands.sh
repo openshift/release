@@ -119,14 +119,14 @@ fi
 if [ ${Z_VERSION} -lt 11 ]; then
   MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
-  replicas: 3
+  replicas: ${CONTROL_PLANE_REPLICAS}
   platform:
     vsphere:
       osDisk:
         diskSizeGB: 120
 compute:
 - name: worker
-  replicas: 3
+  replicas: ${COMPUTE_NODE_REPLICAS}
   platform:
     vsphere:
       cpus: 4
@@ -134,6 +134,13 @@ compute:
       memoryMB: 16384
       osDisk:
         diskSizeGB: 120"
+else
+    MACHINE_POOL_OVERRIDES="controlPlane:
+  name: master
+  replicas: ${CONTROL_PLANE_REPLICAS}
+compute:
+- name: worker
+  replicas: ${COMPUTE_NODE_REPLICAS}"
 fi
 
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
