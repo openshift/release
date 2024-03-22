@@ -430,6 +430,26 @@ export SOURCE_VERSION
 export SOURCE_MINOR_VERSION
 echo "Source release version is: ${SOURCE_VERSION}"
 
+x_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f1 -d. )
+y_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f2 -d. )
+ver="${x_ver}.${y_ver}"
+retry=3
+while (( retry > 0 ));do
+    recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates[]?.version'| xargs)
+    if [[ "${recommends}" == "null" ]] || [[ "${recommends}" != *"${ver}"* ]]; then
+	retry=$((retry - 1))
+        sleep 60
+        echo "No recommended update available! Retry..."
+    else
+        echo "Recommencded update: ${recommends}"
+        break
+    fi
+done
+if (( retry == 0 )); then
+    echo "Timeout to get recommended update!" 
+    exit 1
+fi
+
 set_target_and_upgrade_cmd
 export FORCE_UPDATE="false"
 if ! check_signed; then
