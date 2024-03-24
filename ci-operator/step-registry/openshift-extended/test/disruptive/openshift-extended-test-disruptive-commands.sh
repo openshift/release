@@ -166,7 +166,7 @@ ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal|equinix-ocp-metal-qe|powervs-1)
+equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
@@ -209,7 +209,7 @@ oc get clusterversion version -o yaml || true
 # execute the cases
 function run {
     test_scenarios=""
-    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
+    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
     echo "TEST_SCENARIOS: \"${TEST_SCENARIOS:-}\""
     echo "TEST_ADDITIONAL: \"${TEST_ADDITIONAL:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
