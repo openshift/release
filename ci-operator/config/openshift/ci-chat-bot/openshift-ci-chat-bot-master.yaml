@@ -27,6 +27,14 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/ci-chat-bot/ci-chat-bot
   to: ci-chat-bot
+- dockerfile_path: images/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ci-chat-bot/ci-chat-bot
+  to: ci-chat-bot2
 - dockerfile_path: images/Dockerfile.python
   inputs:
     ocp_ubi-python-311_9:
@@ -70,6 +78,10 @@ tests:
   commands: make test
   container:
     from: src
+- as: random-test
+  commands: echo "Hello World"
+  container:
+    from: ci-chat-bot2
 - as: security
   optional: true
   steps:
