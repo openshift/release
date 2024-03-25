@@ -7,6 +7,22 @@ CLUSTER_NAME="cicd-$(printf $PROW_JOB_ID|sha256sum|cut -c-10)"
 POWERVS_VSI_NAME="${CLUSTER_NAME}-worker"
 BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
 
+echo "Test cluster accessiblity"
+CLUSTER_INFO="/tmp/cluster-${CLUSTER_NAME}-after-e2e.txt"
+touch ${CLUSTER_INFO}
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+echo "=========== oc get clusterversion ==============" >> ${CLUSTER_INFO}
+oc get clusterversion >> ${CLUSTER_INFO}
+echo "=========== oc get node -o wide ==============" >> ${CLUSTER_INFO}
+oc get node -o wide >> ${CLUSTER_INFO}
+echo "=========== oc adm top node ==============" >> ${CLUSTER_INFO}
+oc adm top node >> ${CLUSTER_INFO}
+echo "=========== oc get co -o wide ==============" >> ${CLUSTER_INFO}
+oc get co -o wide >> ${CLUSTER_INFO}
+echo "=========== oc get pod -A -o wide ==============" >> ${CLUSTER_INFO}
+oc get pod -A -o wide >> ${CLUSTER_INFO}
+cp ${CLUSTER_INFO} "${ARTIFACT_DIR}/"
+
 # Installing required tools
 echo "$(date) Installing required tools"
 mkdir /tmp/ibm_cloud_cli

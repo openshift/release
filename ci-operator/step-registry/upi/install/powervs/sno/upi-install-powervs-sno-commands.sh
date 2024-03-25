@@ -773,7 +773,7 @@ scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeconfi
 echo "Finished prepare_next_steps"
 
 echo "Test cluster accessiblity"
-CLUSTER_INFO="/tmp/cluster-${CLUSTER_TYPE}-${CLUSTER_NAME}.txt"
+CLUSTER_INFO="/tmp/cluster-${CLUSTER_NAME}-before-e2e.txt"
 touch ${CLUSTER_INFO}
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 patch_image_registry
@@ -781,6 +781,8 @@ echo "=========== oc get clusterversion ==============" >> ${CLUSTER_INFO}
 oc get clusterversion >> ${CLUSTER_INFO}
 echo "=========== oc get node -o wide ==============" >> ${CLUSTER_INFO}
 oc get node -o wide >> ${CLUSTER_INFO}
+echo "=========== oc adm top node ==============" >> ${CLUSTER_INFO}
+oc adm top node >> ${CLUSTER_INFO}
 echo "=========== oc get co -o wide ==============" >> ${CLUSTER_INFO}
 oc get co -o wide >> ${CLUSTER_INFO}
 echo "=========== oc get pod -A -o wide ==============" >> ${CLUSTER_INFO}
