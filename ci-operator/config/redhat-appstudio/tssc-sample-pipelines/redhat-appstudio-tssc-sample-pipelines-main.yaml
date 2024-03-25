@@ -77,7 +77,29 @@ tests:
   container:
     from: src
   optional: true
-- as: validate-rhtap-sample-pipelines
+- as: rhtap-sample-pipelines-on-pull-request
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    env:
+      EVENT_TYPE: pull_request
+      RHTAP_ENABLE_TPA: "false"
+    post:
+    - ref: redhat-appstudio-rhtap-gather
+    pre:
+    - ref: redhat-appstudio-rhtap-installer-install-rhtap
+    test:
+    - ref: redhat-appstudio-tssc-sample-pipelines-validate-rhtap-pipelines
+    workflow: generic-claim
+- as: rhtap-sample-pipelines-on-push
   cluster_claim:
     architecture: amd64
     cloud: aws

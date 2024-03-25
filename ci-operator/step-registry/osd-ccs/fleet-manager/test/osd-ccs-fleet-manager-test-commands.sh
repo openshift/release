@@ -1477,6 +1477,15 @@ function test_serving_machine_pools () {
           if [ "$MP_AZ_COUNT" -ne "$MP_SUBNET_COUNT" ] || [ "$MP_AZ_COUNT" -ne 2 ]; then
             echo "ERROR. Unexpected machine pool: '$MP_NAME' subnet count: $MP_SUBNET_COUNT or availability count: $MP_AZ_COUNT (expected 2)"
             TEST_PASSED=false
+          else
+            echo "[OCM-6880] - OSDFM should add label to each request-serving MP with the proper subnet"
+            echo "Confirming that $MP_NAME machine pool has properly set label: 'hypershift.openshift.io/request-serving-subnets'"
+            FIRST_SUBNET=$(jq -n "$MP" | jq -r '.subnets[0]') || true
+            SECOND_SUBNET=$(jq -n "$MP" | jq -r '.subnets[1]') || true
+            REQUEST_SUBNET_LABEL=$(jq -n "$MP" | jq -r '.labels' | jq '."hypershift.openshift.io/request-serving-subnets" // empty' | xargs) || true
+            if [ "$REQUEST_SUBNET_LABEL" != "$FIRST_SUBNET.$SECOND_SUBNET" ]; then
+              echo "ERROR. Expecting 'hypershift.openshift.io/request-serving-subnets' serving mp label value to consist of two comma-separated subnets. Found: $REQUEST_SUBNET_LABEL"
+            fi
           fi
           if [ "$OBO_MP_FIRST_TWO_AZS" != "$MP_AZ_ARRAY" ]; then
             echo "ERROR. serving machine pool should only be placed in the first two AZs. It was placed in the following: $MP_AZ_ARRAY"

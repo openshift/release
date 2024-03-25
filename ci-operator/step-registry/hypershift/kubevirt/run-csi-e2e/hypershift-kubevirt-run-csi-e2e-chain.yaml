@@ -32,7 +32,52 @@ chain:
         echo "overriding Monitor Test Failure in CSI tests"
         csi_exit_code=0
       fi
-      exit ${csi_exit_code}
+      
+      export TEST_CSI_DRIVER_MANIFEST="kubevirt-driver-rwx.yaml"
+      export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+      ocp_version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
+      rwx_driver_file_url="https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/release-${ocp_version}/hack/test-driver-rwx.yaml"
+      rwx_supported_http_code=$(curl -o "${TEST_CSI_DRIVER_FILES}" -L -w "%{http_code}" "${rwx_driver_file_url}")
+      if [[ ${rwx_supported_http_code} == "404" ]]; then
+        echo "Read-Write-Many is not supported in version ${ocp_version}. Skipping RWX test"
+        exit ${csi_exit_code}
+      elif [[ ${rwx_supported_http_code} != "200" ]]; then
+        echo "Failed to get the test-driver-rwx.yaml file."
+        # the file should include the http response body 
+        cat "${TEST_CSI_DRIVER_FILES}"
+        exit 1
+      fi
+      
+      sed -i 's/FromExistingClassName: kubevirt/FromExistingClassName: kubevirt-csi-infra-default/' "${TEST_CSI_DRIVER_FILES}"
+      cat "${TEST_CSI_DRIVER_FILES}"
+      openshift-tests run --dry-run --provider "${TEST_PROVIDER}" openshift/csi | \
+          grep -e "External.Storage.*csi.kubevirt.io.*" | \
+          grep -v "CSI Ephemeral-volume*" | \
+          grep "should concurrently access the single volume from pods on different node" | \
+          grep "block volmode" > /tmp/tests_hs_kv_rwx
+      TEST_ARGS="${TEST_ARGS:-} --max-parallel-tests 1 --file /tmp/tests_hs_kv_rwx"
+      echo "${ARTIFACT_DIR}"
+      openshift-tests run openshift/csi ${TEST_ARGS:-} \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/e2e-rwx.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit" 2>&1 | tee /tmp/openshift-csi-tests-rwx.log
+
+      csi_exit_code_rwx=${PIPESTATUS[0]}
+
+      # If this line is shown in the openshift-tests output, all of the conformance test cases passed,
+      # but the monitor test has failed. Currently we're ignoring MonitorTest failures until we resolve:
+      # https://issues.redhat.com/browse/CNV-33717
+      if [[ -n "${SKIP_MONITOR_TEST}" ]] && [[ $(grep "failed due to a MonitorTest failure" /tmp/openshift-csi-tests-rwx.log) ]];
+      then
+        echo "overriding Monitor Test Failure in CSI tests"
+        csi_exit_code_rwx=0
+      fi
+
+      if [[ ${csi_exit_code} -ne 0 ]]; then
+         exit ${csi_exit_code}
+      fi
+
+      exit ${csi_exit_code_rwx}
     timeout: 14400s
     env:
     - name: TEST_ARGS

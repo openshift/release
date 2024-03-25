@@ -241,6 +241,32 @@ function pre-OCP-53921(){
 
 function pre-OCP-53907(){
     echo "Test Start: ${FUNCNAME[0]}"
+    local version 
+    version="$(oc get clusterversion --no-headers | awk '{print $2}')"
+    if [ -z "${version}" ] ; then
+        echo "Fail to get cluster version!"
+        return 1
+    fi
+    x_ver=$( echo "${version}" | cut -f1 -d. )
+    y_ver=$( echo "${version}" | cut -f2 -d. )
+    y_ver=$((y_ver+1))
+    ver="${x_ver}.${y_ver}"
+    local retry=3
+    while (( retry > 0 ));do
+        versions=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates[]?.version'| xargs)
+        if [[ "${versions}" == "null" ]] || [[ "${versions}" != *"${ver}"* ]]; then
+	    retry=$((retry - 1))
+            sleep 60
+            echo "No recommended update available! Retry..."
+        else
+            echo "Recommencded update: ${versions}"
+            break
+        fi
+    done
+    if (( retry == 0 )); then
+        echo "Timeout to get recommended update!" 
+        return 1
+    fi
     recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates')
     mapfile -t images < <(echo ${recommends}|jq -r '.[].image')
     if [ -z "${images[*]}" ]; then
