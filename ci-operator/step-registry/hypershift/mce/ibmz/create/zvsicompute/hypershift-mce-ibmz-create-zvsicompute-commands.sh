@@ -136,7 +136,7 @@ for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
     exit 1
   else
     echo "Floating IP assigned to zVSI : $zvsi_fip"
-fi
+  fi
   zvsi_fip_list+=("$zvsi_fip")
   
 done
