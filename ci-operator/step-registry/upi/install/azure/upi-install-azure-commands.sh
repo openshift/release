@@ -178,7 +178,9 @@ status="false"
 while [ "$status" == "false" ]
 do
   status=$(az storage container exists --account-name $ACCOUNT_NAME --name vhd --account-key $ACCOUNT_KEY -o tsv --query exists)
+  echo "debug2"
 done
+echo "debug3"
 
 az storage blob copy start --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --destination-container vhd --destination-blob "rhcos.vhd" --source-uri "$VHD_URL"
 status="false"
