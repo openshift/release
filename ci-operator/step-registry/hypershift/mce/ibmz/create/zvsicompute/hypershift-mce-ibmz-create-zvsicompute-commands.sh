@@ -124,18 +124,14 @@ for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
       echo "Failure while adding the inbound rule to the $infra_name-compute-$i instance security group."
       exit 1
   fi  
+
+
   nic_name=$(ibmcloud is in-nics $infra_name-compute-$i -q | grep -v ID | awk '{print $2}')
+  
   echo "Creating a Floating IP for zVSI"
-  zvsi_fip=$(ibmcloud is ipc $infra_name-compute-$i-ip --zone $IC_REGION-1 --resource-group-name $infra_name-rg | awk '/Address/{print $2}')
-  echo "Assigning the Floating IP for zVSI"
-  zvsi_fip_status=$(ibmcloud is in-nic-ipc $infra_name-compute-$i $nic_name $infra_name-compute-$i-ip | awk '/Status/{print $2}')
-  if [ "$zvsi_fip_status" != "available" ]; then
-    echo "Error: Floating IP $infra_name-compute-ip is not assigned to the $infra_name-compute instance."
-    exit 1
-  else 
-    echo "Floating IP $infra_name-compute-ip is successfully assigned to the $infra_name-compute instance."
-    zvsi_fip_list+=("$zvsi_fip")
-  fi
+  zvsi_fip=$(ibmcloud is floating-ip-reserve $infra_name-compute-$i-ip  --in $infra_name-compute-$i --zone $IC_REGION-1 | awk '/Address/{print $2}')
+  zvsi_fip_list+=("$zvsi_fip")
+  
 done
 
 # Creating DNS service
