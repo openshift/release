@@ -1,29 +1,24 @@
 workflow:
-  as: rosa-aws-sts-hypershift-sector-advanced
+  as: rosa-aws-sts-hcp-byo-kms-oidc-auditlog
   steps:
     env:
       STS: "true"
       HOSTED_CP: "true"
-      COMPUTE_MACHINE_TYPE: "r5.2xlarge"
+      COMPUTE_MACHINE_TYPE: "m5.xlarge"
+      WORKER_DISK_SIZE: "128GiB"
       ENABLE_AUTOSCALING: "false"
-      REPLICAS: "3"
-      # MIN_REPLICAS: "3"
-      # MAX_REPLICAS: "6"
-      ENABLE_BYOVPC: "true"
-      ENABLE_AUDIT_LOG: "true"
-      # ENABLE_PROXY: "true"
-      ETCD_ENCRYPTION: "true"
-      STORAGE_ENCRYPTION: "true"
-      BYO_OIDC: "true"
-      OIDC_CONFIG_MANAGED: "true"
       DISABLE_WORKLOAD_MONITORING: "true"
       DISABLE_SCP_CHECKS: "false"
-      ENABLE_SECTOR: "true"
+      EC2_METADATA_HTTP_TOKENS: "required"
+      REPLICAS: "3"
+      # Specific
+      ENABLE_AUDIT_LOG: "true"
+      ETCD_ENCRYPTION: "true"
+      STORAGE_ENCRYPTION: "true"
+      OIDC_CONFIG_MANAGED: "true"
     pre:
     - ref: aws-provision-vpc-shared
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
-    # - chain: aws-provision-bastionhost
-    - ref: osd-ccs-fleet-manager-provision-shards
     - chain: rosa-sts-oidc-config-create
     - ref: rosa-sts-kms-key-create
     - ref: rosa-sts-audit-log-create
@@ -36,8 +31,8 @@ workflow:
     - ref: rosa-sts-audit-log-delete
     - ref: rosa-sts-kms-key-delete
     - chain: rosa-sts-oidc-config-delete
-    # - ref: aws-deprovision-s3buckets
     - ref: aws-deprovision-stacks
   documentation: |-
-    This workflow installs an advanced rosa hypershift cluster on a specified provision shard. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
+    This workflow installs a multi_az rosa hcp cluster with the byo kms, unmananged oidc config and audit log. 
+    The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login. 
     After finish testing, the cluster will be deprovsioned.
