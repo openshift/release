@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
-PATCH=/tmp/install-config-sharednetwork.yaml.patch
+PATCH=/tmp/install-config-byo-vpc.yaml.patch
 
 cat > "${PATCH}" << EOF
 platform:
