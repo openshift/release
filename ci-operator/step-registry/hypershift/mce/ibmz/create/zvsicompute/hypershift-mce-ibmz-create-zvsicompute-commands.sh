@@ -128,7 +128,7 @@ for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
 
   
   echo "Getting the Virtual Network Interface ID for zVSI"
-  vni_id=ibmcloud is instance $infra_name-compute-$i | awk '/Primary/{print $7}'
+  vni_id=$(ibmcloud is instance $infra_name-compute-$i | awk '/Primary/{print $7}')
   echo "Creating a Floating IP for zVSI"
   zvsi_fip=$(ibmcloud is floating-ip-reserve $infra_name-compute-$i-ip --nic $vni_id | awk '/Address/{print $2}')
   if [ -z "$zvsi_fip" ]; then
