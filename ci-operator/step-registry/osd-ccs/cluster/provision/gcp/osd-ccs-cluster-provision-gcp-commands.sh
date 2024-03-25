@@ -40,7 +40,7 @@ echo -e "Available cluster versions:\n${versionList}"
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
   OPENSHIFT_VERSION=$(echo "$versionList" | tail -1)
 elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
-  OPENSHIFT_VERSION=$(echo "$versionList" | grep "${OPENSHIFT_VERSION}" | tail -1 || true)
+  OPENSHIFT_VERSION=$(echo "$versionList" | grep "^${OPENSHIFT_VERSION}" | tail -1 || true)
 else
   # Match the whole line
   OPENSHIFT_VERSION=$(echo "$versionList" | { grep -x "${OPENSHIFT_VERSION}" || true; })
