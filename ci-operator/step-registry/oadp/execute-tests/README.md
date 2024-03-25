@@ -44,7 +44,7 @@ This script is executed in the following steps:
   - **If left empty**: A default value of `aws` will be used.
 - `OADP_TEST_FOCUS`
   - **Definition**: The Ginkgo focus used to define which tests in the suite should be run.
-  - **If left empty**: A default value of `test-upstream` will be used.
+  - **If left empty**: A default value of `interop` will be used.
 - `OADP_CREDS_FILE`
   - **Definition**: The path to the `credentials` file used to access the OADP backup location.
   - **If left empty**: A default value of `/tmp/test-settings/credentials` will be used.

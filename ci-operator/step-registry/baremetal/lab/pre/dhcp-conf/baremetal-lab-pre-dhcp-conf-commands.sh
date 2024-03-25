@@ -22,9 +22,12 @@ fi
 
 echo "Generating the DHCP/PXE config..."
 
-DHCP_CONF="# DO NOT EDIT; BEGIN $CLUSTER_NAME
-dhcp-option-force=tag:$CLUSTER_NAME,15,$CLUSTER_NAME.$BASE_DOMAIN
-dhcp-option-force=tag:$CLUSTER_NAME,119,$CLUSTER_NAME.$BASE_DOMAIN"
+DHCP_CONF_OPTS="
+tag:$CLUSTER_NAME,15,$CLUSTER_NAME.$BASE_DOMAIN
+tag:$CLUSTER_NAME,119,$CLUSTER_NAME.$BASE_DOMAIN
+"
+
+DHCP_CONF=""
 
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
@@ -35,14 +38,15 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     exit 1
   fi
   DHCP_CONF="${DHCP_CONF}
-dhcp-host=$mac,$ip,set:$CLUSTER_NAME,infinite"
+$mac,$ip,set:$CLUSTER_NAME,infinite"
 done
 
 DHCP_CONF="${DHCP_CONF}
-# DO NOT EDIT; END $CLUSTER_NAME"
+$(<"${SHARED_DIR}/ipi_bootstrap_mac_address"),$(<"${SHARED_DIR}/ipi_bootstrap_ip_address"),set:$CLUSTER_NAME,infinite"
 
 echo "Setting the DHCP/PXE config in the auxiliary host..."
-timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "'${DHCP_CONF}'" <<'EOF'
-  echo -e "${1}" >> /opt/dnsmasq/etc/dnsmasq.conf
-  systemctl restart dhcp
+timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+  "'${DHCP_CONF}'" "'${DHCP_CONF_OPTS}'" "'${CLUSTER_NAME}'" <<'EOF'
+  echo -e "${1}" > /opt/dnsmasq/hosts/hostsdir/"${3}"
+  echo -e "${2}" > /opt/dnsmasq/hosts/optsdir/"${3}"
 EOF

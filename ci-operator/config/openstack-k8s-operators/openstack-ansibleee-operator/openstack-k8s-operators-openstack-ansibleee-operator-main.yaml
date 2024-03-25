@@ -12,6 +12,7 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM src
+    RUN dnf install -y rubygem-bundler
     RUN pip3 install pre-commit
   from: src
   to: openstack-operator-ci-pre-commit
@@ -68,7 +69,7 @@ tests:
     git log -1
     mkdir -p ../operator && cp -r . ../operator
     cd ../operator
-    pre-commit run --all-files --show-diff-on-failure
+    BUNDLE_PATH="./local/bundle" pre-commit run --all-files --show-diff-on-failure
   container:
     from: openstack-operator-ci-pre-commit
 - as: openstack-ansibleee-operator-build-deploy

@@ -24,10 +24,8 @@ Example of an arm64 cluster that is booting using the 64k-pages kernel
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips'
       MCO_CONF_DAY1_INSTALL_KERNEL_TYPE: 64k-pages
       OCP_ARCH: arm64
-      TAG_VERSION: '@4.15'
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-kerneltype

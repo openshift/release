@@ -179,7 +179,6 @@ def _deployment_resources(gendoc, namespaces):
                                 'command': [
                                                '/usr/bin/release-reimport-controller',
                                                'start',
-                                               '--dry-run',
                                                '-v=4',
                                            ] + _namespace_list(namespaces),
                                 'image': 'release-reimport-controller:latest',

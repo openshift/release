@@ -564,7 +564,7 @@ fi
 IF_INSTALL_INFRA_WORKLOAD=${IF_INSTALL_INFRA_WORKLOAD:=true}
 if [[ ${IF_INSTALL_INFRA_WORKLOAD} != "true" ]];then
    echo "No need to install infra and workload for this OCP cluster"
-   exit 1
+   exit 0
 fi
 
 # Download jq
@@ -587,12 +587,12 @@ total_worker_nodes=$(oc get nodes -l node-role.kubernetes.io/worker= -oname|wc -
 
 scale_type=""
 #Currently only support AWS reference to ROSA settings
-if [[ $total_worker_nodes -gt 100 ]];then
+if [[ $total_worker_nodes -ge 100 ]];then
 	scale_type=medium
-elif [[ $total_worker_nodes -gt 26 && $total_worker_nodes -lt 100 ]];then
+elif [[ $total_worker_nodes -ge 25 && $total_worker_nodes -lt 100 ]];then
 	scale_type=small
 elif [[ $total_worker_nodes -ge 1 && $total_worker_nodes -lt 25 ]];then
-	scale_type=small
+	scale_type=extrasmall
 fi
 
 ######################################################################################

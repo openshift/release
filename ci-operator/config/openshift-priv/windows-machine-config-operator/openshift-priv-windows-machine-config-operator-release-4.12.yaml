@@ -4,7 +4,7 @@ base_images:
     namespace: openshift
     tag: rhel-8-release-golang-1.19-openshift-4.12
   operator-sdk:
-    name: "4.12"
+    name: "4.14"
     namespace: origin
     tag: operator-sdk
 binary_build_commands: make build
@@ -149,6 +149,106 @@ tests:
           cpu: 1000m
           memory: 400Mi
     workflow: ipi-aws-ovn-hybrid
+- always_run: false
+  as: azure-e2e-upgrade
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: install
+      cli: latest
+      commands: |-
+        export WMCO_NS=openshift-windows-machine-config-operator
+        oc create namespace $WMCO_NS
+        oc label --overwrite=true ns $WMCO_NS openshift.io/cluster-monitoring=true \
+        pod-security.kubernetes.io/enforce=privileged
+        # deploy og
+        oc create -f - <<EOF
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: windows-machine-config-operator
+          namespace: ${WMCO_NS}
+        spec:
+          targetNamespaces:
+            - ${WMCO_NS}
+        EOF
+
+        # install operator via subscription
+        oc create -f - <<EOF
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: windows-machine-config-operator
+          namespace: ${WMCO_NS}
+        spec:
+          channel: stable
+          installPlanApproval: Automatic
+          name: windows-machine-config-operator
+          source: redhat-operators
+          sourceNamespace: openshift-marketplace
+        EOF
+
+        # oc wait will immediately fail if the deployment does not exist yet, first retry until the deployment is
+        # created by the subscription controller
+        retries=0
+        while ! oc get -n $WMCO_NS deployment windows-machine-config-operator; do
+          if [[ $retries -eq 10 ]]; then
+            echo "max retries hit"
+            exit 1
+          fi
+          sleep 1m
+          retries=$((retries+1))
+        done
+        oc wait --timeout=10m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
+      from: cli
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test-setup
+      cli: latest
+      commands: |-
+        #!/bin/bash
+        set -euo pipefail
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        oc create secret generic cloud-private-key --from-file=private-key.pem="${KUBE_SSH_KEY_PATH}" -n openshift-windows-machine-config-operator
+        make upgrade-test-setup
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: upgrade
+      cli: latest
+      commands: |
+        export WMCO_NS=openshift-windows-machine-config-operator
+        operator-sdk cleanup --timeout 1m windows-machine-config-operator -n $WMCO_NS || {
+          echo "operator-sdk cleanup timed out"
+        }
+        operator-sdk run bundle --timeout=10m --security-context-config restricted -n $WMCO_NS "$OO_BUNDLE"
+        sleep 5m
+        oc wait --timeout=5m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: wmco-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test
+      cli: latest
+      commands: |-
+        #!/bin/bash
+        set -euo pipefail
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        make upgrade-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    workflow: ipi-azure-ovn-hybrid
 - always_run: false
   as: platform-none-vsphere-e2e-operator
   steps:

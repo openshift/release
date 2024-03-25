@@ -74,6 +74,10 @@ if [[ "$ETCD_ENCRYPTION" == "true" ]]; then
   ETCD_ENCRYPTION_SWITCH="--etcd-encryption"
 fi
 
+SECURE_BOOT_FOR_SHIELDED_VMS_SWITCH=""
+if [[ "$SECURE_BOOT_FOR_SHIELDED_VMS" == "true" ]]; then
+  SECURE_BOOT_FOR_SHIELDED_VMS_SWITCH="--secure-boot-for-shielded-vms"
+fi
 
 # Cluster parameters
 echo "Parameters for cluster request:"
@@ -88,6 +92,7 @@ echo "  Channel group: ${CHANNEL_GROUP}"
 echo "  Etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Subscription type: ${SUBSCRIPTION_TYPE}"
+echo "  Secure boot for shielded VMs: ${SECURE_BOOT_FOR_SHIELDED_VMS}"
 
 echo -e "
 ocm create cluster ${CLUSTER_NAME} \
@@ -101,7 +106,8 @@ ocm create cluster ${CLUSTER_NAME} \
 --subscription-type ${SUBSCRIPTION_TYPE} \
 ${MARKETPLACE_GCP_TERMS_SWITCH} \
 ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
-${ETCD_ENCRYPTION_SWITCH}
+${ETCD_ENCRYPTION_SWITCH} \
+${SECURE_BOOT_FOR_SHIELDED_VMS_SWITCH}
 "
 
 # Create GCP cluster
@@ -117,6 +123,7 @@ ocm create cluster ${CLUSTER_NAME} \
                     ${MARKETPLACE_GCP_TERMS_SWITCH} \
                     ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
                     ${ETCD_ENCRYPTION_SWITCH} \
+                    ${SECURE_BOOT_FOR_SHIELDED_VMS_SWITCH} \
                     > "${ARTIFACT_DIR}/cluster.txt"
 
 # Store the cluster ID for the post steps and the cluster deprovision

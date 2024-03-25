@@ -137,6 +137,18 @@ platform:
   fi
 fi
 
+echo "[INFO] Looking for patches to the install-config.yaml..."
+
+shopt -s nullglob
+for f in "${SHARED_DIR}"/*_patch_install_config.yaml;
+do
+  if test -f "${f}"
+  then
+      echo "[INFO] Applying patch file: $f"
+      yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" $f
+  fi
+done
+
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
 
@@ -173,6 +185,11 @@ case "${BOOT_MODE}" in
   for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     # shellcheck disable=SC1090
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+    if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+      # Do not mount image to additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
+      # on a single-arch payload migrated to a multi-arch cluster)
+      continue
+    fi
     if [ "${transfer_protocol_type}" == "cifs" ]; then
       IP_ADDRESS="$(dig +short "${AUX_HOST}")"
       iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.${arch}.iso"
@@ -218,6 +235,11 @@ proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+    # Do not power on the additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
+    # on a single-arch payload migrated to a multi-arch cluster)
+    continue
+  fi
   echo "Power on #${host} (${name})..."
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "${BOOT_MODE}"
 done

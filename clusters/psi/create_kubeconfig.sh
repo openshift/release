@@ -22,6 +22,7 @@ API_SERVER_URL=$5
 readonly API_SERVER_URL
 SECRET=$6
 readonly SECRET
+SKIP_TLS_VERIFY=${SKIP_TLS_VERIFY:-false}
 
 while :
 do
@@ -40,6 +41,7 @@ template="apiVersion: v1
 clusters:
 - cluster:
     server: {{API_SERVER_URL}}
+    insecure-skip-tls-verify: {{SKIP_TLS_VERIFY}}
   name: {{CLUSTER}}
 contexts:
 - context:
@@ -56,7 +58,7 @@ users:
     token: {{TOKEN}}
 "
 
-echo -n "$template" | ${sed_cmd} "s/{{CLUSTER}}/${CLUSTER}/g;s/{{SERVICE_ACCOUNT}}/${SERVICE_ACCOUNT}/g;s/{{SA_NAMESPACE}}/${SA_NAMESPACE}/g;s/{{API_SERVER_URL}}/${API_SERVER_URL//\//\\/}/g;s/{{TOKEN}}/${TOKEN}/g" > $OUTPUT_PATH
+echo -n "$template" | ${sed_cmd} "s/{{CLUSTER}}/${CLUSTER}/g;s/{{SERVICE_ACCOUNT}}/${SERVICE_ACCOUNT}/g;s/{{SA_NAMESPACE}}/${SA_NAMESPACE}/g;s/{{API_SERVER_URL}}/${API_SERVER_URL//\//\\/}/g;s/{{TOKEN}}/${TOKEN}/g;s/{{SKIP_TLS_VERIFY}}/${SKIP_TLS_VERIFY}/g" > $OUTPUT_PATH
 
 
 

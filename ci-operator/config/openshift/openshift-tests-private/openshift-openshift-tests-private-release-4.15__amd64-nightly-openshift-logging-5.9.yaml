@@ -1,0 +1,141 @@
+base_images:
+  ansible:
+    name: "4.15"
+    namespace: ocp
+    tag: ansible
+  assisted-service-scripts:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  aws-efs-csi-operator-create-efs:
+    name: "4.15"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: "4.15"
+    namespace: ocp
+    tag: hypershift-operator
+  openstack-installer:
+    name: "4.15"
+    namespace: ocp
+    tag: openstack-installer
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.15"
+  tools:
+    name: "4.15"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.15"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: azure-ipi-proxy-workers-rhcos-rhel8-f7
+  cron: 45 21 2,9,16,23 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CLO_SUB_CHANNEL: stable-5.9
+      CLO_TARGET_NAMESPACES: ""
+      COMPUTE_NODE_TYPE: Standard_D4s_v3
+      E2E_RUN_TAGS: '@logging5.9'
+      EO_SUB_CHANNEL: stable
+      EO_SUB_SOURCE: redhat-operators
+      FILTERS_ADDITIONAL: ""
+      FORCE_SUCCESS_EXIT: "true"
+      LO_SUB_CHANNEL: stable-5.9
+      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log5.9
+      TEST_ADDITIONAL: ""
+      TEST_FILTERS: CPaasrunOnly;CPaasrunBoth;~Disruptive&;~Longduration&
+      TEST_IMPORTANCE: ""
+      TEST_PARALLEL: "3"
+      TEST_ROSA_LOGIN_ENV: ""
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "15"
+    test:
+    - ref: enable-qe-catalogsource-logging
+    - ref: operatorhub-subscribe-cluster-logging-operator
+    - ref: operatorhub-subscribe-loki-operator
+    - ref: operatorhub-subscribe-elasticsearch-operator
+    - chain: openshift-e2e-test-logging-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-proxy-workers-rhcos-rhel8
+- as: aws-ipi-f7-disruptive
+  cron: 27 19 5,13,20,27 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CLO_SUB_CHANNEL: stable-5.9
+      CLO_TARGET_NAMESPACES: ""
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      EO_SUB_CHANNEL: stable
+      EO_SUB_SOURCE: redhat-operators
+      FORCE_SUCCESS_EXIT: "true"
+      LO_SUB_CHANNEL: stable-5.9
+      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log5.9
+      TEST_FILTERS: Disruptive;Longduration
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: enable-qe-catalogsource-logging
+    - ref: operatorhub-subscribe-cluster-logging-operator
+    - ref: operatorhub-subscribe-loki-operator
+    - ref: operatorhub-subscribe-elasticsearch-operator
+    - chain: openshift-e2e-test-logging-qe-disruptive
+    workflow: cucushift-installer-rehearse-aws-ipi
+zz_generated_metadata:
+  branch: release-4.15
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-nightly-openshift-logging-5.9

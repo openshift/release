@@ -5,13 +5,6 @@ import yaml
 
 CONFIG = {
 
-    'aws-arm64-quota-slice': {
-        # Wild guesses.  We'll see when we hit quota issues
-        'us-east-1': 10,
-        'us-east-2': 8,
-        'us-west-1': 8,
-        'us-west-2': 8,
-    },
     'aws-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'us-east-1': 50,
@@ -42,6 +35,9 @@ CONFIG = {
     'aws-qe-quota-slice': {
         'us-east-1': 25,
         'ap-northeast-1': 5,
+    },
+    'aws-autorelease-qe-quota-slice': {
+        'us-east-1': 2,
     },
     'aws-terraform-qe-quota-slice': {
         'ap-northeast-1': 2,
@@ -75,8 +71,8 @@ CONFIG = {
         'us-east-2': 5,
     },
     'aws-local-zones-quota-slice': {
-        'us-east-1': 2,
-        'us-west-2': 2
+        'us-east-1': 5,
+        'us-west-2': 5
     },
     'aws-perf-qe-quota-slice': {
         'us-west-2': 3,
@@ -87,8 +83,12 @@ CONFIG = {
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
+    'aws-serverless-quota-slice': {
+        'us-east-1': 5,
+        'us-east-2': 5,
+    },
     'aws-rhtap-qe-quota-slice': {
-        'us-west-2': 10
+        'us-east-1': 10
     },
     'aws-rhtap-performance-quota-slice': {
         'eu-west-1': 10
@@ -161,7 +161,7 @@ CONFIG = {
         'usgovtexas': 5
     },
     'equinix-ocp-metal-quota-slice': {
-        'default': 50,
+        'default': 70,
     },
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
@@ -204,9 +204,6 @@ CONFIG = {
     'nutanix-qe-dis-quota-slice': {},
     'nutanix-qe-zone-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
-    'openstack-quota-slice': {
-        'default': 7,
-    },
     'openstack-vexxhost-quota-slice': {
         'default': 9,
     },
@@ -215,6 +212,9 @@ CONFIG = {
     },
     'openstack-hwoffload-quota-slice': {
         'default': 5,
+    },
+    'openstack-nerc-dev-quota-slice': {
+        'default': 1,
     },
     'openstack-nfv-quota-slice': {
         'default': 5,
@@ -371,10 +371,22 @@ CONFIG = {
         'us-east-2': 5,
         'us-west-1': 5,
         'us-west-2': 5,
+    },
+    'rh-openshift-ecosystem-quota-slice': {
+        'us-east-1': 10,
+        'us-east-2': 10,
+        'us-west-1': 10,
+        'us-west-2': 10,
+    },
+    'odf-aws-quota-slice': {
+        'us-east-1': 25,
+        'us-east-2': 25,
+        'us-west-1': 25,
+        'us-west-2': 25,
     }
 }
 
-for i in range(0,4):
+for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
 # Mihawk0 is updated with RHEL 8.8, adding the Mihawk back to the lease pool
