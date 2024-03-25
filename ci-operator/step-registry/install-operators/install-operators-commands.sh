@@ -67,7 +67,12 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     if [[ "${operator_target_namespaces}" == "!install" ]]; then
         operator_target_namespaces="${operator_install_namespace}"
     fi
-    
+
+    is_available=$(oc get packagemanifest "${operator_name}" -l catalog=${operator_source} -ojson |jq -rc '.status.channels[] | "\(.name):\(.currentCSV)"' | grep ${operator_channel})
+    if [[ -z "${is_available}" ]]; then
+        echo "ERROR: Operator ${operator_name} from ${operator_source} channel ${operator_channel} not found."
+        exit 1
+    fi
     echo "Installing ${operator_name} from ${operator_source} channel ${operator_channel} into ${operator_install_namespace}${operator_target_namespaces:+, targeting $operator_target_namespaces}"
 
     # Create the install namespace
