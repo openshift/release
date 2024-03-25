@@ -28,6 +28,7 @@ PRIVATE_LINK=${PRIVATE_LINK:-false}
 PRIVATE_SUBNET_ONLY="false"
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
+CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
 ADDITIONAL_SECURITY_GROUP=${ADDITIONAL_SECURITY_GROUP:-false}
 NO_CNI=${NO_CNI:-false}
 
@@ -95,10 +96,7 @@ ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 if [[ ! -z "${ROSA_TOKEN}" ]]; then
   echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
   rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
-  if [ $? -ne 0 ]; then
-    echo "Login failed"
-    exit 1
-  fi
+  ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
 else
   echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
   exit 1
@@ -285,12 +283,18 @@ fi
 HYPERSHIFT_SWITCH=""
 if [[ "$HOSTED_CP" == "true" ]]; then
   HYPERSHIFT_SWITCH="--hosted-cp"
-  if [[ "$ENABLE_SECTOR" == "true" ]]; then
-    PROVISION_SHARD_ID=$(cat ${SHARED_DIR}/provision_shard_ids | head -n 1)
-    if [[ -z "$PROVISION_SHARD_ID" ]]; then
-      echo -e "No available provision shard."
-      exit 1
+  if [[ ! -z "${CLUSTER_SECTOR}" ]]; then
+    psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('ready')" | jq -r '.items[].provision_shard_reference.id')
+    if [[ -z "$psList" ]]; then
+      echo "no ready provision shard found, trying to find maintenance status provision shard"
+      # try to find maintenance mode SC, currently osdfm api doesn't support status in ('ready', 'maintenance') query.
+      psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('maintenance')" | jq -r '.items[].provision_shard_reference.id')
+      if [[ -z "$psList" ]]; then
+        echo "No available provision shard!"
+        exit 1
+      fi
     fi
+    PROVISION_SHARD_ID=$(echo "$psList" | head -n 1)
 
     HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
     record_cluster "properties" "provision_shard_id" ${PROVISION_SHARD_ID}
