@@ -126,10 +126,17 @@ for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
   fi  
 
 
-  nic_name=$(ibmcloud is in-nics $infra_name-compute-$i -q | grep -v ID | awk '{print $2}')
   
+  echo "Getting the Virtual Network Interface ID for zVSI"
+  vni_id=ibmcloud is instance $infra_name-compute-$i | awk '/Primary/{print $7}'
   echo "Creating a Floating IP for zVSI"
-  zvsi_fip=$(ibmcloud is floating-ip-reserve $infra_name-compute-$i-ip  --in $infra_name-compute-$i --zone $IC_REGION-1 | awk '/Address/{print $2}')
+  zvsi_fip=$(ibmcloud is floating-ip-reserve $infra_name-compute-$i-ip --nic $vni_id | awk '/Address/{print $2}')
+  if [ -z "$zvsi_fip" ]; then
+    echo "Error: Floating IP assignment failed. zvsi_fip is empty."
+    exit 1
+  else
+    echo "Floating IP assigned to zVSI : $zvsi_fip"
+fi
   zvsi_fip_list+=("$zvsi_fip")
   
 done
