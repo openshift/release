@@ -43,7 +43,7 @@ fi
   --namespace local-cluster \
   --base-domain=${BASEDOMAIN} \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
-  --image-content-sources "${SHARED_DIR}/mgmt_iscp.yaml" \
+  --image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml" \
   --ssh-key="${SHARED_DIR}/id_rsa.pub" \
   --release-image ${RELEASE_IMAGE}
 
