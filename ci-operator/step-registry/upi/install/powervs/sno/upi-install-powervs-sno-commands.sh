@@ -11,11 +11,11 @@ setup_env() {
   # Installing required tools
   echo "$(date) Installing required tools"
   mkdir /tmp/ibm_cloud_cli
-  curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.23.0/IBM_Cloud_CLI_2.23.0_amd64.tar.gz
+  curl -s --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.23.0/IBM_Cloud_CLI_2.23.0_amd64.tar.gz
   tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
   export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
   mkdir /tmp/bin
-  curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/bin/jq && chmod +x /tmp/bin/jq
+  curl -s -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/bin/jq && chmod +x /tmp/bin/jq
   export PATH=$PATH:/tmp/bin
 
   # IBM cloud login
@@ -250,7 +250,7 @@ register_infra() {
 download_iso() {
 
   echo "Downloading ISO \${ISO_URL} ..."
-  curl \${ISO_URL} -o \${CONFIG_DIR}/assisted.iso
+  curl -s \${ISO_URL} -o \${CONFIG_DIR}/assisted.iso
 
   if [[ -f "\${CONFIG_DIR}/assisted.iso" ]]; then
     echo "Extract pxe files from ISO"
@@ -483,7 +483,7 @@ download_installer() {
     echo "Dowmload openshift-install"
     install_tar_file="openshift-install-linux.tar.gz"
     if [[ ! -z \${INSTALLER_URL} ]]; then
-        curl \${INSTALLER_URL} -o \${install_tar_file}
+        curl -s \${INSTALLER_URL} -o \${install_tar_file}
     else
       root_path="https://mirror.openshift.com/pub/openshift-v4/ppc64le/clients"
       install_path="\${root_path}/ocp/latest-\${OCP_VERSION}/\${install_tar_file}"
@@ -510,10 +510,10 @@ sno_prepare_cluster() {
 
     cp \${CONFIG_DIR}/bootstrap-in-place-for-live-iso.ign \${WWW_DIR}/bootstrap.ign
     chmod 644 \${WWW_DIR}/bootstrap.ign
-    curl \${ROOTFS_URL} -o \${WWW_DIR}/rootfs.img
+    curl -s \${ROOTFS_URL} -o \${WWW_DIR}/rootfs.img
 
-    curl \${INITRAMFS_URL} -o \${IMAGES_DIR}/initramfs.img
-    curl \${KERNEL_URL} -o \${IMAGES_DIR}/kernel
+    curl -s \${INITRAMFS_URL} -o \${IMAGES_DIR}/initramfs.img
+    curl -s \${KERNEL_URL} -o \${IMAGES_DIR}/kernel
 }
 
 agent_prepare_cluster() {
