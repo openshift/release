@@ -40,7 +40,6 @@ if [ "${INSTALL_FROM_IIB}" = "true" ]; then
   fi
 
   RUN_COMMAND+=" --s3-bucket-operators-latest-iib-path ${S3_BUCKET_OPERATORS_LATEST_IIB_PATH} \
-                --iib-region ${AWS_REGION} \
                 --aws-region ${AWS_REGION} \
                 --aws-access-key-id ${AWS_ACCESS_KEY_ID} \
                 --aws-secret-access-key ${AWS_SECRET_ACCESS_KEY} "
