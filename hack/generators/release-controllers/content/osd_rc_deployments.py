@@ -24,7 +24,7 @@ def _add_osd_rc_bootstrap(gendoc):
                 {
                     'from': {
                         'kind': 'DockerImage',
-                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.16:tests'
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.15:tests'
                     },
                     'importPolicy': {
                         'scheduled': True
