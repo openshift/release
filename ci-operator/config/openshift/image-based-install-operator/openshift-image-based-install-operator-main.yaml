@@ -42,6 +42,30 @@ tests:
   commands: HOME=/tmp make test
   container:
     from: src
+- as: integration
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: integration-deploy-and-run
+      cli: latest
+      commands: |
+        make run-integration-test
+      dependencies:
+      - env: IMG
+        name: image-based-install-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 - as: publish
   postsubmit: true
   steps:
