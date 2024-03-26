@@ -66,26 +66,46 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_INTERMEDIATE_TAGS: '@4.11 and @azure-ipi and @upgrade-sanity and not
-        @fips'
       E2E_RUN_LATEST_TAGS: '@4.12 and @azure-ipi and @upgrade-sanity and not @fips'
       UPGRADE_CHECK_RUN_TAGS: '@4.10 and @azure-ipi and @upgrade-check and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@4.10 and @azure-ipi and @upgrade-prepare and not @fips'
     test:
-    - chain: openshift-upgrade-qe-test-paused
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-eus
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: vsphere-ipi-f14
   cron: 33 20 9,24 * *
   steps:
     cluster_profile: vsphere-2
     env:
-      E2E_RUN_INTERMEDIATE_TAGS: '@4.11 and @vsphere-ipi and @upgrade-sanity and not
-        @fips'
       E2E_RUN_LATEST_TAGS: '@4.12 and @vsphere-ipi and @upgrade-sanity and not @fips'
       UPGRADE_CHECK_RUN_TAGS: '@4.10 and @vsphere-ipi and @upgrade-check and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@4.10 and @vsphere-ipi and @upgrade-prepare and not @fips'
     test:
-    - chain: openshift-upgrade-qe-test-paused
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-eus
     workflow: cucushift-installer-rehearse-vsphere-ipi
 zz_generated_metadata:
   branch: release-4.12
