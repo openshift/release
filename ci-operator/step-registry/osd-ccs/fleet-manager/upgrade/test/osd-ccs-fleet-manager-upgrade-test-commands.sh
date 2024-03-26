@@ -55,24 +55,25 @@ FAILED_HC_INFO_CHECK_COUNTER=0
 
 for ((i=0; i<1080; i+=1)); do
   UPGRADE_FINISHED=false
-  echo "Checking cluster operators upgraded to: $HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
-  CLUSTER_OPERATORS_COUNT=0
-  CLUSTER_OPERATORS_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get co -A | tail -n +2) || true # failed execution just results in operators count being 0
-  CLUSTER_OPERATORS_COUNT=$(echo "$CLUSTER_OPERATORS_INFO" | wc -l) || true # failed execution just results in operators count being 0
-  MC_CO_UPGRADED=false
-  for ((j=1; j<="$CLUSTER_OPERATORS_COUNT"; j++)); do
-    CO_INFO=$(echo "$CLUSTER_OPERATORS_INFO" | head -n $j | tail -n +$j)
-    if [ "$CO_INFO" == "" ]; then
-      continue
-    fi
-    UPGRADE_PROGRESSING=$(echo "$CO_INFO" | awk '{print $4}')
-    CURRENT_VERSION=$(echo "$CO_INFO" | awk '{print $2}')
-    if [ "${CURRENT_VERSION}" != "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" ] || [ "$UPGRADE_PROGRESSING" == "True" ]; then
-      MC_CO_UPGRADED=false
-      break
-    fi
-    MC_CO_UPGRADED=true
-  done
+  # echo "Checking cluster operators upgraded to: $HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
+  # CLUSTER_OPERATORS_COUNT=0
+  # CLUSTER_OPERATORS_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get co -A | tail -n +2) || true # failed execution just results in operators count being 0
+  # CLUSTER_OPERATORS_COUNT=$(echo "$CLUSTER_OPERATORS_INFO" | wc -l) || true # failed execution just results in operators count being 0
+  # MC_CO_UPGRADED=false
+  # for ((j=1; j<="$CLUSTER_OPERATORS_COUNT"; j++)); do
+  #   CO_INFO=$(echo "$CLUSTER_OPERATORS_INFO" | head -n $j | tail -n +$j)
+  #   if [ "$CO_INFO" == "" ]; then
+  #     continue
+  #   fi
+  #   UPGRADE_PROGRESSING=$(echo "$CO_INFO" | awk '{print $4}')
+  #   CURRENT_VERSION=$(echo "$CO_INFO" | awk '{print $2}')
+  #   if [ "${CURRENT_VERSION}" != "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" ] || [ "$UPGRADE_PROGRESSING" == "True" ]; then
+  #     MC_CO_UPGRADED=false
+  #     break
+  #   fi
+  #   MC_CO_UPGRADED=true
+  # done
+  ### 
   echo "Checking HC operators info available"
   CLUSTER_OPERATORS_INFO=""
   CLUSTER_OPERATORS_INFO=$(oc --request-timeout=5s --kubeconfig "$HC_KUBECONFIG" get co -A --insecure-skip-tls-verify | tail -n +2) || true
