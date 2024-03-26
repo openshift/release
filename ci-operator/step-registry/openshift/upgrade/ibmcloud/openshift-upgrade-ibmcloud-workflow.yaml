@@ -1,0 +1,21 @@
+workflow:
+  as: openshift-upgrade-ibmcloud
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-ibmcloud-pre-stableinitial
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-core-dump
+    - ref: gather-ibmcloud-resource
+    - chain: ipi-ibmcloud-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+      TEST_UPGRADE_OPTIONS: ""
+  documentation: |-
+    The Openshift E2E IBM Cloud workflow executes the upgrade end-to-end test suite on IBM Cloud with a default cluster configuration, exercising an upgrade during the process.
