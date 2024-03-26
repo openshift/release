@@ -3,6 +3,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: ansible
+  assisted-service-scripts:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   cli:
     name: "4.14"
     namespace: ocp
@@ -233,6 +237,17 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-network-mtu-edge-zone-sdn
+- as: aws-ipi-ovn-hypershift-inplace-f7
+  cron: 15 14 3,11,18,25 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_ARGS: --node-upgrade-type=InPlace
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: aws-ipi-ovn-hypershift-replace-f7
   cron: 25 3 3,12,19,26 * *
   steps:
@@ -429,6 +444,34 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-upi
+- as: baremetalds-agent-hypershift-mce-inplace-f7
+  cluster: build05
+  cron: 13 1 5,12,21,28 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      EXTRA_ARGS: --node-upgrade-type=InPlace
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.14
+      MCE_VERSION: "2.5"
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+- as: baremetalds-agent-hypershift-mce-mceupgrade-inplace-f7
+  cluster: build05
+  cron: 37 10 9,16,23,30 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      EXTRA_ARGS: --node-upgrade-type=InPlace
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.14
+      MCE_TARGET_VERSION: "2.5"
+      MCE_VERSION: "2.4"
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - ref: hypershift-mce-upgrade
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
 - as: baremetalds-ipi-ovn-ipv4-fips-f28
   cron: 8 2 5 * *
   steps:
