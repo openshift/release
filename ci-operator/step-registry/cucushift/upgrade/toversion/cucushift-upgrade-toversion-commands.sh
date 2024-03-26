@@ -311,6 +311,7 @@ function set_target_and_upgrade_cmd(){
         exit 1
     fi
     # x.y.z: run upgrade with "oc adm upgrade --to x.y.z";
+    # By default we ENABLE_OTA_TEST: OCP-23799
     if [[ -n "${UPGRADE_TO_VERSION}" ]] && [[ "${UPGRADE_TO_VERSION}" != "latest" ]]; then
         valid_target="false"
         # check if x.y.z is in available_versions, if not, it's invalid target with --to.
