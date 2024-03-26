@@ -39,7 +39,13 @@ REMOTE_LIBVIRT_URI="qemu+tcp://${HOSTNAME}/system"
 echo "Using libvirt connection for $REMOTE_LIBVIRT_URI"
 
 # Test the remote connection
-mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list
+echo "Scanning for resources in the remote environment:"
+echo "--  Domains --"
+mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list --all --name
+echo "--  Pools --"
+mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} pool-list --all --name
+echo "--  Networks --"
+mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} net-list --all --name
 
 set +e
 
@@ -73,7 +79,7 @@ CONFLICTING_NETWORKS=$(mock-nss.sh virsh -c "${REMOTE_LIBVIRT_URI}" net-list --a
 set -e
 
 if [ ! -z "$CONFLICTING_DOMAINS" ] || [ ! -z "$CONFLICTING_POOLS" ] || [ ! -z "$CONFLICTING_NETWORKS" ]; then
-  echo "Could not ensure clean state for lease ${LEASED_RESOURCE}"
+  echo "Could not ensure clean state for lease ${LEASED_RESOURCE}. Found conflicting resources."
   echo "Conflicting domains: $CONFLICTING_DOMAINS"
   echo "Conflicting pools: $CONFLICTING_POOLS"
   echo "Conflicting networks: $CONFLICTING_NETWORKS"
