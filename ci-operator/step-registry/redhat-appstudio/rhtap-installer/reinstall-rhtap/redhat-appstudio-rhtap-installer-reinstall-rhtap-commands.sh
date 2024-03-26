@@ -54,7 +54,7 @@ RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES=${RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAU
 RHTAP_ENABLE_TPA=${RHTAP_ENABLE_TPA:-'true'}
 
 echo "Enabled Components....."
-env | grep RHTAP_ENABLE
+env | grep '^RHTAP_ENABLE'
 
 ACS__API_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-api-token)
 ACS__CENTRAL_ENDPOINT=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-central-endpoint)
@@ -176,23 +176,22 @@ health_check(){
 remove_rhtap(){
   echo "[INFO]Remove RHTAP ..."
   # Get a list of resource names in the namespace
-  resource_names=$(oc get applications -n rhtap -o jsonpath='{.items[*].metadata.name}')
+  resource_names=$(oc get applications -n $NAMESPACE -o jsonpath='{.items[*].metadata.name}')
 
   # Loop through each resource and remove finalizers
   for resource_name in $resource_names; do
-      oc patch application "$resource_name" -n rhtap --type merge -p '{"metadata":{"finalizers":null}}'
+      oc patch application "$resource_name" -n $NAMESPACE --type merge -p '{"metadata":{"finalizers":null}}'
   done
 
-  for c in $(helm  -n rhtap list --all --short); do
-      helm  -n rhtap uninstall --wait "${c}" || true
+  for c in $(helm  -n $NAMESPACE list --all --short); do
+      helm  -n $NAMESPACE uninstall --wait "${c}" || true
   done
 
-  oc delete ns rhtap --ignore-not-found=true
-
-  oc get ns -o name | grep "\-development" | xargs -n1 oc delete &
-  oc get ns -o name | grep "\-prod" | xargs -n1 oc delete &
-  oc get ns -o name | grep "\-stage" | xargs -n1 oc delete &
-  wait
+  oc delete application -n $NAMESPACE --all
+  oc get ns -o name | grep "\-development" | xargs -n1 oc delete  
+  oc get ns -o name | grep "\-prod" | xargs -n1 oc delete  
+  oc get ns -o name | grep "\-stage" | xargs -n1 oc delete  
+  oc delete ns $NAMESPACE --ignore-not-found=true
 }
 
 e2e_test(){
@@ -202,7 +201,7 @@ e2e_test(){
   QUAY_IMAGE_ORG="rhtap_qe"
   GITHUB_ORGANIZATION="rhtap-rhdh-qe"
   GITHUB_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
-  RED_HAT_DEVELOPER_HUB_URL=https://"$(oc get route developer-hub -n rhtap -o jsonpath='{.spec.host}')"
+  RED_HAT_DEVELOPER_HUB_URL=https://"$(oc get route developer-hub -n $NAMESPACE -o jsonpath='{.spec.host}')"
 
   cd "$(mktemp -d)"
 
