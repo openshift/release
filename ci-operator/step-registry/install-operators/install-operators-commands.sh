@@ -68,7 +68,8 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
         operator_target_namespaces="${operator_install_namespace}"
     fi
 
-    is_available=$(oc get packagemanifest "${operator_name}" -l catalog=${operator_source} -ojson |jq -rc '.status.channels[] | "\(.name):\(.currentCSV)"' | grep ${operator_channel})
+    sleep 2h
+    is_available=$(oc get packagemanifest "${operator_name}" -l catalog=${operator_source} --ignore-not-found -ojson |jq -rc '.status.channels[] | "\(.name):\(.currentCSV)"' | grep ${operator_channel})
     if [[ -z "${is_available}" ]]; then
         echo "ERROR: Operator ${operator_name} from ${operator_source} channel ${operator_channel} not found."
         exit 1
