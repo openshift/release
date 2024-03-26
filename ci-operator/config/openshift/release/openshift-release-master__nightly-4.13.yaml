@@ -99,12 +99,68 @@ releases:
     release:
       channel: candidate
       version: 4.13.0-rc.5
+  oldest-supported-z-rollback:
+    release:
+      channel: candidate
+      version: 4.13.0
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: aws-ipi-byo-route53-upgrade-rollback-oldest-supported
+  cron: 20 7 13,29 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_LATEST},${RELEASE_IMAGE_Z_ROLLBACK}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_Z_ROLLBACK
+        name: release:oldest-supported-z-rollback
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
+  timeout: 6h0m0s
+- as: azure-upi-upgrade-rollback-oldest-supported
+  cron: 25 8 10,26 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_LATEST},${RELEASE_IMAGE_Z_ROLLBACK}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_Z_ROLLBACK
+        name: release:oldest-supported-z-rollback
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-azure-upi
+  timeout: 6h0m0s
 - as: e2e-metal-ovn-assisted
   cron: 48 0 * * 0
   steps:
@@ -1015,6 +1071,104 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-cpu-partitioning
+- as: gcp-ipi-ovn-ipsec-upgrade-rollback-oldest-supported
+  cron: 34 20 8,24 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_LATEST},${RELEASE_IMAGE_Z_ROLLBACK}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_Z_ROLLBACK
+        name: release:oldest-supported-z-rollback
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
+  timeout: 6h0m0s
+- as: ibmcloud-ipi-upgrade-rollback-oldest-supported
+  cron: 1 7 4,18 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_LATEST},${RELEASE_IMAGE_Z_ROLLBACK}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_Z_ROLLBACK
+        name: release:oldest-supported-z-rollback
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
+  timeout: 6h0m0s
+- as: nutanix-ipi-upgrade-rollback-oldest-supported
+  cluster: build01
+  cron: 0 8 5,21 * *
+  steps:
+    cluster_profile: nutanix-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_LATEST},${RELEASE_IMAGE_Z_ROLLBACK}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_Z_ROLLBACK
+        name: release:oldest-supported-z-rollback
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: nutanix-upgrade-pre-config
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
+  timeout: 6h0m0s
+- as: vsphere-upi-upgrade-rollback-oldest-supported
+  cron: 21 22 2,18 * *
+  steps:
+    cluster_profile: vsphere-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_LATEST},${RELEASE_IMAGE_Z_ROLLBACK}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_Z_ROLLBACK
+        name: release:oldest-supported-z-rollback
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-sanity
+    workflow: cucushift-installer-rehearse-vsphere-upi
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift
