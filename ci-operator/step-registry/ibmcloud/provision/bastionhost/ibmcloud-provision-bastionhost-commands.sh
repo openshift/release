@@ -97,7 +97,6 @@ echo "INFO" "Created bastion instance ${bastion_name} status: $(jq -r '.status' 
 bastion_private_ip="$(jq -r '.network_interfaces[0].primary_ip.address' ${insFile})"
 
 nic=$(jq -r '.network_interfaces[0].id' ${insFile})
-vid=$(jq -r '.id' ${insFile})
 fip="${cluster_name}-fip"
 ${IBMCLOUD_CLI} is floating-ip-reserve ${fip} --nic-id $nic --output JSON > "${workdir}/${bastion_name}_reserve.json"
 bastion_public_ip=$(jq -r '.address' "${workdir}/${bastion_name}_reserve.json")
