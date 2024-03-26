@@ -217,6 +217,7 @@ e2e_test(){
 login_ocp
 install_rhtap
 health_check
+e2e_test
 remove_rhtap
 install_rhtap
 health_check
