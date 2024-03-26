@@ -54,7 +54,7 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
 
     # If the channel is "!default", find the default channel of the operator
     if [[ "${operator_channel}" == "!default" ]]; then
-        operator_channel=$(oc get packagemanifest "${operator_name}" -o jsonpath='{.status.defaultChannel}')
+        operator_channel=$(oc get packagemanifest "${operator_name}" --ignore-not-found -o jsonpath='{.status.defaultChannel}')
         if [[ -z "${operator_channel}" ]]; then
             echo "ERROR: Default channel not found."
             exit 1
