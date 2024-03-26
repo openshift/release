@@ -183,10 +183,6 @@ remove_rhtap(){
       oc patch application "$resource_name" -n $NAMESPACE --type merge -p '{"metadata":{"finalizers":null}}'
   done
 
-  for c in $(helm  -n $NAMESPACE list --all --short); do
-      helm  -n $NAMESPACE uninstall --wait "${c}" || true
-  done
-
   oc delete application -n $NAMESPACE --all
   oc get ns -o name | grep "\-development" | xargs -n1 oc delete  
   oc get ns -o name | grep "\-prod" | xargs -n1 oc delete  
