@@ -135,16 +135,15 @@ else
     echo "Failure while adding the inbound rule to the $infra_name-sno instance security group."
     exit 1
 fi  
-nic_name=$(ibmcloud is in-nics $infra_name-sno -q | grep -v ID | awk '{print $2}')
+echo "Getting the Virtual Network Interface ID for zVSI"
+vni_id=$(ibmcloud is instance $infra_name-sno | awk '/Primary/{print $7}')
 echo "Creating a Floating IP for zVSI"
-zvsi_fip=$(ibmcloud is ipc $infra_name-sno-ip --zone $IC_REGION-2 --resource-group-name $infra_name-rg | awk '/Address/{print $2}')
-echo "Assigning the Floating IP for zVSI"
-zvsi_fip_status=$(ibmcloud is in-nic-ipc $infra_name-sno $nic_name $infra_name-sno-ip | awk '/Status/{print $2}')
-if [ "$zvsi_fip_status" != "available" ]; then
-  echo "Error: Floating IP $infra_name-sno-ip is not assigned to the $infra_name-sno instance."
+zvsi_fip=$(ibmcloud is floating-ip-reserve $infra_name-sno-ip --nic $vni_id | awk '/Address/{print $2}')
+if [ -z "$zvsi_fip" ]; then
+  echo "Error: Floating IP assignment is failed to the zVSI."
   exit 1
-else 
-  echo "Floating IP $infra_name-sno-ip is successfully assigned to the $infra_name-sno instance."
+else
+  echo "Floating IP is assigned to the zVSI : $zvsi_fip"
 fi
 
 # Create a bastion node in the same VPC for monitoring
@@ -153,7 +152,7 @@ echo "Triggering the $infra_name-bastion VSI creation on IBM Cloud in the VPC $i
 ibmcloud is instance-create $infra_name-bastion $infra_name-vpc $IC_REGION-2 bx2-2x8 $infra_name-sn --image ibm-redhat-9-2-minimal-amd64-2 --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg
 sleep 30
 set +e
-bvsi_state=$(ibmcloud is instance $infra_name-sno | awk '/Status/{print $2}')
+bvsi_state=$(ibmcloud is instance $infra_name-bastion | awk '/Status/{print $2}')
 if [ "$bvsi_state" != "running" ]; then
   echo "Error: Instance $infra_name-bastion is not created properly in the $infra_name-vpc VPC."
   exit 1
@@ -169,16 +168,15 @@ else
     echo "Failure while adding the inbound rule to the $infra_name-bastion instance security group."
     exit 1
 fi  
-bnic_name=$(ibmcloud is in-nics $infra_name-bastion -q | grep -v ID | awk '{print $2}')
+echo "Getting the Virtual Network Interface ID for bastion VSI"
+bvni_id=$(ibmcloud is instance $infra_name-bastion | awk '/Primary/{print $7}')
 echo "Creating a Floating IP for bastion VSI"
-bvsi_fip=$(ibmcloud is ipc $infra_name-bastion-ip --zone $IC_REGION-2 --resource-group-name $infra_name-rg | awk '/Address/{print $2}')
-echo "Assigning the Floating IP for bastion VSI"
-bvsi_fip_status=$(ibmcloud is in-nic-ipc $infra_name-bastion $bnic_name $infra_name-bastion-ip | awk '/Status/{print $2}')
-if [ "$bvsi_fip_status" != "available" ]; then
-  echo "Error: Floating IP $infra_name-bastion-ip is not assigned to the $infra_name-bastion instance."
+bvsi_fip=$(ibmcloud is floating-ip-reserve $infra_name-bastion-ip --nic $bvni_id | awk '/Address/{print $2}')
+if [ -z "$bvsi_fip" ]; then
+  echo "Error: Floating IP assignment is failed to the bastion VSI."
   exit 1
-else 
-  echo "Floating IP $infra_name-bastion-ip is successfully assigned to the $infra_name-bastion instance."
+else
+  echo "Floating IP is assigned to the bastion VSI : $bvsi_fip"
 fi
 echo $bvsi_fip >> ${SHARED_DIR}/bastion-vsi-ip  # Storing to access in further steps 
 
