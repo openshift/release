@@ -25,11 +25,11 @@ fi
 # HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION="4.14.17"
 
 # MC details
-mc_ocm_cluster_id="2a4qben6sk0u168g7dae3kpvmtmvfgln"
+mc_ocm_cluster_id="29qdojgsajgooo6r11e4mbdlg86o0fn9"
 # REMOVE
 ocm get /api/clusters_mgmt/v1/clusters/"$mc_ocm_cluster_id"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/hs-mc.kubeconfig"
 MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
-HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION="4.14.7"
+HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION="4.14.11"
 
 # HC details
 HC_KUBECONFIG="${SHARED_DIR}/hc-kubeconfig"
@@ -47,7 +47,7 @@ function get_hc_details () {
 get_hc_details
 
 UPGRADE_FINISHED=false
-# MC_CO_UPGRADED=false
+MC_CO_UPGRADED=false
 MC_MCP_UPDATED=false
 MC_NODES_UPDATED=false
 MC_UPGRADE_COMPLETE=false
@@ -56,26 +56,23 @@ FAILED_HC_INFO_CHECK_COUNTER=0
 for ((i=0; i<1080; i+=1)); do
   UPGRADE_FINISHED=false
   echo "Checking cluster operators upgraded to: $HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION"
-  # UPGRADING_CO_COUNT=-1 # there might be an issue with executing oc commands during upgrade, so for safety this is set to -1
-  # CLUSTER_OPERATORS_COUNT=0
-  # CLUSTER_OPERATORS_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get co -A | tail -n +2) || true # failed execution just results in operators count being 0
-  # CLUSTER_OPERATORS_COUNT=$(echo "$CLUSTER_OPERATORS_INFO" | wc -l) || true # failed execution just results in operators count being 0
-  
-  # for ((j=1; j<="$CLUSTER_OPERATORS_COUNT"; j++)); do
-  #   UPGRADING_CO_COUNT=0
-  #   CO_INFO=$(echo "$CLUSTER_OPERATORS_INFO" | head -n $j | tail -n +$j)
-  #   UPGRADE_PROGRESSING=$(echo "$CO_INFO" | awk '{print $4}')
-  #   CURRENT_VERSION=$(echo "$CO_INFO" | awk '{print $2}')
-  #   if [ "${CURRENT_VERSION}" != "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" ] || [ "$UPGRADE_PROGRESSING" == "True" ]; then
-  #     ((UPGRADING_CO_COUNT++))
-  #     break
-  #   fi
-  # done
-  # if [ "$UPGRADING_CO_COUNT" -eq 0 ]; then
-  #   MC_CO_UPGRADED=true
-  # else
-  #   MC_CO_UPGRADED=false
-  # fi
+  CLUSTER_OPERATORS_COUNT=0
+  CLUSTER_OPERATORS_INFO=$(oc --kubeconfig "$MC_KUBECONFIG" get co -A | tail -n +2) || true # failed execution just results in operators count being 0
+  CLUSTER_OPERATORS_COUNT=$(echo "$CLUSTER_OPERATORS_INFO" | wc -l) || true # failed execution just results in operators count being 0
+  MC_CO_UPGRADED=false
+  for ((j=1; j<="$CLUSTER_OPERATORS_COUNT"; j++)); do
+    CO_INFO=$(echo "$CLUSTER_OPERATORS_INFO" | head -n $j | tail -n +$j)
+    if [ "$CO_INFO" == "" ]; then
+      continue
+    fi
+    UPGRADE_PROGRESSING=$(echo "$CO_INFO" | awk '{print $4}')
+    CURRENT_VERSION=$(echo "$CO_INFO" | awk '{print $2}')
+    if [ "${CURRENT_VERSION}" != "$HIGHEST_AVAILABLE_PATCH_UPGRADE_VERSION" ] || [ "$UPGRADE_PROGRESSING" == "True" ]; then
+      MC_CO_UPGRADED=false
+      break
+    fi
+    MC_CO_UPGRADED=true
+  done
   echo "Checking HC operators info available"
   CLUSTER_OPERATORS_INFO=""
   CLUSTER_OPERATORS_INFO=$(oc --request-timeout=5s --kubeconfig "$HC_KUBECONFIG" get co -A --insecure-skip-tls-verify | tail -n +2) || true
