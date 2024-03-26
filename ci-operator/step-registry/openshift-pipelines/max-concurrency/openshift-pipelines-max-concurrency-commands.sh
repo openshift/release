@@ -59,6 +59,9 @@ export TEST_TOTAL=20
 export TEST_CONCURRENT=10
 ci-scripts/load-test.sh
 oc delete namespace/benchmark
+rm -f tests/scaling-pipelines/benchmark-tekton.json
+rm -f tests/scaling-pipelines/benchmark-stats.csv
+rm -f tests/scaling-pipelines/benchmark-output.json
 sleep 60
 
 for scenario in $TEST_SCENARIOS; do
