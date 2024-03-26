@@ -38,12 +38,16 @@ resources:
 tests:
 - as: ocs-operator-bundle-e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: odf-aws
+    env:
+      BASE_DOMAIN: makestoragegreatagain.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      ZONES_COUNT: "3"
     test:
     - as: e2e-test
       cli: latest
       commands: |
-        export BUNDLE_FULL_IMAGE_NAME="$OO_BUNDLE"; make install-ocs; make install-noobaa
+        export BUNDLE_FULL_IMAGE_NAME="$OO_BUNDLE"; make install-rook; make install-ocs-client; make install-ocs; make install-noobaa
         export GOFLAGS=''; make functest
       dependencies:
       - env: OO_BUNDLE

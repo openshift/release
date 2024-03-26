@@ -199,7 +199,7 @@ MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets.machine.opensh
   | .spec.selector.matchLabels."machine.openshift.io/cluster-api-machineset" = .metadata.name
   | .spec.template.metadata.labels."machine.openshift.io/cluster-api-machineset" = .metadata.name
   | del(.status) | del(.metadata.creationTimestamp) | del(.metadata.uid) | del(.metadata.resourceVersion)
-  | del(.metadata.generation)
+  | del(.metadata.generation) | del(.metadata.annotations) | del(.metadata.managedFields)
 EOF
 )")
 

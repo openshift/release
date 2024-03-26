@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
+
 function mirror_test_images() {
         echo "### Mirroring test images"
 

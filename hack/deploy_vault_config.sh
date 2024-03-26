@@ -297,9 +297,7 @@ EOF
 echo "Finding ids for dptp members"
 dptp_member_aliases='[
   "skuznets",
-  "aaleman",
   "hongkliu",
-  "bbarcaro",
   "apavel",
   "nmoraiti",
   "pmuller",
@@ -309,7 +307,8 @@ dptp_member_aliases='[
   "jguzik",
   "dgemoli",
   "psalajov",
-  "dmistry"
+  "dmistry",
+  "prucek"
  ]'
 dptp_ids="$(curl -Ss --fail -H "X-vault-token: ${VAULT_TOKEN}" "$VAULT_ADDR/v1/identity/entity/id?list=true" \
             |jq \

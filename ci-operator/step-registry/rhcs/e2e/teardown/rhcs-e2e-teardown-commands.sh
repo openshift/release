@@ -3,7 +3,6 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -o xtrace
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -65,6 +64,12 @@ export RHCS_ENV=${RHCS_ENV}
 export RHCS_TOKEN=${RHCS_TOKEN}
 export VERSION=${VERSION}
 export REGION=${REGION}
+if [ ! -z "$RHCS_SOURCE" ];then
+    export RHCS_SOURCS=$RHCS_SOURCE
+fi
+if [ ! -z "$RHCS_VERSION" ]; then
+    export RHCS_VERSION=$RHCS_VERSION
+fi
 
 make tools
 make install

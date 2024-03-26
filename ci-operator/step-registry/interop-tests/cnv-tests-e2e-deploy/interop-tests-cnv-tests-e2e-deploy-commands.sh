@@ -1,16 +1,16 @@
 #!/bin/bash
 
 set -o nounset
-# set -o errexit
+set -o errexit
 set -o pipefail
 
 # Set cluster variables
-CLUSTER_NAME=$(cat "${SHARED_DIR}/CLUSTER_NAME")
-CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-release-ci.cnv-qe.rhood.us}"
+# CLUSTER_NAME=$(cat "${SHARED_DIR}/CLUSTER_NAME")
+# CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-release-ci.cnv-qe.rhood.us}"
 BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)
 
 # Exports
-export CLUSTER_NAME CLUSTER_DOMAIN
+# export CLUSTER_NAME CLUSTER_DOMAIN
 export PATH="${BIN_FOLDER}:${PATH}"
 
 # Unset the following environment variables to avoid issues with oc command

@@ -15,7 +15,7 @@ if [[ ! -z "$iam_policy_arn" ]]; then
     aws --region $REGION iam detach-role-policy --policy-arn ${iam_policy_arn} --role-name ${iam_role_name}
   fi
 
-  echo "Delete IAM policy $iam_policy_arn ..."
+  echo "Delete IAM policy ..."
   aws --region $REGION iam delete-policy --policy-arn ${iam_policy_arn}
 fi
 

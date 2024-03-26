@@ -167,7 +167,7 @@ ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal|equinix-ocp-metal-qe|powervs-1)
+equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
@@ -257,9 +257,9 @@ function run {
     extended-platform-tests run all --dry-run | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
-    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
+    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
     if [[ "${test_scenarios}" == *"Stagerun"* ]] && [[ "${test_scenarios}" != *"~Stagerun"* ]]; then
-        hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&"
+        hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~VMonly&;~ProdrunOnly&"
     fi
     echo "TEST_FILTERS: \"${hardcoded_filters};${TEST_FILTERS:-}\""
     echo "FILTERS_ADDITIONAL: \"${FILTERS_ADDITIONAL:-}\""

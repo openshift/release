@@ -19,14 +19,21 @@ declare vlanid
 declare primaryrouterhostname
 declare gateway
 declare cidr
+declare image_version
 source "${SHARED_DIR}/vsphere_context.sh"
 
 dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
 gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
 cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].cidr' "${SUBNETS_CONFIG}")
 
+image_version="latest"
+if [[ -n "${IPAM_VERSION}" ]]; then
+    echo "Detected IPAM image override ${IPAM_VERSION}"
+    image_version="${IPAM_VERSION}"
+fi
+
 echo "$(date -u --rfc-3339=seconds) - installing IPPools CRD..."
-curl -k https://raw.githubusercontent.com/rvanderp3/machine-ipam-controller/main/hack/ippools.crd.yaml | oc create -f -
+curl -k https://raw.githubusercontent.com/openshift-splat-team/machine-ipam-controller/main/hack/ippools.crd.yaml | oc create -f -
 
 echo "$(date -u --rfc-3339=seconds) - allowing time for CRD to be picked up by the API..."
 sleep 30
@@ -38,7 +45,8 @@ oc project openshift-machine-api
 # start at the 24th ip address entry to generate a /29 address pool
 address_cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[24]' "${SUBNETS_CONFIG}")
 
-curl -k https://raw.githubusercontent.com/rvanderp3/machine-ipam-controller/main/hack/ci-resources.yaml | oc process -p GATEWAY="${gateway}" -p PREFIX="${cidr}" -p ADDRESS_CIDR="${address_cidr}/29" --local=true -f - | oc create -f -
+# We are ignoring unknown parameters for now due to sync between repo and ci
+curl -k https://raw.githubusercontent.com/openshift-splat-team/machine-ipam-controller/main/hack/ci-resources.yaml | oc process -p GATEWAY="${gateway}" -p PREFIX="${cidr}" -p ADDRESS_CIDR="${address_cidr}/29" -p IPAM_VERSION="${image_version}" --local=true --ignore-unknown-parameters=true -f - | oc create -f -
 
 echo "$(date -u --rfc-3339=seconds) - applying ippool configuration to compute machineset"
 oc get machineset.machine.openshift.io -n openshift-machine-api -o jsonpath='{.items[0]}' | jq -r '.spec.template.spec.providerSpec.value.network.devices[0] +=

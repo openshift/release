@@ -52,7 +52,7 @@ tests:
     cluster_profile: equinix-ocp-metal
     env:
       CLUSTERTYPE: baremetal
-    workflow: baremetalds-e2e-sdn-ipv4
+    workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-virtualmedia
   cluster: build05
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
@@ -65,6 +65,15 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
+- as: check-requirements
+  commands: |-
+    #!/bin/bash
+    set -euxo pipefail
+    # this could also come from the "CLONEREFS_OPTIONS" env variable
+    export CHECK_RELEASE="master"
+    make check-reqs
+  container:
+    from: src
 zz_generated_metadata:
   branch: master
   org: openshift-priv
