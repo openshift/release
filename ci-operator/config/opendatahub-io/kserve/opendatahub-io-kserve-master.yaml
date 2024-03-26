@@ -35,6 +35,12 @@ images:
 - context_dir: python/
   dockerfile_path: sklearn.Dockerfile
   to: sklearn-serving-runtime
+- context_dir: python/
+  dockerfile_path: custom_transformer.Dockerfile
+  to: custom-transformer
+- context_dir: python/
+  dockerfile_path: custom_model_grpc.Dockerfile
+  to: custom-model-grpc
 promotion:
   to:
   - excluded_images:
@@ -43,6 +49,8 @@ promotion:
     - kserve-router
     - kserve-storage-initializer
     - sklearn-serving-runtime
+    - custom-transformer
+    - custom-model-grpc
     namespace: opendatahub-io
     tag: latest
 releases:
@@ -106,6 +114,36 @@ tests:
         name: kserve-storage-initializer
       - env: SKLEARN_IMAGE
         name: sklearn-serving-runtime
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
+- as: e2e-raw
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+    test:
+    - as: e2e-raw
+      cli: latest
+      commands: ./test/scripts/openshift-ci/run-e2e-tests.sh raw
+      dependencies:
+      - env: KSERVE_CONTROLLER_IMAGE
+        name: kserve-controller
+      - env: KSERVE_AGENT_IMAGE
+        name: kserve-agent
+      - env: STORAGE_INITIALIZER_IMAGE
+        name: kserve-storage-initializer
+      - env: SKLEARN_IMAGE
+        name: sklearn-serving-runtime
+      - env: IMAGE_TRANSFORMER_IMG_TAG
+        name: custom-transformer
+      - env: CUSTOM_MODEL_GRPC_IMG_TAG
+        name: custom-model-grpc
       from: src
       resources:
         requests:
