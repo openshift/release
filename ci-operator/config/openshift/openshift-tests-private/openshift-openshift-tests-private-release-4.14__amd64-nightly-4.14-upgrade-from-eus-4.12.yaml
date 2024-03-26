@@ -69,41 +69,73 @@ tests:
         FIPS_MODE=true
         IP_STACK=v4
         NETWORK_TYPE=OVNKubernetes
-      E2E_RUN_INTERMEDIATE_TAGS: '@4.13 and @baremetal-ipi and @upgrade-sanity'
       E2E_RUN_LATEST_TAGS: '@4.14 and @baremetal-ipi and @upgrade-sanity'
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @baremetal-ipi'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @baremetal-ipi'
     test:
-    - chain: openshift-upgrade-qe-test-paused
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-eus
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: gcp-ipi-oidc-rt-fips-f14
   cron: 4 2 14,29 * *
   steps:
     cluster_profile: gcp-qe
     env:
-      E2E_RUN_INTERMEDIATE_TAGS: '@4.13 and @gcp-ipi and @upgrade-sanity'
       E2E_RUN_LATEST_TAGS: '@4.14 and @gcp-ipi and @upgrade-sanity'
       FIPS_ENABLED: "true"
       RT_ENABLED: "true"
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @gcp-ipi'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @gcp-ipi'
     test:
-    - chain: openshift-upgrade-qe-test-paused
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-eus
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
 - as: ibmcloud-ipi-f14
   cron: 6 1 8,23 * *
   steps:
     cluster_profile: ibmcloud-qe
     env:
-      E2E_RUN_INTERMEDIATE_TAGS: '@4.13 and @ibmcloud-ipi and @upgrade-sanity and
-        not @fips'
       E2E_RUN_LATEST_TAGS: '@4.14 and @ibmcloud-ipi and @upgrade-sanity and not @fips'
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @ibmcloud-ipi and not
         @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @ibmcloud-ipi and not
         @fips'
     test:
-    - chain: openshift-upgrade-qe-test-paused
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-eus
     workflow: cucushift-installer-rehearse-ibmcloud-ipi
 - as: nutanix-ipi-proxy-fips-f14
   cluster: build01
@@ -111,27 +143,48 @@ tests:
   steps:
     cluster_profile: nutanix-qe-dis
     env:
-      E2E_RUN_INTERMEDIATE_TAGS: '@4.13 and @nutanix-ipi and @upgrade-sanity'
       E2E_RUN_LATEST_TAGS: '@4.14 and @nutanix-ipi and @upgrade-sanity'
       FIPS_ENABLED: "true"
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @nutanix-ipi'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @nutanix-ipi'
     test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - ref: nutanix-upgrade-pre-config
-    - chain: openshift-upgrade-qe-test-paused
+    - chain: openshift-upgrade-qe-test-eus
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
 - as: vsphere-ipi-f14
   cron: 18 7 6,21 * *
   steps:
     cluster_profile: vsphere-2
     env:
-      E2E_RUN_INTERMEDIATE_TAGS: '@4.13 and @vsphere-ipi and @upgrade-sanity and not
-        @fips'
       E2E_RUN_LATEST_TAGS: '@4.14 and @vsphere-ipi and @upgrade-sanity and not @fips'
       UPGRADE_CHECK_RUN_TAGS: '@4.12 and @vsphere-ipi and @upgrade-check and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@4.12 and @vsphere-ipi and @upgrade-prepare and not @fips'
     test:
-    - chain: openshift-upgrade-qe-test-paused
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-eus
     workflow: cucushift-installer-rehearse-vsphere-ipi
 zz_generated_metadata:
   branch: release-4.14
