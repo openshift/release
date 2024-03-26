@@ -49,20 +49,17 @@ resources:
       memory: 6Gi
 tests:
 - as: kuttl-sequential
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.13"
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
+    cluster_profile: gitops-aws
+    env:
+      BASE_DOMAIN: ocp-gitops-qe.com
     test:
     - as: install
       cli: latest
-      commands: "operator-sdk run bundle -n openshift-operators \"$OO_BUNDLE\"\noc
-        get pods -n openshift-operators \n"
+      commands: |
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-operators deployment gitops-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: gitops-operator-bundle
@@ -80,22 +77,19 @@ tests:
         requests:
           cpu: "2"
           memory: 6Gi
-    workflow: generic-claim
+    workflow: ipi-aws
 - as: kuttl-parallel
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.13"
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
+    cluster_profile: gitops-aws
+    env:
+      BASE_DOMAIN: ocp-gitops-qe.com
     test:
     - as: install
       cli: latest
-      commands: "operator-sdk run bundle -n openshift-operators \"$OO_BUNDLE\"\noc
-        get pods -n openshift-operators \n"
+      commands: |
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-operators deployment gitops-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: gitops-operator-bundle
@@ -113,7 +107,7 @@ tests:
         requests:
           cpu: "2"
           memory: 6Gi
-    workflow: generic-claim
+    workflow: ipi-aws
 - as: e2e
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
