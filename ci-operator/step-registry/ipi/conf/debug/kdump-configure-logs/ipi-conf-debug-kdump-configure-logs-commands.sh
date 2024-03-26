@@ -7,17 +7,12 @@ set -o pipefail
 node_role=${APPLY_NODE_ROLE:=worker}
 log_path=${LOG_PATH:="/var/crash"}
 
-openshift_release="4.11.0"
-if [[ $(echo $RELEASE_IMAGE_LATEST | grep -o -e "4\.[0-9]\+\.") ]]; then
-  openshift_release="$(echo $RELEASE_IMAGE_LATEST | grep -o -e '4\.[0-9]\+\.').0"
-fi
-
 echo "Crash kernel set to ${CRASH_KERNEL_MEMORY}"
 
 echo "Configuring kernel dumps on $node_role nodes"
 cat >> "${SHARED_DIR}/manifest_99_${node_role}_kdump.bu" << EOF
 variant: openshift
-version: "$openshift_release"
+version: "${BUTANE_RELEASE}"
 metadata:
   name: 99-$node_role-kdump
   labels:
