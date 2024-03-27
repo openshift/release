@@ -230,6 +230,7 @@ function check_olm_capability(){
 set_proxy
 run_command "oc whoami"
 run_command "oc version -o yaml"
+sleep 14400
 update_global_auth
 sleep 5
 create_icsp_connected

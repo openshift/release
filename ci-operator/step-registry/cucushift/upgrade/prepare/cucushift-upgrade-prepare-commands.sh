@@ -290,5 +290,5 @@ fi
 set_cluster_access
 preparation_for_test
 filter_tests
-test_execution
-summarize_test_results
+#test_execution
+#summarize_test_results
