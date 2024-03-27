@@ -22,4 +22,4 @@ chainsaw test \
 --report-path "$ARTIFACT_DIR" \
 --report-format "XML" \
 --test-dir \
-tests/e2e-acceptance
+tests/e2e-acceptance || true # Added to ignore the exit status of the command so that chain progresses to execute the rest of the steps.
