@@ -54,7 +54,7 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
 
     # If the channel is "!default", find the default channel of the operator
     if [[ "${operator_channel}" == "!default" ]]; then
-        operator_channel=$(oc get packagemanifest "${operator_name}" -o jsonpath='{.status.defaultChannel}')
+        operator_channel=$(oc get packagemanifest "${operator_name}" --ignore-not-found -o jsonpath='{.status.defaultChannel}')
         if [[ -z "${operator_channel}" ]]; then
             echo "ERROR: Default channel not found."
             exit 1
@@ -67,7 +67,12 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     if [[ "${operator_target_namespaces}" == "!install" ]]; then
         operator_target_namespaces="${operator_install_namespace}"
     fi
-    
+
+    is_available=$(oc get packagemanifest "${operator_name}" -n "${operator_install_namespace}" catalog="${operator_source}" --ignore-not-found -ojson | grep "${operator_channel}")
+    if [[ -z "${is_available}" ]]; then
+        echo "ERROR: Operator ${operator_name} from ${operator_source} channel ${operator_channel} not found."
+        exit 1
+    fi
     echo "Installing ${operator_name} from ${operator_source} channel ${operator_channel} into ${operator_install_namespace}${operator_target_namespaces:+, targeting $operator_target_namespaces}"
 
     # Create the install namespace
