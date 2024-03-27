@@ -27,14 +27,7 @@ unset KUBERNETES_PORT_443_TCP_PORT
 set -x
 START_TIME=$(date "+%s")
 
-# Get oc binary
-# curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
-curl -L "https://github.com/openshift-cnv/cnv-ci/tarball/release-${OCP_VERSION}" -o /tmp/cnv-ci.tgz
-mkdir -p /tmp/cnv-ci
-tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
-cd /tmp/cnv-ci || exit 1
-make deploy_test || /bin/true
-
+poetry run pytest --collect-only
 
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
