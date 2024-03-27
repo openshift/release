@@ -7,6 +7,7 @@ set -o verbose
 
 AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
+OCP_VERSION=$OPENSHIFT_VERSION
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
@@ -44,9 +45,5 @@ if [ "${INSTALL_FROM_IIB}" = "true" ]; then
                 --aws-access-key-id ${AWS_ACCESS_KEY_ID} \
                 --aws-secret-access-key ${AWS_SECRET_ACCESS_KEY} "
 fi
-
-echo "$S3_BUCKET_OPERATORS_LATEST_IIB_PATH path"
-echo "$AWS_REGION region"
-echo "$OCP_VERSION version"
 
 ${RUN_COMMAND}
