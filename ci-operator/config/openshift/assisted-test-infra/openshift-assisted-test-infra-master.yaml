@@ -296,9 +296,18 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OLM_OPERATORS=mce
+        OLM_OPERATORS=mce,odf
         NUM_WORKERS=3
+        WORKER_MEMORY=60000
+        WORKER_CPU=20
+        WORKER_DISK_COUNT=2
+        WORKER_DISK=100000000000
+        MAKEFILE_TARGET=deploy_nodes_with_install
       PACKET_PLAN: m3.large.x86
+      POST_INSTALL_COMMANDS: |
+        export TEST_FUNC=test_mce_storage_post
+        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        make test_parallel
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-mce-sno
@@ -307,9 +316,14 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OLM_OPERATORS=mce
+        OLM_OPERATORS=mce,lvm
         NUM_MASTERS=1
         NUM_WORKERS=0
+        MAKEFILE_TARGET=deploy_nodes_with_install
+      POST_INSTALL_COMMANDS: |
+        export TEST_FUNC=test_mce_storage_post
+        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        make test_parallel
     workflow: assisted-baremetal
 - always_run: false
   as: e2e-metal-assisted-metallb
