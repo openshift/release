@@ -5,11 +5,7 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
-AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
-
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
-export OCP_VERSION=${OPENSHIFT_VERSION}
 
 RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py --action install --kubeconfig ${KUBECONFIG} "
 
@@ -40,10 +36,15 @@ if [ "${INSTALL_FROM_IIB}" = "true" ]; then
     exit 1
   fi
 
-  RUN_COMMAND+=" --s3-bucket-operators-latest-iib-path ${S3_BUCKET_OPERATORS_LATEST_IIB_PATH} \
-                --aws-region ${AWS_REGION} \
-                --aws-access-key-id ${AWS_ACCESS_KEY_ID} \
-                --aws-secret-access-key ${AWS_SECRET_ACCESS_KEY} "
+  AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
+  AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
+
+  export OCP_VERSION=${OPENSHIFT_VERSION}
+  export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+  export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+
+  RUN_COMMAND+=" --s3-bucket-operators-latest-iib-path ${S3_BUCKET_OPERATORS_LATEST_IIB_PATH} --aws-region ${AWS_REGION} "
+
 fi
 
 ${RUN_COMMAND}
