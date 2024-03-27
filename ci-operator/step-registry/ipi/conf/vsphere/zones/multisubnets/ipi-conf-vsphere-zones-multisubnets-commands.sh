@@ -20,6 +20,23 @@ declare vsphere_extra_portgroup_2
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+declare -a vips
+mapfile -t vips < "${SHARED_DIR}"/vips.txt
+
+# if loadbalancer is UserManaged, it's mean using external LB,
+# then keepalived and haproxy will not deployed, but coredns still keep
+if [[ ${LB_TYPE} == "UserManaged" ]]; then
+    APIVIPS_DEF="apiVIPs:
+      - ${vips[0]}"
+    INGRESSVIPS_DEF="ingressVIPs:
+      - ${vips[1]}"
+    LB_TYPE_DEF="loadBalancer:
+      type: UserManaged"
+else
+    APIVIPS_DEF=""
+    INGRESSVIPS_DEF=""
+    LB_TYPE_DEF=""
+fi
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
@@ -51,8 +68,9 @@ compute:
        - "us-east-3"
 platform:
   vsphere:
-    apiVIP:
-    ingressVIP:
+    ${LB_TYPE_DEF}
+    ${APIVIPS_DEF}
+    ${INGRESSVIPS_DEF}
     vCenter: "${vsphere_url}"
     username: "${GOVC_USERNAME}"
     password: ${GOVC_PASSWORD}
@@ -99,6 +117,7 @@ networking:
   machineNetwork:
   - cidr: "${machine_cidr}"
 EOF
+
 # TODO: Add this back in once we have an vsphere
 # environment that will support topology storage
 
