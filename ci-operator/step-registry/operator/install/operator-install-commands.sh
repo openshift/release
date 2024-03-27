@@ -45,4 +45,8 @@ if [ "${INSTALL_FROM_IIB}" = "true" ]; then
                 --aws-secret-access-key ${AWS_SECRET_ACCESS_KEY} "
 fi
 
+echo "$S3_BUCKET_OPERATORS_LATEST_IIB_PATH path"
+echo "$AWS_REGION region"
+echo "$OCP_VERSION version"
+
 ${RUN_COMMAND}
