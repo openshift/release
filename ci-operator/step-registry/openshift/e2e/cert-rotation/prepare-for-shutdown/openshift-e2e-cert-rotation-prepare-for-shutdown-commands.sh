@@ -121,7 +121,7 @@ function prepull-tools-image-for-gather-step {
 function wait-for-operators-to-stabilize {
   # Wait for operators to stabilize
   if
-    ! oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m; then
+    ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=60m; then
       oc get nodes
       oc get co | grep -v "True\s\+False\s\+False"
       exit 1
@@ -273,6 +273,7 @@ spec:
           name: kubelet-dir
 EOZ
 oc create -f /tmp/kubelet-bootstrap-cred-manager-ds.yaml
+oc -n openshift-machine-config-operator wait --for jsonpath='{.status.currentNumberScheduled}'=1 ds/kubelet-bootstrap-cred-manager
 oc -n openshift-machine-config-operator wait pods -l k8s-app=kubelet-bootstrap-cred-manager --for condition=Ready --timeout=300s
 oc -n openshift-kube-controller-manager-operator delete secrets/csr-signer-signer secrets/csr-signer
 oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=30m
