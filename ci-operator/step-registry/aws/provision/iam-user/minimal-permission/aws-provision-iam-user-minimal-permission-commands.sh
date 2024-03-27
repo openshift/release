@@ -230,7 +230,6 @@ s3:GetObjectAcl
 s3:GetObjectTagging
 s3:GetObjectVersion
 s3:GetReplicationConfiguration
-s3:HeadBucket
 s3:ListBucket
 s3:ListBucketMultipartUploads
 s3:ListBucketVersions
