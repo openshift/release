@@ -6,6 +6,8 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+sleep 86400
+
 # Log in
 OCM_VERSION=$(ocm version)
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
