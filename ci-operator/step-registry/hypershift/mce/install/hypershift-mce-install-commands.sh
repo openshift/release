@@ -209,7 +209,7 @@ fi
 echo "Configuring the hosting service cluster Succeeded!"
 
 # export icsp for hypershift hostedcluster if needed
-oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_iscp.yaml && yq-go r /tmp/mgmt_iscp.yaml 'items[*].spec.repositoryDigestMirrors' -  | sed  '/---*/d' > ${SHARED_DIR}/mgmt_iscp.yaml
+oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_icsp.yaml && yq-go r /tmp/mgmt_icsp.yaml 'items[*].spec.repositoryDigestMirrors' -  | sed  '/---*/d' > ${SHARED_DIR}/mgmt_icsp.yaml
 
 echo "wait for addon to Available"
 oc wait --timeout=5m --for=condition=Available -n local-cluster ManagedClusterAddOn/hypershift-addon
