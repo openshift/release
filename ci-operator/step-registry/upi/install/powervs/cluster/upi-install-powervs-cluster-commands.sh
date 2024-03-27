@@ -191,8 +191,11 @@ function create_upi_powervs_cluster() {
   echo "BASTION_PRIVATE_IP:- $BASTION_PRIVATE_IP"
 
   export BASTION_PUBLIC_IP
+  echo "Retrieving the SSH key"
   scp -i "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/id_rsa root@"${BASTION_PUBLIC_IP}":~/openstack-upi/auth/kubeconfig  "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/
+  echo "Done with retrieval"
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/kubeconfig "${SHARED_DIR}"/kubeconfig
+  echo "Done copying the kubeconfig"
 }
 
 function ic() {
