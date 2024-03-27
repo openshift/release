@@ -193,6 +193,16 @@ set -xeuo pipefail
 # Prepare baremetal env for cluster
 # Ideally this could be moved to another file in the "release" repository
 function manage_baremetal_instances(){
+
+    # CS9 in the lab sometimes gets a hostname of localhost (some kind of race condition with systemd-hostnamed and NetworkManager)
+    # we need to clear /etc/hostname so that NetworkManager can set it from dns lookup
+    if [[ \$(hostname) =~ localhost ]] ; then
+        rm -f /etc/hostname
+        while [[ \$(hostname) =~ localhost ]] ; do
+            sleep 1
+        done
+    fi
+
     . /root/dev-scripts/config_root.sh
 
     cp /root/bm.json /root/dev-scripts/bm.json
@@ -294,7 +304,11 @@ EOF2
 # about the Packet provisioner, remove the file if it's present.
 test -f /usr/config && rm -f /usr/config || true
 
-yum install -y git sysstat sos make podman python3-virtualenv python39 jq net-tools gcc
+# extras-common is needed to install epel-release but disabled on ibmcloud
+# also the repo doesn't exist on equinix
+dnf config-manager --set-enabled extras-common || true
+
+dnf install -y git sysstat sos make podman python39 jq net-tools gcc
 
 systemctl start sysstat
 
@@ -347,7 +361,7 @@ echo "export NUM_WORKERS=3" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
 
-# Add APPLIANCE_IMAGE only for appliance e2e tests 
+# Add APPLIANCE_IMAGE only for appliance e2e tests
 if [ "${AGENT_E2E_TEST_BOOT_MODE}" == "DISKIMAGE" ];
 then
   echo "export APPLIANCE_IMAGE=${APPLIANCE_IMAGE}" >> /root/dev-scripts/config_root.sh
