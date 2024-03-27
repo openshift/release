@@ -39,6 +39,23 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: openshift-scorecard-bundle
+  run_if_changed: ^bundle*$
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: medik8s-ci.projects.ecosystem.sysdeseng.com
+    test:
+    - as: test-scorecard-bundle
+      commands: |
+        PREVIOUS_VERSION="0.17.0" VERSION="0.18.0" make bundle-community
+        bin/operator-sdk/*/operator-sdk scorecard -n default ./bundle
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 - as: openshift-e2e
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
