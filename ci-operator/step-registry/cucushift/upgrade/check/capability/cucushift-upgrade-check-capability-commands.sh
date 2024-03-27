@@ -71,8 +71,11 @@ function get_caps_for_version_capset() {
     "v4.15")
     caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager CloudCredential"
     ;;
+    "v4.16")
+    caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager CloudCredential CloudControllerManager Ingress"
+    ;;
     *)
-    caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager CloudCredential"
+    caps_string="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot NodeTuning MachineAPI Build DeploymentConfig ImageRegistry OperatorLifecycleManager CloudCredential CloudControllerManager Ingress"
     ;;
     esac
 
@@ -122,6 +125,12 @@ function get_actual_implicit_caps {
     # The condition message could be "The following capabilities could not be disabled: Console, Insights, Storage"
     tmp_capabilities=$(echo "$implicit_message" | grep -oE 'could not be disabled: (.*)' | cut -d':' -f2)
     actual_implicit_caps=$(echo "$tmp_capabilities" | awk -F', ' '{ for (i=1; i<=NF; i++) print $i }')
+    # need to remove once pr https://github.com/openshift/cluster-version-operator/pull/946 is merged
+    for version in "${!always_enabled_caps[@]}"; do
+        if [[ ${ocp_version/.} -ge ${version} ]]; then
+            actual_implicit_caps="${actual_implicit_caps} ${always_enabled_caps[$version]}"
+        fi
+    done
     # echo "Actual implicitly enabled capabilities list is ${actual_implicit_caps}"
 }
 
@@ -215,6 +224,14 @@ function check_cvo_cap() {
             result=1
         else
             cvo_caps_str=$(echo $cvo_caps | tr -d '["]' | tr "," " " | xargs -n1 | sort -u | xargs)
+            # need to remove once pr https://github.com/openshift/cluster-version-operator/pull/946 is merged
+            for version in "${!always_enabled_caps[@]}"; do
+                if [[ ${ocp_version/.} -ge ${version} ]]; then
+                    cvo_caps_str="${cvo_caps_str} ${always_enabled_caps[$version]}"
+                fi
+            done
+            cvo_caps_str=$(echo ${cvo_caps_str} | xargs -n1 | sort -u | xargs)
+            
             if [[ "${cvo_caps_str}" == "${capability_set}" ]]; then
                 echo "INFO: ${expected_status} capabilities matches with cvo ${cvo_field}!"
                 echo -e "cvo_caps: ${cvo_caps_str}\n${expected_status} capability set: ${capability_set}"
@@ -251,6 +268,11 @@ if [[ -z "${baselinecaps_from_cluster}" || "${baselinecaps_from_cluster}" == "nu
 fi
 echo "baselinecaps_from_cluster: ${baselinecaps_from_cluster}"
 
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2 | tr -d '.')
+# always enabled capabilities
+declare -A always_enabled_caps
+always_enabled_caps[416]="Ingress"
+
 # shellcheck disable=SC2207
 version_set=($(oc get clusterversion version -ojson | jq -r .status.history[].version))
 
@@ -269,6 +291,8 @@ caps_operator[MachineAPI]="machine-api control-plane-machine-set cluster-autosca
 caps_operator[ImageRegistry]="image-registry"
 caps_operator[OperatorLifecycleManager]="operator-lifecycle-manager operator-lifecycle-manager-catalog operator-lifecycle-manager-packageserver"
 caps_operator[CloudCredential]="cloud-credential"
+caps_operator[CloudControllerManager]="cloud-controller-manager"
+caps_operator[Ingress]="ingress"
 
 # Mapping between optional capability and resources
 # Need update when new resource marks as optional
