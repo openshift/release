@@ -14,6 +14,10 @@ ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 
 # Deprovision cluster
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
+
+echo "Fetching installation logs of the cluster ${CLUSTER_ID}..."
+ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/logs/install" > "${ARTIFACT_DIR}/.cluster_install.log"
+
 echo "Deleting cluster: ${CLUSTER_ID}"
 
 ocm delete "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}"
