@@ -30,6 +30,7 @@ function check_nodes_count () {
   TIMEOUT_COUNTER=90
   GOT_NODE_COUNT_MATCH=false
   for ((i=0; i<TIMEOUT_COUNTER; i+=1)); do
+    echo "Check if MHC restored nodes on an MC"
     CURRENT_NUMBER_OF_NODES=$(oc get nodes -A --no-headers | wc -l | tr -d ' ')
     if [ "$CURRENT_NUMBER_OF_NODES" -eq "$ORIGINAL_NUMBER_OF_NODES" ]; then
       GOT_NODE_COUNT_MATCH=true
