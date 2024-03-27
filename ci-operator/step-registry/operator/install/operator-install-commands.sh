@@ -7,9 +7,9 @@ set -o verbose
 
 AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
-OCP_VERSION=$OPENSHIFT_VERSION
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
+export OCP_VERSION=${OPENSHIFT_VERSION}
 
 RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py --action install --kubeconfig ${KUBECONFIG} "
 
