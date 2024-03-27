@@ -14,6 +14,13 @@ SOURCE_KUBECONFIG="/${SOURCE_CLUSTER_DIR}/auth/kubeconfig"
 SOURCE_KUBEADMIN_PASSWORD=$(cat $SOURCE_KUBEADMIN_PASSWORD_FILE)
 TARGET_KUBECONFIG="/${TARGET_CLUSTER_DIR}/auth/kubeconfig"
 
+sleep 60
+
+# Log into target cluster
+cp /mtc-interop/usr/bin/oc/oc /usr/bin/oc
+export KUBECONFIG=$SOURCE_KUBECONFIG
+oc login -u kubeadmin -p $SOURCE_KUBEADMIN_PASSWORD
+
 # Install the Operator on both clusters
 echo "Installing the MTC operator on the source cluster"
 ansible-playbook /mtc-interop/install-mtc.yml \
@@ -25,11 +32,6 @@ ansible-playbook /mtc-interop/install-mtc.yml \
     -e version=${MTC_VERSION} \
     -e isController=true \
     -e kubeconfig_path=${TARGET_KUBECONFIG}
-
-# Log into target cluster
-cp /mtc-interop/usr/bin/oc/oc /usr/bin/oc
-export KUBECONFIG=$SOURCE_KUBECONFIG
-oc login -u kubeadmin -p $SOURCE_KUBEADMIN_PASSWORD
 
 echo "Retrieving source cluster exposed registry path"
 oc patch configs.imageregistry.operator.openshift.io/cluster --patch '{"spec":{"defaultRoute":true}}' --type=merge && sleep 10
