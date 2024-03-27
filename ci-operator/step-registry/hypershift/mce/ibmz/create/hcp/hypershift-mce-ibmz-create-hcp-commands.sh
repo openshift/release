@@ -145,7 +145,7 @@ mkdir /tmp/hc-manifests
 
 ICSP_COMMAND=""
 if [[ $ENABLE_ICSP == "true" ]]; then
-  ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_iscp.yaml")
+  ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml")
 fi
 
 ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \

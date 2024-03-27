@@ -49,8 +49,8 @@ REGION=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.region')
 
 no_critical_check_result=0
 # Get master/worker instance type
-master_instance_type=$(oc get machine --selector machine.openshift.io/cluster-api-machine-type=master -n openshift-machine-api -ojson | jq -r '.items[].spec.providerSpec.value.vmSize' | sort -u)
-worker_instance_type=$(oc get machine --selector machine.openshift.io/cluster-api-machine-type=worker -n openshift-machine-api -ojson | jq -r '.items[].spec.providerSpec.value.vmSize' | sort -u)
+master_instance_type=$(oc get machines.machine.openshift.io --selector machine.openshift.io/cluster-api-machine-type=master -n openshift-machine-api -ojson | jq -r '.items[].spec.providerSpec.value.vmSize' | sort -u)
+worker_instance_type=$(oc get machines.machine.openshift.io --selector machine.openshift.io/cluster-api-machine-type=worker -n openshift-machine-api -ojson | jq -r '.items[].spec.providerSpec.value.vmSize' | sort -u)
 
 # Check on master nodes, each VM should be provisioned across zones
 master_zones=$(az vm list-skus -l ${REGION} --zone --size ${master_instance_type} --query '[].locationInfo[].zones' -otsv)
@@ -59,7 +59,7 @@ if [[ "${master_zones}" == "" ]]; then
 else
     echo "------ Check master nodes provisioned across zone ------"
     for zone in ${master_zones}; do
-        master_node_name=$(oc get machine -n openshift-machine-api --selector machine.openshift.io/cluster-api-machine-type=master,machine.openshift.io/zone=${zone} -ojson | jq -r '.items[].metadata.name')
+        master_node_name=$(oc get machines.machine.openshift.io -n openshift-machine-api --selector machine.openshift.io/cluster-api-machine-type=master,machine.openshift.io/zone=${zone} -ojson | jq -r '.items[].metadata.name')
         if [[ -z "${master_node_name}" ]]; then
             echo "ERROR: not found master node in zone ${zone}"
             no_critical_check_result=1
@@ -75,7 +75,7 @@ if [[ "${worker_zones}" == "" ]]; then
 else
     echo "------ Check worker nodes provisioned across zone ------"
     for zone in ${worker_zones}; do
-        worker_node_name=$(oc get machine -n openshift-machine-api --selector machine.openshift.io/cluster-api-machine-type=worker,machine.openshift.io/zone=${zone} -ojson | jq -r '.items[].metadata.name')
+        worker_node_name=$(oc get machines.machine.openshift.io -n openshift-machine-api --selector machine.openshift.io/cluster-api-machine-type=worker,machine.openshift.io/zone=${zone} -ojson | jq -r '.items[].metadata.name')
         if [[ -z "${worker_node_name}" ]]; then
             echo "ERROR: not found worker node in zone ${zone}"
             no_critical_check_result=1

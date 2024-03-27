@@ -88,6 +88,8 @@ caps_operator[MachineAPI]="machine-api control-plane-machine-set cluster-autosca
 caps_operator[ImageRegistry]="image-registry"
 caps_operator[OperatorLifecycleManager]="operator-lifecycle-manager operator-lifecycle-manager-catalog operator-lifecycle-manager-packageserver"
 caps_operator[CloudCredential]="cloud-credential"
+caps_operator[CloudControllerManager]="cloud-controller-manager"
+caps_operator[Ingress]="ingress"
 
 # Mapping between optional capability and resources
 # Need to be updated when new resource marks as optional
@@ -102,8 +104,12 @@ v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
 v415=" ${v414} OperatorLifecycleManager CloudCredential"
-latest_defined="v415"
+v416=" ${v415} CloudControllerManager Ingress"
+latest_defined="v416"
 always_default="${!latest_defined}"
+# always enabled capabilities
+#declare -A always_enabled_caps
+#always_enabled_caps[416]="Ingress"
 
 # Determine vCurrent
 declare "v${ocp_major_version}${ocp_minor_version}"
@@ -140,6 +146,9 @@ case ${baselinecaps_from_config} in
 "v4.15")
   enabled_capability_set="${v415}"
   ;;
+"v4.16")
+  enabled_capability_set="${v416}"
+  ;;
 "vCurrent")
   enabled_capability_set="${vCurrent}"
   ;;
@@ -152,6 +161,12 @@ additional_caps_from_config=$(yq-go r "${SHARED_DIR}/install-config.yaml" "capab
 if [[ "${additional_caps_from_config}" != "" ]]; then
     enabled_capability_set="${enabled_capability_set} ${additional_caps_from_config}"
 fi
+# Once pr https://github.com/openshift/cluster-version-operator/pull/946 merged, the code can be opened
+#for version in "${!always_enabled_caps[@]}"; do
+#    if [[ ${ocp_version/.} -ge ${version} ]]; then
+#        enabled_capability_set="${enabled_capability_set} ${always_enabled_caps[$version]}"
+#    fi
+#done
 enabled_capability_set=$(echo ${enabled_capability_set} | xargs -n1 | sort -u | xargs)
 disabled_capability_set="${vCurrent}"
 for cap in $enabled_capability_set; do

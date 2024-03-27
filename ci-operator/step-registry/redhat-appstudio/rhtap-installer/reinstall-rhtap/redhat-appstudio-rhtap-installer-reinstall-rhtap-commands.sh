@@ -175,23 +175,7 @@ health_check(){
 
 remove_rhtap(){
   echo "[INFO]Remove RHTAP ..."
-  # Get a list of resource names in the namespace
-  resource_names=$(oc get applications -n $NAMESPACE -o jsonpath='{.items[*].metadata.name}')
-
-  # Loop through each resource and remove finalizers
-  for resource_name in $resource_names; do
-      oc patch application "$resource_name" -n $NAMESPACE --type merge -p '{"metadata":{"finalizers":null}}'
-  done
-
-  for c in $(helm  -n $NAMESPACE list --all --short); do
-      helm  -n $NAMESPACE uninstall --wait "${c}" || true
-  done
-
-  oc delete application -n $NAMESPACE --all
-  oc get ns -o name | grep "\-development" | xargs -n1 oc delete  
-  oc get ns -o name | grep "\-prod" | xargs -n1 oc delete  
-  oc get ns -o name | grep "\-stage" | xargs -n1 oc delete  
-  oc delete ns $NAMESPACE --ignore-not-found=true
+  ./bin/make.sh uninstall -n "$NAMESPACE"
 }
 
 e2e_test(){
