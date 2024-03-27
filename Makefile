@@ -7,14 +7,14 @@ export CONTAINER_ENGINE_OPTS ?= --platform linux/amd64
 export SKIP_PULL ?= false
 
 VOLUME_MOUNT_FLAGS = :z
-ifeq ($(CONTAINER_ENGINE), docker)
-	CONTAINER_USER=--user $(shell id -u):$(shell id -g)
-else
+CONTAINER_USER=--user $(shell id -u):$(shell id -g)
+ifeq ($(CONTAINER_ENGINE), podman)
 	ifeq ($(shell uname -s), Darwin)
 		# if you're running podman on macOS, don't set the SELinux label
 		VOLUME_MOUNT_FLAGS =
+	else
+		CONTAINER_USER=
 	endif
-	CONTAINER_USER=
 endif
 
 help:
