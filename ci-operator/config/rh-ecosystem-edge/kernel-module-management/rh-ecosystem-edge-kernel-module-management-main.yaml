@@ -92,7 +92,7 @@ releases:
   latest:
     release:
       channel: fast
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -210,19 +210,30 @@ tests:
     version: "4.13"
   steps:
     test:
-    - as: run-test
+    - as: install
       cli: latest
       commands: |
-        unset GOFLAGS
-        oc project default
-        ./ci/prow/e2e-hub-spoke-incluster-build
+        oc create namespace openshift-kmm
+        operator-sdk run bundle -n openshift-kmm "$OO_BUNDLE"
+        operator-sdk run bundle -n openshift-kmm "$OO_HUB_BUNDLE"
+        oc wait --for=condition=Available -n openshift-kmm --timeout=1m \
+          deployment/kmm-operator-controller \
+          deployment/kmm-operator-webhook-server
+          deployment/kmm-operator-hub-controller \
+          deployment/kmm-operator-hub-webhook-server
       dependencies:
-      - env: IMG
-        name: kernel-module-management-operator
-      - env: HUB_IMG
-        name: kernel-module-management-operator-hub
-      - env: WEBHOOK_IMG
-        name: kernel-module-management-webhook-server
+      - env: OO_BUNDLE
+        name: operator-bundle
+      - env: OO_HUB_BUNDLE
+        name: hub-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: run-test
+      cli: latest
+      commands: SKIP_MAKE_DEPLOY=true SKIP_MAKE_DEPLOY_HUB=true ./ci/prow/e2e-hub-spoke-incluster-build
       from: e2e-hub-yq
       resources:
         requests:
