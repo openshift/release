@@ -3,10 +3,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: base
-  operator-sdk:
-    name: "4.13"
-    namespace: origin
-    tag: operator-sdk
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.30.0
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -20,7 +20,7 @@ operator:
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
   substitutions:
-  - pullspec: quay.io/medik8s/node-maintenance-operator:latest
+  - pullspec: quay.io/medik8s/node-maintenance-operator:.*
     with: pipeline:node-maintenance-operator
 releases:
   latest:
@@ -34,40 +34,31 @@ resources:
       cpu: 500m
       memory: 1000Mi
 tests:
+- as: unit-test
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: openshift-e2e
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: medik8s-aws
+    dependencies:
+      OO_BUNDLE: my-bundle
     env:
       BASE_DOMAIN: medik8s-ci.projects.ecosystem.sysdeseng.com
-      INSTALL_NAMESPACE: nmo-install
+      OO_INSTALL_NAMESPACE: nmo-install
     test:
-    - as: e2e-install
-      cli: latest
-      commands: |
-        oc create namespace "$INSTALL_NAMESPACE"
-        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
-        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment node-maintenance-operator-controller-manager
-      dependencies:
-      - env: OO_BUNDLE
-        name: my-bundle
-      env:
-      - name: INSTALL_NAMESPACE
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
     - as: e2e-test
-      commands: export OPERATOR_NS="$INSTALL_NAMESPACE" && make cluster-functest
+      commands: export OPERATOR_NS="$OO_INSTALL_NAMESPACE" && make cluster-functest
       env:
-      - name: INSTALL_NAMESPACE
+      - name: OO_INSTALL_NAMESPACE
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: medik8s
