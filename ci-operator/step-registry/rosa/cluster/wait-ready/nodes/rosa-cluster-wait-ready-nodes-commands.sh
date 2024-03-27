@@ -243,3 +243,7 @@ else
     echo "Exiting test!"
     exit 1
 fi
+
+# Sleep 5h for debugging
+echo "Pause deleting. Sleep 5h for personal usage"
+sleep 18000
