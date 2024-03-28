@@ -21,6 +21,11 @@ interface "eth1" {
     also request routers, domain-name, domain-name-servers, domain-search,
         dhcp6.name-servers, dhcp6.domain-search, dhcp6.fqdn, dhcp6.sntp-servers;
 }
+
+interface "eth2" {
+    also request routers, domain-name, domain-name-servers, domain-search,
+        dhcp6.name-servers, dhcp6.domain-search, dhcp6.fqdn, dhcp6.sntp-servers;
+}
 '
 
 echo "Pushing the configuration and starting the load balancer in the auxiliary host..."
@@ -79,6 +84,10 @@ for dev in "${devices[@]}"; do
     -pf "/var/run/dhclient.$interface.pid" \
     -lf "/var/lib/dhcp/dhclient.$interface.lease" "$interface"
 done
+
+nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-$CLUSTER_NAME")" \
+/sbin/dhclient -v -N
+
 echo "Sending HUP to HAProxy to trigger the configuration reload..."
 podman kill --signal HUP "haproxy-$CLUSTER_NAME"
 

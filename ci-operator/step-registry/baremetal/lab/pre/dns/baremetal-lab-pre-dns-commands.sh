@@ -43,9 +43,25 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
 ${name}.${CLUSTER_NAME} IN A ${ip}"
   DNS_REVERSE_INTERNAL="${DNS_REVERSE_INTERNAL}
 $(echo "${ip}." | ( rip=""; while read -r -d . b; do rip="$b${rip+.}${rip}"; done; echo "$rip" ))in-addr.arpa. IN PTR ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}."
+
+  if [ "${ipv6_enabled:-}" == "true" ]; then
+    # shellcheck disable=SC2154
+    if [ ${#ipv6} -eq 0 ]; then
+      echo "Error when parsing the Bare Metal Host metadata"
+      exit 1
+    fi
+    DNS_FORWARD="${DNS_FORWARD}
+${name}.${CLUSTER_NAME} IN AAAA ${ipv6}"
+
+    expanded_ipv6=$(printf "%s" "$ipv6" | awk -F ':' '{for (i=1; i<=NF; i++) printf("%04s", $i); print ""}')
+    reversed_ipv6=$(echo "$expanded_ipv6" | rev)
+    reversed_ipv6_with_dots=$(echo "$reversed_ipv6" | sed 's/\(.\{1\}\)/\1./g')
+    reversed_ipv6="${reversed_ipv6_with_dots}ip6.arpa."
+    DNS_REVERSE_INTERNAL="${DNS_REVERSE_INTERNAL}
+$reversed_ipv6 IN PTR ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}."
+  fi
 done
 
-# TODO add ipv6 (single and dual stack?)
 
 DNS_REVERSE_INTERNAL="${DNS_REVERSE_INTERNAL}
 ;DO NOT EDIT; END $CLUSTER_NAME"
