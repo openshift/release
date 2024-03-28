@@ -15,6 +15,8 @@ ls -ld $(pwd)
 export HOME WORKSPACE CHROME_IMAGE CHROME_TAG
 HOME=/tmp
 WORKSPACE=$(pwd)
+
+cd /tmp
 echo "Permission"
 ls -ld $(pwd)
 
