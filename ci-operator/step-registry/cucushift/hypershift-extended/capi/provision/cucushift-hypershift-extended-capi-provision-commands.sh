@@ -156,16 +156,16 @@ ${ADDITIONAL_SECURITY_GROUPS_YAML}'
     if [[ -n "${DEFAULT_MP_MIN_REPLICAS}" ]] && [[ -n "${DEFAULT_MP_MAX_REPLICAS}" ]] ; then
       DEFAULT_MP_AUTOSCALING_YAML='  defaultMachinePoolSpec:
     autoscaling:
-      minReplicas: "'"${DEFAULT_MP_MIN_REPLICAS}"'"
-      maxReplicas: "'"${DEFAULT_MP_MAX_REPLICAS}"'"'
+      minReplicas: ${DEFAULT_MP_MIN_REPLICAS}
+      maxReplicas: ${DEFAULT_MP_MAX_REPLICAS}'
       export DEFAULT_MP_AUTOSCALING_YAML=${DEFAULT_MP_AUTOSCALING_YAML}
     fi
 
     # machinepool autosacling spec in rosamachinepool
     if [[ -n "${MIN_REPLICAS}" ]] && [[ -n "${MAX_REPLICAS}" ]] ; then
       MP_AUTOSCALING_YAML='  autoscaling:
-    minReplicas: "'"${MIN_REPLICAS}"'"
-    maxReplicas: "'"${MAX_REPLICAS}"'"'
+    minReplicas: ${MIN_REPLICAS}
+    maxReplicas: ${MAX_REPLICAS}'
       export MP_AUTOSCALING_YAML=${MP_AUTOSCALING_YAML}
     fi
 
