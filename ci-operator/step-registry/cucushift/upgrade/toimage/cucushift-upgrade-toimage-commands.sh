@@ -20,6 +20,7 @@ KUBECONFIG="" oc --loglevel=8 registry login
 function debug() {
     if (( FRC != 0 )); then
         echo -e "oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
+        echo -e "oc get machineconfig\n$(oc get machineconfig)"
         echo -e "Describing abnormal nodes...\n"
         oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
         echo -e "Describing abnormal operators...\n"
@@ -393,7 +394,7 @@ function check_clusteroperators() {
 }
 
 function wait_clusteroperators_continous_success() {
-    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=20
+    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=30
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
         if check_clusteroperators; then
@@ -553,17 +554,15 @@ function check_signed() {
     fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    set -x
     try=0
-    max_retries=2
-    response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+    max_retries=3
+    response=0
     while (( try < max_retries && response != 200 )); do
         echo "Trying #${try}"
-        response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+        response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
         (( try += 1 ))
         sleep 60
     done
-    set +x
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -578,6 +577,7 @@ function admin_ack() {
     fi
 
     local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r ".data")"
+    echo -e "All admin acks:\n${out}"
     if [[ ${out} != *"ack-4.${SOURCE_MINOR_VERSION}"* ]]; then
         echo "Admin ack not required: ${out}" && return
     fi
@@ -597,7 +597,7 @@ function admin_ack() {
     done
     echo "Admin-acks patch gets started"
 
-    echo -e "sleep 5 min wait admin-acks patch to be valid...\n"
+    echo -e "sleep 5 mins wait admin-acks patch to be valid...\n"
     while (( wait_time_loop_var < 5 )); do
         sleep 1m
         echo -e "wait_time_passed=${wait_time_loop_var} min.\n"
@@ -704,7 +704,10 @@ function check_upgrade_status() {
         if ! ( run_command "oc get clusterversion" ); then
             continue
         fi
-        if ! out="$(oc get clusterversion --no-headers)"; then continue; fi
+        if ! out="$(oc get clusterversion --no-headers || false)"; then
+            echo "Error occurred when getting clusterversion"
+            continue 
+        fi
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${cluster_version}" ]]; then
@@ -753,17 +756,6 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# Get the target upgrades release, by default, OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is the target release
-# If it's serial upgrades then override-upgrade file will store the release and overrides OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
-# upgrade-edge file expects a comma separated releases list like target_release1,target_release2,...
-export TARGET_RELEASES=("${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}")
-if [[ -f "${SHARED_DIR}/upgrade-edge" ]]; then
-    release_string="$(< "${SHARED_DIR}/upgrade-edge")"
-    # shellcheck disable=SC2207
-    TARGET_RELEASES=($(echo "$release_string" | tr ',' ' '))
-fi
-echo "Upgrade targets are ${TARGET_RELEASES[*]}"
-
 export OC="run_command_oc"
 
 # Target version oc will be extract in the /tmp/client directory, use it first
@@ -771,50 +763,46 @@ mkdir -p /tmp/client
 export OC_DIR="/tmp/client"
 export PATH=${OC_DIR}:$PATH
 
-for target in "${TARGET_RELEASES[@]}"
-do
-    export TARGET="${target}"
-    TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
-    extract_oc
+export TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
+extract_oc
 
-    SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
-    SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
-    export SOURCE_VERSION
-    export SOURCE_MINOR_VERSION
-    echo -e "Source release version is: ${SOURCE_VERSION}\nSource minor version is: ${SOURCE_MINOR_VERSION}"
+SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
+SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
+export SOURCE_VERSION
+export SOURCE_MINOR_VERSION
+echo -e "Source release version is: ${SOURCE_VERSION}\nSource minor version is: ${SOURCE_MINOR_VERSION}"
 
-    TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
-    export TARGET_VERSION
-    export TARGET_MINOR_VERSION
-    echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
+TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
+export TARGET_VERSION
+export TARGET_MINOR_VERSION
+echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
 
-    export FORCE_UPDATE="false"
-    if ! check_signed; then
-        echo "You're updating to an unsigned images, you must override the verification using --force flag"
-        FORCE_UPDATE="true"
-        if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358" "OCP-69968" "OCP-56083"; then
-            echo "The case need to run against a signed target image!"
-            exit 1
-        fi
-    else
-        echo "You're updating to a signed images, so run the upgrade command without --force flag"
+export FORCE_UPDATE="false"
+if ! check_signed; then
+    echo "You're updating to an unsigned images, you must override the verification using --force flag"
+    FORCE_UPDATE="true"
+    if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-24358" "OCP-69968" "OCP-56083"; then
+        echo "The case need to run against a signed target image!"
+        exit 1
     fi
-    if [[ "${FORCE_UPDATE}" == "false" ]]; then
-        admin_ack
-        cco_annotation
-    fi
-    if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
-        update_cloud_credentials_oidc
-    fi
-    upgrade
-    check_upgrade_status
-    check_history
+else
+    echo "You're updating to a signed images, so run the upgrade command without --force flag"
+fi
+if [[ "${FORCE_UPDATE}" == "false" ]]; then
+    admin_ack
+    cco_annotation
+fi
+if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
+    update_cloud_credentials_oidc
+fi
+upgrade
+check_upgrade_status
+check_history
 
-    if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
-        echo -e "oc get node -owide\n$(oc get node -owide)"
-        rhel_repo
-        rhel_upgrade
-    fi
-    health_check
-done
-
+if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
+    echo -e "oc get node -owide\n$(oc get node -owide)"
+    rhel_repo
+    rhel_upgrade
+fi
+health_check
