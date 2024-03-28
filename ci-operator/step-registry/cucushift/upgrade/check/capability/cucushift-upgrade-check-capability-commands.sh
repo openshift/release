@@ -10,18 +10,18 @@ trap 'FRC=$?; create_postupgrade_junit' EXIT TERM
 # Generate the Junit for cap check
 function create_postupgrade_junit() {
     echo "Generating the Junit for post upgrade check on capability"
-    filename="cluster upgrade"
+    filename="junit_cluster_upgrade.xml"
     testsuite="cluster upgrade"
     subteam="OTA"
     if (( FRC == 0 )); then
-        cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
+        cat >"${ARTIFACT_DIR}/${filename}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="$SECONDS">
   <testcase name="${subteam}:Post upgrade check on capability should succeed or skip"/>
 </testsuite>
 EOF
     else
-        cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
+        cat >"${ARTIFACT_DIR}/${filename}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="$SECONDS">
   <testcase name="${subteam}:Post upgrade check on capability should succeed">
