@@ -5,6 +5,8 @@ set -x
 # Hosted Control Plane parameters
 hcp_ns="$HC_NS-$HC_NAME"
 export hcp_ns
+hcp_domain=$(echo -n $PROW_JOB_ID|cut -c-8)-$HYPERSHIFT_BASEDOMAIN
+export hcp_domain
 
 # InfraEnv configs
 ssh_key_file="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key"
@@ -152,8 +154,8 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --name=${HC_NAME} \
     --pull-secret="${PULL_SECRET_FILE}" \
     --agent-namespace=${hcp_ns} \
-    --base-domain=${HYPERSHIFT_BASEDOMAIN} \
-    --api-server-address=api.${HC_NAME}.${HYPERSHIFT_BASEDOMAIN} \
+    --base-domain=${hcp_domain} \
+    --api-server-address=api.${HC_NAME}.${hcp_domain} \
     --ssh-key=${ssh_key_file} \
     --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
     --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
