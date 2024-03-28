@@ -117,7 +117,7 @@ EOF
 
 # apply managedclusterset binding
 oc apply -f - <<EOF
-apiVersion: cluster.open-cluster-management.io/v1beta1
+apiVersion: cluster.open-cluster-management.io/v1beta2
 kind: ManagedClusterSetBinding
 metadata:
   name: default
