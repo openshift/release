@@ -133,15 +133,14 @@ tests:
       cli: latest
       commands: |
         export QUAY_PASS=$(cat /maistra-secrets/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
           sh -c \
-          "docker login -u='maistra-dev+prow' \
-          -p=${QUAY_PASS} quay.io; \
-          cd /work && \
+          "cd /work && \
           export BUILD_WITH_CONTAINER="0" && \
           make docker-build docker-push \
-          IMAGE=quay.io/maistra-dev/istio-ubi9-operator:PR-${PULL_NUMBER}"
+          IMAGE=quay.io/maistra-dev/sail-operator:PR-${PULL_NUMBER}"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
       - mount_path: /maistra-secrets
@@ -348,12 +347,10 @@ tests:
     - as: e2e-kind
       cli: latest
       commands: |
-        export QUAY_PASS=$(cat /maistra-secrets/password)
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
           sh -c \
           "export TAG=PR-${PULL_NUMBER} && \
-          docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
           cd /work && \
           export BUILD_WITH_CONTAINER="0" && \
           make test.e2e.kind"
@@ -455,11 +452,7 @@ tests:
       commands: |
         export QUAY_PASS=$(cat /maistra-secrets/password)
         export GITHUB_TOKEN=$(cat /creds-github/token)
-        # login to quay.io in the privileged pod
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          docker login -u='maistra-dev+prow' \
-          -p=${QUAY_PASS} quay.io
-        # build and push images and publish the bundle into OperatorHub
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
           sh -c \
