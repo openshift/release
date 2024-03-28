@@ -453,6 +453,9 @@ function destroy_resources() {
   cat > "/tmp/ocp-test/metadata.json" << EOF
 {"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
 EOF
+  echo "Print values for debugging"
+  cat "/tmp/ocp-test/metadata.json"
+  exit 1
 
   #
   # Call destroy cluster on fake metadata file
