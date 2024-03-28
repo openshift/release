@@ -109,10 +109,11 @@ function export_envs() {
     ADDITIONAL_TAGS_YAML=""
     TAGS="capi-prow-ci: ${CLUSTER_NAME}"
     if [[ -n "${ADDITIONAL_TAGS}" ]]; then
-      TAGS="${TAGS},${ADDITIONAL_TAGS}"
+      TagsKeyValue=$(echo ${ADDITIONAL_TAGS} | sed 's/\([^ ,]\+\):\([^ ,]\+\)/\1: \2/g')
+      TAGS="${TAGS},${TagsKeyValue}"
     fi
     IFS=',' read -ra tag_arr <<< "${TAGS}"
-    for tag in "${tag_arr[@]}"; do ADDITIONAL_TAGS_YAML+="  - ${tag}"$'\n'; done
+    for tag in "${tag_arr[@]}"; do ADDITIONAL_TAGS_YAML+="    ${tag}"$'\n'; done
     export ADDITIONAL_TAGS_YAML=${ADDITIONAL_TAGS_YAML}
 
     AVAILABILITY_ZONE_YAML=""
@@ -315,7 +316,7 @@ spec:
   version: "${OPENSHIFT_VERSION}"
 ${MP_AUTOSCALING_YAML}
 ${ADDITIONAL_SECURITY_GROUPS_YAML}
-  labels:
+  additionalTags:
 ${ADDITIONAL_TAGS_YAML}
   nodeDrainGracePeriod: ${NODE_DRAIN_GRACE_PERIOD}
 EOF
