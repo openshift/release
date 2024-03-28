@@ -11,6 +11,13 @@ whoami
 
 echo "Permission"
 ls -ld $(pwd)
+
+export HOME WORKSPACE CHROME_IMAGE CHROME_TAG
+HOME=/tmp
+WORKSPACE=$(pwd)
+echo "Permission"
+ls -ld $(pwd)
+
 # Clone and checkout the specific PR
 # git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 git clone "https://github.com/subhashkhileri/backstage-showcase.git"
