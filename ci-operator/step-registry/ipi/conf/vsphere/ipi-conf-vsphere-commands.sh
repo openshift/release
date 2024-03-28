@@ -135,12 +135,24 @@ compute:
       osDisk:
         diskSizeGB: 120"
 else
-    MACHINE_POOL_OVERRIDES="controlPlane:
+  MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
   replicas: ${CONTROL_PLANE_REPLICAS}
+  platform:
+    vsphere:
+      cpus: ${CONTROL_PLANE_CPU}
+      memoryMB: ${CONTROL_PLANE_MEMORY}
+      osDisk:
+        diskSizeGB: ${CONTROL_PLANE_DISK_SIZE}
 compute:
 - name: worker
-  replicas: ${COMPUTE_NODE_REPLICAS}"
+  replicas: ${COMPUTE_NODE_REPLICAS}
+  platform:
+    vsphere:
+      cpus: ${COMPUTE_NODE_CPU}
+      memoryMB: ${COMPUTE_NODE_MEMORY}
+      osDisk:
+        diskSizeGB: ${COMPUTE_NODE_DISK_SIZE}"
 fi
 
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
