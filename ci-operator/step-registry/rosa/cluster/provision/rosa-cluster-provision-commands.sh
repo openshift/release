@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -x
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -31,6 +32,7 @@ ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
 CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
 ADDITIONAL_SECURITY_GROUP=${ADDITIONAL_SECURITY_GROUP:-false}
 NO_CNI=${NO_CNI:-false}
+CONFIGURE_CLUSTER_AUTOSCALER=${CONFIGURE_CLUSTER_AUTOSCALER:-false}
 
 # Record Cluster Configurations
 cluster_config_file="${SHARED_DIR}/cluster-config"
@@ -256,11 +258,28 @@ if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
     MIN_REPLICAS=3
   fi
   COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"  
-  record_cluster "nodes" "max_replicas" ${MIN_REPLICAS}
-  record_cluster "nodes" "min_replicas" ${MAX_REPLICAS}
+  record_cluster "nodes" "min_replicas" ${MIN_REPLICAS}
+  record_cluster "nodes" "max_replicas" ${MAX_REPLICAS}
 else
   COMPUTE_NODES_SWITCH="--replicas ${REPLICAS}"
   record_cluster "nodes" "replicas" ${REPLICAS}
+fi
+
+CONFIGURE_CLUSTER_AUTOSCALER_SWITCH=""
+if [[ "$ENABLE_AUTOSCALING" == "true" ]] && [[ "$CONFIGURE_CLUSTER_AUTOSCALER" == "true" ]] && [[ "$HOSTED_CP" == "false" ]]; then
+  CONFIGURE_CLUSTER_AUTOSCALER_SWITCH="--autoscaler-log-verbosity ${AUTOSCALER_LOG_VERBOSITY} --autoscaler-max-pod-grace-period ${AUTOSCALER_MAX_POD_GRACE_PERIOD} --autoscaler-pod-priority-threshold ${AUTOSCALER_POD_PRIORITY_THRESHOLD} --autoscaler-max-node-provision-time ${AUTOSCALER_MAX_NODE_PROVISION_TIME} --autoscaler-balancing-ignored-labels ${AUTOSCALER_BALANCING_IGNORED_LABELS} --autoscaler-max-nodes-total ${AUTOSCALER_MAX_NODES_TOTAL} --autoscaler-min-cores ${AUTOSCALER_MIN_CORES} --autoscaler-max-cores ${AUTOSCALER_MAX_CORES} --autoscaler-min-memory ${AUTOSCALER_MIN_MEMORY} --autoscaler-max-memory ${AUTOSCALER_MAX_MEMORY} --autoscaler-gpu-limit ${AUTOSCALER_GPU_LIMIT} --autoscaler-scale-down-unneeded-time ${AUTOSCALER_SCALE_DOWN_UNNEEDED_TIME} --autoscaler-scale-down-utilization-threshold ${AUTOSCALER_SCALE_DOWN_UTILIZATION_THRESHOLD} --autoscaler-scale-down-delay-after-add ${AUTOSCALER_SCALE_DOWN_DELAY_AFTER_ADD} --autoscaler-scale-down-delay-after-delete ${AUTOSCALER_SCALE_DOWN_DELAY_AFTER_DELETE} --autoscaler-scale-down-delay-after-failure ${AUTOSCALER_SCALE_DOWN_DELAY_AFTER_FAILURE}"
+  if [ "$AUTOSCALER_BALANCE_SIMILAR_NODE_GROUPS" == "true" ]; then
+    CONFIGURE_CLUSTER_AUTOSCALER_SWITCH+=" --autoscaler-balance-similar-node-groups "
+  fi
+  if [ "$AUTOSCALER_SKIP_NODES_WITH_LOCAL_STORAGE" == "true" ]; then
+    CONFIGURE_CLUSTER_AUTOSCALER_SWITCH+=" --autoscaler-skip-nodes-with-local-storage "
+  fi
+  if [ "$AUTOSCALER_IGNORE_DAEMONSETS_UTILIZATION" == "true" ]; then
+    CONFIGURE_CLUSTER_AUTOSCALER_SWITCH+=" --autoscaler-ignore-daemonsets-utilization "
+  fi
+  if [ "$AUTOSCALER_SCALE_DOWN_ENABLED" == "true" ]; then
+    CONFIGURE_CLUSTER_AUTOSCALER_SWITCH+=" --autoscaler-scale-down-enabled "
+  fi
 fi
 
 ETCD_ENCRYPTION_SWITCH=""
@@ -470,9 +489,32 @@ echo "  Additional Security groups: ${ADDITIONAL_SECURITY_GROUP}"
 echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then 
   echo "  Min replicas: ${MIN_REPLICAS}"
-  echo "  Min replicas: ${MAX_REPLICAS}"  
+  echo "  Max replicas: ${MAX_REPLICAS}"
 else
   echo "  Replicas: ${REPLICAS}"
+fi
+echo "  Configure cluster autoscaler: ${CONFIGURE_CLUSTER_AUTOSCALER}"
+if [[ "$ENABLE_AUTOSCALING" == "true" ]] && [[ "$CONFIGURE_CLUSTER_AUTOSCALER" == "true" ]]; then 
+  echo "  Autoscaler balance similar node groups: ${AUTOSCALER_BALANCE_SIMILAR_NODE_GROUPS}"                
+  echo "  Autoscaler skip nodes with local storage: ${AUTOSCALER_SKIP_NODES_WITH_LOCAL_STORAGE}"            
+  echo "  Autoscaler log verbosity: ${AUTOSCALER_LOG_VERBOSITY}" 
+  echo "  Autoscaler max pod grace period: ${AUTOSCALER_MAX_POD_GRACE_PERIOD}"
+  echo "  Autoscaler pod priority threshold: ${AUTOSCALER_POD_PRIORITY_THRESHOLD}" 
+  echo "  Autoscaler ignore daemonsets utilization: ${AUTOSCALER_IGNORE_DAEMONSETS_UTILIZATION}"    
+  echo "  Autoscaler max node provision time: ${AUTOSCALER_MAX_NODE_PROVISION_TIME}"
+  echo "  Autoscaler balancing ignored labels: ${AUTOSCALER_BALANCING_IGNORED_LABELS}"
+  echo "  Autoscaler max nodes: ${AUTOSCALER_MAX_NODES_TOTAL}" 
+  echo "  Autoscaler min cores: ${AUTOSCALER_MIN_CORES}" 
+  echo "  Autoscaler max cores: ${AUTOSCALER_MAX_CORES}" 
+  echo "  Autoscaler min memory: ${AUTOSCALER_MIN_MEMORY}"
+  echo "  Autoscaler max memory: ${AUTOSCALER_MAX_MEMORY}" 
+  echo "  Autoscaler gpu limit: ${AUTOSCALER_GPU_LIMIT}" 
+  echo "  Autoscaler scale down enabled: ${AUTOSCALER_SCALE_DOWN_ENABLED}"       
+  echo "  Autoscaler scale down unneeded time: ${AUTOSCALER_SCALE_DOWN_UNNEEDED_TIME}"
+  echo "  Autoscaler scale down utilization threshold: ${AUTOSCALER_SCALE_DOWN_UTILIZATION_THRESHOLD}"
+  echo "  Autoscaler scale down delay after add: ${AUTOSCALER_SCALE_DOWN_DELAY_AFTER_ADD}"  
+  echo "  Autoscaler scale down delay after delete: ${AUTOSCALER_SCALE_DOWN_DELAY_AFTER_DELETE}" 
+  echo "  Autoscaler scale down delay after failure: ${AUTOSCALER_SCALE_DOWN_DELAY_AFTER_FAILURE}" 
 fi
 
 echo "  Enable Shared VPC: ${ENABLE_SHARED_VPC}"
@@ -513,6 +555,7 @@ ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
 ${SHARED_VPC_SWITCH} \
 ${SECURITY_GROUP_ID_SWITCH} \
 ${NO_CNI_SWITCH} \
+${CONFIGURE_CLUSTER_AUTOSCALER_SWITCH} \
 ${DRY_RUN_SWITCH}
 " | sed -E 's/\s{2,}/ /g' > "${SHARED_DIR}/create_cluster.sh"
 cat "${SHARED_DIR}/create_cluster.sh" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${ARTIFACT_DIR}/create_cluster.sh"
@@ -555,6 +598,7 @@ rosa create cluster -y \
                     ${SHARED_VPC_SWITCH} \
                     ${SECURITY_GROUP_ID_SWITCH} \
                     ${NO_CNI_SWITCH} \
+                    ${CONFIGURE_CLUSTER_AUTOSCALER_SWITCH} \
                     ${DRY_RUN_SWITCH} > "${CLUSTER_INFO_WITHOUT_MASK}"
 
 cat ${CLUSTER_INFO_WITHOUT_MASK} | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${CLUSTER_INFO}"
