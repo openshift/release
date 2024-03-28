@@ -30,6 +30,7 @@ if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | 
 fi
 machine_cidr_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipv6prefix' "${SUBNETS_CONFIG}")
 
+VIP_MODE="SingleVIPs"
 if [[ "${VIP_MODE}" == "DualVIPs" ]]; then
   IPV6_API_VIP="${machine_cidr_ipv6%%::*}::4"
   IPV6_INGRESS_VIP="${machine_cidr_ipv6%%::*}::5"
