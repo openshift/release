@@ -107,12 +107,12 @@ function export_envs() {
     export INGRESS_ARN=${INGRESS_ARN}
 
     ADDITIONAL_TAGS_YAML=""
-    TAGS="capi-prow-ci:${CLUSTER_NAME}"
+    TAGS="capi-prow-ci: ${CLUSTER_NAME}"
     if [[ -n "${ADDITIONAL_TAGS}" ]]; then
       TAGS="${TAGS},${ADDITIONAL_TAGS}"
     fi
     IFS=',' read -ra tag_arr <<< "${TAGS}"
-    for tag in "${tag_arr[@]}"; do ADDITIONAL_TAGS_YAML+="  - ${tag}\n"; done
+    for tag in "${tag_arr[@]}"; do ADDITIONAL_TAGS_YAML+="  - ${tag}"$'\n'; done
     export ADDITIONAL_TAGS_YAML=${ADDITIONAL_TAGS_YAML}
 
     AVAILABILITY_ZONE_YAML=""
@@ -122,7 +122,7 @@ function export_envs() {
       AVAILABILITY_ZONES=$(cat ${SHARED_DIR}/availability_zones | tr -d "[']")
     fi
     IFS=',' read -ra zone_arr <<< "${AVAILABILITY_ZONES}"
-    for zone in "${zone_arr[@]}"; do AVAILABILITY_ZONE_YAML+="  - ${zone}\n"; done
+    for zone in "${zone_arr[@]}"; do AVAILABILITY_ZONE_YAML+="  - ${zone}"$'\n'; done
     export AVAILABILITY_ZONE_YAML=${AVAILABILITY_ZONE_YAML}
 
     PUBLIC_SUBNET_IDs=$(cat ${SHARED_DIR}/public_subnet_ids | tr -d "[']")
@@ -130,12 +130,12 @@ function export_envs() {
 
     SUBNET_LIST_YAML=""
     IFS=',' read -ra private_subnet_arr <<< "${PRIVATE_SUBNET_IDs}"
-    for subnet in "${private_subnet_arr[@]}"; do SUBNET_LIST_YAML+="  - ${subnet}\n"; done
+    for subnet in "${private_subnet_arr[@]}"; do SUBNET_LIST_YAML+="  - ${subnet}"$'\n'; done
 
     # do not set public subnet for private cluster
     if [[ "${ENDPOINT_ACCESS}" == "Public" ]]; then
       IFS=',' read -ra public_subnet_arr <<< "${PUBLIC_SUBNET_IDs}"
-      for subnet in "${public_subnet_arr[@]}"; do SUBNET_LIST_YAML+="  - ${subnet}\n"; done
+      for subnet in "${public_subnet_arr[@]}"; do SUBNET_LIST_YAML+="  - ${subnet}"$'\n'; done
     fi
     export SUBNET_LIST_YAML=${SUBNET_LIST_YAML}
 
@@ -146,7 +146,7 @@ function export_envs() {
       ADDITIONAL_SECURITY_GROUPS_YAML=""
       SECURITY_GROUP_IDs=$(cat ${SHARED_DIR}/security_groups_ids | xargs |sed 's/ /,/g')
       IFS=',' read -ra sg_arr <<< "${SECURITY_GROUP_IDs}"
-      for sg in "${sg_arr[@]}"; do ADDITIONAL_SECURITY_GROUPS_YAML+="  - ${sg}\n"; done
+      for sg in "${sg_arr[@]}"; do ADDITIONAL_SECURITY_GROUPS_YAML+="  - ${sg}"$'\n'; done
       export ADDITIONAL_SECURITY_GROUPS_YAML='  additionalSecurityGroups:
 ${ADDITIONAL_SECURITY_GROUPS_YAML}'
     fi
@@ -209,7 +209,6 @@ export_envs
 rosa_login
 download_envsubst
 
-sleep 3h
 # create AWSClusterControllerIdentity
 cat <<EOF | oc -n default apply -f -
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
