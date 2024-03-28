@@ -14,13 +14,13 @@ ref:
       default: "staging"
       documentation: The environment for rosa login. The supported values are [production, staging, integration].
     - name: OPENSHIFT_VERSION
-      default: "4.14.11"
-      documentation: The openshift version for the cluster (e.g. "4.14.5"). Specify a major/minor (e.g. "4.14") to get the latest version from that stream.
+      default: "4.15.0"
+      documentation: The openshift version for the cluster (e.g. "4.15.0"). Specify a major/minor (e.g. "4.15") to get the latest version from that stream.
     - name: CLUSTER_NAME
-      default: "capitest"
-      documentation: The name of the rosa cluster to create. Must be unique for the account, lowercase, and no more than 15 characters.
+      default: ""
+      documentation: The name of the rosa cluster to create. Must be unique for the account, lowercase, and no more than 54 characters.
     - name: AVAILABILITY_ZONES
-      default: "a"
+      default: ""
       documentation: The availability zones to use when installing a non-BYOVPC cluster. Format should be a comma-separated list, etc. 'a,b'.
     - name: ACCOUNT_ROLES_PREFIX
       default: ""
@@ -29,10 +29,63 @@ ref:
       default: ""
       documentation: User-defined prefix for generated AWS operator policies.
     - name: REGION
-      default: "us-east-1"
+      default: "us-west-2"
       documentation: "The AWS region of the cluster."
     - name: CLUSTER_TIMEOUT
       default: "1800"
       documentation: Set to number of seconds for the cluster to timeout if it's not ready.
+    - name: PRIVATE
+      default: "false"
+      documentation: Restrict master API endpoint and application routes to direct, private connectivity.
+    - name: MACHINE_CIDR
+      default: "10.0.0.0/16"
+      documentation: capi hcp cluster machine cidr.
+    - name: NETWORK_TYPE
+      default: "OVNKubernetes"
+      documentation: The CNI network type, default is OVNKubernetes. The supported values are [OVNKubernetes, Other]
+    - name: ENDPOINT_ACCESS
+      default: "Public"
+      documentation: Specifies the publishing scope of cluster endpoints. The supported values are [Public, Private].The default is Public.
+    - name: DEFAULT_MP_MIN_REPLICAS
+      default: ""
+      documentation: The min number of the default hcp machinepool nodes with autosacling enabled. Autoscaling min/max value must be equal or multiple of the availability zones count.
+    - name: DEFAULT_MP_MAX_REPLICAS
+      default: ""
+      documentation: The max number of the default hcp machinepool nodes with autosacling enabled. Autoscaling min/max value must be equal or multiple of the availability zones count. The value must not less that the min_replica.
+    - name: MIN_REPLICAS
+      default: ""
+      documentation: The min number of the hcp worker nodes. Autoscaling min/max value must be equal or multiple of the availability zones count.
+    - name: MAX_REPLICAS
+      default: ""
+      documentation: The max number of the hcp worker nodes. Autoscaling min/max value must be equal or multiple of the availability zones count. The value must not less that the min_replica.
+    - name: ADDITIONAL_TAGS
+      default: ""
+      documentation: Apply user defined tags to all resources created by CAPI ROSA HCP. Tags are comma separated example - 'foo:bar,bar:baz', The default value is "capi-prow-ci:${CLUSTER_NAME}".
+    - name: ETCD_ENCRYPTION
+      default: "false"
+      documentation: Add etcd encryption. By default etcd data is encrypted at rest. This option configures etcd encryption on top of existing storage encryption.
+    - name: ADDITIONAL_SECURITY_GROUP
+      default: "false"
+      documentation: Indicates if there are additional security groups are enabled for the cluster creation
+    - name: ENABLE_AUDIT_LOG
+      default: "false"
+      documentation: Enable Forwarding audit logs to AWS CloudWatch.
+    - name: CLUSTER_SECTOR
+      default: ""
+      documentation: Sector groups a set of service clusters for HCP. The supported values are [canary, main].
+    - name: NODE_DRAIN_GRACE_PERIOD
+      default: ""
+      documentation: |-
+        NODE_DRAIN_GRACE_PERIOD is grace period for how long Pod Disruption Budget-protected workloads will be
+        respected during upgrades. After this grace period, any workloads protected by Pod Disruption
+        Budgets that have not been successfully drained from a node will be forcibly evicted.
+        Valid values are from 0 to 1 week(10080m|168h). 0 or empty value means that the MachinePool can be drained without any time limitation.
+    - name: DOMAIN_PREFIX
+      default: ""
+      documentation: |-
+        DOMAIN_PREFIX is an optional prefix added to the cluster's domain name. It will be used
+        when generating a sub-domain for the cluster on openshiftapps domain. It must be valid DNS-1035 label
+        consisting of lower case alphanumeric characters or '-', start with an alphabetic character
+        end with an alphanumeric character and have a max length of 15 characters.
   documentation: |-
-    deploy rosacluster, rosa controlplane resources
+    deploy rosacluster, rosa controlplane resources by capi
