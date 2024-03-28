@@ -25,7 +25,6 @@ workflow:
       CONTROL_PLANE_INSTANCE_TYPE: "m6i.2xlarge"
       ZONES_COUNT: "3"
       ETCD_STORAGE_CLASS: gp3-csi
-      SKIP_MONITOR_TEST: "true"
     leases:
       - env: LEASED_RESOURCE
         resource_type: aws-3-quota-slice
@@ -37,9 +36,8 @@ workflow:
     - ref: hypershift-install
     - chain: hypershift-kubevirt-create
     - ref: hypershift-kubevirt-health-check
-    test:
-    - chain: hypershift-conformance
     post:
+    - ref: wait
     - chain: hypershift-dump
     - chain: gather-core-dump
     - chain: hypershift-kubevirt-destroy
