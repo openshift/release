@@ -1,0 +1,199 @@
+base_images:
+  ansible:
+    name: "4.14"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.15"
+  tools:
+    name: "4.14"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+releases:
+  intermediate415:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.15"
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.14"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-c2s-ipi-disc-priv-fips-f14
+  cron: 0 9 8,22 * *
+  steps:
+    cluster_profile: aws-c2s-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
+      UPGRADE_PRE_RUN_TAGS: '@disconnected'
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_TARGET}" >
+        ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE415
+        name: release:intermediate415
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
+- as: aws-ipi-disc-priv-sts-basecap-none-fips-f14
+  cron: 46 3 12,28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST: MachineAPI
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FIPS_ENABLED: "true"
+      PERSISTENT_MONITORING: "false"
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CCO_MANUAL_MODE: oidc
+      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
+      UPGRADE_PRE_RUN_TAGS: '@disconnected'
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_TARGET}" >
+        ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE415
+        name: release:intermediate415
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
+- as: azure-ipi-to-multiarch-f14
+  cron: 46 5 12,26 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
+      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_TARGET}" >
+        ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE415
+        name: release:intermediate415
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-test-heterogeneous
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: gcp-ipi-proxy-private-f14
+  cron: 15 7 9,25 * *
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_TARGET}" >
+        ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE415
+        name: release:intermediate415
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
+- as: gcp-ipi-to-multiarch-f14
+  cron: 15 12 3,17 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
+      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_TARGET}" >
+        ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE415
+        name: release:intermediate415
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-test-heterogeneous
+    workflow: cucushift-installer-rehearse-gcp-ipi
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-nightly-4.16-upgrade-from-stable-4.14
