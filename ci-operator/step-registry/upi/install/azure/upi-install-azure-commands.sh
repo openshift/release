@@ -4,7 +4,6 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 #Save exit code for must-gather to generate junit
 trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
 trap 'cp "${ARTIFACT_DIR}/installer/metadata.json" "${SHARED_DIR}"' EXIT TERM
-trap 'cp "${ARTIFACT_DIR}/installer/auth/kubeconfig" "${SHARED_DIR}"' EXIT TERM
 
 # The oc binary is placed in the shared-tmp by the test container and we want to use
 # that oc for all actions.
@@ -178,9 +177,7 @@ status="false"
 while [ "$status" == "false" ]
 do
   status=$(az storage container exists --account-name $ACCOUNT_NAME --name vhd --account-key $ACCOUNT_KEY -o tsv --query exists)
-  echo "debug2"
 done
-echo "debug3"
 
 az storage blob copy start --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --destination-container vhd --destination-blob "rhcos.vhd" --source-uri "$VHD_URL"
 status="false"
@@ -367,5 +364,5 @@ date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 # Password for the cluster gets leaked in the installer logs and hence removing them.
 sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
 #cp "${ARTIFACT_DIR}/installer/metadata.json" "${SHARED_DIR}"
-#cp "${ARTIFACT_DIR}/installer/auth/kubeconfig" "${SHARED_DIR}"
+cp "${ARTIFACT_DIR}/installer/auth/kubeconfig" "${SHARED_DIR}"
 touch /tmp/install-complete
