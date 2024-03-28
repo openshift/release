@@ -9,8 +9,8 @@ if [ "${ENABLE_PROVISIONING_NETWORK:-true}" != "true" ]; then
   exit 0
 fi
 
-[ -z "${PROVISIONING_HOST}" ] && { echo "PROVISIONING_HOST is not filled. Failing."; exit 1; }
-[ -z "${PROVISIONING_NET_DEV}" ] && { echo "PROVISIONING_NET_DEV is not filled. Failing."; exit 1; }
+[ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
+[ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
 
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
@@ -148,14 +148,14 @@ interfaces:
   type: vlan
   state: up
   vlan:
-    base-iface: ${PROVISIONING_NET_DEV}
+    base-iface: $(<"${CLUSTER_PROFILE_DIR}/provisioning-net-dev-${architecture}")
     id: ${VLAN_ID}
 "
 
 echo "[INFO] Configuring the provisioning network in the provisioning host via the NMState specs: "
 echo "${NMSTATE_CONFIG}" | tee "${ARTIFACT_DIR}/nmstate-provisioning-net-config.yaml"
 
-timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+timeout -s 9 10m ssh "${SSHOPTS[@]}" -p "$(<"${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")" "root@${AUX_HOST}" bash -s -- \
   "'${NMSTATE_CONFIG}'" "br-${CLUSTER_NAME: -12}"  << 'EOF'
 
 echo "$1" | nmstatectl apply -
