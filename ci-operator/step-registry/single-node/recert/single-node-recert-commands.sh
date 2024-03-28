@@ -8,37 +8,37 @@ function info {
   echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*"
 }
 
-function gather_recert_logs {
-  info "Adding systemd recert.service log to ${ARTIFACT_DIR}/recert.log ..."
-  ssh -i "${KUBE_SSH_KEY_PATH}" "${SSH_OPTS[@]}" core@"${SINGLE_NODE_IP}" "sudo journalctl -u recert.service" > "${ARTIFACT_DIR}/recert.log"
-
-  info "Adding recert_summary_clean.yaml to ${ARTIFACT_DIR}/ssh-bastion/gather/ ..."
-  scp -i "${KUBE_SSH_KEY_PATH}" "${SSH_OPTS[@]}" core@"${SINGLE_NODE_IP}":/etc/kubernetes/recert_summary_clean.yaml "${ARTIFACT_DIR}/"
-}
-
-if oc get service ssh-bastion -n "${SSH_BASTION_NAMESPACE:-test-ssh-bastion}"; then
-  info "Found bastion host, setting up the respective env vars and the container's SSH configuration..."
-
-  SINGLE_NODE_IP="$(oc --insecure-skip-tls-verify get machines -n openshift-machine-api -o 'jsonpath={.items[*].status.addresses[?(@.type=="InternalIP")].address}')"
-  INGRESS_HOST="$(oc get service --all-namespaces -l run=ssh-bastion -o go-template='{{ with (index (index .items 0).status.loadBalancer.ingress 0) }}{{ or .hostname .ip }}{{end}}')"
-
-  KUBE_SSH_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
-  SSH_OPTS=(-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${INGRESS_HOST}")
-
-  export SINGLE_NODE_IP INGRESS_HOST KUBE_SSH_KEY_PATH SSH_OPTS
-
-  mkdir -p ~/.ssh
-  cp "${KUBE_SSH_KEY_PATH}" ~/.ssh/id_rsa
-  chmod 0600 ~/.ssh/id_rsa
-  if ! whoami &> /dev/null; then
-      if [[ -w /etc/passwd ]]; then
-          echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-      fi
-  fi
-
-  info "Ready to gather recert logs on EXIT and TERM..."
-  trap gather_recert_logs EXIT TERM
-fi
+#function gather_recert_logs {
+#  info "Adding systemd recert.service log to ${ARTIFACT_DIR}/recert.log ..."
+#  ssh -i "${KUBE_SSH_KEY_PATH}" "${SSH_OPTS[@]}" core@"${SINGLE_NODE_IP}" "sudo journalctl -u recert.service" > "${ARTIFACT_DIR}/recert.log"
+#
+#  info "Adding recert_summary_clean.yaml to ${ARTIFACT_DIR}/ssh-bastion/gather/ ..."
+#  scp -i "${KUBE_SSH_KEY_PATH}" "${SSH_OPTS[@]}" core@"${SINGLE_NODE_IP}":/etc/kubernetes/recert_summary_clean.yaml "${ARTIFACT_DIR}/"
+#}
+#
+#if oc get service ssh-bastion -n "${SSH_BASTION_NAMESPACE:-test-ssh-bastion}"; then
+#  info "Found bastion host, setting up the respective env vars and the container's SSH configuration..."
+#
+#  SINGLE_NODE_IP="$(oc --insecure-skip-tls-verify get machines -n openshift-machine-api -o 'jsonpath={.items[*].status.addresses[?(@.type=="InternalIP")].address}')"
+#  INGRESS_HOST="$(oc get service --all-namespaces -l run=ssh-bastion -o go-template='{{ with (index (index .items 0).status.loadBalancer.ingress 0) }}{{ or .hostname .ip }}{{end}}')"
+#
+#  KUBE_SSH_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
+#  SSH_OPTS=(-o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${INGRESS_HOST}")
+#
+#  export SINGLE_NODE_IP INGRESS_HOST KUBE_SSH_KEY_PATH SSH_OPTS
+#
+#  mkdir -p ~/.ssh
+#  cp "${KUBE_SSH_KEY_PATH}" ~/.ssh/id_rsa
+#  chmod 0600 ~/.ssh/id_rsa
+#  if ! whoami &> /dev/null; then
+#      if [[ -w /etc/passwd ]]; then
+#          echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+#      fi
+#  fi
+#
+#  info "Ready to gather recert logs on EXIT and TERM..."
+#  trap gather_recert_logs EXIT TERM
+#fi
 
 # Echo a script to be run as our systemd unit to a file so we can base64 encode it.
 recert_script=$(cat << EOF
@@ -217,21 +217,21 @@ info "Waiting for master MachineConfigPool to have condition=updating..."
 oc wait --for=condition=updating machineconfigpools master --timeout 2m
 
 # Make sure the ssh-bastion is there, otherwise skip waiting for recert completion logging
-if oc get service ssh-bastion -n "${SSH_BASTION_NAMESPACE:-test-ssh-bastion}"; then
-  info "Waiting for recert to be completed..."
-  while true; do
-    if ssh "${SSH_OPTS[@]}" "core@${SINGLE_NODE_IP}" test -e /var/recert.done; then
-      info "Recert completed successfully"
-      break
-    elif ssh "${SSH_OPTS[@]}" "core@${SINGLE_NODE_IP}" test -e /var/recert.failed; then
-      info "Recert failed"
-      exit 1
-    else
-      info "Waiting for recert to be completed..."
-      sleep 5
-    fi
-  done
-fi
+#if oc get service ssh-bastion -n "${SSH_BASTION_NAMESPACE:-test-ssh-bastion}"; then
+#  info "Waiting for recert to be completed..."
+#  while true; do
+#    if ssh "${SSH_OPTS[@]}" "core@${SINGLE_NODE_IP}" test -e /var/recert.done; then
+#      info "Recert completed successfully"
+#      break
+#    elif ssh "${SSH_OPTS[@]}" "core@${SINGLE_NODE_IP}" test -e /var/recert.failed; then
+#      info "Recert failed"
+#      exit 1
+#    else
+#      info "Waiting for recert to be completed..."
+#      sleep 5
+#    fi
+#  done
+#fi
 
 info "Waiting for master MachineConfigPool to have condition=updated..."
 until oc wait --for=condition=updated machineconfigpools master --timeout=5m &> /dev/null
@@ -241,3 +241,5 @@ do
 done
 
 oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m
+
+sleep 3600
