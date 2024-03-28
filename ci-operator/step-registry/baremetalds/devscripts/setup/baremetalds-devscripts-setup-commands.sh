@@ -294,14 +294,20 @@ EOF2
 # about the Packet provisioner, remove the file if it's present.
 test -f /usr/config && rm -f /usr/config || true
 
-yum install -y git sysstat sos make podman python3-virtualenv python39 jq net-tools gcc
+# venv needed by okd bm job but
+# nothing provides python3-wheel-wheel needed by python3-virtualenv-20.21.1-1.el9.noarch from epel
+# yum install -y epel-release
+# yum install -y python3-virtualenv
+
+yum install -y git sysstat sos make podman python39 jq net-tools gcc
 
 systemctl start sysstat
 
 mkdir -p /tmp/artifacts
 
-mkdir dev-scripts
-tar -xzvf dev-scripts.tar.gz -C /root/dev-scripts
+#mkdir dev-scripts
+#tar -xzvf dev-scripts.tar.gz -C /root/dev-scripts
+git clone https://github.com/derekhiggins/dev-scripts -b rock9 /root/dev-scripts
 chown -R root:root dev-scripts
 
 if [ "${NVME_DEVICE}" = "auto" ];
