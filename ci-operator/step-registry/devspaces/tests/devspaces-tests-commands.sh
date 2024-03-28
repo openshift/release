@@ -11,6 +11,7 @@ export KUBECONFIG=$SHARED_DIR/kubeconfig
 # login for interop
 if test -f ${SHARED_DIR}/kubeadmin-password
 then
+  echo "SHARED:"
   OCP_CRED_USR="kubeadmin"
   export OCP_CRED_USR
   OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
@@ -19,6 +20,9 @@ then
 else #login for ROSA & Hypershift platforms
   eval "$(cat "${SHARED_DIR}/api.login")"
 fi
+echo "SHARED: ${SHARED_DIR}/kubeadmin-password" || true
+echo "$(cat ${SHARED_DIR}/kubeadmin-password)" || true
+echo "SHARED1: "$(cat ${SHARED_DIR}/api.login")" || true
 
 cd /tmp/devspaces/scripts
 #cp /var/run/secrets/ci.openshift.io/multi-stage/kubeconfig ./
