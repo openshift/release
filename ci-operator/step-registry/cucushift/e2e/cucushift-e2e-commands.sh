@@ -72,7 +72,7 @@ function filter_test_by_platform() {
     extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            none)
+            none|powervs)
                 export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
                 eval "$extrainfoCmd"
                 ;;
@@ -129,6 +129,14 @@ function filter_test_by_proxy() {
     fi
     echo_e2e_tags
 }
+function filter_test_by_hypershift() {
+    local topo
+    topo="$(oc get infrastructures.config.openshift.io cluster -o yaml | yq '.status.controlPlaneTopology')"
+    if [[ "_${topo}_" = '_External_' ]] ; then
+        export E2E_RUN_TAGS="@hypershift-hosted and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags
+}
 function filter_test_by_fips() {
     local data
     data="$(oc get configmap cluster-config-v1 -n kube-system -o yaml | yq '.data')"
@@ -141,23 +149,24 @@ function filter_test_by_capability() {
     local enabledcaps xversion yversion
     enabledcaps="$(oc get clusterversion version -o yaml | yq '.status.capabilities.enabledCapabilities[]')"
     IFS='.' read xversion yversion _ < <(oc version -o yaml | yq '.openshiftVersion')
-    local v411 v412 v413 v414 v415 v416
+    local v411 v412 v413 v414 v415 v416 v417
     v411="baremetal marketplace openshift-samples"
     v412="${v411} Console Insights Storage CSISnapshot"
     v413="${v412} NodeTuning"
     v414="${v413} MachineAPI Build DeploymentConfig ImageRegistry"
     v415="${v414} OperatorLifecycleManager CloudCredential"
-    v416="${v415}"
+    v416="${v415} CloudControllerManager Ingress"
+    v417="${v416}"
     # [console]=console
     # the first `console` is the capability name
     # the second `console` is the tag name in verification-tests
     declare -A tagmaps
     tagmaps=([baremetal]=xxx
-             [Build]=xxx
+             [Build]=workloads
              [CloudCredential]=xxx
              [Console]=console
              [CSISnapshot]=storage
-             [DeploymentConfig]=xxx
+             [DeploymentConfig]=workloads
              [ImageRegistry]=xxx
              [Insights]=xxx
              [MachineAPI]=xxx
@@ -170,6 +179,9 @@ function filter_test_by_capability() {
     local versioncaps
     versioncaps="$v416"
     case "$xversion.$yversion" in
+        4.17)
+            versioncaps="$v417"
+            ;;
         4.16)
             versioncaps="$v416"
             ;;
@@ -207,6 +219,7 @@ function filter_test_by_capability() {
 function filter_tests() {
     filter_test_by_capability
     filter_test_by_fips
+    filter_test_by_hypershift
     filter_test_by_proxy
     filter_test_by_sno
     filter_test_by_network

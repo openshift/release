@@ -1,12 +1,12 @@
 base_images:
+  base:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-enterprise-base-multi-openshift-4.16
   builder:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
-  ubi:
-    name: ubi
-    namespace: ocp
-    tag: "9"
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   image_stream_tag:
@@ -15,7 +15,11 @@ build_root:
     tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
 images:
 - dockerfile_path: Dockerfile
-  from: ubi
+  from: base
+  inputs:
+    builder:
+      as:
+      - golang:1.21
   to: multiarch-tuning-operator
 - dockerfile_literal: |
     FROM quay.io/operator-framework/operator-sdk:v1.26.0 as osdk
@@ -25,10 +29,6 @@ images:
     RUN chmod -R g+rwX /code
     WORKDIR /code
   from: src
-  inputs:
-    builder:
-      as:
-      - golang:1.21
   to: operator-sdk-src
 operator:
   bundles:
@@ -79,6 +79,10 @@ tests:
     from: src
 - as: vet
   commands: NO_DOCKER=1 make vet && make verify-diff
+  container:
+    from: src
+- as: vendor
+  commands: NO_DOCKER=1 make vendor && make verify-diff
   container:
     from: src
 - as: goimports

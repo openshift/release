@@ -236,7 +236,7 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
-      TEST_SUITE: upgrade-conformance
+      TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
 - as: ocp-installer-e2e-aws-ovn-arm64
   interval: 24h
@@ -258,17 +258,6 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       OCP_ARCH: arm64
     workflow: openshift-e2e-aws-image-ecosystem
-- as: ocp-jenkins-e2e-aws-ovn-arm64
-  interval: 96h
-  steps:
-    cluster_profile: aws-2
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OCP_ARCH: arm64
-      TEST_SUITE: openshift/jenkins-e2e-rhel-only
-    workflow: openshift-e2e-aws
 - as: ocp-e2e-ovn-serial-aws-arm64
   interval: 72h
   steps:
@@ -393,7 +382,7 @@ tests:
       BASE_DOMAIN: ci.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
-      TEST_SUITE: upgrade-conformance
+      TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure
 - as: ocp-e2e-ovn-remote-libvirt-s390x
   cluster: build01
@@ -483,10 +472,7 @@ tests:
       FIPS_ENABLED: "true"
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
-    pre:
-    - chain: ipi-libvirt-pre
-    - ref: fips-check
-    workflow: openshift-e2e-libvirt
+    workflow: openshift-e2e-libvirt-fips
 - as: ocp-e2e-compact-ovn-remote-libvirt-s390x
   cluster: build01
   cron: 0 20 * * 6
@@ -580,10 +566,7 @@ tests:
       BRANCH: "4.16"
       FIPS_ENABLED: "true"
       TEST_TYPE: conformance-parallel
-    pre:
-    - chain: ipi-libvirt-pre
-    - ref: fips-check
-    workflow: openshift-e2e-libvirt
+    workflow: openshift-e2e-libvirt-fips
 - as: ocp-e2e-compact-ovn-remote-libvirt-ppc64le
   cluster: build01
   cron: 0 20 * * 6
@@ -675,7 +658,7 @@ tests:
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
-      TEST_SUITE: upgrade-conformance
+      TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-gcp
 - as: ocp-e2e-gcp-ovn-heterogeneous
   cron: 0 11 * * 0
