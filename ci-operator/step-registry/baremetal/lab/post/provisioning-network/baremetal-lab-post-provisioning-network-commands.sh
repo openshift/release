@@ -8,7 +8,6 @@ if [ ! -f "${SHARED_DIR}/provisioning_network" ]; then
 fi
 
 [ -z "${PROVISIONING_HOST}" ] && { echo "PROVISIONING_HOST is not filled. Failing."; exit 1; }
-[ -z "${PROVISIONING_NET_DEV}" ] && { echo "PROVISIONING_NET_DEV is not filled. Failing."; exit 1; }
 
 # As the API_VIP is unique in the managed network and based on how it is reserved in the reservation steps,
 # we use the last part of it to define the VLAN ID.

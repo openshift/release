@@ -100,7 +100,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      CNV_PRERELEASE_VERSION: "4.14"
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
@@ -134,6 +133,15 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
+- always_run: false
+  as: e2e-kubevirt-metal-conformance
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.14
+    workflow: hypershift-kubevirt-baremetalds-conformance
 - as: e2e-ibmcloud-iks
   optional: true
   run_if_changed: ^api/

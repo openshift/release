@@ -133,6 +133,17 @@ function post-OCP-21588(){
     return $ret
 }
 
+function post-OCP-53907(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    local arch 
+    arch=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "ReleaseAccepted")|.message')
+    if [[ "${arch}" != *"architecture=\"Multi\""* ]]; then
+        echo "The architecture info: ${arch} is not expected!"
+        return 1
+    fi
+    return 0
+}
+
 function post-OCP-47197(){
     echo "Test Start: ${FUNCNAME[0]}"
     local version 
@@ -222,6 +233,30 @@ function post-OCP-69948(){
         return 1
     fi
     return 0
+}
+
+function post-OCP-56083(){
+    echo "Post Test Start: OCP-56083"
+    echo "Upgrade cluster when channel is unset"
+    local  expected_msg result accepted_risk_result
+    expected_msg='Precondition "ClusterVersionRecommendedUpdate" failed because of "NoChannel": Configured channel is unset, so the recommended status of updating from'
+    result=$(oc get clusterversion/version -ojson | jq -r '.status.conditions[]|select(.type == "ReleaseAccepted").status')
+    if  [[ "${result}" == "True" ]]; then
+        accepted_risk_result=$(oc get clusterversion/version -ojson | jq -r '.status.history[0].acceptedRisks')
+        echo "${accepted_risk_result}"
+        if [[ "${accepted_risk_result}" =~ ${expected_msg} ]]; then
+            echo "history.acceptedRisks complains ClusterVersion RecommendedUpdate failure with NoChannel"
+            echo "Test Passed: OCP-56083"
+            return 0 
+        else
+            echo "Error: history.acceptedRisks Not complains about ClusterVersion RecommendedUpdate failure with NoChannel"
+        fi
+    else
+        echo "Error: Release Not Accepted"
+        echo "clusterversion release accepted status value: ${result}"
+    fi
+    echo "Test Failed: OCP-56083"
+    return 1
 }
 
 # This func run all test cases with with checkpoints which will not break other cases,

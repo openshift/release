@@ -20,6 +20,7 @@ KUBECONFIG="" oc --loglevel=8 registry login
 function debug() {
     if (( FRC != 0 )); then
         echo -e "oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
+        echo -e "oc get machineconfig\n$(oc get machineconfig)"
         echo -e "Describing abnormal nodes...\n"
         oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
         echo -e "Describing abnormal operators...\n"
@@ -443,9 +444,7 @@ function check_signed() {
     fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    set -x
-    response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
-    set +x
+    response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -542,6 +541,209 @@ function check_history() {
     fi
 }
 
+function echo_e2e_tags() {
+    echo "In function: ${FUNCNAME[1]}"
+    echo "E2E_RUN_TAGS: '${E2E_RUN_TAGS}'"
+}
+
+function filter_test_by_platform() {
+    local platform ipixupi
+    ipixupi='upi'
+    if (oc get configmap openshift-install -n openshift-config &>/dev/null) ; then
+        ipixupi='ipi'
+    fi
+    platform="$(oc get infrastructure cluster -o yaml | yq '.status.platform' | tr 'A-Z' 'a-z')"
+    extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
+    if [[ -n "$platform" ]] ; then
+        case "$platform" in
+            none|powervs)
+                export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
+                eval "$extrainfoCmd"
+                ;;
+            external)
+                echo "Expected, got platform as '$platform'"
+                eval "$extrainfoCmd"
+                ;;
+            alibabacloud)
+                export E2E_RUN_TAGS="@alicloud-${ipixupi} and ${E2E_RUN_TAGS}"
+                ;;
+            aws|azure|baremetal|gcp|ibmcloud|nutanix|openstack|vsphere)
+                export E2E_RUN_TAGS="@${platform}-${ipixupi} and ${E2E_RUN_TAGS}"
+                ;;
+            *)
+                echo "Unexpected, got platform as '$platform'"
+                eval "$extrainfoCmd"
+                ;;
+        esac
+    fi
+    echo_e2e_tags
+}
+
+function filter_test_by_proxy() {
+    local proxy
+    proxy="$(oc get proxies.config.openshift.io cluster -o yaml | yq '.spec|(.httpProxy,.httpsProxy)' | uniq)"
+    if [[ -n "$proxy" ]] && [[ "$proxy" != 'null' ]] ; then
+        export E2E_RUN_TAGS="@proxy and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags 
+}
+
+function filter_test_by_fips() {
+    local data
+    data="$(oc get configmap cluster-config-v1 -n kube-system -o yaml | yq '.data')"
+    if ! (grep --ignore-case --quiet 'fips' <<< "$data") ; then
+        export E2E_RUN_TAGS="not @fips and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags
+}
+
+function filter_test_by_sno() {
+    local nodeno
+    nodeno="$(oc get nodes --no-headers | wc -l)"
+    if [[ $nodeno -eq 1 ]] ; then
+        export E2E_RUN_TAGS="@singlenode and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags 
+}
+
+function filter_test_by_network() {
+    local networktype
+    networktype="$(oc get network.config/cluster -o yaml | yq '.spec.networkType')"
+    case "${networktype,,}" in
+        openshiftsdn)
+        networktag='@network-openshiftsdn'
+        ;;
+        ovnkubernetes)
+        networktag='@network-ovnkubernetes'
+        ;;
+        *)
+        echo "######Expected network to be SDN/OVN, but got: $networktype"
+        ;; 
+    esac
+    if [[ -n $networktag ]] ; then
+        export E2E_RUN_TAGS="${networktag} and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags
+}
+
+function filter_test_by_version() { 
+    local xversion yversion
+    IFS='.' read xversion yversion _ < <(oc version -o yaml | yq '.openshiftVersion')
+    if [[ -n $xversion ]] && [[ $xversion -eq 4 ]] && [[ -n $yversion ]] && [[ $yversion =~ [12][0-9] ]] ; then
+        export E2E_RUN_TAGS="@${xversion}.${yversion} and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags
+}
+
+function filter_test_by_arch() {
+    local node_archs arch_tags
+    mapfile -t node_archs < <(oc get nodes -o yaml | yq '.items[].status.nodeInfo.architecture' | sort -u | sed 's/^/@/g')
+    arch_tags="${node_archs[*]/%/ and}"
+    case "${#node_archs[@]}" in
+        0)
+            echo "=========================="
+            echo "Error: got unexpected arch"
+            oc get nodes -o yaml
+            echo "=========================="
+            ;;
+        1)
+            export E2E_RUN_TAGS="${arch_tags[*]} ${E2E_RUN_TAGS}"
+            ;;
+        *)
+            export E2E_RUN_TAGS="@heterogeneous and ${arch_tags[*]} ${E2E_RUN_TAGS}"
+            ;;
+    esac
+    echo_e2e_tags
+}
+
+function filter_tests() {
+    filter_test_by_fips
+    filter_test_by_proxy
+    filter_test_by_sno
+    filter_test_by_network
+    filter_test_by_platform
+    filter_test_by_arch
+    filter_test_by_version
+
+    echo_e2e_tags
+}
+
+function summarize_test_results() {
+    # summarize test results
+    echo "Summarizing test results..."
+    local failures=0 errors=0 skipped=0 tests=0
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
+    while read -a row ; do
+        # if the last ARG of command `let` evaluates to 0, `let` returns 1
+        let failures+=${row[0]} errors+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
+    done < /tmp/zzz-tmp.log
+    TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
+    cat > "${TEST_RESULT_FILE}" <<- EOF
+cucushift:
+  type: cucushift-e2e
+  total: $tests
+  failures: $failures
+  errors: $errors
+  skipped: $skipped
+EOF
+    if [ $((failures)) != 0 ] ; then
+        echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
+        readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | cut -d':' -f3- | sed -E 's/^( +)//;s/\x1b\[[0-9;]*m$//' | sort)
+        for (( i=0; i<failures; i++ )) ; do
+            echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
+        done
+    fi
+    cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-upgrade-qe-test-report" || true
+}
+
+function run_upgrade_e2e() {
+    export PARALLEL=4
+    local E2E_SKIP_TAGS="not @console
+          and not @destructive
+          and not @disconnected
+          and not @flaky
+          and not @inactive
+          and not @prod-only
+          and not @stage-only
+          and not @upgrade-check
+          and not @upgrade-prepare
+          and not @serial
+    "
+    local e2e_start_time e2e_end_time
+
+    e2e_start_time=$(date +%s)
+    echo "Starting the upgrade e2e tests on $(date "+%F %T")"
+    E2E_RUN_TAGS="$E2E_RUN_TAGS and $E2E_SKIP_TAGS"
+
+    filter_tests
+
+    cp -Lrvf "${KUBECONFIG}" /tmp/kubeconfig
+
+    #shellcheck source=${SHARED_DIR}/runtime_env
+    source "${SHARED_DIR}/runtime_env"
+
+    pushd verification-tests
+    # run normal tests
+    export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-normal"
+    parallel_cucumber -n "${PARALLEL}" --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number --exec \
+    'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)));
+     export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
+     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and not @admin\" -p junit"' || true
+
+    # run admin tests
+    export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-admin"
+    parallel_cucumber -n "${PARALLEL}" --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number --exec \
+    'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)));
+     export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
+     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and @admin\" -p junit"' || true
+
+    summarize_test_results
+    popd
+    echo "Ending the upgrade e2e tests on $(date "+%F %T")"
+    e2e_end_time=$(date +%s)
+    echo "e2e test take $(( ($e2e_end_time - $e2e_start_time)/60 )) minutes"
+}
+
 if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
@@ -611,5 +813,8 @@ do
         rhel_upgrade
     fi
     health_check
+    if [[ -n "${E2E_RUN_TAGS}" ]]; then
+        run_upgrade_e2e
+    fi
 done
 echo "${FINAL_TARGET}" > "${SHARED_DIR}/upgrade-edge"

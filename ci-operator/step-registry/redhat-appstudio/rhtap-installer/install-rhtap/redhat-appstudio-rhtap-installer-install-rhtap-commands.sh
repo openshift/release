@@ -13,6 +13,8 @@ export ACS__API_TOKEN \
   GITHUB__APP__WEBHOOK_SECRET \
   GITHUB__APP__WEBHOOK_URL \
   GITHUB__APP__PRIVATE_KEY \
+  GITOPS__GIT_TOKEN \
+  QUAY__DOCKERCONFIGJSON \
   TPA__GUAC__PASSWORD \
   TPA__KEYCLOAK__ADMIN_PASSWORD \
   TPA__MINIO__ROOT_PASSWORD \
@@ -30,7 +32,20 @@ export ACS__API_TOKEN \
   TAS__SECURESIGN__FULCIO__ORG_NAME \
   TAS__SECURESIGN__FULCIO__OIDC__URL \
   TAS__SECURESIGN__FULCIO__OIDC__CLIENT_ID \
-  TAS__SECURESIGN__FULCIO__OIDC__TYPE
+  TAS__SECURESIGN__FULCIO__OIDC__TYPE \
+  RHTAP_ENABLE_GITHUB \
+  RHTAP_ENABLE_GITLAB \
+  RHTAP_ENABLE_DEVELOPER_HUB \
+  RHTAP_ENABLE_TAS \
+  RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES \
+  RHTAP_ENABLE_TPA
+
+RHTAP_ENABLE_GITHUB=${RHTAP_ENABLE_GITHUB:-'true'} 
+RHTAP_ENABLE_GITLAB=${RHTAP_ENABLE_GITLAB:-'false'}
+RHTAP_ENABLE_DEVELOPER_HUB=${RHTAP_ENABLE_DEVELOPER_HUB:-'true'}
+RHTAP_ENABLE_TAS=${RHTAP_ENABLE_TAS:-'true'}
+RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES=${RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES:-'true'}
+RHTAP_ENABLE_TPA=${RHTAP_ENABLE_TPA:-'true'}
 
 ACS__API_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-api-token)
 ACS__CENTRAL_ENDPOINT=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-central-endpoint)
@@ -39,8 +54,9 @@ GITHUB__APP__APP_ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-app-id)
 GITHUB__APP__CLIENT_ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-id)
 GITHUB__APP__CLIENT_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-secret)
 GITHUB__APP__WEBHOOK_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-webhook-secret)
-GITHUB__APP__WEBHOOK_URL=GITHUB_APP_WEBHOOK_URL
 GITHUB__APP__PRIVATE_KEY=$(base64 -d < /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-private-key)
+GITOPS__GIT_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
+QUAY__DOCKERCONFIGJSON=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhtap_quay_ci_token)
 SPRAYPROXY_SERVER_URL=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-url)
 SPRAYPROXY_SERVER_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-token)
 DEVELOPER_HUB__QUAY_TOKEN__ASK_THE_INSTALLER_DEV_TEAM=$(cat /usr/local/rhtap-ci-secrets/rhtap/quay-token)
@@ -61,7 +77,7 @@ TAS__SECURESIGN__FULCIO__OIDC__CLIENT_ID="fake-one"
 TAS__SECURESIGN__FULCIO__OIDC__TYPE="dex"
 NAMESPACE=rhtap
 
-yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
+yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' "$KUBECONFIG"
 OPENSHIFT_PASSWORD="$(cat $KUBEADMIN_PASSWORD_FILE)"
 
 timeout --foreground 5m bash  <<- "EOF"
@@ -76,6 +92,10 @@ if [ $? -ne 0 ]; then
 fi
 
 clone_repo(){
+  if [[ "${JOB_NAME}" == *"redhat-appstudio-rhtap-installer"* ]]; then
+    echo "[INFO]Skip cloning rhtap-installer repo..."
+    return
+  fi
   echo "[INFO]Cloning rhtap-installer repo..."
   git clone https://github.com/redhat-appstudio/rhtap-installer.git
   cd rhtap-installer
@@ -92,8 +112,7 @@ wait_for_pipeline() {
 install_rhtap(){
   echo "[INFO]Generate private-values.yaml file ..."
   ./bin/make.sh values
-  # enable debug model
-  yq e -i '.debug.script=true' private-values.yaml
+  
   echo "[INFO]Install RHTAP ..."
   ./bin/make.sh apply -d -n $NAMESPACE -- --values private-values.yaml
 
@@ -128,9 +147,9 @@ EOF
   callback_url=$(grep "callback-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
   webhook_url=$(grep "webhook-url" < "$DEBUG_OUTPUT"  | sed 's/.*: //g') 
 
-  echo "$homepage_url" > "${SHARED_DIR}/homepage_url"
-  echo "$callback_url" > "${SHARED_DIR}/callback_url"
-  echo "$webhook_url" > "${SHARED_DIR}/webhook_url"
+  echo "$homepage_url" | tee "${SHARED_DIR}/homepage_url"
+  echo "$callback_url" | tee "${SHARED_DIR}/callback_url"
+  echo "$webhook_url" | tee "${SHARED_DIR}/webhook_url"
 }
 
 e2e_test(){
