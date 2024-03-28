@@ -209,6 +209,7 @@ export_envs
 rosa_login
 download_envsubst
 
+sleep 3h
 # create AWSClusterControllerIdentity
 cat <<EOF | oc -n default apply -f -
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
