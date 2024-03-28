@@ -17,7 +17,9 @@ function join_by { local IFS="$1"; shift; echo "$*"; }
 # aws_source_region: for non-C2S/SC2S cluster, it's the same as REGION, for C2S/SC2S it's the source region that emulator runs on.
 #             e.g. for instance, if installing a cluster on a C2S (us-iso-east-1) region and its emulator runs on us-east-1:
 #                  so the REGION is us-iso-east-1, and aws_source_region is us-east-1
-REGION="${LEASED_RESOURCE}"
+if [[ -z $REGION ]];then
+   REGION="${LEASED_RESOURCE}"
+fi
 aws_source_region="${REGION}"
 
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
@@ -132,8 +134,10 @@ else
 fi
 
 arch_instance_type=$(echo -n "${CONTROL_PLANE_INSTANCE_TYPE}" | cut -d . -f 1)
-BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
-
+if [[ -z $BOOTSTRAP_NODE_TYPE ]];then
+    BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
+fi
+echo BOOTSTRAP_NODE_TYPE is $BOOTSTRAP_NODE_TYPE
 worker_replicas=${COMPUTE_NODE_REPLICAS:-3}
 if [[ "${COMPUTE_NODE_REPLICAS}" -le 0 ]]; then
     worker_replicas=0
