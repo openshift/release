@@ -43,7 +43,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   DHCP_CONF="${DHCP_CONF}
 $mac,$ip,set:$CLUSTER_NAME,infinite"
   
-  if [ "${IPV6_ENABLE:-}" == "true" ]; then
+  if [ "${ipv6_enabled:-}" == "true" ]; then
     # shellcheck disable=SC2154
     if [ ${#ipv6} -eq 0 ] || [ ${#name} -eq 0 ]; then
       echo "Error when parsing the Bare Metal Host metadata"

@@ -44,7 +44,7 @@ ${name}.${CLUSTER_NAME} IN A ${ip}"
   DNS_REVERSE_INTERNAL="${DNS_REVERSE_INTERNAL}
 $(echo "${ip}." | ( rip=""; while read -r -d . b; do rip="$b${rip+.}${rip}"; done; echo "$rip" ))in-addr.arpa. IN PTR ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}."
 
-  if [ "${IPV6_ENABLE:-}" == "true" ]; then
+  if [ "${ipv6_enabled:-}" == "true" ]; then
     # shellcheck disable=SC2154
     if [ ${#ipv6} -eq 0 ]; then
       echo "Error when parsing the Bare Metal Host metadata"
