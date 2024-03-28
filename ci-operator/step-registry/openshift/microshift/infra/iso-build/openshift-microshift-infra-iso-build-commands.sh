@@ -32,7 +32,7 @@ fi
 sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
 
 chmod 0755 ~
-tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
+tar -xf /tmp/microshift.tgz -C ~ --strip-components 2
 
 cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
 cp /tmp/ssh-privatekey ~/.ssh/id_rsa
@@ -81,7 +81,10 @@ fi
 EOF
 chmod +x /tmp/iso.sh
 
-tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
+# TODO: Undo these changes
+#tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
+git clone https://github.com/ggiguash/microshift -b bootc_pilot "${HOME}/microshift"
+tar czf /tmp/microshift.tgz "${HOME}/microshift"
 
 scp \
     /tmp/iso.sh \
