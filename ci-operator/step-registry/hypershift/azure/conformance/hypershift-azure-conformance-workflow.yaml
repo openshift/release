@@ -27,10 +27,17 @@ workflow:
     post:
     - chain: hypershift-dump
     - chain: hypershift-azure-destroy
+    - chain: hypershift-azure-destroy-nested-management-cluster
     - chain: ipi-azure-post
     test:
     - chain: hypershift-conformance
     pre:
     - chain: ipi-azure-pre
-    - ref: hypershift-install
+    - chain: hypershift-azure-setup-nested-management-cluster
+    - ref: hypershift-install-azure
     - chain: hypershift-azure-create
+    env:
+      USE_HYPERSHIFT_AZURE_CREDS: "true"
+      BASE_DOMAIN: "hypershift.azure.devcluster.openshift.com"
+      HYPERSHIFT_BASE_DOMAIN: "hypershift.azure.devcluster.openshift.com"
+      HYPERSHIFT_AZURE_REGION: "eastus"
