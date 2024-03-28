@@ -88,26 +88,6 @@ tests:
   secrets:
   - mount_path: /creds-github
     name: github-token
-- as: sync-upstream-istio-3.0
-  commands: |
-    ./tools/automator-main.sh \
-    --org=maistra \
-    --repo=istio \
-    --branch=maistra-3.0 \
-    --token-path=/creds-github/token \
-    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
-    "--labels=tide/merge-method-merge,auto-merge" \
-    --modifier=merge_upstream_istio_master \
-    --merge-repository=https://github.com/istio/istio \
-    --merge-branch=master \
-    --merge-failure-notify=@maistra/release-managers-3-0 \
-    --merge-strategy=merge
-  container:
-    from: src
-  cron: 00 05 * * 1-5
-  secrets:
-  - mount_path: /creds-github
-    name: github-token
 - as: update-istio-builder-image
   commands: |
     export NEW_IMAGE=$(curl -sL https://raw.githubusercontent.com/istio/common-files/master/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
