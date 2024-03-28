@@ -189,6 +189,9 @@ cp "${INSTALL_DIR}/metadata.json" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
 
+# Copy coreos stream file so the observer pod can check if the correct live image was booted
+oinst coreos print-stream-json > "${SHARED_DIR}/coreos-stream.json"
+
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 # The installer's terraform template using the ironic provider needs to reach the ironic endpoint in the bootstrap VM

@@ -279,6 +279,9 @@ cp "${INSTALL_DIR}/metadata.json" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
 
+# Copy coreos stream file so the observer pod can check if the correct live image was booted
+oinst coreos print-stream-json > "${SHARED_DIR}/coreos-stream.json"
+
 echo -e "\nPower on the hosts..."
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
