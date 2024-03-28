@@ -132,7 +132,9 @@ else
 fi
 
 arch_instance_type=$(echo -n "${CONTROL_PLANE_INSTANCE_TYPE}" | cut -d . -f 1)
-BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
+if [[ -z $BOOTSTRAP_NODE_TYPE ]];then
+    BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
+fi
 
 worker_replicas=${COMPUTE_NODE_REPLICAS:-3}
 if [[ "${COMPUTE_NODE_REPLICAS}" -le 0 ]]; then
