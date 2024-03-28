@@ -55,6 +55,40 @@ function validate_user_tags() {
 ret=0
 validation_ret=0
 
+echo "$(date -u --rfc-3339=seconds) - Checking userTags of machines..."
+readarray -t items < <(gcloud compute instances list --filter="name~${CLUSTER_NAME}" --format="table(name,zone)" | grep -v NAME)
+for line in "${items[@]}"; do
+  name="${line%% *}"
+  zone="${line##* }"
+  current_tags="$(gcloud resource-manager tags bindings list --parent=//compute.googleapis.com/projects/${GOOGLE_PROJECT_ID}/zones/${zone}/instances/${name} --location=${zone} --effective)"
+  echo "${current_tags}"
+  validate_user_tags "${current_tags}" || validation_ret=$?
+  if [ $validation_ret -gt 0 ]; then
+    echo "$(date -u --rfc-3339=seconds) - FAILED for machine '${name}'."
+    ret=1
+  else
+    echo "$(date -u --rfc-3339=seconds) - PASSED for machine '${name}'."
+  fi
+done
+
+echo "$(date -u --rfc-3339=seconds) - Checking userTags of disks..."
+readarray -t items < <(gcloud compute disks list --filter="name~${CLUSTER_NAME}" --format="table(name,zone)" | grep -v NAME)
+for line in "${items[@]}"; do
+  name="${line%% *}"
+  zone="${line##* }"
+  zone=$(basename ${zone})
+  disk_id=$(gcloud compute disks describe ${name} --zone ${zone} --format json | jq -r -c .id)
+  current_tags="$(gcloud resource-manager tags bindings list --parent=//compute.googleapis.com/projects/${GOOGLE_PROJECT_ID}/zones/${zone}/disks/${disk_id} --location=${zone} --effective)"
+  echo "${current_tags}"
+  validate_user_tags "${current_tags}" || validation_ret=$?
+  if [ $validation_ret -gt 0 ]; then
+    echo "$(date -u --rfc-3339=seconds) - FAILED for disk '${name}'."
+    ret=1
+  else
+    echo "$(date -u --rfc-3339=seconds) - PASSED for disk '${name}'."
+  fi
+done
+
 echo "$(date -u --rfc-3339=seconds) - Checking userTags of image-registry buckets..."
 readarray -t items < <(gsutil ls | grep "${INFRA_ID}-image-registry")
 for line in "${items[@]}"; do
