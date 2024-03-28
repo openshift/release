@@ -8,7 +8,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 OSDFM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/fleetmanager-token")
 if [[ ! -z "${OSDFM_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token"
   ocm login --url "${OCM_LOGIN_ENV}" --token "${OSDFM_TOKEN}"
   if [ $? -ne 0 ]; then
     echo "Login failed"
