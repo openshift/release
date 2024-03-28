@@ -68,6 +68,41 @@ function add_iam_policy_binding()
   done
 }
 
+function wait_for_bootstrap() {
+
+  if ! which gcloud; then
+    GCLOUD_TAR="google-cloud-sdk-468.0.0-linux-x86_64.tar.gz"
+    GCLOUD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$GCLOUD_TAR"
+    logger "INFO" "gcloud not installed, installing from $GCLOUD_URL"
+    pushd ${HOME}
+    curl -O "$GCLOUD_URL"
+    tar -xzf "$GCLOUD_TAR"
+    export PATH=${HOME}/google-cloud-sdk/bin:${PATH}
+    popd
+  fi
+
+  # login to the service project
+  service_project_id="$(jq -r -c .project_id "${GCP_CREDENTIALS_FILE}")"
+  gcloud auth activate-service-account --key-file="${GCP_CREDENTIALS_FILE}"
+  gcloud config set project "${service_project_id}"
+
+  cmd="gcloud compute instances list --filter='name~${CLUSTER_NAME}' | grep ${CLUSTER_NAME}"
+  logger "INFO" "Running Command '${cmd}'"
+  eval "${cmd}"
+  if [ $? -ne 0 ]; then
+    logger "ERROR" "Failed to find cluster machines on GCP"
+    return 1
+  fi
+  return 0
+}
+
+function gather_on_failure() {
+  logger "INFO" "Trying to gather debug info of the OSD cluster..."
+  ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/logs/install" > "${ARTIFACT_DIR}/.cluster_install.log" || echo "error: Unable to pull installation log."
+  ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" > "${ARTIFACT_DIR}/.kubeadmin.creds" || echo "error: Unable to pull credentials."
+  logger "INFO" "Please refer to '${ARTIFACT_DIR}/' directory."
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 if [ "${ENABLE_SHARED_VPC}" == "yes" ] && [ ! -f "${SHARED_DIR}/xpn.json" ]; then
@@ -86,6 +121,7 @@ DISABLE_WORKLOAD_MONITORING=${DISABLE_WORKLOAD_MONITORING:-false}
 SUBSCRIPTION_TYPE=${SUBSCRIPTION_TYPE:-"standard"}
 REGION=${REGION:-"${LEASED_RESOURCE}"}
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
+BOOTSTRAP_TIMEOUT=${BOOTSTRAP_TIMEOUT}
 
 if [ "${ENABLE_SHARED_VPC}" == "yes" ]; then
   logger "INFO" "Extracting the Shared VPC configurations..."
@@ -137,7 +173,7 @@ COMPUTE_NODES=${COMPUTE_NODES:-$default_compute_nodes}
 
 # Switches
 MARKETPLACE_GCP_TERMS_SWITCH=""
-if [[ ! -z "$SUBSCRIPTION_TYPE" ]]; then
+if [[ "$SUBSCRIPTION_TYPE" == "marketplace-gcp" ]]; then
   MARKETPLACE_GCP_TERMS_SWITCH="--marketplace-gcp-terms"
 fi
 
@@ -208,7 +244,7 @@ start_time=$(date +"%s")
 while true; do
   sleep 60
   CLUSTER_STATE=$(ocm get cluster "${CLUSTER_ID}" | jq -r '.status.state')
-  echo "Cluster state: ${CLUSTER_STATE}"
+  logger "INFO" "Cluster state: ${CLUSTER_STATE}"
   if [[ "${ENABLE_SHARED_VPC}" == "yes" ]] && [[ "${CLUSTER_STATE}" == "waiting" ]]; then
     logger "INFO" "Granting the required permissions in the host project..."
     ephemeral_sa_email=$(ocm describe cluster "${CLUSTER_ID}" | grep -Po "osd-managed-admin-[^\s\t]+")
@@ -219,13 +255,19 @@ while true; do
     echo "Cluster ${CLUSTER_ID} is reported as ready"
     break
   fi
+  if (( $(date +"%s") - $start_time >= $BOOTSTRAP_TIMEOUT )) && ! wait_for_bootstrap; then
+    gather_on_failure
+    logger "ERROR" "Timed out while waiting for cluster bootstrap completion (in $BOOTSTRAP_TIMEOUT seconds)"
+    exit 1
+  fi
   if (( $(date +"%s") - $start_time >= $CLUSTER_TIMEOUT )); then
-    echo "error: Timed out while waiting for cluster to be ready"
+    gather_on_failure
+    logger "ERROR" "Timed out while waiting for cluster to be ready"
     exit 1
   fi
   if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" ]]; then
-    ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/logs/install" > "${ARTIFACT_DIR}/.cluster_install.log" || echo "error: Unable to pull installation log."
-    echo "error: Cluster reported invalid state: ${CLUSTER_STATE}"
+    gather_on_failure
+    logger "ERROR" "Cluster reported invalid state: ${CLUSTER_STATE}"
     exit 1
   fi
 done
