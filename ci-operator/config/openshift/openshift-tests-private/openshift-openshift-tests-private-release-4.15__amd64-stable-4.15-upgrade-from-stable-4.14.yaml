@@ -42,19 +42,13 @@ build_root:
     tag: golang-1.18
 releases:
   latest:
-    prerelease:
-      architecture: amd64
-      product: ocp
-      version_bounds:
-        lower: 4.14.0-0
-        upper: 4.15.0-0
+    release:
+      channel: candidate
+      version: 4.14.0-ec.3
   target:
-    prerelease:
-      architecture: amd64
-      product: ocp
-      version_bounds:
-        lower: 4.15.0-0
-        upper: 4.16.0-0
+    release:
+      channel: candidate
+      version: 4.15.0-ec.0
 resources:
   '*':
     requests:
@@ -153,7 +147,12 @@ tests:
     env:
       ENABLE_OTA_TEST: OCP-24358
     test:
-    - chain: openshift-upgrade-qe-sanity
+    - ref: cucushift-upgrade-healthcheck
+    - ref: cucushift-upgrade-setchannel
+    - ref: cucushift-upgrade-check-not-recommended
+    - ref: cucushift-ota-preupgrade
+    - ref: cucushift-upgrade-toimage
+    - ref: cucushift-ota-postupgrade
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
 - as: ibmcloud-ipi-proxy-private-fips-rt-f14
   cron: 55 18 7,21 * *
