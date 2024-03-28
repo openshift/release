@@ -6,7 +6,11 @@ GIT_PR_NUMBER=1129
 
 GITHUB_ORG_NAME="janus-idp"
 GITHUB_REPOSITORY_NAME="backstage-showcase"
+echo "whoami"
+whoami
 
+echo "Permission"
+ls -ld $(pwd)
 # Clone and checkout the specific PR
 # git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 git clone "https://github.com/subhashkhileri/backstage-showcase.git"
