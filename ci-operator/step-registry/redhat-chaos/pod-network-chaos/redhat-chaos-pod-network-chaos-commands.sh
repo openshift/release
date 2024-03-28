@@ -19,7 +19,7 @@ echo "Using the flattened version of kubeconfig"
 oc config view --flatten > /tmp/config
 
 export KUBECONFIG=/tmp/config
-export NAMESPACE=$NAMESPACE
+export NAMESPACE=$TEST_NAMESPACE
 export TRAFFIC_TYPE=$TRAFFIC_TYPE
 export INGRESS_PORTS=$INGRESS_PORTS
 export EGRESS_PORTS=$EGRESS_PORTS
