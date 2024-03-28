@@ -42,6 +42,8 @@ if [[ -z "$CLUSTER_ID" ]]; then
 fi
 
 echo "Deleting cluster-id: ${CLUSTER_ID}"
+sleep 86400
+
 rosa delete cluster -c "${CLUSTER_ID}" -y
 while rosa describe cluster -c "${CLUSTER_ID}" ; do
   sleep 60
