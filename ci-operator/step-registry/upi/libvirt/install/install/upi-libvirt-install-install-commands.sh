@@ -17,8 +17,6 @@ CLUSTER_DOMAIN="libvirt-s390x-amd64-0-0.ci"
 LIBVIRT_DOMAIN_NAME_SUFFIX="libvirt-s390x-amd64-0-0-ci"
 
 mkdir /tmp/bin
-curl -o /tmp/bin/yq -L "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_amd64" && chmod u+x /tmp/bin/yq
-curl -o /tmp/bin/jq -L "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-amd64" && chmod u+x /tmp/bin/jq
 
 if [ -n "${OPENSHIFT_CLIENT_VERSION_OVERRIDE}" ]; then
   echo "Downloading openshift client ${OPENSHIFT_CLIENT_VERSION_OVERRIDE}"
@@ -51,7 +49,7 @@ function approve_csrs() {
   while true; do
     if [[ ! -f /tmp/install-complete ]]; then
       # even if oc get csr fails continue
-      oc get csr -ojson | jq -r '.items[] | select(.status == {} ) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve || true
+      oc get csr -ojson | yq-v4 -oy '.items[] | select(.status == {} ) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve || true
       sleep 15 & wait
       continue
     else
@@ -201,9 +199,9 @@ upload_to_pool httpd "${INSTALL_DIR}/worker.ign" "/var/www/html/worker.ign"
 #
 # virt-install then downloads the initramfs and kernel and uploads them
 # as temporary boot artifacts via libvirt for each machine that is booted.
-KERNEL_URL=$($OCPINSTALL coreos print-stream-json | jq -r ".architectures.$ARCH.artifacts.metal.formats.pxe.kernel.location")
-INITRAMFS_URL=$($OCPINSTALL coreos print-stream-json | jq -r ".architectures.$ARCH.artifacts.metal.formats.pxe.initramfs.location")
-ROOTFS_URL=$($OCPINSTALL coreos print-stream-json | jq -r ".architectures.$ARCH.artifacts.metal.formats.pxe.rootfs.location")
+KERNEL_URL=$($OCPINSTALL coreos print-stream-json | yq-v4 -oy ".architectures.$ARCH.artifacts.metal.formats.pxe.kernel.location")
+INITRAMFS_URL=$($OCPINSTALL coreos print-stream-json | yq-v4 -oy ".architectures.$ARCH.artifacts.metal.formats.pxe.initramfs.location")
+ROOTFS_URL=$($OCPINSTALL coreos print-stream-json | yq-v4 -oy ".architectures.$ARCH.artifacts.metal.formats.pxe.rootfs.location")
 
 KERNEL_FILENAME=$(basename "$KERNEL_URL")
 INITRAMFS_FILENAME=$(basename "$INITRAMFS_URL")
