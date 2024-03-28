@@ -100,7 +100,10 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} || tr
 
 SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios"
 EXCLUDE_CNCF_CONFORMANCE=false
-if [[ "$JOB_NAME" =~ .*periodic.* ]] && [[ ! "$JOB_NAME" =~ .*nightly-presubmit.* ]]; then
+
+if [[ ${JOB_NAME} =~ .*bootc.* ]] ; then
+  SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios-bootc"
+elif [[ "${JOB_NAME}" =~ .*periodic.* ]] && [[ ! "${JOB_NAME}" =~ .*nightly-presubmit.* ]]; then
   SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios-periodics"
   if [ "${JOB_TYPE}" == "presubmit" ]; then
     EXCLUDE_CNCF_CONFORMANCE=true
