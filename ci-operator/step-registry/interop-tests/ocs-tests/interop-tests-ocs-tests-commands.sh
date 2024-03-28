@@ -34,8 +34,24 @@ mkdir -p "${LOGS_FOLDER}"
 mkdir -p "${CLUSTER_PATH}/auth"
 mkdir -p "${CLUSTER_PATH}/data"
 
-cp -v "${KUBECONFIG}"              "${CLUSTER_PATH}/auth/kubeconfig"
-cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+cp -v "${KUBECONFIG}" "${CLUSTER_PATH}/auth/kubeconfig"
+#cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
+#cp -v "${SHARED_DIR}/kubeadmin-password" "${CLUSTER_PATH}/auth/kubeadmin-password"
+
+# login for interop
+if test -f ${SHARED_DIR}/kubeadmin-password
+then
+  OCP_CRED_USR="kubeadmin"
+  export OCP_CRED_USR
+  OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
+  export OCP_CRED_PSW
+  oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
+else #login for ROSA & Hypershift platforms
+  eval "$(cat "${SHARED_DIR}/api.login")"
+fi
+#oc login https://api.ci-rosa-h-10f4.cvgi.s3.devshift.org:443 -u rosa-admin -p HTPasswd_ryRqci --insecure-skip-tls-verify=true
+
 
 # Create ocs-tests config overwrite file
 cat > "${LOGS_CONFIG}" << __EOF__
