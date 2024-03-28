@@ -4,6 +4,23 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+trap 'warn_0_case_executed' INT TERM EXIT
+function warn_0_case_executed {
+    local count
+    count="$(ls ${ARTIFACT_DIR} | wc -l)"
+    if [ $((count)) == 0 ] ; then
+        mkdir --parents "${ARTIFACT_DIR}"
+        cat >"${ARTIFACT_DIR}/junit-cucushift-result.xml" <<- EOF
+<testsuite name="cucushift-e2e" tests="1" errors="1">
+  <testcase name="Overall status of cucushift-e2e test">
+    <failure message="">Caution: NO test cases executed.</failure>
+  </testcase>
+</testsuite>
+EOF
+
+    fi
+}
+
 function show_test_execution_time() {
     local test_type time_used
     test_type="$1"
