@@ -30,13 +30,19 @@ if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | 
 fi
 machine_cidr_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipv6prefix' "${SUBNETS_CONFIG}")
 
-IPV6_API_VIP="${machine_cidr_ipv6%%::*}::4"
-IPV6_INGRESS_VIP="${machine_cidr_ipv6%%::*}::5"
-export IPV6_API_VIP
-export IPV6_INGRESS_VIP
+if [[ "${VIP_MODE}" == "DualVIPs" ]]; then
+  IPV6_API_VIP="${machine_cidr_ipv6%%::*}::4"
+  IPV6_INGRESS_VIP="${machine_cidr_ipv6%%::*}::5"
+  export IPV6_API_VIP
+  export IPV6_INGRESS_VIP
 
-/tmp/yq e --inplace '.platform.vsphere.apiVIPs += [strenv(API_VIP), strenv(IPV6_API_VIP)]' ${SHARED_DIR}/install-config.yaml
-/tmp/yq e --inplace '.platform.vsphere.ingressVIPs += [strenv(INGRESS_VIP), strenv(IPV6_INGRESS_VIP)]' ${SHARED_DIR}/install-config.yaml
+  /tmp/yq e --inplace '.platform.vsphere.apiVIPs += [strenv(API_VIP), strenv(IPV6_API_VIP)]' ${SHARED_DIR}/install-config.yaml
+  /tmp/yq e --inplace '.platform.vsphere.ingressVIPs += [strenv(INGRESS_VIP), strenv(IPV6_INGRESS_VIP)]' ${SHARED_DIR}/install-config.yaml
+else
+  # convert to VIPs list anyway
+  /tmp/yq e --inplace '.platform.vsphere.apiVIPs += [strenv(API_VIP)]' ${SHARED_DIR}/install-config.yaml
+  /tmp/yq e --inplace '.platform.vsphere.ingressVIPs += [strenv(INGRESS_VIP)]' ${SHARED_DIR}/install-config.yaml
+fi
 
 cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
 networking:
