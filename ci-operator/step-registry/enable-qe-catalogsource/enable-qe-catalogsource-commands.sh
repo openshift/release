@@ -128,7 +128,35 @@ function create_catalog_sources()
 
     echo "Create QE catalogsource: qe-app-registry"
     echo "Use $index_image in catalogsource/qe-app-registry"
-    cat <<EOF | oc create -f -
+    # since OCP 4.15, the official catalogsource use this way. OCP4.14=K8s1.27
+    # details: https://issues.redhat.com/browse/OCPBUGS-31427
+    if [[ ${kube_major} -gt 1 || ${kube_minor} -gt 27 ]]; then
+        echo "the index image as the initContainer cache image)" 
+        cat <<EOF | oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: qe-app-registry
+  namespace: openshift-marketplace
+  annotations:
+    olm.catalogImageTemplate: "quay.io/openshift-qe-optional-operators/aosqe-index:v{kube_major_version}.{kube_minor_version}"
+spec:
+  displayName: Production Operators
+  grpcPodConfig:
+    extractContent:
+      cacheDir: /tmp/cache
+      catalogDir: /configs
+    memoryTarget: 30Mi
+  image: ${index_image}
+  publisher: OpenShift QE
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 15m
+EOF
+    else
+        echo "the index image as the server image" 
+        cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -145,6 +173,8 @@ spec:
     registryPoll:
       interval: 15m
 EOF
+    fi
+
     set +e 
     COUNTER=0
     while [ $COUNTER -lt 600 ]
