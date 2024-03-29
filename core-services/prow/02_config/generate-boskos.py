@@ -383,6 +383,9 @@ CONFIG = {
         'us-east-2': 25,
         'us-west-1': 25,
         'us-west-2': 25,
+    },
+    'aws-ip-pools': {
+        'us-east-1': 256,
     }
 }
 
