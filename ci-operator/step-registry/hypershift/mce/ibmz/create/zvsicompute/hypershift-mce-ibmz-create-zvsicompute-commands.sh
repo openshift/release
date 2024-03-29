@@ -3,8 +3,6 @@
 set -x
 
 # Session variables
-HC_NAME="$(printf $PROW_JOB_ID|sha256sum|cut -c-20)"
-export HC_NAME
 job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
 export job_id
 plugins_list=("vpc-infrastructure" "cloud-dns-services")

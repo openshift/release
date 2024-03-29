@@ -1,8 +1,6 @@
 #!/bin/bash
 
 set -x
-HC_NAME="$(printf $PROW_JOB_ID|sha256sum|cut -c-20)"
-export HC_NAME
 hcp_ns="${HC_NS}-${HC_NAME}"
 export hcp_ns
 
