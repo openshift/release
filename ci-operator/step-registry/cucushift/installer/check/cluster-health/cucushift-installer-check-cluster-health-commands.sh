@@ -253,6 +253,8 @@ if [[ -z "${EXPECTED_VERSION}" ]]; then
     EXPECTED_VERSION=$(oc get clusterversion/version -o json | jq -r '.status.history[0].version')
 fi
 
+run_command "oc get machineconfig"
+
 check_history || exit 1
 
 echo "Step #1: Make sure no degrated or updating mcp"

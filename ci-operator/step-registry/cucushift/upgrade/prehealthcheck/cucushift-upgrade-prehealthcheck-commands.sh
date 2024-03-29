@@ -11,11 +11,6 @@ function run_command_oc() {
         return 0
     fi
 
-    # if [[ "$*" != *"image"* ]] && [[ "$*" != *"release"* ]]; then
-    #     # Don't re-try it, when we access the cluster
-    #     max=1
-    # fi
-
     while (( try < max )); do
         if ret_val=$(oc "$@" 2>&1); then
             break
@@ -72,7 +67,7 @@ function check_clusteroperators() {
         echo >&2 "$unavailable_operator"
         (( tmp_ret += 1 ))
     fi
-    if ${OC} get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Available") | .status' | grep -iv "True"; then
+    if ${OC} get clusteroperator -o jsonpath='{.items[].status.conditions[?(@.type=="Available")].status}'| grep -iv "True"; then
         echo >&2 "Some operators are unavailable, pls run 'oc get clusteroperator -o json' to check"
         (( tmp_ret += 1 ))
     fi
@@ -97,7 +92,7 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
     #co_check=$(${OC} get clusteroperator -o json | jq '.items[] | select(.metadata.name != "openshift-samples") | .status.conditions[] | select(.type == "Degraded") | .status'  | grep -iv 'False')
-    if ${OC} get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Degraded") | .status'  | grep -iv 'False'; then
+    if ${OC} get clusteroperator -o jsonpath='{.items[].status.conditions[?(@.type=="Degraded")].status}'| grep -iv 'False'; then
         echo >&2 "Some operators are Degraded, pls run 'oc get clusteroperator -o json' to check"
         (( tmp_ret += 1 ))
     fi
@@ -106,7 +101,7 @@ function check_clusteroperators() {
 }
 
 function wait_clusteroperators_continous_success() {
-    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=20
+    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=30
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
         if check_clusteroperators; then
@@ -121,8 +116,8 @@ function wait_clusteroperators_continous_success() {
     done
     if (( continous_successful_check != passed_criteria )); then
         echo >&2 "Some cluster operator does not get ready or not stable"
-        echo "Debug: current clusterverison output is:"
-        oc get clusterversion
+        echo "Debug: current CO output is:"
+        oc get co
         return 1
     else
         echo "All cluster operators status check PASSED"
@@ -177,7 +172,10 @@ function check_mcp() {
 }
 
 function wait_mcp_continous_success() {
-    local try=0 continous_successful_check=0 passed_criteria=5 max_retries=20 ret=0
+    local try=0 continous_successful_check=0 passed_criteria max_retries ret=0 interval=30
+    num=$(oc get node --no-headers | wc -l)
+    max_retries=$(expr $num \* 20 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
+    passed_criteria=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
     local continous_degraded_check=0 degraded_criteria=5
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
@@ -200,7 +198,7 @@ function wait_mcp_continous_success() {
             fi
         fi
         echo "wait and retry..."
-        sleep 60
+        sleep ${interval}
         (( try += 1 ))
     done
     if (( continous_successful_check != passed_criteria )); then
@@ -237,6 +235,12 @@ function check_pod() {
     oc get pods --all-namespaces
 }
 
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
+}
+
 # Setup proxy if it's present in the shared dir
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
@@ -245,6 +249,8 @@ then
 fi
 
 OC="run_command_oc"
+
+run_command "oc get machineconfig"
 
 echo "Step #1: Make sure no degrated or updating mcp"
 wait_mcp_continous_success
