@@ -781,6 +781,7 @@ export https_proxy=http://${BASTION}:2005/
 export no_proxy="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 EOF
 echo "Finished prepare_next_steps"
+source "${SHARED_DIR}/proxy-conf.sh"
 
 echo "Test cluster accessiblity"
 CLUSTER_INFO="/tmp/cluster-${CLUSTER_NAME}-before-e2e.txt"

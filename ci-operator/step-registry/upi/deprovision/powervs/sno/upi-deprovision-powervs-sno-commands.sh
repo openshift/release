@@ -9,6 +9,7 @@ BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
 
 if [ -f "${SHARED_DIR}/kubeconfig" ]; then
   echo "Test cluster accessiblity"
+  source "${SHARED_DIR}/proxy-conf.sh"
   CLUSTER_INFO="/tmp/cluster-${CLUSTER_NAME}-after-e2e.txt"
   touch ${CLUSTER_INFO}
   export KUBECONFIG="${SHARED_DIR}/kubeconfig"
