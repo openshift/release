@@ -268,3 +268,7 @@ else
     exit 1
 fi
 cat "${SHARED_DIR}/cluster-config"
+
+# Sleep 6h for debugging
+echo "Pause deleting. Sleep 6h for personal usage"
+sleep 21600
