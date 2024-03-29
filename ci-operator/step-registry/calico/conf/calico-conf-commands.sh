@@ -6,8 +6,8 @@ set -o pipefail
 set -x
 
 cv="$CALICO_VERSION"
-OLM_VER_WHOLE="$CALICO_OLM_VERSION"
-OLM_VER_CHANNEL="$CALICO_OLM_CHANNEL"
+#OLM_VER_WHOLE="$CALICO_OLM_VERSION"
+#OLM_VER_CHANNEL="$CALICO_OLM_CHANNEL"
 
 sed -i "s/networkType: .*/networkType: Calico/" "${SHARED_DIR}/install-config.yaml"
 
