@@ -7,21 +7,23 @@ CLUSTER_NAME="cicd-$(printf $PROW_JOB_ID|sha256sum|cut -c-10)"
 POWERVS_VSI_NAME="${CLUSTER_NAME}-worker"
 BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
 
-echo "Test cluster accessiblity"
-CLUSTER_INFO="/tmp/cluster-${CLUSTER_NAME}-after-e2e.txt"
-touch ${CLUSTER_INFO}
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-echo "=========== oc get clusterversion ==============" >> ${CLUSTER_INFO}
-oc get clusterversion >> ${CLUSTER_INFO}
-echo "=========== oc get node -o wide ==============" >> ${CLUSTER_INFO}
-oc get node -o wide >> ${CLUSTER_INFO}
-echo "=========== oc adm top node ==============" >> ${CLUSTER_INFO}
-oc adm top node >> ${CLUSTER_INFO}
-echo "=========== oc get co -o wide ==============" >> ${CLUSTER_INFO}
-oc get co -o wide >> ${CLUSTER_INFO}
-echo "=========== oc get pod -A -o wide ==============" >> ${CLUSTER_INFO}
-oc get pod -A -o wide >> ${CLUSTER_INFO}
-cp ${CLUSTER_INFO} "${ARTIFACT_DIR}/"
+if [ -f "${SHARED_DIR}/kubeconfig" ]; then
+  echo "Test cluster accessiblity"
+  CLUSTER_INFO="/tmp/cluster-${CLUSTER_NAME}-after-e2e.txt"
+  touch ${CLUSTER_INFO}
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+  echo "=========== oc get clusterversion ==============" >> ${CLUSTER_INFO}
+  oc get clusterversion >> ${CLUSTER_INFO}
+  echo "=========== oc get node -o wide ==============" >> ${CLUSTER_INFO}
+  oc get node -o wide >> ${CLUSTER_INFO}
+  echo "=========== oc adm top node ==============" >> ${CLUSTER_INFO}
+  oc adm top node >> ${CLUSTER_INFO}
+  echo "=========== oc get co -o wide ==============" >> ${CLUSTER_INFO}
+  oc get co -o wide >> ${CLUSTER_INFO}
+  echo "=========== oc get pod -A -o wide ==============" >> ${CLUSTER_INFO}
+  oc get pod -A -o wide >> ${CLUSTER_INFO}
+  cp ${CLUSTER_INFO} "${ARTIFACT_DIR}/"
+}
 
 # Installing required tools
 echo "$(date) Installing required tools"
@@ -110,9 +112,9 @@ echo "removing menuentry from grub.cfg"
 /usr/bin/cp /var/lib/tftpboot/boot/grub2/grub.cfg.orig /var/lib/tftpboot/boot/grub2/grub.cfg
 systemctl restart tftp;
 
-echo "Recover to orignal haproxy.cfg"
-/usr/bin/cp /etc/haproxy/haproxy.cfg.orig /etc/haproxy/haproxy.cfg
-systemctl restart haproxy;
+#echo "Recover to orignal haproxy.cfg"
+#/usr/bin/cp /etc/haproxy/haproxy.cfg.orig /etc/haproxy/haproxy.cfg
+#systemctl restart haproxy;
 
 echo "restarting tftp, dhcpd and haproxy"
 ) 200>"\$LOCK_FILE"

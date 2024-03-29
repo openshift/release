@@ -573,13 +573,13 @@ echo "writing menuentry to grub.cfg "
 cat /var/lib/tftpboot/boot/grub2/grub.cfg.cicd | envsubst > /var/lib/tftpboot/boot/grub2/grub.cfg
 systemctl restart tftp;
 
-eecho "writing host entries to dhcpd.conf"
+echo "writing host entries to dhcpd.conf"
 cat /etc/dhcp/dhcpd.conf.cicd | envsubst > /etc/dhcp/dhcpd.conf
 systemctl restart dhcpd;
 
-echo "write config for haproxy"
-cat /etc/haproxy/haproxy.cfg.cicd | envsubst > /etc/haproxy/haproxy.cfg
-systemctl restart haproxy;
+#echo "write config for haproxy"
+#cat /etc/haproxy/haproxy.cfg.cicd | envsubst > /etc/haproxy/haproxy.cfg
+#systemctl restart haproxy;
 
 echo "restarting services tftp & dhcpd"
 )200>"\$LOCK_FILE"
@@ -734,9 +734,9 @@ create_sno_node
 ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./setup-sno.sh ${CLUSTER_NAME} ${BASE_DOMAIN} ${POWERVS_MACHINE_NETWORK_CIDR} ${INSTALLATION_DISK} $(eval "echo ${LIVE_ROOTFS_URL}") $(eval "echo ${LIVE_KERNEL_URL}") $(eval "echo ${LIVE_INITRAMFS_URL}") $(printf "http://%s" "${BASTION}") ${MAC_ADDRESS} ${IP_ADDRESS} ${INSTALL_TYPE} ${OCP_VERSION}"
 
 # Creating dns records in ibmcloud cis service for SNO node to reach hosted cluster and for ingress purpose
-ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "api.${CLUSTER_NAME}" --content "${BASTION_IP}"
-ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "api-int.${CLUSTER_NAME}" --content "${BASTION_IP}"
-ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "*.apps.${CLUSTER_NAME}" --content "${BASTION_IP}"
+ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "api.${CLUSTER_NAME}" --content "${IP_ADDRESS}"
+ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "api-int.${CLUSTER_NAME}" --content "${IP_ADDRESS}"
+ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "*.apps.${CLUSTER_NAME}" --content "${IP_ADDRESS}"
 
 # Rebooting the node to boot from net
 ibmcloud pi ins act $instance_id --operation soft-reboot
@@ -770,6 +770,16 @@ cp /etc/sno-power-credentials/pull-secret "${SHARED_DIR}/"
 #Copy the auth artifacts to shared dir for the next steps
 scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeadmin-password "${SHARED_DIR}/"
 scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeconfig "${SHARED_DIR}/"
+echo "Create proxy-conf.sh file"
+cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
+export HTTP_PROXY=http://${BASTION}:2005/
+export HTTPS_PROXY=http://${BASTION}:2005/
+export NO_PROXY="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+
+export http_proxy=http://${BASTION}:2005/
+export https_proxy=http://${BASTION}:2005/
+export no_proxy="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+EOF
 echo "Finished prepare_next_steps"
 
 echo "Test cluster accessiblity"
