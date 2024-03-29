@@ -4,6 +4,23 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+trap 'warn_0_case_executed' INT TERM EXIT
+function warn_0_case_executed {
+    local count
+    count="$(ls ${ARTIFACT_DIR} | wc -l)"
+    if [ $((count)) == 0 ] ; then
+        mkdir --parents "${ARTIFACT_DIR}"
+        cat >"${ARTIFACT_DIR}/junit-ginkgo-result.xml" <<- EOF
+<testsuite name="openshift-extended-test" tests="1" errors="1">
+  <testcase name="Overall status of openshift-extended test">
+    <failure message="">Caution: NO test cases executed.</failure>
+  </testcase>
+</testsuite>
+EOF
+
+    fi
+}
+
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
