@@ -38,7 +38,7 @@ tests:
     test:
     - chain: openshift-extended-rosacli-tests
     workflow: rosa-aws-non-sts
-- as: aws-rosa-non-sts-advanced-e2e-f3
+- as: aws-rosa-non-sts-byo-vpc-kms-proxy-e2e-f3
   cron: 23 5 1,4,7,10,13,16,19,22,24,28 * *
   steps:
     cluster_profile: aws-qe
@@ -49,8 +49,8 @@ tests:
       MIN_REPLICAS: "3"
     test:
     - chain: openshift-extended-rosacli-tests
-    workflow: rosa-aws-non-sts-advanced
-- as: aws-rosa-sts-e2e-f3
+    workflow: rosa-aws-non-sts-byo-vpc-kms-proxy
+- as: aws-rosa-e2e-f3
   cron: 38 16 3,6,9,12,15,18,21,23,27,30 * *
   steps:
     cluster_profile: aws-qe
@@ -59,7 +59,7 @@ tests:
     test:
     - chain: openshift-extended-rosacli-tests
     workflow: rosa-aws-sts
-- as: aws-rosa-sts-upgrade-e2e-f7
+- as: aws-rosa-upgrade-e2e-f7
   cron: 25 21 7,14,22,30 * *
   steps:
     cluster_profile: aws-qe
@@ -71,27 +71,23 @@ tests:
     test:
     - ref: rosa-cluster-upgrade-cluster
     workflow: rosa-aws-sts
-- as: aws-rosa-sts-advanced-e2e-f3
+- as: aws-rosa-byo-kms-oidc-e2e-f3
   cron: 41 2 2,5,7,11,14,17,20,23,26,29 * *
   steps:
     cluster_profile: aws-qe
     env:
-      ADDITIONAL_SECURITY_GROUP: "true"
-      ARN_PATH: /rosa/e2e/
       CHANNEL_GROUP: candidate
       ENABLE_AUTOSCALING: "true"
       MAX_REPLICAS: "6"
       MIN_REPLICAS: "3"
     test:
     - chain: openshift-extended-rosacli-tests
-    workflow: rosa-aws-sts-advanced
-- as: aws-rosa-sts-advanced-prod-critical-e2e-f3
+    workflow: rosa-aws-sts-byo-kms-oidc
+- as: aws-rosa-byo-kms-oidc-prod-critical-e2e-f3
   cron: 22 18 1,4,7,10,13,16,18,22,25,28 * *
   steps:
     cluster_profile: aws-qe
     env:
-      ADDITIONAL_SECURITY_GROUP: "true"
-      ARN_PATH: /rosa/e2e/
       CHANNEL_GROUP: candidate
       ENABLE_AUTOSCALING: "true"
       MAX_REPLICAS: "6"
@@ -100,8 +96,17 @@ tests:
       TEST_FILTERS: Critical
     test:
     - chain: openshift-extended-rosacli-tests
-    workflow: rosa-aws-sts-advanced
-- as: aws-rosa-sts-private-link-e2e-f7
+    workflow: rosa-aws-sts-byo-kms-oidc
+- as: aws-rosa-localzone-e2e-f3
+  cron: 11 15 3,6,9,12,15,17,21,24,27,30 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: candidate
+    test:
+    - chain: openshift-extended-rosacli-tests
+    workflow: rosa-aws-sts-localzone
+- as: aws-rosa-private-proxy-e2e-f7
   cron: 24 2 4,11,18,26 * *
   steps:
     cluster_profile: aws-qe
@@ -109,8 +114,8 @@ tests:
       CHANNEL_GROUP: candidate
     test:
     - chain: openshift-extended-rosacli-tests
-    workflow: rosa-aws-sts-private-link
-- as: aws-rosa-sts-private-link-prod-critical-e2e-f7
+    workflow: rosa-aws-sts-private-proxy
+- as: aws-rosa-private-proxy-prod-critical-e2e-f7
   cron: 32 0 1,9,17,24 * *
   steps:
     cluster_profile: aws-qe
@@ -120,7 +125,16 @@ tests:
       TEST_FILTERS: Critical
     test:
     - chain: openshift-extended-rosacli-tests
-    workflow: rosa-aws-sts-private-link
+    workflow: rosa-aws-sts-private-proxy
+- as: aws-rosa-security-group-e2e-f3
+  cron: 15 21 2,4,8,11,14,17,20,23,26,29 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: candidate
+    test:
+    - chain: openshift-extended-rosacli-tests
+    workflow: rosa-aws-sts-security-group
 - as: aws-rosa-hcp-e2e-f3
   cron: 32 0 3,6,9,12,14,18,21,24,27,30 * *
   steps:
