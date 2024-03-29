@@ -4,6 +4,23 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+trap 'warn_0_case_executed' INT TERM EXIT
+function warn_0_case_executed {
+    local count
+    count="$(ls ${ARTIFACT_DIR} | wc -l)"
+    if [ $((count)) == 0 ] ; then
+        mkdir --parents "${ARTIFACT_DIR}"
+        cat >"${ARTIFACT_DIR}/junit-cucushift-result.xml" <<- EOF
+<testsuite name="cucushift-e2e" tests="1" errors="1">
+  <testcase name="Overall status of cucushift-e2e test">
+    <failure message="">Caution: NO test cases executed.</failure>
+  </testcase>
+</testsuite>
+EOF
+
+    fi
+}
+
 function show_test_execution_time() {
     local test_type time_used
     test_type="$1"
@@ -141,13 +158,14 @@ function filter_test_by_capability() {
     local enabledcaps xversion yversion
     enabledcaps="$(oc get clusterversion version -o yaml | yq '.status.capabilities.enabledCapabilities[]')"
     IFS='.' read xversion yversion _ < <(oc version -o yaml | yq '.openshiftVersion')
-    local v411 v412 v413 v414 v415 v416
+    local v411 v412 v413 v414 v415 v416 v417
     v411="baremetal marketplace openshift-samples"
     v412="${v411} Console Insights Storage CSISnapshot"
     v413="${v412} NodeTuning"
     v414="${v413} MachineAPI Build DeploymentConfig ImageRegistry"
     v415="${v414} OperatorLifecycleManager CloudCredential"
-    v416="${v415}"
+    v416="${v415} CloudControllerManager Ingress"
+    v417="${v416}"
     # [console]=console
     # the first `console` is the capability name
     # the second `console` is the tag name in verification-tests
@@ -170,6 +188,9 @@ function filter_test_by_capability() {
     local versioncaps
     versioncaps="$v416"
     case "$xversion.$yversion" in
+        4.17)
+            versioncaps="$v417"
+            ;;
         4.16)
             versioncaps="$v416"
             ;;

@@ -928,6 +928,20 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: osd-ccs-gcp
+- as: gcp-ocm-osd-ccs-xpn-marketplace-f14
+  cron: 52 3 7,21 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@osd_ccs'
+      OPENSHIFT_VERSION: "4.14"
+      SUBSCRIPTION_TYPE: marketplace-gcp
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
+      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: osd-ccs-gcp-xpn
 - as: aws-rosa-non-sts-advanced-f14
   cron: 18 0 7,21 * *
   steps:
@@ -994,7 +1008,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: rosa-aws-sts-shared-vpc
-- as: aws-rosa-sts-hcp-int-full-f7
+- as: aws-rosa-hcp-int-full-f7
   cron: 1 21 7,14,21,28 * *
   steps:
     cluster_profile: aws-sd-qe
@@ -1006,8 +1020,8 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
     test:
     - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hypershift
-- as: aws-rosa-sts-hcp-stage-full-f7
+    workflow: rosa-aws-sts-hcp
+- as: aws-rosa-hcp-stage-full-f7
   cron: 53 12 6,15,22,29 * *
   steps:
     cluster_profile: aws-sd-qe
@@ -1018,8 +1032,8 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
     test:
     - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hypershift
-- as: aws-rosa-sts-hcp-advanced-int-full-f7
+    workflow: rosa-aws-sts-hcp
+- as: aws-rosa-hcp-byo-kms-oidc-auditlog-int-full-f7
   cron: 21 7 9,16,23,30 * *
   steps:
     cluster_profile: aws-sd-qe
@@ -1031,8 +1045,8 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
     test:
     - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hypershift-advanced
-- as: aws-rosa-sts-hcp-advanced-stage-full-f7
+    workflow: rosa-aws-sts-hcp-byo-kms-oidc-auditlog
+- as: aws-rosa-hcp-byo-kms-oidc-auditlog-stage-full-f7
   cron: 22 19 4,11,18,27 * *
   steps:
     cluster_profile: aws-sd-qe
@@ -1043,8 +1057,8 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
     test:
     - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hypershift-advanced
-- as: aws-rosa-sts-hcp-private-link-int-full-f7
+    workflow: rosa-aws-sts-hcp-byo-kms-oidc-auditlog
+- as: aws-rosa-hcp-private-proxy-int-full-f7
   cron: 48 15 4,11,18,27 * *
   steps:
     cluster_profile: aws-sd-qe
@@ -1056,8 +1070,8 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
     test:
     - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hypershift-private-link
-- as: aws-rosa-sts-hcp-private-link-stage-full-f7
+    workflow: rosa-aws-sts-hcp-private-proxy
+- as: aws-rosa-hcp-private-proxy-stage-full-f7
   cron: 4 2 3,12,19,26 * *
   steps:
     cluster_profile: aws-sd-qe
@@ -1068,7 +1082,7 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
     test:
     - chain: openshift-e2e-test-hypershift-qe
-    workflow: rosa-aws-sts-hypershift-private-link
+    workflow: rosa-aws-sts-hcp-private-proxy
 - as: aws-sc2s-ipi-disc-priv-fips-f14
   cron: 12 9 5,21 * *
   steps:
@@ -2126,7 +2140,7 @@ tests:
     env:
       TEST_FILTERS: ~HyperShiftMGMT
       TEST_PARALLEL: "3"
-      TEST_SCENARIOS: The Security Profiles Operator
+      TEST_SCENARIOS: Security_Profiles_Operator
       TEST_TIMEOUT: "20"
     test:
     - ref: openshift-extended-test
