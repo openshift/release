@@ -1,0 +1,66 @@
+base_images:
+  golang-image:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.16
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.16
+images:
+- dockerfile_path: Dockerfile
+  from: golang-image
+  to: odf-operator
+- dockerfile_path: bundle.Dockerfile
+  to: odf-operator-bundle
+- dockerfile_path: catalog.Dockerfile
+  to: odf-operator-catalog
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: odf-operator-e2e-aws
+  steps:
+    cluster_profile: odf-aws
+    env:
+      BASE_DOMAIN: makestoragegreatagain.com
+    test:
+    - as: unit-tests
+      cli: latest
+      commands: |
+        export GOFLAGS=''
+        make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-tests
+      cli: latest
+      commands: |
+        unset VERSION
+        export GOFLAGS=''
+        make e2e-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.16
+  org: red-hat-storage
+  repo: odf-operator
