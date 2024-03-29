@@ -18,7 +18,7 @@ if [ ! -f ${AWS_SHARED_CREDENTIALS_FILE} ];then
 fi
 export AWS_SHARED_CREDENTIALS_FILE
 
-shared_vpc_aws_cred="${CLUSTER_PROFILE_DIR}/.awscred-shared-vpc"
+shared_vpc_aws_cred="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
 if [ ! -f ${shared_vpc_aws_cred} ];then
     error_exit "missing mandatory aws credential file ${shared_vpc_aws_cred}"
 fi
