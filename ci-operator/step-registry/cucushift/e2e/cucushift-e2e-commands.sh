@@ -321,6 +321,7 @@ function summarize_test_results() {
     # summarize test results
     echo "Summarizing test results..."
     failures=0 errors=0 skipped=0 tests=0
+    [[ -e "${ARTIFACT_DIR}" ]] || exit 0
     grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
     while read -a row ; do
         # if the last ARG of command `let` evaluates to 0, `let` returns 1
