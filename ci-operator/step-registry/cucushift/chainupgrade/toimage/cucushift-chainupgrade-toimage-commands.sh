@@ -887,6 +887,9 @@ export PATH=${OC_DIR}:$PATH
 index=0
 for target in "${TARGET_RELEASES[@]}"
 do
+
+    run_command "oc get machineconfig"
+
     (( index += 1 ))
     export TARGET="${target}"
     TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
