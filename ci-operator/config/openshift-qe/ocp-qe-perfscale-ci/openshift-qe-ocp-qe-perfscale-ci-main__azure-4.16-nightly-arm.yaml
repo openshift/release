@@ -11,6 +11,12 @@ promotion:
   - namespace: ci
     tag: latest
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.16"
   latest:
     candidate:
       product: ocp
@@ -26,15 +32,14 @@ tests:
   as: control-plane-3nodes-arm
   steps:
     cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "9"
-      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
-      OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE: Standard_D32s_v3
+      COMPUTE_NODE_REPLICAS: "3"
     test:
-    - chain: openshift-qe-data-path-tests
-    - ref: openshift-qe-perfscale-azu-data-path-nsg
-    workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-azure-ipi-ovn-arm
   timeout: 7h0m0s
 zz_generated_metadata:
   branch: main
