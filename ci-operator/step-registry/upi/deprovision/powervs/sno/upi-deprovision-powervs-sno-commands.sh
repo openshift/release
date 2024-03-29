@@ -23,7 +23,7 @@ if [ -f "${SHARED_DIR}/kubeconfig" ]; then
   echo "=========== oc get pod -A -o wide ==============" >> ${CLUSTER_INFO}
   oc get pod -A -o wide >> ${CLUSTER_INFO}
   cp ${CLUSTER_INFO} "${ARTIFACT_DIR}/"
-}
+fi
 
 # Installing required tools
 echo "$(date) Installing required tools"
