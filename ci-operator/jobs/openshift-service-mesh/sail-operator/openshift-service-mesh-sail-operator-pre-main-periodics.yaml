@@ -79,10 +79,11 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
-  cron: 00 03 * * *
+  cron: 00 05 * * 1-5
   decorate: true
   decoration_config:
     skip_cloning: true
+    timeout: 20m0s
   extra_refs:
   - base_ref: pre-main
     org: openshift-service-mesh
@@ -90,15 +91,15 @@ periodics:
   labels:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-service-mesh-sail-operator-pre-main-update-deps
+  name: periodic-ci-openshift-service-mesh-sail-operator-pre-main-sync-upstream
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/github-token
-      - --target=update-deps
+      - --secret-dir=/secrets/ossm-github-simple-job
+      - --target=sync-upstream
       command:
       - ci-operator
       image: ci-operator:latest
@@ -111,11 +112,11 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
-      - mountPath: /secrets/github-token
-        name: github-token
-        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /secrets/ossm-github-simple-job
+        name: ossm-github-simple-job
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
@@ -125,12 +126,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: github-token
-      secret:
-        secretName: github-token
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - name: ossm-github-simple-job
+      secret:
+        secretName: ossm-github-simple-job
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
