@@ -63,7 +63,7 @@ The test results will be reported into the both `OCSQE` Jira Project and a publi
 
 - `BASE_DOMAIN`
   - **Definition**: A fully-qualified domain or subdomain name. The base domain of the cloud provider is used for setting baseDomain variable of the install configuration of the cluster.
-  - **If left empty**: The [`firewatch-ipi-aws` workflow](../../../step-registry/ipi/aws/firewatch-ipi-aws-workflow.yaml) will fail.
+  - **If left empty**: The `firewatch-ipi-aws` workflow will fail.
 - `ODF_VERSION_MAJOR_MINOR`
   - **Definition**: The odf major.minor version
   - **Default value**: Is `4.13`.
