@@ -224,7 +224,9 @@ function rhel_repo(){
     command: yum clean all
 EOF
 
-    version_info="$(oc version | grep Server | sed -E 's/.*: ([4-9].[0-9]+)/\1/' | cut -d '.' -f 1,2)"
+    # current Server version may not be the expected branch when cluster is not fully upgraded 
+    # using TARGET_REPO_VERSION instead directly
+    version_info="${TARGET_REPO_VERSION}"
     openshift_ansible_branch='master'
     if [[ "$version_info" =~ [4-9].[0-9]+ ]] ; then
         openshift_ansible_branch="release-${version_info}"
@@ -640,6 +642,11 @@ function check_upgrade_status() {
             echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
             return 0
         fi
+	if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${TARGET_VERSION}"* ]]; then
+	    UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
+            echo -e "Upgrade stuck at updating RHEL worker, run the RHEL worker upgrade now...\n\n"
+            return 0
+        fi
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
         echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
@@ -922,13 +929,17 @@ do
     fi
     upgrade
     check_upgrade_status
-    check_history
 
     if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
         echo -e "oc get node -owide\n$(oc get node -owide)"
         rhel_repo
         rhel_upgrade
+	if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "triggered" ]]; then
+	    echo -e "RHEL worker upgrade completed, but the cluster upgrade hasn't been finished, check the cluster status again...\    n"
+	    check_upgrade_status
+        fi
     fi
+    check_history
     health_check
     if [[ -n "${E2E_RUN_TAGS}" ]]; then
         run_upgrade_e2e "${index}"
