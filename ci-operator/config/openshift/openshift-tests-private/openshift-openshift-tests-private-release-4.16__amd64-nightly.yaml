@@ -899,7 +899,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: rosa-aws-non-sts
-- as: aws-rosa-non-sts-advanced-f7
+- as: aws-rosa-non-sts-byo-vpc-kms-proxy-f7
   cron: 20 15 3,10,17,26 * *
   steps:
     cluster_profile: aws-qe
@@ -911,9 +911,9 @@ tests:
       TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
     test:
     - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-non-sts-advanced
+    workflow: rosa-aws-non-sts-byo-vpc-kms-proxy
 - as: aws-rosa-sts-f7
-  cron: 2 9 3,10,17,24 * *
+  cron: 23 15 5,12,20,28 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -925,12 +925,11 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: rosa-aws-sts
-- as: aws-rosa-sts-advanced-f7
-  cron: 12 10 7,14,23,30 * *
+- as: aws-rosa-sts-byo-kms-oidc-f7
+  cron: 39 0 5,12,20,28 * *
   steps:
     cluster_profile: aws-qe
     env:
-      ADDITIONAL_SECURITY_GROUP: "true"
       CHANNEL_GROUP: nightly
       E2E_RUN_TAGS: '@rosa'
       OPENSHIFT_VERSION: "4.16"
@@ -938,7 +937,59 @@ tests:
       TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
     test:
     - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-sts-advanced
+    workflow: rosa-aws-sts-byo-kms-oidc
+- as: aws-rosa-sts-localzone-f7
+  cron: 13 14 4,12,19,26 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@rosa'
+      OPENSHIFT_VERSION: "4.16"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: rosa-aws-sts-localzone
+- as: aws-rosa-sts-security-group-f7
+  cron: 28 3 5,13,21,28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@rosa'
+      OPENSHIFT_VERSION: "4.16"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: rosa-aws-sts-security-group
+- as: aws-rosa-sts-private-proxy-f7
+  cron: 36 14 2,9,17,25 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@disconnected and @rosa'
+      OPENSHIFT_VERSION: "4.16"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: rosa-aws-sts-private-proxy
+- as: aws-rosa-sts-shared-vpc-f7
+  cron: 49 2 2,10,18,25 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      E2E_RUN_TAGS: '@rosa'
+      OPENSHIFT_VERSION: "4.16"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: rosa-aws-sts-shared-vpc
 - as: aws-rosa-hcp-int-full-f7
   cron: 46 5 3,10,17,24 * *
   steps:
@@ -1014,32 +1065,6 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-aws-sts-hcp-private-proxy
-- as: aws-rosa-sts-private-link-f7
-  cron: 16 11 4,11,18,27 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@disconnected and @rosa'
-      OPENSHIFT_VERSION: "4.16"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-sts-private-link
-- as: aws-rosa-sts-shared-vpc-f7
-  cron: 4 3 6,13,20,29 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: nightly
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: "4.16"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-      TEST_FILTERS_SUPPLEMENTARY: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: rosa-aws-sts-shared-vpc
 - as: aws-sc2s-ipi-disc-priv-fips-f2
   cron: 56 14 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
   steps:
