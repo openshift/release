@@ -61,99 +61,38 @@ tests:
   container:
     from: src
   timeout: 20m0s
-- as: update-deps
+- as: sync-upstream
   commands: |
-    # load test-infra automator.sh script
     git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git
     cd test-infra
     export BUILD_WITH_CONTAINER="0"
     export XDG_CACHE_HOME="/tmp/cache"
     export GOCACHE="/tmp/cache"
     export GOMODCACHE="/tmp/cache"
-    ./tools/automator.sh \
-      -o openshift-service-mesh \
-      -r sail-operator \
-      -f /creds-github/token \
-      '-c ./tools/update_deps.sh' \
-      '-t [pre-main] Automator: Update dependencies' \
-      -m update_deps_pre_main \
-      -l auto-merge \
-      -b pre-main
+    ./tools/automator-main.sh \
+    --org=openshift-service-mesh \
+    --repo=sail-operator \
+    --branch=pre-main \
+    --token-path=/creds-github/token \
+    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
+    "--labels=tide/merge-method-merge,auto-merge" \
+    --modifier=merge_upstream_pre-main \
+    --merge-repository=https://github.com/istio-ecosystem/sail-operator \
+    --merge-branch=pre-main \
+    --merge-strategy=merge
   container:
     from: src
-  cron: 00 03 * * *
+  cron: 00 05 * * 1-5
   secrets:
   - mount_path: /creds-github
-    name: github-token
-- as: push-images
-  optional: true
-  steps:
-    cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
-    env:
-      BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      GOBIN: /gobin
-      GOCACHE: /tmp/cache
-      GOMODCACHE: /tmp/cache
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.15.3-multi
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
-      MAISTRA_NAMESPACE: maistra-e2e-test
-      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-      XDG_CACHE_HOME: /tmp/cache
-    test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: push-images
-      cli: latest
-      commands: |
-        export QUAY_PASS=$(cat /maistra-secrets/password)
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          entrypoint \
-          sh -c \
-          "docker login -u='maistra-dev+prow' \
-          -p=${QUAY_PASS} quay.io; \
-          cd /work && \
-          export BUILD_WITH_CONTAINER="0" && \
-          make docker-build docker-push \
-          IMAGE=quay.io/maistra-dev/istio-ubi9-operator:PR-${PULL_NUMBER}"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      credentials:
-      - mount_path: /maistra-secrets
-        name: maistra-dev-prow
-        namespace: test-credentials
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      - name: GOCACHE
-      - name: GOBIN
-      - name: GOMODCACHE
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-hypershift
-- as: integration-ocp-4-15
+    name: ossm-github-simple-job
+  timeout: 20m0s
+- as: e2e-ocp-4-15
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.15.3-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.15.6-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -174,7 +113,7 @@ tests:
           cpu: 200m
           memory: 200Mi
       timeout: 10m0s
-    - as: integration-ocp-4-15
+    - as: e2e-ocp-4-15
       cli: latest
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
@@ -185,7 +124,7 @@ tests:
           export BUILD_WITH_CONTAINER="0" && \
           cd /work && \
           entrypoint \
-          make test.integration.ocp"
+          make test.e2e.ocp"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
@@ -198,7 +137,7 @@ tests:
           memory: 200Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-hypershift
-- as: integration-ocp-4-16
+- as: e2e-ocp-4-16
   optional: true
   steps:
     cluster_profile: ossm-aws
@@ -216,6 +155,7 @@ tests:
         # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
         oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
         oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
+        oc cp `which oc` ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/bin
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -225,7 +165,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 10m0s
-    - as: integration-ocp-4-16
+    - as: e2e-ocp-4-16
       cli: latest
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
@@ -236,7 +176,7 @@ tests:
           export BUILD_WITH_CONTAINER="0" && \
           cd /work && \
           entrypoint \
-          make test.integration.ocp"
+          make test.e2e.ocp"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
@@ -249,7 +189,7 @@ tests:
           memory: 100Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-hypershift
-- as: integration-ocp-4-15-arm
+- as: e2e-ocp-4-15-arm
   steps:
     cluster_profile: ossm-aws
     dependencies:
@@ -279,7 +219,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 10m0s
-    - as: integration-ocp-4-15-arm
+    - as: e2e-ocp-4-15-arm
       cli: latest
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
@@ -290,7 +230,7 @@ tests:
           export BUILD_WITH_CONTAINER="0" && \
           cd /work && \
           entrypoint \
-          make test.integration.ocp"
+          make test.e2e.ocp"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
@@ -303,14 +243,14 @@ tests:
           memory: 100Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-profile
-- as: integration-kind
+- as: e2e-kind
   steps:
     cluster_profile: ossm-aws
     dependencies:
       RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.15.3-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.15.6-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -330,23 +270,17 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 10m0s
-    - as: integration-kind
+    - as: e2e-kind
       cli: latest
       commands: |
-        export QUAY_PASS=$(cat /maistra-secrets/password)
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
           sh -c \
           "export TAG=PR-${PULL_NUMBER} && \
-          docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
           cd /work && \
           export BUILD_WITH_CONTAINER="0" && \
-          make test.integration.kind"
+          make test.e2e.kind"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      credentials:
-      - mount_path: /maistra-secrets
-        name: maistra-dev-prow
-        namespace: test-credentials
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -363,7 +297,7 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.15.3-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.15.6-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -375,6 +309,7 @@ tests:
         # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
         oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
         oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
+        oc cp `which oc` ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/bin
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -414,7 +349,7 @@ tests:
       RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.15.3-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.15.6-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-nightly-images
       MAISTRA_SC_POD: maistra-nightly-images-pod
@@ -437,7 +372,7 @@ tests:
     - as: build
       cli: latest
       commands: |
-        export QUAY_PASS=$(cat /maistra-secrets/password)
+        export QUAY_PASS=$(cat /quay-secret/password)
         export GITHUB_TOKEN=$(cat /creds-github/token)
         # login to quay.io in the privileged pod
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
@@ -454,11 +389,11 @@ tests:
            make -e GITHUB_TOKEN=${GITHUB_TOKEN} -e NIGHTLY=true docker-buildx bundle-publish-nightly"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
-      - mount_path: /maistra-secrets
-        name: maistra-dev-prow
+      - mount_path: /quay-secret
+        name: quay-pass
         namespace: test-credentials
       - mount_path: /creds-github
-        name: workflow-github
+        name: ossm-github
         namespace: test-credentials
       env:
       - name: MAISTRA_NAMESPACE
