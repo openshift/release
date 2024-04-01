@@ -26,7 +26,6 @@ export KRKN_KUBE_CONFIG=$KUBECONFIG
 mkdir -p $HOME/.aws
 cat "/secret/telemetry/.awscred" > $HOME/.aws/config
 cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
-ls -al /secret/telemetry/
 
 # read passwords from vault
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
@@ -38,6 +37,8 @@ export TELEMETRY_PASSWORD=$telemetry_password
 export AWS_DEFAULT_REGION=us-west-2
 #export AWS_ACCESS_KEY_ID=$aws_access_key_id
 #export AWS_SECRET_ACCESS_KEY=$aws_secret_access_key
+
+ls node-disruptions
 
 ./node-disruptions/prow_run.sh
 rc=$?
