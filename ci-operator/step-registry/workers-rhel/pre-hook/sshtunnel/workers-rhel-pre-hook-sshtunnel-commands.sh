@@ -187,4 +187,6 @@ cat > scaleup-pre-hook-ssh-tunnel.yaml <<-'EOF'
 EOF
 
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
-ansible-playbook -i "${SHARED_DIR}/ansible-hosts" scaleup-pre-hook-ssh-tunnel.yaml -vvv
+ansible-playbook -i "${SHARED_DIR}/ansible-hosts" scaleup-pre-hook-ssh-tunnel.yaml -vvv || true
+echo "Debug ssh timeout"
+sleep 120m
