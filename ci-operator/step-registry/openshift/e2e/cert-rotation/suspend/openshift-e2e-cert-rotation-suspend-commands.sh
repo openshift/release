@@ -62,6 +62,13 @@ run-on-all-nodes "timedatectl set-time +${SKEW} && timedatectl status"
 # Restart kubelet
 run-on-all-nodes "systemctl restart kubelet"
 
+### DEBUG ###
+# The etcd peer, server, and client certs will be expired by now so we can't continue with wait-for-nodes-to-be-ready
+# since that will wait for the apiserver to come up which can't happen with expired etcd certs 
+# TODO: Once etcd can regenerate the certs offline, add a check here to see if etcd is up and running with valid certs
+echo "DEBUG: sleep infinity. Use pkill sleep to continue"
+sleep infinity
+
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
 wait-for-nodes-to-be-ready
 
