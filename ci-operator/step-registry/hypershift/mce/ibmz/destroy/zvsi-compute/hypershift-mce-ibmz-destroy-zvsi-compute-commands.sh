@@ -96,7 +96,28 @@ for status in "${fip_delete_status[@]}"; do
     fi
 done
 
-sleep 60
+# Deleting the bastion VSI
+echo "Triggering the $infra_name-bastion instance deletion in the $infra_name-vpc VPC."
+bvsi_delete_status=$(ibmcloud is instance-delete $infra_name-bastion --output JSON -f | jq -r '.[]|.result')
+if [ "$bvsi_delete_status" = 'false' ]; then
+    echo "Deletion of $infra_name-bastion instance is not successful."
+    exit 1
+else 
+    echo "Successfully deleted the $infra_name-bastion instance in the $infra_name-vpc VPC."
+fi
+
+# Deleting the bastion VSI Floating IP
+echo "Triggering the $infra_name-bastion-ip Floating IP in the $infra_name-rg resource group."
+bfip_delete_status=$(ibmcloud is ipd $infra_name-bastion-ip --output JSON -f | jq -r '.[]|.result')
+if [ "$bfip_delete_status" = 'false' ]; then
+    echo "Deletion of $infra_name-bastion-ip floating IP is not successful."
+    exit 1
+else 
+    echo "Successfully deleted the $infra_name-bastion-ip floating IP in the $infra_name-rg resource group."
+fi
+
+sleep 60   # Allowing all the subnet resources to get deleted
+
 
 # Deleting the subnet
 echo "Triggering the $infra_name-sn subnet deletion in the $infra_name-vpc VPC."

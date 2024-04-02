@@ -98,6 +98,44 @@ else
   echo "Subnet $infra_name-sn is created successfully in the $infra_name-vpc VPC."
 fi
 
+
+# Create a bastion node in the same VPC for monitoring
+set -e
+echo "Triggering the $infra_name-bastion VSI creation on IBM Cloud in the VPC $infra_name-vpc"
+ibmcloud is instance-create $infra_name-bastion $infra_name-vpc $IC_REGION-1 bx2-2x8 $infra_name-sn --image ibm-redhat-9-2-minimal-amd64-2 --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg
+sleep 60
+set +e
+bvsi_state=$(ibmcloud is instance $infra_name-bastion | awk '/Status/{print $2}')
+if [ "$bvsi_state" != "running" ]; then
+  echo "Error: Instance $infra_name-bastion is not created properly in the $infra_name-vpc VPC."
+  exit 1
+else 
+  echo "Instance $infra_name-bastion is created successfully in the $infra_name-vpc VPC."
+fi
+bsg_name=$(ibmcloud is instance $infra_name-bastion --output JSON | jq -r '.network_interfaces|.[].security_groups|.[].name')
+echo "Adding an inbound rule in the $infra_name-bastion instance security group for ssh and scp."
+ibmcloud is sg-rulec $bsg_name inbound tcp --port-min 22 --port-max 22
+if [ $? -eq 0 ]; then
+    echo "Successfully added the inbound rule."
+else
+    echo "Failure while adding the inbound rule to the $infra_name-bastion instance security group."
+    exit 1
+fi  
+echo "Getting the Virtual Network Interface ID for bastion VSI"
+bvni_id=$(ibmcloud is instance $infra_name-bastion | awk '/Primary/{print $7}')
+echo "Creating a Floating IP for bastion VSI"
+bvsi_fip=$(ibmcloud is floating-ip-reserve $infra_name-bastion-ip --nic $bvni_id | awk '/Address/{print $2}')
+if [ -z "$bvsi_fip" ]; then
+  echo "Error: Floating IP assignment is failed to the bastion VSI."
+  exit 1
+else
+  echo "Floating IP is assigned to the bastion VSI : $bvsi_fip"
+fi
+
+
+# Install package on bastion to configure proxy server
+ssh "${ssh_options[@]}" root@$bvsi_fip "yum install squid -y"
+
 # Create zVSI compute nodes
 set -e
 zvsi_rip_list=()
@@ -288,3 +326,14 @@ echo "$(date) Checking the compute nodes in the hosted control plane"
 oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
 oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=30m
 echo "$(date) Successfully completed the e2e creation chain"
+
+
+cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
+export HTTP_PROXY=http://${bvsi_fip}:3128/
+export HTTPS_PROXY=http://${bvsi_fip}:3128/
+export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+
+export http_proxy=http://${bvsi_fip}:3128/
+export https_proxy=http://${bvsi_fip}:3128/
+export no_proxy="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+EOF
