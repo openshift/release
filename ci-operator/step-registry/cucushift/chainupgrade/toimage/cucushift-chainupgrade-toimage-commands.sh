@@ -618,6 +618,25 @@ function admin_ack() {
 
 # Upgrade the cluster to target release
 function upgrade() {
+    set_channel $TARGET_VERSION
+    local retry=3 conditional_updates
+    while (( retry > 0 )); do
+        conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]?.release.version' | xargs)
+        if [[ -z "${conditional_updates}" ]]; then
+            retry=$((retry - 1))
+            sleep 60
+            echo "No conditionalUpdates update available! Retry..."
+        else
+            #shellcheck disable=SC2076
+            if [[ " $conditional_updates " =~ " $TARGET_VERSION " ]]; then
+                echo "Error: $TARGET_VERSION is not recommended, for details please refer:"
+                oc get clusterversion version -o json | jq -r '.status.conditionalUpdates'
+                exit 1
+            fi
+            break
+        fi
+    done
+
     run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
@@ -863,6 +882,18 @@ function run_upgrade_e2e() {
     echo "Ending the upgrade e2e tests on $(date "+%F %T")"
     e2e_end_time=$(date +%s)
     echo "e2e test take $(( ($e2e_end_time - $e2e_start_time)/60 )) minutes"
+}
+
+function set_channel(){
+    local x_ver y_ver version="$1"
+    x_ver=$( echo "${version}" | cut -f1 -d. )
+    y_ver=$( echo "${version}" | cut -f2 -d. )
+    ver="${x_ver}.${y_ver}"
+    target_channel="${UPGRADE_CHANNEL}-${ver}"
+    if ! oc adm upgrade channel ${target_channel}; then
+        echo "Fail to change channel to ${target_channel}!"
+        exit 1
+    fi
 }
 
 if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
