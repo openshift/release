@@ -134,7 +134,7 @@ cat > packet-setup.yaml <<-EOF
         plan: ${PACKET_PLAN}
         metro: da
         tags:  "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME')[:77], 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
-        user_data: "{{ user_data | default(omit) }}"
+        userdata: "{{ user_data | default(omit) }}"
       register: hosts
     - name: write device info to file
       copy:
