@@ -83,12 +83,13 @@ function upgrade_cluster_to () {
   done
 
   # Speed up the upgrading process
-  set_proxy
-  echo "Force restarting the MUO pod to speed up the upgrading process."
-  muo_pod=$(oc get pod -n openshift-managed-upgrade-operator | grep 'managed-upgrade-operator' | grep -v 'catalog' | cut -d ' ' -f1)
-  oc delete pod $muo_pod -n openshift-managed-upgrade-operator
-  unset_proxy
-
+  if [[ "$HOSTED_CP" == "false" ]]; then
+    set_proxy
+    echo "Force restarting the MUO pod to speed up the upgrading process."
+    muo_pod=$(oc get pod -n openshift-managed-upgrade-operator | grep 'managed-upgrade-operator' | grep -v 'catalog' | cut -d ' ' -f1)
+    oc delete pod $muo_pod -n openshift-managed-upgrade-operator
+    unset_proxy
+  fi
   # Upgrade cluster
   start_time=$(date +"%s")
   while true; do
