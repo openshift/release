@@ -133,8 +133,6 @@ else
 fi
 
 
-# Install package on bastion to configure proxy server
-ssh "${ssh_options[@]}" root@$bvsi_fip "yum install squid -y"
 
 # Create zVSI compute nodes
 set -e
@@ -327,6 +325,9 @@ oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
 oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=30m
 echo "$(date) Successfully completed the e2e creation chain"
 
+
+# Install package on bastion to configure proxy server
+ssh "${ssh_options[@]}" root@$bvsi_fip "yum install squid -y"
 
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=http://${bvsi_fip}:3128/
