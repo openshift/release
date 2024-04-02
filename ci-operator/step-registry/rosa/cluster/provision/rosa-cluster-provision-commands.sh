@@ -31,6 +31,7 @@ ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
 CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
 ADDITIONAL_SECURITY_GROUP=${ADDITIONAL_SECURITY_GROUP:-false}
 NO_CNI=${NO_CNI:-false}
+CONFIGURE_CLUSTER_AUTOSCALER=${CONFIGURE_CLUSTER_AUTOSCALER:-false}
 
 # Record Cluster Configurations
 cluster_config_file="${SHARED_DIR}/cluster-config"
@@ -256,11 +257,16 @@ if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
     MIN_REPLICAS=3
   fi
   COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"  
-  record_cluster "nodes" "max_replicas" ${MIN_REPLICAS}
-  record_cluster "nodes" "min_replicas" ${MAX_REPLICAS}
+  record_cluster "nodes" "min_replicas" ${MIN_REPLICAS}
+  record_cluster "nodes" "max_replicas" ${MAX_REPLICAS}
 else
   COMPUTE_NODES_SWITCH="--replicas ${REPLICAS}"
   record_cluster "nodes" "replicas" ${REPLICAS}
+fi
+
+CONFIGURE_CLUSTER_AUTOSCALER_SWITCH=""
+if [[ "$ENABLE_AUTOSCALING" == "true" ]] && [[ "$CONFIGURE_CLUSTER_AUTOSCALER" == "true" ]] && [[ "$HOSTED_CP" == "false" ]]; then
+  CONFIGURE_CLUSTER_AUTOSCALER_SWITCH="--autoscaler-balance-similar-node-groups --autoscaler-skip-nodes-with-local-storage --autoscaler-ignore-daemonsets-utilization --autoscaler-scale-down-enabled"
 fi
 
 ETCD_ENCRYPTION_SWITCH=""
@@ -470,10 +476,11 @@ echo "  Additional Security groups: ${ADDITIONAL_SECURITY_GROUP}"
 echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then 
   echo "  Min replicas: ${MIN_REPLICAS}"
-  echo "  Min replicas: ${MAX_REPLICAS}"  
+  echo "  Max replicas: ${MAX_REPLICAS}"  
 else
   echo "  Replicas: ${REPLICAS}"
 fi
+echo "  Config cluster autoscaler: ${CONFIGURE_CLUSTER_AUTOSCALER}"
 
 echo "  Enable Shared VPC: ${ENABLE_SHARED_VPC}"
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
@@ -513,6 +520,7 @@ ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
 ${SHARED_VPC_SWITCH} \
 ${SECURITY_GROUP_ID_SWITCH} \
 ${NO_CNI_SWITCH} \
+${CONFIGURE_CLUSTER_AUTOSCALER_SWITCH} \
 ${DRY_RUN_SWITCH}
 " | sed -E 's/\s{2,}/ /g' > "${SHARED_DIR}/create_cluster.sh"
 cat "${SHARED_DIR}/create_cluster.sh" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${ARTIFACT_DIR}/create_cluster.sh"
@@ -555,6 +563,7 @@ rosa create cluster -y \
                     ${SHARED_VPC_SWITCH} \
                     ${SECURITY_GROUP_ID_SWITCH} \
                     ${NO_CNI_SWITCH} \
+                    ${CONFIGURE_CLUSTER_AUTOSCALER_SWITCH} \
                     ${DRY_RUN_SWITCH} > "${CLUSTER_INFO_WITHOUT_MASK}"
 
 cat ${CLUSTER_INFO_WITHOUT_MASK} | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${CLUSTER_INFO}"
