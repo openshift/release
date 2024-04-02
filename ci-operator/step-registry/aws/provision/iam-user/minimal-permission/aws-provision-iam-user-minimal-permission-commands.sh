@@ -174,7 +174,6 @@ iam:DeleteInstanceProfile
 iam:DeleteRole
 iam:DeleteRolePolicy
 iam:DeleteUser
-iam:DeleteUserPolicy
 iam:GetInstanceProfile
 iam:GetRole
 iam:GetRolePolicy
