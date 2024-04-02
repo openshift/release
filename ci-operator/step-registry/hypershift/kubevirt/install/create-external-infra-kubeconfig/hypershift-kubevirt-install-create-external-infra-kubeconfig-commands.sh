@@ -93,6 +93,14 @@ rules:
       - egressfirewalls
     verbs:
       - '*'
+  - apiGroups:
+    - snapshot.storage.k8s.io
+    resources:
+    - volumesnapshots
+    verbs:
+    - get
+    - create
+    - delete
 EOF
 
 # Bind this role with the service account
