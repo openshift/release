@@ -326,8 +326,15 @@ oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condi
 echo "$(date) Successfully completed the e2e creation chain"
 
 
+# Configuring proxy server on bastion 
+
 # Install package on bastion to configure proxy server
-ssh "${ssh_options[@]}" root@$bvsi_fip "yum install squid -y"
+ssh "${ssh_options[@]}" root@$bvsi_fip "yum install squid -y ; systemctl start squid ; systemctl enable squid"
+ssh "${ssh_options[@]}" root@$bvsi_fip "echo 'acl allowed_hosts dstdomain .${hcp_domain}' | sudo tee -a /etc/squid/squid.conf > /dev/null"
+ssh "${ssh_options[@]}" root@$bvsi_fip "echo 'http_access allow allowed_hosts' | sudo tee -a /etc/squid/squid.conf > /dev/null"
+
+# Restarting squid serivce 
+ssh "${ssh_options[@]}" root@$bvsi_fip "systemctl restart squid"
 
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=http://${bvsi_fip}:3128/
