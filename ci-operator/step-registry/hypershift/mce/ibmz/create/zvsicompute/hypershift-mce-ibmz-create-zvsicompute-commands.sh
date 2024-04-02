@@ -99,7 +99,7 @@ else
 fi
 
 
-# Create a bastion node in the same VPC for monitoring
+# Create a bastion node in the same VPC for configuring proxy server
 set -e
 echo "Triggering the $infra_name-bastion VSI creation on IBM Cloud in the VPC $infra_name-vpc"
 ibmcloud is instance-create $infra_name-bastion $infra_name-vpc $IC_REGION-1 bx2-2x8 $infra_name-sn --image ibm-redhat-9-2-minimal-amd64-2 --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg
@@ -332,7 +332,7 @@ echo "$(date) Successfully completed the e2e creation chain"
 
 # Install package on bastion to configure proxy server
 ssh "${ssh_options[@]}" root@$bvsi_fip "yum install squid -y ; systemctl start squid ; systemctl enable squid"
-ssh "${ssh_options[@]}" root@$bvsi_fip "sed -i \"/acl Safe_ports port 777/a acl allowed_hosts dstdomain .${domain}\" \"/etc/squid/squid.conf\""
+ssh "${ssh_options[@]}" root@$bvsi_fip "sed -i \"/acl Safe_ports port 777/a acl allowed_hosts dstdomain .${hcp_domain}\" \"/etc/squid/squid.conf\""
 ssh "${ssh_options[@]}" root@$bvsi_fip "sed -i \"/http_access deny/a http_access allow allowed_hosts\" \"/etc/squid/squid.conf\""
 
 # Restarting squid serivce 
