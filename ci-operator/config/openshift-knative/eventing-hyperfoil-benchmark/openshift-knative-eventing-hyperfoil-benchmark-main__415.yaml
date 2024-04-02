@@ -5,12 +5,13 @@ promotion:
   to:
   - additional_images:
       eventing-hyperfoil-benchmark-src: src
-    name: main
     namespace: openshift
+    tag: main
 releases:
   latest:
-    release:
-      channel: fast
+    candidate:
+      product: ocp
+      stream: nightly
       version: "4.15"
 resources:
   '*':
@@ -18,6 +19,62 @@ resources:
       cpu: 500m
       memory: 1Gi
 tests:
+- as: test-kafka-broker-midstr-a0cb886-aws-415
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.15"
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    post:
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: src
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: src
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: src
+      grace_period: 1m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    test:
+    - as: test
+      cli: latest
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-kafka-broker-midstream-nightly
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: generic-claim
 - as: test-kafka-broker-namesp-8045b51-aws-415
   cluster_claim:
     architecture: amd64
@@ -74,7 +131,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-kafka-broker-namesp-8045b51-aws-415-c
+- as: test-kafka-broker-namesp-6e0fff9-aws-415
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -82,7 +139,6 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.15"
-  cron: 23 1 * * 2,6
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -93,7 +149,7 @@ tests:
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
       from: src
-      optional_on_success: false
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
@@ -103,7 +159,7 @@ tests:
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
       from: src
-      optional_on_success: false
+      optional_on_success: true
       resources:
         requests:
           cpu: 100m
@@ -115,7 +171,7 @@ tests:
         | /bin/bash -s
       from: src
       grace_period: 1m0s
-      optional_on_success: false
+      optional_on_success: true
       resources:
         requests:
           cpu: 300m
@@ -124,7 +180,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-kafka-broker-namespaced-midstream-nightly
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-kafka-broker-namespaced-upstream-nightly
       from: src
       resources:
         requests:
@@ -172,63 +228,6 @@ tests:
       from: src
       grace_period: 1m0s
       optional_on_success: true
-      resources:
-        requests:
-          cpu: 300m
-          memory: 300Mi
-      timeout: 20m0s
-    test:
-    - as: test
-      cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-kafka-broker-upstream-nightly
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: generic-claim
-- as: test-kafka-broker-upstre-fbbddbf-aws-415-c
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: serverless-ci
-    product: ocp
-    timeout: 2h0m0s
-    version: "4.15"
-  cron: 43 1 * * 2,6
-  steps:
-    allow_best_effort_post_steps: true
-    allow_skip_on_success: true
-    post:
-    - as: knative-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
-        "${ARTIFACT_DIR}/gather-knative"
-      from: src
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-gather-extra
-      best_effort: true
-      cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
-        | /bin/bash -s
-      from: src
-      grace_period: 1m0s
-      optional_on_success: false
       resources:
         requests:
           cpu: 300m
