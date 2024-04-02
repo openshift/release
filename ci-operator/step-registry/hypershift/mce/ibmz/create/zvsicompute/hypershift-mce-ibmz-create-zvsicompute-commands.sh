@@ -115,6 +115,8 @@ fi
 bsg_name=$(ibmcloud is instance $infra_name-bastion --output JSON | jq -r '.network_interfaces|.[].security_groups|.[].name')
 echo "Adding an inbound rule in the $infra_name-bastion instance security group for ssh and scp."
 ibmcloud is sg-rulec $bsg_name inbound tcp --port-min 22 --port-max 22
+ibmcloud is sg-rulec $bsg_name inbound all
+
 if [ $? -eq 0 ]; then
     echo "Successfully added the inbound rule."
 else
