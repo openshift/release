@@ -80,7 +80,7 @@ export RELEASE_IMAGE="${RELEASE_IMAGE}"
 cd ${remote_workdir}/ib-orchestrate-vm
 
 # Create the seed vm
-make seed-vm-create wait-for-seed dnsmasq-workaround seed-cluster-prepare
+make seed
 
 # Create and push the seed image
 echo "Generating the seed image using OCP ${SEED_VERSION} as ${SEED_IMAGE}:${SEED_IMAGE_TAG}"
