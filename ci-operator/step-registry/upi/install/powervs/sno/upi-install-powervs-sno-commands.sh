@@ -772,6 +772,7 @@ scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeadmin
 scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeconfig "${SHARED_DIR}/"
 echo "Create proxy-conf.sh file"
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
+echo "Setup proxy to ${BASTION}:2005"
 export HTTP_PROXY=http://${BASTION}:2005/
 export HTTPS_PROXY=http://${BASTION}:2005/
 export NO_PROXY="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
