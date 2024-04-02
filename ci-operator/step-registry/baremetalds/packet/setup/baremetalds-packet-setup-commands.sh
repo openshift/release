@@ -144,7 +144,7 @@ cat > packet-setup.yaml <<-EOF
 EOF
 
 ansible-galaxy collection install equinix.cloud
-pip3 install -r https://raw.githubusercontent.com/equinix-labs/ansible-collection-equinix/main/requirements.txt
+pip3.11 install -r https://raw.githubusercontent.com/equinix-labs/ansible-collection-equinix/main/requirements.txt
 
 export METAL_AUTH_TOKEN=$(cat ${CLUSTER_PROFILE_DIR}/packet-auth-token)
 ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
