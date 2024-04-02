@@ -816,6 +816,10 @@ function test_machine_health_check_config () {
     TEST_PASSED=false
   fi
 
+  ## save node count to confirm that machinehealthchecks restores nodes after HC removal
+  NUMBER_OF_NODES=$(oc get nodes -A --no-headers | wc -l | tr -d ' ')
+  echo "${NUMBER_OF_NODES}" > "${SHARED_DIR}/osd-fm-mc-node_count"
+
   update_results "OCPQE-17157" $TEST_PASSED
 }
 
