@@ -59,10 +59,10 @@ if [[ -n "${DOWNSTREAM_TESTS_COMMIT}" ]]; then
     tests/e2e-pdb
 
   # Enable required feature gates.
-  OTEL_CSV_NAME=$(oc get csv -n openshift-operators | grep "opentelemetry-operator" | awk '{print $1}')
-  oc -n openshift-operators patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--feature-gates=+operator.autoinstrumentation.multi-instrumentation\"]}]"
+  OTEL_CSV_NAME=$(oc get csv -n openshift-opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
+  oc -n openshift-opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--feature-gates=+operator.autoinstrumentation.multi-instrumentation\"]}]"
   sleep 10
-  oc wait --for condition=Available -n openshift-operators deployment opentelemetry-operator-controller-manager
+  oc wait --for condition=Available -n openshift-opentelemetry-operator deployment opentelemetry-operator-controller-manager
 
   # Execute OpenTelemetry e2e tests
   KUBECONFIG=$KUBECONFIG kuttl test \
