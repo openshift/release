@@ -25,8 +25,7 @@ ssh_host_ip="$host@$instance_ip"
 SEED_VERSION=$(cat ${SHARED_DIR}/seed_version)
 RECIPIENT_VERSION=$(cat ${SHARED_DIR}/recipient_version)
 RECIPIENT_IMAGE=$(cat ${SHARED_DIR}/recipient_image)
-
-SEED_IMAGE_TAG="pre-${PULL_PULL_SHA}"
+SEED_IMAGE_TAG=$(cat ${SHARED_DIR}/seed_tag)
 
 echo "${RECIPIENT_VM_NAME}" > "${SHARED_DIR}/recipient_vm_name"
 

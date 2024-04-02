@@ -69,12 +69,16 @@ case $SEED_IMAGE_TAG_FORMAT in
   "presubmit")
     SEED_IMAGE_TAG="pre-${PULL_PULL_SHA}"
     ;;
+  "release")
+    SEED_IMAGE_TAG="rel-${SEED_VERSION}-${PULL_PULL_SHA}"
+    ;;
   *)
     echo "Unknown image tag format specified ${SEED_IMAGE_TAG_FORMAT}"
     exit 1
     ;;
 esac
 
+echo "${SEED_IMAGE_TAG}" > "${SHARED_DIR}/seed_tag"
 echo "${SEED_VM_NAME}" > "${SHARED_DIR}/seed_vm_name"
 
 echo "Creating seed script..."
