@@ -43,7 +43,6 @@ Please see the [`firewatch-ipi-aws`](https://steps.ci.openshift.org/workflow/fir
 For ODF, we are required to use these specifications: 
 
 - `COMPUTE_NODE_TYPE`: m5.4xlarge 
-- `CONTROL_PLANE_INSTANCE_TYPE`: m5.4xlarge
 - `ZONES_COUNT`: 3
 
 Following the test cluster being provisioned, the following steps are executed in this order:
