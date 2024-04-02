@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+export KUBECONFIG
+
 echo "Check if catalog sources are healthy"
 
 echo "Writing pods and statuses to disk"
