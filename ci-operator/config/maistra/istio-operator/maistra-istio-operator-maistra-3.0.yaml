@@ -132,7 +132,7 @@ tests:
     - as: push-images
       cli: latest
       commands: |
-        export QUAY_PASS=$(cat /maistra-secrets/password)
+        export QUAY_PASS=$(cat /quay-secret/password)
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
           sh -c \
@@ -144,8 +144,8 @@ tests:
           IMAGE=quay.io/maistra-dev/istio-ubi9-operator:PR-${PULL_NUMBER}"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
-      - mount_path: /maistra-secrets
-        name: maistra-dev-prow
+      - mount_path: /quay-secret
+        name: quay-pass
         namespace: test-credentials
       env:
       - name: MAISTRA_NAMESPACE
@@ -356,10 +356,6 @@ tests:
           export BUILD_WITH_CONTAINER="0" && \
           make test.e2e.kind"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      credentials:
-      - mount_path: /maistra-secrets
-        name: maistra-dev-prow
-        namespace: test-credentials
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -451,7 +447,7 @@ tests:
     - as: build
       cli: latest
       commands: |
-        export QUAY_PASS=$(cat /maistra-secrets/password)
+        export QUAY_PASS=$(cat /quay-secret/password)
         export GITHUB_TOKEN=$(cat /creds-github/token)
         # login to quay.io in the privileged pod
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
@@ -468,8 +464,8 @@ tests:
            make -e GITHUB_TOKEN=${GITHUB_TOKEN} -e NIGHTLY=true docker-buildx bundle-publish-nightly"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
-      - mount_path: /maistra-secrets
-        name: maistra-dev-prow
+      - mount_path: /quay-secret
+        name: quay-pass
         namespace: test-credentials
       - mount_path: /creds-github
         name: workflow-github
