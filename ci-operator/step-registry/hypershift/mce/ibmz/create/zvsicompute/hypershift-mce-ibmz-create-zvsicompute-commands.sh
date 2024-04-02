@@ -332,8 +332,8 @@ echo "$(date) Successfully completed the e2e creation chain"
 
 # Install package on bastion to configure proxy server
 ssh "${ssh_options[@]}" root@$bvsi_fip "yum install squid -y ; systemctl start squid ; systemctl enable squid"
-ssh "${ssh_options[@]}" root@$bvsi_fip "echo 'acl allowed_hosts dstdomain .${hcp_domain}' | sudo tee -a /etc/squid/squid.conf > /dev/null"
-ssh "${ssh_options[@]}" root@$bvsi_fip "echo 'http_access allow allowed_hosts' | sudo tee -a /etc/squid/squid.conf > /dev/null"
+ssh "${ssh_options[@]}" root@$bvsi_fip "sed -i \"/acl Safe_ports port 777/a acl allowed_hosts dstdomain .${domain}\" \"/etc/squid/squid.conf\""
+ssh "${ssh_options[@]}" root@$bvsi_fip "sed -i \"/http_access deny/a http_access allow allowed_hosts\" \"/etc/squid/squid.conf\""
 
 # Restarting squid serivce 
 ssh "${ssh_options[@]}" root@$bvsi_fip "systemctl restart squid"
