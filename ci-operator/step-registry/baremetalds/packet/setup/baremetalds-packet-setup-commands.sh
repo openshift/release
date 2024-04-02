@@ -127,13 +127,12 @@ cat > packet-setup.yaml <<-EOF
   - name: create Packet host with error handling
     block:
     - name: create Packet host {{ packet_hostname }}
-      packet_device:
-        auth_token: "{{ packet_auth_token }}"
+      equinix.cloud.metal_device:
         project_id: "{{ packet_project_id }}"
-        hostnames: "{{ packet_hostname }}"
+        hostname: "{{ packet_hostname }}"
         operating_system: ${PACKET_OS}
         plan: ${PACKET_PLAN}
-        facility: ${PACKET_FACILITY}
+        metro: da
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME')[:77], 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
         user_data: "{{ user_data | default(omit) }}"
       register: hosts
@@ -144,12 +143,16 @@ cat > packet-setup.yaml <<-EOF
         dest="${SHARED_DIR}/hosts.json"
 EOF
 
+ansible-galaxy collection install equinix.cloud
+pip install -r https://raw.githubusercontent.com/equinix-labs/ansible-collection-equinix/main/requirements.txt
+
+export METAL_AUTH_TOKEN=$(cat ${CLUSTER_PROFILE_DIR}/packet-auth-token)
 ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
-DEVICEID=$(jq -r .devices[0].id < ${SHARED_DIR}/hosts.json)
+DEVICEID=$(jq -r .id < ${SHARED_DIR}/hosts.json)
 
 function refresh_device_info(){
-    curl -H "X-Auth-Token: $(cat ${CLUSTER_PROFILE_DIR}/packet-auth-token)"  "https://api.equinix.com/metal/v1/devices/$DEVICEID" > /tmp/device.json
+    curl -H "X-Auth-Token: $METAL_AUTH_TOKEN"  "https://api.equinix.com/metal/v1/devices/$DEVICEID" > /tmp/device.json
     STATE=$(jq -r .state < /tmp/device.json)
     IP=$(jq -r .ip_addresses[0].address < /tmp/device.json)
 }
