@@ -1,6 +1,7 @@
+import configparser
 import glob
 import os
-import configparser
+
 
 def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
     hyphened_version = f'{major_minor.replace(".", "-")}'
@@ -127,6 +128,10 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
                                 'periodSeconds': 120,
                             }
                         }],
+                        'nodeSelector': {
+                            'kubernetes.io/os': 'linux',
+                            'kubernetes.io/arch': 'amd64'
+                        },
                         'volumes': [
                             {
                                 'configMap': {
