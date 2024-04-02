@@ -223,13 +223,22 @@ function install_required_tools() {
   export HOME=/tmp
 
   if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.22.1/IBM_Cloud_CLI_2.22.1_amd64.tar.gz
+    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.24.0/IBM_Cloud_CLI_2.24.0_amd64.tar.gz
     tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
 
     if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]; then
       echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud does not exist?"
       exit 1
     fi
+
+    curl --output /tmp/ibmcloud-cli.pub https://ibmcloud-cli-installer-public-keys.s3.us.cloud-object-storage.appdomain.cloud/ibmcloud-cli.pub
+    pushd /tmp/Bluemix_CLI/bin/
+    if ! openssl dgst -sha256 -verify /tmp/ibmcloud-cli.pub -signature ibmcloud.sig ibmcloud
+    then
+      echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud fails signature test!"
+      exit 1
+    fi
+    popd
 
     PATH=${PATH}:/tmp/Bluemix_CLI/bin
 
@@ -344,7 +353,30 @@ function init_ibmcloud() {
     ibmcloud target -g "${POWERVS_RESOURCE_GROUP}"
   fi
 
-  CIS_INSTANCE_CRN=$(ibmcloud cis instances --output json | jq -r '.[].id');
+  echo "BASE_DOMAIN = ${BASE_DOMAIN}"
+  (
+  set -xeuo pipefail;
+  INSTANCES=$(mktemp);
+  DOMAINS=$(mktemp);
+  trap '/bin/rm "${INSTANCES}" "${DOMAINS}"' EXIT;
+  ibmcloud cis instances --output json > ${INSTANCES};
+  while read INSTANCE;
+  do
+    ibmcloud cis instance "${INSTANCE}" --output json | jq -r '.crn' > /tmp/cis_instance;
+    ibmcloud cis instance-set ${INSTANCE};
+    ibmcloud cis domains --output json > ${DOMAINS};
+    while read DOMAIN;
+    do
+      echo "DOMAIN=${DOMAIN}";
+      if [ "${DOMAIN}" == "${BASE_DOMAIN}" ]
+      then
+        exit 0;
+      fi;
+    done < <(jq -r '.[] | .name' ${DOMAINS});
+  done < <(jq -r '.[] | .name' ${INSTANCES});
+  true > /tmp/cis_instance;
+  )
+  CIS_INSTANCE_CRN=$(cat /tmp/cis_instance)
   if [ -z "${CIS_INSTANCE_CRN}" ]; then
     echo "Error: CIS_INSTANCE_CRN is empty!"
     exit 1

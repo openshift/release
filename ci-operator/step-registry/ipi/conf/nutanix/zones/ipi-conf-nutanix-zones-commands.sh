@@ -24,7 +24,9 @@ declare prism_element3_subnet
 # shellcheck source=/dev/null
 source "${NUTANIX_AUTH_PATH}"
 
-failureDomains="- failure-domain-1\n        - failure-domain-2\n        - failure-domain-3"
+failureDomains="- failure-domain-1
+        - failure-domain-2
+        - failure-domain-3"
 if [[ "$SINGLE_ZONE" == "true" ]]; then
   failureDomains="- failure-domain-1"
 fi
