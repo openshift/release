@@ -293,10 +293,11 @@ platform:
   none: {}
 EOF
 # Adding pull-secret and ssh key
-cat "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret" | tr -d '\n\\n[:space:]' | jq > "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret-trim"
+cat "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret" | tr -d '\n\\n[:space:]' | jq > "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret-clean"
+chmod 700 "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret-clean"
 cat >> "$HOME/$CLUSTER_NAME/install-config.yaml" << EOF
 pullSecret: >
-  $(<"${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret-trim")
+  $(<"${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret-clean")
 sshKey: |
   $(<"${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key")
 EOF
