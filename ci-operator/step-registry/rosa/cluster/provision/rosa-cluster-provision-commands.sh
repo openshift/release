@@ -531,6 +531,7 @@ CLUSTER_INFO="${ARTIFACT_DIR}/cluster.txt"
 CLUSTER_INFO_WITHOUT_MASK="$(mktemp)"
 CLUSTER_INSTALL_LOG="${ARTIFACT_DIR}/.install.log"
 
+
 # The default cluster mode is sts now
 rosa create cluster -y \
                     ${STS_SWITCH} \
