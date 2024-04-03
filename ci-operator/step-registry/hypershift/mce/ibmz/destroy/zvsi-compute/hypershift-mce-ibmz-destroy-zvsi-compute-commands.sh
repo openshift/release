@@ -106,6 +106,15 @@ else
     echo "Successfully deleted the $infra_name-bastion instance in the $infra_name-vpc VPC."
 fi
 
+# Clearing proxy setup as we deleted bastion ( proxy server )
+
+unset http_proxy
+unset https_proxy
+unset HTTP_PROXY
+unset HTTPS_PROXY
+unset NO_PROXY
+unset no_proxy
+
 # Deleting the bastion VSI Floating IP
 echo "Triggering the $infra_name-bastion-ip Floating IP in the $infra_name-rg resource group."
 bfip_delete_status=$(ibmcloud is ipd $infra_name-bastion-ip --output JSON -f | jq -r '.[]|.result')
