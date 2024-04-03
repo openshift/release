@@ -122,7 +122,7 @@ install_rhtap(){
     apiVersion: tekton.dev/v1
     kind: PipelineRun
     metadata:
-      generateName: rhtap-pe-info-
+      generateName: trusted-application-pipeline-pe-info-
       namespace: "$NAMESPACE"
     spec:
       pipelineSpec:
@@ -134,7 +134,7 @@ install_rhtap(){
                 - name: kind
                   value: task
                 - name: name
-                  value: rhtap-pe-info
+                  value: trusted-application-pipeline-pe-info
                 - name: namespace
                   value: "$NAMESPACE"
 EOF

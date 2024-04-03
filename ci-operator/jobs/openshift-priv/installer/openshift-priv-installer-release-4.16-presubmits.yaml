@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/agent-integration-tests
     decorate: true
     decoration_config:
@@ -810,7 +810,7 @@ presubmits:
     - ^release-4\.16$
     - ^release-4\.16-
     cluster: build05
-    context: ci/prow/altinfra-e2e-aws-ovn-shared-vpc-edge-zones
+    context: ci/prow/altinfra-e2e-aws-ovn-shared-vpc-local-zones
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -824,11 +824,10 @@ presubmits:
       ci-operator.openshift.io/variant: altinfra
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.16-altinfra-e2e-aws-ovn-shared-vpc-edge-zones
+    name: pull-ci-openshift-priv-installer-release-4.16-altinfra-e2e-aws-ovn-shared-vpc-local-zones
     optional: true
     path_alias: github.com/openshift/installer
-    rerun_command: /test altinfra-e2e-aws-ovn-shared-vpc-edge-zones
-    run_if_changed: aws
+    rerun_command: /test altinfra-e2e-aws-ovn-shared-vpc-local-zones
     spec:
       containers:
       - args:
@@ -838,8 +837,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-ovn-shared-vpc-edge-zones-cluster-profile
-        - --target=e2e-aws-ovn-shared-vpc-edge-zones
+        - --secret-dir=/usr/local/e2e-aws-ovn-shared-vpc-local-zones-cluster-profile
+        - --target=e2e-aws-ovn-shared-vpc-local-zones
         - --variant=altinfra
         command:
         - ci-operator
@@ -856,7 +855,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-ovn-shared-vpc-edge-zones-cluster-profile
+        - mountPath: /usr/local/e2e-aws-ovn-shared-vpc-local-zones-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -896,7 +895,99 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )altinfra-e2e-aws-ovn-shared-vpc-edge-zones,?($|\s.*)
+    trigger: (?m)^/test( | .* )altinfra-e2e-aws-ovn-shared-vpc-local-zones,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build05
+    context: ci/prow/altinfra-e2e-aws-ovn-shared-vpc-wavelength-zones
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/variant: altinfra
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-installer-release-4.16-altinfra-e2e-aws-ovn-shared-vpc-wavelength-zones
+    optional: true
+    path_alias: github.com/openshift/installer
+    rerun_command: /test altinfra-e2e-aws-ovn-shared-vpc-wavelength-zones
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-aws-ovn-shared-vpc-wavelength-zones-cluster-profile
+        - --target=e2e-aws-ovn-shared-vpc-wavelength-zones
+        - --variant=altinfra
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-ovn-shared-vpc-wavelength-zones-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )altinfra-e2e-aws-ovn-shared-vpc-wavelength-zones,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1088,7 +1179,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/altinfra-e2e-azure-capi-ovn
     decorate: true
     decoration_config:
@@ -1564,7 +1655,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/altinfra-e2e-ibmcloud-capi-ovn
     decorate: true
     decoration_config:
@@ -1749,7 +1840,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/altinfra-e2e-openstack-capi-ovn
     decorate: true
     decoration_config:
@@ -2117,7 +2208,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/altinfra-images
     decorate: true
     decoration_config:
@@ -2183,7 +2274,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/aro-unit
     decorate: true
     decoration_config:
@@ -2247,7 +2338,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/azure-ovn-marketplace-images
     decorate: true
     decoration_config:
@@ -4520,7 +4611,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
@@ -4610,7 +4701,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-azure-ovn-resourcegroup
     decorate: true
     decoration_config:
@@ -4701,7 +4792,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-azure-ovn-shared-vpc
     decorate: true
     decoration_config:
@@ -4792,7 +4883,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-azure-ovn-upi
     decorate: true
     decoration_config:
@@ -5823,7 +5914,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-ibmcloud-ovn
     decorate: true
     decoration_config:
@@ -5914,7 +6005,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
@@ -6464,7 +6555,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     decoration_config:
@@ -6737,7 +6828,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-openstack-ccpmso-zone
     decorate: true
     decoration_config:
@@ -6827,7 +6918,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-openstack-dualstack
     decorate: true
     decoration_config:
@@ -6916,7 +7007,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-openstack-dualstack-upi
     decorate: true
     decoration_config:
@@ -7007,7 +7098,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-openstack-externallb
     decorate: true
     decoration_config:
@@ -7097,7 +7188,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-openstack-nfv-intel
     decorate: true
     decoration_config:
@@ -7278,7 +7369,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-openstack-proxy
     decorate: true
     decoration_config:
@@ -7912,7 +8003,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -7976,7 +8067,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/golint
     decorate: true
     decoration_config:
@@ -8040,7 +8131,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -8104,7 +8195,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -8257,7 +8348,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/terraform-images
     decorate: true
     decoration_config:
@@ -8322,7 +8413,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/terraform-verify-vendor
     decorate: true
     decoration_config:
@@ -8388,7 +8479,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -8452,7 +8543,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/verify-codegen
     decorate: true
     decoration_config:
@@ -8515,7 +8606,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build04
     context: ci/prow/verify-vendor
     decorate: true
     decoration_config:
