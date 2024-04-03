@@ -1,12 +1,16 @@
 base_images:
   cli:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: cli
   ocs-ci-tests:
     name: ocs-ci-container
     namespace: ci
     tag: stable
+  openshift-virtualization-tests:
+    name: openshift-virtualization-tests
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -15,7 +19,7 @@ build_root:
 images:
 - build_args:
   - name: OCP_VERSION
-    value: "4.15"
+    value: "4.16"
   - name: OC_CLI_VERSION
     value: latest
   context_dir: cnv-ci
@@ -26,17 +30,17 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.16"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: cnv-odf-tests-aws-upi-ocp415
-  cron: 0 6 25 10 *
+- as: cnv-odf-tests-aws-upi-ocp416
+  cron: 4 16 * * */6
   steps:
-    cluster_profile: aws-cspi-qe
+    cluster_profile: aws-interop-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_TYPE: c5n.metal
@@ -60,12 +64,13 @@ tests:
               {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp", "self-managed-lp", "cnv-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp", "self-managed-lp", "cnv-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
-      OCP_VERSION: "4.15"
+      OCP_VERSION: "4.16"
       ODF_OPERATOR_CHANNEL: stable-4.15
       ODF_VERSION_MAJOR_MINOR: "4.15"
+      RE_TRIGGER_ON_FAILURE: "true"
       USER_TAGS: |
         scenario cnv
     test:
@@ -73,9 +78,10 @@ tests:
     - ref: interop-tests-deploy-odf
     - ref: interop-tests-ocs-tests
     - ref: interop-tests-cnv-tests-e2e-deploy
+    - ref: interop-tests-openshift-virtualization-tests
     workflow: firewatch-ipi-aws
 zz_generated_metadata:
-  branch: cnv-4.15
+  branch: cnv-4.16
   org: RedHatQE
   repo: interop-testing
-  variant: cnv-odf-ocp4.15-lp-interop
+  variant: ocp-cnv-odf-4.16
