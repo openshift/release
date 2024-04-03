@@ -10,6 +10,9 @@ if [[ "$payload_url" == *"@sha256"* ]]; then
     payload_url=$(echo "$payload_url" | sed 's/@sha256.*/:latest/')
 fi
 
+echo "Login to registry"
+oc registry login
+
 echo "Testing auth"
 oc adm release info "${payload_url}"
 
