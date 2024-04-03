@@ -181,7 +181,7 @@ remove_rhtap(){
 e2e_test(){
   echo "[INFO]Trigger installer e2e tests..."
 
-  APPLICATION_ROOT_NAMESPACE="rhtap-e2e-ci"
+  APPLICATION_ROOT_NAMESPACE="rhtap-app"
   QUAY_IMAGE_ORG="rhtap_qe"
   GITHUB_ORGANIZATION="rhtap-rhdh-qe"
   GITHUB_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
@@ -190,8 +190,6 @@ e2e_test(){
   cd "$(mktemp -d)"
 
   git clone https://github.com/redhat-appstudio/rhtap-e2e.git .
-
-  /bin/bash ./scripts/create-creds.sh "${APPLICATION_ROOT_NAMESPACE}"
 
   NODE_TLS_REJECT_UNAUTHORIZED=0
   yarn && yarn test
