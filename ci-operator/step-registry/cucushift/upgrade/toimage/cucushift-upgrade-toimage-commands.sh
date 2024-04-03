@@ -88,6 +88,7 @@ function extract_ccoctl(){
     else
         chmod 775 /tmp/ccoctl
     fi
+    export PATH="$PATH"
 }
 
 function update_cloud_credentials_oidc(){
@@ -287,6 +288,7 @@ function extract_oc(){
         sleep 60
     done
     mv ${tmp_oc}/oc ${OC_DIR} -f
+    export PATH="$PATH"
     which oc
     oc version --client
     return 0
