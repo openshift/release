@@ -13,6 +13,9 @@ fi
 echo "Setting runtime dir"
 mkdir -p /tmp/.docker/ ${XDG_RUNTIME_DIR}
 
+echo "copy creds"
+cp /tmp/import-secret/.dockerconfigjson /tmp/.docker/config.json
+
 echo "Login to registry"
 oc registry login --to /tmp/.docker/config.json
 
