@@ -138,7 +138,7 @@ install_rhtap(){
     apiVersion: tekton.dev/v1
     kind: PipelineRun
     metadata:
-      generateName: rhtap-pe-info-
+      generateName: trusted-application-pipeline-pe-info-
       namespace: "$NAMESPACE"
     spec:
       pipelineSpec:
@@ -150,7 +150,7 @@ install_rhtap(){
                 - name: kind
                   value: task
                 - name: name
-                  value: rhtap-pe-info
+                  value: trusted-application-pipeline-pe-info
                 - name: namespace
                   value: "$NAMESPACE"
 EOF
@@ -175,29 +175,13 @@ health_check(){
 
 remove_rhtap(){
   echo "[INFO]Remove RHTAP ..."
-  # Get a list of resource names in the namespace
-  resource_names=$(oc get applications -n $NAMESPACE -o jsonpath='{.items[*].metadata.name}')
-
-  # Loop through each resource and remove finalizers
-  for resource_name in $resource_names; do
-      oc patch application "$resource_name" -n $NAMESPACE --type merge -p '{"metadata":{"finalizers":null}}'
-  done
-
-  for c in $(helm  -n $NAMESPACE list --all --short); do
-      helm  -n $NAMESPACE uninstall --wait "${c}" || true
-  done
-
-  oc delete application -n $NAMESPACE --all
-  oc get ns -o name | grep "\-development" | xargs -n1 oc delete  
-  oc get ns -o name | grep "\-prod" | xargs -n1 oc delete  
-  oc get ns -o name | grep "\-stage" | xargs -n1 oc delete  
-  oc delete ns $NAMESPACE --ignore-not-found=true
+  ./bin/make.sh uninstall -n "$NAMESPACE"
 }
 
 e2e_test(){
   echo "[INFO]Trigger installer e2e tests..."
 
-  APPLICATION_ROOT_NAMESPACE="rhtap-e2e-ci"
+  APPLICATION_ROOT_NAMESPACE="rhtap-app"
   QUAY_IMAGE_ORG="rhtap_qe"
   GITHUB_ORGANIZATION="rhtap-rhdh-qe"
   GITHUB_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
@@ -206,8 +190,6 @@ e2e_test(){
   cd "$(mktemp -d)"
 
   git clone https://github.com/redhat-appstudio/rhtap-e2e.git .
-
-  /bin/bash ./scripts/create-creds.sh "${APPLICATION_ROOT_NAMESPACE}"
 
   NODE_TLS_REJECT_UNAUTHORIZED=0
   yarn && yarn test
