@@ -10,8 +10,11 @@ if [[ "$payload_url" == *"@sha256"* ]]; then
     payload_url=$(echo "$payload_url" | sed 's/@sha256.*/:latest/')
 fi
 
+echo "Setting runtime dir"
+mkdir -p /tmp/.docker/ ${XDG_RUNTIME_DIR}
+
 echo "Login to registry"
-oc registry login
+oc registry login --to /tmp/.docker/config.json
 
 echo "Testing auth"
 oc adm release info "${payload_url}"
