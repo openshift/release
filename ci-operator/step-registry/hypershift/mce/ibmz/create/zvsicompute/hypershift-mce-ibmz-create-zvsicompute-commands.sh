@@ -328,25 +328,38 @@ oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condi
 
 
 
-# Configuring proxy server on bastion 
-echo "Getting management cluster basedomain to allow traffic to proxy server"
-mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut -d':' -f1)
 
-# Install package on bastion to configure proxy server
-ssh "${ssh_options[@]}" root@$bvsi_fip "yum install squid -y ; systemctl start squid ; systemctl enable squid"
-ssh "${ssh_options[@]}" root@$bvsi_fip "sed -i \"/acl Safe_ports port 777/a acl allowed_hosts dstdomain .${hcp_domain} .${mgmt_domain}\" \"/etc/squid/squid.conf\""
-ssh "${ssh_options[@]}" root@$bvsi_fip "sed -i \"/http_access deny/a http_access allow allowed_hosts\" \"/etc/squid/squid.conf\""
 
-# Restarting squid serivce 
-ssh "${ssh_options[@]}" root@$bvsi_fip "systemctl restart squid"
+# Install package on bastion to configure proxy server HAProxy
+ssh "${ssh_options[@]}" root@$bvsi_fip "yum install haproxy -y ; systemctl start haproxy ; systemctl enable haproxy"
+
+# Configuring proxy server on bastion HAProxy
+
+haproxy_config=$(cat <<EOF
+frontend http_front
+    bind *:80
+    default_backend http_back
+
+backend http_back
+    balance roundrobin
+    server server1 ${bvsi_fip}:80 check
+EOF
+)
+
+ssh "${ssh_options[@]}" root@$bvsi_fip "echo ${haproxy_config} | sudo tee -a /etc/haproxy/haproxy.cfg >/dev/null"
+
+
+# Restarting HAProxy serivce 
+ssh "${ssh_options[@]}" root@$bvsi_fip "systemctl restart haproxy"
+
 
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
-export HTTP_PROXY=http://${bvsi_fip}:3128/
-export HTTPS_PROXY=http://${bvsi_fip}:3128/
+export HTTP_PROXY=http://${bvsi_fip}:80/
+export HTTPS_PROXY=http://${bvsi_fip}:80/
 export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 
-export http_proxy=http://${bvsi_fip}:3128/
-export https_proxy=http://${bvsi_fip}:3128/
+export http_proxy=http://${bvsi_fip}:80/
+export https_proxy=http://${bvsi_fip}:80/
 export no_proxy="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 EOF
 
