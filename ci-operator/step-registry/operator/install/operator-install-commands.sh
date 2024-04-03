@@ -39,7 +39,6 @@ if [ "${INSTALL_FROM_IIB}" = "true" ]; then
   AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
   AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 
-  export OCP_VERSION=${OPENSHIFT_VERSION}
   export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
   export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 
