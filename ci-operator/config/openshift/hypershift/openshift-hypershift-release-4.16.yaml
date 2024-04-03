@@ -1,4 +1,12 @@
 base_images:
+  base:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-enterprise-base-multi-openshift-4.16
+  builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
   cli:
     name: "4.16"
     namespace: ocp
@@ -7,22 +15,24 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
 binary_build_commands: make build
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
 images:
-- inputs:
-    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    builder:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
   to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
+  from: base
   inputs:
-    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
+    builder:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
   to: hypershift
