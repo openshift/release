@@ -20,6 +20,8 @@ cd
 cat > packet-teardown.yaml <<-EOF
 - name: teardown Packet host
   hosts: localhost
+  collections:
+   - equinix.cloud
   gather_facts: no
   vars:
     - cluster_type: "{{ lookup('env', 'CLUSTER_TYPE') }}"
@@ -35,10 +37,10 @@ cat > packet-teardown.yaml <<-EOF
   - name: remove Packet host with error handling
     block:
     - name: remove Packet host {{ packet_hostname }}
-      packet_device:
-        auth_token: "{{ packet_auth_token }}"
+      equinix.cloud.metal_device:
+        metal_api_token: "{{ packet_auth_token }}"
         project_id: "{{ packet_project_id }}"
-        hostnames: "{{ packet_hostname }}"
+        hostname: "{{ packet_hostname }}"
         state: absent
       retries: 5
       delay: 120
@@ -58,4 +60,5 @@ cat > packet-teardown.yaml <<-EOF
         msg: "Packet teardown failed."
 EOF
 
-ansible-playbook packet-teardown.yaml -e "packet_hostname=ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
+ansible-playbook packet-teardown.yaml -e "ansible_python_interpreter=/usr/bin/python3.11" \
+  -e "packet_hostname=ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'

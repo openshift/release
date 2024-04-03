@@ -18,7 +18,7 @@ fi
 
 #Packet API call to get list of servers in project
 servers="$(curl -X GET --header 'Accept: application/json' --header "X-Auth-Token: ${PACKET_AUTH_TOKEN}" \
- "https://api.packet.net/projects/${PACKET_PROJECT_ID}/devices?exclude=root_password,ssh_keys,created_by,project,project_lite,ip_addresses,plan,meta,operating_system,facility,network_ports&per_page=1000"
+ "https://api.packet.net/projects/${PACKET_PROJECT_ID}/devices?exclude=root_password,ssh_keys,created_by,project,project_lite,ip_addresses,plan,meta,operating_system,metro,network_ports&per_page=1000"
 )"
 
 #Assuming all servers created more than LEAK_THRESHOLD_SECONDS ago are leaks
