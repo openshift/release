@@ -336,17 +336,14 @@ ssh "${ssh_options[@]}" root@$bvsi_fip "yum install haproxy -y ; systemctl start
 # Configuring proxy server on bastion HAProxy
 
 haproxy_config=$(cat <<EOF
-frontend http_front
+listen agent-hcp-console
+    mode tcp
     bind *:80
-    default_backend http_back
-
-backend http_back
-    balance roundrobin
-    server server1 ${bvsi_fip}:80 check
+    server server1 ${bvsi_fip}
 EOF
 )
 
-ssh "${ssh_options[@]}" root@$bvsi_fip "echo ${haproxy_config} | sudo tee -a /etc/haproxy/haproxy.cfg >/dev/null"
+ssh "${ssh_options[@]}" root@$bvsi_fip "echo \"$haproxy_config\" | sudo tee -a /etc/haproxy/haproxy.cfg >/dev/null"
 
 
 # Restarting HAProxy serivce 
