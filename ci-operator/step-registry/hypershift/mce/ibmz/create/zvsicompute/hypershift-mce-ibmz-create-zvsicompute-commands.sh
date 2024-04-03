@@ -329,10 +329,12 @@ echo "$(date) Successfully completed the e2e creation chain"
 
 
 # Configuring proxy server on bastion 
+echo "Getting management cluster basedomain to allow traffic to proxy server"
+mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut -d':' -f1)
 
 # Install package on bastion to configure proxy server
 ssh "${ssh_options[@]}" root@$bvsi_fip "yum install squid -y ; systemctl start squid ; systemctl enable squid"
-ssh "${ssh_options[@]}" root@$bvsi_fip "sed -i \"/acl Safe_ports port 777/a acl allowed_hosts dstdomain .${hcp_domain}\" \"/etc/squid/squid.conf\""
+ssh "${ssh_options[@]}" root@$bvsi_fip "sed -i \"/acl Safe_ports port 777/a acl allowed_hosts dstdomain .${hcp_domain} .${mgmt_domain}\" \"/etc/squid/squid.conf\""
 ssh "${ssh_options[@]}" root@$bvsi_fip "sed -i \"/http_access deny/a http_access allow allowed_hosts\" \"/etc/squid/squid.conf\""
 
 # Restarting squid serivce 
