@@ -7,15 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.16
-  ubi9:
-    name: ubi
-    namespace: ocp
-    tag: "9"
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.openshift
-  from: base-os
   inputs:
     ocp_builder_rhel-9-golang-1.20-openshift-4.16:
       as:
@@ -26,13 +21,6 @@ promotion:
   - disabled: true
     name: "4.16"
     namespace: ocp
-raw_steps:
-- pipeline_image_cache_step:
-    commands: |
-      rm -rf /etc/yum.repos.d/*
-      curl http://base-4-16-rhel9.ocp.svc > /etc/yum.repos.d/base-4-16-rhel9.repo
-    from: ubi9
-    to: base-os
 releases:
   initial:
     integration:
