@@ -12,11 +12,11 @@ fi
 
 function notify_ocmqe() {
   message=$1
-  slack_message='{"text": "'"${message}"'. Sleep 8 hours for debugging with the job '"${JOB_NAME}/${BUILD_ID}"'. <@UD955LPJL> <@UEEQ10T4L>"}'
+  slack_message='{"text": "'"${message}"'. Sleep 4 hours for debugging with the job '"${JOB_NAME}/${BUILD_ID}"'. <@UD955LPJL> <@UEEQ10T4L>"}'
   if [[ -e ${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url ]]; then
     slack_hook_url=$(cat "${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url")    
     curl -X POST -H 'Content-type: application/json' --data "${slack_message}" "${slack_hook_url}"
-    sleep 28800
+    sleep 14400
   fi
 }
 
@@ -37,10 +37,6 @@ ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 if [[ ! -z "${ROSA_TOKEN}" ]]; then
   echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
   rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
-  if [ $? -ne 0 ]; then
-    echo "Login failed"
-    exit 1
-  fi
 else
   echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
   exit 1
