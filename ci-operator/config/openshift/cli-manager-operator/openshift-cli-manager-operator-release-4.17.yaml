@@ -1,8 +1,12 @@
 base_images:
-  base:
+  base-rhel9:
     name: "4.17"
     namespace: ocp
-    tag: base
+    tag: base-rhel9
+  ocp_4.16_cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
@@ -10,9 +14,14 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base
+- dockerfile_path: Dockerfile.ci
   inputs:
+    base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_4.16_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:cli
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
