@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 if [ "$MASQ_TEST" == "ipv4" ]; then
-cat >> "manifests/cluster-network-03-config.yml" << EOF
+cat >> "${SHARED_DIR}/cluster-network-03-config.yml" << EOF
 apiVersion: operator.openshift.io/v1
 kind: Network
 metadata:
@@ -51,4 +51,4 @@ spec:
 EOF
 fi
 
-cat "manifests/cluster-network-03-config.yml"
+cat "${SHARED_DIR}/cluster-network-03-config.yml"
