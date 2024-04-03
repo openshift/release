@@ -22,23 +22,23 @@ build_root:
     namespace: openshift
     tag: golang-1.21
 images:
-  - dockerfile_path: Dockerfile
-    to: lightspeed-operator
+- dockerfile_path: Dockerfile
+  to: lightspeed-operator
 operator:
   bundles:
-    - as: lightspeed-operator-bundle
-      dockerfile_path: bundle.Dockerfile
+  - as: lightspeed-operator-bundle
+    dockerfile_path: bundle.Dockerfile
   substitutions:
-    - pullspec: quay.io/openshift/lightspeed-console-plugin:latest
-      with: pipeline:lightspeed-console-plugin
-    - pullspec: quay.io/openshift/lightspeed-operator:latest
-      with: pipeline:lightspeed-operator
-    - pullspec: quay.io/openshift/lightspeed-service-api:latest
-      with: pipeline:lightspeed-service-api
+  - pullspec: quay.io/openshift/lightspeed-console-plugin:latest
+    with: pipeline:lightspeed-console-plugin
+  - pullspec: quay.io/openshift/lightspeed-operator:latest
+    with: pipeline:lightspeed-operator
+  - pullspec: quay.io/openshift/lightspeed-service-api:latest
+    with: pipeline:lightspeed-service-api
 promotion:
   to:
-    - namespace: ols
-      tag: latest
+  - namespace: ols
+    tag: latest
 releases:
   initial:
     integration:
@@ -49,52 +49,52 @@ releases:
       name: "4.15"
       namespace: ocp
 resources:
-  "*":
+  '*':
     limits:
       memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-  - as: generate
-    commands: make generate --always-make && git diff --exit-code
-    container:
-      from: src
-  - as: unit
-    commands: make test --warn-undefined-variables
-    container:
-      from: src
-  - as: lint
-    commands: |
-      export GOCACHE=/tmp/
-      export GOLANGCI_LINT_CACHE=/tmp/.cache
-      export GOPROXY=https://proxy.golang.org
-      make lint
-    container:
-      clone: true
-      from: golangci-lint
-  - as: bundle-e2e
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-    steps:
-      cluster_profile: aws-2
-      env:
-        HYPERSHIFT_BASE_DOMAIN: hypershift.aws-2.ci.openshift.org
-      test:
-        - as: e2e-install
-          cli: latest
-          commands: |
-            oc create namespace openshift-lightspeed
-            operator-sdk run bundle -n openshift-lightspeed "$OO_BUNDLE"
-            oc wait --for condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager
-          dependencies:
-            - env: OO_BUNDLE
-              name: lightspeed-operator-bundle
-          from: operator-sdk
-          resources:
-            requests:
-              cpu: 100m
-              memory: 200Mi
-      workflow: hypershift-hostedcluster-workflow
+- as: generate
+  commands: make generate --always-make && git diff --exit-code
+  container:
+    from: src
+- as: unit
+  commands: make test --warn-undefined-variables
+  container:
+    from: src
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
+  container:
+    clone: true
+    from: golangci-lint
+- as: bundle-e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-2
+    env:
+      HYPERSHIFT_BASE_DOMAIN: hypershift.aws-2.ci.openshift.org
+    test:
+    - as: e2e-install
+      cli: latest
+      commands: |
+        oc create namespace openshift-lightspeed
+        operator-sdk run bundle -n openshift-lightspeed "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: lightspeed-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: main
   org: openshift
