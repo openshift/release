@@ -278,9 +278,6 @@ Reach out to the repo owner(s) to confirm that this is the case. If they have th
 in
 the private repo themselves. Otherwise, utilize the bot account to delete the tag.
 
-## `periodic-image-mirroring-supplemental-ci-images`
-This job [mirrors external images to the CI registry](https://docs.ci.openshift.org/docs/how-tos/external-images/) `registry.ci.openshift.org`.
-
 ### Symptom
 
 ```
