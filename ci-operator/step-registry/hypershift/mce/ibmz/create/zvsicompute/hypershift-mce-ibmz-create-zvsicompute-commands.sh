@@ -330,24 +330,17 @@ oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condi
 
 
 
-# Install package on bastion to configure proxy server HAProxy
-ssh "${ssh_options[@]}" root@$bvsi_fip "yum install haproxy -y ; systemctl start haproxy ; systemctl enable haproxy"
+# Configuring proxy server on bastion 
+echo "Getting management cluster basedomain to allow traffic to proxy server"
+mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut -d':' -f1)
 
-# Configuring proxy server on bastion HAProxy
+# Install package on bastion to configure proxy server
+ssh "${ssh_options[@]}" root@$bvsi_fip "yum install squid -y ; systemctl start squid ; systemctl enable squid"
+ssh "${ssh_options[@]}" root@$bvsi_fip "sed -i \"/acl Safe_ports port 777/a acl allowed_hosts dstdomain .${hcp_domain} .${mgmt_domain}\" \"/etc/squid/squid.conf\""
+ssh "${ssh_options[@]}" root@$bvsi_fip "sed -i \"/http_access deny/a http_access allow allowed_hosts\" \"/etc/squid/squid.conf\""
 
-haproxy_config=$(cat <<EOF
-listen agent-hcp-console
-    mode tcp
-    bind *:80
-    server server1 ${bvsi_fip}
-EOF
-)
-
-ssh "${ssh_options[@]}" root@$bvsi_fip "echo \"$haproxy_config\" | sudo tee -a /etc/haproxy/haproxy.cfg >/dev/null"
-
-
-# Restarting HAProxy serivce 
-ssh "${ssh_options[@]}" root@$bvsi_fip "systemctl restart haproxy"
+# Restarting squid serivce 
+ssh "${ssh_options[@]}" root@$bvsi_fip "systemctl restart squid"
 
 
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
