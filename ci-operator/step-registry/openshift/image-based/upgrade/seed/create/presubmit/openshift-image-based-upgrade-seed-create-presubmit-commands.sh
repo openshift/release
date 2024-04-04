@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -x
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -24,6 +24,40 @@ ssh_host_ip="$host@$instance_ip"
 
 seed_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${SEED_VM_NAME}/auth/kubeconfig
 
+# Setup the release image
+#OCP_ARCH="x86_64"
+
+seed_base_info=""
+release_base_info=""
+
+case $OCP_IMAGE_SOURCE in
+  "ci")
+  seed_base_info="$(curl -s "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep ${OCP_BASE_VERSION} | tail -n1)"
+  release_base_info="$(curl -s "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep ${OCP_BASE_VERSION} | tail -n2 | head -1)"
+  ;;
+  "release")
+  seed_base_info="$(curl -s "https://api.openshift.com/api/upgrades_info/graph?arch=amd64&channel=stable-${OCP_BASE_VERSION}" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | tail -n1)"
+  release_base_info="$(curl -s "https://api.openshift.com/api/upgrades_info/graph?arch=amd64&channel=stable-${OCP_BASE_VERSION}" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | tail -n2 | head -1)"
+  ;;
+  *)
+  echo "Unknown OCP image source '${OCP_IMAGE_SOURCE}'"
+  exit 1
+  ;;
+esac
+
+SEED_VERSION="$(echo ${seed_base_info} | cut -d " " -f 1)"
+RELEASE_IMAGE="$(echo ${seed_base_info} | cut -d " " -f 2)"
+
+# Save off the seed version and the recipient version for upgrades
+echo "${SEED_VERSION}" > "${SHARED_DIR}/seed_version"
+
+recipient_version="$(echo ${release_base_info} | cut -d " " -f 1)"
+recipient_image="$(echo ${release_base_info} | cut -d " " -f 2)"
+
+echo "${recipient_version}" > "${SHARED_DIR}/recipient_version"
+echo "${recipient_image}" > "${SHARED_DIR}/recipient_image"
+
+# Calculate the tag for the seed
 SEED_IMAGE_TAG="unknown"
 case $SEED_IMAGE_TAG_FORMAT in
   "latest")
@@ -35,12 +69,16 @@ case $SEED_IMAGE_TAG_FORMAT in
   "presubmit")
     SEED_IMAGE_TAG="pre-${PULL_PULL_SHA}"
     ;;
+  "release")
+    SEED_IMAGE_TAG="rel-${SEED_VERSION}-${PULL_PULL_SHA}"
+    ;;
   *)
     echo "Unknown image tag format specified ${SEED_IMAGE_TAG_FORMAT}"
     exit 1
     ;;
 esac
 
+echo "${SEED_IMAGE_TAG}" > "${SHARED_DIR}/seed_tag"
 echo "${SEED_VM_NAME}" > "${SHARED_DIR}/seed_vm_name"
 
 echo "Creating seed script..."
@@ -53,12 +91,12 @@ export BACKUP_SECRET='${BACKUP_SECRET}'
 export SEED_VM_NAME="${SEED_VM_NAME}"
 export SEED_VERSION="${SEED_VERSION}"
 export LCA_IMAGE="${LCA_PULL_REF}"
-export IMG="${LCA_PULL_REF}"
+export RELEASE_IMAGE="${RELEASE_IMAGE}"
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
 # Create the seed vm
-make seed-vm-create wait-for-seed dnsmasq-workaround seed-cluster-prepare
+make seed
 
 # Create and push the seed image
 echo "Generating the seed image using OCP ${SEED_VERSION} as ${SEED_IMAGE}:${SEED_IMAGE_TAG}"

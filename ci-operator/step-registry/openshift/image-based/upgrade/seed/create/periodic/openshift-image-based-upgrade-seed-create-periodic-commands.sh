@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#set -x
+set -x
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -24,6 +24,27 @@ host=$(cat ${SHARED_DIR}/ssh_user)
 ssh_host_ip="$host@$instance_ip"
 
 seed_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${SEED_VM_NAME}/auth/kubeconfig
+
+# Setup the release image
+#OCP_ARCH="x86_64"
+
+seed_base_info=""
+
+case $OCP_IMAGE_SOURCE in
+  "ci")
+  seed_base_info="$(curl -s "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep ${OCP_BASE_VERSION} | tail -n1)"
+  ;;
+  "release")
+  seed_base_info="$(curl -s "https://api.openshift.com/api/upgrades_info/graph?arch=amd64&channel=stable-${OCP_BASE_VERSION}" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | tail -n1)"
+  ;;
+  *)
+  echo "Unknown OCP image source '${OCP_IMAGE_SOURCE}'"
+  exit 1
+  ;;
+esac
+
+SEED_VERSION="$(echo ${seed_base_info} | cut -d " " -f 1)"
+RELEASE_IMAGE="$(echo ${seed_base_info} | cut -d " " -f 2)"
 
 SEED_IMAGE_TAG="unknown"
 case $SEED_IMAGE_TAG_FORMAT in
@@ -54,11 +75,12 @@ export BACKUP_SECRET='${BACKUP_SECRET}'
 export SEED_VM_NAME="${SEED_VM_NAME}"
 export SEED_VERSION="${SEED_VERSION}"
 export LCA_IMAGE="${LCA_PULL_REF}"
+export RELEASE_IMAGE="${RELEASE_IMAGE}"
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
 # Create the seed vm
-make seed-vm-create wait-for-seed dnsmasq-workaround seed-cluster-prepare
+make seed
 
 # Create and push the seed image
 echo "Generating the seed image using OCP ${SEED_VERSION} as ${SEED_IMAGE}:${SEED_IMAGE_TAG}"
