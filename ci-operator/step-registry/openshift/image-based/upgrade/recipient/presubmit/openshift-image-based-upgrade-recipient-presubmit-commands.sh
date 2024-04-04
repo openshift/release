@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -x
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -22,8 +22,10 @@ remote_workdir=$(cat ${SHARED_DIR}/remote_workdir)
 instance_ip=$(cat ${SHARED_DIR}/public_address)
 host=$(cat ${SHARED_DIR}/ssh_user)
 ssh_host_ip="$host@$instance_ip"
-
-SEED_IMAGE_TAG="pre-${PULL_PULL_SHA}"
+SEED_VERSION=$(cat ${SHARED_DIR}/seed_version)
+RECIPIENT_VERSION=$(cat ${SHARED_DIR}/recipient_version)
+RECIPIENT_IMAGE=$(cat ${SHARED_DIR}/recipient_image)
+SEED_IMAGE_TAG=$(cat ${SHARED_DIR}/seed_tag)
 
 echo "${RECIPIENT_VM_NAME}" > "${SHARED_DIR}/recipient_vm_name"
 
@@ -36,6 +38,7 @@ export PULL_SECRET='${PULL_SECRET}'
 export BACKUP_SECRET='${BACKUP_SECRET}'
 export RECIPIENT_VM_NAME="${RECIPIENT_VM_NAME}"
 export RECIPIENT_VERSION="${RECIPIENT_VERSION}"
+export RELEASE_IMAGE="${RECIPIENT_IMAGE}"
 export LCA_IMAGE="${LCA_PULL_REF}"
 export SEED_VERSION="${SEED_VERSION}"
 export UPGRADE_TIMEOUT="60m"
