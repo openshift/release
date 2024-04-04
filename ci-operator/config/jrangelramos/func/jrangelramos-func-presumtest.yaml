@@ -6,6 +6,9 @@ base_images:
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+images:
+  - dockerfile_path: openshift/ci-operator/gitserver-image/Dockerfile
+    to: gitserver-image
 releases:
   latest:
     candidate:
@@ -37,8 +40,12 @@ tests:
     test:
     - as: test
       commands: |
-        openshift/e2e_setup.sh
+        openshift/install-subscriptions.sh
+        openshift/install-git-server.sh
         openshift/e2e_oncluster_tests.sh
+      dependencies:
+        - env: GITSERVER_IMAGE
+          name: gitserver-image
       from: src
       resources:
         requests:
