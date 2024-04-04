@@ -344,10 +344,10 @@ chmod 700 $HOME/setup_proxy.sh
 
 
 echo "Transferring the setup script to Bastion"
-scp "${ssh_options[@]}" $HOME/setup_proxy.sh root@$bvsi_fip:/var/home/core/setup_proxy.sh
+scp "${ssh_options[@]}" $HOME/setup_proxy.sh root@$bvsi_fip:/root/setup_proxy.sh
 
 echo "Triggering the proxy server setup on Bastion"
-ssh "${ssh_options[@]}" root@$bvsi_fip "/var/home/core/setup_proxy.sh"
+ssh "${ssh_options[@]}" root@$bvsi_fip "/root/setup_proxy.sh"
 
 
 
