@@ -331,16 +331,24 @@ oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condi
 
 
 # Configuring proxy server on bastion 
+
 echo "Getting management cluster basedomain to allow traffic to proxy server"
 mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut -d':' -f1)
 
-# Install package on bastion to configure proxy server
-ssh "${ssh_options[@]}" root@$bvsi_fip "yum install squid -y ; systemctl start squid ; systemctl enable squid"
-ssh "${ssh_options[@]}" root@$bvsi_fip "sed -i \"/acl Safe_ports port 777/a acl allowed_hosts dstdomain .${hcp_domain} .${mgmt_domain}\" \"/etc/squid/squid.conf\""
-ssh "${ssh_options[@]}" root@$bvsi_fip "sed -i \"/http_access deny/a http_access allow allowed_hosts\" \"/etc/squid/squid.conf\""
+echo "Downloading the proxy setup script"
+curl -k -L --output $HOME/setup_proxy.sh "http://$httpd_vsi_ip:80/setup_proxy.sh"
 
-# Restarting squid serivce 
-ssh "${ssh_options[@]}" root@$bvsi_fip "systemctl restart squid"
+sed -i "s|MGMT_DOMAIN|${mgmt_domain}|" $HOME/setup_proxy.sh 
+sed -i "s|HCP_DOMAIN|${hcp_domain}|" $HOME/setup_proxy.sh 
+chmod 700 $HOME/setup_proxy.sh
+
+
+echo "Transferring the setup script to Bastion"
+scp "${ssh_options[@]}" $HOME/setup_proxy.sh root@$bvsi_fip:/var/home/core/setup_proxy.sh
+
+echo "Triggering the proxy server setup on Bastion"
+ssh "${ssh_options[@]}" root@$bvsi_fip "/var/home/core/setup_proxy.sh"
+
 
 
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
