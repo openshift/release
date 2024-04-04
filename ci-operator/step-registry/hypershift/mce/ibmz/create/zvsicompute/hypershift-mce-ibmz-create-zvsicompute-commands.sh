@@ -344,12 +344,12 @@ ssh "${ssh_options[@]}" root@$bvsi_fip "systemctl restart squid"
 
 
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
-export HTTP_PROXY=http://${bvsi_fip}:80/
-export HTTPS_PROXY=http://${bvsi_fip}:80/
+export HTTP_PROXY=http://${bvsi_fip}:3128/
+export HTTPS_PROXY=http://${bvsi_fip}:3128/
 export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 
-export http_proxy=http://${bvsi_fip}:80/
-export https_proxy=http://${bvsi_fip}:80/
+export http_proxy=http://${bvsi_fip}:3128/
+export https_proxy=http://${bvsi_fip}:3128/
 export no_proxy="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 EOF
 
