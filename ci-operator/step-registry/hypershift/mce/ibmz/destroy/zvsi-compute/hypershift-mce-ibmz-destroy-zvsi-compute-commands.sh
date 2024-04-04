@@ -108,6 +108,8 @@ fi
 
 # Clearing proxy setup as we deleted bastion ( proxy server )
 
+rm -rf "${SHARED_DIR}/proxy-conf.sh"
+
 unset http_proxy
 unset https_proxy
 unset HTTP_PROXY
