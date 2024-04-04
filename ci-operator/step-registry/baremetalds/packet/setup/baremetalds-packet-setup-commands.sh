@@ -138,7 +138,7 @@ cat > packet-setup.yaml <<-EOF
         metro: ${PACKET_METRO}
         provisioning_wait_seconds: ${PACKET_PROVISION_WAIT}
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME')[:77], 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
-        user_data: "{{ user_data | default(omit) }}"
+        userdata: "{{ user_data | default(omit) }}"
       register: hosts
       no_log: true
     - name: write device info to file
@@ -147,7 +147,8 @@ cat > packet-setup.yaml <<-EOF
         dest="${SHARED_DIR}/hosts.json"
 EOF
 
-ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
+ansible-playbook packet-setup.yaml -e "ansible_python_interpreter=/usr/bin/python3.11" \
+  -e "packet_hostname=ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
 DEVICEID=$(jq -r .id < ${SHARED_DIR}/hosts.json)
 

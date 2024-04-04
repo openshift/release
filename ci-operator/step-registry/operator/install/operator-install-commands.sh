@@ -25,4 +25,25 @@ fi
 
 echo "$RUN_COMMAND" | sed -r "s/token [=A-Za-z0-9\.\-]+/token hashed-token /g"
 
+if [ "${INSTALL_FROM_IIB}" = "true" ]; then
+  if [ -z "$S3_BUCKET_OPERATORS_LATEST_IIB_PATH" ]; then
+    echo "S3_BUCKET_OPERATORS_LATEST_IIB_PATH is mandatory for iib installation"
+    exit 1
+  fi
+
+  if [ -z "$AWS_REGION" ]; then
+    echo "AWS_REGION is mandatory for iib installation"
+    exit 1
+  fi
+
+  AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
+  AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
+
+  export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+  export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+
+  RUN_COMMAND+=" --s3-bucket-operators-latest-iib-path ${S3_BUCKET_OPERATORS_LATEST_IIB_PATH} --aws-region ${AWS_REGION} "
+
+fi
+
 ${RUN_COMMAND}

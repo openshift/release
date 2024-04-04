@@ -156,7 +156,7 @@ ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal|equinix-ocp-metal-qe|powervs-1)
+equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
@@ -302,6 +302,7 @@ function run {
     # summarize test results
     echo "Summarizing test results..."
     failures=0 errors=0 skipped=0 tests=0
+    [[ -e "${ARTIFACT_DIR}" ]] || exit 0
     grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
     while read -a row ; do
         # if the last ARG of command `let` evaluates to 0, `let` returns 1

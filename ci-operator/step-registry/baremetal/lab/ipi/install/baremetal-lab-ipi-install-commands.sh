@@ -10,7 +10,6 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM ERR
 
 [ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
-[ -z "${PROVISIONING_HOST}" ] && { echo "\$PROVISIONING_HOST is not filled. Failing."; exit 1; }
 [ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
 [ -z "${workers}" ] && { echo "\$workers is not filled. Failing."; exit 1; }
 [ -z "${masters}" ] && { echo "\$masters is not filled. Failing."; exit 1; }
@@ -89,7 +88,7 @@ compute:
 platform:
   baremetal:
     libvirtURI: >-
-      qemu+ssh://root@${PROVISIONING_HOST}/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1
+      qemu+ssh://root@${AUX_HOST}:$(<"${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")/system?keyfile=${CLUSTER_PROFILE_DIR}/ssh-key&no_verify=1&no_tty=1
     apiVIP: $(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
     ingressVIP: $(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")
     provisioningBridge: $(<"${SHARED_DIR}/provisioning_bridge")

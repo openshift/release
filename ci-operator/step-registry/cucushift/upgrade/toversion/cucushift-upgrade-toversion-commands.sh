@@ -87,6 +87,7 @@ function extract_ccoctl(){
     else
         chmod 775 /tmp/ccoctl
     fi
+    export PATH="$PATH"
 }
 
 function update_cloud_credentials_oidc(){
@@ -194,6 +195,7 @@ function extract_oc(){
         sleep 60
     done
     mv ${tmp_oc}/oc ${OC_DIR} -f
+    export PATH="$PATH"
     which oc
     oc version --client
     return 0
@@ -311,6 +313,7 @@ function set_target_and_upgrade_cmd(){
         exit 1
     fi
     # x.y.z: run upgrade with "oc adm upgrade --to x.y.z";
+    # By default we ENABLE_OTA_TEST: OCP-23799
     if [[ -n "${UPGRADE_TO_VERSION}" ]] && [[ "${UPGRADE_TO_VERSION}" != "latest" ]]; then
         valid_target="false"
         # check if x.y.z is in available_versions, if not, it's invalid target with --to.
@@ -429,6 +432,26 @@ SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
 export SOURCE_VERSION
 export SOURCE_MINOR_VERSION
 echo "Source release version is: ${SOURCE_VERSION}"
+
+x_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f1 -d. )
+y_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f2 -d. )
+ver="${x_ver}.${y_ver}"
+retry=3
+while (( retry > 0 ));do
+    recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates[]?.version'| xargs)
+    if [[ "${recommends}" == "null" ]] || [[ "${recommends}" != *"${ver}"* ]]; then
+	retry=$((retry - 1))
+        sleep 60
+        echo "No recommended update available! Retry..."
+    else
+        echo "Recommencded update: ${recommends}"
+        break
+    fi
+done
+if (( retry == 0 )); then
+    echo "Timeout to get recommended update!" 
+    exit 1
+fi
 
 set_target_and_upgrade_cmd
 export FORCE_UPDATE="false"

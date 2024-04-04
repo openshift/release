@@ -3,14 +3,10 @@ build_root:
     dockerfile_literal: |
       FROM registry.ci.openshift.org/ocp/ubi-python-311:9
       USER 0
+      RUN dnf install -y podman
 images:
-- dockerfile_path: Containerfile.rag-content
-  to: lightspeed-rag-content
 - dockerfile_path: Containerfile
   to: lightspeed-service-api
-- dockerfile_path: Containerfile.rag
-  from: lightspeed-service-api
-  to: lightspeed-service-api-rag
 - dockerfile_path: Containerfile.redis
   to: lightspeed-service-redis
 promotion:
@@ -30,10 +26,10 @@ releases:
 resources:
   '*':
     limits:
-      memory: 20Gi
+      memory: 4Gi
     requests:
       cpu: 100m
-      memory: 10Gi
+      memory: 2Gi
 tests:
 - as: verify
   commands: pip install black ruff mypy && make verify && make check-types
@@ -71,8 +67,7 @@ tests:
         export PROVIDER_URL=https://ols-test.openai.azure.com/
         export PROVIDER_DEPLOYMENT_NAME=0301-dep
         export MODEL=gpt-3.5-turbo
-        # TODO remove scripts/test-e2e-standalone.sh
-        tests/scripts/test-e2e-standalone.sh || scripts/test-e2e-standalone.sh
+        tests/scripts/test-e2e-standalone.sh
       credentials:
       - mount_path: /var/run/azureopenai
         name: azureopenai-apitoken
@@ -93,8 +88,7 @@ tests:
         export PROVIDER_KEY_PATH=/var/run/bam/token
         export PROVIDER=bam
         export MODEL=ibm/granite-13b-chat-v2
-        # TODO remove scripts/test-e2e-standalone.sh
-        tests/scripts/test-e2e-standalone.sh || scripts/test-e2e-standalone.sh
+        tests/scripts/test-e2e-standalone.sh
       credentials:
       - mount_path: /var/run/bam
         name: bam-apitoken
@@ -115,8 +109,7 @@ tests:
         export PROVIDER_KEY_PATH=/var/run/openai/token
         export PROVIDER=openai
         export MODEL=gpt-3.5-turbo
-        # TODO remove scripts/test-e2e-standalone.sh
-        tests/scripts/test-e2e-standalone.sh || scripts/test-e2e-standalone.sh
+        tests/scripts/test-e2e-standalone.sh
       credentials:
       - mount_path: /var/run/openai
         name: openai-apitoken
@@ -138,8 +131,7 @@ tests:
         export PROVIDER=watsonx
         export PROVIDER_PROJECT_ID=ad629765-c373-4731-9d69-dc701724c081
         export MODEL=ibm/granite-13b-chat-v2
-        # TODO remove scripts/test-e2e-standalone.sh
-        tests/scripts/test-e2e-standalone.sh || scripts/test-e2e-standalone.sh
+        tests/scripts/test-e2e-standalone.sh
       credentials:
       - mount_path: /var/run/watsonx
         name: watsonx-apitoken
@@ -183,7 +175,7 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: OLS_IMAGE
-        name: lightspeed-service-api-rag
+        name: lightspeed-service-api
       from: src
       resources:
         requests:

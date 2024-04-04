@@ -184,4 +184,23 @@ dashboard.new(
     x: 0,
     y: 0,
   })
+.addPanel(
+    (graphPanel.new(
+        'ROSA Cluster Count',
+        description='Number of running ROSA clusters',
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_current=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'ci_chat_bot_rosa_cluster_count',
+        legendFormat='{{pod}}',
+    )), gridPos={
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 0,
+  })
 + dashboardConfig
