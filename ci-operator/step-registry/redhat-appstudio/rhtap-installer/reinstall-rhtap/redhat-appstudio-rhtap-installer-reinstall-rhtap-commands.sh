@@ -150,7 +150,7 @@ install_rhtap(){
                 - name: kind
                   value: task
                 - name: name
-                  value: redhat-rhtap-pe-info
+                  value: rhtap-pe-info
                 - name: namespace
                   value: "$NAMESPACE"
 EOF
