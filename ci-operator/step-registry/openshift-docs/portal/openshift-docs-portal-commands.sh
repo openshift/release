@@ -26,6 +26,7 @@ for DISTRO in "${DISTROS[@]}"; do
 
     ./scripts/get-updated-distros.sh | while read -r FILENAME; do
         if [ "${FILENAME}" == "${TOPICMAP}" ]; then
+            echo -e "\e[91mBuilding openshift-docs with ${DISTRO} distro...\e[0m"
             python3 "${BUILD}" --distro "${DISTRO}" --product "OpenShift Container Platform" --version "${VERSION}" --no-upstream-fetch
         elif [ "${FILENAME}" == "_distro_map.yml" ]; then
             python3 "${BUILD}" --distro "openshift-enterprise" --product "OpenShift Container Platform" --version "${VERSION}" --no-upstream-fetch
