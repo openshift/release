@@ -77,7 +77,20 @@ else
   fi
   subfix=$(openssl rand -hex 2)
   CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
+  # For long cluster name enabled, append a 39 chars long random string to cluster name
+  # Max possible prefix length is 9, max possible subfix length is 4, hyppen is used 2 times, random string of length 39
+  # (9 + 4 + 2 + 39 = 54)
+  if [[ "$LONG_CLUSTER_NAME_ENABLED" == "true" ]]; then
+    long_name_prefix=$(openssl rand -hex 20 | tr -dc 'a-f' | cut -c -39)
+    CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix-$long_name_prefix"}
+  fi
   echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+fi
+
+DOMAIN_PRIFIX_SWITCH=""
+if [[ "$DOMAIN_PRIFIX_ENABLED" == "true" ]]; then
+  DOMAIN_PRIFIX=${CLUSTER_NAME:-"$prefix-$subfix"}
+  DOMAIN_PRIFIX_SWITCH="--domain-prefix $DOMAIN_PREFIX"
 fi
 
 # Configure aws
@@ -527,6 +540,7 @@ ${SHARED_VPC_SWITCH} \
 ${SECURITY_GROUP_ID_SWITCH} \
 ${NO_CNI_SWITCH} \
 ${CONFIGURE_CLUSTER_AUTOSCALER_SWITCH} \
+${DOMAIN_PRIFIX_SWITCH} \
 ${DRY_RUN_SWITCH}
 " 
 echo "$cmd"| sed -E 's/\s{2,}/ /g' > "${SHARED_DIR}/create_cluster.sh"
