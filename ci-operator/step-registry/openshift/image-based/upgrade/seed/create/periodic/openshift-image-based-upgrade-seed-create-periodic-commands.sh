@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -x
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -24,9 +23,6 @@ host=$(cat ${SHARED_DIR}/ssh_user)
 ssh_host_ip="$host@$instance_ip"
 
 seed_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${SEED_VM_NAME}/auth/kubeconfig
-
-# Setup the release image
-#OCP_ARCH="x86_64"
 
 seed_base_info=""
 
@@ -76,6 +72,7 @@ export SEED_VM_NAME="${SEED_VM_NAME}"
 export SEED_VERSION="${SEED_VERSION}"
 export LCA_IMAGE="${LCA_PULL_REF}"
 export RELEASE_IMAGE="${RELEASE_IMAGE}"
+export RECERT_IMAGE="${RECERT_IMAGE}"
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
