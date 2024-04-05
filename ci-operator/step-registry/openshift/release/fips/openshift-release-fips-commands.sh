@@ -38,7 +38,7 @@ fi
 
 # run node scan and check the result
 report="/tmp/fips-check-payload-scan.log"
-oc --request-timeout=300s -n "$project" debug node/"$master_node_0" -- chroot /host bash -c "export http_proxy=$cluster_http_proxy; export https_proxy=$cluster_https_proxy; podman run --authfile /var/lib/kubelet/config.json --privileged -i -v /:/myroot registry.ci.openshift.org/ci/check-payload:latest scan payload -V $MAJOR_MINOR --url $payload_url --root  /myroot &> $report" || true
+oc --request-timeout=300s -n "$project" debug node/"$master_node_0" -- chroot /host bash -c "podman run --authfile /var/lib/kubelet/config.json --privileged -i -v /:/myroot registry.ci.openshift.org/ci/check-payload:latest scan payload -V $MAJOR_MINOR --url $payload_url --root  /myroot &> $report" || true
 out=$(oc --request-timeout=300s -n "$project" debug node/"$master_node_0" -- chroot /host bash -c "cat /$report" || true)
 echo "The report is: $out"
 oc delete ns $project || true
