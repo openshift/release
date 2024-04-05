@@ -98,7 +98,6 @@ else
   echo "Subnet $infra_name-sn is created successfully in the $infra_name-vpc VPC."
 fi
 
-
 # Create a bastion node in the same VPC for configuring proxy server
 set -e
 echo "Triggering the $infra_name-bastion VSI creation on IBM Cloud in the VPC $infra_name-vpc"
@@ -134,8 +133,6 @@ else
   echo "Floating IP is assigned to the bastion VSI : $bvsi_fip"
 fi
 
-
-
 # Create zVSI compute nodes
 set -e
 zvsi_rip_list=()
@@ -164,8 +161,6 @@ for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
       echo "Failure while adding the inbound rule to the $infra_name-compute-$i instance security group."
       exit 1
   fi  
-
-
   
   echo "Getting the Virtual Network Interface ID for zVSI"
   vni_id=$(ibmcloud is instance $infra_name-compute-$i | awk '/Primary/{print $7}')
@@ -178,7 +173,6 @@ for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
     echo "Floating IP assigned to zVSI : $zvsi_fip"
   fi
   zvsi_fip_list+=("$zvsi_fip")
-  
 done
 
 # Creating DNS service
@@ -326,12 +320,7 @@ echo "$(date) Checking the compute nodes in the hosted control plane"
 oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
 oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=30m
 
-
-
-
-
 # Configuring proxy server on bastion 
-
 echo "Getting management cluster basedomain to allow traffic to proxy server"
 mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut -d':' -f1)
 
@@ -342,14 +331,10 @@ sed -i "s|MGMT_DOMAIN|${mgmt_domain}|" $HOME/setup_proxy.sh
 sed -i "s|HCP_DOMAIN|${hcp_domain}|" $HOME/setup_proxy.sh 
 chmod 700 $HOME/setup_proxy.sh
 
-
 echo "Transferring the setup script to Bastion"
 scp "${ssh_options[@]}" $HOME/setup_proxy.sh root@$bvsi_fip:/root/setup_proxy.sh
-
 echo "Triggering the proxy server setup on Bastion"
 ssh "${ssh_options[@]}" root@$bvsi_fip "/root/setup_proxy.sh"
-
-
 
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=http://${bvsi_fip}:3128/
@@ -360,5 +345,4 @@ export http_proxy=http://${bvsi_fip}:3128/
 export https_proxy=http://${bvsi_fip}:3128/
 export no_proxy="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 EOF
-
 echo "$(date) Successfully completed the e2e creation chain"
