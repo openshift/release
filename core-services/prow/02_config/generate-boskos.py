@@ -272,6 +272,9 @@ CONFIG = {
     'powervs-4-quota-slice': {
         'wdc06': 1,
     },
+    'powervs-5-quota-slice': {
+        'mad02': 4,
+    },
     'powervs-multi-1-quota-slice': {
         'wdc06': 2,
     },

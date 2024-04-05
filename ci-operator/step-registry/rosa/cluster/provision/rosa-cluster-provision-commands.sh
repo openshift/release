@@ -64,6 +64,7 @@ if [[ "$HOSTED_CP" == "true" ]]; then
 fi
 
 # Define cluster name
+CLUSTER_NAME=""
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]] && [[ -e "${SHARED_DIR}/cluster-name" ]]; then
   # For Shared VPC cluster, cluster name is determined in step aws-provision-route53-private-hosted-zone
   #   as Private Hosted Zone needs to be ready before installing Shared VPC cluster
@@ -77,8 +78,8 @@ else
   fi
   subfix=$(openssl rand -hex 2)
   CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
-  echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 fi
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
 # Configure aws
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
@@ -532,7 +533,11 @@ ${DRY_RUN_SWITCH}
 echo "$cmd"| sed -E 's/\s{2,}/ /g' > "${SHARED_DIR}/create_cluster.sh"
 
 log "Running command:"
-cat "${SHARED_DIR}/create_cluster.sh" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" | sed "s/$SHARED_VPC_AWS_ACCOUNT_ID/$SHARED_VPC_AWS_ACCOUNT_ID_MASK/g"
+cmdout=$(cat "${SHARED_DIR}/create_cluster.sh" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g")
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+  cmdout=$(echo $cmdout | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g")
+fi
+echo "$cmdout"
 CLUSTER_INFO_WITHOUT_MASK="$(mktemp)"
 eval "${cmd}" > "${CLUSTER_INFO_WITHOUT_MASK}"
 
