@@ -30,26 +30,6 @@ else
     pass=false
 fi
 
-# check whether it is disconnected cluster
-oc label namespace "$project" security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite=true || true
-cluster_http_proxy=$(oc get proxy cluster -o=jsonpath='{.spec.httpProxy}')
-cluster_https_proxy=$(oc get proxy cluster -o=jsonpath='{.spec.httpProxy}')
-attempt=0
-while true; do
-    out=$(oc --request-timeout=60s -n "$project" debug node/"$master_node_0" -- chroot /host bash -c "export http_proxy=$cluster_http_proxy; export https_proxy=$cluster_https_proxy; curl -sSI ifconfig.me --connect-timeout 5" 2> /dev/null || true)
-    if [[ $out == *"Via: 1.1"* ]]; then
-        echo "This is not a disconnected cluster"
-        break
-    fi
-    attempt=$(( attempt + 1 ))
-    if [[ $attempt -gt 3 ]]; then
-        echo "This is a disconnected cluster, skip testing"
-        oc delete ns "$project"
-        exit 0
-    fi
-    sleep 5
-done
-
 payload_url="${RELEASE_IMAGE_LATEST}"
 
 if [[ "$payload_url" == *"@sha256"* ]]; then
