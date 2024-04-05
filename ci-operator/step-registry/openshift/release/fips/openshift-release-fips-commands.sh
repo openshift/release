@@ -34,8 +34,11 @@ if [[ "$payload_url" == *"@sha256"* ]]; then
     payload_url=$(echo "$payload_url" | sed 's/@sha256.*/:latest/')
 fi
 
+echo "copy creds"
+cp /tmp/import-secret/.dockerconfigjson /tmp/.docker/config.json
+
 echo "Login to registry"
-oc registry login
+oc registry login --to /tmp/.docker/config.json
 
 # run node scan and check the result
 report="/tmp/fips-check-payload-scan.log"
