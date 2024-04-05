@@ -34,6 +34,9 @@ if [[ "$payload_url" == *"@sha256"* ]]; then
     payload_url=$(echo "$payload_url" | sed 's/@sha256.*/:latest/')
 fi
 
+echo "Login to registry"
+oc registry login
+
 # run node scan and check the result
 report="/tmp/fips-check-payload-scan.log"
 oc --request-timeout=300s -n "$namespace" debug node/"$master_node_0" -- chroot /host bash -c "podman run --authfile /var/lib/kubelet/config.json --privileged -i -v /:/myroot registry.ci.openshift.org/ci/check-payload:latest scan payload -V $MAJOR_MINOR --url $payload_url &> $report" || true
