@@ -63,6 +63,7 @@ out=$(oc --request-timeout=300s -n "$project" debug node/"$master_node_0" -- chr
 echo "The report is: $out"
 oc delete ns $project || true
 res=$(echo "$out" | grep -E 'Failure Report|Successful run with warnings|Warning Report' || true)
+echo "The result is: $res"
 if [[ -n $res ]];then
     echo "The result is: $res"
     pass=false
