@@ -4,13 +4,17 @@ base_images:
     namespace: ocp
     tag: base
   loki:
-    name: v2.9.4
+    name: v2.9.6
     namespace: logging
     tag: loki
   lokistack-gateway:
     name: mirror-5.y
     namespace: logging
     tag: lokistack-gateway
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
   opa-openshift:
     name: mirror-5.y
     namespace: logging
@@ -24,6 +28,10 @@ images:
 - context_dir: operator
   dockerfile_path: Dockerfile
   from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - golang:1.20.10
   to: loki-operator
 operator:
   bundles:
@@ -33,7 +41,7 @@ operator:
   substitutions:
   - pullspec: quay.io/openshift-logging/loki-operator:v0.1.0
     with: pipeline:loki-operator
-  - pullspec: quay.io/openshift-logging/loki:v2.9.4
+  - pullspec: quay.io/openshift-logging/loki:v2.9.6
     with: pipeline:loki
   - pullspec: quay.io/observatorium/api:latest
     with: pipeline:lokistack-gateway
@@ -48,7 +56,7 @@ promotion:
 releases:
   latest:
     release:
-      channel: fast
+      channel: stable
       version: "4.13"
 resources:
   '*':
@@ -114,7 +122,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.13"
   steps:
     dependencies:
       OO_INDEX: ci-index-loki-operator-bundle
