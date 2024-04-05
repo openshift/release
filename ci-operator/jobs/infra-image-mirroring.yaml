@@ -1013,57 +1013,6 @@ periodics:
   cron: '@hourly'
   decorate: true
   labels:
-    ci.openshift.io/area: coreos
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-cosa
-  spec:
-    automountServiceAccountToken: true
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_coreos_assembler*; do
-          # Remove --keep-manifest-list option for now until the internal
-          # registry supports it. https://issues.redhat.com/browse/IR-192
-          echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.14:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: .dockerconfigjson
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-ci-central
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
     ci.openshift.io/area: konveyor
     ci.openshift.io/role: image-mirroring
   name: periodic-image-mirroring-konveyor
