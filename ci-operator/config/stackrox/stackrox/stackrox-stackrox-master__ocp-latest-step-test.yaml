@@ -1,31 +1,22 @@
 releases:
   latest:
-    candidate:
+    release:
       product: ocp
-      stream: nightly
-      version: "4.16"
+      channel: stable
+      version: "4.15"
 resources:
   '*':
     requests:
       cpu: "8"
       memory: 8000Mi
 tests:
-- as: e2e
-  cluster_claim:
-    architecture: amd64
-    as: custom
-    cloud: aws
-    labels:
-      size: "6"
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.15"
+- as: e2e-hypershift
   steps:
+    cluster_profile: aws-2
     test:
     - as: claim
       commands: oc get node
-      from: stable-custom:cli
+      from: stable:cli
       resources:
         requests:
           cpu: 100m
@@ -33,12 +24,12 @@ tests:
     - ref: stackrox-install
     - as: list
       commands: oc get pods -n "stackrox"
-      from: stable-custom:cli
+      from: stable:cli
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: generic-claim
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: master
   org: stackrox
