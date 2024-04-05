@@ -5,12 +5,14 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.11-e2e-kitchensink-ocp-411
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.11"
       ci.openshift.io/generator: prowgen
       job-release: "4.11"
@@ -22,10 +24,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-kitchensink-ocp-411-cluster-profile
         - --target=e2e-kitchensink-ocp-411
         - --variant=4.11
         command:
@@ -37,14 +40,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/e2e-kitchensink-ocp-411-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -57,12 +62,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -136,12 +147,14 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.11-operator-e2e-aws-ocp-411
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.11"
       ci.openshift.io/generator: prowgen
       job-release: "4.11"
@@ -152,10 +165,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/operator-e2e-aws-ocp-411-cluster-profile
         - --target=operator-e2e-aws-ocp-411
         - --variant=4.11
         command:
@@ -167,14 +181,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/operator-e2e-aws-ocp-411-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -187,12 +203,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -208,12 +230,14 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.11-ui-tests
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.11"
       ci.openshift.io/generator: prowgen
       job-release: "4.11"
@@ -225,10 +249,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ui-tests-cluster-profile
         - --target=ui-tests
         - --variant=4.11
         command:
@@ -240,14 +265,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/ui-tests-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -260,12 +287,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -281,12 +314,14 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.11-upgrade-kitchensink-ocp-411
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.11"
       ci.openshift.io/generator: prowgen
       job-release: "4.11"
@@ -298,10 +333,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/upgrade-kitchensink-ocp-411-cluster-profile
         - --target=upgrade-kitchensink-ocp-411
         - --variant=4.11
         command:
@@ -313,14 +349,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/upgrade-kitchensink-ocp-411-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -333,12 +371,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -354,12 +398,14 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.11-upgrade-tests-aws-ocp-411
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.11"
       ci.openshift.io/generator: prowgen
       job-release: "4.11"
@@ -371,10 +417,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/upgrade-tests-aws-ocp-411-cluster-profile
         - --target=upgrade-tests-aws-ocp-411
         - --variant=4.11
         command:
@@ -386,14 +433,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/upgrade-tests-aws-ocp-411-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -406,12 +455,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -427,12 +482,14 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.11-upstream-e2e-aws-ocp-411
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.11"
       ci.openshift.io/generator: prowgen
       job-release: "4.11"
@@ -444,10 +501,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/upstream-e2e-aws-ocp-411-cluster-profile
         - --target=upstream-e2e-aws-ocp-411
         - --variant=4.11
         command:
@@ -459,14 +517,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/upstream-e2e-aws-ocp-411-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -479,12 +539,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -500,12 +566,14 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.11-upstream-e2e-kafka-aws-ocp-411
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.11"
       ci.openshift.io/generator: prowgen
       job-release: "4.11"
@@ -517,10 +585,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/upstream-e2e-kafka-aws-ocp-411-cluster-profile
         - --target=upstream-e2e-kafka-aws-ocp-411
         - --variant=4.11
         command:
@@ -532,14 +601,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/upstream-e2e-kafka-aws-ocp-411-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -552,12 +623,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -573,13 +650,15 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.11-upstream-e2e-mesh-aws-ocp-411
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h10m0s
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.11"
       ci.openshift.io/generator: prowgen
       job-release: "4.11"
@@ -591,10 +670,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/upstream-e2e-mesh-aws-ocp-411-cluster-profile
         - --target=upstream-e2e-mesh-aws-ocp-411
         - --variant=4.11
         command:
@@ -606,14 +686,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/upstream-e2e-mesh-aws-ocp-411-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -626,12 +708,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -761,12 +849,14 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.13-e2e-kitchensink-ocp-413
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.13"
       ci.openshift.io/generator: prowgen
       job-release: "4.13"
@@ -778,10 +868,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-kitchensink-ocp-413-cluster-profile
         - --target=e2e-kitchensink-ocp-413
         - --variant=4.13
         command:
@@ -793,14 +884,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/e2e-kitchensink-ocp-413-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -813,12 +906,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1006,12 +1105,14 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.13-operator-e2e-aws-ocp-413
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.13"
       ci.openshift.io/generator: prowgen
       job-release: "4.13"
@@ -1023,10 +1124,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/operator-e2e-aws-ocp-413-cluster-profile
         - --target=operator-e2e-aws-ocp-413
         - --variant=4.13
         command:
@@ -1038,14 +1140,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/operator-e2e-aws-ocp-413-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1058,12 +1162,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1193,12 +1303,14 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.13-ui-tests
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.13"
       ci.openshift.io/generator: prowgen
       job-release: "4.13"
@@ -1210,10 +1322,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/ui-tests-cluster-profile
         - --target=ui-tests
         - --variant=4.13
         command:
@@ -1225,14 +1338,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/ui-tests-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1245,12 +1360,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1266,12 +1387,14 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.13-upgrade-kitchensink-ocp-413
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.13"
       ci.openshift.io/generator: prowgen
       job-release: "4.13"
@@ -1283,10 +1406,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/upgrade-kitchensink-ocp-413-cluster-profile
         - --target=upgrade-kitchensink-ocp-413
         - --variant=4.13
         command:
@@ -1298,14 +1422,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/upgrade-kitchensink-ocp-413-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1318,12 +1444,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1339,12 +1471,14 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.13-upgrade-tests-aws-ocp-413
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.13"
       ci.openshift.io/generator: prowgen
       job-release: "4.13"
@@ -1357,10 +1491,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/upgrade-tests-aws-ocp-413-cluster-profile
         - --target=upgrade-tests-aws-ocp-413
         - --variant=4.13
         command:
@@ -1372,14 +1507,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/upgrade-tests-aws-ocp-413-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1392,12 +1529,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1413,12 +1556,14 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.13-upstream-e2e-aws-ocp-413
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.13"
       ci.openshift.io/generator: prowgen
       job-release: "4.13"
@@ -1431,10 +1576,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/upstream-e2e-aws-ocp-413-cluster-profile
         - --target=upstream-e2e-aws-ocp-413
         - --variant=4.13
         command:
@@ -1446,14 +1592,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/upstream-e2e-aws-ocp-413-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1466,12 +1614,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1487,12 +1641,14 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.13-upstream-e2e-kafka-aws-ocp-413
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.13"
       ci.openshift.io/generator: prowgen
       job-release: "4.13"
@@ -1505,10 +1661,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/upstream-e2e-kafka-aws-ocp-413-cluster-profile
         - --target=upstream-e2e-kafka-aws-ocp-413
         - --variant=4.13
         command:
@@ -1520,14 +1677,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/upstream-e2e-kafka-aws-ocp-413-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1540,12 +1699,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1561,13 +1726,15 @@ presubmits:
     branches:
     - ^release-1\.31$
     - ^release-1\.31-
-    cluster: build04
+    cluster: build03
     context: ci/prow/4.13-upstream-e2e-mesh-aws-ocp-413
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h10m0s
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
       ci-operator.openshift.io/variant: "4.13"
       ci.openshift.io/generator: prowgen
       job-release: "4.13"
@@ -1579,10 +1746,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/upstream-e2e-mesh-aws-ocp-413-cluster-profile
         - --target=upstream-e2e-mesh-aws-ocp-413
         - --variant=4.13
         command:
@@ -1594,14 +1762,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/upstream-e2e-mesh-aws-ocp-413-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1614,12 +1784,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-aws-serverless
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
