@@ -38,12 +38,12 @@ export PATH=$PATH:/tmp/bin
 
 # IBM cloud login
 ibmcloud config --check-version=false
-echo | ibmcloud login --apikey @"/etc/sno-power-credentials/.powercreds"
+echo | ibmcloud login --apikey @"/etc/sno-power-credentials/.powercreds" --no-region
 
 # Installing required ibmcloud plugins
 echo "$(date) Installing required ibmcloud plugins"
-ibmcloud plugin install power-iaas
-ibmcloud plugin install cis
+ibmcloud plugin install -f power-iaas
+ibmcloud plugin install -f cis
 
 # Set target powervs and cis service instance
 ibmcloud pi ws tg ${POWERVS_INSTANCE_CRN}

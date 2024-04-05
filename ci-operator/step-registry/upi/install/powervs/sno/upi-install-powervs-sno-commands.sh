@@ -24,8 +24,8 @@ setup_env() {
 
   # Installing required ibmcloud plugins
   echo "$(date) Installing required ibmcloud plugins"
-  ibmcloud plugin install power-iaas
-  ibmcloud plugin install cis
+  ibmcloud plugin install -f power-iaas
+  ibmcloud plugin install -f cis
 
   # Set target powervs and cis service instance
   ibmcloud pi ws tg ${POWERVS_INSTANCE_CRN}
@@ -39,7 +39,7 @@ setup_env() {
 create_sno_node() {
   # Creating VSI in PowerVS instance
   echo "$(date) Creating VSI in PowerVS instance"
-  ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --subnets ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE}
+  ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --subnets ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE}  --storage-tier tier0
 
   instance_id=$(ibmcloud pi ins ls --json | jq -r --arg serverName ${POWERVS_VSI_NAME} '.pvmInstances[] | select (.name == $serverName ) | .id')
 
@@ -232,7 +232,7 @@ create_cluster() {
 register_infra() {
   echo "Register the cluster: \${NEW_CLUSTER_ID}"
   cat cluster-register-template.json | envsubst > \${CONFIG_DIR}/cluster-register.json
- 
+
   curl -s -X POST "\${API_URL}/infra-envs" \
       -H "Content-Type: application/json" \
       -H "Authorization: Bearer \${API_TOKEN}" \
@@ -329,7 +329,7 @@ wait_install_complete() {
         pre_status=\${status}
       fi
       if [[ \${status} == "installed" ]]; then
-        echo "Done of OCP installation" 
+        echo "Done of OCP installation"
         break
       fi
       sleep 60
@@ -391,7 +391,7 @@ metadata:
 rendezvousIP: \${IP_ADDRESS}
 hosts:
   - hostname: \${CLUSTER_NAME}
-    rootDeviceHints: 
+    rootDeviceHints:
       deviceName: \${INSTALLATION_DISK}
     role: master
     interfaces:
