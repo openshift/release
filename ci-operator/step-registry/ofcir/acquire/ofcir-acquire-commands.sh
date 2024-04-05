@@ -70,6 +70,8 @@ cat > "${SHARED_DIR}/packet-conf.sh" <<-EOF
         ssh "\${SSHOPTS[@]}" "root@\${IP}" hostname && break
         # Ironic hosts
         ssh "\${SSHOPTS[@]}" "centos@\${IP}" sudo dd if=/home/centos/.ssh/authorized_keys of=/root/.ssh/authorized_keys && break
+        # Ironic hosts CS9
+        ssh "\${SSHOPTS[@]}" "cloud-user@\${IP}" sudo dd if=/home/cloud-user/.ssh/authorized_keys of=/root/.ssh/authorized_keys && break
         sleep 10
     done
 EOF
