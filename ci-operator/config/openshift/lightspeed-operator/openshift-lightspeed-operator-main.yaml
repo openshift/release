@@ -3,6 +3,14 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.54.2
+  lightspeed-service-api:
+    name: lightspeed-service-api
+    namespace: ols
+    tag: latest
+  operator-sdk:
+    name: "4.14"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -12,9 +20,20 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   to: lightspeed-operator
+operator:
+  bundles:
+  - as: lightspeed-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/lightspeed-operator:latest
+    with: pipeline:lightspeed-operator
+  - pullspec: quay.io/openshift/lightspeed-service-api:latest
+    with: pipeline:lightspeed-service-api
 promotion:
   to:
-  - namespace: ols
+  - additional_images:
+      lightspeed-bundle: lightspeed-operator-bundle
+    namespace: ols
     tag: latest
 releases:
   initial:
@@ -50,6 +69,33 @@ tests:
   container:
     clone: true
     from: golangci-lint
+- as: bundle-e2e
+  cluster_claim:
+    architecture: amd64
+    as: custom
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    test:
+    - as: e2e-install
+      cli: latest
+      commands: |
+        oc create namespace openshift-lightspeed
+        operator-sdk run bundle --timeout=10m -n openshift-lightspeed "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: lightspeed-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
