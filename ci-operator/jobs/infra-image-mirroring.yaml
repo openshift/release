@@ -118,32 +118,27 @@ periodics:
   name: periodic-image-mirroring-openshift-azure
   spec:
     containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_openshift_azure*; do
-          echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
+    - command:
+      - /tp-entrypoint.sh
       env:
       - name: HOME
         value: /home/mirror
-      image: quay.io/openshift/origin-cli:4.3
+      - name: MAPPING_FILE_PREFIX
+        value: mapping_openshift_azure
+      - name: dry_run
+        value: "false"
+      image: registry.ci.openshift.org/ci/skopeo:skopeo-stable-v1.15.0-jq
       imagePullPolicy: Always
       name: ""
       resources:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
+      - mountPath: /home/mirror/.docker/pull-config.json
+        name: pull
+        readOnly: true
+        subPath: .dockerconfigjson
+      - mountPath: /home/mirror/.docker/push-config.json
         name: push
         readOnly: true
         subPath: .dockerconfigjson
@@ -153,6 +148,9 @@ periodics:
     - name: push
       secret:
         secretName: registry-push-credentials-quay.io-openshift-azure
+    - name: pull
+      secret:
+        secretName: registry-pull-credentials
     - configMap:
         name: image-mirror-mappings
       name: config
