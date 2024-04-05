@@ -1,34 +1,34 @@
 base_images:
-  ocp_4.14_cli:
-    name: "4.14"
+  ocp_4.15_cli:
+    name: "4.15"
     namespace: ocp
     tag: cli
   ocp_ubi-minimal_8:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  openshift_eventing-istio-src_knative-v1.11:
+  openshift_eventing-istio-src_knative-v1.12:
     name: eventing-istio-src
     namespace: openshift
-    tag: knative-v1.11
-  openshift_eventing-kafka-broker-src_knative-v1.11:
+    tag: knative-v1.12
+  openshift_eventing-kafka-broker-src_knative-v1.12:
     name: eventing-kafka-broker-src
     namespace: openshift
-    tag: knative-v1.11
-  openshift_knative-eventing-src_knative-v1.11:
+    tag: knative-v1.12
+  openshift_knative-eventing-src_knative-v1.12:
     name: knative-eventing-src
     namespace: openshift
-    tag: knative-v1.11
-  openshift_knative-serving-src_knative-v1.11:
+    tag: knative-v1.12
+  openshift_knative-serving-src_knative-v1.12:
     name: knative-serving-src
     namespace: openshift
-    tag: knative-v1.11
+    tag: knative-v1.12
   openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.21-openshift-4.16
-  origin_4.14_operator-registry:
-    name: "4.14"
+  origin_4.15_operator-registry:
+    name: "4.15"
     namespace: origin
     tag: operator-registry
 build_root:
@@ -48,9 +48,9 @@ images:
   to: serverless-bundle
 - dockerfile_path: olm-catalog/serverless-operator/index/Dockerfile
   inputs:
-    origin_4.14_operator-registry:
+    origin_4.15_operator-registry:
       as:
-      - registry.ci.openshift.org/origin/4.14:operator-registry
+      - registry.ci.openshift.org/origin/4.15:operator-registry
   to: serverless-index
 - dockerfile_path: openshift-knative-operator/Dockerfile
   inputs:
@@ -64,21 +64,21 @@ images:
 - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
   from: src
   inputs:
-    ocp_4.14_cli:
+    ocp_4.15_cli:
       as:
-      - registry.ci.openshift.org/ocp/4.14:cli
-    openshift_eventing-istio-src_knative-v1.11:
+      - registry.ci.openshift.org/ocp/4.15:cli
+    openshift_eventing-istio-src_knative-v1.12:
       as:
-      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.11
-    openshift_eventing-kafka-broker-src_knative-v1.11:
+      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.12
+    openshift_eventing-kafka-broker-src_knative-v1.12:
       as:
-      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.11
-    openshift_knative-eventing-src_knative-v1.11:
+      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.12
+    openshift_knative-eventing-src_knative-v1.12:
       as:
-      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.11
-    openshift_knative-serving-src_knative-v1.11:
+      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.12
+    openshift_knative-serving-src_knative-v1.12:
       as:
-      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.11
+      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.12
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
   inputs:
@@ -98,11 +98,16 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
   to: serverless-metadata-webhook
+promotion:
+  to:
+  - additional_images:
+      serverless-operator-src: src
+    namespace: knative
+    tag: release-1.32
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: fast
       version: "4.15"
 resources:
   '*':
@@ -113,11 +118,17 @@ resources:
       memory: 200Mi
 tests:
 - as: kitchensink-e2e-aws-415
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.15"
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -153,7 +164,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -178,13 +188,19 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: kitchensink-upgrade-aws-415
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.15"
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -220,7 +236,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -245,13 +260,19 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: mesh-e2e-aws-415
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.15"
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -287,7 +308,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -312,14 +332,20 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
   timeout: 5h0m0s
 - as: mesh-upgrade-aws-415
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.15"
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -355,7 +381,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -380,12 +405,18 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: operator-e2e-aws-415
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.15"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -421,7 +452,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -446,12 +476,18 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: test-upgrade-aws-415
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.15"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -487,7 +523,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -512,14 +547,20 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: ui-e2e-aws-415
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.15"
   optional: true
   run_if_changed: test/ui
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -555,7 +596,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -580,13 +620,19 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: upstream-e2e-aws-415
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.15"
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -622,7 +668,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -647,13 +692,19 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: upstream-e2e-kafka-aws-415
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.15"
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws
     post:
     - as: knative-must-gather
       best_effort: true
@@ -689,7 +740,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -714,7 +764,7 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: release-1.32
   org: openshift-knative
