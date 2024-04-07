@@ -37,7 +37,11 @@ fi
 
 unset KUBECONFIG
 
-oc registry login
+echo "Setting runtime dir"
+mkdir -p /tmp/.docker/ ${XDG_RUNTIME_DIR}
+
+echo "Login to registry"
+oc registry login --to /tmp/.docker/config.json
 
 # run node scan and check the result
 report="/tmp/fips-check-payload-scan.log"
