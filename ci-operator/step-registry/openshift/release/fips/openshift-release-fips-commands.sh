@@ -21,6 +21,7 @@ fi
 # create a ns
 namespace="fips-scan-payload-$RANDOM"
 run_command "oc create ns $namespace -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
+
 if [ $? == 0 ]; then
     echo "create $namespace namespace successfully"
 else
@@ -34,14 +35,9 @@ if [[ "$payload_url" == *"@sha256"* ]]; then
     payload_url=$(echo "$payload_url" | sed 's/@sha256.*/:latest/')
 fi
 
-echo "Setting runtime dir"
-mkdir -p /tmp/.docker/ ${XDG_RUNTIME_DIR}
+unset KUBECONFIG
 
-echo "copy creds"
-cp /tmp/import-secret/.dockerconfigjson /tmp/.docker/config.json
-
-echo "Login to registry"
-oc registry login --to /tmp/.docker/config.json
+oc registry login
 
 # run node scan and check the result
 report="/tmp/fips-check-payload-scan.log"
