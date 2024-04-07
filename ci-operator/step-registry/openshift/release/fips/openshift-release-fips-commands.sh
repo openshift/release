@@ -35,13 +35,14 @@ if [[ "$payload_url" == *"@sha256"* ]]; then
     payload_url=$(echo "$payload_url" | sed 's/@sha256.*/:latest/')
 fi
 
-unset KUBECONFIG
 
 echo "Setting runtime dir"
 mkdir -p /tmp/.docker/ ${XDG_RUNTIME_DIR}
 
 echo "Login to registry"
 oc registry login --to /tmp/.docker/config.json
+
+export KUBECONFIG=/tmp/.docker/config.json
 
 # run node scan and check the result
 report="/tmp/fips-check-payload-scan.log"
