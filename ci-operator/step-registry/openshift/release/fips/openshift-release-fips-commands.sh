@@ -29,9 +29,6 @@ else
     pass=false
 fi
 
-echo "Entering newly created namespace"
-oc project $namespace
-
 oc get secret fips-payload-scan -oyaml | grep -v '^\s*namespace:\s' | oc apply --namespace=$namespace -f -
 
 unset KUBECONFIG
