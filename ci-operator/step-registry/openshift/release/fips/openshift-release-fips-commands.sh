@@ -32,14 +32,12 @@ fi
 echo "Entering newly created namespace"
 oc project $namespace
 
-echo "Setting runtime dir"
-mkdir -p /tmp/.docker/ ${XDG_RUNTIME_DIR}
+oc get secret fips-payload-scan -oyaml | grep -v '^\s*namespace:\s' | oc apply --namespace=$namespace -f -
 
-echo "copy creds"
-cp /tmp/import-secret/.dockerconfigjson /tmp/.docker/config.json
+unset KUBECONFIG
 
 echo "Login to registry"
-oc registry login --to /tmp/.docker/config.json
+oc registry login
 echo "Registry login successful"
 
 payload_url="${RELEASE_IMAGE_LATEST}"
