@@ -6,6 +6,12 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 
 # Log in
