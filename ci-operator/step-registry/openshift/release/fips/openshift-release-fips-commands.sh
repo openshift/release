@@ -29,12 +29,8 @@ else
     pass=false
 fi
 
-payload_url="${RELEASE_IMAGE_LATEST}"
-
-if [[ "$payload_url" == *"@sha256"* ]]; then
-    payload_url=$(echo "$payload_url" | sed 's/@sha256.*/:latest/')
-fi
-
+echo "Entering newly created namespace"
+oc project $namespace
 
 echo "Setting runtime dir"
 mkdir -p /tmp/.docker/ ${XDG_RUNTIME_DIR}
@@ -42,12 +38,16 @@ mkdir -p /tmp/.docker/ ${XDG_RUNTIME_DIR}
 echo "Login to registry"
 oc registry login --to /tmp/.docker/config.json
 
-export KUBECONFIG=/tmp/.docker/config.json
+payload_url="${RELEASE_IMAGE_LATEST}"
+
+if [[ "$payload_url" == *"@sha256"* ]]; then
+    payload_url=$(echo "$payload_url" | sed 's/@sha256.*/:latest/')
+fi
 
 # run node scan and check the result
 report="/tmp/fips-check-payload-scan.log"
-oc --request-timeout=300s -n "$namespace" debug node/"$master_node_0" -- chroot /host bash -c "podman run --authfile /var/lib/kubelet/config.json --privileged -i -v /:/myroot registry.ci.openshift.org/ci/check-payload:latest scan payload -V $MAJOR_MINOR --url $payload_url &> $report" || true
-out=$(oc --request-timeout=300s -n "$namespace" debug node/"$master_node_0" -- chroot /host bash -c "cat /$report" || true)
+oc --request-timeout=300s debug node/"$master_node_0" -- chroot /host bash -c "unset KUBECONFIG; podman run --authfile /var/lib/kubelet/config.json --privileged -i -v /:/myroot registry.ci.openshift.org/ci/check-payload:latest scan payload -V $MAJOR_MINOR --url $payload_url &> $report" || true
+out=$(oc --request-timeout=300s debug node/"$master_node_0" -- chroot /host bash -c "cat /$report" || true)
 echo "The report is: $out"
 oc delete ns $namespace || true
 res=$(echo "$out" | grep -E 'Failure Report|Successful run with warnings|Warning Report' || true)
