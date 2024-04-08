@@ -33,11 +33,11 @@ fi
 
 mkdir -p /tmp/.docker/
 
-unset KUBECONFIG
-
 echo "Login to registry"
 oc registry login --to /tmp/.docker/config.json
 echo "Registry login successful"
+
+unset KUBECONFIG
 
 payload_url="${RELEASE_IMAGE_LATEST}"
 
