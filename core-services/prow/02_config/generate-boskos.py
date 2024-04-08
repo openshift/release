@@ -242,6 +242,7 @@ CONFIG = {
     'vsphere-connected-2-quota-slice':{},
     'vsphere-multizone-2-quota-slice':{},
     'vsphere-8-vpn-quota-slice':{},
+    'vsphere-multi-vcenter-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
     },
@@ -441,6 +442,8 @@ for i in [1287,1289,1296,1298,1300,1302]:
 for i in [1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274,1283,1285,1305,1309]:
     CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
 
+for i in [956]:
+    CONFIG['vsphere-multi-vcenter-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
 
 config = {
     'resources': [],
