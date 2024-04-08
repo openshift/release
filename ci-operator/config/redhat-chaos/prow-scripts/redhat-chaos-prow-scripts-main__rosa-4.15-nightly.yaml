@@ -122,6 +122,27 @@ tests:
     - chain: redhat-chaos-hog-scenarios
     workflow: rosa-aws-sts-hcp
   timeout: 5h0m0s
+- always_run: false
+  as: krkn-tests-rosa-infra
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.15"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+    test:
+    - ref: redhat-chaos-node-disruptions-infra-outage
+    workflow: rosa-aws-sts
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
