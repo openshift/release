@@ -80,7 +80,7 @@ for machinepool in ${machinepools} ; do
   rosamachinepool_name=$(oc get MachinePool -n "${namespace}" "${machinepool}" -ojsonpath='{.spec.template.spec.infrastructureRef.name}')
   is_ready=$(oc get rosamachinepool "${rosamachinepool_name}" -n "${namespace}" -ojsonpath='{.status.ready}')
   if [[ "${is_ready}" != "true" ]]; then
-    echo "Error: rosamachinepool  ${rosamachinepool_name} is not in the ready status: ${is_ready}"
+    echo "Error: rosamachinepool ${rosamachinepool_name} is not in the ready status: ${is_ready}"
     oc get rosamachinepool "${rosamachinepool_name}" -n "${namespace}" -oyaml
     exit 1
   fi
