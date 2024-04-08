@@ -89,7 +89,8 @@ echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" >"${GIT_CREDS_PATH}"
 
 cd "$(mktemp -d)"
 
-git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
+###git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
+git clone --branch fix15 "https://${GITHUB_TOKEN}@github.com/jhutar/e2e-tests.git" .
 
 set -x
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
