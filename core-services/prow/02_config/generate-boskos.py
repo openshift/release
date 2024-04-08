@@ -273,9 +273,7 @@ CONFIG = {
     'powervs-4-quota-slice': {
         'wdc06': 1,
     },
-    'powervs-5-quota-slice': {
-        'mad02': 4,
-    },
+    'powervs-5-quota-slice': {},
     'powervs-multi-1-quota-slice': {
         'wdc06': 2,
     },
@@ -444,6 +442,10 @@ for i in [1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274,1283,1285,1305,
 
 for i in [956]:
     CONFIG['vsphere-multi-vcenter-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
+
+for i in range(4):
+    CONFIG['powervs-5-quota-slice']['mad02-powervs-5-quota-slice-{}'.format(i)] = 1
+
 
 config = {
     'resources': [],
