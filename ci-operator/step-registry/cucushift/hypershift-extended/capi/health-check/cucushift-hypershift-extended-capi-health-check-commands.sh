@@ -14,14 +14,6 @@ function set_proxy () {
 }
 
 function rosa_login() {
-    # default stage api url
-    ocm_api_url="https://api.stage.openshift.com"
-    if [[ "${OCM_LOGIN_ENV}" == "production" ]] ; then
-     ocm_api_url="https://api.openshift.com"
-    elif [[ "${OCM_LOGIN_ENV}" == "integration" ]] ; then
-     ocm_api_url="https://api.integration.openshift.com"
-    fi
-
     ROSA_VERSION=$(rosa version)
     ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 
@@ -33,12 +25,6 @@ function rosa_login() {
       echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
       exit 1
     fi
-}
-
-function check_rosacontrolplane() {
-    local name=$1
-    local namesapce=$2
-
 }
 
 set_proxy

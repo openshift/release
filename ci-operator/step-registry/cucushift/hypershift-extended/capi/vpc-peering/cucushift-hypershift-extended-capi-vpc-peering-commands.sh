@@ -48,7 +48,8 @@ function check_vpc_peering_connection() {
 }
 
 function check_kubeconfig_secret() {
-    local res=$(oc get secret -A | grep ${CLUSTER_NAME}-kubeconfig)
+    local res
+    res=$(oc get secret -A | grep ${CLUSTER_NAME}-kubeconfig)
     if [[ -z "$res" ]]; then
       return 1
     fi

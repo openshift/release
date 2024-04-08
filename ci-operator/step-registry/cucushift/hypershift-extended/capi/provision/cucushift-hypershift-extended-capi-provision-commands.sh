@@ -27,7 +27,8 @@ function retry() {
 }
 
 function is_hcp_started() {
-    local cluster_res=$(rosa list clusters | grep ${CLUSTER_NAME})
+    local cluster_res
+    cluster_res=$(rosa list clusters | grep ${CLUSTER_NAME})
     if [[ -n "${cluster_res}" ]] ; then
       return 0
     fi
