@@ -29,12 +29,14 @@ else
     pass=false
 fi
 
-oc get secret fips-payload-scan -oyaml | grep -v '^\s*namespace:\s' | oc apply --namespace=$namespace -f -
+#oc get secret fips-payload-scan -oyaml | grep -v '^\s*namespace:\s' | oc apply --namespace=$namespace -f -
+
+mkdir -p /tmp/.docker/
 
 unset KUBECONFIG
 
 echo "Login to registry"
-oc registry login
+oc registry login --to /tmp/.docker/config.json
 echo "Registry login successful"
 
 payload_url="${RELEASE_IMAGE_LATEST}"
