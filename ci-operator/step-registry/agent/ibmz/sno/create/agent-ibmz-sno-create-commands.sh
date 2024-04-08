@@ -293,7 +293,7 @@ platform:
   none: {}
 EOF
 # Adding pull-secret and ssh key
-cat "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret" | tr -d '\n\\n[:space:]' > "$HOME/abi-pull-secret-clean"
+awk '{gsub(/\\n|[[:space:]\\\\]|\\t/,""); print}' "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret" > "$HOME/abi-pull-secret-clean" # Cleaning the pull-secret
 cat >> "$HOME/$CLUSTER_NAME/install-config.yaml" << EOF
 pullSecret: >
   $(<"$HOME/abi-pull-secret-clean")
