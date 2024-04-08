@@ -12,13 +12,6 @@ function run_command() {
 
 pass=true
 
-unset KUBECONFIG
-mkdir -p /tmp/.docker/
-
-echo "Login to registry"
-oc registry login --to /tmp/.docker/config.json
-echo "Registry login successful"
-
 # get a master node
 master_node_0=$(oc get node -l node-role.kubernetes.io/master= --no-headers | grep -Ev "NotReady|SchedulingDisabled"| awk '{print $1}' | awk 'NR==1{print}')
 if [[ -z $master_node_0 ]]; then
@@ -36,13 +29,16 @@ else
     pass=false
 fi
 
-#oc get secret fips-payload-scan -oyaml | grep -v '^\s*namespace:\s' | oc apply --namespace=$namespace -f -
 
 payload_url="${RELEASE_IMAGE_LATEST}"
 
 if [[ "$payload_url" == *"@sha256"* ]]; then
     payload_url=$(echo "$payload_url" | sed 's/@sha256.*/:latest/')
 fi
+
+echo "Login to registry"
+oc registry login
+echo "Registry login successful"
 
 # run node scan and check the result
 report="/tmp/fips-check-payload-scan.log"
