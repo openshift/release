@@ -308,7 +308,6 @@ tar -xzf $HOME/openshift-install.tar.gz -C $HOME/$CLUSTER_NAME/
 
 # Generate PXE artifacts
 echo "Generating pxe-boot artifacts for SNO cluster"
-oc registry login # for pulling images build cluster registry
 $HOME/$CLUSTER_NAME/openshift-install agent create pxe-files --dir $HOME/$CLUSTER_NAME/ --log-level debug
 
 # Generating script for agent boot execution on zVSI
