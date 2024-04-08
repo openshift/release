@@ -20,9 +20,11 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   to: lightspeed-operator
+- dockerfile_path: bundle.Dockerfile
+  to: lightspeed-operator-bundle
 operator:
   bundles:
-  - as: lightspeed-operator-bundle
+  - as: lightspeed-bundle-test
     dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/openshift/lightspeed-operator:latest
@@ -31,9 +33,7 @@ operator:
     with: pipeline:lightspeed-service-api
 promotion:
   to:
-  - additional_images:
-      lightspeed-bundle: lightspeed-operator-bundle
-    namespace: ols
+  - namespace: ols
     tag: latest
 releases:
   initial:
@@ -89,7 +89,7 @@ tests:
         oc wait --for condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
-        name: lightspeed-operator-bundle
+        name: lightspeed-bundle-test
       from: operator-sdk
       resources:
         requests:
