@@ -102,7 +102,7 @@ promotion:
   to:
   - additional_images:
       serverless-operator-src: src
-    name: release-1.32.1
+    name: release-1.32
     namespace: knative
 releases:
   latest:
@@ -118,17 +118,13 @@ resources:
       memory: 200Mi
 tests:
 - as: kitchensink-e2e-aws-412
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -164,6 +160,7 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -188,19 +185,15 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
+    workflow: ipi-aws
 - as: kitchensink-upgrade-aws-412
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -236,6 +229,7 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -260,19 +254,15 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
+    workflow: ipi-aws
 - as: mesh-e2e-aws-412
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -308,6 +298,7 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -332,20 +323,16 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
+    workflow: ipi-aws
   timeout: 5h0m0s
 - as: mesh-upgrade-aws-412
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -381,6 +368,7 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -405,18 +393,14 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
+    workflow: ipi-aws
 - as: operator-e2e-aws-412
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -452,6 +436,7 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -476,18 +461,14 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
+    workflow: ipi-aws
 - as: test-upgrade-aws-412
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -523,6 +504,7 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -547,20 +529,16 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
+    workflow: ipi-aws
 - as: ui-e2e-aws-412
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
   optional: true
   run_if_changed: test/ui
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -596,6 +574,7 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -620,19 +599,15 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
+    workflow: ipi-aws
 - as: upstream-e2e-aws-412
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -668,6 +643,7 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -692,19 +668,15 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
+    workflow: ipi-aws
 - as: upstream-e2e-kafka-aws-412
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
   optional: true
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
@@ -740,6 +712,7 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -764,7 +737,7 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-1.32
   org: openshift-knative

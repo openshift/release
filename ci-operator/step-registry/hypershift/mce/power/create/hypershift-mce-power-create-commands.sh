@@ -377,9 +377,10 @@ done
 echo "$(date) Setup pxe boot in bastion"
 ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR} && ./setup-pxe-boot.sh ${HOSTED_CLUSTER_NAME} ${HYPERSHIFT_NODE_COUNT} ${serverArgs}"
 
+sleep 240
+
 # Rebooting vm to boot from the network
 for instance in "${INSTANCE_ID[@]}"; do
-    sleep 120
     ibmcloud pi ins act $instance -o soft-reboot
 done
 

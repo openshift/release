@@ -196,7 +196,6 @@ tests:
       COMPUTE_NODE_REPLICAS: "2"
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_SET: TechPreviewNoUpgrade
       TEST_SCENARIOS: Cluster_Infrastructure
       TEST_TIMEOUT: "90"
     test:
@@ -862,7 +861,6 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
       E2E_RUN_TAGS: '@disconnected'
-      FEATURE_SET: TechPreviewNoUpgrade
       TEST_SCENARIOS: Cluster_Infrastructure
       TEST_TIMEOUT: "90"
     test:
@@ -899,6 +897,30 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity
+- as: azure-ipi-des-day2-amd-f28-destructive
+  cron: 7 9 26 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set-day2
+- as: azure-ipi-des-day2-arm-f28
+  cron: 12 11 27 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set-day2
 - as: azure-ipi-des-minimal-permission-amd-f9-destructive
   cron: 57 17 4,13,22 * *
   steps:
@@ -1415,8 +1437,6 @@ tests:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       BASELINE_CAPABILITY_SET: None
       DISCONNECTED: "false"
-      PROVISIONING_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      PROVISIONING_NET_DEV: enP2p1s0f0np0
       RESERVE_BOOTSTRAP: "false"
       architecture: arm64
       masters: "3"
@@ -1435,8 +1455,6 @@ tests:
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       DISCONNECTED: "false"
-      PROVISIONING_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      PROVISIONING_NET_DEV: enP2p1s0f0np0
       RESERVE_BOOTSTRAP: "false"
       architecture: arm64
       masters: "3"
@@ -1444,7 +1462,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-external-lb
-- as: baremetal-ipi-ovn-ipv4-f7
+- as: baremetal-ipi-ovn-ipv4-arm-f7
   cluster: build05
   cron: 41 14 4,11,18,25 * *
   steps:
@@ -1455,10 +1473,26 @@ tests:
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       DISCONNECTED: "false"
-      PROVISIONING_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      PROVISIONING_NET_DEV: enP2p1s0f0np0
       RESERVE_BOOTSTRAP: "false"
       architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi
+- as: baremetal-ipi-ovn-ipv4-amd-f7
+  cluster: build05
+  cron: 41 14 4,11,18,25 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      MULTI_RELEASE_IMAGE: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
       masters: "3"
       workers: "2"
     test:
@@ -1547,7 +1581,6 @@ tests:
       ADDITIONAL_WORKERS: "1"
       COMPUTE_NODE_REPLICAS: "2"
       E2E_RUN_TAGS: '@disconnected'
-      FEATURE_SET: TechPreviewNoUpgrade
       TEST_SCENARIOS: Cluster_Infrastructure
       TEST_TIMEOUT: "90"
     test:

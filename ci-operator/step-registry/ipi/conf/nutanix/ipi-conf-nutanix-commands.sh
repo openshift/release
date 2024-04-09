@@ -57,6 +57,15 @@ controlPlane:
   replicas: 3"
 fi
 
+# if loadbalancer is UserManaged, it's mean using external LB,
+# then keepalived and haproxy will not deployed, but coredns still keep
+if [[ ${LB_TYPE} == "UserManaged" ]]; then
+    LB_TYPE_DEF="loadBalancer:
+      type: UserManaged"
+else
+    LB_TYPE_DEF=""
+fi
+
 echo "$(date -u --rfc-3339=seconds) - Adding platform data to install-config.yaml"
 
 # Populate install-config with Nutanix specifics
@@ -67,6 +76,7 @@ platform:
   nutanix:${RHCOS_PATCH}
     apiVIP: ${API_VIP}
     ingressVIP: ${INGRESS_VIP}
+    ${LB_TYPE_DEF}
     prismCentral:
       endpoint:
         address: ${NUTANIX_HOST}

@@ -135,7 +135,7 @@ compute:
       osDisk:
         diskSizeGB: 120"
 else
-    MACHINE_POOL_OVERRIDES="controlPlane:
+  MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
   replicas: ${CONTROL_PLANE_REPLICAS}
 compute:
@@ -209,11 +209,6 @@ else
     apiVIP: "${vips[0]}"
     ingressVIP: "${vips[1]}"
 EOF
-fi
-
-if [ -f "${SHARED_DIR}"/enable_template_content.txt ]; then
-  echo "$(date -u --rfc-3339=seconds) - tamplate defined, appending to platform spec"
-  cat "${SHARED_DIR}"/enable_template_content.txt >>${CONFIG}
 fi
 
 if [ -f ${STATIC_IPS} ]; then
