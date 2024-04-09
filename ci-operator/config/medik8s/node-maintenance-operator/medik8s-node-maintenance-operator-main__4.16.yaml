@@ -41,34 +41,34 @@ tests:
     cluster_profile: medik8s-aws
     env:
       BASE_DOMAIN: medik8s-ci.projects.ecosystem.sysdeseng.com
-      INSTALL_NAMESPACE: nmo-install
+      OPERATOR_NAMESPACE: nmo-install
     test:
-    - as: e2e-install-operator
+    - as: e2e-install-operator-last-version
       cli: latest
       commands: |
-        oc create namespace "$INSTALL_NAMESPACE"
+        oc create namespace "$OPERATOR_NAMESPACE"
 
         # workaround for OLM pod not running with restricted PSA
-        oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
-        oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+        oc label --overwrite ns "$OPERATOR_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "$OPERATOR_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
 
-        OPERATOR_NAMESPACE="$INSTALL_NAMESPACE" VERSION=0.17.0 make bundle-run
+        # OPERATOR_NAMESPACE variable is used by bundle-run and bundle-run-update
+        BUNDLE_IMG=quay.io/medik8s/node-maintenance-operator-bundle:v0.17.0 make bundle-run
       env:
-      - name: INSTALL_NAMESPACE
+      - name: OPERATOR_NAMESPACE
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: e2e-upgrade-operator
+    - as: e2e-upgrade-operator-latest
       cli: latest
-      commands: OPERATOR_NAMESPACE="$INSTALL_NAMESPACE" BUNDLE_IMG="$OO_BUNDLE" make
-        bundle-run-update
+      commands: BUNDLE_IMG="$OO_BUNDLE" make bundle-run-update
       dependencies:
       - env: OO_BUNDLE
         name: my-bundle
       env:
-      - name: INSTALL_NAMESPACE
+      - name: OPERATOR_NAMESPACE
       from: src
       resources:
         requests:
@@ -76,9 +76,9 @@ tests:
           memory: 200Mi
     - as: e2e-test
       cli: latest
-      commands: export OPERATOR_NS="$INSTALL_NAMESPACE" && make cluster-functest
+      commands: export OPERATOR_NS="$OPERATOR_NAMESPACE" && make cluster-functest
       env:
-      - name: INSTALL_NAMESPACE
+      - name: OPERATOR_NAMESPACE
       from: src
       resources:
         requests:
