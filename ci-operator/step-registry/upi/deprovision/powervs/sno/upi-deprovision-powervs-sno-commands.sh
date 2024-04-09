@@ -9,7 +9,9 @@ BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
 
 if [ -f "${SHARED_DIR}/kubeconfig" ]; then
   echo "Test cluster accessiblity"
-  source "${SHARED_DIR}/proxy-conf.sh"
+  if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+  fi
   CLUSTER_INFO="/tmp/cluster-${CLUSTER_NAME}-after-e2e.txt"
   touch ${CLUSTER_INFO}
   export KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -113,11 +115,7 @@ echo "removing menuentry from grub.cfg"
 /usr/bin/cp /var/lib/tftpboot/boot/grub2/grub.cfg.orig /var/lib/tftpboot/boot/grub2/grub.cfg
 systemctl restart tftp;
 
-#echo "Recover to orignal haproxy.cfg"
-#/usr/bin/cp /etc/haproxy/haproxy.cfg.orig /etc/haproxy/haproxy.cfg
-#systemctl restart haproxy;
-
-echo "restarting tftp, dhcpd and haproxy"
+echo "restarting tftp and dhcpd"
 ) 200>"\$LOCK_FILE"
 
 rm -rf /tmp/\${CLUSTER_NAME}* \${IMAGES_DIR} \${WWW_DIR}

@@ -577,10 +577,6 @@ echo "writing host entries to dhcpd.conf"
 cat /etc/dhcp/dhcpd.conf.cicd | envsubst > /etc/dhcp/dhcpd.conf
 systemctl restart dhcpd;
 
-#echo "write config for haproxy"
-#cat /etc/haproxy/haproxy.cfg.cicd | envsubst > /etc/haproxy/haproxy.cfg
-#systemctl restart haproxy;
-
 echo "restarting services tftp & dhcpd"
 )200>"\$LOCK_FILE"
 
@@ -771,7 +767,7 @@ cp /etc/sno-power-credentials/pull-secret "${SHARED_DIR}/"
 scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeadmin-password "${SHARED_DIR}/"
 scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeconfig "${SHARED_DIR}/"
 echo "Create proxy-conf.sh file"
-cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
+cat << EOF > "${SHARED_DIR}/proxy-conf.sh"
 echo "Setup proxy to ${BASTION}:2005"
 export HTTP_PROXY=http://${BASTION}:2005/
 export HTTPS_PROXY=http://${BASTION}:2005/
