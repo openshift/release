@@ -45,7 +45,7 @@ function hasCPMS() {
         if [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
             REQUIRED_OCP_VERSION="4.15"
         else
-            REQUIRED_OCP_VERSION="4.99999"
+            REQUIRED_OCP_VERSION="4.16"
         fi
         ;;
     *)

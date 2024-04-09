@@ -6,15 +6,11 @@ set -o pipefail
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 # shellcheck source=/dev/null
 declare vsphere_datacenter
-declare vsphere_datastore
-declare vsphere_url
-declare vsphere_cluster
-declare vsphere_portgroup
-# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
-
+CONFIG="${SHARED_DIR}/install-config.yaml"
+PATCH="${SHARED_DIR}/template.yaml.patch"
 
 if [ -z "${RHCOS_VM_TEMPLATE}" ]; then
   installer_bin=$(which openshift-install)
@@ -42,17 +38,12 @@ else
   vm_template="${RHCOS_VM_TEMPLATE}"
 fi
 
-cat >> "${SHARED_DIR}"/enable_template_content.txt << EOF
+cat > "${PATCH}" << EOF
+platform:
+  vsphere:
     failureDomains:
-    - name: generated-failure-domain
-      region: generated-region
-      server: "${vsphere_url}"
-      topology:
-        computeCluster: /${vsphere_datacenter}/host/${vsphere_cluster}
-        datacenter: ${vsphere_datacenter}
-        datastore: /${vsphere_datacenter}/datastore/${vsphere_datastore}
+    - topology:
         template: /${vsphere_datacenter}/vm/${vm_template}
-        networks:
-        - ${vsphere_portgroup}
-      zone: generated-zone
 EOF
+yq-go m -x -i "${CONFIG}" "${PATCH}"
+
