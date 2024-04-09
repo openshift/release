@@ -698,7 +698,9 @@ do
   if [ $tries -gt 1 ]; then
     write_install_status
     cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
-    openshift-install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+    openshift-install --dir="${dir}" destroy cluster 2>&1 \
+      | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' \
+      | sed 's/arn:aws.*user[^ ]*/***AWS_CI_USER***/g' &
     wait "$!"
     ret="$?"
     if test "${ret}" -ne 0 ; then
@@ -719,7 +721,10 @@ do
   copy_kubeconfig_minimal "${dir}" &
   copy_kubeconfig_pid=$!
 
-  openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+  openshift-install --dir="${dir}" create cluster 2>&1 \
+    | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' \
+    | sed 's/arn:aws.*user[^ ]*/***AWS_CI_USER***/g' &
+
   wait "$!"
   ret="$?"
   echo "Installer exit with code $ret"

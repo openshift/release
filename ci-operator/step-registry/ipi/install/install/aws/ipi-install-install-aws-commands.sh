@@ -271,7 +271,9 @@ date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 TF_LOG_PATH="${dir}/terraform.txt"
 export TF_LOG_PATH
 
-openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+openshift-install --dir="${dir}" create cluster 2>&1 \
+    | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' \
+    | sed 's/arn:aws.*user[^ ]*/***AWS_CI_USER***/g' &
 
 set +e
 wait "$!"
