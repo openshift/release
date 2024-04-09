@@ -1,4 +1,5 @@
 #!/bin/bash
+# The script runs the Jaeger operator tests.
 
 set -o errexit
 set -o pipefail

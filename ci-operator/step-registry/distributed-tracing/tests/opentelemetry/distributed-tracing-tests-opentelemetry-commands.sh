@@ -1,4 +1,5 @@
 #!/bin/bash
+# The script runs the OpenTelemetry operator tests.
 
 set -o nounset
 set -o errexit
