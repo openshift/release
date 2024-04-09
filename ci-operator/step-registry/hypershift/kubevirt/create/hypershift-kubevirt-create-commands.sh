@@ -12,12 +12,12 @@ else
     CLUSTER_NAMESPACE_PREFIX=clusters
 fi
 
-if [[ -n ${MCE} ]] ; then
-  if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     # shellcheck source=/dev/null
     source "${SHARED_DIR}/proxy-conf.sh"
-  fi
+fi
 
+if [[ -n ${MCE} ]] ; then
   HYPERSHIFT_NAME=hcp
   if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
     echo "MCE version is less than 2.4, use hypershift command"
@@ -96,8 +96,9 @@ echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
   --generate-ssh
 
 if [[ -n ${MCE} ]] ; then
-  oc annotate hostedclusters -n "${CLUSTER_NAMESPACE_PREFIX}" "${CLUSTER_NAME}" "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
-  oc apply -f - <<EOF
+  if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
+    oc annotate hostedclusters -n "${CLUSTER_NAMESPACE_PREFIX}" "${CLUSTER_NAME}" "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
+    oc apply -f - <<EOF
 apiVersion: cluster.open-cluster-management.io/v1
 kind: ManagedCluster
 metadata:
@@ -115,6 +116,7 @@ spec:
   hubAcceptsClient: true
   leaseDurationSeconds: 60
 EOF
+  fi
 fi
 
 
