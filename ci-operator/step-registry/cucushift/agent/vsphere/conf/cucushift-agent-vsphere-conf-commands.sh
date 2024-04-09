@@ -85,7 +85,14 @@ pullSecret: >
 EOF
 fi
 
-yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "${SHARED_DIR}/install-config.yaml" - <<<"
+echo "Installing from initial release $RELEASE_IMAGE_LATEST"
+oc adm release extract -a "$pull_secret_path" "$RELEASE_IMAGE_LATEST" \
+  --command=openshift-install --to=/tmp
+
+version=$(/tmp/openshift-install version | grep 'openshift-install' | awk '{print $2}' | cut -d '.' -f 1,2 --output-delimiter='')
+# Add vSphere credentials if the version is 4.15 or more
+if [[ "${version}" -ge "415" ]]; then
+  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "${SHARED_DIR}/install-config.yaml" - <<<"
 platform:
   vsphere:
     failureDomains:
@@ -108,6 +115,7 @@ platform:
       password: ${GOVC_PASSWORD}
       user: ${GOVC_USERNAME}
 "
+fi
 
 if [ "${MASTERS}" -eq 1 ]; then
   yq --inplace 'del(.platform)' "${SHARED_DIR}"/install-config.yaml
@@ -234,17 +242,12 @@ agent_config="${SHARED_DIR}/agent-config.yaml"
 yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
   "${agent_config}" - <<<"$(cat "${agent_config_patch}")"
 
-echo "Installing from initial release $RELEASE_IMAGE_LATEST"
-oc adm release extract -a "$pull_secret_path" "$RELEASE_IMAGE_LATEST" \
-  --command=openshift-install --to=/tmp
-
+echo "Creating agent image..."
 dir=/tmp/installer
 mkdir "${dir}/"
 pushd ${dir}
-cp -t "${dir}" \
-  "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
+cp -t "${dir}" "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
 
-echo "Creating agent image..."
 /tmp/openshift-install agent create image --dir="${dir}" --log-level debug &
 
 if ! wait $!; then
