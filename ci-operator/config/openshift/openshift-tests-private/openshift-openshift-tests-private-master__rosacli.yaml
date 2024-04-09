@@ -83,20 +83,6 @@ tests:
     test:
     - chain: openshift-extended-rosacli-tests
     workflow: rosa-aws-sts-byo-kms-oidc
-- as: aws-rosa-byo-kms-oidc-prod-critical-e2e-f3
-  cron: 22 18 1,4,7,10,13,16,18,22,25,28 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: candidate
-      ENABLE_AUTOSCALING: "true"
-      MAX_REPLICAS: "6"
-      MIN_REPLICAS: "3"
-      OCM_LOGIN_ENV: production
-      TEST_FILTERS: Critical
-    test:
-    - chain: openshift-extended-rosacli-tests
-    workflow: rosa-aws-sts-byo-kms-oidc
 - as: aws-rosa-localzone-e2e-f7
   cron: 31 1 6,14,22,29 * *
   steps:
@@ -112,17 +98,6 @@ tests:
     cluster_profile: aws-qe
     env:
       CHANNEL_GROUP: stable
-    test:
-    - chain: openshift-extended-rosacli-tests
-    workflow: rosa-aws-sts-private-proxy
-- as: aws-rosa-private-proxy-prod-critical-e2e-f7
-  cron: 32 0 1,9,17,24 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      CHANNEL_GROUP: candidate
-      OCM_LOGIN_ENV: production
-      TEST_FILTERS: Critical
     test:
     - chain: openshift-extended-rosacli-tests
     workflow: rosa-aws-sts-private-proxy
@@ -165,6 +140,31 @@ tests:
     test:
     - ref: rosa-cluster-upgrade-cluster
     workflow: rosa-aws-sts-shared-vpc
+- as: aws-rosa-byo-kms-oidc-prod-critical-e2e-f3
+  cron: 22 18 1,4,7,10,13,16,18,22,25,28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: candidate
+      ENABLE_AUTOSCALING: "true"
+      MAX_REPLICAS: "6"
+      MIN_REPLICAS: "3"
+      OCM_LOGIN_ENV: production
+      TEST_FILTERS: Critical
+    test:
+    - chain: openshift-extended-rosacli-tests
+    workflow: rosa-aws-sts-byo-kms-oidc
+- as: aws-rosa-private-proxy-prod-critical-e2e-f7
+  cron: 32 0 1,9,17,24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: candidate
+      OCM_LOGIN_ENV: production
+      TEST_FILTERS: Critical
+    test:
+    - chain: openshift-extended-rosacli-tests
+    workflow: rosa-aws-sts-private-proxy
 - as: aws-rosa-hcp-e2e-f3
   cron: 32 0 3,6,9,12,14,18,21,24,27,30 * *
   steps:
@@ -186,6 +186,45 @@ tests:
     test:
     - chain: openshift-extended-rosacli-tests
     workflow: rosa-aws-sts-hcp-byo-kms-oidc-auditlog
+- as: aws-rosa-hcp-private-proxy-e2e-f7
+  cron: 56 11 1,9,17,24 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+    test:
+    - chain: openshift-extended-rosacli-tests
+    workflow: rosa-aws-sts-hcp-private-proxy
+- as: aws-rosa-hcp-security-group-e2e-f7
+  cron: 27 17 3,10,18,26 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+    test:
+    - chain: openshift-extended-rosacli-tests
+    workflow: rosa-aws-sts-hcp-security-group
+- as: aws-rosa-hcp-security-group-private-e2e-f7
+  cron: 34 12 7,14,21,29 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+    test:
+    - chain: openshift-extended-rosacli-tests
+    workflow: rosa-aws-sts-hcp-security-group-private
+- as: aws-rosa-hcp-upgrade-e2e-f7
+  cron: 56 11 1,9,17,24 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      AVAILABLE_UPGRADE: "yes"
+      CHANNEL_GROUP: candidate
+      OPENSHIFT_VERSION: "4.15"
+      UPGRADED_TO_VERSION: "4.16"
+    test:
+    - ref: rosa-cluster-upgrade-cluster
+    workflow: rosa-aws-sts-hcp
 - as: aws-rosa-hcp-byo-kms-oidc-auditlog-prod-critical-e2e-f3
   cron: 51 12 3,6,9,12,15,18,20,24,27,30 * *
   steps:
@@ -200,15 +239,6 @@ tests:
     test:
     - chain: openshift-extended-rosacli-tests
     workflow: rosa-aws-sts-hcp-byo-kms-oidc-auditlog
-- as: aws-rosa-hcp-private-proxy-e2e-f7
-  cron: 56 11 1,9,17,24 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      CHANNEL_GROUP: candidate
-    test:
-    - chain: openshift-extended-rosacli-tests
-    workflow: rosa-aws-sts-hcp-private-proxy
 - as: aws-rosa-hcp-private-proxy-prod-critical-e2e-f7
   cron: 3 15 2,10,18,25 * *
   steps:
@@ -219,18 +249,6 @@ tests:
     test:
     - chain: openshift-extended-rosacli-tests
     workflow: rosa-aws-sts-hcp-private-proxy
-- as: aws-rosa-hcp-upgrade-e2e-f7
-  cron: 56 11 1,9,17,24 * *
-  steps:
-    cluster_profile: aws-sd-qe
-    env:
-      AVAILABLE_UPGRADE: "yes"
-      CHANNEL_GROUP: candidate
-      OPENSHIFT_VERSION: "4.15"
-      UPGRADED_TO_VERSION: "4.16"
-    test:
-    - ref: rosa-cluster-upgrade-cluster
-    workflow: rosa-aws-sts-hcp
 zz_generated_metadata:
   branch: master
   org: openshift
