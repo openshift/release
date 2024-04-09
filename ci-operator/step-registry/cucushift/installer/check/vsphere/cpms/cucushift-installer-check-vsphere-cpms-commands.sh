@@ -75,7 +75,7 @@ if (( ${ocp_minor_version} < 15 )); then
 	echo "CPMS failureDomain check is only available on 4.15+ cluster, skip the check!"
         exit 0
 fi
-if [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
+if (( ${ocp_minor_version} > 15 )) || [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
       echo "cpms spec:"
       oc get controlplanemachineset -n openshift-machine-api -ojson | jq -r '.items[].spec.template.machines_v1beta1_machine_openshift_io'
       checkTemplate

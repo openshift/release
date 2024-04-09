@@ -22,6 +22,9 @@ fi
 
 echo "Generating the DHCP/PXE config..."
 
+# DHCP unique identifier (DUID)
+DUID="00:03:00:01"
+
 DHCP_CONF_OPTS="
 tag:$CLUSTER_NAME,15,$CLUSTER_NAME.$BASE_DOMAIN
 tag:$CLUSTER_NAME,119,$CLUSTER_NAME.$BASE_DOMAIN
@@ -39,6 +42,16 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   fi
   DHCP_CONF="${DHCP_CONF}
 $mac,$ip,set:$CLUSTER_NAME,infinite"
+  
+  if [ "${ipv6_enabled:-}" == "true" ]; then
+    # shellcheck disable=SC2154
+    if [ ${#ipv6} -eq 0 ] || [ ${#name} -eq 0 ]; then
+      echo "Error when parsing the Bare Metal Host metadata"
+      exit 1
+    fi
+    DHCP_CONF="${DHCP_CONF}
+id:$DUID:$mac,$name,[$ipv6],infinite"
+  fi
 done
 
 DHCP_CONF="${DHCP_CONF}

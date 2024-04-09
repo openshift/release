@@ -71,7 +71,8 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'Many mirroring tasks to quay.io have been failed in the last minute. Please check errors in the pod logs to figure out the cause.',
+              message: 'Many mirroring tasks to quay.io have been failed in the last minute. Please check errors in the pod logs to figure out the cause: <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures|SOP>.',
+              runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures',
             },
           },
         ],

@@ -1,8 +1,12 @@
 base_images:
   base:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: base-rhel9
+  loki-tag:
+    name: v2.9.6
+    namespace: logging
+    tag: loki
   lokistack-gateway:
     name: mirror-5.y
     namespace: logging
@@ -51,8 +55,8 @@ operator:
   substitutions:
   - pullspec: quay.io/openshift-logging/loki-operator:0.1.0
     with: pipeline:loki-operator
-  - pullspec: quay.io/openshift-logging/loki:v2.9.4
-    with: pipeline:loki
+  - pullspec: quay.io/openshift-logging/loki:v2.9.6
+    with: pipeline:loki-tag
   - pullspec: quay.io/observatorium/api:latest
     with: pipeline:lokistack-gateway
   - pullspec: quay.io/observatorium/opa-openshift:latest
@@ -65,10 +69,9 @@ promotion:
     namespace: logging
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.14"
+    release:
+      channel: stable
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -133,7 +136,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.15"
   steps:
     dependencies:
       OO_INDEX: ci-index-loki-operator-bundle

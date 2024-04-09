@@ -1482,7 +1482,7 @@ function test_serving_machine_pools () {
             echo "ERROR. Unexpected machine pool: '$MP_NAME' subnet count: $MP_SUBNET_COUNT or availability count: $MP_AZ_COUNT (expected 2)"
             TEST_PASSED=false
           else
-            echo "[OCM-6880] - OSDFM should add label to each request-serving MP with the proper subnet"
+            echo "[OCM-6880 | OCM-7157] - OSDFM should add label to each request-serving MP with the proper subnet"
             echo "Confirming that $MP_NAME machine pool has properly set label: 'hypershift.openshift.io/request-serving-subnets'"
             FIRST_SUBNET=$(jq -n "$MP" | jq -r '.subnets[0]') || true
             SECOND_SUBNET=$(jq -n "$MP" | jq -r '.subnets[1]') || true
@@ -1632,6 +1632,51 @@ function test_memory_node_limit_labels () {
 
 ###### end of test OSDFM should set label with 60% of node memory limit as label (OCM-6666) ######
 
+##################################################################
+
+###### test: Delete MC before it getting OCM Id assigned (OCPQE-20732) ######
+
+function test_delete_mc () {
+  echo "[OCPQE-20732] - Delete MC before it getting OCM Id assigned"
+  TEST_PASSED=true
+  echo "Trying to find ready/ maintenance service cluster in main/ canary sector"
+  SC_CLUSTERS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters)
+  NO_OF_CLUSTERS=$(jq -n "$SC_CLUSTERS_OUTPUT" | jq -r .total)
+  MAIN_SECTOR="main"
+  CANARY_SECTOR="canary"
+  STATUS_READY="ready"
+  STATUS_MAINTENANCE="maintenance"
+  SECTOR=""
+  STATUS=""
+  SC_OSD_FM_ID=""
+  for ((i=0; i<$((NO_OF_CLUSTERS)); i+=1)); do
+    CLUSTER_STATUS=$(jq -n "$SC_CLUSTERS_OUTPUT" | jq -r .items[$i].status)
+    CLUSTER_SECTOR=$(jq -n "$SC_CLUSTERS_OUTPUT" | jq -r .items[$i].sector)
+    if [ "$CLUSTER_SECTOR" == "$MAIN_SECTOR" ] || [ "$CLUSTER_SECTOR" == "$CANARY_SECTOR" ]; then
+      if [ "$CLUSTER_STATUS" == "$STATUS_READY" ] || [ "$CLUSTER_STATUS" == "$STATUS_MAINTENANCE" ]; then
+        SC_OSD_FM_ID=$(jq -n "$SC_CLUSTERS_OUTPUT" | jq -r .items[$i].id)
+        SECTOR="$CLUSTER_SECTOR"
+        STATUS="$CLUSTER_STATUS"
+        break
+      fi
+    fi
+  done
+  echo "Found service cluster in sector: '$SECTOR' with status: '$STATUS' with osd fm ID: $SC_OSD_FM_ID"
+  echo "Creating management cluster..."
+  MC_CLUSTER_ID=$(echo '{"service_cluster_id": "'"${SC_OSD_FM_ID}"'"}' | ocm post /api/osd_fleet_mgmt/v1/management_clusters | jq -r '.id')
+  wait_for_cluster_status "$MC_CLUSTER_ID" "management_clusters" "cluster_account_provisioned" 360
+  echo "Deleting management cluster with ID: '$MC_CLUSTER_ID'"
+  ocm delete /api/osd_fleet_mgmt/v1/management_clusters/"$MC_CLUSTER_ID"
+  wait_for_cluster_status "$MC_CLUSTER_ID" "management_clusters" "cleanup_ack_pending" 120
+  ocm delete /api/osd_fleet_mgmt/v1/management_clusters/"$MC_CLUSTER_ID"/ack
+  wait_for_cluster_status "$MC_CLUSTER_ID" "management_clusters" "" 120 # empty status means cluster deleted
+  update_results "OCPQE-20732" $TEST_PASSED
+}
+
+###### end of test: Delete MC before it getting OCM Id assigned (OCPQE-20732) ######
+
+##################################################################
+
 # Test all cases and print results
 
 test_monitoring_disabled
@@ -1680,6 +1725,8 @@ test_mc_request_serving_pool_autoscaling
 test_delete_sc
 
 test_memory_node_limit_labels
+
+test_delete_mc
 
 printf "\nPassed tests:\n"
 for p in "${PASSED[@]}"; do
