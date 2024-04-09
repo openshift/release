@@ -85,17 +85,17 @@ for machinepool in ${machinepools} ; do
     exit 1
   fi
 
-  echo "check machinepool ${machinepool} spec"
+  echo "check rosamachinepool ${machinepool} spec"
   nodepool_name=$(oc get rosamachinepool "${rosamachinepool_name}" -n "${namespace}" -ojsonpath='{.spec.nodePoolName}')
   rosa_mp_file="/tmp/rosa-mp-${nodepool_name}.json"
   rosa describe machinepool -c "${CLUSTER_NAME}" --machinepool "${nodepool_name}" -ojson > "${rosa_mp_file}"
   capi_mp_file="/tmp/capi-mp-${rosamachinepool_name}.json"
   oc get rosamachinepool "${rosamachinepool_name}" -n "${namespace}" -ojson > "${capi_mp_file}"
 
-  # check mp additional security group
   capi_additional_sgs=$(jq -r '.spec.additionalSecurityGroups //""' < "${capi_mp_file}")
   rosa_additional_sgs=$(jq -r '.aws_node_pool.additional_security_group_ids //""' < "${rosa_mp_file}")
   if [[ -n "${capi_additional_sgs}" ]] && [[ -n "${rosa_additional_sgs}" ]] ; then
+    echo "check rosamachinepool additional security group"
     for sg in "${capi_additional_sgs[@]}"; do
       if [[ " ${rosa_additional_sgs[*]} " != *"${sg}"* ]]; then
         echo "Error: additional security group ${sg} not found in rosa machinepool ${nodepool_name}, capi ${rosamachinepool_name}"
@@ -104,9 +104,9 @@ for machinepool in ${machinepools} ; do
     done
   fi
 
-  # check mp additional tags
   tags=$(jq -r '.spec.additionalTags //""' < "${capi_mp_file}")
   if [[ -n "${tags}" ]]; then
+    echo "check rosamachinepool additional tags"
     echo "${tags}" | jq -r 'to_entries[] | "\(.key) \(.value)"' | while read key value; do
       contain_key=$(jq -e '.aws_node_pool.tags | contains({"'"${key}"'": "'"${value}"'"})' < "${rosa_mp_file}")
       if [[ "${contain_key}" != "true" ]] ; then
@@ -119,6 +119,7 @@ for machinepool in ${machinepools} ; do
   # check auto scaling
   autosacling=$(jq -r '.spec.autoscaling //""' < "${capi_mp_file}")
   if [[ -n "${autosacling}" ]]; then
+    echo "check rosamachinepool autoscaling spec"
     capi_mp_max=$(jq -r '.spec.autoscaling.maxReplicas' < "${capi_mp_file}")
     capi_mp_min=$(jq -r '.spec.autoscaling.minReplicas' < "${capi_mp_file}")
     rosa_mp_max=$(jq -r '.autoscaling.max_replica' < "${rosa_mp_file}")
@@ -139,6 +140,7 @@ oc get rosacontrolplane ${rosacontrolplane_name} -n ${namespace} -ojson > ${capi
 ## check rosacontrolplane multi-az support
 az_list=$(jq -r '.spec.availabilityZones[] //""' < "${capi_cp_json_file}")
 for az in ${az_list} ; do
+  echo "check rosacontrolplane availabilityZones"
   dft_workerpool=$(rosa list machinepool -c ${CLUSTER_NAME} | grep -E "workers.*${az}")
   if [[ -z "${dft_workerpool}" ]] ; then
     echo "Error: default machinepool not found in az ${az}"
@@ -149,6 +151,7 @@ done
 ## check rosacontrolplane domain prefix
 domain_prefix=$(jq -r '.spec.domainPrefix  //""' < "${capi_cp_json_file}")
 if [[ -n "${domain_prefix}" ]] ; then
+  echo "check rosacontrolplane domainPrefix"
   api_url=$(jq -r '.api.url  //""' < "${rosa_hcp_info_file}")
   if [[ ! "${api_url}" =~ ${domain_prefix} ]] ; then
     echo "Error: domain prefix ${domain_prefix} not found in api url ${api_url}"
@@ -159,6 +162,7 @@ fi
 # check endpointAccess
 endpoint_access=$(jq -r '.spec.endpointAccess  //""' < "${capi_cp_json_file}")
 if [[ "${endpoint_access}" == "Private" ]] ; then
+  echo "check rosacontrolplane Private endpointAccess"
   api_listening=$(jq -r '.api.listening' < "${rosa_hcp_info_file}")
   if [[ "${api_listening}" != "internal" ]] ; then
     echo "Error: capi endpointAccess ${endpoint_access} does not match with rosa hcp api.listening ${api_listening}"
@@ -169,6 +173,7 @@ fi
 # check network
 capi_network_type=$(jq -r '.spec.network.networkType  //""' < "${capi_cp_json_file}")
 rosa_network_type=$(jq -r '.network.type  //""' < "${rosa_hcp_info_file}")
+echo "check rosacontrolplane networkType"
 if [[ "${capi_network_type}" != "${rosa_network_type}" ]] ; then
     echo "Error: capi network type ${capi_network_type} does not match with rosa hcp network type ${rosa_network_type}"
     exit 1
@@ -176,6 +181,7 @@ fi
 
 capi_machine_cidr=$(jq -r '.spec.network.machineCIDR  //""' < "${capi_cp_json_file}")
 rosa_machine_cidr=$(jq -r '.network.machine_cidr  //""' < "${rosa_hcp_info_file}")
+echo "check rosacontrolplane machineCIDR"
 if [[ "${capi_machine_cidr}" != "${rosa_machine_cidr}" ]] ; then
     echo "Error: capi network machineCIDR ${capi_machine_cidr} does not match with rosa hcp network machine.cidr ${rosa_machine_cidr}"
     exit 1
@@ -184,6 +190,7 @@ fi
 # check additional tags
 tags=$(jq -r '.spec.additionalTags  //""' < "${capi_cp_json_file}")
 if [[ -n "${tags}" ]]; then
+  echo "check rosacontrolplane additionalTags"
   hc_dft_sg=$(cat "${SHARED_DIR}/capi_hcp_default_security_group")
   echo "${tags}" | jq -r 'to_entries[] | "\(.key) \(.value)"' | while read key value; do
     contain_key=$(jq -e '.aws.tags | contains({"'"${key}"'": "'"${value}"'"})' < "${rosa_hcp_info_file}")
@@ -203,6 +210,7 @@ fi
 # check etcd kms key
 etcd_kms_arn=$(jq -r '.spec.etcdEncryptionKMSARN  //""' < "${capi_cp_json_file}")
 if [[ -n "${etcd_kms_arn}" ]]; then
+  echo "check rosacontrolplane etcdEncryptionKMSARN"
   rosa_etcd_encryption=$(jq -r '.etcd_encryption' < "${rosa_hcp_info_file}")
   if [[ "${rosa_etcd_encryption}" != "true" ]] ; then
     echo "Error: etcd_encryption is not true ${rosa_etcd_encryption}"
@@ -219,6 +227,7 @@ fi
 # check audit log
 audit_log_role=$(jq -r '.spec.auditLogRoleARN  //""' < "${capi_cp_json_file}")
 if [[ -n "${audit_log_role}" ]]; then
+  echo "check rosacontrolplane auditLogRoleARN"
   rosa_audit_log_role=$(jq -r '.aws.audit_log.role_arn' < "${rosa_hcp_info_file}")
   if [[ -z "${rosa_audit_log_role}" ]] || [[ "${audit_log_role}" != "${rosa_audit_log_role}" ]]; then
     echo "Error: audit log role arn not matched, rosacontrolplane.spec.auditLogRoleARN %{audit_log_role}, ${rosa_audit_log_role}"
