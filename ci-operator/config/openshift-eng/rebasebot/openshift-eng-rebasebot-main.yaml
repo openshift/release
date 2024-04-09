@@ -554,6 +554,37 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: jaeger-operator
+  cron: 0 23 * * 1-5
+  steps:
+    test:
+    - as: jaeger-operator
+      commands: |
+        rebasebot --source https://github.com/jaegertracing/jaeger-operator:main \
+                  --dest openshift/jaegertracing-jaeger-operator:main \
+                  --rebase IshwarKanse/jaeger-operator:rebase-bot-main \
+                  --update-go-modules \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/dt-secrets/dt-cloner \
+                  --github-cloner-id 811756 \
+                  --git-username tracing-team-rebase-bot \
+                  --git-email tracing-team@redhat.com \
+                  --bot-emails tracing-team@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=none
+      credentials:
+      - mount_path: /secrets/dt-secrets
+        name: dt-secrets
+        namespace: test-credentials
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: unit
   commands: make deps && make unittests
   container:
