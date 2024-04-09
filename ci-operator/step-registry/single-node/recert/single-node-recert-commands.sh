@@ -94,6 +94,11 @@ function stop_containers {
   systemctl stop crio.service
 }
 
+function delete_ovn_certs {
+  rm -rf /var/lib/ovn-ic/etc/ovnkube-node-certs
+  rm -rf /etc/cni/multus/certs
+}
+
 function wait_for_recert_etcd {
   echo "Waiting for recert etcd to be available..."
   until curl -s http://localhost:2379/health |jq -e '.health == "true"' &> /dev/null
@@ -127,15 +132,11 @@ function recert {
       -v /etc/kubernetes:/kubernetes \
       -v /var/lib/kubelet:/kubelet \
       -v /etc/machine-config-daemon:/machine-config-daemon \
-      -v /etc/cni/multus:/multus \
-      -v /var/lib/ovn-ic:/ovn-ic \
       \${recert_image} \
       --etcd-endpoint localhost:2379 \
       --static-dir /kubernetes \
       --static-dir /kubelet \
       --static-dir /machine-config-daemon \
-      --static-dir /multus \
-      --static-dir /ovn-ic \
       --use-cert /certs/admin-kubeconfig-client-ca.crt \
       --use-key "kube-apiserver-localhost-signer /keys/localhost-serving-signer.key" \
       --use-key "kube-apiserver-lb-signer /keys/loadbalancer-serving-signer.key" \
@@ -162,6 +163,7 @@ wait_for_api
 fetch_crts_keys
 fetch_etcd_image
 stop_containers
+delete_ovn_certs
 
 recert
 
