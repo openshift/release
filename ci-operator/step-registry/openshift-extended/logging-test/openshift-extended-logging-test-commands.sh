@@ -199,6 +199,7 @@ oc get clusterversion version -o yaml || true
 # execute the cases
 function run {
     set_gloki_credentials
+    set_azure_credentials
     test_scenarios=""
     echo "TEST_SCENARIOS: \"${TEST_SCENARIOS:-}\""
     echo "TEST_ADDITIONAL: \"${TEST_ADDITIONAL:-}\""
@@ -522,4 +523,25 @@ function set_gloki_credentials() {
         echo "Error: glokiuser or glokipwd file not found. Make sure the ext-grafana-loki credential is mounted." >&2
     fi
 }
+
+function set_azure_credentials() {
+    # export Analytics workspaces  Info
+    if [ -f "${CLUSTER_PROFILE_DIR}/azLogAnalyticsWorkSpaceKey" ]; then
+	export AZURE_LOG_WORKSPACE_KEY_FILE="${CLUSTER_PROFILE_DIR}/azLogAnalyticsWorkSpaceKey"
+    else
+	export AZURE_LOG_WORKSPACE_KEY_FILE=""
+    fi
+    if [ -f "${CLUSTER_PROFILE_DIR}/azLogAnalyticsWorkSpaceID" ]; then
+	    export AZURE_LOG_WORKSPACE_ID=$(cat "${CLUSTER_PROFILE_DIR}/azLogAnalyticsWorkSpaceID")
+    else
+	export AZURE_LOG_WORKSPACE_ID=""
+    fi
+
+    if [ -f "${CLUSTER_PROFILE_DIR}/" ]; then
+	    export AZURE_LOG_WORKSPACE_RESOURCE_ID=$(cat "${CLUSTER_PROFILE_DIR}/azLogAnalyticsWorkSpaceResourceID")
+    else
+	export AZURE_LOG_WORKSPACE_RESOURCE_ID=""
+    fi
+}
+
 run
