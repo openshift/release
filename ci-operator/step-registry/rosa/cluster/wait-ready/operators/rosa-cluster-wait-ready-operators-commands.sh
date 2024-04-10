@@ -42,3 +42,5 @@ if [[ "${costatus}" =~ "timed out" ]]; then
 else
   echo "All cluster operators are done progressing."
 fi
+
+sleep 36000
