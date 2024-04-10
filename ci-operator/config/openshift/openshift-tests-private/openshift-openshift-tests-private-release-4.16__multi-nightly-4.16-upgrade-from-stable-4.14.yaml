@@ -18,11 +18,11 @@ base_images:
   tests-private-postupg:
     name: tests-private
     namespace: ci
-    tag: "4.15"
+    tag: "4.16"
   tests-private-preupg:
     name: tests-private
     namespace: ci
-    tag: "4.14"
+    tag: "4.15"
   tools:
     name: "4.14"
     namespace: ocp
@@ -41,56 +41,31 @@ build_root:
     namespace: openshift
     tag: golang-1.18
 releases:
-  intermediate414:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
-      version: "4.14"
-  latest:
-    release:
-      architecture: multi
-      channel: fast
-      version: "4.13"
-  target:
+  intermediate415:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
       version: "4.15"
+  latest:
+    release:
+      architecture: multi
+      channel: fast
+      version: "4.14"
+  target:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.16"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-ovn-ipsec-amd-mixarch-f14
-  cron: 23 23 1,16 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
-      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
-    test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_TARGET}" >
-        ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE414
-        name: release:intermediate414
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - ref: ipi-install-heterogeneous
-    - chain: openshift-upgrade-qe-test-chainupgrade
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 - as: azure-ipi-ovn-ipsec-arm-mixarch-f14
-  cron: 13 0 5,20 * *
+  cron: 10 22 7,21 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -105,11 +80,11 @@ tests:
       UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_TARGET}" >
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_TARGET}" >
         ${SHARED_DIR}/upgrade-edge
       dependencies:
-      - env: RELEASE_IMAGE_INTERMEDIATE414
-        name: release:intermediate414
+      - env: RELEASE_IMAGE_INTERMEDIATE415
+        name: release:intermediate415
       - env: RELEASE_IMAGE_TARGET
         name: release:target
       from: cli
@@ -121,7 +96,7 @@ tests:
     - chain: openshift-upgrade-qe-test-chainupgrade
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
 zz_generated_metadata:
-  branch: release-4.15
+  branch: release-4.16
   org: openshift
   repo: openshift-tests-private
-  variant: multi-nightly-4.15-upgrade-from-stable-4.13
+  variant: multi-nightly-4.16-upgrade-from-stable-4.14
