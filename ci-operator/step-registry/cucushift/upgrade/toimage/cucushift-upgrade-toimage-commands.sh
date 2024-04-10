@@ -449,7 +449,13 @@ function upgrade() {
 
 # Monitor the upgrade status
 function check_upgrade_status() {
-    local wait_upgrade="${TIMEOUT}" out avail progress cluster_version
+    local wait_upgrade="${TIMEOUT}" out avail progress cluster_version time_step
+    if check_ota_case_enabled "OTA-1114"; then
+        time_step=1
+    else
+        time_step=5
+    fi
+
     if [[ -n "${1:-}" ]]; then
         cluster_version="$1"
     else
@@ -457,8 +463,16 @@ function check_upgrade_status() {
     fi
     echo "Starting the upgrade checking on $(date "+%F %T")"
     while (( wait_upgrade > 0 )); do
-        sleep 5m
-        wait_upgrade=$(( wait_upgrade - 5 ))
+
+        # Put the output before sleep can help us get a very early status of the cluster
+        if check_ota_case_enabled "OTA-1114"; then
+            echo "------------------upgrade status ${wait_upgrade}---------------------"
+            run_command "oc adm upgrade status"
+            echo "------------------end ${wait_upgrade}---------------------"
+        fi
+
+        sleep ${time_step}m
+        wait_upgrade=$(( wait_upgrade - time_step ))
         if ! ( run_command "oc get clusterversion" ); then
             continue
         fi
@@ -559,8 +573,20 @@ fi
 if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
     update_cloud_credentials_oidc
 fi
+
+if check_ota_case_enabled "OTA-1114"; then
+    export OC_ENABLE_CMD_UPGRADE_STATUS=true
+    echo "Upgrade status before upgrading: "
+    run_command "oc adm upgrade status"
+fi
 upgrade
 check_upgrade_status
+
+if check_ota_case_enabled "OTA-1114"; then
+    echo "------------------upgrade status when upgrade finished---------------------"
+    run_command "oc adm upgrade status"
+    echo "------------------end---------------------"
+fi
 
 if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
     echo -e "oc get node -owide\n$(oc get node -owide)"
