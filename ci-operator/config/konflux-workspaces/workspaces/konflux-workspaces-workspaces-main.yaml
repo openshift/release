@@ -1,0 +1,87 @@
+build_root:
+  project_image:
+    dockerfile_path: ci/Dockerfile
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 250Mi
+tests:
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  run_if_changed: ^.github/workflows/push.yaml$|^server|^operator|^ci
+  steps:
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        make -C server kustomize
+        export KUSTOMIZE="$(realpath server/bin/kustomize)"
+        export TAG="pr-${PULL_NUMBER}-${PULL_PULL_SHA:0:8}"
+        export OPERATOR_IMG="quay.io/konflux-workspaces/workspaces-operator:${TAG}"
+        export SERVER_IMG="quay.io/konflux-workspaces/workspaces-server:${TAG}"
+        export NAMESPACE=workspaces-system
+        export USE_INSECURE_TLS=true
+        unset REPO_NAME
+        echo "${TAG}"
+
+        while [[ -z "$(skopeo list-tags docker://quay.io/konflux-workspaces/host-operator | grep ${TAG})" ]]; do
+            sleep 5
+        done
+        ci/toolchain_manager.sh deploy "${TAG}"
+
+        while [[ -z "$(skopeo list-tags docker://quay.io/konflux-workspaces/workspaces-operator | grep ${TAG})" ]]; do
+            sleep 5
+        done
+
+        export SERVER_LOG_LEVEL=-4
+        export E2E_POLL_TIMEOUT=5m
+        make -C e2e deploy-operator deploy-server
+
+        kubectl get -n "${NAMESPACE}" routes workspaces-rest-api-server -o yaml
+        echo "+++"
+        kubectl get -n "${NAMESPACE}" services workspaces-rest-api-server -o yaml
+
+        if make -C e2e test; then
+            exit 0
+        else
+            echo "operator logs:"
+            echo "+++"
+            kubectl logs -n "${NAMESPACE}" deployments/workspaces-controller-manager manager
+            echo "+++"
+            echo "server logs:"
+            echo "+++"
+            kubectl logs -n "${NAMESPACE}" deployments/workspaces-rest-api-server rest-api
+            echo "+++"
+            echo "proxy logs:"
+            echo "+++"
+            kubectl logs -n "${NAMESPACE}" deployments/workspaces-rest-api-server proxy
+            echo "+++"
+            exit 1
+        fi
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+zz_generated_metadata:
+  branch: main
+  org: konflux-workspaces
+  repo: workspaces
