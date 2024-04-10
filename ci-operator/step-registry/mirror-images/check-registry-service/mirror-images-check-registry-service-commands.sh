@@ -68,4 +68,5 @@ function check_mirror_registry_service_status()
 }
 
 check_mirror_registry_response
+sleep 3600
 check_mirror_registry_service_status
