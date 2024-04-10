@@ -88,6 +88,7 @@ function extract_ccoctl(){
     else
         chmod 775 /tmp/ccoctl
     fi
+    export PATH="$PATH"
 }
 
 function update_cloud_credentials_oidc(){
@@ -224,7 +225,9 @@ function rhel_repo(){
     command: yum clean all
 EOF
 
-    version_info="$(oc version | grep Server | sed -E 's/.*: ([4-9].[0-9]+)/\1/' | cut -d '.' -f 1,2)"
+    # current Server version may not be the expected branch when cluster is not fully upgraded 
+    # using TARGET_REPO_VERSION instead directly
+    version_info="${TARGET_REPO_VERSION}"
     openshift_ansible_branch='master'
     if [[ "$version_info" =~ [4-9].[0-9]+ ]] ; then
         openshift_ansible_branch="release-${version_info}"
@@ -285,6 +288,7 @@ function extract_oc(){
         sleep 60
     done
     mv ${tmp_oc}/oc ${OC_DIR} -f
+    export PATH="$PATH"
     which oc
     oc version --client
     return 0
@@ -616,6 +620,25 @@ function admin_ack() {
 
 # Upgrade the cluster to target release
 function upgrade() {
+    set_channel $TARGET_VERSION
+    local retry=3 conditional_updates
+    while (( retry > 0 )); do
+        conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]?.release.version' | xargs)
+        if [[ -z "${conditional_updates}" ]]; then
+            retry=$((retry - 1))
+            sleep 60
+            echo "No conditionalUpdates update available! Retry..."
+        else
+            #shellcheck disable=SC2076
+            if [[ " $conditional_updates " =~ " $TARGET_VERSION " ]]; then
+                echo "Error: $TARGET_VERSION is not recommended, for details please refer:"
+                oc get clusterversion version -o json | jq -r '.status.conditionalUpdates'
+                exit 1
+            fi
+            break
+        fi
+    done
+
     run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
@@ -638,6 +661,11 @@ function check_upgrade_status() {
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${TARGET_VERSION}" ]]; then
             echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
+            return 0
+        fi
+	if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${TARGET_VERSION}"* ]]; then
+	    UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
+            echo -e "Upgrade stuck at updating RHEL worker, run the RHEL worker upgrade now...\n\n"
             return 0
         fi
     done
@@ -673,12 +701,8 @@ function filter_test_by_platform() {
     extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            none|powervs)
+            external|none|powervs)
                 export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
-                eval "$extrainfoCmd"
-                ;;
-            external)
-                echo "Expected, got platform as '$platform'"
                 eval "$extrainfoCmd"
                 ;;
             alibabacloud)
@@ -862,6 +886,18 @@ function run_upgrade_e2e() {
     echo "e2e test take $(( ($e2e_end_time - $e2e_start_time)/60 )) minutes"
 }
 
+function set_channel(){
+    local x_ver y_ver version="$1"
+    x_ver=$( echo "${version}" | cut -f1 -d. )
+    y_ver=$( echo "${version}" | cut -f2 -d. )
+    ver="${x_ver}.${y_ver}"
+    target_channel="${UPGRADE_CHANNEL}-${ver}"
+    if ! oc adm upgrade channel ${target_channel}; then
+        echo "Fail to change channel to ${target_channel}!"
+        exit 1
+    fi
+}
+
 if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
@@ -887,6 +923,9 @@ export PATH=${OC_DIR}:$PATH
 index=0
 for target in "${TARGET_RELEASES[@]}"
 do
+
+    run_command "oc get machineconfig"
+
     (( index += 1 ))
     export TARGET="${target}"
     TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
@@ -919,13 +958,17 @@ do
     fi
     upgrade
     check_upgrade_status
-    check_history
 
     if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
         echo -e "oc get node -owide\n$(oc get node -owide)"
         rhel_repo
         rhel_upgrade
+	if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "triggered" ]]; then
+	    echo -e "RHEL worker upgrade completed, but the cluster upgrade hasn't been finished, check the cluster status again...\    n"
+	    check_upgrade_status
+        fi
     fi
+    check_history
     health_check
     if [[ -n "${E2E_RUN_TAGS}" ]]; then
         run_upgrade_e2e "${index}"

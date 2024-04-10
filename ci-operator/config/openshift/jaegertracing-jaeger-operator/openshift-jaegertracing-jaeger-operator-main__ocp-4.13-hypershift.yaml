@@ -66,15 +66,16 @@ tests:
   steps:
     cluster_profile: aws-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EO_SUB_CHANNEL: stable-5.8
-      EO_SUB_SOURCE: redhat-operators
+      OPERATORS: |
+        [
+            {"name": "elasticsearch-operator", "source": "redhat-operators", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespace": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"}
+        ]
     test:
     - ref: cucushift-hypershift-extended-health-check
     - ref: cucushift-pre
-    - ref: operatorhub-subscribe-elasticsearch-operator
-    - ref: operatorhub-subscribe-amq-streams
-    - ref: distributed-tracing-install-opentelemetry-product
+    - ref: install-operators
     - as: install
       cli: latest
       commands: |

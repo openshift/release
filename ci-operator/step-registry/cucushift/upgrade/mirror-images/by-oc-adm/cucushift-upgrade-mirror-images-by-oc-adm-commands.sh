@@ -113,6 +113,7 @@ function extract_oc(){
         sleep 60
     done
     mv ${tmp_oc}/oc ${OC_DIR} -f
+    export PATH="$PATH"
     which oc
     oc version --client
     return 0

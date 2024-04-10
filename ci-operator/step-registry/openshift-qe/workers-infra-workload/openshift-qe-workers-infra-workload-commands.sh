@@ -602,7 +602,7 @@ SET_ENV_BY_PLATFORM=${SET_ENV_BY_PLATFORM:=$platform_type}
 echo SET_ENV_BY_PLATFORM is $SET_ENV_BY_PLATFORM
 case ${SET_ENV_BY_PLATFORM} in
 	aws)
-           #ARM64 Architecture:
+     #ARM64 Architecture:
 	   if [[ $node_arch == "arm64" ]];then
 	      if [[ ${scale_type} == "medium" ]];then
                 OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=m6g.12xlarge
@@ -666,13 +666,20 @@ case ${SET_ENV_BY_PLATFORM} in
              ;;
 
 	azure)
-	   #Azure use VM_SIZE as instance type, to unify variable, define all to INSTANCE_TYPE
-           OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=Standard_D16s_v3
-           OPENSHIFT_INFRA_NODE_VOLUME_TYPE=Premium_LRS
-           OPENSHIFT_INFRA_NODE_VOLUME_SIZE=128
-           OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=Standard_D32s_v3
-           OPENSHIFT_WORKLOAD_NODE_VOLUME_TYPE=Premium_LRS
-           OPENSHIFT_WORKLOAD_NODE_VOLUME_SIZE=500
+      #Azure use VM_SIZE as instance type, to unify variable, define all to INSTANCE_TYPE
+      #ARM64 Architecture:
+      if [[ $node_arch == "arm64" ]];then
+          OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=Standard_D16ps_v5
+          OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=Standard_D32ps_v5
+      else 
+          OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=Standard_D16s_v3
+          OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=Standard_D32s_v3
+      fi
+            
+        OPENSHIFT_INFRA_NODE_VOLUME_TYPE=Premium_LRS
+        OPENSHIFT_INFRA_NODE_VOLUME_SIZE=128
+        OPENSHIFT_WORKLOAD_NODE_VOLUME_TYPE=Premium_LRS
+        OPENSHIFT_WORKLOAD_NODE_VOLUME_SIZE=500
              ;;
 	vsphere)
 	   OPENSHIFT_INFRA_NODE_VOLUME_SIZE=120

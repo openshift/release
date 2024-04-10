@@ -13,13 +13,20 @@ if [[ -s "${SHARED_DIR}/xpn.json" ]] && [[ -f "${CLUSTER_PROFILE_DIR}/xpn_creds.
   GOOGLE_CLOUD_XPN_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/xpn_creds.json"
   gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_XPN_KEYFILE_JSON}"
 fi
-GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
-export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
-sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
-if ! gcloud auth list | grep -E "\*\s+${sa_email}"
-then
+if [[ "${OSD_QE_PROJECT_AS_SERVICE_PROJECT}" == "yes" ]]; then
+  export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json"
+  GOOGLE_PROJECT_ID="$(jq -r -c .project_id "${GCP_SHARED_CREDENTIALS_FILE}")"
   gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
   gcloud config set project "${GOOGLE_PROJECT_ID}"
+else
+  GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
+  export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
+  sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
+  if ! gcloud auth list | grep -E "\*\s+${sa_email}"
+  then
+    gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
+    gcloud config set project "${GOOGLE_PROJECT_ID}"
+  fi
 fi
 
 ## Destroying DNS resources of mirror registry

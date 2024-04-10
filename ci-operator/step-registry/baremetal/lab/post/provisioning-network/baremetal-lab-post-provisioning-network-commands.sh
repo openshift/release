@@ -7,7 +7,8 @@ if [ ! -f "${SHARED_DIR}/provisioning_network" ]; then
   exit 0
 fi
 
-[ -z "${PROVISIONING_HOST}" ] && { echo "PROVISIONING_HOST is not filled. Failing."; exit 1; }
+[ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
+[ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
 
 # As the API_VIP is unique in the managed network and based on how it is reserved in the reservation steps,
 # we use the last part of it to define the VLAN ID.
@@ -109,7 +110,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 echo "[INFO] Rolling back the provisioning network configuration via the NMState specs"
-timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+timeout -s 9 10m ssh "${SSHOPTS[@]}" -p "$(<"${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")" "root@${AUX_HOST}" bash -s -- \
   "'${NMSTATE_CONFIG}'"  << 'EOF'
 echo "$1" | nmstatectl apply -
 EOF

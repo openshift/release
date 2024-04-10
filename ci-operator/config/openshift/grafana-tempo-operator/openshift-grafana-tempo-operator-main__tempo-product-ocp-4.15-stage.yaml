@@ -37,13 +37,15 @@ tests:
   steps:
     env:
       DOWNSTREAM_TESTS_COMMIT: c19aa1cd60741748256d7f8c7c05a2f9c8e30239
-      OTEL_SOURCE: dt-catalogsource
+      OPERATORS: |
+        [
+            {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"}
+        ]
       SKIP_TESTS: tests/e2e-openshift/red-metrics tests/e2e-openshift/monitoring
-      TEMPO_SOURCE: dt-catalogsource
     test:
     - ref: enable-stage-catalogsource
-    - ref: distributed-tracing-install-tempo-product
-    - ref: distributed-tracing-install-opentelemetry-product
+    - ref: install-operators
     - ref: distributed-tracing-tests-tempo
     workflow: generic-claim
 zz_generated_metadata:
