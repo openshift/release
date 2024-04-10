@@ -441,19 +441,33 @@ function upgrade() {
         run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade"
         error_check_invalid_image
         clear_upgrade
-        check_upgrade_status "${cluster_src_ver}"
+        check_upgrade_progress "${cluster_src_ver}"
     fi
     run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
+#Trigger background upgrade status watch
+function watch_upgrade_status() {
+    export OC_ENABLE_CMD_UPGRADE_STATUS=true
+    export filter='s/[0-9]\+h\|[0-9]\+m\|[0-9]\+m\|[0-9]\+s\|[0-9]\+%\|[0-9]\+\.[0-9]\+s\|[0-9]\+ of [0-9]\+\|waiting on .*/---/g'
+    while [ -f $1 ]; do
+        # print status once, then waits for a change in status output, ignoring minor changes as defined in the regex filter above
+        echo "---`date`---"
+        oc adm upgrade status
+        watch -gn 10 "oc adm upgrade status | sed '$filter'" &> /dev/null
+    done &
+}
+
 # Monitor the upgrade status
-function check_upgrade_status() {
+function check_upgrade_progress() {
     local wait_upgrade="${TIMEOUT}" out avail progress cluster_version time_step
+    time_step=5
     if check_ota_case_enabled "OTA-1114"; then
-        time_step=1
-    else
-        time_step=5
+        # once done upgrading, signal termination to background watch loop by deletion of the file
+        watch_file=$(mktemp)
+        export watch_file
+        watch_upgrade_status $watch_file
     fi
 
     if [[ -n "${1:-}" ]]; then
@@ -463,14 +477,6 @@ function check_upgrade_status() {
     fi
     echo "Starting the upgrade checking on $(date "+%F %T")"
     while (( wait_upgrade > 0 )); do
-
-        # Put the output before sleep can help us get a very early status of the cluster
-        if check_ota_case_enabled "OTA-1114"; then
-            echo "------------------upgrade status ${wait_upgrade}---------------------"
-            run_command "oc adm upgrade status"
-            echo "------------------end ${wait_upgrade}---------------------"
-        fi
-
         sleep ${time_step}m
         wait_upgrade=$(( wait_upgrade - time_step ))
         if ! ( run_command "oc get clusterversion" ); then
@@ -484,15 +490,18 @@ function check_upgrade_status() {
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${cluster_version}" ]]; then
             echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
+            check_ota_case_enabled "OTA-1114" && rm $watch_file
             return 0
         fi
         if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${cluster_version}"* ]]; then
 	    UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
             echo -e "Upgrade stuck at updating RHEL worker, run the RHEL worker upgrade now...\n\n"
+            check_ota_case_enabled "OTA-1114" && rm $watch_file
             return 0
         fi
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
+        check_ota_case_enabled "OTA-1114" && rm $watch_file
         echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
     fi
 }
@@ -580,7 +589,7 @@ if check_ota_case_enabled "OTA-1114"; then
     run_command "oc adm upgrade status"
 fi
 upgrade
-check_upgrade_status
+check_upgrade_progress
 
 if check_ota_case_enabled "OTA-1114"; then
     echo "------------------upgrade status when upgrade finished---------------------"
@@ -594,7 +603,7 @@ if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
     rhel_upgrade
     if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "triggered" ]]; then
 	echo -e "RHEL worker upgrade completed, but the cluster upgrade hasn't been finished, check the cluster status again...\    n"
-	check_upgrade_status
+	check_upgrade_progress
     fi
 fi
 check_history
