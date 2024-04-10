@@ -2,8 +2,8 @@
 
 set -eu -o pipefail
 # Define the paths to the JSON files
-declare -r MASTER_JSON="/var/run/vault/dt-secrets/99-master-it-ca.json"
-declare -r WORKER_JSON="/var/run/vault/dt-secrets/99-worker-it-ca.json"
+declare -r MASTER_JSON="/var/run/vault/distributed-tracing-team/99-master-it-ca.json"
+declare -r WORKER_JSON="/var/run/vault/distributed-tracing-team/99-worker-it-ca.json"
 declare -r STAGE_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.json"
 
 declare ICSP_NAME=${ICSP_NAME:-"dt-registry"}
