@@ -133,7 +133,6 @@ pushd /home
 popd
 
 echo "6. Create imageconentsourcepolicy and catalogsource"
-find /home/oc-mirror-workspace -type d -name '*results*' -exec oc apply -f {}/*.yaml \;
 cat << END | oc apply -f -
 apiVersion: operator.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
@@ -145,11 +144,24 @@ spec:
     - \${mirror_registry}/multicluster-engine
     source: registry.redhat.io/rhacm2
   - mirrors:
-    - \${mirror_registry}/rh-osbs
-    source: registry-proxy.engineering.redhat.com/rh-osbs
+    - \${mirror_registry}/rh-osbs/multicluster-engine-mce-operator-bundle
+    source: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-mce-operator-bundle
+  - mirrors:
+    - \${mirror_registry}/rh-osbs/iib
+    source: registry-proxy.engineering.redhat.com/rh-osbs/iib
   - mirrors:
     - \${mirror_registry}/multicluster-engine
     source: registry.redhat.io/multicluster-engine
+END
+cat << END | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: cs-mce-custom-registry
+  namespace: openshift-marketplace
+spec:
+  image: \${mirror_registry}/acm-d/mce-custom-registry:2.4
+  sourceType: grpc
 END
 echo "Waiting for the new ImageContentSourcePolicy to be updated on machines"
 oc wait clusteroperators/machine-config --for=condition=Upgradeable=true --timeout=15m
