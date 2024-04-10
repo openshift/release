@@ -25,6 +25,9 @@ else
   if [[ $E2E_RUN_TAGS =~ @osd_ccs|@rosa ]] ; then
     echo "Testing against online cluster"
     ./console-test-managed-service.sh || true
+  elif [[ $E2E_RUN_TAGS =~ @level0 ]]; then
+    echo "only run level0 scenarios"
+    ./console-test-frontend.sh --tags @level0 || true
   # if the TYPE is ui, then it's a job specific for UI, run full tests
   # or else, we run smoke tests to balance coverage and cost
   elif [[ "X${E2E_TEST_TYPE}X" == 'XuiX' ]]; then
