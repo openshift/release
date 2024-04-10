@@ -1,10 +1,10 @@
 base_images:
   ansible:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: ansible
   cli:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: cli
   dev-scripts:
@@ -14,13 +14,13 @@ base_images:
   tests-private-postupg:
     name: tests-private
     namespace: ci
-    tag: "4.15"
+    tag: "4.16"
   tests-private-preupg:
     name: tests-private
     namespace: ci
-    tag: "4.14"
+    tag: "4.15"
   tools:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: tools
   verification-tests:
@@ -59,10 +59,9 @@ releases:
       channel: fast
       version: "4.10"
   intermediate411:
-    candidate:
+    release:
       architecture: amd64
-      product: ocp
-      stream: nightly
+      channel: fast
       version: "4.11"
   intermediate412:
     candidate:
@@ -82,6 +81,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.14"
+  intermediate415:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.15"
   latest:
     release:
       architecture: amd64
@@ -92,7 +97,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.16"
 resources:
   '*':
     requests:
@@ -100,7 +105,7 @@ resources:
       memory: 200Mi
 tests:
 - as: aws-ipi-f30
-  cron: 16 13 14 * *
+  cron: 8 21 29 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -113,9 +118,11 @@ tests:
     - chain: ipi-install
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE45},${RELEASE_IMAGE_INTERMEDIATE46},${RELEASE_IMAGE_INTERMEDIATE47},${RELEASE_IMAGE_INTERMEDIATE48},${RELEASE_IMAGE_INTERMEDIATE49},${RELEASE_IMAGE_INTERMEDIATE410},${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE45},${RELEASE_IMAGE_INTERMEDIATE46},${RELEASE_IMAGE_INTERMEDIATE47},${RELEASE_IMAGE_INTERMEDIATE48},${RELEASE_IMAGE_INTERMEDIATE49},${RELEASE_IMAGE_INTERMEDIATE410},${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE415
+        name: release:intermediate415
       - env: RELEASE_IMAGE_INTERMEDIATE414
         name: release:intermediate414
       - env: RELEASE_IMAGE_INTERMEDIATE413
@@ -148,7 +155,7 @@ tests:
     - ref: enable-qe-catalogsource
     - chain: openshift-upgrade-qe-test
 zz_generated_metadata:
-  branch: release-4.15
+  branch: release-4.16
   org: openshift
   repo: openshift-tests-private
-  variant: amd64-nightly-4.15-upgrade-from-stable-4.4
+  variant: amd64-nightly-4.16-upgrade-from-stable-4.4
