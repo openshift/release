@@ -19,8 +19,9 @@ KUBECONFIG="" oc --loglevel=8 registry login
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
     if (( FRC != 0 )); then
-        echo -e "oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
-        echo -e "oc get machineconfig\n$(oc get machineconfig)"
+        echo -e "\noc adm upgrade status\n$(env OC_ENABLE_CMD_UPGRADE_STATUS='true' oc adm upgrade status)"
+        echo -e "\noc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
+        echo -e "\noc get machineconfig\n$(oc get machineconfig)"
         echo -e "Describing abnormal nodes...\n"
         oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
         echo -e "Describing abnormal operators...\n"
@@ -32,7 +33,7 @@ function debug() {
 
 # Generate the Junit for upgrade
 function createUpgradeJunit() {
-    echo "Generating the Junit for upgrade"
+    echo -e "\nGenerating the Junit for upgrade"
     if (( FRC == 0 )); then
       cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
