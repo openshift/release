@@ -33,6 +33,10 @@ else
   elif [[ "X${E2E_TEST_TYPE}X" == 'XuiX' ]]; then
     echo "Testing on normal cluster"
     ./console-test-frontend.sh || true
+  elif [[ "X${E2E_RUN_TAGS}X" == 'XNetwork_ObservabilityX' ]]; then
+    # not using --grepTags here since cypress in 4.12 doesn't have that plugin
+    echo "Running Network_Observability tests"
+    ./console-test-frontend.sh --spec tests/netobserv/* || true
   else
     echo "only run smoke scenarios"
     ./console-test-frontend.sh --tags @smoke || true
