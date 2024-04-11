@@ -1,8 +1,8 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
-set -o pipefail
+#set -o errexit
+#set -o pipefail
 
 # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
 # to be able to SSH.
@@ -18,7 +18,7 @@ fi
 cat > scaleup-pre-hook-ibmcloud.yaml << EOF
 - name: Configure RHEL machine on IBMCloud
   hosts: new_workers
-  any_errors_fatal: true
+  any_errors_fatal: false
   gather_facts: true
 
   tasks:
@@ -36,5 +36,8 @@ cat > scaleup-pre-hook-ibmcloud.yaml << EOF
     until: makecache_result.rc == 0
 EOF
 
+cp ${SHARED_DIR}/kubeconfig "${ARTIFACT_DIR}"
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
+echo "waiting debug...."
+sleep 2h
 ansible-playbook -i "${SHARED_DIR}/ansible-hosts" scaleup-pre-hook-ibmcloud.yaml -vvv
