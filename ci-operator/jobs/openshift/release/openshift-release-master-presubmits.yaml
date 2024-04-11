@@ -162,14 +162,14 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-clusterimageset-validate
     rerun_command: /test clusterimageset-validate
-    run_if_changed: ^clusters/hive/pools/.*
+    run_if_changed: ^clusters/hosted-mgmt/pools/.*
     spec:
       containers:
       - args:
         - --pools
-        - ./clusters/hive/pools
+        - ./clusters/hosted-mgmt/pools
         - --imagesets
-        - ./clusters/hive/pools
+        - ./clusters/hosted-mgmt/pools
         command:
         - clusterimageset-updater
         image: registry.ci.openshift.org/ci/clusterimageset-updater:latest
@@ -991,19 +991,19 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: app.ci
-    context: ci/build-farm/hive-dry
+    cluster: build02
+    context: ci/build-farm/hosted-mgmt-dry
     decorate: true
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-hive-dry
-    rerun_command: /test hive-dry
+    name: pull-ci-openshift-release-master-hosted-mgmt-dry
+    rerun_command: /test hosted-mgmt-dry
     run_if_changed: ^clusters/.*
     spec:
       containers:
       - args:
         - --config-dir
-        - clusters/hive
+        - clusters/hosted-mgmt
         - --kubeconfig
         - /etc/build-farm-credentials/kubeconfig
         - --as=
@@ -1029,12 +1029,12 @@ presubmits:
       - name: build-farm-credentials
         secret:
           items:
-          - key: sa.config-updater.hive.config
+          - key: sa.config-updater.hosted-mgmt.config
             path: kubeconfig
           secretName: config-updater
       - emptyDir: {}
         name: tmp
-    trigger: (?m)^/test( | .* )hive-dry,?($|\s.*)
+    trigger: (?m)^/test( | .* )hosted-mgmt-dry,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

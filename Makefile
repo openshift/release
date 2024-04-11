@@ -425,7 +425,7 @@ secret-config-updater:
 	--from-file=sa.config-updater.build04.config=$(TMPDIR)/sa.config-updater.build04.config \
 	--from-file=sa.config-updater.build05.config=$(TMPDIR)/sa.config-updater.build05.config \
 	--from-file=sa.config-updater.build09.config=$(TMPDIR)/sa.config-updater.build09.config \
-	--from-file=sa.config-updater.hive.config=$(TMPDIR)/sa.config-updater.hive.config \
+	--from-file=sa.config-updater.hosted-mgmt.config=$(TMPDIR)/sa.config-updater.hosted-mgmt.config \
 	--from-file=sa.config-updater.vsphere02.config=$(TMPDIR)/sa.config-updater.vsphere02.config \
 	--dry-run=client -o json | oc --context app.ci apply --dry-run=${DRY_RUN} --as system:admin -f -
 .PHONY: secret-config-updater
@@ -462,7 +462,7 @@ generate-hypershift-deployment:
 		--oidc-storage-provider-s3-region=us-east-1 \
 		--hypershift-image=registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
 		--enable-uwm-telemetry-remote-write=false \
-		render | $(yq) eval 'select(.kind != "Secret")' > clusters/hive/hypershift/hypershift-install.yaml
+		render | $(yq) eval 'select(.kind != "Secret")' > clusters/hosted-mgmt/hypershift/hypershift-install.yaml
 .PHONY: generate-hypershift-deployment
 
 build-hypershift-deployment: TAG ?= $(shell date +%Y%m%d)
