@@ -37,6 +37,7 @@ cat > scaleup-pre-hook-ibmcloud.yaml << EOF
 EOF
 
 cp ${SHARED_DIR}/kubeconfig "${ARTIFACT_DIR}"
+cp scaleup-pre-hook-ibmcloud.yaml "${ARTIFACT_DIR}"
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
 echo "waiting debug...."
 sleep 2h
