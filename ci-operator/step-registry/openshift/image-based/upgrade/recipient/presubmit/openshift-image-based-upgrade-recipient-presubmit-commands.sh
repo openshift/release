@@ -49,7 +49,7 @@ echo "Making a recipient cluster..."
 make recipient
 
 echo "Upgrading recipient cluster from ${RECIPIENT_VERSION} to ${SEED_VERSION} using ${SEED_IMAGE}:${SEED_IMAGE_TAG}..."
-make sno-upgrade SEED_IMAGE=${SEED_IMAGE}:${SEED_IMAGE_TAG}
+make sno-upgrade SEED_IMAGE=${SEED_IMAGE}:${SEED_IMAGE_TAG} DISABLE_IBU_ROLLBACK=true
 EOF
 
 chmod +x ${SHARED_DIR}/upgrade_from_seed.sh
