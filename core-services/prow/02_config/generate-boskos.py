@@ -74,9 +74,6 @@ CONFIG = {
         'us-east-1': 5,
         'us-west-2': 5
     },
-    'aws-perf-qe-quota-slice': {
-        'us-west-2': 3,
-    },
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 10,
     },
