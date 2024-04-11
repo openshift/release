@@ -451,12 +451,13 @@ function upgrade() {
 #Trigger background upgrade status watch
 function watch_upgrade_status() {
     export OC_ENABLE_CMD_UPGRADE_STATUS=true
-    export filter='s/[0-9]\+h\|[0-9]\+m\|[0-9]\+m\|[0-9]\+s\|[0-9]\+%\|[0-9]\+\.[0-9]\+s\|[0-9]\+ of [0-9]\+\|waiting on .*/---/g'
+    # a changes in the following strings would be ignored while watching upgrade status for changes to log
+    export filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of [0-9]+|waiting on .*'
     while [ -f $1 ]; do
-        # print status once, then waits for a change in status output, ignoring minor changes as defined in the regex filter above
+        # print status once, then waits for a change in status output
         echo "---`date`---"
         oc adm upgrade status
-        watch -gn 10 "oc adm upgrade status | sed '$filter'" &> /dev/null
+        watch -gn 10 'oc adm upgrade status | sed -E "s/${filter}//g"' &> /dev/null
     done &
 }
 
