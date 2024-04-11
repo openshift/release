@@ -311,10 +311,9 @@ CONFIG = {
         'us-west-2': 5,
     },
     'azure-virtualization-quota-slice': {
-        'centralus': 5,
-        'eastus': 5,
-        'eastus2': 5,
-        'westus': 5
+        'eastus': 10,
+        'eastus2': 10,
+        'westus': 10
     },
     'gcp-virtualization-quota-slice': {
         'us-central1': 50,
