@@ -6,7 +6,7 @@ set -o pipefail
 
 # Setup necessary env variables
 
-export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN QUAY_OAUTH_TOKEN_RELEASE_SOURCE QUAY_OAUTH_TOKEN_RELEASE_DESTINATION OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
+export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
     GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING GITHUB_TOKENS_LIST
 
 DEFAULT_QUAY_ORG=redhat-appstudio-qe
@@ -16,8 +16,6 @@ GITHUB_TOKEN=""
 QUAY_TOKEN=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/quay-token)
 QUAY_OAUTH_USER=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/quay-oauth-user)
 QUAY_OAUTH_TOKEN=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/quay-oauth-token)
-QUAY_OAUTH_TOKEN_RELEASE_SOURCE=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-source)
-QUAY_OAUTH_TOKEN_RELEASE_DESTINATION=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-destination)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 PREVIOUS_RATE_REMAINING=0
