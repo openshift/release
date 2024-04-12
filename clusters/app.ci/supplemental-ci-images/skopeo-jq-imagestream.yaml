@@ -1,0 +1,79 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: skopeo
+  namespace: ci
+spec:
+  tags:
+  - annotations:
+      openshift.io/imported-from: quay.io/skopeo/stable:v1.15.0
+    name: "v1.15.0"
+    referencePolicy:
+      type: Local
+    from:
+      kind: DockerImage
+      name: quay.io/skopeo/stable:v1.15.0
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: skopeo-jq
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: skopeo:skopeo-stable-v1.15.0-jq
+  source:
+    dockerfile: |
+      FROM quay.io/skopeo/stable:v1.15.0
+      RUN dnf install -y jq && dnf clean all && rm -rf /var/cache/dnf
+      RUN echo $'#!/bin/sh \n\
+       \n\
+      set -o errexit \n\
+       \n\
+      if [ -z ${MAPPING_FILE_PREFIX} ]; then >&2 echo "MAPPING_FILE_PREFIX is unset or empty" && exit 1; else echo "MAPPING_FILE_PREFIX is set to $MAPPING_FILE_PREFIX"; fi \n\
+       \n\
+      skopeo_cmd=echo \n\
+      if [[ "${dry_run}" = "false" ]] ; then \n\
+        skopeo_cmd=skopeo \n\
+      fi \n\
+       \n\
+      failures=0 \n\
+      for mapping in /etc/imagemirror/${MAPPING_FILE_PREFIX}*; do \n\
+        while IFS= read -r line || [ -n "$line" ]; do \n\
+          if [[ ${line} = \#* ]] ; then  \n\
+            echo "ignored comment line ${line}" \n\
+            continue \n\
+          fi \n\
+          arg_array=($line) \n\
+          len=${#arg_array[@]} \n\
+          if [[ "${len}" < "2" ]] ; then \n\
+            echo "ignored invalid line ${line}" \n\
+            continue \n\
+          fi \n\
+          prefix="registry.ci.openshift.org/" \n\
+          source=${arg_array[0]#"$prefix"} \n\
+          source=${source//[\/:]/_} \n\
+          source_host="quay.io" \n\
+          for target in "${arg_array[@]:1}"; do \n\
+            if ! ${skopeo_cmd} copy --src-authfile=/home/mirror/.docker/pull-config.json --dest-authfile=/home/mirror/.docker/push-config.json "docker://${source_host}/openshift/ci:${source}" "docker://${target}" ; then \n\
+              failures=$((failures+1)) \n\
+            fi \n\
+          done \n\
+        done < "$mapping" \n\
+      done \n\
+       \n\
+      echo "finished" \n\
+      exit $failures ' >> /tp-entrypoint.sh && chmod +x /tp-entrypoint.sh
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: skopeo:v1.15.0
+        namespace: ci
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
