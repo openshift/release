@@ -42,6 +42,8 @@ chain:
       
         export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
         export RESTRICTED_INFRA_KUBECONFIG="/tmp/secret/restricted_infra_kubeconfig"
+      
+        INFRA_PLATFORM_TYPE=$(oc --kubeconfig /tmp/secret/kubeconfig get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
 
         while [ ! -e "${RESTRICTED_INFRA_KUBECONFIG}" ]; do
           sleep 10
@@ -65,7 +67,8 @@ chain:
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
                   --e2e.kubevirt-infra-kubeconfig=${RESTRICTED_INFRA_KUBECONFIG} \
                   ${STORAGE_CLASS_FLAG} \
-                  --e2e.kubevirt-infra-namespace=${EXTERNAL_INFRA_NS}
+                  --e2e.kubevirt-infra-namespace=${EXTERNAL_INFRA_NS} \
+                  --e2e.annotations=hypershift.openshift.io/management-platform=${INFRA_PLATFORM_TYPE}
 
     credentials:
       - mount_path: /etc/ci-pull-credentials
