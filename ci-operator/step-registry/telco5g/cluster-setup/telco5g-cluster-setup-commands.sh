@@ -25,6 +25,7 @@ PREPARED_CLUSTER=("cnfdu1" "cnfdu3")
 source $SHARED_DIR/main.env
 echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
 
+# testing
 # Set environment for jobs to run
 INTERNAL=true
 INTERNAL_ONLY=true
