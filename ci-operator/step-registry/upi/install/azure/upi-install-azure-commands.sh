@@ -168,13 +168,15 @@ else
   VHD_URL="$(jq -r .azure.url /var/lib/openshift-install/rhcos.json)"
 fi
 
+# change to use --account-key instead of --auth-mode login to avoid issue
+# https://github.com/MicrosoftDocs/azure-docs/issues/53299
 echo "Copying VHD image from ${VHD_URL}"
-az storage container create --name vhd --account-name $ACCOUNT_NAME --auth-mode login
+az storage container create --name vhd --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY
 
 status="false"
 while [ "$status" == "false" ]
 do
-  status=$(az storage container exists --account-name $ACCOUNT_NAME --name vhd --auth-mode login -o tsv --query exists)
+  status=$(az storage container exists --account-name $ACCOUNT_NAME --name vhd --account-key $ACCOUNT_KEY -o tsv --query exists)
 done
 
 az storage blob copy start --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --destination-container vhd --destination-blob "rhcos.vhd" --source-uri "$VHD_URL"
@@ -185,9 +187,11 @@ do
 done
 
 status="pending"
-while [ "$status" == "pending" ]
+cmd_result=1
+while [[ ${cmd_result} -eq 1 ]]
 do
-  status=$(az storage blob show --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --container-name vhd --name "rhcos.vhd" -o tsv --query properties.copy.status)
+  cmd_result=0
+  status=$(az storage blob show --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --container-name vhd --name "rhcos.vhd" -o tsv --query properties.copy.status) || cmd_result=1
 done
 if [[ "$status" != "success" ]]; then
   echo "Error copying VHD image ${VHD_URL}"

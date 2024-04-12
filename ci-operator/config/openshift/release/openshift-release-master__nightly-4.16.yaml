@@ -83,10 +83,6 @@ releases:
       product: ocp
       stream: nightly
       version: "4.16"
-  oldest-supported-z-rollback:
-    release:
-      channel: candidate
-      version: 4.16.0-ec.0
 resources:
   '*':
     requests:
@@ -196,6 +192,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-sdn-serial-ipv4
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ovn-ipv6
   cluster: build05
   interval: 168h
@@ -205,6 +202,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-serial-virtualmedia
   cluster: build05
   interval: 168h
@@ -214,6 +212,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-virtualmedia
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ovn-dualstack
   cluster: build05
   interval: 168h
@@ -223,6 +222,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-sdn-bm-upgrade
   cluster: build05
   cron: 0 12 1 1 *
@@ -583,32 +583,6 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-xpn
-  timeout: 6h0m0s
-- as: aws-ovn-upgrade-rollback-oldest-supported
-  interval: 168h
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-    test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_LATEST},${RELEASE_IMAGE_Z_ROLLBACK}" > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_Z_ROLLBACK
-        name: release:oldest-supported-z-rollback
-      - env: RELEASE_IMAGE_LATEST
-        name: release:latest
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - ref: cucushift-chainupgrade-toimage
-    - chain: openshift-upgrade-qe-sanity
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn
   timeout: 6h0m0s
 - as: e2e-aws-sdn-upgrade
   interval: 168h

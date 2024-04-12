@@ -4,6 +4,23 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+trap 'warn_0_case_executed' INT TERM EXIT
+function warn_0_case_executed {
+    local count
+    count="$(ls ${ARTIFACT_DIR} | wc -l)"
+    if [ $((count)) == 0 ] ; then
+        mkdir --parents "${ARTIFACT_DIR}"
+        cat >"${ARTIFACT_DIR}/junit-cucushift-result.xml" <<- EOF
+<testsuite name="cucushift-e2e" tests="1" errors="1">
+  <testcase name="Overall status of cucushift-e2e test">
+    <failure message="">Caution: NO test cases executed.</failure>
+  </testcase>
+</testsuite>
+EOF
+
+    fi
+}
+
 function show_test_execution_time() {
     local test_type time_used
     test_type="$1"
@@ -72,12 +89,8 @@ function filter_test_by_platform() {
     extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            none|powervs)
+            external|none|powervs)
                 export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
-                eval "$extrainfoCmd"
-                ;;
-            external)
-                echo "Expected, got platform as '$platform'"
                 eval "$extrainfoCmd"
                 ;;
             alibabacloud)
@@ -304,6 +317,7 @@ function summarize_test_results() {
     # summarize test results
     echo "Summarizing test results..."
     failures=0 errors=0 skipped=0 tests=0
+    [[ -e "${ARTIFACT_DIR}" ]] || exit 0
     grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
     while read -a row ; do
         # if the last ARG of command `let` evaluates to 0, `let` returns 1

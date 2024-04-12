@@ -3,12 +3,10 @@ build_root:
     dockerfile_literal: |
       FROM registry.ci.openshift.org/ocp/ubi-python-311:9
       USER 0
+      RUN dnf install -y podman
 images:
 - dockerfile_path: Containerfile
   to: lightspeed-service-api
-- dockerfile_path: Containerfile.rag
-  from: lightspeed-service-api
-  to: lightspeed-service-api-rag
 - dockerfile_path: Containerfile.redis
   to: lightspeed-service-redis
 promotion:
@@ -69,8 +67,7 @@ tests:
         export PROVIDER_URL=https://ols-test.openai.azure.com/
         export PROVIDER_DEPLOYMENT_NAME=0301-dep
         export MODEL=gpt-3.5-turbo
-        # TODO remove scripts/test-e2e-standalone.sh
-        tests/scripts/test-e2e-standalone.sh || scripts/test-e2e-standalone.sh
+        tests/scripts/test-e2e-standalone.sh
       credentials:
       - mount_path: /var/run/azureopenai
         name: azureopenai-apitoken
@@ -91,8 +88,7 @@ tests:
         export PROVIDER_KEY_PATH=/var/run/bam/token
         export PROVIDER=bam
         export MODEL=ibm/granite-13b-chat-v2
-        # TODO remove scripts/test-e2e-standalone.sh
-        tests/scripts/test-e2e-standalone.sh || scripts/test-e2e-standalone.sh
+        tests/scripts/test-e2e-standalone.sh
       credentials:
       - mount_path: /var/run/bam
         name: bam-apitoken
@@ -113,8 +109,7 @@ tests:
         export PROVIDER_KEY_PATH=/var/run/openai/token
         export PROVIDER=openai
         export MODEL=gpt-3.5-turbo
-        # TODO remove scripts/test-e2e-standalone.sh
-        tests/scripts/test-e2e-standalone.sh || scripts/test-e2e-standalone.sh
+        tests/scripts/test-e2e-standalone.sh
       credentials:
       - mount_path: /var/run/openai
         name: openai-apitoken
@@ -136,8 +131,7 @@ tests:
         export PROVIDER=watsonx
         export PROVIDER_PROJECT_ID=ad629765-c373-4731-9d69-dc701724c081
         export MODEL=ibm/granite-13b-chat-v2
-        # TODO remove scripts/test-e2e-standalone.sh
-        tests/scripts/test-e2e-standalone.sh || scripts/test-e2e-standalone.sh
+        tests/scripts/test-e2e-standalone.sh
       credentials:
       - mount_path: /var/run/watsonx
         name: watsonx-apitoken
@@ -150,9 +144,7 @@ tests:
 - as: e2e-ols-cluster
   run_if_changed: ^(Containerfile.*|Makefile|manifests/.*|ols/.*|pyproject.toml|pdm.lock|scripts/.*|tests/.*)$
   steps:
-    cluster_profile: aws-2
-    env:
-      HYPERSHIFT_BASE_DOMAIN: hypershift.aws-2.ci.openshift.org
+    cluster_profile: aws
     test:
     - as: e2e
       cli: latest
@@ -165,6 +157,9 @@ tests:
         export PROVIDER_KEY_PATH=/var/run/openai/token
         export PROVIDER=openai
         export MODEL=gpt-3.5-turbo-1106
+
+        export CP_OFFLINE_TOKEN=$(cat /var/run/insights-stage-upload-offline-token/token)
+
         tests/scripts/test-e2e-cluster.sh
       credentials:
       - mount_path: /var/run/azure_openai
@@ -179,14 +174,17 @@ tests:
       - mount_path: /var/run/watsonx
         name: watsonx-apitoken
         namespace: test-credentials
+      - mount_path: /var/run/insights-stage-upload-offline-token
+        name: insights-stage-upload-offline-token
+        namespace: test-credentials
       dependencies:
       - env: OLS_IMAGE
-        name: lightspeed-service-api-rag
+        name: lightspeed-service-api
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: hypershift-hostedcluster-workflow
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
