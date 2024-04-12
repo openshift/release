@@ -16,24 +16,45 @@ UPGRADED_TO_VERSION=${UPGRADED_TO_VERSION:-}
 CLUTER_UPGRADE_TIMEOUT=${CLUTER_UPGRADE_TIMEOUT:-"14400"}
 NODE_UPGRADE_TIMEOUT=${NODE_UPGRADE_TIMEOUT:-"7200"}
 
+# Record Cluster Configurations
+cluster_config_file="${SHARED_DIR}/cluster-config"
+function record_cluster() {
+  if [ $# -eq 2 ]; then
+    location="."
+    key=$1
+    value=$2
+  else
+    location=".$1"
+    key=$2
+    value=$3
+  fi
+
+  payload=$(cat $cluster_config_file)
+  if [[ "$value" == "true" ]] || [[ "$value" == "false" ]]; then
+    echo $payload | jq "$location += {\"$key\":$value}" > $cluster_config_file
+  else
+    echo $payload | jq "$location += {\"$key\":\"$value\"}" > $cluster_config_file
+  fi
+}
+
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
-        echo "setting the proxy"
+        log "setting the proxy"
         # cat "${SHARED_DIR}/proxy-conf.sh"
-        echo "source ${SHARED_DIR}/proxy-conf.sh"
+        log "source ${SHARED_DIR}/proxy-conf.sh"
         source "${SHARED_DIR}/proxy-conf.sh"
     else
-        echo "no proxy setting."
+        log "no proxy setting."
     fi
 }
 
 function unset_proxy () {
     if test -s "${SHARED_DIR}/unset-proxy.sh" ; then
-        echo "unset the proxy"
-        echo "source ${SHARED_DIR}/unset-proxy.sh"
+        log "unset the proxy"
+        log "source ${SHARED_DIR}/unset-proxy.sh"
         source "${SHARED_DIR}/unset-proxy.sh"
     else
-        echo "no proxy setting found."
+        log "no proxy setting found."
     fi
 }
 
@@ -74,17 +95,17 @@ function upgrade_cluster_to () {
     rosa upgrade cluster -y -m auto --version $recommended_version -c $cluster_id ${HCP_SWITCH} 1>"/tmp/update_info.txt" 2>&1
     upgrade_info=$(cat "/tmp/update_info.txt")
     if [[ "$upgrade_info" == *"There is already"* ]]; then
-      echo "Waiting for the previous upgrade schedule to be removed."
+      log "Waiting for the previous upgrade schedule to be removed."
       sleep 120
     else
-      echo -e "$upgrade_info"
+      log -e "$upgrade_info"
       break
     fi
   done
 
   # Speed up the upgrading process
   set_proxy
-  echo "Force restarting the MUO pod to speed up the upgrading process."
+  log "Force restarting the MUO pod to speed up the upgrading process."
   muo_pod=$(oc get pod -n openshift-managed-upgrade-operator | grep 'managed-upgrade-operator' | grep -v 'catalog' | cut -d ' ' -f1)
   oc delete pod $muo_pod -n openshift-managed-upgrade-operator
   unset_proxy
@@ -93,10 +114,11 @@ function upgrade_cluster_to () {
   start_time=$(date +"%s")
   while true; do
     sleep 120
-    echo "Wait for the cluster upgrading finished ..."
+    log "Wait for the cluster upgrading finished ..."
     current_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
     if [[ "$current_version" == "$recommended_version" ]]; then
-      log "Upgrade the cluster $cluster_id to the openshift version $recommended_version successfully"
+      record_cluster "timers.ocp_upgrade" "${recommended_version}" $(( $(date +"%s") - "${start_time}" ))
+      log "Upgrade the cluster $cluster_id to the openshift version $recommended_version successfully after $(( $(date +"%s") - ${start_time} )) seconds"
       break
     fi
 
@@ -118,7 +140,7 @@ function upgrade_machinepool_to () {
     mp_recommended_version=""
     get_recommended_version_for_machinepool $mp_id $major_version
     log "Upgrade the machinepool $mp_id to $mp_recommended_version"
-    echo "rosa upgrade machinepool $mp_id -y -c $cluster_id --version $mp_recommended_version"
+    log "rosa upgrade machinepool $mp_id -y -c $cluster_id --version $mp_recommended_version"
     rosa upgrade machinepool $mp_id -y -c $cluster_id --version $mp_recommended_version
   done
 
@@ -126,10 +148,11 @@ function upgrade_machinepool_to () {
     start_time=$(date +"%s")
     while true; do
         sleep 120
-        echo "Wait for the node upgrading for the machinepool $mp_id finished ..."
+        log "Wait for the node upgrading for the machinepool $mp_id finished ..."
         node_version=$(rosa list machinepool -c $cluster_id -o json | jq -r --arg k $mp_id '.[] | select(.id==$k) .version.id')
         if [[ "$node_version" =~ ${mp_recommended_version}- ]]; then
-          log "Upgrade the machinepool $mp_id to the openshift version $mp_recommended_version successfully"
+          record_cluster "timers.machinset_upgrade" "${mp_id}" $(( $(date +"%s") - "${start_time}" ))
+          log "Upgrade the machinepool $mp_id successfully to the openshift version $mp_recommended_version after $(( $(date +"%s") - ${start_time} )) seconds"
           break
         fi
 
@@ -139,7 +162,7 @@ function upgrade_machinepool_to () {
           exit 1
         fi
     done
-  done  
+  done
 }
 
 # Configure aws
@@ -149,7 +172,7 @@ if [[ -f "${AWSCRED}" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
   export AWS_DEFAULT_REGION="${CLOUD_PROVIDER_REGION}"
 else
-  echo "Did not find compatible cloud provider cluster_profile"
+  log "Did not find compatible cloud provider cluster_profile"
   exit 1
 fi
 
@@ -157,14 +180,14 @@ fi
 ROSA_VERSION=$(rosa version)
 ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+  log "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
   rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
   if [ $? -ne 0 ]; then
-    echo "Login failed"
+    log "Login failed"
     exit 1
   fi
 else
-  echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
+  log "Cannot login! You need to specify the offline token ROSA_TOKEN!"
   exit 1
 fi
 
@@ -174,12 +197,12 @@ if [[ "$HOSTED_CP" == "true" ]]; then
 fi
 
 if [[ -z "${UPGRADED_TO_VERSION}" ]]; then
-  echo "The UPGRADED_TO_VERSION is mandatory!"
+  log "The UPGRADED_TO_VERSION is mandatory!"
   exit 1
 fi
 current_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
 if [[ "$current_version" == "$UPGRADED_TO_VERSION" ]]; then
-  echo "The cluster has been in the version $UPGRADED_TO_VERSION"
+  log "The cluster has been in the version $UPGRADED_TO_VERSION"
   exit 1
 fi
 
