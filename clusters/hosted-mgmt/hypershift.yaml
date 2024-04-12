@@ -127,7 +127,7 @@ subjects:
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 metadata:
-  name: hypershift-rj7rg-worker-us-east-1a
+  name: hypershift-gwhmb-worker-us-east-1b
   namespace: openshift-machine-api
 spec:
   selector:
@@ -146,40 +146,38 @@ spec:
       providerSpec:
         value:
           ami:
-            id: ami-03d1c2cba04df838c
+            id: ami-057df4d0cb8cbae0d
           apiVersion: awsproviderconfig.openshift.io/v1beta1
           blockDevices:
             - ebs:
                 encrypted: true
-                iops: 100
+                iops: 0
                 kmsKey:
                   arn: ''
-                volumeSize: 300
+                volumeSize: 100
                 volumeType: gp2
           securityGroups:
             - filters:
                 - name: 'tag:Name'
                   values:
-                    - hive-rj7rg-worker-sg
+                    - hosted-mgmt-gwhmb-worker-sg
           credentialsSecret:
             name: aws-cloud-credentials
           deviceIndex: 0
+          publicIp: true
           iamInstanceProfile:
-            id: hive-rj7rg-worker-profile
-          instanceType: m5.4xlarge
+            id: hosted-mgmt-gwhmb-worker-profile
+          instanceType: m6a.4xlarge
           kind: AWSMachineProviderConfig
           metadata:
             creationTimestamp: null
           placement:
-            availabilityZone: us-east-1a
+            availabilityZone: us-east-1b
             region: us-east-1
           subnet:
-            filters:
-            - name: tag:Name
-              values:
-              - hive-rj7rg-private-us-east-1a
+            id: subnet-0c49e1e79050cb7c3
           tags:
-          - name: kubernetes.io/cluster/hive-rj7rg
+          - name: kubernetes.io/cluster/hosted-mgmt-gwhmb
             value: owned
           userDataSecret:
             name: worker-user-data
@@ -191,7 +189,7 @@ spec:
 apiVersion: autoscaling.openshift.io/v1beta1
 kind: MachineAutoscaler
 metadata:
-  name: hypershift-rj7rg-worker-us-east-1a
+  name: hypershift-rj7rg-worker-us-east-1b
   namespace: openshift-machine-api
 spec:
   maxReplicas: 100
@@ -199,4 +197,4 @@ spec:
   scaleTargetRef:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
-    name: hypershift-rj7rg-worker-us-east-1a
+    name: hypershift-rj7rg-worker-us-east-1b
