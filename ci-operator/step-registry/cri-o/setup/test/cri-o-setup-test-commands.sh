@@ -22,7 +22,9 @@ gcloud compute images create "crio-setup-${currentDate}" --source-image-family="
 # Delete images older than 2 weeks
 images=$(gcloud compute images list --project="openshift-node-devel" --filter="family:crio-setup AND creationTimestamp<$(date -d '2 weeks ago' +%Y-%m-%dT%H:%M:%SZ)" --format="value(name)")
 if [ -n "$images" ]; then
-	echo "$images" | xargs -I '{}' gcloud compute images delete '{}' --project="openshift-node-devel"
+    echo "The following images will be deleted:"
+    echo "$images"
+    echo "$images" | xargs -I '{}' gcloud compute images delete '{}' --project="openshift-node-devel" || true
 else
-	echo "No images found that were created more than 2 weeks ago."
+    echo "No images found that were created more than 2 weeks ago."
 fi
