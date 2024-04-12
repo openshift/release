@@ -1,10 +1,15 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.54.2
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.17
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Containerfile
   to: nvidia-ci-tools
 resources:
   '*':
@@ -13,6 +18,12 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: lint
+  commands: ./scripts/golangci-lint.sh
+  container:
+    clone: true
+    from: golangci-lint
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge

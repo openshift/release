@@ -46,7 +46,7 @@ tests:
   cron: 00 05 * * 1-5
   secrets:
   - mount_path: /creds-github
-    name: github-token
+    name: ossm-github-simple-job
 - as: sync-upstream-envoy-2.4
   commands: |
     ./tools/automator-main.sh \
@@ -66,7 +66,7 @@ tests:
   cron: 00 05 * * 1-5
   secrets:
   - mount_path: /creds-github
-    name: github-token
+    name: ossm-github-simple-job
 - as: sync-upstream-istio-2.4
   commands: |
     ./tools/automator-main.sh \
@@ -87,27 +87,7 @@ tests:
   cron: 00 05 * * 1-5
   secrets:
   - mount_path: /creds-github
-    name: github-token
-- as: sync-upstream-istio-3.0
-  commands: |
-    ./tools/automator-main.sh \
-    --org=maistra \
-    --repo=istio \
-    --branch=maistra-3.0 \
-    --token-path=/creds-github/token \
-    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
-    "--labels=tide/merge-method-merge,auto-merge" \
-    --modifier=merge_upstream_istio_master \
-    --merge-repository=https://github.com/istio/istio \
-    --merge-branch=master \
-    --merge-failure-notify=@maistra/release-managers-3-0 \
-    --merge-strategy=merge
-  container:
-    from: src
-  cron: 00 05 * * 1-5
-  secrets:
-  - mount_path: /creds-github
-    name: github-token
+    name: ossm-github-simple-job
 - as: update-istio-builder-image
   commands: |
     export NEW_IMAGE=$(curl -sL https://raw.githubusercontent.com/istio/common-files/master/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
@@ -118,24 +98,20 @@ tests:
     --token-path=/creds-github/token \
     '--title=Update maistra/istio builder image' \
     --modifier=update_istio_builder_image_master \
-    '--cmd=sed -i "s|\(gcr.io/istio-testing/build-tools\):.* \(registry.ci.openshift.org/ci/maistra-builder:upstream-master\)|\1:$NEW_IMAGE \2|" core-services/image-mirroring/supplemental-ci-images/mapping_supplemental_ci_images_ci' \
+    '--cmd=sed -i "s|\(gcr.io/istio-testing/build-tools\):.*|\1:$NEW_IMAGE|" core-services/image-mirroring/_config.yaml' \
     '--body=cc @jwendell'
   container:
     from: src
   cron: 00 05 * * 1-5
   secrets:
   - mount_path: /creds-github
-    name: github-token
+    name: ossm-github-simple-job
 - as: test-infra-build-containers-2-2
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
   run_if_changed: ^docker/maistra-builder_2\.2\.Dockerfile|^docker/scripts
   steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.2
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -167,21 +143,17 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-claim
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: test-infra-push-containers-2-2
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
   postsubmit: true
   run_if_changed: ^docker/maistra-builder_2\.2\.Dockerfile|^docker/scripts
   steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.2
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -221,20 +193,16 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-claim
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: test-infra-build-containers-2-3
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
   run_if_changed: ^docker/maistra-builder_2\.3\.Dockerfile|^docker/scripts
   steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -266,21 +234,17 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-claim
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: test-infra-push-containers-2-3
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
   postsubmit: true
   run_if_changed: ^docker/maistra-builder_2\.3\.Dockerfile|^docker/scripts
   steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -320,20 +284,16 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-claim
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: test-infra-build-containers-2-4
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
   run_if_changed: ^docker/maistra-builder_2\.4\.Dockerfile|^docker/scripts
   steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -365,21 +325,17 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-claim
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: test-infra-push-containers-2-4
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
   postsubmit: true
   run_if_changed: ^docker/maistra-builder_2\.4\.Dockerfile|^docker/scripts
   steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -419,20 +375,16 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-claim
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: test-infra-build-containers-2-5
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.14"
   run_if_changed: ^docker/maistra-builder_2\.5\.Dockerfile|^docker/scripts
   steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -464,21 +416,17 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "4"
-          memory: 8Gi
+          cpu: 100m
+          memory: 100Mi
       timeout: 4h0m0s
-    workflow: servicemesh-istio-e2e-claim
+    workflow: servicemesh-istio-e2e-profile
 - as: test-infra-push-containers-2-5
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.14"
   postsubmit: true
   run_if_changed: ^docker/maistra-builder_2\.5\.Dockerfile|^docker/scripts
   steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -518,20 +466,16 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
+          cpu: 100m
+          memory: 100Mi
       timeout: 4h0m0s
-    workflow: servicemesh-istio-e2e-claim
+    workflow: servicemesh-istio-e2e-profile
 - as: test-infra-build-containers-2-6
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.14"
   run_if_changed: ^docker/maistra-builder_2\.6\.Dockerfile|^docker/scripts
   steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -563,21 +507,17 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "4"
-          memory: 8Gi
+          cpu: 100m
+          memory: 100Mi
       timeout: 4h0m0s
-    workflow: servicemesh-istio-e2e-claim
+    workflow: servicemesh-istio-e2e-profile
 - as: test-infra-push-containers-2-6
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.14"
   postsubmit: true
   run_if_changed: ^docker/maistra-builder_2\.6\.Dockerfile|^docker/scripts
   steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -617,20 +557,16 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
+          cpu: 100m
+          memory: 100Mi
       timeout: 4h0m0s
-    workflow: servicemesh-istio-e2e-claim
+    workflow: servicemesh-istio-e2e-profile
 - as: test-infra-build-containers-3-0
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
   run_if_changed: ^docker/maistra-builder_3\.0\.Dockerfile|^docker/scripts
   steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:3.0
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -662,21 +598,17 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-claim
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: test-infra-push-containers-3-0
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
   postsubmit: true
   run_if_changed: ^docker/maistra-builder_3\.0\.Dockerfile|^docker/scripts
   steps:
+    cluster_profile: ossm-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:3.0
       MAISTRA_NAMESPACE: maistra-e2e-test
@@ -716,10 +648,10 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-claim
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 zz_generated_metadata:
   branch: main
   org: maistra

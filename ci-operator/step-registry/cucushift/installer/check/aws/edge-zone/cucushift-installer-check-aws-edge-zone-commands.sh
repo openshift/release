@@ -22,14 +22,14 @@ then
 fi
 
 echo "====== MachineSet"
-oc get machineset -n openshift-machine-api -owide
+oc get machineset.machine.openshift.io -n openshift-machine-api -owide
 echo "====== Machines"
-oc get machines -n openshift-machine-api -owide
+oc get machines.machine.openshift.io -n openshift-machine-api -owide
 echo "====== Nodes"
 oc get node -owide
 
-MACHINESETS=$(oc get machineset -n openshift-machine-api --no-headers | grep edge | awk '{print$1}')
-MACHINES=$(oc get machines -n openshift-machine-api --no-headers | grep edge | awk '{print$1}')
+MACHINESETS=$(oc get machineset.machine.openshift.io -n openshift-machine-api --no-headers | grep edge | awk '{print$1}')
+MACHINES=$(oc get machines.machine.openshift.io -n openshift-machine-api --no-headers | grep edge | awk '{print$1}')
 NODES=$(oc get node --no-headers | grep edge | awk '{print$1}')
 # machineset=$MACHINESETS
 
@@ -41,8 +41,8 @@ ret=0
 
 for machineset in $MACHINESETS;
 do
-  schedulable_effect=$(oc get machineset -n openshift-machine-api $machineset -o json | jq -r '.spec.template.spec.taints[] | select(.key=="node-role.kubernetes.io/edge") | .effect')
-  public_ip=$(oc get machineset -n openshift-machine-api $machineset -o json | jq -r '.spec.template.spec.providerSpec.value.publicIp')
+  schedulable_effect=$(oc get machineset.machine.openshift.io -n openshift-machine-api $machineset -o json | jq -r '.spec.template.spec.taints[] | select(.key=="node-role.kubernetes.io/edge") | .effect')
+  public_ip=$(oc get machineset.machine.openshift.io -n openshift-machine-api $machineset -o json | jq -r '.spec.template.spec.providerSpec.value.publicIp')
   echo "MACHINESET: ${machineset}: schedulable_effect:[${schedulable_effect}], public_ip:[${public_ip}]"
 
   if [[ ${EDGE_NODE_WORKER_SCHEDULABLE} == "yes" ]] && ([[ ${schedulable_effect} == "" ]] || [[ ${schedulable_effect} == "null" ]]); then
@@ -68,9 +68,9 @@ done
 
 for machine in $MACHINES;
 do
-  instance_id=$(oc get machines -n openshift-machine-api ${machine} -o json | jq -r '.status.providerStatus.instanceId')
-  external_dns=$(oc get machine -n openshift-machine-api ${machine} -o json | jq -r '.status.addresses[] | select(.type=="ExternalDNS") | .address')
-  internal_dns=$(oc get machine -n openshift-machine-api ${machine} -o json | jq -r '.status.addresses[] | select(.type=="InternalDNS") | .address')
+  instance_id=$(oc get machines.machine.openshift.io -n openshift-machine-api ${machine} -o json | jq -r '.status.providerStatus.instanceId')
+  external_dns=$(oc get machines.machine.openshift.io -n openshift-machine-api ${machine} -o json | jq -r '.status.addresses[] | select(.type=="ExternalDNS") | .address')
+  internal_dns=$(oc get machines.machine.openshift.io -n openshift-machine-api ${machine} -o json | jq -r '.status.addresses[] | select(.type=="InternalDNS") | .address')
 
   machine_info="instance_id:[${instance_id}], external_dns:[${external_dns}], internal_dns:[${internal_dns}]"
 
