@@ -30,6 +30,8 @@ AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 
+sleep 600
+
 # log in with az
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
     az cloud set --name AzureUSGovernment
