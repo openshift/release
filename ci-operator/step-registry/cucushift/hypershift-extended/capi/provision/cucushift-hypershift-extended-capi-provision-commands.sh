@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -xeuo pipefail
+set -euo pipefail
 
 function retry() {
     local check_func=$1
@@ -400,6 +400,12 @@ if [[ "${INFRA_ID}" == "null" ]]; then
   INFRA_ID=$CLUSTER_NAME
 fi
 echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"
+
+# if kubeconfig secret exists, that means we could use the cluster admin user directly
+kc=$(oc get secret -n default ${CLUSTER_NAME}-kubeconfig --ignore-not-found -ojsonpath='{.data.value}')
+if [[ ! -z "${kc}" ]] ; then
+  echo ${kc} | base64 -d > "${SHARED_DIR}/kubeconfig"
+fi
 
 # do not check worker node here
 # wait for cluster machinepool ready
