@@ -53,6 +53,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.14"
+  optional: true
   steps:
     test:
     - as: install
@@ -69,7 +70,21 @@ tests:
         requests:
           cpu: 100m
           memory: 400Mi
-    - ref: rhobs-obo-test-harness
+    - as: obo-e2e
+      cli: latest
+      commands: |
+        if ! which kubectl; then
+            mkdir -p /tmp/obo
+            export PATH=$PATH:/tmp/obo
+            ln -s "$(which oc)" /tmp/obo/kubectl
+        fi
+        export GOFLAGS=""
+        ./test/run-e2e.sh --no-deploy --ns obo --ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 400Mi
     workflow: generic-claim
 zz_generated_metadata:
   branch: main

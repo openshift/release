@@ -29,7 +29,7 @@ if [ ! -f /tmp/yq-v4 ]; then
   curl -L "https://github.com/mikefarah/yq/releases/download/v4.30.5/yq_linux_\$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
     -o /tmp/yq-v4 && chmod +x /tmp/yq-v4
 fi
-oc get imagecontentsourcepolicy -oyaml | /tmp/yq-v4 '.items[] | .spec.repositoryDigestMirrors' > /home/mgmt_iscp.yaml
+oc get imagecontentsourcepolicy -oyaml | /tmp/yq-v4 '.items[] | .spec.repositoryDigestMirrors' > /home/mgmt_icsp.yaml
 
 CLUSTER_NAME=\$(cat /home/hostedcluster_name)
 CLUSTER_NAMESPACE=local-cluster-\${CLUSTER_NAME}
@@ -64,7 +64,7 @@ fi
   --namespace local-cluster \
   --base-domain=\${BASEDOMAIN} \
   --api-server-address=api.\${CLUSTER_NAME}.\${BASEDOMAIN} \
-  --image-content-sources "/home/mgmt_iscp.yaml" \
+  --image-content-sources "/home/mgmt_icsp.yaml" \
   --release-image \${PLAYLOADIMAGE}
 
 echo "Waiting for cluster to become available"

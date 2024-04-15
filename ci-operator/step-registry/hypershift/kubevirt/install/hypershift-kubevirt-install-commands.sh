@@ -5,6 +5,12 @@ set -ex
 function ocp_version() {
     oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}'
 }
+if [[ ! "${CNV_SUBSCRIPTION_SOURCE}" =~ ^(cnv-prerelease-catalog-source|redhat-operators)$ ]]
+then
+    echo "CNV_SUBSCRIPTION_SOURCE environment variable value '${CNV_SUBSCRIPTION_SOURCE}' not allowed, allowed values are 'redhat-operators' or 'cnv-prerelease-catalog-source'"
+    exit 1
+fi
+
 
 # Get yq tool
 YQ="/tmp/yq"
@@ -15,21 +21,16 @@ chmod +x ${YQ}
 CNV_PRERELEASE_CATALOG_IMAGE=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
   ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_PRERELEASE_CATALOG_IMAGE") | .value')
 
-if [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ]
-then
+if [ "${CNV_SUBSCRIPTION_SOURCE}" == "redhat-operators" ]
+  then
   CNV_RELEASE_CHANNEL=stable
-  CNV_SUBSCRIPTION_SOURCE=cnv-prerelease-catalog-source
-elif [ -n "${CNV_PRERELEASE_VERSION}" ]
-then
-  CNV_RELEASE_CHANNEL=nightly-${CNV_PRERELEASE_VERSION}
-  CNV_SUBSCRIPTION_SOURCE=cnv-prerelease-catalog-source
+elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ]
+  then
+  CNV_RELEASE_CHANNEL=stable
 else
-  CNV_RELEASE_CHANNEL=stable
-  CNV_SUBSCRIPTION_SOURCE=redhat-operators
+  CNV_RELEASE_CHANNEL=nightly-$(ocp_version)
+  CNV_PRERELEASE_CATALOG_IMAGE=quay.io/openshift-cnv/nightly-catalog:$(ocp_version)
 fi
-
-CNV_PRERELEASE_VERSION=${CNV_PRERELEASE_VERSION:-$(ocp_version)}
-CNV_PRERELEASE_CATALOG_IMAGE=${CNV_PRERELEASE_CATALOG_IMAGE:-quay.io/openshift-cnv/nightly-catalog:${CNV_PRERELEASE_VERSION}}
 
 # The kubevirt tests require wildcard routes to be allowed
 oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
@@ -37,7 +38,7 @@ oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p 
 # Make the masters schedulable so we have more capacity to run VMs
 oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
 
-if [ -n "${CNV_PRERELEASE_VERSION}" ]
+if [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ]
   then
   # Add pullsecret for cnv nightly channel from quay.io/openshift-cnv
   QUAY_USERNAME=openshift-cnv+openshift_ci

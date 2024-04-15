@@ -62,6 +62,7 @@ systemd:
 
       [Service]
       Type=oneshot
+      EnvironmentFile=/etc/os-release
       # Ensure disks are wiped before running the installer. This should be done by the wiping steps, but since
       # we can control installation in bm-upi, let's mitigate the risk of a previous installation that left data
       # on the disks due to the wiping step failing or being skipped.
@@ -79,7 +80,8 @@ systemd:
       #        https://github.com/coreos/fedora-coreos-tracker/issues/947
       ExecStartPre=/usr/bin/bash -c ' \
         ARCH=\$(uname -m | sed "s/x86_64/x64/;s/aarch64/aa64/"); \
-        /usr/sbin/efibootmgr -c -d "$root_device" -p 2 -c -L "Red Hat CoreOS" -l "\\\\EFI\\\\redhat\\\\shim\$ARCH.efi" \
+        [ \$ID = "fedora" ] && OS="fedora" || OS=\$(cut -d \':\' -f 3 <<< "\$CPE_NAME"); \
+        /usr/sbin/efibootmgr -c -d "$root_device" -p 2 -c -L "Red Hat CoreOS" -l "\\\\EFI\\\\\\\$OS\\\\shim\$ARCH.efi" \
       '
       ExecStart=/usr/bin/systemctl --no-block reboot
       StandardOutput=kmsg+console

@@ -1,15 +1,27 @@
 base_images:
-  base:
+  ocp_4.16_base-rhel9:
     name: 4.17-priv
     namespace: ocp-private
-    tag: base
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.16
 binary_build_commands: make build
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.15
+    name: builder-priv
+    namespace: ocp-private
+    tag: rhel-9-golang-1.21-openshift-4.16
 canonical_go_repository: github.com/k8snetworkplumbingwg/sriov-network-metrics-exporter
+images:
+- dockerfile_path: Dockerfile.rhel
+  from: ocp_4.16_base-rhel9
+  inputs:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: sriov-network-metrics-exporter
 promotion:
   to:
   - name: 4.17-priv
@@ -31,6 +43,11 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
 zz_generated_metadata:
   branch: release-4.17
   org: openshift-priv

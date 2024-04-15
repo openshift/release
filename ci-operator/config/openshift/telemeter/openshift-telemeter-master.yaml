@@ -3,10 +3,10 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.16
+    tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
 images:
@@ -15,9 +15,9 @@ images:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: telemeter
 promotion:
   to:
@@ -38,6 +38,7 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: dnf -y install memcached
 tests:
 - as: vendor
   commands: GO111MODULE=on make vendor && git diff --exit-code
@@ -54,7 +55,7 @@ tests:
 - as: integration
   commands: make test-integration
   container:
-    from: src
+    from: test-bin
 - as: e2e-aws-ovn
   steps:
     cluster_profile: aws

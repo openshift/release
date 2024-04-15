@@ -11,6 +11,8 @@ cp -R /tmp/jaeger-operator /tmp/jaeger-tests && cd /tmp/jaeger-tests
 
 # Replace with patched files for running Jaeger tests on Prow CI
 curl -o tests/e2e/Makefile -L https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/tests/e2e/Makefile
+curl -o tests/e2e/examples/render.sh -L https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/tests/e2e/examples/render.sh
+curl -o tests/e2e/streaming/render.sh -L https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/tests/e2e/streaming/render.sh
 curl -o hack/run-e2e-test-suite.sh -L https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/hack/run-e2e-test-suite.sh
 curl -o hack/install/install-kuttl.sh -L https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/hack/install/install-kuttl.sh
 

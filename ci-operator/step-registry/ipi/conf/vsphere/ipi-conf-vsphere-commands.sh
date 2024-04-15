@@ -119,14 +119,14 @@ fi
 if [ ${Z_VERSION} -lt 11 ]; then
   MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
-  replicas: 3
+  replicas: ${CONTROL_PLANE_REPLICAS}
   platform:
     vsphere:
       osDisk:
         diskSizeGB: 120
 compute:
 - name: worker
-  replicas: 3
+  replicas: ${COMPUTE_NODE_REPLICAS}
   platform:
     vsphere:
       cpus: 4
@@ -134,6 +134,13 @@ compute:
       memoryMB: 16384
       osDisk:
         diskSizeGB: 120"
+else
+  MACHINE_POOL_OVERRIDES="controlPlane:
+  name: master
+  replicas: ${CONTROL_PLANE_REPLICAS}
+compute:
+- name: worker
+  replicas: ${COMPUTE_NODE_REPLICAS}"
 fi
 
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
@@ -152,7 +159,8 @@ compute:
   replicas: 0"
 fi
 
-cat >>"${CONFIG}" <<EOF
+if [ "${Z_VERSION}" -lt 13 ]; then
+  cat >>"${CONFIG}" <<EOF
 baseDomain: $base_domain
 $MACHINE_POOL_OVERRIDES
 platform:
@@ -166,6 +174,33 @@ platform:
     username: "${GOVC_USERNAME}"
     ${RESOURCE_POOL_DEF}
 EOF
+else
+  cat >>"${CONFIG}" <<EOF
+baseDomain: $base_domain
+$MACHINE_POOL_OVERRIDES
+platform:
+  vsphere:
+    vcenters:
+    - datacenters:
+       - ${vsphere_datacenter}
+      password: ${GOVC_PASSWORD}
+      port: 443
+      server: ${vsphere_url}
+      user: ${GOVC_USERNAME}
+    failureDomains:
+    - name: generated-failure-domain
+      region: generated-region
+      server: ${vsphere_url}
+      topology:
+        computeCluster: /${vsphere_datacenter}/host/${vsphere_cluster}
+        datacenter: ${vsphere_datacenter}
+        datastore: /${vsphere_datacenter}/datastore/${vsphere_datastore}
+        networks:
+        - ${vsphere_portgroup}
+        ${RESOURCE_POOL_DEF}
+      zone: generated-zone
+EOF
+fi
 
 if [ -f ${SHARED_DIR}/external_lb ]; then
   echo "$(date -u --rfc-3339=seconds) - external load balancer in use, not setting VIPs"
@@ -174,11 +209,6 @@ else
     apiVIP: "${vips[0]}"
     ingressVIP: "${vips[1]}"
 EOF
-fi
-
-if [ -f "${SHARED_DIR}"/enable_template_content.txt ]; then
-  echo "$(date -u --rfc-3339=seconds) - tamplate defined, appending to platform spec"
-  cat "${SHARED_DIR}"/enable_template_content.txt >>${CONFIG}
 fi
 
 if [ -f ${STATIC_IPS} ]; then

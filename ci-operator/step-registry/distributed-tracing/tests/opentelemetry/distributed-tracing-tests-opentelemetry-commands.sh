@@ -18,8 +18,8 @@ if [[ -n "${DOWNSTREAM_TESTS_COMMIT}" ]]; then
 
   #Set parameters for running the test cases on OpenShift
   unset NAMESPACE
-  OPERATOROPAMPBRIDGE_IMG=ghcr.io/open-telemetry/opentelemetry-operator/operator-opamp-bridge:v0.89.0 TARGETALLOCATOR_IMG=ghcr.io/open-telemetry/opentelemetry-operator/target-allocator:v0.89.0 SED_BIN="$(which sed)" ./hack/modify-test-images.sh
-  sed -i 's/- -duration=1m/- -duration=6m/' tests/e2e-autoscale/autoscale/02-install.yaml
+  OPERATOROPAMPBRIDGE_IMG=ghcr.io/open-telemetry/opentelemetry-operator/operator-opamp-bridge:v0.93.0
+  sed -i 's/--duration=1m/--duration=6m/g' tests/e2e-autoscale/autoscale/02-install.yaml
   oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | xargs -I {} oc label nodes {} ingress-ready=true
 
   # Remove test cases to be skipped from the test run
@@ -56,14 +56,13 @@ if [[ -n "${DOWNSTREAM_TESTS_COMMIT}" ]]; then
     tests/e2e-openshift \
     tests/e2e-prometheuscr \
     tests/e2e-instrumentation \
-    tests/e2e-pdb \
-    tests/e2e-opampbridge
+    tests/e2e-pdb
 
   # Enable required feature gates.
-  OTEL_CSV_NAME=$(oc get csv -n openshift-operators | grep "opentelemetry-operator" | awk '{print $1}')
-  oc -n openshift-operators patch csv $OTEL_CSV_NAME --type=json -p '[{"op":"replace","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args","value":["--metrics-addr=127.0.0.1:8080", "--enable-leader-election", "--zap-log-level=info", "--zap-time-encoding=rfc3339nano", "--feature-gates=+operator.autoinstrumentation.multi-instrumentation"]}]'
+  OTEL_CSV_NAME=$(oc get csv -n openshift-opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
+  oc -n openshift-opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--feature-gates=+operator.autoinstrumentation.multi-instrumentation\"]}]"
   sleep 10
-  oc wait --for condition=Available -n openshift-operators deployment opentelemetry-operator-controller-manager
+  oc wait --for condition=Available -n openshift-opentelemetry-operator deployment opentelemetry-operator-controller-manager
 
   # Execute OpenTelemetry e2e tests
   KUBECONFIG=$KUBECONFIG kuttl test \
@@ -74,6 +73,7 @@ if [[ -n "${DOWNSTREAM_TESTS_COMMIT}" ]]; then
     --start-kind=false \
     --timeout="$TIMEOUT" \
     --manifest-dir=$MANIFEST_DIR \
+    tests/e2e-opampbridge \
     tests/e2e-multi-instrumentation
 
 else
@@ -86,7 +86,6 @@ else
 
   #Set parameters for running the test cases on OpenShift
   unset NAMESPACE
-  sed -i 's/- -duration=1m/- -duration=6m/' tests/e2e-autoscale/autoscale/02-install.yaml
   oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | xargs -I {} oc label nodes {} ingress-ready=true
 
   # Remove test cases to be skipped from the test run
@@ -109,44 +108,63 @@ else
     rm -rf $SKIP_TESTS_TO_REMOVE
   fi
 
-  # Enable required feature gates.
+  # Initialize a variable to keep track of errors
+  any_errors=false
+
+  # Set the operator args required for tests execution.
   OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-  oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--feature-gates=+operator.autoinstrumentation.go,+operator.observability.prometheus,+operator.autoinstrumentation.nginx\"]}]"
+  oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--feature-gates=+operator.autoinstrumentation.go,+operator.autoinstrumentation.nginx\"]}]"
   sleep 10
   oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
 
   # Execute OpenTelemetry e2e tests
-  KUBECONFIG=$KUBECONFIG kuttl test \
-    --report=xml \
-    --artifacts-dir="$ARTIFACT_DIR" \
-    --parallel="$PARALLEL_TESTS" \
-    --report-name="$REPORT_NAME" \
-    --start-kind=false \
-    --timeout="$TIMEOUT" \
-    --manifest-dir=$MANIFEST_DIR \
-    tests/e2e \
-    tests/e2e-autoscale \
-    tests/e2e-openshift \
-    tests/e2e-prometheuscr \
-    tests/e2e-instrumentation \
-    tests/e2e-pdb \
-    tests/e2e-opampbridge \
-    tests/e2e-targetallocator
+  chainsaw test \
+  --report-name "$REPORT_NAME" \
+  --report-path "$ARTIFACT_DIR" \
+  --report-format "XML" \
+  --test-dir \
+  tests/e2e \
+  tests/e2e-autoscale \
+  tests/e2e-openshift \
+  tests/e2e-prometheuscr \
+  tests/e2e-instrumentation \
+  tests/e2e-pdb \
+  tests/e2e-opampbridge \
+  tests/e2e-targetallocator || any_errors=true
 
-  # Enable required feature gates.
+  # Set the operator args required for tests execution.
   OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-  oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--feature-gates=+operator.autoinstrumentation.multi-instrumentation\"]}]"
+  oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--enable-multi-instrumentation\"]}]"
   sleep 10
   oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
 
   # Execute OpenTelemetry e2e tests
-  KUBECONFIG=$KUBECONFIG kuttl test \
-    --report=xml \
-    --artifacts-dir="$ARTIFACT_DIR" \
-    --parallel="$PARALLEL_TESTS" \
-    --report-name="$REPORT_NAME-2" \
-    --start-kind=false \
-    --timeout="$TIMEOUT" \
-    --manifest-dir=$MANIFEST_DIR \
-    tests/e2e-multi-instrumentation
+  chainsaw test \
+  --report-name "$REPORT_NAME" \
+  --report-path "$ARTIFACT_DIR" \
+  --report-format "XML" \
+  --test-dir \
+  tests/e2e-multi-instrumentation || any_errors=true
+
+  # Set the operator args required for tests execution.
+  OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
+  oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--annotations-filter=*filter.out\", \"--labels=*filter.out\"]}]"
+  sleep 10
+  oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
+
+  # Execute OpenTelemetry e2e tests
+  chainsaw test \
+  --report-name "$REPORT_NAME" \
+  --report-path "$ARTIFACT_DIR" \
+  --report-format "XML" \
+  --test-dir \
+  tests/e2e-metadata-filters || any_errors=true
+
+  # Check if any errors occurred
+  if $any_errors; then
+    echo "Tests failed, check the logs for more details."
+    exit 1
+  else
+    echo "All the tests passed."
+  fi
 fi

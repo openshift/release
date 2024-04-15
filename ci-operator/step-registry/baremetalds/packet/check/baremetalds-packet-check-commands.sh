@@ -18,7 +18,7 @@ fi
 
 #Packet API call to get list of servers in project
 servers="$(curl -X GET --header 'Accept: application/json' --header "X-Auth-Token: ${PACKET_AUTH_TOKEN}" \
- "https://api.packet.net/projects/${PACKET_PROJECT_ID}/devices?exclude=root_password,ssh_keys,created_by,project,project_lite,ip_addresses,plan,meta,operating_system,facility,network_ports&per_page=1000"
+ "https://api.packet.net/projects/${PACKET_PROJECT_ID}/devices?exclude=root_password,ssh_keys,created_by,project,project_lite,ip_addresses,plan,meta,operating_system,metro,network_ports&per_page=1000"
 )"
 
 #Assuming all servers created more than LEAK_THRESHOLD_SECONDS ago are leaks
@@ -37,7 +37,7 @@ leak_num="$(echo "$leak_ids" | wc -w)"
 leak_report="${leak_report}\nProw job references per leaked server:" 
 for server in $leak_servers
 do
-  leak_report="${leak_report}\n<https://search.ci.openshift.org/?search=$server&maxAge=48h&context=-1&type=build-log|$server>"
+  leak_report="${leak_report}\n<https://search.dptools.openshift.org/?search=$server&maxAge=48h&context=-1&type=build-log|$server>"
 done
 set -x
 

@@ -26,6 +26,11 @@ apiServer:
   - ${IP_ADDRESS}
 EOF
 
+configure_vm_args=""
+if "${OPTIONAL_RPMS}"; then
+  configure_vm_args="--optional-rpms"
+fi
+
 cat <<EOF > /tmp/install.sh
 #!/bin/bash
 set -xeuo pipefail
@@ -38,7 +43,7 @@ sudo mkdir -p /etc/microshift
 sudo mv /tmp/config.yaml /etc/microshift/config.yaml
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 cd ~/microshift
-./scripts/devenv-builder/configure-vm.sh --force-firewall --pull-images /tmp/pull-secret
+./scripts/devenv-builder/configure-vm.sh --force-firewall --pull-images ${configure_vm_args} /tmp/pull-secret
 EOF
 chmod +x /tmp/install.sh
 

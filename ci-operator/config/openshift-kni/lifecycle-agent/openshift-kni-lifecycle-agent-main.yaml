@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.14"
+    name: "4.16"
     namespace: ocp
     tag: base
 build_root:
@@ -19,17 +19,17 @@ operator:
     with: pipeline:lifecycle-agent-operator
 promotion:
   to:
-  - name: "4.14"
+  - name: "4.16"
     namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -53,7 +53,7 @@ tests:
   steps:
     cluster_profile: aws-telco
     env:
-      BASE_DOMAIN: sysdeseng.devcluster.openshift.com
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-lifecycle-agent
       OO_PACKAGE: lifecycle-agent
@@ -83,6 +83,27 @@ tests:
   container:
     from: test-bin
   run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^.markdown.*)$
+- as: ibu-e2e-flow
+  cluster: build02
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+    env:
+      OCP_BASE_VERSION: "4.15"
+      OCP_IMAGE_SOURCE: release
+      SEED_IMAGE_TAG_FORMAT: presubmit
+    workflow: openshift-image-based-upgrade-presubmit
+  timeout: 4h0m0s
+- as: security
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: lifecycle-agent
+      SNYK_CODE_ADDITIONAL_ARGS: --policy-path=.snyk
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: openshift-kni
