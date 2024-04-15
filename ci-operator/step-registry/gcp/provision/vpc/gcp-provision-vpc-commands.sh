@@ -7,6 +7,12 @@ set -o pipefail
 python3 --version 
 export CLOUDSDK_PYTHON=python3
 
+echo "(jiwei-debug-1)----------"
+ls -l "${CLUSTER_PROFILE_DIR}"
+echo "(jiwei-debug-2)----------"
+cat "${CLUSTER_PROFILE_DIR}"
+echo "(jiwei-debug-3)----------"
+
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
