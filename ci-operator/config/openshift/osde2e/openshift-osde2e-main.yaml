@@ -151,13 +151,29 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-- as: aws-prod-cleanup
+- as: stage-clusters-cleanup
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="stage"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --clusters --dry-run=false
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 0 * * 2
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: prod-clusters-cleanup
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="prod"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
 
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --clusters --dry-run=false
   container:
     clone: true
     from: osde2e
