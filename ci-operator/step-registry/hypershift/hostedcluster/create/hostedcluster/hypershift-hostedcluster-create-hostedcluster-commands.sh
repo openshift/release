@@ -6,7 +6,7 @@ echo HyperShift CLI version
 
 echo Generating pull secret to current build farm
 oc registry login --to=${SHARED_DIR}/pull-secret-build-farm.json
-echo "Set KUBECONFIG to Hive cluster"
+echo "Set KUBECONFIG to management cluster"
 export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
 
 if [[ "${PLATFORM}" == "aws" ]]; then
