@@ -166,7 +166,7 @@ cat << EOF > ~/ocp-install.yml
     shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Progressing'\'')].status}'
     register: oc_status
     until: "'False' in oc_status.stdout"
-    retries: 30
+    retries: 60
     delay: 60
     ignore_errors: true
 
@@ -306,8 +306,6 @@ EOF
 
 #Set status and run playbooks
 status=0
-# Install posix collection so that we can use debug callback
-ansible-galaxy collection install ansible.posix
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
 sleep 300  # Wait for cluster to be ready after a reboot

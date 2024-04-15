@@ -46,7 +46,7 @@ tests:
   cron: 00 05 * * 1-5
   secrets:
   - mount_path: /creds-github
-    name: github-token
+    name: ossm-github-simple-job
 - as: sync-upstream-envoy-2.4
   commands: |
     ./tools/automator-main.sh \
@@ -66,7 +66,7 @@ tests:
   cron: 00 05 * * 1-5
   secrets:
   - mount_path: /creds-github
-    name: github-token
+    name: ossm-github-simple-job
 - as: sync-upstream-istio-2.4
   commands: |
     ./tools/automator-main.sh \
@@ -87,7 +87,7 @@ tests:
   cron: 00 05 * * 1-5
   secrets:
   - mount_path: /creds-github
-    name: github-token
+    name: ossm-github-simple-job
 - as: update-istio-builder-image
   commands: |
     export NEW_IMAGE=$(curl -sL https://raw.githubusercontent.com/istio/common-files/master/files/common/scripts/setup_env.sh | grep IMAGE_VERSION= | cut -d= -f2)
@@ -98,14 +98,14 @@ tests:
     --token-path=/creds-github/token \
     '--title=Update maistra/istio builder image' \
     --modifier=update_istio_builder_image_master \
-    '--cmd=sed -i "s|\(gcr.io/istio-testing/build-tools\):.* \(registry.ci.openshift.org/ci/maistra-builder:upstream-master\)|\1:$NEW_IMAGE \2|" core-services/image-mirroring/supplemental-ci-images/mapping_supplemental_ci_images_ci' \
+    '--cmd=sed -i "s|\(gcr.io/istio-testing/build-tools\):.*|\1:$NEW_IMAGE|" core-services/image-mirroring/_config.yaml' \
     '--body=cc @jwendell'
   container:
     from: src
   cron: 00 05 * * 1-5
   secrets:
   - mount_path: /creds-github
-    name: github-token
+    name: ossm-github-simple-job
 - as: test-infra-build-containers-2-2
   run_if_changed: ^docker/maistra-builder_2\.2\.Dockerfile|^docker/scripts
   steps:

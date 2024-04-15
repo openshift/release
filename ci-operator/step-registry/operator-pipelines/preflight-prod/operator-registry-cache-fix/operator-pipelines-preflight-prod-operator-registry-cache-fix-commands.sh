@@ -9,10 +9,10 @@ oc get pods -n openshift-marketplace -o "jsonpath={range .items[*]}{.metadata.na
 
 cat /tmp/catalog-sources-status
 
-echo "Read pods and statuses from disk; if any pod has status CrashLoopBackoff delete pod"
+echo "Read pods and statuses from disk; if any pod has status CrashLoopBackOff delete pod"
 while IFS=' ' read -r podName status
 do
-  if [ "$status" == "CrashLoopBackoff" ]; then
+  if [ "$status" == "CrashLoopBackOff" ]; then
     echo "Deleting $podName"
     oc delete -n openshift-marketplace pod/"$podName"
   fi

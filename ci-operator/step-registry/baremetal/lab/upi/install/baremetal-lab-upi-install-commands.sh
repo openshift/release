@@ -243,6 +243,13 @@ compute:
   name: worker
   replicas: ${workers}"
 
+shopt -s nullglob
+for f in "${SHARED_DIR}"/*_patch_install_config.yaml;
+do
+  echo "[INFO] Applying patch file: $f"
+  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
+done
+
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 # From now on, we assume no more patches to the install-config.yaml are needed.
 # We can create the installation dir with the manifests and, finally, the ignition configs

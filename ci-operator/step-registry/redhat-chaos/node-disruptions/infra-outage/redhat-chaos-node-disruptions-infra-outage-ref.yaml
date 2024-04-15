@@ -1,0 +1,43 @@
+ref:
+  as: redhat-chaos-node-disruptions-infra-outage
+  from_image:
+    namespace: chaos
+    name: prow-scripts
+    tag: latest
+  commands: redhat-chaos-node-disruptions-infra-outage-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aws-chaos
+    mount_path: /secret/telemetry
+  - namespace: test-credentials
+    name: ocp-qe-perfscale-es
+    mount_path: /secret/es
+  env:
+    - name: ACTION
+      default: "node_stop_start_scenario"
+    - name: LABEL_SELECTOR
+      default: "node-role.kubernetes.io/infra="
+    - name: NODE_NAME
+      default: ""
+    - name: INSTANCE_COUNT
+      default: ""
+    - name: RUNS
+      default: "1"
+    - name: CLOUD_TYPE
+      default: "aws"
+    - name: TIMEOUT
+      default: "180" 
+    - name: ENABLE_ALERTS
+      default: "True"
+    - name: ALERTS_PATH
+      default: "./node-disruptions/slos" 
+    - name: CHECK_CRITICAL_ALERTS
+      default: "True"
+    - name: WAIT_DURATION
+      default: "600"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the krkn-hub config workload in the deployed cluster to cause infra node outage to understand the impact on stability and performance.

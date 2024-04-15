@@ -144,9 +144,7 @@ tests:
 - as: e2e-ols-cluster
   run_if_changed: ^(Containerfile.*|Makefile|manifests/.*|ols/.*|pyproject.toml|pdm.lock|scripts/.*|tests/.*)$
   steps:
-    cluster_profile: aws-2
-    env:
-      HYPERSHIFT_BASE_DOMAIN: hypershift.aws-2.ci.openshift.org
+    cluster_profile: aws
     test:
     - as: e2e
       cli: latest
@@ -159,6 +157,9 @@ tests:
         export PROVIDER_KEY_PATH=/var/run/openai/token
         export PROVIDER=openai
         export MODEL=gpt-3.5-turbo-1106
+
+        export CP_OFFLINE_TOKEN=$(cat /var/run/insights-stage-upload-offline-token/token)
+
         tests/scripts/test-e2e-cluster.sh
       credentials:
       - mount_path: /var/run/azure_openai
@@ -173,6 +174,9 @@ tests:
       - mount_path: /var/run/watsonx
         name: watsonx-apitoken
         namespace: test-credentials
+      - mount_path: /var/run/insights-stage-upload-offline-token
+        name: insights-stage-upload-offline-token
+        namespace: test-credentials
       dependencies:
       - env: OLS_IMAGE
         name: lightspeed-service-api
@@ -180,7 +184,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: hypershift-hostedcluster-workflow
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
