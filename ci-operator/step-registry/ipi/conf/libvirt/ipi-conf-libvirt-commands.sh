@@ -26,6 +26,9 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+cluster_dir=$(ls -l "${CLUSTER_PROFILE_DIR}")
+echo "contents of cluster profile directory ${cluster_dir}"
+
 # ensure leases file is present
 if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
   echo "Couldn't find lease config file"
