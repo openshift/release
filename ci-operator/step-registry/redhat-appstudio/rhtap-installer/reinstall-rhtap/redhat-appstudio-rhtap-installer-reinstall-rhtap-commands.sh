@@ -183,7 +183,7 @@ e2e_test(){
   QUAY_IMAGE_ORG="rhtap_qe"
   GITHUB_ORGANIZATION="rhtap-rhdh-qe"
   GITHUB_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
-  RED_HAT_DEVELOPER_HUB_URL=https://"$(oc get route developer-hub -n $NAMESPACE -o jsonpath='{.spec.host}')"
+  RED_HAT_DEVELOPER_HUB_URL=https://"$(oc get route redhat-developer-hub -n $NAMESPACE -o jsonpath='{.spec.host}')"
 
   cd "$(mktemp -d)"
 
