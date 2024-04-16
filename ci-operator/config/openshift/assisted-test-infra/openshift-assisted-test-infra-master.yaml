@@ -64,6 +64,11 @@ releases:
       product: ocp
       stream: nightly
       version: "4.16"
+  latest-okd:
+    candidate:
+      product: okd
+      stream: ""
+      version: "4.16"
 resources:
   '*':
     requests:
@@ -79,6 +84,17 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
+    env:
+      PACKET_PLAN: m3.small.x86
+    workflow: assisted-baremetal
+- always_run: false
+  as: e2e-metal-assisted-okd
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-okd
     env:
       PACKET_PLAN: m3.small.x86
     workflow: assisted-baremetal
