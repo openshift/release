@@ -114,7 +114,7 @@ then
     CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id") || true
     export CLUSTER_ID
 fi
-
+sleep 10080
 # configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
