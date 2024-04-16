@@ -27,13 +27,12 @@ if [[ $E2E_RUN_TAGS =~ @osd_ccs|@rosa ]] ; then
 fi
 ## determine if it is hypershift guest cluster or not
 if ! (oc get node --kubeconfig=${KUBECONFIG} | grep master) ; then
-    run_shell=console-test-frontend-hypershift.sh
+    run_shell="console-test-frontend-hypershift.sh"
 fi
 
 if [[ $E2E_RUN_TAGS =~ @level0 ]]; then
     echo "only run level0 scenarios"
-    ./${run_shell} ./tests/logging/--tags @level0 || true
-    #./${run_shell} --spec ./tests/logging/ --tags @smoke || true
+    ./${run_shell} ./tests/logging/ --tags @level0 || true
 else
     ./${run_shell} --spec ./tests/logging/ || true
 fi
