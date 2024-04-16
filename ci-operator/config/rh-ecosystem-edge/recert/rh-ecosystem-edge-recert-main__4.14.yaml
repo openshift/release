@@ -11,10 +11,6 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.14"
-  tests-private-ui:
-    name: tests-private-ui
-    namespace: ci
-    tag: "4.14"
   upi-installer:
     name: "4.14"
     namespace: ocp
@@ -80,13 +76,21 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
-      FILTERS_ADDITIONAL: ~LSO&
+      E2E_RUN_TAGS: '@level0'
+      TEST_IMPORTANCE: LEVEL0
     observers:
       enable:
       - observers-resource-watch
     test:
     - ref: enable-qe-catalogsource
-    - chain: openshift-e2e-test-qe
+    - chain: cucushift-installer-check-cluster-health
+    - ref: idp-htpasswd
+    - ref: fips-check-fips-or-die
+    - ref: fips-check-node-scan
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-e2e-test-qe-report
     workflow: openshift-e2e-aws-single-node-recert
   timeout: 8h0m0s
 - as: e2e-aws-ipi-sno-fips-recert
@@ -95,11 +99,19 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@level0'
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Disruptive&;~Serial&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      TEST_IMPORTANCE: LEVEL0
     test:
     - ref: single-node-recert
-    - chain: openshift-e2e-test-qe
+    - chain: cucushift-installer-check-cluster-health
+    - ref: idp-htpasswd
+    - ref: fips-check-fips-or-die
+    - ref: fips-check-node-scan
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-aws-ipi-sno
 zz_generated_metadata:
   branch: main

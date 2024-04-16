@@ -5,10 +5,12 @@ set -o nounset
 set -o pipefail
 
 if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; then
-    SINGLE_NODE_AWS_INSTANCE_TYPE="m6gd.2xlarge"
+    DEFAULT_AWS_INSANCE_TYPE="m6gd.2xlarge"
 else
-    SINGLE_NODE_AWS_INSTANCE_TYPE="m5d.2xlarge"
+    DEFAULT_AWS_INSANCE_TYPE="m5d.2xlarge"
 fi
+
+SINGLE_NODE_AWS_INSTANCE_TYPE="${SINGLE_NODE_AWS_INSTANCE_TYPE:-${DEFAULT_AWS_INSANCE_TYPE}}"
 
 echo "Updating install-config.yaml to a single ${SINGLE_NODE_AWS_INSTANCE_TYPE} control plane node and 0 workers"
 

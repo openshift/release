@@ -25,7 +25,6 @@ export ACS__API_TOKEN \
   TPA__POSTGRES__TPA_PASSWORD \
   SPRAYPROXY_SERVER_URL \
   SPRAYPROXY_SERVER_TOKEN \
-  DEVELOPER_HUB__QUAY_TOKEN__ASK_THE_INSTALLER_DEV_TEAM \
   OPENSHIFT_API \
   OPENSHIFT_PASSWORD \
   TAS__SECURESIGN__FULCIO__ORG_EMAIL \
@@ -59,7 +58,6 @@ GITOPS__GIT_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
 QUAY__DOCKERCONFIGJSON=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhtap_quay_ci_token)
 SPRAYPROXY_SERVER_URL=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-url)
 SPRAYPROXY_SERVER_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-token)
-DEVELOPER_HUB__QUAY_TOKEN__ASK_THE_INSTALLER_DEV_TEAM=$(cat /usr/local/rhtap-ci-secrets/rhtap/quay-token)
 
 TPA__GUAC__PASSWORD="guac1234" # notsecret
 TPA__KEYCLOAK__ADMIN_PASSWORD="admin123456" # notsecret
@@ -122,7 +120,7 @@ install_rhtap(){
     apiVersion: tekton.dev/v1
     kind: PipelineRun
     metadata:
-      generateName: trusted-application-pipeline-pe-info-
+      generateName: rhtap-pe-info-
       namespace: "$NAMESPACE"
     spec:
       pipelineSpec:
@@ -134,7 +132,7 @@ install_rhtap(){
                 - name: kind
                   value: task
                 - name: name
-                  value: trusted-application-pipeline-pe-info
+                  value: rhtap-pe-info
                 - name: namespace
                   value: "$NAMESPACE"
 EOF

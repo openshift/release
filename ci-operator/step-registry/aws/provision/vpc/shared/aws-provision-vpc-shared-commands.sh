@@ -478,6 +478,10 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   aws_add_param_to_json "ResourceSharePrincipals" ${CLUSTER_CREATOR_AWS_ACCOUNT_NO} "$vpc_params"
 fi
 
+if [[ -n "${VPC_CIDR}" ]]; then
+     aws_add_param_to_json "VpcCidr" ${VPC_CIDR} "$vpc_params"
+fi
+
 if [[ ${ZONES_LIST} != "" ]]; then
   zones_list_count=$(echo "$ZONES_LIST" | awk -F',' '{ print NF }')
   if [[ "${zones_list_count}" != "${ZONES_COUNT}" ]]; then
