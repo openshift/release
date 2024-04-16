@@ -559,6 +559,7 @@ fi
 if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
     update_cloud_credentials_oidc
 fi
+sleep 10080
 upgrade
 check_upgrade_status
 
