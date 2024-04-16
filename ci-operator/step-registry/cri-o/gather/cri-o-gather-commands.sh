@@ -21,6 +21,7 @@ function getlogs() {
       fi
     done
     scp -rv "${SSHOPTS[@]}" "${USER}@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
+    ssh "${SSHOPTS[@]}" -o StrictHostKeyChecking=no "${USER}@${IP}" "sudo journalctl --no-pager" > "${ARTIFACT_DIR}/journal.log"
 }
 
 # Gather logs regardless of what happens after this
