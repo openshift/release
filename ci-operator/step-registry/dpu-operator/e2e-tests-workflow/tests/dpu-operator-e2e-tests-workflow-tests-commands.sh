@@ -45,7 +45,11 @@ do
     if [ "$result" != "null" ]; then
         # Job has completed
         echo "Job Result: $result"
-        if [ "$result" == "SUCCESS" ]; then
+	
+	curl_info=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/consoleText")
+	echo "$curl_info"
+        
+	if [ "$result" == "SUCCESS" ]; then
             exit 0
         else
             exit 1
