@@ -100,12 +100,6 @@ EOF
   fi
 }
 
-clone_repo(){
-  echo "[INFO]Cloning rhtap-installer repo..."
-  git clone https://github.com/redhat-appstudio/rhtap-installer.git
-  cd rhtap-installer
-}
-
 wait_for_pipeline() {
   if ! oc wait --for=condition=succeeded "$1" -n "$2" --timeout 300s >"$DEBUG_OUTPUT"; then
     echo "[ERROR] Pipeline failed to complete successful" >&2
@@ -185,18 +179,20 @@ e2e_test(){
   GITHUB_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
   RED_HAT_DEVELOPER_HUB_URL=https://"$(oc get route redhat-developer-hub -n $NAMESPACE -o jsonpath='{.spec.host}')"
 
-  cd "$(mktemp -d)"
+  pushd "$(mktemp -d)"
 
   git clone https://github.com/redhat-appstudio/rhtap-e2e.git .
 
   NODE_TLS_REJECT_UNAUTHORIZED=0
   yarn && yarn test
+  popd
 }
 
 
 login_ocp
 install_rhtap
 health_check
+e2e_test
 remove_rhtap
 install_rhtap
 health_check
