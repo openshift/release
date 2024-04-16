@@ -16,17 +16,15 @@ timeout --foreground 5m bash  <<- "EOF"
     done
 EOF
 
-APPLICATION_ROOT_NAMESPACE="rhtap-e2e-ci"
+APPLICATION_ROOT_NAMESPACE="rhtap-app"
 QUAY_IMAGE_ORG="rhtap_qe"
 GITHUB_ORGANIZATION="rhtap-rhdh-qe"
 GITHUB_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
-RED_HAT_DEVELOPER_HUB_URL=https://"$(oc get route developer-hub -n rhtap -o jsonpath='{.spec.host}')"
+RED_HAT_DEVELOPER_HUB_URL=https://"$(oc get route redhat-developer-hub -n rhtap -o jsonpath='{.spec.host}')"
 
 cd "$(mktemp -d)"
 
 git clone https://github.com/redhat-appstudio/rhtap-e2e.git .
-
-/bin/bash ./scripts/create-creds.sh "${APPLICATION_ROOT_NAMESPACE}"
 
 NODE_TLS_REJECT_UNAUTHORIZED=0
 yarn && yarn test

@@ -10,13 +10,9 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.14"
-  tests-private-ui:
-    name: tests-private-ui
-    namespace: ci
-    tag: "4.14"
+    tag: "4.16"
   upi-installer:
-    name: "4.14"
+    name: "4.16"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -36,9 +32,9 @@ promotion:
     tag_by_commit: true
 releases:
   latest:
-    release:
-      channel: fast
-      version: "4.14"
+    integration:
+      name: "4.16"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -62,7 +58,7 @@ tests:
   commands: cargo clippy
   container:
     from: recert-check
-- always_run: false
+- always_run: true
   as: e2e-aws-ovn-single-node-recert-serial
   steps:
     cluster_profile: aws-2
@@ -75,7 +71,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node-recert
-- always_run: false
+- always_run: true
   as: e2e-aws-ovn-single-node-recert-parallel
   steps:
     cluster_profile: aws-2
@@ -92,13 +88,21 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
-      FILTERS_ADDITIONAL: ~LSO&
+      E2E_RUN_TAGS: '@level0'
+      TEST_IMPORTANCE: LEVEL0
     observers:
       enable:
       - observers-resource-watch
     test:
     - ref: enable-qe-catalogsource
-    - chain: openshift-e2e-test-qe
+    - chain: cucushift-installer-check-cluster-health
+    - ref: idp-htpasswd
+    - ref: fips-check-fips-or-die
+    - ref: fips-check-node-scan
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-e2e-test-qe-report
     workflow: openshift-e2e-aws-single-node-recert
   timeout: 8h0m0s
 - as: e2e-aws-ipi-sno-fips-recert
@@ -107,13 +111,21 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@level0'
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Disruptive&;~Serial&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      TEST_IMPORTANCE: LEVEL0
     test:
     - ref: single-node-recert
-    - chain: openshift-e2e-test-qe
+    - chain: cucushift-installer-check-cluster-health
+    - ref: idp-htpasswd
+    - ref: fips-check-fips-or-die
+    - ref: fips-check-node-scan
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-aws-ipi-sno
-- always_run: false
+- always_run: true
   as: baremetalds-sno-recert-cluster-rename
   steps:
     cluster_profile: packet-sno

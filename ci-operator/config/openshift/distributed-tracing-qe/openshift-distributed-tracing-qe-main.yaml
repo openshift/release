@@ -35,20 +35,18 @@ tests:
   cron: 0 6 * * 0
   steps:
     env:
-      AMQ_SOURCE: dt-catalogsource
       DT_TEST_TYPE: DAST
-      EO_SUB_CHANNEL: stable-5.7
-      EO_SUB_SOURCE: dt-catalogsource
-      JAEGER_SOURCE: dt-catalogsource
-      OTEL_SOURCE: dt-catalogsource
-      TEMPO_SOURCE: dt-catalogsource
+      OPERATORS: |
+        [
+            {"name": "elasticsearch-operator", "source": "dt-catalogsource", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespace": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "amq-streams", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "jaeger-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespace": "", "operator_group": "openshift-distributed-tracing"},
+            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespace": "", "operator_group": "openshift-tempo-operator"}
+        ]
     test:
     - ref: enable-stage-catalogsource
-    - ref: operatorhub-subscribe-elasticsearch-operator
-    - ref: operatorhub-subscribe-amq-streams
-    - ref: distributed-tracing-install-jaeger-product
-    - ref: distributed-tracing-install-tempo-product
-    - ref: distributed-tracing-install-opentelemetry-product
+    - ref: install-operators
     - ref: distributed-tracing-tests-common
     workflow: generic-claim
 zz_generated_metadata:

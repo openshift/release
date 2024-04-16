@@ -74,9 +74,6 @@ CONFIG = {
         'us-east-1': 5,
         'us-west-2': 5
     },
-    'aws-perf-qe-quota-slice': {
-        'us-west-2': 3,
-    },
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 10,
     },
@@ -242,6 +239,7 @@ CONFIG = {
     'vsphere-connected-2-quota-slice':{},
     'vsphere-multizone-2-quota-slice':{},
     'vsphere-8-vpn-quota-slice':{},
+    'vsphere-multi-vcenter-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
     },
@@ -272,6 +270,7 @@ CONFIG = {
     'powervs-4-quota-slice': {
         'wdc06': 1,
     },
+    'powervs-5-quota-slice': {},
     'powervs-multi-1-quota-slice': {
         'wdc06': 2,
     },
@@ -312,10 +311,9 @@ CONFIG = {
         'us-west-2': 5,
     },
     'azure-virtualization-quota-slice': {
-        'centralus': 5,
-        'eastus': 5,
-        'eastus2': 5,
-        'westus': 5
+        'eastus': 10,
+        'eastus2': 10,
+        'westus': 10
     },
     'gcp-virtualization-quota-slice': {
         'us-central1': 50,
@@ -383,6 +381,9 @@ CONFIG = {
         'us-east-2': 25,
         'us-west-1': 25,
         'us-west-2': 25,
+    },
+    'aws-ip-pools-us-east-1': {
+        'default': 256,
     }
 }
 
@@ -434,6 +435,12 @@ for i in [1287,1289,1296,1298,1300,1302]:
 
 for i in [1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274,1283,1285,1305,1309]:
     CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
+
+for i in [956]:
+    CONFIG['vsphere-multi-vcenter-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
+
+for i in range(4):
+    CONFIG['powervs-5-quota-slice']['mad02-powervs-5-quota-slice-{}'.format(i)] = 1
 
 
 config = {
