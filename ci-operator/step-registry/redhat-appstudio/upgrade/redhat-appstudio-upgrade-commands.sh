@@ -13,26 +13,26 @@ export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOK
     QE_SPRAYPROXY_HOST QE_SPRAYPROXY_TOKEN
 
 DEFAULT_QUAY_ORG=redhat-appstudio-qe
-DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/default-quay-org-token)
+DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/default-quay-org-token)
 GITHUB_USER=""
 GITHUB_TOKEN=""
-GITHUB_TOKENS_LIST="$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/github_accounts)"
-QUAY_TOKEN=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/quay-token)
-QUAY_OAUTH_USER=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/quay-oauth-user)
-QUAY_OAUTH_TOKEN=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/quay-oauth-token)
-PYXIS_STAGE_KEY=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/pyxis-stage-key)
-PYXIS_STAGE_CERT=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/pyxis-stage-cert)
+GITHUB_TOKENS_LIST="$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github_accounts)"
+QUAY_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/quay-token)
+QUAY_OAUTH_USER=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/quay-oauth-user)
+QUAY_OAUTH_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/quay-oauth-token)
+PYXIS_STAGE_KEY=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pyxis-stage-key)
+PYXIS_STAGE_CERT=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pyxis-stage-cert)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 PREVIOUS_RATE_REMAINING=0
-OAUTH_REDIRECT_PROXY_URL=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/oauth-redirect-proxy-url)
-SPI_GITHUB_CLIENT_ID=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/spi-github-client-id)
-SPI_GITHUB_CLIENT_SECRET=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/spi-github-client-secret)
-QE_SPRAYPROXY_HOST=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/qe-sprayproxy-host)
-QE_SPRAYPROXY_TOKEN=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/qe-sprayproxy-token)
+OAUTH_REDIRECT_PROXY_URL=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/oauth-redirect-proxy-url)
+SPI_GITHUB_CLIENT_ID=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/spi-github-client-id)
+SPI_GITHUB_CLIENT_SECRET=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/spi-github-client-secret)
+QE_SPRAYPROXY_HOST=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qe-sprayproxy-host)
+QE_SPRAYPROXY_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qe-sprayproxy-token)
 
 # user stored: username:token,username:token
-IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<< "$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/github_accounts)"
+IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<< "$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github_accounts)"
 for account in "${GITHUB_ACCOUNTS_ARRAY[@]}"
 do :
     IFS=':' read -r -a GITHUB_USERNAME_ARRAY <<< "$account"
