@@ -37,4 +37,8 @@ cat > scaleup-pre-hook-ibmcloud.yaml << EOF
 EOF
 
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
-ansible-playbook -i "${SHARED_DIR}/ansible-hosts" scaleup-pre-hook-ibmcloud.yaml -vvv
+ansible-playbook -i "${SHARED_DIR}/ansible-hosts" scaleup-pre-hook-ibmcloud.yaml -vvv || true
+echo "debug ...."
+sleep 3h
+
+
