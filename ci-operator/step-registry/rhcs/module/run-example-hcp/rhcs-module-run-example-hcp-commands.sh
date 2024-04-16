@@ -21,17 +21,7 @@ if [ ! -f ${AWS_SHARED_CREDENTIALS_FILE} ];then
 fi
 export AWS_SHARED_CREDENTIALS_FILE
 
-shared_vpc_aws_cred="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
-if [ ! -f ${shared_vpc_aws_cred} ];then
-    error_exit "missing mandatory aws credential file ${shared_vpc_aws_cred}"
-fi
-TF_VAR_shared_vpc_aws_access_key_id=$(cat ${shared_vpc_aws_cred} | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f2)
-export TF_VAR_shared_vpc_aws_access_key_id
-TF_VAR_shared_vpc_aws_secret_access_key=$(cat ${shared_vpc_aws_cred} | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f2)
-export TF_VAR_shared_vpc_aws_secret_access_key
-
-export AWS_REGION="${AWS_REGION:-us-east-1}"
-export TF_VAR_shared_vpc_aws_region="${TF_VAR_shared_vpc_aws_region:-us-east-1}"
+export AWS_REGION="${AWS_REGION:-us-west-2}"
 
 random_md5sum=$(echo "$RANDOM" | md5sum)
 random_string=$(printf '%s' ${random_md5sum} | cut -c 1-4)
