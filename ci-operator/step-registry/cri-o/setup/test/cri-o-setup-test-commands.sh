@@ -18,7 +18,13 @@ EOF
 
 currentDate=$(date +'%s')
 gcloud compute instances stop ${instance_name} --zone=${ZONE}
-gcloud compute images create "crio-setup-${currentDate}" --source-image-family="crio-setup" --source-image-project="${PROJECT_ID}" --family="crio-setup" --project="openshift-node-devel"
+disk_name=$(gcloud compute instances describe ${instance_name} --zone=${ZONE} --format='get(disks[0].source)')
+
+gcloud compute images create crio-setup-${currentDate} \
+    --source-disk="${disk_name}" \
+    --family="crio-setup" \
+    --source-disk-zone=${ZONE} \
+    --project="openshift-node-devel"
 # Delete images older than 2 weeks
 images=$(gcloud compute images list --project="openshift-node-devel" --filter="family:crio-setup AND creationTimestamp<$(date -d '2 weeks ago' +%Y-%m-%dT%H:%M:%SZ)" --format="value(name)")
 if [ -n "$images" ]; then
@@ -28,3 +34,4 @@ if [ -n "$images" ]; then
 else
     echo "No images found that were created more than 2 weeks ago."
 fi
+gcloud compute instances delete ${instance_name} --zone=${ZONE}
