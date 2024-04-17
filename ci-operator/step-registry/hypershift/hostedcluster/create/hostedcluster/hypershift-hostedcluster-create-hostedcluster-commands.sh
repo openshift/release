@@ -75,6 +75,7 @@ case "${PLATFORM}" in
       --release-image ${RELEASE_IMAGE} \
       --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
       --node-selector "hypershift.openshift.io/control-plane=true" \
+      --olm-catalog-placement guest \
       --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
       --annotations "cluster-profile=${CLUSTER_PROFILE_NAME}" \
@@ -114,6 +115,7 @@ case "${PLATFORM}" in
       --resource-group ${POWERVS_RESOURCE_GROUP} \
       --pull-secret=/etc/registry-pull-credentials/.dockerconfigjson \
       --release-image ${RELEASE_IMAGE} \
+      --olm-catalog-placement guest \
       --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
       --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
       --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
