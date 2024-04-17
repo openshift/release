@@ -2,11 +2,12 @@
 
 set -euo pipefail
 git version
+go version
 
 echo "Clone opencontainers distribution-spec Repository..."
 cd /tmp && git clone https://github.com/opencontainers/distribution-spec.git && cd distribution-spec/conformance || true
 
-go test -c && ls 
+go test -c -mod=mod  && ls 
 
 # Registry details
 export OCI_ROOT_URL="https://r.myreg.io"
