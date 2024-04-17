@@ -457,12 +457,12 @@ generate-hypershift-deployment:
 		-v "$(MGMT_AWS_CONFIG_PATH):/mgmt-aws$(VOLUME_MOUNT_FLAGS)" \
 		registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
 		install \
-		--oidc-storage-provider-s3-bucket-name=hypershift-oidc-provider \
+		--oidc-storage-provider-s3-bucket-name=dptp-hypershift-oidc-provider \
 		--oidc-storage-provider-s3-credentials=/mgmt-aws \
 		--oidc-storage-provider-s3-region=us-east-1 \
 		--hypershift-image=registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
 		--enable-uwm-telemetry-remote-write=false \
-		render | $(yq) eval 'select(.kind != "Secret")' > clusters/hosted-mgmt/hypershift/hypershift-install.yaml
+		render | $(yq) eval 'select(.kind != "Secret")' > clusters/hosted-mgmt/hypershift/SS_hypershift-install.yaml
 .PHONY: generate-hypershift-deployment
 
 build-hypershift-deployment: TAG ?= $(shell date +%Y%m%d)
