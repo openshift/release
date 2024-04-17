@@ -18,7 +18,8 @@ KUBECONFIG="" oc --loglevel=8 registry login
 
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
-    if (( FRC != 0 )); then
+    # to delete - temporary enable debug every time
+    if true ; then
         echo -e "\n# oc adm upgrade status\n$(env OC_ENABLE_CMD_UPGRADE_STATUS='true' oc adm upgrade status)"
         echo -e "\n# oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
         echo -e "\n# oc get machineconfig\n$(oc get machineconfig)"
