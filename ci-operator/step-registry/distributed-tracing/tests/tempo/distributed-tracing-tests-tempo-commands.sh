@@ -92,6 +92,8 @@ else
   # Unset environment variable which conflicts with Chainsaw
   unset NAMESPACE
 
+  sleep 10800
+
   # Execute Tempo e2e tests
   chainsaw test \
   --config .chainsaw-openshift.yaml \
