@@ -37,6 +37,10 @@ else
     # not using --grepTags here since cypress in 4.12 doesn't have that plugin
     echo "Running Network_Observability tests"
     ./console-test-frontend.sh --spec tests/netobserv/* || true
+  elif [[ $E2E_RUN_TAGS =~ @wrs ]]; then
+    # WRS specific testing
+    echo 'WRS testing'
+    ./console-test-frontend.sh --tags @wrs || true
   else
     echo "only run smoke scenarios"
     ./console-test-frontend.sh --tags @smoke || true
