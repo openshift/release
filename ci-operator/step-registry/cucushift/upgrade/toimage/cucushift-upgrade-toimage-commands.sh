@@ -448,6 +448,21 @@ function upgrade() {
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
+# Log abnormal cluster status
+function dump_status_if_unexpected() {
+    # expecting oc to equal TARGET_MINOR_VERSION, skip if less than .16
+        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+            local out; out="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status)"
+            # if upgrading, and not progressing well, dump status to log
+            if ! grep -qE 'The cluster version is not updating|Upgrade is proceeding well' <<< "${out}" ; then
+                echo "${out}"
+            fi
+        else
+            # skip for older oc with no status command, or TARGET_MINOR_VERSION unset
+            return 0
+        fi
+}
+
 # Monitor the upgrade status
 function check_upgrade_status() {
     local wait_upgrade="${TIMEOUT}" out avail progress cluster_version
@@ -478,6 +493,7 @@ function check_upgrade_status() {
             echo -e "Upgrade stuck at updating RHEL worker, run the RHEL worker upgrade now...\n\n"
             return 0
         fi
+        dump_status_if_unexpected
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
         echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
