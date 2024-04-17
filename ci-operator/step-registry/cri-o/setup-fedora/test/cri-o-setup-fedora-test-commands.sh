@@ -18,11 +18,20 @@ EOF
 
 currentDate=$(date +'%s')
 gcloud compute instances stop ${instance_name} --zone=${ZONE}
-gcloud compute images create "crio-setup-fedora-${currentDate}" --source-image-family="crio-setup-fedora" --source-image-project="${PROJECT_ID}" --family="crio-setup-fedora" --project="openshift-node-devel"
+disk_name=$(gcloud compute instances describe ${instance_name} --zone=${ZONE} --format='get(disks[0].source)')
+
+gcloud compute images create crio-setup-fedora-${currentDate} \
+    --source-disk="${disk_name}" \
+    --family="crio-setup-fedora" \
+    --source-disk-zone=${ZONE} \
+    --project="openshift-node-devel"
 # Delete images older than 2 weeks
 images=$(gcloud compute images list --project="openshift-node-devel" --filter="family:crio-setup-fedora AND creationTimestamp<$(date -d '2 weeks ago' +%Y-%m-%dT%H:%M:%SZ)" --format="value(name)")
 if [ -n "$images" ]; then
-    echo "$images" | xargs -I '{}' gcloud compute images delete '{}' --project="openshift-node-devel"
+    echo "The following images will be deleted:"
+    echo "$images"
+    echo "$images" | xargs -I '{}' gcloud compute images delete '{}' --project="openshift-node-devel" || true
 else
     echo "No images found that were created more than 2 weeks ago."
 fi
+gcloud compute instances delete ${instance_name} --zone=${ZONE}

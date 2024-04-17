@@ -164,58 +164,6 @@ postsubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-stackrox-release-x.y-merge-gke-ebpf-qa-e2e-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-gke-ebpf-qa-e2e-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-x\.y$
-    cluster: build02
-    decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -434,6 +382,58 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-gke-scale-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-x\.y$
+    cluster: build02
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-stackrox-stackrox-release-x.y-merge-gke-scanner-v4-tests
+    run_if_changed: ^(scanner|image|central/localscanner|sensor/kubernetes/localscanner|roxctl|deploy|proto|scripts/ci|tests/e2e)/.*
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=merge-gke-scanner-v4-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -785,10 +785,10 @@ postsubmits:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-11
+      ci-operator.openshift.io/variant: ocp-4-12
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-11-merge-compliance-e2e-tests
+    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-12-merge-compliance-e2e-tests
     spec:
       containers:
       - args:
@@ -796,7 +796,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-compliance-e2e-tests
-        - --variant=ocp-4-11
+        - --variant=ocp-4-12
         command:
         - ci-operator
         image: ci-operator:latest
@@ -839,10 +839,10 @@ postsubmits:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-11
+      ci-operator.openshift.io/variant: ocp-4-12
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-11-merge-ebpf-qa-e2e-tests
+    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-12-merge-ebpf-qa-e2e-tests
     spec:
       containers:
       - args:
@@ -850,7 +850,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-ebpf-qa-e2e-tests
-        - --variant=ocp-4-11
+        - --variant=ocp-4-12
         command:
         - ci-operator
         image: ci-operator:latest
@@ -893,10 +893,10 @@ postsubmits:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-11
+      ci-operator.openshift.io/variant: ocp-4-12
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-11-merge-operator-e2e-tests
+    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-12-merge-operator-e2e-tests
     spec:
       containers:
       - args:
@@ -904,7 +904,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-operator-e2e-tests
-        - --variant=ocp-4-11
+        - --variant=ocp-4-12
         command:
         - ci-operator
         image: ci-operator:latest
@@ -947,10 +947,10 @@ postsubmits:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-11
+      ci-operator.openshift.io/variant: ocp-4-12
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-11-merge-qa-e2e-tests
+    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-12-merge-qa-e2e-tests
     spec:
       containers:
       - args:
@@ -958,7 +958,62 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-qa-e2e-tests
-        - --variant=ocp-4-11
+        - --variant=ocp-4-12
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-x\.y$
+    cluster: build02
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci-operator.openshift.io/variant: ocp-4-12
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-12-merge-scanner-v4-tests
+    run_if_changed: ^(scanner|image|central/localscanner|sensor/kubernetes/localscanner|roxctl|deploy|proto|scripts/ci|tests/e2e)/.*
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=merge-scanner-v4-tests
+        - --variant=ocp-4-12
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1001,10 +1056,10 @@ postsubmits:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-11
+      ci-operator.openshift.io/variant: ocp-4-12
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-11-merge-ui-e2e-tests
+    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-12-merge-ui-e2e-tests
     spec:
       containers:
       - args:
@@ -1012,7 +1067,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-ui-e2e-tests
-        - --variant=ocp-4-11
+        - --variant=ocp-4-12
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1055,10 +1110,10 @@ postsubmits:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-14
+      ci-operator.openshift.io/variant: ocp-4-15
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-14-merge-compliance-e2e-tests
+    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-15-merge-compliance-e2e-tests
     spec:
       containers:
       - args:
@@ -1066,7 +1121,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-compliance-e2e-tests
-        - --variant=ocp-4-14
+        - --variant=ocp-4-15
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1109,64 +1164,10 @@ postsubmits:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-14
+      ci-operator.openshift.io/variant: ocp-4-15
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-14-merge-ebpf-qa-e2e-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-ebpf-qa-e2e-tests
-        - --variant=ocp-4-14
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-x\.y$
-    cluster: build02
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci-operator.openshift.io/variant: ocp-4-14
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-14-merge-fips-qa-e2e-tests
+    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-15-merge-fips-qa-e2e-tests
     spec:
       containers:
       - args:
@@ -1174,7 +1175,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-fips-qa-e2e-tests
-        - --variant=ocp-4-14
+        - --variant=ocp-4-15
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1217,10 +1218,10 @@ postsubmits:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-14
+      ci-operator.openshift.io/variant: ocp-4-15
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-14-merge-operator-e2e-tests
+    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-15-merge-operator-e2e-tests
     spec:
       containers:
       - args:
@@ -1228,7 +1229,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-operator-e2e-tests
-        - --variant=ocp-4-14
+        - --variant=ocp-4-15
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1271,10 +1272,10 @@ postsubmits:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-14
+      ci-operator.openshift.io/variant: ocp-4-15
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-14-merge-qa-e2e-tests
+    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-15-merge-qa-e2e-tests
     spec:
       containers:
       - args:
@@ -1282,7 +1283,62 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-qa-e2e-tests
-        - --variant=ocp-4-14
+        - --variant=ocp-4-15
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-x\.y$
+    cluster: build02
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci-operator.openshift.io/variant: ocp-4-15
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-15-merge-scanner-v4-tests
+    run_if_changed: ^(scanner|image|central/localscanner|sensor/kubernetes/localscanner|roxctl|deploy|proto|scripts/ci|tests/e2e)/.*
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=merge-scanner-v4-tests
+        - --variant=ocp-4-15
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1325,10 +1381,10 @@ postsubmits:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/variant: ocp-4-14
+      ci-operator.openshift.io/variant: ocp-4-15
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-14-merge-ui-e2e-tests
+    name: branch-ci-stackrox-stackrox-release-x.y-ocp-4-15-merge-ui-e2e-tests
     spec:
       containers:
       - args:
@@ -1336,7 +1392,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-ui-e2e-tests
-        - --variant=ocp-4-14
+        - --variant=ocp-4-15
         command:
         - ci-operator
         image: ci-operator:latest

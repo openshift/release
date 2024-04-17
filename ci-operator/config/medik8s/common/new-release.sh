@@ -27,12 +27,14 @@ fi
 cd ${REPO}
 
 # copy all main config files
-for file in $(ls | grep main); do
+for file in $(ls | grep main__); do
   # rename the file with branch name
-  new_file=$(echo ${file} | sed "s/main/${BRANCH}/")
+  new_file=$(echo ${file} | sed "s/main__/${BRANCH}__/")
   cp ${file} ${new_file}
   # update the branch name in the config
   sed -i "s/branch: main/branch: ${BRANCH}/g" ${new_file}
 done
 
 echo "Done, please run 'make update' for creating jobs"
+echo "HEADS UP: update branch protection in core-services/prow/02_config/medik8s!"
+

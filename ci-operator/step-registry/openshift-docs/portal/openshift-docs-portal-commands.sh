@@ -10,7 +10,7 @@ IFS=' ' read -r -a DISTROS <<< "${DISTROS}"
 for DISTRO in "${DISTROS[@]}"; do
 
     case "${DISTRO}" in
-        "openshift-enterprise"|"openshift-acs"|"openshift-pipelines"|"openshift-serverless"|"openshift-gitops")
+        "openshift-enterprise"|"openshift-acs"|"openshift-pipelines"|"openshift-serverless"|"openshift-gitops"|"openshift-builds"|"openshift-service-mesh"|"openshift-opp"|"openshift-rhde")
             TOPICMAP="_topic_maps/_topic_map.yml"
             ;;
         "openshift-rosa")
@@ -22,13 +22,11 @@ for DISTRO in "${DISTROS[@]}"; do
         "microshift")
             TOPICMAP="_topic_maps/_topic_map_ms.yml"
             ;;
-        "openshift-opp")
-            TOPICMAP="_topic_map.yml"
-            ;;
     esac
 
     ./scripts/get-updated-distros.sh | while read -r FILENAME; do
         if [ "${FILENAME}" == "${TOPICMAP}" ]; then
+            echo -e "\e[91mBuilding openshift-docs with ${DISTRO} distro...\e[0m"
             python3 "${BUILD}" --distro "${DISTRO}" --product "OpenShift Container Platform" --version "${VERSION}" --no-upstream-fetch
         elif [ "${FILENAME}" == "_distro_map.yml" ]; then
             python3 "${BUILD}" --distro "openshift-enterprise" --product "OpenShift Container Platform" --version "${VERSION}" --no-upstream-fetch

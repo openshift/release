@@ -61,7 +61,8 @@ function destroy_bootstrap() {
   BUILD_ID="$1"
   mac="$2"
   echo "Destroying bootstrap: removing the DHCP/PXE config..."
-  sed -i "/^dhcp-host=$mac/d" /opt/dnsmasq/etc/dnsmasq.conf
+  sed -i "/^$mac/d" /opt/dnsmasq/hosts/hostsdir/"${BUILD_ID}"
+  kill -s HUP "$(podman inspect -f '{{ .State.Pid }}' "dhcp")"
   echo "Destroying bootstrap: removing the grub config..."
   rm -f "/opt/dnsmasq/tftpboot/grub.cfg-01-${mac//:/-}" || echo "no grub.cfg for $mac."
   echo "Destroying bootstrap: removing dns entries..."
@@ -80,7 +81,6 @@ function destroy_bootstrap() {
   podman kill -s HUP "haproxy-${BUILD_ID}"
   podman exec bind9 rndc reload
   podman exec bind9 rndc flush
-  systemctl restart dhcp
 EOF
   # do not fail if unable to wipe the bootstrap disk and do not release it, to retry later in post steps
   # shellcheck disable=SC2154
@@ -242,6 +242,13 @@ compute:
   hyperthreading: Enabled
   name: worker
   replicas: ${workers}"
+
+shopt -s nullglob
+for f in "${SHARED_DIR}"/*_patch_install_config.yaml;
+do
+  echo "[INFO] Applying patch file: $f"
+  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" "$f"
+done
 
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 # From now on, we assume no more patches to the install-config.yaml are needed.

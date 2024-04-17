@@ -45,3 +45,7 @@ for STACK_SUFFIX in compute-2 compute-1 compute-0 control-plane bootstrap proxy 
 do
     aws cloudformation delete-stack --stack-name "${CLUSTER_NAME}-${STACK_SUFFIX}"
 done
+
+s3_bucket_uri=$(head -n 1 ${SHARED_DIR}/s3_bucket_uri)
+echo "Deleting bootstrap s3 bucket ${s3_bucket_uri}"
+aws s3 rb ${s3_bucket_uri} --force

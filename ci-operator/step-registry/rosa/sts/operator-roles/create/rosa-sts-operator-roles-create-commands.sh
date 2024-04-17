@@ -34,6 +34,8 @@ else
   echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
   exit 1
 fi
+AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
+AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
 # Switches
 account_installer_role_arn=$(cat "${SHARED_DIR}/account-roles-arns" | { grep "Installer-Role" || true; })
@@ -58,7 +60,8 @@ rosa create operator-roles -y --mode auto \
                            --installer-role-arn ${account_installer_role_arn} \
                            --channel-group ${CHANNEL_GROUP} \
                            ${HOSTED_CP_SWITCH} \
-                           ${SHARED_VPC_SWITCH}
+                           ${SHARED_VPC_SWITCH} \
+                           | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
 # Store the operator-roles for the post steps and the operator roles deletion
 echo -n "${OPERATOR_ROLES_PREFIX}" > "${SHARED_DIR}/operator-roles-prefix"
 # rosa list operator-roles --prefix ${OPERATOR_ROLES_PREFIX} --output json > "${SHARED_DIR}/operator-roles-arns"

@@ -3,7 +3,6 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -o xtrace
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -13,13 +12,16 @@ if [ -z "${RHCS_TOKEN}" ]; then
 fi
 export RHCS_TOKEN
 
+RHCS_URL=https://api.stage.openshift.com
+export RHCS_URL
+
 AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 if [ ! -f ${AWS_SHARED_CREDENTIALS_FILE} ];then
     error_exit "missing mandatory aws credential file ${AWS_SHARED_CREDENTIALS_FILE}"
 fi
 export AWS_SHARED_CREDENTIALS_FILE
 
-shared_vpc_aws_cred="${CLUSTER_PROFILE_DIR}/.awscred-shared-vpc"
+shared_vpc_aws_cred="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
 if [ ! -f ${shared_vpc_aws_cred} ];then
     error_exit "missing mandatory aws credential file ${shared_vpc_aws_cred}"
 fi

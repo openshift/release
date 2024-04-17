@@ -88,6 +88,15 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-shared-phz-sts
+- as: azure-ipi-disc-fullyprivate-firewall-f28
+  cron: 54 11 9 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate-firewall
 - as: azure-ipi-disktype-premium-lrs-disksize-f14
   cron: 5 16 6,22 * *
   steps:
@@ -175,6 +184,7 @@ tests:
     env:
       AZURE_MANAGED_IDENTITY_TYPE: system
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity-managed-identity
@@ -185,6 +195,7 @@ tests:
     env:
       AZURE_MANAGED_IDENTITY_TYPE: user-defined
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity-managed-identity
@@ -199,19 +210,6 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-private
-- as: azure-ipi-private-network-type-m-accelarated-w-basic-f14
-  cron: 19 12 8,24 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      AZURE_COMPUTE_NETWORKING_TYPE: Basic
-      AZURE_DEFAULT_MACHINE_NETWORKING_TYPE: Accelerated
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D8s_v3
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8s_v3
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-azure-ipi-private-networking-type
 - as: azure-ipi-private-sshkey-f14
   cron: 37 16 11,25 * *
   steps:
@@ -269,6 +267,15 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-users-static
+- as: gcp-ipi-oidc-on-bastionhost-auth-with-sa-f28
+  cron: 7 2 16 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity-auth-with-sa
 - as: gcp-ipi-nested-virtualization-osdisk-type-size-f28
   cron: 24 18 3 * *
   steps:
@@ -283,6 +290,24 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-users-static
+- as: nutanix-ipi-zones-single-f28
+  cluster: build01
+  cron: 23 1 14 * *
+  steps:
+    cluster_profile: nutanix-qe-zone
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      SINGLE_ZONE: "true"
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-nutanix-ipi-zones
+- as: vsphere-ipi-customized-resource-f28
+  cron: 3 19 5 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-vsphere-ipi-customized-resource
 zz_generated_metadata:
   branch: master
   org: openshift

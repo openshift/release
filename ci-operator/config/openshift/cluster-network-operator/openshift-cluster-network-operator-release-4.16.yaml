@@ -11,18 +11,14 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: hypershift-operator
-  hypershift-tests:
-    name: "4.16"
-    namespace: ocp
-    tag: hypershift-tests
   ocp_4.16_base-rhel9:
     name: "4.16"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.16
+    tag: rhel-9-golang-1.21-openshift-4.16
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
@@ -32,9 +28,9 @@ images:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cluster-network-operator
 promotion:
   to:
@@ -65,12 +61,6 @@ tests:
   commands: hack/verify-style.sh
   container:
     from: src
-- as: e2e-gcp-sdn
-  steps:
-    cluster_profile: gcp-3
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    workflow: openshift-e2e-gcp-sdn
 - as: e2e-gcp-ovn-upgrade
   steps:
     cluster_profile: gcp
@@ -82,12 +72,6 @@ tests:
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-upgrade-aws-sdn
-- as: e2e-aws-sdn-multi
-  steps:
-    cluster_profile: aws
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-ovn-step-registry
   optional: true
   steps:
@@ -131,7 +115,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      WINDOWS_SERVER_VERSION: "2019"
+      CUSTOM_VXLAN_PORT: "true"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
@@ -179,23 +163,14 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-ovn
-- as: e2e-vsphere-ovn-windows
+- always_run: false
+  as: e2e-vsphere-ovn-windows
+  optional: true
   steps:
     cluster_profile: vsphere-2
     test:
-    - ref: windows-e2e-operator-test-with-custom-vxlan-port
+    - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
-- as: e2e-openstack-sdn
-  optional: true
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: OpenShiftSDN
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_SUITE: openshift/conformance/parallel
-    workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-ovn
   optional: true
   steps:
@@ -210,7 +185,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SDN_LIVE_MIGRATION_OPTIONS: target-cni=OVNKubernetes
       TEST_SUITE: openshift/network/live-migration
@@ -228,7 +202,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_SDN_LIVE_MIGRATION_OPTIONS: target-cni=OVNKubernetes,rollback=true
       TEST_SUITE: openshift/network/live-migration
@@ -259,39 +232,6 @@ tests:
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-sdn
-- as: e2e-aws-sdn-network-migration-rollback
-  steps:
-    cluster_profile: aws
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    test:
-    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-config-multicast
-    - ref: ovn-sdn-migration
-    - ref: ovn-sdn-migration-rollback
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-validate-multicast
-    - ref: openshift-e2e-test
-    workflow: openshift-e2e-aws-sdn
-- as: e2e-aws-sdn-network-reverse-migration
-  steps:
-    cluster_profile: aws
-    env:
-      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
-        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
-        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
-    test:
-    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-config-multicast
-    - ref: ovn-sdn-migration-rollback
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-validate-multicast
-    - ref: openshift-e2e-test
-    workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
@@ -300,7 +240,7 @@ tests:
 - as: e2e-hypershift-ovn
   steps:
     cluster_profile: hypershift
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-conformance
 - as: lint
   commands: |
     export GOCACHE=/tmp/
@@ -336,20 +276,6 @@ tests:
     - chain: network-mtu-migration-increase
     - chain: baremetalds-ipi-test
     workflow: baremetalds-e2e-ovn-ipv6
-  timeout: 5h0m0s
-- as: e2e-network-mtu-migration-sdn-ipv4
-  optional: true
-  steps:
-    cluster_profile: gcp
-    env:
-      MTU_DECREASE: "400"
-      MTU_INCREASE: "200"
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    test:
-    - chain: network-mtu-migration-decrease
-    - chain: network-mtu-migration-increase
-    - ref: openshift-e2e-test
-    workflow: openshift-e2e-gcp-sdn
   timeout: 5h0m0s
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   optional: true

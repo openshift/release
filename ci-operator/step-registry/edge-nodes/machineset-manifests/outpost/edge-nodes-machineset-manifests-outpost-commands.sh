@@ -8,14 +8,9 @@ REGION="${LEASED_RESOURCE}"
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 
-MACHINE_ROLE="worker"
-if [[ ${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP} == "yes" ]]; then
-  subnet_id=$(head -n 1 "${SHARED_DIR}/outpost_public_id")
-else
-  subnet_id=$(head -n 1 "${SHARED_DIR}/outpost_private_id")
-fi
-
-zone_name=$(yq-go r "${SHARED_DIR}/availability_zones" '[0]')
+MACHINE_ROLE="outposts"
+subnet_id=$(head -n 1 "${SHARED_DIR}/edge_zone_subnet_id")
+zone_name=$(head -n 1 "${SHARED_DIR}/outpost_availability_zone")
 machineset_name_postfix=${RANDOM:0:2}
 
 # keeping manifest_ prefix as this step can be used in manifest injection before installation 
@@ -60,7 +55,10 @@ spec:
         machine.openshift.io/cluster-api-machine-type: ${MACHINE_ROLE}
         machine.openshift.io/cluster-api-machineset: PLACEHOLDER_INFRA_ID-${MACHINE_ROLE}-${zone_name}${machineset_name_postfix}
     spec:
-      metadata: {}
+      metadata:
+        labels:
+          node-role.kubernetes.io/outposts: ""
+          location: outposts
       providerSpec:
         value:
           ami:
@@ -105,6 +103,19 @@ spec:
           publicIp: true
 EOF
   yq-go m -x -i "${edge_node_machineset}" "${ip_patch}"
+fi
+
+if [[ "${EDGE_NODE_WORKER_SCHEDULABLE}" == "no" ]]; then
+  schedulable_patch=`mktemp`
+  cat <<EOF > ${schedulable_patch}
+spec:
+  template:
+    spec:
+      taints:
+        - key: node-role.kubernetes.io/outposts
+          effect: NoSchedule
+EOF
+  yq-go m -x -i "${edge_node_machineset}" "${schedulable_patch}"
 fi
 
 cp "${edge_node_machineset}" "${ARTIFACT_DIR}/"

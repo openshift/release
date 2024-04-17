@@ -1,6 +1,10 @@
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+images:
+- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+  from: src
+  to: knative-eventing-hyperfoil-benchmark-source-image
 promotion:
   to:
   - additional_images:
@@ -18,24 +22,20 @@ resources:
       cpu: 500m
       memory: 1Gi
 tests:
-- as: test-kafka-8045b51-aws-ocp-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
+- as: test-kafka-broker-midstr-a0cb886-aws-414
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-eventing-hyperfoil-benchmark-source-image
       optional_on_success: true
       resources:
         requests:
@@ -45,7 +45,7 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-eventing-hyperfoil-benchmark-source-image
       optional_on_success: true
       resources:
         requests:
@@ -56,7 +56,7 @@ tests:
       cli: latest
       commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
-      from: src
+      from: knative-eventing-hyperfoil-benchmark-source-image
       grace_period: 1m0s
       optional_on_success: true
       resources:
@@ -64,91 +64,34 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-kafka-broker-namespaced-midstream-nightly
-      from: src
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-kafka-broker-midstream-nightly
+      dependencies:
+      - env: KNATIVE_EVENTING_HYPERFOIL_BENCHMARK_SOURCE_IMAGE
+        name: knative-eventing-hyperfoil-benchmark-source-image
+      from: knative-eventing-hyperfoil-benchmark-source-image
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
-- as: test-kafka-8045b51-aws-ocp-414-continuous
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  cron: 0 5 * * 2,6
+    workflow: ipi-aws
+- as: test-kafka-broker-upstre-fbbddbf-aws-414
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     post:
     - as: knative-must-gather
       best_effort: true
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
-      from: src
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-gather-extra
-      best_effort: true
-      cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
-        | /bin/bash -s
-      from: src
-      grace_period: 1m0s
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 300m
-          memory: 300Mi
-      timeout: 20m0s
-    test:
-    - as: test
-      cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-kafka-broker-namespaced-midstream-nightly
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: generic-claim
-- as: test-kafka-fbbddbf-aws-ocp-414
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  steps:
-    allow_best_effort_post_steps: true
-    allow_skip_on_success: true
-    post:
-    - as: knative-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
-        "${ARTIFACT_DIR}/gather-knative"
-      from: src
+      from: knative-eventing-hyperfoil-benchmark-source-image
       optional_on_success: true
       resources:
         requests:
@@ -158,7 +101,7 @@ tests:
       best_effort: true
       cli: latest
       commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
+      from: knative-eventing-hyperfoil-benchmark-source-image
       optional_on_success: true
       resources:
         requests:
@@ -169,7 +112,7 @@ tests:
       cli: latest
       commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
-      from: src
+      from: knative-eventing-hyperfoil-benchmark-source-image
       grace_period: 1m0s
       optional_on_success: true
       resources:
@@ -177,73 +120,20 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
       commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-kafka-broker-upstream-nightly
-      from: src
+      dependencies:
+      - env: KNATIVE_EVENTING_HYPERFOIL_BENCHMARK_SOURCE_IMAGE
+        name: knative-eventing-hyperfoil-benchmark-source-image
+      from: knative-eventing-hyperfoil-benchmark-source-image
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: generic-claim
-- as: test-kafka-fbbddbf-aws-ocp-414-continuous
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  cron: 0 5 * * 2,6
-  steps:
-    allow_best_effort_post_steps: true
-    allow_skip_on_success: true
-    post:
-    - as: knative-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
-        "${ARTIFACT_DIR}/gather-knative"
-      from: src
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
-      from: src
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
-    - as: openshift-gather-extra
-      best_effort: true
-      cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
-        | /bin/bash -s
-      from: src
-      grace_period: 1m0s
-      optional_on_success: false
-      resources:
-        requests:
-          cpu: 300m
-          memory: 300Mi
-      timeout: 20m0s
-    test:
-    - as: test
-      cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make test-kafka-broker-upstream-nightly
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: generic-claim
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift-knative
