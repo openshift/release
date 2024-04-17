@@ -6,6 +6,11 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+if [[ "${AWS_PUBLIC_IPV4_POOL_ID}" == "none" ]]; then
+  echo "BYOIP custom IP pool use explicitly disabled with AWS_PUBLIC_IPV4_POOL_ID=${AWS_PUBLIC_IPV4_POOL_ID}; skipping"
+  exit 0
+fi
+
 RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_INITIAL:-}"
 if [[ -z "${RELEASE_IMAGE_INSTALL}" ]]; then
   # If there is no initial release, we will be installing latest.
