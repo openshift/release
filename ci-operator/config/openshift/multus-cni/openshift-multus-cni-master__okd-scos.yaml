@@ -1,4 +1,8 @@
 base_images:
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
@@ -13,35 +17,24 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.21-openshift-4.16
 images:
-- dockerfile_path: Dockerfile.rhel7
+- dockerfile_path: Dockerfile.openshift
   from: origin_scos-4.15_base-stream9
   inputs:
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: sriov-network-operator
-- dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
-  from: origin_scos-4.15_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: sriov-network-config-daemon
-- dockerfile_path: Dockerfile.webhook.rhel7
-  from: origin_scos-4.15_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: sriov-network-webhook
+  to: multus-cni
 promotion:
   to:
-  - name: "4.16"
+  - name: scos-4.15
     namespace: origin
 releases:
   latest:
     integration:
-      name: "4.16"
+      name: scos-4.15
       namespace: origin
 resources:
   '*':
@@ -51,5 +44,5 @@ resources:
 zz_generated_metadata:
   branch: master
   org: openshift
-  repo: sriov-network-operator
+  repo: multus-cni
   variant: okd-scos
