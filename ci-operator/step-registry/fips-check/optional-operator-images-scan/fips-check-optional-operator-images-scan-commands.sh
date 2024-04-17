@@ -174,19 +174,18 @@ echo "Tests took ${time_used} minutes"
 
 echo "Generating the Junit for fips check optional operators scan"
 filename="fips-check-soptional_operators-images-scan"
-testsuite="fips-check-soptional_operators-images-scan"
 subteam="Security_and_Compliance"
 if $pass; then
     cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="$SECONDS">
+<testsuite name="${subteam}" failures="0" errors="0" skipped="0" tests="1" time="$SECONDS">
 <testcase name="${subteam}:optional operators scan of fips check should succeedded or skipped"/>
 </testsuite>
 EOF
 else
     cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="$SECONDS">
+<testsuite name="${subteam}" failures="1" errors="0" skipped="0" tests="1" time="$SECONDS">
 <testcase name="${subteam}:optional operators scan of fips check should succeedded or skipped">
 <failure message="">Fips optional operators scan check failed</failure>
 </testcase>

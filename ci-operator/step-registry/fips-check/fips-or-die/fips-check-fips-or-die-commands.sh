@@ -185,17 +185,18 @@ for image in "${images[@]}"; do
 done
 
 mkdir -p "${ARTIFACT_DIR}/junit"
+subteam="Security_and_Compliance"
 if $pass; then
     echo "All tests pass!"
     cat >"${ARTIFACT_DIR}/junit/fips-or-die-result.xml" <<EOF
-    <testsuite name="fips" tests="1" failures="0">
+    <testsuite name="${subteam}" tests="1" failures="0">
         <testcase name="fips-or-die"/>
     </testsuite>
 EOF
 else
     echo "Test fail, please check log."
     cat >"${ARTIFACT_DIR}/junit/fips-or-die-result.xml" <<EOF
-    <testsuite name="fips" tests="1" failures="1">
+    <testsuite name="${subteam}" tests="1" failures="1">
       <testcase name="fips-or-die">
         <failure message="">Test fail, please check full log in Prow.</failure>
         <system-out>
