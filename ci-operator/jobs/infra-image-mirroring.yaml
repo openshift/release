@@ -1231,26 +1231,18 @@ periodics:
     ci.openshift.io/role: image-mirroring
   name: periodic-image-mirroring-lvms
   spec:
+    automountServiceAccountToken: true
     containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        failures=0
-        for mapping in /etc/imagemirror/mapping_lvms*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
+    - command:
+      - /tp-entrypoint.sh
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.14:cli
+      - name: MAPPING_FILE_PREFIX
+        value: mapping_lvms
+      - name: dry_run
+        value: "false"
+      image: registry.ci.openshift.org/ci/image-mirror:oc-415
       imagePullPolicy: Always
       name: ""
       resources:
