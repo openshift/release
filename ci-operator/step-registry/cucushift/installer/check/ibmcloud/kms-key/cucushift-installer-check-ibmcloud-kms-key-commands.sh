@@ -4,6 +4,27 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function set_proxy () {
+    if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
+        echo "setting the proxy"
+        # cat "${SHARED_DIR}/proxy-conf.sh"
+        echo "source ${SHARED_DIR}/proxy-conf.sh"
+        source "${SHARED_DIR}/proxy-conf.sh"
+    else
+        echo "no proxy setting."
+    fi
+}
+
+function unset_proxy () {
+    if test -s "${SHARED_DIR}/unset-proxy.sh" ; then 
+        echo "unset the proxy"
+        echo "source ${SHARED_DIR}/unset-proxy.sh"
+        source "${SHARED_DIR}/unset-proxy.sh"
+    else  
+        echo "no proxy setting found."
+    fi        
+} 
+
 # IBM Cloud CLI login
 function ibmcloud_login {
     export IBMCLOUD_CLI=ibmcloud
@@ -58,7 +79,9 @@ if [[ -n ${id_m} ]]; then
     mapfile -t vols_m < <(ibmcloud kp registrations -i ${id_m} -o JSON  | jq -r .[].resourceCrn)
     echo "INFO: master key registrations list is: ${#vols_m[@]}" "${vols_m[@]}"
     #check that node os disk is encrypted
+    set_proxy
     machines=$(oc get machines -A --no-headers | grep master | awk '{print $2}')
+    unset_proxy
     if [[ ! $(echo "${machines}" | wc -l) -gt 0 ]]; then
         echo "ERROR: Fail to find master machines ${machines}"
         critical_check_result=1
@@ -78,7 +101,9 @@ fi
 if [[ -n ${id_w} ]]; then
     mapfile -t vols_w < <(ibmcloud kp registrations -i ${id_w} -o JSON  | jq -r .[].resourceCrn)
     echo "INFO: worker key registrations list is: ${#vols_w[@]}" "${vols_w[@]}"
+    set_proxy
     machines=$(oc get machines -A --no-headers | grep worker | awk '{print $2}')
+    unset_proxy
     if [[ ! $(echo "${machines}" | wc -l) -gt 0 ]]; then
         echo "ERROR: Fail to find worker machines ${machines}"
         critical_check_result=1

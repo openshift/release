@@ -35,12 +35,13 @@ resources:
       memory: 200Mi
 tests:
 - as: krkn-hub-tests-415
-  cron: 0 4 * * 1
+  cron: 0 4 8,24 * *
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
       SPOT_INSTANCES: "true"
+      TELEMETRY_GROUP: prow-ocp-4.15
     observers:
       enable:
       - redhat-chaos-cerberus
@@ -52,13 +53,15 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     - chain: redhat-chaos-hog-scenarios
-- always_run: false
-  as: krkn-hub-tests-415-hog
+  timeout: 6h0m0s
+- as: krkn-hub-tests-415-hog
+  cron: 0 1 8,24 * *
   steps:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
       SPOT_INSTANCES: "true"
+      TELEMETRY_GROUP: prow-ocp-4.15
     observers:
       enable:
       - redhat-chaos-cerberus
@@ -69,6 +72,15 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     test:
     - chain: redhat-chaos-hog-scenarios
+- as: krkn-hub-tests-415-gcp
+  cron: 29 5 9,25 * 2
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - chain: redhat-chaos-krkn-hub-tests
+    - chain: redhat-chaos-hog-scenarios
+    workflow: openshift-qe-installer-gcp
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-chaos

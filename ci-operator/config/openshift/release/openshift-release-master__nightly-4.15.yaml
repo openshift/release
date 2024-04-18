@@ -95,10 +95,6 @@ releases:
       product: ocp
       stream: nightly
       version: "4.15"
-  oldest-supported-z-rollback:
-    release:
-      channel: candidate
-      version: 4.15.0-rc.0
 resources:
   '*':
     requests:
@@ -199,20 +195,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-sdn-ipv4
-- as: e2e-metal-ipi-ovn-dualstack-local-gateway
-  cluster: build05
-  interval: 168h
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        NETWORK_TYPE=OVNKubernetes
-        OVN_LOCAL_GATEWAY_MODE=true
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: baremetalds-e2e
 - as: e2e-metal-ipi-sdn-serial-ipv4
   cluster: build05
   interval: 168h
@@ -231,7 +213,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6
-- as: e2e-metal-ipi-ovn-serial-virtualmedia-bond
+- as: e2e-metal-ipi-ovn-serial-virtualmedia
   cluster: build05
   interval: 168h
   steps:
@@ -239,7 +221,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: baremetalds-e2e-serial-virtualmedia-bond
+    workflow: baremetalds-e2e-serial-virtualmedia
 - as: e2e-metal-ipi-serial-ovn-dualstack
   cluster: build05
   interval: 168h
@@ -316,6 +298,7 @@ tests:
     cluster_profile: vsphere-8-vpn
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      IPAM_VERSION: v1alpha1
     observers:
       enable:
       - observers-resource-watch
@@ -446,6 +429,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-workers-rhel
 - as: e2e-gcp-libvirt-cert-rotation
+  cluster: build02
   cron: '@daily'
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -483,6 +467,7 @@ tests:
     - ref: fips-check
     workflow: openshift-e2e-aws
 - as: e2e-gcp-sdn
+  cluster: build04
   interval: 168h
   steps:
     cluster_profile: gcp-3
@@ -493,6 +478,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-sdn
 - as: e2e-gcp-ovn-upgrade
+  cluster: build02
   interval: 168h
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -503,6 +489,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-gcp-ovn
 - as: e2e-gcp-sdn-upgrade
+  cluster: build04
   interval: 168h
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -514,6 +501,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-gcp-sdn
 - as: e2e-gcp-ovn-fips
+  cluster: build02
   interval: 168h
   steps:
     cluster_profile: gcp-3
@@ -527,6 +515,7 @@ tests:
     - ref: fips-check
     workflow: openshift-e2e-gcp
 - as: e2e-gcp-ovn-csi
+  cluster: build04
   interval: 168h
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -566,6 +555,7 @@ tests:
     - ref: fips-check
     workflow: openshift-e2e-aws
 - as: e2e-gcp-sdn-fips-serial
+  cluster: build02
   interval: 168h
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -602,6 +592,7 @@ tests:
           memory: 200Mi
     workflow: ipi-aws
 - as: e2e-gcp-ovn-rt
+  cluster: build04
   interval: 168h
   steps:
     cluster_profile: gcp-3
@@ -613,36 +604,11 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-realtime
 - as: e2e-gcp-ovn-xpn
+  cluster: build02
   interval: 168h
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-xpn
-  timeout: 6h0m0s
-- as: aws-ovn-upgrade-rollback-oldest-supported
-  interval: 48h
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-    test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_LATEST},${RELEASE_IMAGE_Z_ROLLBACK}" > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_Z_ROLLBACK
-        name: release:oldest-supported-z-rollback
-      - env: RELEASE_IMAGE_LATEST
-        name: release:latest
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - ref: cucushift-chainupgrade-toimage
-    - chain: openshift-upgrade-qe-sanity
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn
   timeout: 6h0m0s
 - as: e2e-aws-sdn-upgrade
   interval: 168h
@@ -919,7 +885,7 @@ tests:
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 00 13 */1 * 1-5
+  cron: 0 4 * * 1,3,5
   steps:
     env:
       T5CI_JOB_TYPE: ptp
@@ -978,6 +944,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-azure-upi
 - as: e2e-gcp-ovn-upi
+  cluster: build04
   interval: 168h
   steps:
     cluster_profile: gcp
@@ -1003,6 +970,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-nutanix
 - as: e2e-gcp-sdn-serial
+  cluster: build02
   interval: 168h
   steps:
     cluster_profile: gcp-3
@@ -1021,6 +989,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-etcd-scaling
 - as: e2e-gcp-ovn-etcd-scaling
+  cluster: build04
   interval: 168h
   steps:
     cluster_profile: gcp
@@ -1052,6 +1021,7 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-cpu-partitioning
 - as: e2e-gcp-graceful-shutdown
+  cluster: build02
   interval: 168h
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -1099,140 +1069,140 @@ tests:
   steps:
     cluster_profile: packet-sno
     env:
-      SKEW: +30d
+      SKEW: 30d
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - as: e2e-metal-ovn-sno-cert-rotation-suspend-60d
   cron: '@weekly'
   steps:
     cluster_profile: packet-sno
     env:
-      SKEW: +60d
+      SKEW: 60d
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - as: e2e-metal-ovn-sno-cert-rotation-suspend-90d
   cron: '@weekly'
   steps:
     cluster_profile: packet-sno
     env:
-      SKEW: +90d
+      SKEW: 90d
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - as: e2e-metal-ovn-sno-cert-rotation-suspend-180d
   cron: '@weekly'
   steps:
     cluster_profile: packet-sno
     env:
-      SKEW: +180d
+      SKEW: 180d
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - as: e2e-metal-ovn-sno-cert-rotation-suspend-360d
   cron: '@weekly'
   steps:
     cluster_profile: packet-sno
     env:
-      SKEW: +360d
+      SKEW: 360d
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-30d
   cron: '@weekly'
   steps:
     cluster_profile: packet-sno
     env:
-      SKEW: +30d
+      SKEW: 30d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-60d
   cron: '@weekly'
   steps:
     cluster_profile: packet-sno
     env:
-      SKEW: +60d
+      SKEW: 60d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-90d
   cron: '@weekly'
   steps:
     cluster_profile: packet-sno
     env:
-      SKEW: +90d
+      SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-180d
   cron: '@weekly'
   steps:
     cluster_profile: packet-sno
     env:
-      SKEW: +180d
+      SKEW: 180d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-360d
   cron: '@weekly'
   steps:
     cluster_profile: packet-sno
     env:
-      SKEW: +360d
+      SKEW: 360d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-ha-cert-rotation-suspend-30d
   cron: '@weekly'
   steps:
     cluster_profile: packet-assisted
     env:
-      SKEW: +30d
+      SKEW: 30d
     workflow: openshift-e2e-cert-rotation-suspend
 - as: e2e-metal-ovn-ha-cert-rotation-suspend-60d
   cron: '@weekly'
   steps:
     cluster_profile: packet-assisted
     env:
-      SKEW: +60d
+      SKEW: 60d
     workflow: openshift-e2e-cert-rotation-suspend
 - as: e2e-metal-ovn-ha-cert-rotation-suspend-90d
   cron: '@weekly'
   steps:
     cluster_profile: packet-assisted
     env:
-      SKEW: +90d
+      SKEW: 90d
     workflow: openshift-e2e-cert-rotation-suspend
 - as: e2e-metal-ovn-ha-cert-rotation-suspend-180d
   cron: '@weekly'
   steps:
     cluster_profile: packet-assisted
     env:
-      SKEW: +180d
+      SKEW: 180d
     workflow: openshift-e2e-cert-rotation-suspend
 - as: e2e-metal-ovn-ha-cert-rotation-suspend-360d
   cron: '@weekly'
   steps:
     cluster_profile: packet-assisted
     env:
-      SKEW: +360d
+      SKEW: 360d
     workflow: openshift-e2e-cert-rotation-suspend
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-30d
   cron: '@weekly'
   steps:
     cluster_profile: packet-assisted
     env:
-      SKEW: +30d
+      SKEW: 30d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-60d
   cron: '@weekly'
   steps:
     cluster_profile: packet-assisted
     env:
-      SKEW: +60d
+      SKEW: 60d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-90d
   cron: '@weekly'
   steps:
     cluster_profile: packet-assisted
     env:
-      SKEW: +90d
+      SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-180d
   cron: '@weekly'
   steps:
     cluster_profile: packet-assisted
     env:
-      SKEW: +180d
+      SKEW: 180d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-360d
   cron: '@weekly'
   steps:
     cluster_profile: packet-assisted
     env:
-      SKEW: +360d
+      SKEW: 360d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-aws-crun-wasm
   interval: 24h
@@ -1250,7 +1220,7 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       BASELINE_CAPABILITY_SET: None
       PERSISTENT_MONITORING: "false"
-      SKEW: +30d
+      SKEW: 30d
     workflow: openshift-e2e-aws-cert-rotation
   timeout: 4h0m0s
 - as: e2e-aws-ovn-edge-zones
@@ -1265,6 +1235,12 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
   timeout: 6h0m0s
+- as: e2e-aws-ovn-edge-zones-manifest-validation
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-local-zones
+    workflow: openshift-installer-manifests-aws-edge-zones
+  timeout: 1h0m0s
 - as: e2e-aws-overlay-mtu-ovn-5000
   cron: '@weekly'
   steps:

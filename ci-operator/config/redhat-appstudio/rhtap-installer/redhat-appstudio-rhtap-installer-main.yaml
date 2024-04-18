@@ -1,28 +1,8 @@
-base_images:
-  cli:
-    name: "4.14"
-    namespace: ocp
-    tag: cli
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
+  project_image:
+    dockerfile_path: ci/Dockerfile
 images:
-- dockerfile_literal: |-
-    FROM src
-    ENV SHELLCHECK_VERSION=0.7.1
-    ENV YQ_VERSION=v4.25.2
-    ENV TEKTONCD_CLI_VERSION="v0.33.0"
-
-    # Install yamllint, shellcheck, yq, heml
-    RUN pip3 install --upgrade setuptools pip && \
-        pip3 install yamllint && yamllint --version && \
-        curl --fail -sSL  https://github.com/koalaman/shellcheck/releases/download/v$SHELLCHECK_VERSION/shellcheck-v$SHELLCHECK_VERSION.linux.x86_64.tar.xz | tar -xJvf - shellcheck-v$SHELLCHECK_VERSION/shellcheck && \
-        mv shellcheck-v$SHELLCHECK_VERSION/shellcheck /usr/local/bin/shellcheck && chmod 755 /usr/local/bin/shellcheck && rm -rf "shellcheck-v$SHELLCHECK_VERSION" && \
-        curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64 && chmod +x /usr/local/bin/yq && \
-        curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh && rm -rf get_helm.sh && \
-        curl -fsSL -o tkn.tgz "https://github.com/tektoncd/cli/releases/download/${TEKTONCD_CLI_VERSION}/tkn_${TEKTONCD_CLI_VERSION:1}_Linux_x86_64.tar.gz" && tar -C "/usr/local/bin" --no-same-owner -xzf "tkn.tgz" tkn && rm -rf "tkn.tgz"
+- dockerfile_path: ci/Dockerfile
   from: src
   to: rhtap-installer
 promotion:
@@ -34,7 +14,7 @@ releases:
     release:
       architecture: amd64
       channel: fast
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -43,17 +23,78 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: rhtap-installer-static-checks
+- as: nightly
+  cron: 0 0 * * *
   steps:
     test:
-    - as: shellcheck
+    - as: stage-environment-update
+      cli: latest
       commands: |
-        #!/usr/bin/env bash
-        ls -l
+        export OPENSHIFT_LOGIN_USERNAME="$(cat /usr/local/ci-secrets/rhtap-stage-secrets/openshift_login_username)"
+        export OPENSHIFT_LOGIN_PASSWORD="$(cat /usr/local/ci-secrets/rhtap-stage-secrets/openshift_login_password)"
+        export OPENSHIFT_API_URL="$(cat /usr/local/ci-secrets/rhtap-stage-secrets/openshift_api_url)"
+        source /usr/local/ci-secrets/rhtap-stage-secrets/stage-secrets-environments
+        unset KUBECONFIG
+
+        # Login to Staging Openshift Cluster
+        oc login -u "${OPENSHIFT_LOGIN_USERNAME}" -p "${OPENSHIFT_LOGIN_PASSWORD}" "${OPENSHIFT_API_URL}" --insecure-skip-tls-verify=true
+
+        # Remove previous installation
+        helm uninstall developer-hub -n rhtap || true
+        helm uninstall installer -n rhtap || true
+        helm uninstall tpa -n rhtap || true
+        helm uninstall tpa-infrastructure -n rhtap || true
+
+        resource_names=$(oc get applications -n rhtap -o jsonpath='{.items[*].metadata.name}')
+
+        # Loop through each resource and remove finalizers
+        for resource_name in $resource_names; do
+            oc patch application $resource_name -n rhtap --type merge -p '{"metadata":{"finalizers":null}}'
+            oc delete application $resource_name -n rhtap
+        done
+
+        oc delete namespace rhtap || true
+
+        # Run the installation in debug mode
+        ./bin/make.sh values
+        yq e -i '.debug.script=true' private-values.yaml
+        ./bin/make.sh apply -n rhtap -- --debug --values private-values.yaml
+      credentials:
+      - mount_path: /usr/local/ci-secrets/rhtap-stage-secrets
+        name: rhtap-stage-secrets
+        namespace: test-credentials
       from: rhtap-installer
       resources:
         requests:
           cpu: 100m
+          memory: 200Mi
+- as: rhtap-installer-shellcheck
+  commands: |
+    #!/usr/bin/env bash
+    set -o errexit
+    set -o nounset
+    set -o pipefail
+    find . -type f -name "*.sh" -print0 | xargs -r -0 shellcheck
+  container:
+    from: rhtap-installer
+- as: rhtap-installer-yamllint
+  commands: |
+    #!/usr/bin/env bash
+    set -o errexit
+    set -o nounset
+    set -o pipefail
+
+    CONFIG_FILE="ci/config/yamllint.yaml"
+
+    yamllint -c "$CONFIG_FILE" .
+  container:
+    from: rhtap-installer
+  optional: true
+- as: rhtap-dump-external-resources
+  cron: 0 */24 * * *
+  steps:
+    test:
+    - ref: redhat-appstudio-rhtap-installer-sprayproxy-cleanup
 - as: rhtap-installer-e2e
   cluster_claim:
     architecture: amd64
@@ -63,12 +104,66 @@ tests:
     owner: rhtap
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.14"
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^tests/release/pipelines/|^tests/load-tests/|^cmd/loadTests.go$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
+    env:
+      RHTAP_ENABLE_TPA: "false"
     test:
     - ref: redhat-appstudio-rhtap-installer-e2e-test
-    workflow: generic-claim
+    workflow: redhat-appstudio-rhtap-installer
+- as: rhtap-installer-e2e-postsubmit
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  postsubmit: true
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^tests/release/pipelines/|^tests/load-tests/|^cmd/loadTests.go$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    env:
+      RHTAP_ENABLE_TPA: "false"
+    test:
+    - ref: redhat-appstudio-rhtap-installer-e2e-test
+    workflow: redhat-appstudio-rhtap-installer
+- as: rhtap-installer-e2e-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  cron: 0 */4 * * *
+  steps:
+    env:
+      RHTAP_ENABLE_TPA: "false"
+    test:
+    - ref: redhat-appstudio-rhtap-installer-e2e-test
+    workflow: redhat-appstudio-rhtap-installer
+- as: rhtap-installer-reinstall-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  cron: 0 */24 * * *
+  steps:
+    env:
+      RHTAP_ENABLE_TPA: "true"
+    test:
+    - ref: redhat-appstudio-rhtap-installer-reinstall-rhtap
+    workflow: redhat-appstudio-rhtap-installer
 zz_generated_metadata:
   branch: main
   org: redhat-appstudio

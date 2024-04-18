@@ -39,7 +39,7 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.20
-  postgresql-12-centos7:
+  postgresql-12-c8s:
     name: postgresql-12-centos7
     namespace: edge-infrastructure
     tag: latest
@@ -119,8 +119,8 @@ operator:
     with: assisted-installer-controller
   - pullspec: quay.io/edge-infrastructure/assisted-image-service:ocm-2.9
     with: assisted-image-service
-  - pullspec: quay.io/centos7/postgresql-12-centos7:latest
-    with: postgresql-12-centos7
+  - pullspec: quay.io/sclorg/postgresql-12-c8s:latest
+    with: postgresql-12-c8s
 promotion:
   to:
   - name: ocm-2.9
@@ -154,15 +154,6 @@ tests:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
   postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: assisted-service
-    env:
-      RELEASE_TAG_PREFIX: ocm-2.9
-    test:
-    - ref: assisted-baremetal-images-publish
-- as: push-pr-image
-  optional: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-service
@@ -273,7 +264,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.10"
-  cron: 00 00 */1 * 0-5
+  cron: 00 00 */1 * 0,3
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -344,7 +335,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.10"
-  cron: 00 00 */1 * 0-5
+  cron: 00 00 */1 * 0,3
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -383,7 +374,7 @@ tests:
       PACKET_PLAN: c3.medium.x86
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-periodic
-  cron: 00 00 */1 * 0-5
+  cron: 00 00 */1 * 0,3
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -406,7 +397,7 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters-periodic
-  cron: 00 00 */1 * 0-5
+  cron: 00 00 */1 * 0,3
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -430,7 +421,7 @@ tests:
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected-periodic
-  cron: 00 00 */1 * 0-5
+  cron: 00 00 */1 * 0,3
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -481,7 +472,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-periodic
-  cron: 05 00 */1 * 0-5
+  cron: 00 00 */1 * 0,3
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -494,7 +485,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-node-labels-periodic
-  cron: 50 00 */1 * 0-5
+  cron: 00 00 */1 * 0,3
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -544,7 +535,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
-  cron: 25 00 */1 * 0-5
+  cron: 00 00 */1 * 0,3
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -597,7 +588,7 @@ tests:
       PROVIDER_IMAGE: cluster-api-provider-agent
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-capi-periodic
-  cron: 25 00 */1 * 0-5
+  cron: 00 00 */1 * 0,3
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -643,7 +634,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     workflow: assisted-baremetal-operator-hypershift
 - as: e2e-ai-operator-ztp-remove-node-periodic
-  cron: 45 02 */1 * 0-5
+  cron: 00 00 */1 * 0,3
   steps:
     cluster_profile: packet-assisted
     dependencies:

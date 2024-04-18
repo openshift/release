@@ -20,6 +20,7 @@ KUBECONFIG="" oc --loglevel=8 registry login
 function debug() {
     if (( FRC != 0 )); then
         echo -e "oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
+        echo -e "oc get machineconfig\n$(oc get machineconfig)"
         echo -e "Describing abnormal nodes...\n"
         oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
         echo -e "Describing abnormal operators...\n"
@@ -51,6 +52,92 @@ EOF
     fi
 }
 
+function extract_ccoctl(){
+    local payload_image image_arch cco_image
+    local retry=5
+    local tmp_ccoctl="/tmp/upgtool"
+    mkdir -p ${tmp_ccoctl}
+    export PATH=/tmp:${PATH}
+                
+    echo -e "Extracting ccoctl\n"
+    payload_image="${TARGET}"
+    set -x          
+    image_arch=$(oc adm release info ${payload_image} -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o jsonpath='{.config.architecture}')
+    if [[ "${image_arch}" == "arm64" ]]; then
+        echo "The target payload is arm64 arch, trying to find out a matched version of payload image on amd64"
+        if [[ -n ${RELEASE_IMAGE_TARGET:-} ]]; then
+            payload_image=${RELEASE_IMAGE_TARGET}
+            echo "Getting target release image from RELEASE_IMAGE_TARGET: ${payload_image}"
+        elif env "NO_PROXY=*" "no_proxy=*" "KUBECONFIG=" oc get istag "release:target" -n ${NAMESPACE} &>/dev/null; then
+            payload_image=$(env "NO_PROXY=*" "no_proxy=*" "KUBECONFIG=" oc -n ${NAMESPACE} get istag "release:target" -o jsonpath='{.tag.from.name}')
+            echo "Getting target release image from build farm imagestream: ${payload_image}"
+        fi 
+    fi  
+    set +x  
+    cco_image=$(oc adm release info --image-for='cloud-credential-operator' ${payload_image} -a "${CLUSTER_PROFILE_DIR}/pull-secret") || return 1
+    while ! (env "NO_PROXY=*" "no_proxy=*" oc image extract $cco_image --path="/usr/bin/ccoctl:${tmp_ccoctl}" -a "${CLUSTER_PROFILE_DIR}/pull-secret");
+    do
+        echo >&2 "Failed to extract ccoctl binary, retry..."
+        (( retry -= 1 ))
+        if (( retry < 0 )); then return 1; fi
+        sleep 60
+    done
+    mv ${tmp_ccoctl}/ccoctl /tmp -f
+    if [[ ! -e /tmp/ccoctl ]]; then
+        echo "No ccoctl tool found!" && return 1
+    else
+        chmod 775 /tmp/ccoctl
+    fi
+    export PATH="$PATH"
+}
+
+function update_cloud_credentials_oidc(){
+    local platform preCredsDir tobeCredsDir tmp_ret
+
+    platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
+    preCredsDir="/tmp/pre-include-creds"
+    tobeCredsDir="/tmp/tobe-include-creds"
+    mkdir "${preCredsDir}" "${tobeCredsDir}"
+    # Extract all CRs from live cluster with --included
+    if ! oc adm release extract --to "${preCredsDir}" --included --credentials-requests; then
+        echo "Failed to extract CRs from live cluster!" && exit 1
+    fi
+    if ! oc adm release extract --to "${tobeCredsDir}" --included --credentials-requests "${TARGET}"; then
+        echo "Failed to extract CRs from tobe upgrade release payload!" && exit 1
+    fi
+
+    # TODO: add gcp and azure
+    # Update iam role with ccoctl based on tobeCredsDir
+    tmp_ret=0
+    diff -r "${preCredsDir}" "${tobeCredsDir}" || tmp_ret=1
+    if [[ ${tmp_ret} != 0 ]]; then
+        toManifests="/tmp/to-manifests"
+        mkdir "${toManifests}"
+        case "${platform}" in
+        "AWS")
+            if [[ ! -e ${SHARED_DIR}/aws_oidc_provider_arn ]]; then
+                echo "No aws_oidc_provider_arn file in SHARED_DIR" && exit 1
+            else
+                export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+                infra_name=${NAMESPACE}-${UNIQUE_HASH}
+                oidc_provider=$(head -n1 ${SHARED_DIR}/aws_oidc_provider_arn)
+                extract_ccoctl
+                if ! ccoctl aws create-iam-roles --name="${infra_name}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="${tobeCredsDir}" --identity-provider-arn="${oidc_provider}" --output-dir="${toManifests}"; then
+                    echo "Failed to update iam role!" && exit 1
+                fi
+                if [[ "$(ls -A ${toManifests}/manifests)" ]]; then
+                    echo "Apply the new credential secrets."
+                    oc apply -f "${toManifests}/manifests"
+                fi
+            fi
+            ;;
+        *)
+           echo "to be supported platform: ${platform}" 
+           ;;
+        esac
+    fi
+}
+
 # Add cloudcredential.openshift.io/upgradeable-to: <version_number> to cloudcredential cluster when cco mode is manual
 function cco_annotation(){
     if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )); then
@@ -58,10 +145,21 @@ function cco_annotation(){
     fi
 
     local cco_mode; cco_mode="$(oc get cloudcredential cluster -o jsonpath='{.spec.credentialsMode}')"
-    if [[ ${cco_mode} != "Manual" ]]; then
-        echo "CCO annotation change is not required in non-manual mode" && return
-    fi
-
+    local platform; platform="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')"
+    if [[ ${cco_mode} == "Manual" ]]; then
+        echo "CCO annotation change is required in Manual mode"
+    elif [[ -z "${cco_mode}" || ${cco_mode} == "Mint" ]]; then
+        if [[ "${SOURCE_MINOR_VERSION}" == "14" && ${platform} == "GCP" ]] ; then
+            echo "CCO annotation change is required in default or Mint mode on 4.14 GCP cluster"
+        else
+            echo "CCO annotation change is not required in default or Mint mode on 4.${SOURCE_MINOR_VERSION} ${platform} cluster"
+            return 0
+        fi
+    else
+        echo "CCO annotation change is not required in ${cco_mode} mode"
+        return 0
+    fi  
+        
     echo "Require CCO annotation change"
     local wait_time_loop_var=0; to_version="$(echo "${TARGET_VERSION}" | cut -f1 -d-)"
     oc patch cloudcredential.operator.openshift.io/cluster --patch '{"metadata":{"annotations": {"cloudcredential.openshift.io/upgradeable-to": "'"${to_version}"'"}}}' --type=merge
@@ -103,7 +201,7 @@ function rhel_repo(){
     export SOURCE_REPO_VERSION
     export TARGET_REPO_VERSION
 
-    cat > repo.yaml <<-'EOF'
+    cat > /tmp/repo.yaml <<-'EOF'
 ---
 - name: Update repo Playbook
   hosts: workers
@@ -127,8 +225,29 @@ function rhel_repo(){
     command: yum clean all
 EOF
 
+    # current Server version may not be the expected branch when cluster is not fully upgraded 
+    # using TARGET_REPO_VERSION instead directly
+    version_info="${TARGET_REPO_VERSION}"
+    openshift_ansible_branch='master'
+    if [[ "$version_info" =~ [4-9].[0-9]+ ]] ; then
+        openshift_ansible_branch="release-${version_info}"
+        minor_version="${version_info##*.}"
+        if [[ -n "$minor_version" ]] && [[ $minor_version -le 10 ]] ; then
+            source /opt/python-env/ansible2.9/bin/activate
+        else
+            source /opt/python-env/ansible-core/bin/activate
+        fi
+        ansible --version
+    else
+        echo "WARNING: version_info is $version_info"
+    fi
+    echo -e "Using openshift-ansible branch $openshift_ansible_branch\n"
+    cd /usr/share/ansible/openshift-ansible
+    git stash || true
+    git checkout "$openshift_ansible_branch"
+    git pull || true
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
-    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" repo.yaml -vvv
+    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/repo.yaml -vvv
 }
 
 # Upgrade RHEL node
@@ -136,8 +255,9 @@ function rhel_upgrade(){
     echo "Upgrading RHEL nodes"
     echo "Validating parsed Ansible inventory"
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
-    echo "Running RHEL worker upgrade"
-    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" playbooks/upgrade.yml -vvv
+    echo -e "\nRunning RHEL worker upgrade"
+    sed -i 's|^remote_tmp.*|remote_tmp = /tmp/.ansible|g' /usr/share/ansible/openshift-ansible/ansible.cfg
+    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv
 
     echo "Check K8s version on the RHEL node"
     master_0=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
@@ -168,6 +288,7 @@ function extract_oc(){
         sleep 60
     done
     mv ${tmp_oc}/oc ${OC_DIR} -f
+    export PATH="$PATH"
     which oc
     oc version --client
     return 0
@@ -204,7 +325,7 @@ function run_command_oc() {
 }
 
 function check_clusteroperators() {
-    local tmp_ret=0 tmp_clusteroperator input column last_column_name tmp_clusteroperator_1 rc null_version unavailable_operator degraded_operator skip_operator
+    local tmp_ret=0 tmp_clusteroperator input column last_column_name tmp_clusteroperator_1 rc unavailable_operator degraded_operator skip_operator
 
     skip_operator="aro" # ARO operator versioned but based on RP git commit ID not cluster version
     echo "Make sure every operator do not report empty column"
@@ -231,12 +352,6 @@ function check_clusteroperators() {
     done < "${input}"
     rm -f "${tmp_clusteroperator}"
 
-    echo "Make sure every operator column reports version"
-    if null_version=$(${OC} get clusteroperator -o json | jq '.items[] | select(.status.versions == null) | .metadata.name') && [[ ${null_version} != "" ]]; then
-      echo >&2 "Null Version: ${null_version}"
-      (( tmp_ret += 1 ))
-    fi
-
     echo "Make sure every operator reports correct version"
     if incorrect_version=$(${OC} get clusteroperator --no-headers | grep -v ${skip_operator} | awk -v var="${TARGET_VERSION}" '$2 != var') && [[ ${incorrect_version} != "" ]]; then
         echo >&2 "Incorrect CO Version: ${incorrect_version}"
@@ -249,7 +364,7 @@ function check_clusteroperators() {
         echo >&2 "$unavailable_operator"
         (( tmp_ret += 1 ))
     fi
-    if ${OC} get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Available") | .status' | grep -iv "True"; then
+    if ${OC} get clusteroperator -o jsonpath='{.items[].status.conditions[?(@.type=="Available")].status}'| grep -iv "True"; then
         echo >&2 "Some operators are unavailable, pls run 'oc get clusteroperator -o json' to check"
         (( tmp_ret += 1 ))
     fi
@@ -274,7 +389,7 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
     #co_check=$(${OC} get clusteroperator -o json | jq '.items[] | select(.metadata.name != "openshift-samples") | .status.conditions[] | select(.type == "Degraded") | .status'  | grep -iv 'False')
-    if ${OC} get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Degraded") | .status'  | grep -iv 'False'; then
+    if ${OC} get clusteroperator -o jsonpath='{.items[].status.conditions[?(@.type=="Degraded")].status}'| grep -iv 'False'; then
         echo >&2 "Some operators are Degraded, pls run 'oc get clusteroperator -o json' to check"
         (( tmp_ret += 1 ))
     fi
@@ -283,7 +398,7 @@ function check_clusteroperators() {
 }
 
 function wait_clusteroperators_continous_success() {
-    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=20
+    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=30
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
         if check_clusteroperators; then
@@ -358,19 +473,26 @@ function wait_mcp_continous_success() {
     num=$(oc get node --no-headers | wc -l)
     max_retries=$(expr $num \* 20 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
     passed_criteria=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
+    local continous_degraded_check=0 degraded_criteria=5
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
         ret=0
         check_mcp || ret=$?
         if [[ "$ret" == "0" ]]; then
+            continous_degraded_check=0
             echo "Passed #${continous_successful_check}"
             (( continous_successful_check += 1 ))
         elif [[ "$ret" == "1" ]]; then
             echo "Some machines are updating..."
             continous_successful_check=0
+            continous_degraded_check=0
         else
-            echo "Some machines are degraded..."
-            break
+            continous_successful_check=0
+            echo "Some machines are degraded #${continous_degraded_check}..."
+            (( continous_degraded_check += 1 ))
+            if (( continous_degraded_check >= degraded_criteria )); then
+                break
+            fi
         fi
         echo "wait and retry..."
         sleep ${interval}
@@ -426,7 +548,7 @@ function health_check() {
 
 # Check if a build is signed
 function check_signed() {
-    local digest algorithm hash_value response
+    local digest algorithm hash_value response try max_retries
     if [[ "${TARGET}" =~ "@sha256:" ]]; then
         digest="$(echo "${TARGET}" | cut -f2 -d@)"
         echo "The target image is using digest pullspec, its digest is ${digest}"
@@ -436,9 +558,15 @@ function check_signed() {
     fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    set -x
-    response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
-    set +x
+    try=0
+    max_retries=3
+    response=0
+    while (( try < max_retries && response != 200 )); do
+        echo "Trying #${try}"
+        response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+        (( try += 1 ))
+        sleep 60
+    done
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -455,11 +583,12 @@ function admin_ack() {
     local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r ".data")"
     echo -e "All admin acks:\n${out}"
     if [[ ${out} != *"ack-4.${SOURCE_MINOR_VERSION}"* ]]; then
-        echo "Admin ack not required" && return
+        echo "Admin ack not required: ${out}" && return
     fi
 
-    echo "Require admin ack"
+    echo "Require admin ack:\n ${out}"
     local wait_time_loop_var=0 ack_data
+
     ack_data="$(echo "${out}" | jq -r "keys[]")"
     for ack in ${ack_data};
     do
@@ -470,7 +599,6 @@ function admin_ack() {
             oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
         fi
     done
-
     echo "Admin-acks patch gets started"
 
     echo -e "sleep 5 mins wait admin-acks patch to be valid...\n"
@@ -492,6 +620,25 @@ function admin_ack() {
 
 # Upgrade the cluster to target release
 function upgrade() {
+    set_channel $TARGET_VERSION
+    local retry=3 conditional_updates
+    while (( retry > 0 )); do
+        conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]?.release.version' | xargs)
+        if [[ -z "${conditional_updates}" ]]; then
+            retry=$((retry - 1))
+            sleep 60
+            echo "No conditionalUpdates update available! Retry..."
+        else
+            #shellcheck disable=SC2076
+            if [[ " $conditional_updates " =~ " $TARGET_VERSION " ]]; then
+                echo "Error: $TARGET_VERSION is not recommended, for details please refer:"
+                oc get clusterversion version -o json | jq -r '.status.conditionalUpdates'
+                exit 1
+            fi
+            break
+        fi
+    done
+
     run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
@@ -516,6 +663,11 @@ function check_upgrade_status() {
             echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
             return 0
         fi
+	if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${TARGET_VERSION}"* ]]; then
+	    UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
+            echo -e "Upgrade stuck at updating RHEL worker, run the RHEL worker upgrade now...\n\n"
+            return 0
+        fi
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
         echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
@@ -524,14 +676,228 @@ function check_upgrade_status() {
 
 # Check version, state in history
 function check_history() {
-    local cv version state
-    cv=$(oc get clusterversion/version -o json)
-    version=$(echo "${cv}" | jq -r '.status.history[0].version')
-    state=$(echo "${cv}" | jq -r '.status.history[0].state')
+    local version state
+    version=$(oc get clusterversion/version -o jsonpath='{.status.history[0].version}')
+    state=$(oc get clusterversion/version -o jsonpath='{.status.history[0].state}')
     if [[ ${version} == "${TARGET_VERSION}" && ${state} == "Completed" ]]; then
         echo "History check PASSED, cluster is now upgraded to ${TARGET_VERSION}" && return 0
     else
         echo >&2 "History check FAILED, cluster upgrade to ${TARGET_VERSION} failed, current version is ${version}, exiting" && return 1
+    fi
+}
+
+function echo_e2e_tags() {
+    echo "In function: ${FUNCNAME[1]}"
+    echo "E2E_RUN_TAGS: '${E2E_RUN_TAGS}'"
+}
+
+function filter_test_by_platform() {
+    local platform ipixupi
+    ipixupi='upi'
+    if (oc get configmap openshift-install -n openshift-config &>/dev/null) ; then
+        ipixupi='ipi'
+    fi
+    platform="$(oc get infrastructure cluster -o yaml | yq '.status.platform' | tr 'A-Z' 'a-z')"
+    extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
+    if [[ -n "$platform" ]] ; then
+        case "$platform" in
+            external|none|powervs)
+                export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
+                eval "$extrainfoCmd"
+                ;;
+            alibabacloud)
+                export E2E_RUN_TAGS="@alicloud-${ipixupi} and ${E2E_RUN_TAGS}"
+                ;;
+            aws|azure|baremetal|gcp|ibmcloud|nutanix|openstack|vsphere)
+                export E2E_RUN_TAGS="@${platform}-${ipixupi} and ${E2E_RUN_TAGS}"
+                ;;
+            *)
+                echo "Unexpected, got platform as '$platform'"
+                eval "$extrainfoCmd"
+                ;;
+        esac
+    fi
+    echo_e2e_tags
+}
+
+function filter_test_by_proxy() {
+    local proxy
+    proxy="$(oc get proxies.config.openshift.io cluster -o yaml | yq '.spec|(.httpProxy,.httpsProxy)' | uniq)"
+    if [[ -n "$proxy" ]] && [[ "$proxy" != 'null' ]] ; then
+        export E2E_RUN_TAGS="@proxy and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags 
+}
+
+function filter_test_by_fips() {
+    local data
+    data="$(oc get configmap cluster-config-v1 -n kube-system -o yaml | yq '.data')"
+    if ! (grep --ignore-case --quiet 'fips' <<< "$data") ; then
+        export E2E_RUN_TAGS="not @fips and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags
+}
+
+function filter_test_by_sno() {
+    local nodeno
+    nodeno="$(oc get nodes --no-headers | wc -l)"
+    if [[ $nodeno -eq 1 ]] ; then
+        export E2E_RUN_TAGS="@singlenode and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags 
+}
+
+function filter_test_by_network() {
+    local networktype
+    networktype="$(oc get network.config/cluster -o yaml | yq '.spec.networkType')"
+    case "${networktype,,}" in
+        openshiftsdn)
+            networktag='@network-openshiftsdn'
+            ;;
+        ovnkubernetes)
+            networktag='@network-ovnkubernetes'
+            ;;
+        other)
+            networktag=''
+            ;;
+        *)
+            echo "######Expected network to be SDN/OVN/Other, but got: $networktype"
+            ;;
+    esac
+    if [[ -n $networktag ]] ; then
+        export E2E_RUN_TAGS="${networktag} and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags
+}
+
+function filter_test_by_version() { 
+    local xversion yversion
+    IFS='.' read xversion yversion _ < <(oc version -o yaml | yq '.openshiftVersion')
+    if [[ -n $xversion ]] && [[ $xversion -eq 4 ]] && [[ -n $yversion ]] && [[ $yversion =~ [12][0-9] ]] ; then
+        export E2E_RUN_TAGS="@${xversion}.${yversion} and ${E2E_RUN_TAGS}"
+    fi
+    echo_e2e_tags
+}
+
+function filter_test_by_arch() {
+    local node_archs arch_tags
+    mapfile -t node_archs < <(oc get nodes -o yaml | yq '.items[].status.nodeInfo.architecture' | sort -u | sed 's/^/@/g')
+    arch_tags="${node_archs[*]/%/ and}"
+    case "${#node_archs[@]}" in
+        0)
+            echo "=========================="
+            echo "Error: got unexpected arch"
+            oc get nodes -o yaml
+            echo "=========================="
+            ;;
+        1)
+            export E2E_RUN_TAGS="${arch_tags[*]} ${E2E_RUN_TAGS}"
+            ;;
+        *)
+            export E2E_RUN_TAGS="@heterogeneous and ${arch_tags[*]} ${E2E_RUN_TAGS}"
+            ;;
+    esac
+    echo_e2e_tags
+}
+
+function filter_tests() {
+    filter_test_by_fips
+    filter_test_by_proxy
+    filter_test_by_sno
+    filter_test_by_network
+    filter_test_by_platform
+    filter_test_by_arch
+    filter_test_by_version
+
+    echo_e2e_tags
+}
+
+function summarize_test_results() {
+    # summarize test results
+    echo "Summarizing test results..."
+    local failures=0 errors=0 skipped=0 tests=0
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
+    while read -a row ; do
+        # if the last ARG of command `let` evaluates to 0, `let` returns 1
+        let failures+=${row[0]} errors+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
+    done < /tmp/zzz-tmp.log
+    TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
+    cat > "${TEST_RESULT_FILE}" <<- EOF
+cucushift:
+  type: cucushift-e2e
+  total: $tests
+  failures: $failures
+  errors: $errors
+  skipped: $skipped
+EOF
+    if [ $((failures)) != 0 ] ; then
+        echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
+        readarray -t failingscenarios < <(grep -h -r -E 'cucumber.*features/.*.feature' "${ARTIFACT_DIR}/.." | cut -d':' -f3- | sed -E 's/^( +)//;s/\x1b\[[0-9;]*m$//' | sort)
+        for (( i=0; i<failures; i++ )) ; do
+            echo "    - ${failingscenarios[$i]}" >> "${TEST_RESULT_FILE}"
+        done
+    fi
+    cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-upgrade-qe-test-report" || true
+}
+
+function run_upgrade_e2e() {
+    local idx="$1"
+    export PARALLEL=4
+    local E2E_SKIP_TAGS="not @console
+          and not @destructive
+          and not @disconnected
+          and not @flaky
+          and not @inactive
+          and not @prod-only
+          and not @stage-only
+          and not @upgrade-check
+          and not @upgrade-prepare
+          and not @serial
+    "
+    local e2e_start_time e2e_end_time
+
+    e2e_start_time=$(date +%s)
+    echo "Starting the upgrade e2e tests on $(date "+%F %T")"
+    E2E_RUN_TAGS="$E2E_RUN_TAGS and $E2E_SKIP_TAGS"
+
+    filter_tests
+
+    cp -Lrvf "${KUBECONFIG}" /tmp/kubeconfig
+
+    #shellcheck source=${SHARED_DIR}/runtime_env
+    source "${SHARED_DIR}/runtime_env"
+
+    pushd verification-tests
+    # run normal tests
+    export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-normal-${idx}"
+    parallel_cucumber -n "${PARALLEL}" --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number --exec \
+    'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)));
+     export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
+     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and not @admin\" -p junit"' || true
+
+    # run admin tests
+    export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-admin-${idx}"
+    parallel_cucumber -n "${PARALLEL}" --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number --exec \
+    'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)));
+     export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
+     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and @admin\" -p junit"' || true
+
+    summarize_test_results
+    popd
+    echo "Ending the upgrade e2e tests on $(date "+%F %T")"
+    e2e_end_time=$(date +%s)
+    echo "e2e test take $(( ($e2e_end_time - $e2e_start_time)/60 )) minutes"
+}
+
+function set_channel(){
+    local x_ver y_ver version="$1"
+    x_ver=$( echo "${version}" | cut -f1 -d. )
+    y_ver=$( echo "${version}" | cut -f2 -d. )
+    ver="${x_ver}.${y_ver}"
+    target_channel="${UPGRADE_CHANNEL}-${ver}"
+    if ! oc adm upgrade channel ${target_channel}; then
+        echo "Fail to change channel to ${target_channel}!"
+        exit 1
     fi
 }
 
@@ -545,15 +911,10 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# Get the target upgrades release, by default, OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is the target release
-# If it's serial upgrades then override-upgrade file will store the release and overrides OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
 # upgrade-edge file expects a comma separated releases list like target_release1,target_release2,...
-export TARGET_RELEASES=("${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}")
-if [[ -f "${SHARED_DIR}/upgrade-edge" ]]; then
-    release_string="$(< "${SHARED_DIR}/upgrade-edge")"
-    # shellcheck disable=SC2207
-    TARGET_RELEASES=($(echo "$release_string" | tr ',' ' '))
-fi
+release_string="$(< "${SHARED_DIR}/upgrade-edge")"
+# shellcheck disable=SC2207
+TARGET_RELEASES=($(echo "$release_string" | tr ',' ' '))
 echo "Upgrade targets are ${TARGET_RELEASES[*]}"
 
 export OC="run_command_oc"
@@ -562,11 +923,13 @@ export OC="run_command_oc"
 mkdir -p /tmp/client
 export OC_DIR="/tmp/client"
 export PATH=${OC_DIR}:$PATH
-
-FINAL_TARGET="${TARGET_RELEASES[-1]}"
-unset 'TARGET_RELEASES[-1]'
+index=0
 for target in "${TARGET_RELEASES[@]}"
 do
+
+    run_command "oc get machineconfig"
+
+    (( index += 1 ))
     export TARGET="${target}"
     TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
     extract_oc
@@ -593,16 +956,24 @@ do
         admin_ack
         cco_annotation
     fi
-
+    if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
+        update_cloud_credentials_oidc
+    fi
     upgrade
     check_upgrade_status
-    check_history
 
     if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
         echo -e "oc get node -owide\n$(oc get node -owide)"
         rhel_repo
         rhel_upgrade
+	if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "triggered" ]]; then
+	    echo -e "RHEL worker upgrade completed, but the cluster upgrade hasn't been finished, check the cluster status again...\    n"
+	    check_upgrade_status
+        fi
     fi
+    check_history
     health_check
+    if [[ -n "${E2E_RUN_TAGS}" ]]; then
+        run_upgrade_e2e "${index}"
+    fi
 done
-echo "${FINAL_TARGET}" > "${SHARED_DIR}/upgrade-edge"

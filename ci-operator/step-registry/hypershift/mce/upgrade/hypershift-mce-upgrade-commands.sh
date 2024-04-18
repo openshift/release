@@ -2,6 +2,10 @@
 
 set -ex
 
+if [[ -f "${SHARED_DIR}/mgmt_kubeconfig" ]]; then
+  export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+fi
+
 _REPO="quay.io/acm-d/mce-custom-registry"
 MCE_TARGET_VERSION=${MCE_TARGET_VERSION:-"2.4"}
 
@@ -22,9 +26,9 @@ spec:
       interval: 10m
 EOF
 
-mceRef=`oc get csv -n multicluster-engine -o custom-columns=NAME:.metadata.name --no-headers | grep multicluster-engine.v`
-if [ $? -eq 0 ]; then
-  oc delete csv -n multicluster-engine ${mceRef}
+mceRef=$(oc get csv -n multicluster-engine -o custom-columns=NAME:.metadata.name --no-headers | grep multicluster-engine.v || true)
+if [ -n "$mceRef" ]; then
+  oc delete csv -n multicluster-engine "$mceRef"
 else
   echo "WARNING: CSV with multicluster-engine was not found in project multicluster-engine."
 fi
@@ -57,24 +61,9 @@ for ((i=1; i<=60; i++)); do
   fi
   sleep 10
 done
-_apiReady=0
-echo "* Using CSV: ${CSVName}"
-for ((i=1; i<=20; i++)); do
-  sleep 30
-  output=$(oc get csv -n multicluster-engine $CSVName -o jsonpath='{.status.phase}' >> /dev/null && echo "exists" || echo "not found")
-  if [ "$output" != "exists" ]; then
-    continue
-  fi
-  phase=$(oc get csv -n multicluster-engine $CSVName -o jsonpath='{.status.phase}')
-  if [ "$phase" == "Succeeded" ]; then
-    _apiReady=1
-    break
-  fi
-  echo "Waiting for CSV to be ready"
+oc wait --timeout=20m csv -n multicluster-engine --all --for=jsonpath='{.status.phase}'=Succeeded
+oc wait --timeout=20m pod -n multicluster-engine --all --for=condition=Ready
+until oc get multiclusterengines multiclusterengine-sample -ojsonpath="{.status.currentVersion}" | grep -q "$MCE_TARGET_VERSION"; do
+  sleep 10
 done
-
-if [ $_apiReady -eq 0 ]; then
-  echo "multiclusterengine subscription could not upgrade in the allotted time."
-  exit 1
-fi
 echo "multiclusterengine upgrade successfully"

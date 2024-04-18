@@ -213,7 +213,8 @@ case "$CLUSTER_TYPE" in
       echo "Removing the grub.cfg file for host with mac ${mac}..."
       rm -f "/opt/tftpboot/grub.cfg-01-${mac//:/-}" || echo "no grub.cfg for $mac."
       echo "Removing the DHCP config for ${name}/${mac}..."
-      sed -i "/^dhcp-host=$mac/d" /opt/dnsmasq/etc/dnsmasq.conf
+      sed -i "/^$mac/d" /opt/dnsmasq/hosts/hostsdir/"${CLUSTER_NAME}"
+      kill -s HUP "$(podman inspect -f '{{ .State.Pid }}' "dhcp")"
       echo "Removing the DNS config for ${name}/${mac}..."
       sed -i "/${name}.*${CLUSTER_NAME:-glob-protected-from-empty-var}/d" /opt/bind9_zones/{zone,internal_zone.rev}
       # haproxy.cfg is mounted as a volume, and we need to remove the bootstrap node from being a backup:
@@ -229,7 +230,6 @@ case "$CLUSTER_TYPE" in
       docker kill -s HUP "haproxy-${CLUSTER_NAME}"
       podman exec bind9 rndc reload
       podman exec bind9 rndc flush
-      systemctl restart dhcp
     done
 EOF
   echo "Wiping the disks and releasing the nodes for further reservations in other jobs..."

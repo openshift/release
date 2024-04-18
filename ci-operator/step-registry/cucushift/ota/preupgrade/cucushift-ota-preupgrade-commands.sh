@@ -16,6 +16,7 @@ function extract_oc(){
         sleep 60
     done
     mv ${tmp_oc}/oc /tmp -f
+    export PATH="$PATH"
     which oc
     oc version --client
 }
@@ -228,6 +229,132 @@ function pre-OCP-47197(){
     return 0
 }
 
+function pre-OCP-53921(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    local arch
+    arch=$(oc get clusterversion version -ojson|jq -r '.status.conditions[]|select(.type == "ReleaseAccepted")|.message')
+    if [[ "${arch}" != *"amd64"* ]]; then
+        echo "The architecture info: ${arch} is not expected!"
+        return 1
+    fi
+    return 0
+}
+
+function pre-OCP-53907(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    local version 
+    version="$(oc get clusterversion --no-headers | awk '{print $2}')"
+    if [ -z "${version}" ] ; then
+        echo "Fail to get cluster version!"
+        return 1
+    fi
+    x_ver=$( echo "${version}" | cut -f1 -d. )
+    y_ver=$( echo "${version}" | cut -f2 -d. )
+    y_ver=$((y_ver+1))
+    ver="${x_ver}.${y_ver}"
+    local retry=3
+    while (( retry > 0 ));do
+        versions=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates[]?.version'| xargs)
+        if [[ "${versions}" == "null" ]] || [[ "${versions}" != *"${ver}"* ]]; then
+	    retry=$((retry - 1))
+            sleep 60
+            echo "No recommended update available! Retry..."
+        else
+            echo "Recommencded update: ${versions}"
+            break
+        fi
+    done
+    if (( retry == 0 )); then
+        echo "Timeout to get recommended update!" 
+        return 1
+    fi
+    recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates')
+    mapfile -t images < <(echo ${recommends}|jq -r '.[].image')
+    if [ -z "${images[*]}" ]; then
+        echo "No image extracted from recommended update!"
+        return 1
+    fi
+    bad_metadata="true"
+    for image in ${images[*]}; do
+        if [[ "${image}" == "null" ]] ; then
+            echo "No image info!"
+            return 1
+        fi
+        metadata=$(oc adm release info ${image} -ojson|jq .metadata.metadata)
+        if [[ "${metadata}" == "null" ]]; then
+            echo "No metadata for recommended update ${image}!"
+            continue
+        fi
+        bad_metadata="false"
+        arch=$(oc adm release info ${image} -ojson|jq -r '.metadata.metadata."release.openshift.io/architecture"')
+        if [[ "${arch}" != "multi" ]]; then
+            echo "The architecture info ${arch} of recommended update ${image} is not expected!"
+            return 1
+        fi
+    done
+    if [[ "${bad_metadata}" == "true" ]]; then
+        echo "All images' metadata is null in available update!"
+        return 1
+    fi
+    return 0
+}
+
+function pre-OCP-69968(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    local spec testurl="http://examplefortest.com"
+    spec=$(oc get clusterversion version -ojson|jq -r '.spec')
+    if [[ "${spec}" == *"signatureStores"* ]]; then
+        echo "There should not be signatureStores by default!"
+        return 1
+    fi
+    if ! oc patch clusterversion version --type merge -p "{\"spec\": {\"signatureStores\": [{\"url\": \"${testurl}\"}]}}"; then
+        echo "Fail to patch clusterversion signatureStores!"
+        return 1
+    fi
+    signstore=$(oc get clusterversion version -ojson|jq -r '.spec.signatureStores[].url')
+    if [[ "${signstore}" != "${testurl}" ]]; then
+        echo "Fail to set clusterversion signatureStores!"
+        return 1
+    fi
+    return 0
+}
+
+function pre-OCP-69948(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    local spec teststore="https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release"
+    spec=$(oc get clusterversion version -ojson|jq -r '.spec')
+    if [[ "${spec}" == *"signatureStores"* ]]; then
+        echo "There should not be signatureStores by default!"
+        return 1
+    fi
+    if ! oc patch clusterversion version --type merge -p "{\"spec\": {\"signatureStores\": [{\"url\": \"${teststore}\"}]}}"; then
+        echo "Fail to patch clusterversion signatureStores!"
+        return 1
+    fi
+    signstore=$(oc get clusterversion version -ojson|jq -r '.spec.signatureStores[].url')
+    if [[ "${signstore}" != "${teststore}" ]]; then
+        echo "Fail to set clusterversion signatureStores!"
+        return 1
+    fi
+    return 0
+}
+
+
+function pre-OCP-56083(){
+    echo "Pre Test Start: OCP-56083"
+    echo "Unset the upgrade channel"
+    local  tmp_log result
+    tmp_log=$(mktemp)
+    oc adm upgrade channel --allow-explicit-channel  2>&1 | tee "${tmp_log}" 
+    result=$(oc get clusterversion/version -ojson | jq -r '.spec.channel')
+    if [[ "${result}" == null ]] || [[ -z "${result}" ]]; then
+       echo "Successfully cleared the upgrade channel"
+       return 0 
+    fi
+    echo "Failed to clear Upgrade Channel"
+    cat "${tmp_log}" 
+    return 1
+}
 # This func run all test cases with checkpoints which will not break other cases, 
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be run or not

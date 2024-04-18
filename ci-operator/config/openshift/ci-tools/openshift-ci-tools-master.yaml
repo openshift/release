@@ -15,6 +15,10 @@ base_images:
     name: centos
     namespace: origin
     tag: stream8
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
 binary_build_commands: make production-install
 build_root:
   from_repository: true
@@ -67,7 +71,7 @@ images:
       - registry.ci.openshift.org/ci/nginx-unprivileged:stable
   to: gh-pull-through-cache
 - context_dir: images/dptp-3312-hypershift-leaks-cleaner/
-  from: os
+  from: ubi_minimal
   inputs:
     bin:
       paths:
@@ -159,6 +163,8 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/pj-rehearse
+      - destination_dir: usr/bin
+        source_path: /usr/local/bin/oc
   to: pj-rehearse
 - context_dir: images/slack-bot/
   from: os
@@ -670,21 +676,6 @@ images:
 - dockerfile_literal: |-
     FROM quay.io/centos/centos:stream8
     RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
-    ADD job-run-aggregator /usr/bin/job-run-aggregator
-    ADD prcreator /usr/bin/prcreator
-    ENTRYPOINT ["job-run-aggregator"]
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/job-run-aggregator
-      - destination_dir: .
-        source_path: /go/bin/prcreator
-  to: auto-aggregator-job-names
-- dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
-    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
     ADD sync-rover-groups /usr/bin/sync-rover-groups
     ADD usr/bin/oc /usr/bin/oc
     ENTRYPOINT ["sync-rover-groups"]
@@ -751,6 +742,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/gpu-scheduling-webhook
   to: gpu-scheduling-webhook
+- context_dir: images/helpdesk-faq/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/helpdesk-faq
+  to: helpdesk-faq
 promotion:
   to:
   - namespace: ci
@@ -758,8 +757,8 @@ promotion:
 resources:
   '*':
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: 500m
+      memory: 600Mi
 test_binary_build_commands: make race-install
 tests:
 - as: unit

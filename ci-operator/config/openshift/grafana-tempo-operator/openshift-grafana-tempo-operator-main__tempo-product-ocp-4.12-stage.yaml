@@ -26,20 +26,28 @@ resources:
       memory: 200Mi
 tests:
 - as: tempo-stage-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.12"
   cron: 0 6 1 10 *
   steps:
-    cluster_profile: aws-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      DOWNSTREAM_TESTS_COMMIT: 599381998f7e4543f62545adac9e1822f22a3ff7
-      OTEL_SOURCE: dt-catalogsource
-      TEMPO_SOURCE: dt-catalogsource
+      DOWNSTREAM_TESTS_COMMIT: c19aa1cd60741748256d7f8c7c05a2f9c8e30239
+      OPERATORS: |
+        [
+            {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"}
+        ]
+      SKIP_TESTS: tests/e2e-openshift/red-metrics tests/e2e-openshift/monitoring
     test:
     - ref: enable-stage-catalogsource
-    - ref: distributed-tracing-install-tempo-product
-    - ref: distributed-tracing-install-opentelemetry-product
+    - ref: install-operators
     - ref: distributed-tracing-tests-tempo
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift

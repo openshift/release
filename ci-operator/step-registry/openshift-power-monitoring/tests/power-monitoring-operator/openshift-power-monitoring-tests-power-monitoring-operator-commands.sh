@@ -6,7 +6,7 @@ declare -r LOGS_DIR="/$ARTIFACT_DIR/test-run-logs"
 declare -r OPERATOR_DEPLOY_NAME="kepler-operator-controller"
 declare -r OPERATORS_NS="openshift-operators"
 
-declare KEPLER_DEPLOYMENT_NS="${KEPLER_DEPLOYMENT_NS:-kepler-operator}"
+declare KEPLER_DEPLOYMENT_NS=""
 
 validate_install() {
 	echo "Validating Operator Install"
@@ -24,9 +24,9 @@ must_gather() {
 	for x in $(oc api-resources --api-group=operators.coreos.com -o name); do
 		oc get "$x" -n "$OPERATORS_NS" -o yaml | tee "$LOGS_DIR/$x.yaml"
 	done
-	oc get pods -n "$OPERATORS_NS"
-	oc describe deployment "$OPERATOR_DEPLOY_NAME" -n "$OPERATORS_NS"
-	oc logs -f -n "$OPERATORS_NS" "deployment/$OPERATOR_DEPLOY_NAME"
+	oc get pods -n "$OPERATORS_NS" -o yaml | tee "$LOGS_DIR/pod.yaml"
+	oc describe deployment "$OPERATOR_DEPLOY_NAME" -n "$OPERATORS_NS" | tee "$LOGS_DIR/$OPERATOR_DEPLOY_NAME"
+	oc logs -n "$OPERATORS_NS" "deployment/$OPERATOR_DEPLOY_NAME" | tee "$LOGS_DIR/$OPERATOR_DEPLOY_NAME.log"
 }
 log_events() {
 	local ns="$1"
@@ -43,6 +43,11 @@ main() {
 		return 1
 	}
 
+	[[ -z "$KEPLER_DEPLOYMENT_NS" ]] && {
+		KEPLER_DEPLOYMENT_NS=$(oc get "deployment/$OPERATOR_DEPLOY_NAME" -n "$OPERATORS_NS" \
+			-o jsonpath='{.spec.template.spec.containers[*].args[*]}' | awk -F'--deployment-namespace=' '{print $2}' | awk '{print $1}')
+	}
+
 	echo "Running e2e tests"
 
 	log_events "$OPERATORS_NS" &
@@ -50,7 +55,7 @@ main() {
 
 	local ret=0
 
-	./e2e.test -test.v -test.failfast 2>&1 | tee "$LOGS_DIR/e2e.log" || ret=1
+	./e2e.test -test.v -test.failfast -deployment-namespace="$KEPLER_DEPLOYMENT_NS" 2>&1 | tee "$LOGS_DIR/e2e.log" || ret=1
 
 	# terminating both log_events
 	{ jobs -p | xargs -I {} -- pkill -TERM -P {}; } || true

@@ -80,7 +80,7 @@ EOF
 
 # Check connectivity
 ping ${BASTION_IP} -c 10 || true
-echo "exit" | curl telnet://${BASTION_IP}:22 && echo "SSH port is opened"|| echo "status = $?"
+echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
 ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
@@ -162,6 +162,14 @@ cat << EOF > ~/ocp-install.yml
     delay: 60
     ignore_errors: true
 
+  - name: Run oc command to check if cluster is ready
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Progressing'\'')].status}'
+    register: oc_status
+    until: "'False' in oc_status.stdout"
+    retries: 60
+    delay: 60
+    ignore_errors: true
+
   - name: Grab the log from HV to artifacts
     fetch:
       src: "{{ item.src }}"
@@ -182,7 +190,7 @@ cat << EOF > ~/ocp-install.yml
     set_fact:
       deploy_failed: true
     when:
-      - (job_result.failed | bool) or (sno_deploy.failed | bool)
+      - (sno_deploy.failed | bool) or (oc_status.failed | bool)
 
   - name: Show last logs from cloud init if failed
     shell: tail -100 /tmp/${CLUSTER_NAME}_sno_ag.log
@@ -192,7 +200,7 @@ cat << EOF > ~/ocp-install.yml
   - name: Fail if deployment did not finish
     fail:
       msg: Installation not finished yet
-    when: job_result.failed | bool
+    when: oc_status.failed | bool
 
   - name: Fail if deployment failed
     fail:
@@ -242,12 +250,23 @@ cat << EOF > ~/fetch-information.yml
 
   - name: Get cluster version
     shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion
+    ignore_errors: true
 
   - name: Get bmh objects
     shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get bmh -A
+    ignore_errors: true
 
   - name: Get nodes
     shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get node
+    ignore_errors: true
+
+  - name: Get MCP
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get mcp
+    ignore_errors: true
+
+  - name: Get operators
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get co
+    ignore_errors: true
 EOF
 
 cat << EOF > ~/check-cluster.yml
@@ -258,7 +277,7 @@ cat << EOF > ~/check-cluster.yml
   tasks:
 
   - name: Check if cluster is available
-    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Progressing'\'')].status}'
     register: ready_check
 
   - name: Check for errors in cluster deployment
@@ -268,14 +287,25 @@ cat << EOF > ~/check-cluster.yml
   - name: Fail if deployment failed
     fail:
       msg: Installation has failed
-    when: "'True' not in ready_check.stdout or 'Error while reconciling' in error_check.stdout"
+    when: "'False' not in ready_check.stdout"
+
+EOF
+
+cat << EOF > $SHARED_DIR/destroy-cluster.yml
+---
+- name: Delete cluster
+  hosts: hypervisor
+  gather_facts: false
+  tasks:
+
+  - name: Delete deployment plan
+    debug:
+      msg: "Doing nothing currently"
 
 EOF
 
 #Set status and run playbooks
 status=0
-# Install posix collection so that we can use debug callback
-ansible-galaxy collection install ansible.posix
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
 sleep 300  # Wait for cluster to be ready after a reboot

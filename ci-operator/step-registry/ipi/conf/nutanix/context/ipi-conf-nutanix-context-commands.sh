@@ -65,14 +65,14 @@ if [[ ! -z "${one_net_mode_network_name:-}" ]]; then
 fi
 
 subnets_json=$(curl -ks -u "${un}":"${pw}" -X POST ${api_ep} -H "Content-Type: application/json" -d @-<<<"${data}")
-subnet_uuid=$(echo "${subnets_json}" | jq ".entities[0] | select (.spec.name == \"${subnet_name}\") | .metadata.uuid ")
+subnet_uuid=$(echo "${subnets_json}" | jq ".entities[] | select (.spec.name == \"${subnet_name}\") | .metadata.uuid ")
 
 if [[ -z "${subnet_uuid}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Cannot get Subnet UUID"
   exit 1
 fi
 
-subnet_ip=$(echo "${subnets_json}" | jq ".entities[0] | select(.spec.name==\"${subnet_name}\") | .spec.resources.ip_config.subnet_ip")
+subnet_ip=$(echo "${subnets_json}" | jq ".entities[] | select(.spec.name==\"${subnet_name}\") | .spec.resources.ip_config.subnet_ip")
 
 if [[ -z "${API_VIP}" ]]; then
   if [[ -z "${subnet_ip}" ]]; then

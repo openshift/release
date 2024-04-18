@@ -59,7 +59,8 @@ v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
 v415=" ${v414} OperatorLifecycleManager CloudCredential"
-latest_defined="v415"
+v416=" ${v415} CloudControllerManager Ingress"
+latest_defined="v416"
 always_default="${!latest_defined}"
 
 # Determine vCurrent
@@ -96,6 +97,9 @@ case ${BASELINE_CAPABILITY_SET} in
   ;;
 "v4.15")
   enabled_operators="${v415}"
+  ;;
+"v4.16")
+  enabled_operators="${v416}"
   ;;
 "vCurrent")
   enabled_operators="${vCurrent}"
