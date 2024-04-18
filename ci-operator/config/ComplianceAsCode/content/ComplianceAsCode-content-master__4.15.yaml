@@ -1,3 +1,12 @@
+base_images:
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: release
 build_root:
   image_stream_tag:
     name: release
@@ -886,6 +895,102 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-aws-rosa-sts-hcp-fips-ocp4-pci-dss-node-weekly
+  cron: 0 22 * * 6
+  steps:
+    cluster_profile: quay-aws
+    env:
+      ADDITIONAL_SECURITY_GROUP: "true"
+      CHANNEL_GROUP: stable
+      OPENSHIFT_VERSION: "4.15"
+    test:
+    - as: test-ocp4-pci-dss-node
+      cli: latest
+      commands: |
+        export PROFILE=pci-dss-node
+        export PRODUCT=ocp4
+        export CONTENT_IMAGE=ghcr.io/complianceascode/k8scontent:latest
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -platform="rosa"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: rosa-aws-sts-hcp
+- as: e2e-aws-rosa-sts-hcp-fips-ocp4-cis-weekly
+  cron: 0 22 * * 6
+  steps:
+    cluster_profile: quay-aws
+    env:
+      ADDITIONAL_SECURITY_GROUP: "true"
+      CHANNEL_GROUP: stable
+      OPENSHIFT_VERSION: "4.15"
+    test:
+    - as: test-ocp4-cis
+      cli: latest
+      commands: |
+        export PROFILE=cis
+        export PRODUCT=ocp4
+        export CONTENT_IMAGE=ghcr.io/complianceascode/k8scontent:latest
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -platform="rosa"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: rosa-aws-sts-hcp
+- as: e2e-aws-rosa-sts-hcp-fips-ocp4-cis-node-weekly
+  cron: 0 22 * * 6
+  steps:
+    cluster_profile: quay-aws
+    env:
+      ADDITIONAL_SECURITY_GROUP: "true"
+      CHANNEL_GROUP: stable
+      OPENSHIFT_VERSION: "4.15"
+    test:
+    - as: test-ocp4-cis-node
+      cli: latest
+      commands: |
+        export PROFILE=cis-node
+        export PRODUCT=ocp4
+        export CONTENT_IMAGE=ghcr.io/complianceascode/k8scontent:latest
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -platform="rosa"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: rosa-aws-sts-hcp
+- as: e2e-aws-rosa-sts-hcp-fips-ocp4-pci-dss-weekly
+  cron: 0 22 * * 6
+  steps:
+    cluster_profile: quay-aws
+    env:
+      ADDITIONAL_SECURITY_GROUP: "true"
+      CHANNEL_GROUP: stable
+      OPENSHIFT_VERSION: "4.15"
+    test:
+    - as: test-pci-dss
+      cli: latest
+      commands: |
+        export PROFILE=pci-dss
+        export PRODUCT=ocp4
+        export CONTENT_IMAGE=ghcr.io/complianceascode/k8scontent:latest
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -platform="rosa"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: rosa-aws-sts-hcp
 zz_generated_metadata:
   branch: master
   org: ComplianceAsCode
