@@ -33,6 +33,18 @@ def _add_osd_rc_bootstrap(gendoc):
                     'referencePolicy': {
                         'type': 'Source'
                     }
+                }, {
+                    'from': {
+                        'kind': 'DockerImage',
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.16:tools'
+                    },
+                    'importPolicy': {
+                        'scheduled': True
+                    },
+                    'name': 'tools',
+                    'referencePolicy': {
+                        'type': 'Source'
+                    }
                 }]
         }
     })
