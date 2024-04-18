@@ -30,7 +30,7 @@ function populate_artifact_dir() {
       unset IBMCLOUD_TRACE
 
       echo "8<--------8<--------8<--------8<-------- Instance names, ids, and MAC addresses 8<--------8<--------8<--------8<--------"
-      ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | [.serverName, .pvmInstanceID, .addresses[].ip, .addresses[].macAddress]'
+      ibmcloud pi instance list --json | jq -r '.pvmInstances[] | select (.name|test("'${CLUSTER_NAME}'")) | [.name, .id, .networkPorts[].ip, .networkPorts[].macAddress]'
       echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
       ;;
     *)
@@ -223,13 +223,22 @@ function install_required_tools() {
   export HOME=/tmp
 
   if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.22.1/IBM_Cloud_CLI_2.22.1_amd64.tar.gz
+    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.24.0/IBM_Cloud_CLI_2.24.0_amd64.tar.gz
     tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
 
     if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]; then
       echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud does not exist?"
       exit 1
     fi
+
+    curl --output /tmp/ibmcloud-cli.pub https://ibmcloud-cli-installer-public-keys.s3.us.cloud-object-storage.appdomain.cloud/ibmcloud-cli.pub
+    pushd /tmp/Bluemix_CLI/bin/
+    if ! openssl dgst -sha256 -verify /tmp/ibmcloud-cli.pub -signature ibmcloud.sig ibmcloud
+    then
+      echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud fails signature test!"
+      exit 1
+    fi
+    popd
 
     PATH=${PATH}:/tmp/Bluemix_CLI/bin
 
@@ -344,7 +353,30 @@ function init_ibmcloud() {
     ibmcloud target -g "${POWERVS_RESOURCE_GROUP}"
   fi
 
-  CIS_INSTANCE_CRN=$(ibmcloud cis instances --output json | jq -r '.[].id');
+  echo "BASE_DOMAIN = ${BASE_DOMAIN}"
+  (
+  set -xeuo pipefail;
+  INSTANCES=$(mktemp);
+  DOMAINS=$(mktemp);
+  trap '/bin/rm "${INSTANCES}" "${DOMAINS}"' EXIT;
+  ibmcloud cis instances --output json > ${INSTANCES};
+  while read INSTANCE;
+  do
+    ibmcloud cis instance "${INSTANCE}" --output json | jq -r '.crn' > /tmp/cis_instance;
+    ibmcloud cis instance-set ${INSTANCE};
+    ibmcloud cis domains --output json > ${DOMAINS};
+    while read DOMAIN;
+    do
+      echo "DOMAIN=${DOMAIN}";
+      if [ "${DOMAIN}" == "${BASE_DOMAIN}" ]
+      then
+        exit 0;
+      fi;
+    done < <(jq -r '.[] | .name' ${DOMAINS});
+  done < <(jq -r '.[] | .name' ${INSTANCES});
+  true > /tmp/cis_instance;
+  )
+  CIS_INSTANCE_CRN=$(cat /tmp/cis_instance)
   if [ -z "${CIS_INSTANCE_CRN}" ]; then
     echo "Error: CIS_INSTANCE_CRN is empty!"
     exit 1
@@ -359,7 +391,7 @@ function init_ibmcloud() {
   # BUG, this:
   #  ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .crn'
   # does not always return a match!  This also is likely to fail:
-  #  ibmcloud pi service-list --json | jq -r '.[] | select(.CRN|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .CRN'
+  #  ibmcloud pi workspace list --json | jq -r '.[] | select(.CRN|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .CRN'
   SERVICE_INSTANCE_CRN="$(ibmcloud resource search "crn:*${POWERVS_SERVICE_INSTANCE_ID}*" --output json | jq -r '.items[].crn')"
   if [ -z "${SERVICE_INSTANCE_CRN}" ]; then
     echo "Error: SERVICE_INSTANCE_CRN is empty!"
@@ -367,7 +399,7 @@ function init_ibmcloud() {
   fi
   export SERVICE_INSTANCE_CRN
 
-  ibmcloud pi service-target ${SERVICE_INSTANCE_CRN}
+  ibmcloud pi workspace target ${SERVICE_INSTANCE_CRN}
 
   CLOUD_INSTANCE_ID="$(echo ${SERVICE_INSTANCE_CRN} | cut -d: -f8)"
   if [ -z "${CLOUD_INSTANCE_ID}" ]; then
@@ -405,7 +437,7 @@ function check_resources() {
   #
   # Quota check for image imports
   #
-  JOBS=$(ibmcloud pi jobs --operation-action imageImport --json | jq -r '.jobs[] | select (.status.state|test("running")) | .id')
+  JOBS=$(ibmcloud pi job list --operation-action imageImport --json | jq -r '.jobs[] | select (.status.state|test("running")) | .id')
   if [ -n "${JOBS}" ]
   then
     echo "JOBS=${JOBS}"
@@ -426,14 +458,14 @@ function delete_network() {
   (
     while read UUID
     do
-      echo ibmcloud pi network-delete ${UUID}
-      ibmcloud pi network-delete ${UUID}
+      echo ibmcloud pi subnet delete ${UUID}
+      ibmcloud pi subnet delete ${UUID}
     done
-  ) < <(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID')
+  ) < <(ibmcloud pi subnet list --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID')
 
   for (( TRIES=0; TRIES<20; TRIES++ ))
   do
-    LINES=$(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID' | wc -l)
+    LINES=$(ibmcloud pi subnet list --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID' | wc -l)
     echo "LINES=${LINES}"
     if (( LINES == 0 ))
     then
@@ -663,10 +695,25 @@ function dump_resources() {
   )
 
   echo "8<--------8<--------8<--------8<-------- Instance names, health 8<--------8<--------8<--------8<--------"
-  ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | " \(.serverName) - \(.status) - health: \(.health.reason) - \(.health.status)"'
+  ibmcloud pi instance list --json | jq -r '.pvmInstances[] | select(.name|test("'${CLUSTER_NAME}'")) | " \(.name) - \(.status) - health reason: \(.health.reason) - health status: \(.health.status)"'
 
   echo "8<--------8<--------8<--------8<-------- Running jobs 8<--------8<--------8<--------8<--------"
-  ibmcloud pi jobs --json | jq -r '.jobs[] | select (.status.state|test("running"))'
+  ibmcloud pi job list --json | jq -r '.jobs[] | select (.status.state|test("running"))'
+
+  echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud 8<-------8<--------8<--------"
+  (
+    if [ ! -f "${dir}/auth/envtest.kubeconfig" ]
+    then
+      exit 0
+    fi
+    export KUBECONFIG=${dir}/auth/envtest.kubeconfig
+    echo "8<--------8<--------8<-------- ibmpowervscluster 8<--------8<--------8<--------"
+    oc --request-timeout=5s get ibmpowervscluster -n openshift-cluster-api-guests -o yaml
+    echo "8<--------8<--------8<-------- ibmpowervsimage 8<--------8<--------8<--------"
+    oc --request-timeout=5s get ibmpowervsimage -n openshift-cluster-api-guests -o yaml
+    echo "8<--------8<--------8<-------- ibmpowervsmachines 8<--------8<--------8<--------"
+    oc --request-timeout=5s get ibmpowervsmachines -n openshift-cluster-api-guests -o yaml
+  )
 
   echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
 

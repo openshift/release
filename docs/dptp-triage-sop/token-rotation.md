@@ -50,7 +50,7 @@ If it is for a cluster managed by us, we can get the kubeconfig by
 
 > make CLUSTER=${CLUSTER} API_SERVER_URL=$API_SERVER_URL config-updater-kubeconfig
 
-If the cluster is not managed by the test-platform team such as `vsphere` or `arm01`, we could use `oc extract secret/config-updater -n ci --to=- --keys sa.config-updater.${CLUSTER}.config` to get the new token or ask the owners of the cluster to provide the new token if `secret/config-updater` on `app.ci` is still valid.
+If the cluster is not managed by the test-platform team such as `vsphere`, we could use `oc extract secret/config-updater -n ci --to=- --keys sa.config-updater.${CLUSTER}.config` to get the new token or ask the owners of the cluster to provide the new token if `secret/config-updater` on `app.ci` is still valid.
 Then the secret will be refreshed with the new token after the next run of `prowjob/periodic-ci-secret-bootstrap`.
 
 In case `secret/config-updater` does not work, we have to fix the secret manually because `prowjob/periodic-ci-secret-bootstrap` depends on it.

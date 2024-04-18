@@ -13,7 +13,7 @@ fi
 echo "Downloaded ${EXTERNAL_MANIFESTS_URL}, sha256 checksum matches ${EXTERNAL_MANIFESTS_SHA256_HASH}"
 
 # Check file syntax
-pip3 install pyyaml --user
+pip3 install pyyaml==6.0 --user
 python3 -c 'import yaml
 import sys
 data = yaml.safe_load_all(open(sys.argv[1]))' "${LOCALPATH}"

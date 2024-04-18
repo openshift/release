@@ -4,6 +4,23 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+trap 'warn_0_case_executed' INT TERM EXIT
+function warn_0_case_executed {
+    local count
+    count="$(ls ${ARTIFACT_DIR} | wc -l)"
+    if [ $((count)) == 0 ] ; then
+        mkdir --parents "${ARTIFACT_DIR}"
+        cat >"${ARTIFACT_DIR}/junit-ginkgo-result.xml" <<- EOF
+<testsuite name="openshift-extended-test" tests="1" errors="1">
+  <testcase name="Overall status of openshift-extended test">
+    <failure message="">Caution: NO test cases executed.</failure>
+  </testcase>
+</testsuite>
+EOF
+
+    fi
+}
+
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
@@ -167,7 +184,7 @@ ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal|equinix-ocp-metal-qe|powervs-1)
+equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
@@ -257,9 +274,9 @@ function run {
     extended-platform-tests run all --dry-run | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
-    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
+    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
     if [[ "${test_scenarios}" == *"Stagerun"* ]] && [[ "${test_scenarios}" != *"~Stagerun"* ]]; then
-        hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&"
+        hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~VMonly&;~ProdrunOnly&"
     fi
     echo "TEST_FILTERS: \"${hardcoded_filters};${TEST_FILTERS:-}\""
     echo "FILTERS_ADDITIONAL: \"${FILTERS_ADDITIONAL:-}\""
@@ -268,8 +285,16 @@ function run {
         echo "add FILTERS_ADDITIONAL into test_filters"
         test_filters="${hardcoded_filters};${TEST_FILTERS};${FILTERS_ADDITIONAL}"
     fi
+    echo "------handle test filter start------"
     echo "${test_filters}"
     handle_filters "${test_filters}"
+    echo "------handle test filter done------"
+
+    echo "------handle module filter start------"
+    echo "MODULE_FILTERS: \"${MODULE_FILTERS:-}\""
+    handle_module_filter "${MODULE_FILTERS}"
+    echo "------handle module filter done------"
+
     echo "------------------the case selected------------------"
     selected_case_num=$(cat ./case_selected|wc -l)
     if [ "W${selected_case_num}W" == "W0W" ]; then
@@ -312,6 +337,7 @@ function run {
     # summarize test results
     echo "Summarizing test results..."
     failures=0 errors=0 skipped=0 tests=0
+    [[ -e "${ARTIFACT_DIR}" ]] || exit 0
     grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
     while read -a row ; do
         # if the last ARG of command `let` evaluates to 0, `let` returns 1
@@ -431,6 +457,52 @@ function handle_or_filter {
         check_case_selected "${ret}"
     fi
 }
+
+function handle_module_filter {
+    local module_filter="$1"
+    declare -a module_filter_keys
+    declare -a module_filter_values
+    valid_and_get_module_filter "$module_filter"
+
+
+    for i in "${!module_filter_keys[@]}"; do
+
+        module_key="${module_filter_keys[$i]}"
+        filter_value="${module_filter_values[$i]}"
+        echo "moudle: $module_key"
+        echo "filter: $filter_value"
+        [ -s ./case_selected ] || { echo "No Case already Selected before handle ${module_key}"; continue; }
+
+        cat ./case_selected | grep -v -E "${module_key}" > ./case_selected_exclusive || true
+        cat ./case_selected | grep -E "${module_key}" > ./case_selected_inclusive || true
+        rm -fr ./case_selected && cp -fr ./case_selected_inclusive ./case_selected && rm -fr ./case_selected_inclusive
+
+        handle_filters "${filter_value}"
+
+        [ -e ./case_selected ] && cat ./case_selected_exclusive >> ./case_selected && rm -fr ./case_selected_exclusive
+        [ -e ./case_selected ] && sort -u ./case_selected > ./case_selected_sort && mv -f ./case_selected_sort ./case_selected
+
+    done
+}
+
+function valid_and_get_module_filter {
+    local module_filter_tmp="$1"
+
+    IFS='#' read -ra pairs <<< "$module_filter_tmp"
+    for pair in "${pairs[@]}"; do
+        IFS=':' read -ra kv <<< "$pair"
+        if [[ ${#kv[@]} -ne 2 ]]; then
+            echo "moudle filter format is not correct"
+            exit 1
+        fi
+
+        module_key="${kv[0]}"
+        filter_value="${kv[1]}"
+        module_filter_keys+=("$module_key")
+        module_filter_values+=("$filter_value")
+    done
+}
+
 function handle_result {
     resultfile=`ls -rt -1 ${ARTIFACT_DIR}/junit/junit_e2e_* 2>&1 || true`
     echo $resultfile

@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.10
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.10
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.10
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.10
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.10
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.10
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -35,34 +35,22 @@ base_images:
     name: 4.16-priv
     namespace: ocp-private
     tag: cli
-  ocp_4.15_base:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base
-  ocp_4.15_cli:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: cli
-  ocp_4.15_installer-terraform-providers:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: installer-terraform-providers
   ocp_4.16_base:
     name: 4.16-priv
     namespace: ocp-private
     tag: base
+  ocp_4.16_cli:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: cli
   ocp_4.16_installer-terraform-providers:
     name: 4.16-priv
     namespace: ocp-private
     tag: installer-terraform-providers
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
-  ocp_builder_rhel-8-golang-1.20-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.16
+    tag: rhel-8-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
   use_build_cache: true
@@ -70,117 +58,80 @@ canonical_go_repository: github.com/openshift/installer
 images:
 - dockerfile_path: images/installer/Dockerfile.ci
   inputs:
-    ocp_4.15_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:base
-    ocp_4.15_installer-terraform-providers:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_4.16_base:
       as:
       - registry.ci.openshift.org/ocp/4.16:base
     ocp_4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-    ocp_builder_rhel-8-golang-1.20-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   inputs:
-    ocp_4.15_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:base
-    ocp_4.15_installer-terraform-providers:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_4.16_base:
       as:
       - registry.ci.openshift.org/ocp/4.16:base
     ocp_4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-    ocp_builder_rhel-8-golang-1.20-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   inputs:
-    ocp_4.15_installer-terraform-providers:
+    ocp_4.16_cli:
       as:
-      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      - registry.ci.openshift.org/ocp/4.16:cli
+    ocp_4.16_installer-terraform-providers:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: libvirt-installer
 - dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
   inputs:
-    ocp_4.15_base:
+    ocp_4.16_base:
       as:
-      - registry.ci.openshift.org/ocp/4.15:base
-    ocp_4.15_cli:
+      - registry.ci.openshift.org/ocp/4.16:base
+    ocp_4.16_cli:
       as:
-      - registry.ci.openshift.org/ocp/4.15:cli
-    ocp_4.15_installer-terraform-providers:
+      - registry.ci.openshift.org/ocp/4.16:cli
+    ocp_4.16_installer-terraform-providers:
       as:
-      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
   inputs:
-    ocp_4.15_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:base
-    ocp_4.15_installer-terraform-providers:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_4.16_base:
       as:
       - registry.ci.openshift.org/ocp/4.16:base
     ocp_4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-    ocp_builder_rhel-8-golang-1.20-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   inputs:
-    ocp_4.15_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:base
-    ocp_4.15_installer-terraform-providers:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:installer-terraform-providers
     ocp_4.16_base:
       as:
       - registry.ci.openshift.org/ocp/4.16:base
     ocp_4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-    ocp_builder_rhel-8-golang-1.20-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
   to: ovirt-installer
 - dockerfile_literal: |
     FROM src
@@ -335,44 +286,29 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-sharednetwork
   timeout: 6h0m0s
-- as: e2e-aws-ovn-shared-vpc-localzones
+- always_run: false
+  as: e2e-aws-ovn-edge-zones
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-local-zones
-    env:
-      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
-    workflow: openshift-e2e-aws-local-zones-byo-vpc
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-edge-zones
   timeout: 6h0m0s
-- as: e2e-aws-ovn-localzones
+- always_run: false
+  as: e2e-aws-ovn-shared-vpc-edge-zones
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-local-zones
-    env:
-      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
-    workflow: openshift-e2e-aws-local-zones
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-edge-zones-byo-vpc
   timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-ovn-wavelengthzones
-  optional: true
+- always_run: true
+  as: e2e-aws-ovn-edge-zones-manifest-validation
+  run_if_changed: aws
   steps:
     cluster_profile: aws-local-zones
-    env:
-      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
-      EDGE_ZONE_TYPE: wavelength-zone
-    workflow: openshift-e2e-aws-local-zones
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-ovn-shared-vpc-wavelengthzones
-  optional: true
-  steps:
-    cluster_profile: aws-local-zones
-    env:
-      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
-      EDGE_ZONE_TYPE: wavelength-zone
-    workflow: openshift-e2e-aws-local-zones-byo-vpc
-  timeout: 6h0m0s
+    workflow: openshift-installer-manifests-aws-edge-zones
+  timeout: 3h0m0s
 - as: e2e-aws-ovn-imdsv2
   optional: true
   run_if_changed: aws
@@ -476,7 +412,7 @@ tests:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp-latestinstaller
   timeout: 6h0m0s
-- as: e2e-metal-ipi-sdn
+- as: e2e-metal-ipi-ovn
   cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
@@ -485,10 +421,10 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
+        NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
   timeout: 6h0m0s
-- as: e2e-metal-ipi-sdn-swapped-hosts
+- as: e2e-metal-ipi-ovn-swapped-hosts
   cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
@@ -497,7 +433,7 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
+        NETWORK_TYPE=OVNKubernetes
         HOSTS_SWAP_DEFINITION=true
     workflow: baremetalds-e2e
   timeout: 6h0m0s
@@ -542,29 +478,22 @@ tests:
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
-- as: e2e-openstack-upi
+- as: e2e-openstack-dualstack-upi
   optional: true
   run_if_changed: (^images/openstack/)|(^docs/user/openstack/install_upi\.md$)|(^upi/openstack/)
   steps:
-    cluster_profile: openstack-vexxhost
+    cluster_profile: openstack-hwoffload
     env:
+      CONFIG_TYPE: dual-stack-upi
+      OPENSTACK_COMPUTE_FLAVOR: m1.xlarge
       OPENSTACK_TEST_SKIPS: The OpenStack platform creates Worker nodes in a server
         group\|The OpenStack platform creates Control plane nodes in a server group
+      TEST_SKIPS: Services Secondary IP Family \[LinuxOnly\] should function for service
+        endpoints using hostNetwork\| Services Secondary IP Family \[LinuxOnly\] should
+        function for node-Service\| Services Secondary IP Family \[LinuxOnly\] should
+        function for pod-Service
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-upi
-  timeout: 6h0m0s
-- as: e2e-openstack-sdn-parallel
-  optional: true
-  run_if_changed: openstack
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: OpenShiftSDN
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_SUITE: openshift/conformance/parallel
-    workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
 - as: e2e-openstack-proxy
   optional: true
@@ -681,13 +610,6 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-crc
   timeout: 6h0m0s
-- as: e2e-libvirt
-  optional: true
-  run_if_changed: libvirt
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-e2e-gcp-libvirt
-  timeout: 6h0m0s
 - as: e2e-metal-assisted
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
@@ -762,24 +684,14 @@ tests:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix-ovn
   timeout: 6h0m0s
-- as: e2e-nutanix-sdn
-  cluster: build01
-  optional: true
-  run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
-  steps:
-    cluster_profile: nutanix
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    workflow: openshift-e2e-nutanix-sdn
-  timeout: 6h0m0s
 - as: agent-integration-tests
   commands: hack/go-integration-test.sh
   container:
     from: src-oc
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
 - as: e2e-agent-compact-ipv4
   cluster: build05
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -792,7 +704,7 @@ tests:
 - as: e2e-agent-compact-ipv4-none-platform
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -805,7 +717,7 @@ tests:
 - as: e2e-agent-compact-ipv4-appliance
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -818,7 +730,7 @@ tests:
 - as: e2e-agent-compact-ipv4-appliance-diskimage
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     allow_skip_on_success: true
     cluster_profile: equinix-ocp-metal
@@ -836,7 +748,7 @@ tests:
 - as: e2e-agent-sno-ipv6
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-sno-ipv6
@@ -844,7 +756,7 @@ tests:
 - as: e2e-agent-sno-ipv4-pxe
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -856,14 +768,10 @@ tests:
 - as: e2e-agent-ha-dualstack
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
-        MIRROR_IMAGES=true
-    workflow: agent-e2e-generic
+    workflow: agent-e2e-ha-dualstack
   timeout: 6h0m0s
 - as: e2e-aws-ovn-public-subnets
   optional: true

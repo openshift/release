@@ -68,9 +68,17 @@ function confirm_labels () {
 
   echo "Confirming correct state of labels for cluster with id: '$cluster_id'"
 
+  CLUSTER_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id")
+  CLUSTER_CREATION_TIMESTAMP=$(echo "$CLUSTER_OUTPUT" | jq -r .creation_timestamp | awk -F'.' '{print $1}' | date "+%s") || true
   LABELS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/"$cluster_type"/"$cluster_id"/labels)
   LABELS_COUNT=$(echo "$LABELS_OUTPUT" | jq -r .total)
-  if [[ "$LABELS_COUNT" -gt "$count" ]]; then
+  ## validation for OCPQE-19422
+  LABELS_PAGE=$(echo "$LABELS_OUTPUT" | jq -r .page)
+  if [[ "$LABELS_PAGE" -ne 1 ]]; then
+    echo "ERROR. Expected labels starting page to be 1. Got: $LABELS_PAGE"
+    TEST_PASSED=false
+  fi
+  if [[ "$LABELS_COUNT" -ne "$count" ]]; then
     echo "ERROR. Expected labels count for $cluster_type with $cluster_id to be $count. Got: $LABELS_COUNT"
     TEST_PASSED=false
   fi
@@ -86,6 +94,15 @@ function confirm_labels () {
       echo "ERROR. Expected previously added label value: '$value' to be returned in labels, but none was found"
       TEST_PASSED=false
     fi
+    ## validation for OCPQE-19536
+    echo "[OCPQE-19536] - Confirming validity of labels' creation timestamps"
+    for ((i=0; i<"$LABELS_COUNT"; i++)); do
+      LABEL_CREATION_TIMESTAMP=$(jq -n "$LABELS_OUTPUT" | jq -r .items[$i].creation_timestamp | awk -F'.' '{print $1}' | date "+%s") || true
+      if [ "$CLUSTER_CREATION_TIMESTAMP" -ge "$LABEL_CREATION_TIMESTAMP" ]; then
+        echo "ERROR. Expected cluster creation timestamp: '$CLUSTER_CREATION_TIMESTAMP' to not be greater or equal to label creation timestamp: '$LABEL_CREATION_TIMESTAMP'"
+        TEST_PASSED=false
+      fi
+    done
   fi
 }
 
@@ -115,6 +132,7 @@ cleanup_labels ()
 
 function test_autoscaler ()
 {
+  echo "[OCP-63511] - proportional autoscaler"
   TEST_PASSED=true
 
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
@@ -256,6 +274,7 @@ function test_autoscaler ()
 
 function test_monitoring_disabled ()
 {
+  echo "[OCP-60338] - disable workload monitoring"
   TEST_PASSED=true
   function check_monitoring_disabled () 
   {
@@ -288,6 +307,7 @@ function test_monitoring_disabled ()
 
 function test_labels() 
 {
+  echo "[OCP-63998] - Sector predicates to support multiple sectors by labels"
   TEST_PASSED=true
   sc_cluster_id=$(cat "${SHARED_DIR}"/osd-fm-sc-id)
   mc_cluster_id=$(cat "${SHARED_DIR}"/osd-fm-mc-id)
@@ -405,6 +425,7 @@ function test_labels()
 ###### endpoints tests (OCPQE-16843) ######
 
 function test_endpoints () {
+  echo "[OCP-63998] - endpoints tests"
   TEST_PASSED=true
   echo "Querying '/errors' endpoint"
   ERRORS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/errors)
@@ -502,7 +523,8 @@ function test_endpoints () {
 ###### /audit endpoint tests (OCP-67823) ######
 
 function test_audit_endpooint () {
-TEST_PASSED=true
+  echo "[OCP-67823] - /audit endpoint"
+  TEST_PASSED=true
   ## confirm /audit endpoints works
   echo "Querying '/audit' endpoint"
   AUDIT_ENDPOINT_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/audit)
@@ -632,6 +654,7 @@ TEST_PASSED=true
 ###### machinesets naming test (OCP-68154) ######
 
 function test_machinesets_naming () {
+  echo "[OCP-68154] - machinesets naming"
   TEST_PASSED=true
 
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
@@ -639,7 +662,7 @@ function test_machinesets_naming () {
   echo "Getting the name of a first available machineset to confirm that its valid"
   MACHINE_SETS_OUTPUT=""
   ## if no machinesets are found, the statement below will not assign anything to the MACHINE_SETS_OUTPUT
-  MACHINE_SETS_OUTPUT=$(oc get machinesets -A | grep "serving" | grep -v "non-serving" |  awk '{print $2}' | head -1) || true
+  MACHINE_SETS_OUTPUT=$(oc get machinesets.machine.openshift.io -A | grep "serving" | grep -v "non-serving" |  awk '{print $2}' | head -1) || true
   if [[ "$MACHINE_SETS_OUTPUT" != "" ]]; then
     # get suffix of the machineset name (e.g. for 'hs-mc-20bivna6g-wh8nq-serving-9-us-east-1b', the suffix will be 'us-east-1b')
     # it is obtained by trimming everything up to (including) 6th occurence of the '-' symbol
@@ -664,26 +687,30 @@ function test_machinesets_naming () {
 ###### host_prefix (podisolation) validation test (OCPQE-17288) ######
 
 function test_host_prefix_podisolation () {
+  echo "[OCPQE-17288] - machinesets naming"
   TEST_PASSED=true
-  echo "Getting list of management clusters in podisolation sector"
-  CLUSTERS=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters --parameter search="sector='podisolation'")
+  echo "Getting list of management clusters"
+  CLUSTERS=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters)
   CLUSTER_NUMBER=$(jq -n "$CLUSTERS" | jq -r .size)
   echo "Found $CLUSTER_NUMBER clusters"
   if [ "$CLUSTER_NUMBER" -gt 0 ]; then
     for ((i=0; i<"$CLUSTER_NUMBER"; i++)); do
       MC_CLUSTER_ID=$(jq -n "$CLUSTERS" | jq -r .items[$i].id)
       CLUSTER_STATUS=$(jq -n "$CLUSTERS" | jq -r .items[$i].status)
+      SECTOR=$(jq -n "$CLUSTERS" | jq -r .items[$i].sector)
       if [ "$CLUSTER_STATUS" != "ready" ]; then
         echo "MC with ID: $MC_CLUSTER_ID is not ready"
       else
-        MGMT_CLUSTER_ID=$(jq -n "$CLUSTERS" | jq -r .items[$i].cluster_management_reference.cluster_id)
-        MGMT_CLUSTER_HREF=$(jq -n "$CLUSTERS" | jq -r .items[$i].cluster_management_reference.href)
-        echo "Getting network configuration for MC with cluster mgmt ID: $MGMT_CLUSTER_ID"
-        HOST_PREFIX=$(ocm get "$MGMT_CLUSTER_HREF" | jq -r .network.host_prefix)
-        echo "Confirming that host_prefix of the MC is '24'"
-        if [ "$HOST_PREFIX" -ne 24 ]; then
-          echo "Expected host_prefix of the MC to be '24'. Got '$HOST_PREFIX'"
-          TEST_PASSED=false
+        if [ "$SECTOR" == "main" ] || [ "$SECTOR" = "canary" ]; then
+          MGMT_CLUSTER_ID=$(jq -n "$CLUSTERS" | jq -r .items[$i].cluster_management_reference.cluster_id)
+          MGMT_CLUSTER_HREF=$(jq -n "$CLUSTERS" | jq -r .items[$i].cluster_management_reference.href)
+          echo "Getting network configuration for MC with cluster mgmt ID: $MGMT_CLUSTER_ID in sector: $SECTOR"
+          HOST_PREFIX=$(ocm get "$MGMT_CLUSTER_HREF" | jq -r .network.host_prefix)
+          echo "Confirming that host_prefix of the MC is '24'"
+          if [ "$HOST_PREFIX" -ne 24 ]; then
+            echo "Expected host_prefix of the MC to be '24'. Got '$HOST_PREFIX'"
+            TEST_PASSED=false
+          fi
         fi
       fi
     done
@@ -698,35 +725,39 @@ function test_host_prefix_podisolation () {
 ###### podisolation obo machine pool test (OCPQE-17367) ######
 
 function test_obo_machine_pool () {
+  echo "[OCPQE-17367] - podisolation obo machine pool"
   TEST_PASSED=true
-  echo "Getting list of management clusters in podisolation sector"
-  CLUSTERS=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters --parameter search="sector='podisolation'")
+  echo "Getting list of management clusters"
+  CLUSTERS=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters)
   CLUSTER_NUMBER=$(jq -n "$CLUSTERS" | jq -r .size)
   echo "Found $CLUSTER_NUMBER clusters"
   if [ "$CLUSTER_NUMBER" -gt 0 ]; then
     for ((i=0; i<"$CLUSTER_NUMBER"; i++)); do
       MC_CLUSTER_ID=$(jq -n "$CLUSTERS" | jq -r .items[$i].id)
       CLUSTER_STATUS=$(jq -n "$CLUSTERS" | jq -r .items[$i].status)
+      SECTOR=$(jq -n "$CLUSTERS" | jq -r .items[$i].sector)
       if [ "$CLUSTER_STATUS" != "ready" ]; then
         echo "MC with ID: $MC_CLUSTER_ID is not ready"
       else
-        MGMT_CLUSTER_ID=$(jq -n "$CLUSTERS" | jq -r .items[$i].cluster_management_reference.cluster_id)
-        MGMT_CLUSTER_MP_HREF="/api/clusters_mgmt/v1/clusters/$MGMT_CLUSTER_ID/machine_pools"
-        MGMT_CLUSTER_OBO_MP_COUNT=$(ocm get "$MGMT_CLUSTER_MP_HREF" | jq -r .items[].id | grep -c obo)
-        echo "Confirming that 'obo' machine pool count is exactly 1 for cluster with ID: $MGMT_CLUSTER_ID"
-        if [ "$MGMT_CLUSTER_OBO_MP_COUNT" -ne 1 ]; then
-          echo "ERROR: Expected count of 'obo' machine pools to be 1. Got '$MGMT_CLUSTER_OBO_MP_COUNT'"
-          TEST_PASSED=false
-        else
-          MACHINE_POOL_OUTPUT=$(ocm get "$MGMT_CLUSTER_MP_HREF"/obo-1)
-          MP_REPLICAS=$(jq -n "$MACHINE_POOL_OUTPUT" | jq -r .replicas)
-          AVAILABILITY_ZONES=$(jq -n "$MACHINE_POOL_OUTPUT" | jq -r '.availability_zones | length')
-          echo "Confirming that the number of replicas and availability zones in the obo machine pool is 3"
-          if [ "$MP_REPLICAS" -ne 3 ] || [ "$AVAILABILITY_ZONES" -ne 3 ]; then
-            echo "ERROR. Expected number of replicas and availability zones in the obo machine pool to be 3 Got:"
-            echo "replicas: $MP_REPLICAS"
-            echo "availability zones: $AVAILABILITY_ZONES"
+        if [ "$SECTOR" == "main" ] || [ "$SECTOR" = "canary" ]; then
+          MGMT_CLUSTER_ID=$(jq -n "$CLUSTERS" | jq -r .items[$i].cluster_management_reference.cluster_id)
+          MGMT_CLUSTER_MP_HREF="/api/clusters_mgmt/v1/clusters/$MGMT_CLUSTER_ID/machine_pools"
+          MGMT_CLUSTER_OBO_MP_COUNT=$(ocm get "$MGMT_CLUSTER_MP_HREF" | jq -r .items[].id | grep -c obo)
+          echo "Confirming that 'obo' machine pool count is exactly 1 for cluster with ID: $MGMT_CLUSTER_ID in sector: $SECTOR"
+          if [ "$MGMT_CLUSTER_OBO_MP_COUNT" -ne 1 ]; then
+            echo "ERROR: Expected count of 'obo' machine pools to be 1. Got '$MGMT_CLUSTER_OBO_MP_COUNT'"
             TEST_PASSED=false
+          else
+            MACHINE_POOL_OUTPUT=$(ocm get "$MGMT_CLUSTER_MP_HREF"/obo-1)
+            MP_REPLICAS=$(jq -n "$MACHINE_POOL_OUTPUT" | jq -r .replicas)
+            AVAILABILITY_ZONES=$(jq -n "$MACHINE_POOL_OUTPUT" | jq -r '.availability_zones | length')
+            echo "Confirming that the number of replicas and availability zones in the obo machine pool is 3"
+            if [ "$MP_REPLICAS" -ne 3 ] || [ "$AVAILABILITY_ZONES" -ne 3 ]; then
+              echo "ERROR. Expected number of replicas and availability zones in the obo machine pool to be 3 Got:"
+              echo "replicas: $MP_REPLICAS"
+              echo "availability zones: $AVAILABILITY_ZONES"
+              TEST_PASSED=false
+            fi
           fi
         fi
       fi
@@ -742,13 +773,14 @@ function test_obo_machine_pool () {
 ###### MC srep-worker-healthcheck MHC check (OCPQE-17157) ######
 
 function test_machine_health_check_config () {
+  echo "[OCPQE-17157] - MC srep-worker-healthcheck MHC check"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 
   echo "Checking MC MHC match expressions operator"
   EXPECTED_MHC_MATCH_EXPRESSIONS_OPERATOR="NotIn"
   ACTUAL_MHC_MATCH_EXPRESSIONS_OPERATOR=""
-  ACTUAL_MHC_MATCH_EXPRESSIONS_OPERATOR=$(oc get machinehealthcheck srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .operator) || true
+  ACTUAL_MHC_MATCH_EXPRESSIONS_OPERATOR=$(oc get machinehealthchecks.machine.openshift.io srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .operator) || true
 
   if [[ "$EXPECTED_MHC_MATCH_EXPRESSIONS_OPERATOR" != "$ACTUAL_MHC_MATCH_EXPRESSIONS_OPERATOR" ]]; then
     echo "ERROR: Expected the matching expressions operator to be '$EXPECTED_MHC_MATCH_EXPRESSIONS_OPERATOR'. Found: '$ACTUAL_MHC_MATCH_EXPRESSIONS_OPERATOR'"
@@ -760,9 +792,9 @@ function test_machine_health_check_config () {
   MASTER_MACHINES_EXCLUDED=0
   INFRA_MACHINES_EXCLUDED=0
   WORKER_MACHINES_EXCLUDED=-1
-  MASTER_MACHINES_EXCLUDED=$(oc get machinehealthcheck srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .values | grep -c master) || true
-  INFRA_MACHINES_EXCLUDED=$(oc get machinehealthcheck srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .values | grep -c infra) || true
-  WORKER_MACHINES_EXCLUDED=$(oc get machinehealthcheck srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .values | grep -c worker) || true
+  MASTER_MACHINES_EXCLUDED=$(oc get machinehealthchecks.machine.openshift.io srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .values | grep -c master) || true
+  INFRA_MACHINES_EXCLUDED=$(oc get machinehealthchecks.machine.openshift.io srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .values | grep -c infra) || true
+  WORKER_MACHINES_EXCLUDED=$(oc get machinehealthchecks.machine.openshift.io srep-worker-healthcheck -n openshift-machine-api -o json | jq -r .spec.selector.matchExpressions[] | jq 'select(.key == ("machine.openshift.io/cluster-api-machine-role"))' | jq -r .values | grep -c worker) || true
 
   # 1 expecred - master machines should be included in the 'NotIn' mhc operator check
   if [ "$MASTER_MACHINES_EXCLUDED" -ne "$EXPECTED_EXCLUDED_IN_MHC" ]; then
@@ -784,6 +816,10 @@ function test_machine_health_check_config () {
     TEST_PASSED=false
   fi
 
+  ## save node count to confirm that machinehealthchecks restores nodes after HC removal
+  NUMBER_OF_NODES=$(oc get nodes -A --no-headers | wc -l | tr -d ' ')
+  echo "${NUMBER_OF_NODES}" > "${SHARED_DIR}/osd-fm-mc-node_count"
+
   update_results "OCPQE-17157" $TEST_PASSED
 }
 
@@ -794,6 +830,7 @@ function test_machine_health_check_config () {
 ###### test fix for 'Pods can be created on MC request serving nodes before taints are applied' (OCPQE-17578) ######
 
 function test_compliance_monkey_descheduler () {
+  echo "[OCPQE-17578] - fix for 'Pods can be created on MC request serving nodes before taints are applied'"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 
@@ -817,6 +854,7 @@ function test_compliance_monkey_descheduler () {
 ###### Stop installing Hypershift CRDs to service clusters tests (OCPQE-17815) ######
 
 function test_hypershift_crds_not_installed_on_sc () {
+  echo "[OCPQE-17815] - Stop installing Hypershift CRDs to service clusters"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-sc.kubeconfig"
   
@@ -857,6 +895,7 @@ function test_hypershift_crds_not_installed_on_sc () {
 ###### Add labels to MC&SC after provision tests (OCPQE-17816) ######
 
 function test_add_labels_to_sc_after_installing () {
+  echo "[OCPQE-17816] - Add labels to MC&SC after provision"
   TEST_PASSED=true
   sc_cluster_id=$(cat "${SHARED_DIR}/ocm-sc-id")
   mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
@@ -889,6 +928,7 @@ function test_add_labels_to_sc_after_installing () {
 ###### Ensure only ready management clusters are considered in ACM's placement decision test (OCPQE-17818) ######
 
 function test_ready_mc_acm_placement_decision () {
+  echo "[OCPQE-17818] - Ensure only ready management clusters are considered in ACM's placement decision"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-sc.kubeconfig"
 
@@ -929,6 +969,7 @@ function test_ready_mc_acm_placement_decision () {
 ###### Fix: Unable to fetch cluster details via the API test (OCPQE-17819) ######
 
 function test_fetching_cluster_details_from_api () {
+  echo "[OCPQE-17819] - Fix: Unable to fetch cluster details via the API"
   TEST_PASSED=true
 
   function compare_jq_filter_values () {
@@ -1045,26 +1086,27 @@ function test_fetching_cluster_details_from_api () {
 ###### Create machine pools for request serving HCP components tests (OCPQE-17866) ######
 
 function test_machineset_tains_and_labels () {
+  echo "[OCPQE-17866] - Create machine pools for request serving HCP components"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 
   echo "Getting a name of serving machineset"
   SERVING_MACHINE_SET_NAME=""
-  SERVING_MACHINE_SET_NAME=$(oc get machineset -A | grep -e "serving" | grep -v "non-serving" | awk '{print $2}' | head -1) || true
+  SERVING_MACHINE_SET_NAME=$(oc get machinesets.machine.openshift.io -A | grep -e "serving" | grep -v "non-serving" | awk '{print $2}' | head -1) || true
   if [ "$SERVING_MACHINE_SET_NAME" == "" ]; then
     echo "ERROR. Failed to get a name of a serving machineset"
     TEST_PASSED=false
   else
     echo "Getting labels of of serving machineset: $SERVING_MACHINE_SET_NAME and confirming that 'hypershift.openshift.io/request-serving-component' is set to true"
     SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE=""
-    SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE=$(oc get machineset "$SERVING_MACHINE_SET_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.metadata.labels | jq  '."hypershift.openshift.io/request-serving-component"')
+    SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE=$(oc get machinesets.machine.openshift.io "$SERVING_MACHINE_SET_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.metadata.labels | jq  '."hypershift.openshift.io/request-serving-component"')
     if [ "$SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE" == "" ] || [ "$SERVING_MACHINE_SET_REQUEST_SERVING_LABEL_VALUE" = false ]; then
       echo "ERROR. 'hypershift.openshift.io/request-serving-component' should be present in machineset labels and set to true. Unable to get the key value pair from labels"
       TEST_PASSED=false
     fi
     echo "Getting tains of of serving machineset: $SERVING_MACHINE_SET_NAME and confirming that 'hypershift.openshift.io/request-serving-component' is set to true"
     SERVING_MACHINE_SET_REQUEST_SERVING_TAINT_VALUE=false
-    SERVING_MACHINE_SET_REQUEST_SERVING_TAINT_VALUE=$(oc get machineset "$SERVING_MACHINE_SET_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.taints[] | jq 'select(.key == "hypershift.openshift.io/request-serving-component")' | jq -r .value)
+    SERVING_MACHINE_SET_REQUEST_SERVING_TAINT_VALUE=$(oc get machinesets.machine.openshift.io "$SERVING_MACHINE_SET_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.taints[] | jq 'select(.key == "hypershift.openshift.io/request-serving-component")' | jq -r .value)
     if [ "$SERVING_MACHINE_SET_REQUEST_SERVING_TAINT_VALUE" = false ]; then
       echo "ERROR. 'hypershift.openshift.io/request-serving-component' should be present in machineset taints and set to true. Unable to get the key value pair from taints"
       TEST_PASSED=false
@@ -1081,6 +1123,7 @@ function test_machineset_tains_and_labels () {
 ###### MCs/SCs are created as OSD or ROSA STS clusters tests (OCPQE-17867) ######
 
 function test_sts_mc_sc () {
+  echo "[OCPQE-17867] - MCs/SCs are created as OSD or ROSA STS clusters"
   TEST_PASSED=true
   mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
   sc_cluster_id=$(cat "${SHARED_DIR}/ocm-sc-id")
@@ -1127,6 +1170,7 @@ function test_sts_mc_sc () {
 ###### fix: Backups created only once tests (OCPQE-17901) ######
 
 function test_backups_created_only_once () {
+  echo "[OCPQE-17901] - fix: Backups created only once"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 
@@ -1185,6 +1229,7 @@ function test_backups_created_only_once () {
 ###### fix: Hypershift OBO machineset set to 3 nodes in the same AZ tests (OCPQE-17964) ######
 
 function test_obo_machinesets () {
+  echo "[OCPQE-17964] - fix: Hypershift OBO machineset set to 3 nodes in the same AZ"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
   mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
@@ -1213,7 +1258,7 @@ function test_obo_machinesets () {
       TEST_PASSED=false
     fi
     echo "Getting obo machinesets"
-    OBO_MACHINESETS_OUTPUT=$(oc get machinesets -A | grep obo)
+    OBO_MACHINESETS_OUTPUT=$(oc get machinesets.machine.openshift.io -A | grep obo)
     NO_OF_OBO_MACHINESETS=$(echo -n "$OBO_MACHINESETS_OUTPUT" | grep -c '^')
     EXPECTED_NO_OF_OBO_MACHINESETS=3
     if [ "$NO_OF_OBO_MACHINESETS" -ne "$EXPECTED_NO_OF_OBO_MACHINESETS" ]; then
@@ -1232,8 +1277,8 @@ function test_obo_machinesets () {
           TEST_PASSED=false
           break
         fi
-        REGION=$(oc get machineset "$MS_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.providerSpec.value.placement.region) || true
-        AZ=$(oc get machineset "$MS_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.providerSpec.value.placement.availabilityZone) || true
+        REGION=$(oc get machinesets.machine.openshift.io "$MS_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.providerSpec.value.placement.region) || true
+        AZ=$(oc get machinesets.machine.openshift.io "$MS_NAME" -n openshift-machine-api -o json | jq -r .spec.template.spec.providerSpec.value.placement.availabilityZone) || true
         if [ "$PREVIOUS_MS_REGION" == "" ]; then
           if [ "$REGION" == "" ]; then
             echo "ERROR. Expected machineset: $MS_NAME spec to contain non-empty region. Unable to get this property"
@@ -1264,6 +1309,7 @@ function test_obo_machinesets () {
 ###### sts enable MC not able to create awsendpointservice correctly (OCPQE-17965) ######
 
 function test_awsendpointservices_status_output_populated () {
+  echo "[OCPQE-17965] - sts enable MC not able to create awsendpointservice correctly"
   TEST_PASSED=true
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 
@@ -1320,6 +1366,7 @@ function test_awsendpointservices_status_output_populated () {
 ###### HCP: Management cluster request-serving pool autoscaling (OCPQE-18303) ######
 
 function test_mc_request_serving_pool_autoscaling () {
+  echo "[OCPQE-18303] - HCP: Management cluster request-serving pool autoscaling"
   TEST_PASSED=true
   MP_COUNT=0
   mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
@@ -1369,7 +1416,7 @@ function test_mc_request_serving_pool_autoscaling () {
   confirm_labels "management_clusters" "$fm_mc_cluster_id" 0 "" ""
 
   # # add a label with correct key and value, mps should be scaled up to maximum count (64)
-  add_label "$SERVING_MP_MINIMUM_WARMUP_KEY" "100" "$MGMT_CLUSTER_TYPE" "$fm_mc_cluster_id" false 120
+  add_label "$SERVING_MP_MINIMUM_WARMUP_KEY" "100" "$MGMT_CLUSTER_TYPE" "$fm_mc_cluster_id" false 240
 
   confirm_labels "management_clusters" "$fm_mc_cluster_id" 1 "$SERVING_MP_MINIMUM_WARMUP_KEY" "100"
 
@@ -1401,6 +1448,7 @@ function test_mc_request_serving_pool_autoscaling () {
 ###### test serving machine_pools verification (OCPQE-18337) ######
 
 function test_serving_machine_pools () {
+  echo "[OCPQE-18337] - serving machine_pools verification"
   TEST_PASSED=true
   mc_cluster_id=$(cat "${SHARED_DIR}/ocm-mc-id")
   echo "Getting machine pools names for MC with clusters mgmt API ID: $mc_cluster_id"
@@ -1433,6 +1481,15 @@ function test_serving_machine_pools () {
           if [ "$MP_AZ_COUNT" -ne "$MP_SUBNET_COUNT" ] || [ "$MP_AZ_COUNT" -ne 2 ]; then
             echo "ERROR. Unexpected machine pool: '$MP_NAME' subnet count: $MP_SUBNET_COUNT or availability count: $MP_AZ_COUNT (expected 2)"
             TEST_PASSED=false
+          else
+            echo "[OCM-6880 | OCM-7157] - OSDFM should add label to each request-serving MP with the proper subnet"
+            echo "Confirming that $MP_NAME machine pool has properly set label: 'hypershift.openshift.io/request-serving-subnets'"
+            FIRST_SUBNET=$(jq -n "$MP" | jq -r '.subnets[0]') || true
+            SECOND_SUBNET=$(jq -n "$MP" | jq -r '.subnets[1]') || true
+            REQUEST_SUBNET_LABEL=$(jq -n "$MP" | jq -r '.labels' | jq '."hypershift.openshift.io/request-serving-subnets" // empty' | xargs) || true
+            if [ "$REQUEST_SUBNET_LABEL" != "$FIRST_SUBNET.$SECOND_SUBNET" ]; then
+              echo "ERROR. Expecting 'hypershift.openshift.io/request-serving-subnets' serving mp label value to consist of two comma-separated subnets. Found: $REQUEST_SUBNET_LABEL"
+            fi
           fi
           if [ "$OBO_MP_FIRST_TWO_AZS" != "$MP_AZ_ARRAY" ]; then
             echo "ERROR. serving machine pool should only be placed in the first two AZs. It was placed in the following: $MP_AZ_ARRAY"
@@ -1446,6 +1503,189 @@ function test_serving_machine_pools () {
 }
 
 ###### end of test serving machine_pools verification (OCPQE-18337) ######
+
+function wait_for_cluster_status() {
+  CLUSTER_ID=$1
+  CLUSTER_TYPE=$2
+  EXPECTED_CLUSTER_STATUS=$3
+  TIMEOUT_COUNTER=$4 # TIMEOUT = 5s * TIMEOUT_COUNTER
+  echo "Waiting for cluster with ID: '$CLUSTER_ID' ($CLUSTER_TYPE) to reach status '$EXPECTED_CLUSTER_STATUS' within $TIMEOUT_COUNTER retries (every 5 seconds)"
+  STATUS_OBSERVED=false
+  for ((i=0; i<TIMEOUT_COUNTER; i+=1)); do
+    CURRENT_CLUSTER_STATUS=$(ocm get /api/osd_fleet_mgmt/v1/"$CLUSTER_TYPE"/"$CLUSTER_ID" | jq -r '.status') || true
+    if [ "$CURRENT_CLUSTER_STATUS" == "$EXPECTED_CLUSTER_STATUS" ]; then
+      STATUS_OBSERVED=true
+      break
+    fi
+    echo "Expected status: '$EXPECTED_CLUSTER_STATUS' for cluster: '$CLUSTER_TYPE' with cluster ID: '$CLUSTER_ID' not reached yet. Currently at: '$CURRENT_CLUSTER_STATUS'. Sleep for 5 seconds"
+    sleep 5
+  done
+  if [ "$STATUS_OBSERVED" = true ]; then
+    echo "Expected status: '$EXPECTED_CLUSTER_STATUS' for cluster: '$CLUSTER_TYPE' with cluster ID: '$CLUSTER_ID' reached."
+  else
+    TEST_PASSED=false
+    echo "[ERROR]: Expected status: '$EXPECTED_CLUSTER_STATUS' for cluster: '$CLUSTER_TYPE' with cluster ID: '$CLUSTER_ID' not reached within '$TIMEOUT_COUNTER' retries"
+  fi
+}
+
+##################################################################
+
+###### test: fix: Clusters deleted before OCM cluster is created get stuck in cleanup_account (OCPQE-19976) ######
+
+function test_delete_sc () {
+  echo "[OCPQE-19976] - fix: Clusters deleted before OCM cluster is created get stuck in cleanup_account"
+  TEST_PASSED=true
+  OSDFM_REGION=${LEASED_RESOURCE}
+  echo "Creating a service cluster in the '$OSDFM_REGION' region"
+  SC_CLUSTER_ID=$(echo '{"region": "'"${OSDFM_REGION}"'", "cloud_provider": "aws"}' | ocm post /api/osd_fleet_mgmt/v1/service_clusters | jq -r '.id')
+  wait_for_cluster_status "$SC_CLUSTER_ID" "service_clusters" "cluster_account_provisioned" 360
+  echo "Deleting service cluster with ID: '$SC_CLUSTER_ID'"
+  ocm delete /api/osd_fleet_mgmt/v1/service_clusters/"$SC_CLUSTER_ID"
+  wait_for_cluster_status "$SC_CLUSTER_ID" "service_clusters" "cleanup_ack_pending" 120
+  ocm delete /api/osd_fleet_mgmt/v1/service_clusters/"$SC_CLUSTER_ID"/ack
+  wait_for_cluster_status "$SC_CLUSTER_ID" "service_clusters" "" 120 # empty status means cluster deleted
+  update_results "OCPQE-19976" $TEST_PASSED
+}
+
+###### end of test: fix: Clusters deleted before OCM cluster is created get stuck in cleanup_account (OCPQE-19976) ######
+
+##################################################################
+
+###### test OSDFM should set label with 60% of node memory limit as label (OCM-6666) ######
+
+function test_memory_node_limit_labels () {
+  TEST_PASSED=true
+  echo "[OCM-6666] - test OSDFM should set label with 60% of node memory limit as label"
+  # TODO - run it against ap-northeast-1 once this configuration is enabled by default
+  echo "Getting list of management clusters with various mp sizes configuration"
+  MCS=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters --parameter search="sector='multi-serving-machine-pools'")
+  MCS_NUMBER=$(jq -n "$MCS" | jq -r .total)
+  for ((i=0; i<$((MCS_NUMBER)); i+=1)); do
+    MC_STATUS=$(jq -n "$MCS" | jq -r .items[$i].status)
+    MC_OCM_CLUSTER_ID=$(jq -n "$MCS" | jq -r .items[$i].cluster_management_reference.cluster_id)
+    if [ "$MC_STATUS" == "ready" ]; then
+      echo "Getting kubeconfig of MC with ocm cluster ID: $MC_OCM_CLUSTER_ID"
+      ocm get /api/clusters_mgmt/v1/clusters/"$MC_OCM_CLUSTER_ID"/credentials | jq -r .kubeconfig > "$SHARED_DIR/mc"
+      echo "Getting machinesets of MC with ocm cluster ID: $MC_OCM_CLUSTER_ID"
+      MS_OUTPUT=$(oc --kubeconfig "$SHARED_DIR/mc" get machinesets.machine.openshift.io -A -o json | jq -r .items[].metadata.name)
+      echo "$MS_OUTPUT" | while read -r MACHINE_SET_NAME; do
+        MACHINE_SET_OUTPUT=$(oc --kubeconfig "$SHARED_DIR/mc" get machinesets.machine.openshift.io "$MACHINE_SET_NAME" -n openshift-machine-api -o json)
+        echo "Checking $MACHINE_SET_NAME machineset label values"
+        MACHINE_SET_REQUEST_SERVING_COMPONENT_LABEL_VALUE=$(jq -n "$MACHINE_SET_OUTPUT" | jq -r .spec.template.spec.metadata.labels | jq  '."hypershift.openshift.io/request-serving-component" // empty' | xargs)
+        MACHINE_SET_REQUEST_SERVING_GOMEMLIMIT_LABEL_VALUE=$(jq -n "$MACHINE_SET_OUTPUT" | jq -r .spec.template.spec.metadata.labels | jq '."hypershift.openshift.io/request-serving-gomemlimit" // empty' | xargs)
+        MACHINE_SET_OSD_FLEET_MANAGER_VALUE=$(jq -n "$MACHINE_SET_OUTPUT" | jq -r .spec.template.spec.metadata.labels | jq '."osd-fleet-manager" // empty' | xargs)
+        MACHINE_SET_CLUSTER_SIZE_VALUE=$(jq -n "$MACHINE_SET_OUTPUT" | jq -r .spec.template.spec.metadata.labels | jq '."hypershift.openshift.io/cluster-size" // empty' | xargs)
+        MACHINE_SET_CONTROL_PLANE_LABEL_VALUE=$(jq -n "$MACHINE_SET_OUTPUT" | jq -r .spec.template.spec.metadata.labels | jq '."hypershift.openshift.io/control-plane" // empty' | xargs)
+        echo "Label 'hypershift.openshift.io/request-serving-component': $MACHINE_SET_REQUEST_SERVING_COMPONENT_LABEL_VALUE"
+        echo "label 'hypershift.openshift.io/request-serving-gomemlimit': $MACHINE_SET_REQUEST_SERVING_GOMEMLIMIT_LABEL_VALUE"
+        echo "label 'osd-fleet-manager': $MACHINE_SET_OSD_FLEET_MANAGER_VALUE"
+        echo "label 'hypershift.openshift.io/cluster-size': $MACHINE_SET_CLUSTER_SIZE_VALUE"
+        echo "label 'hypershift.openshift.io/control-plane': $MACHINE_SET_CONTROL_PLANE_LABEL_VALUE"
+        if [[ $MACHINE_SET_NAME == *"infra"* ]] || [[ $MACHINE_SET_NAME == *"worker"* ]]; then
+          if [ "$MACHINE_SET_REQUEST_SERVING_COMPONENT_LABEL_VALUE" != "" ] || [ "$MACHINE_SET_REQUEST_SERVING_GOMEMLIMIT_LABEL_VALUE" != "" ] || [ "$MACHINE_SET_OSD_FLEET_MANAGER_VALUE" != "" ] || [ "$MACHINE_SET_CLUSTER_SIZE_VALUE" != "" ]; then
+            echo "ERROR. Metadata labels should be empty for infra/worker machinesets (see values above)"
+            TEST_PASSED=false
+          fi
+        fi
+        if [[ $MACHINE_SET_NAME == *"non-serving"* ]] || [[ $MACHINE_SET_NAME == *"obo-"* ]]; then
+          if [ "$MACHINE_SET_REQUEST_SERVING_COMPONENT_LABEL_VALUE" != "" ] || [ "$MACHINE_SET_REQUEST_SERVING_GOMEMLIMIT_LABEL_VALUE" != "" ] || ! [ "$MACHINE_SET_OSD_FLEET_MANAGER_VALUE" ] || [ "$MACHINE_SET_CLUSTER_SIZE_VALUE" != "" ]; then
+            echo "ERROR. non-serving/obo machineset should only have 'osd-fleet-manager' metadata label set to true (see values above)"
+            TEST_PASSED=false
+          fi
+        fi
+        if [[ $MACHINE_SET_NAME == *"serving"* ]]; then
+          # test: OCPQE-20847 - (non-) serving machine pools should have 'hypershift.openshift.io/control-plane' label set to true
+          if ! [ "$MACHINE_SET_CONTROL_PLANE_LABEL_VALUE" ]; then
+            echo "ERROR. (non-)serving machineset should have 'hypershift.openshift.io/control-plane' label set to true (see values above)"
+            TEST_PASSED=false
+          fi
+        fi
+        if [[ $MACHINE_SET_NAME == *"serving"* ]] && [[ $MACHINE_SET_NAME != *"non-serving"* ]]; then
+          if ! [ "$MACHINE_SET_OSD_FLEET_MANAGER_VALUE" ] || ! [ "$MACHINE_SET_REQUEST_SERVING_COMPONENT_LABEL_VALUE" ]; then
+            echo "ERROR. serving machineset should have 'osd-fleet-manager' and 'hypershift.openshift.io/request-serving-component' metadata labels set to true (see values above)"
+            TEST_PASSED=false
+          fi
+          case $MACHINE_SET_CLUSTER_SIZE_VALUE in
+            "large")
+              if [ "$MACHINE_SET_REQUEST_SERVING_GOMEMLIMIT_LABEL_VALUE" != "157286MiB" ]; then
+                echo "ERROR. Expecting 'hypershift.openshift.io/request-serving-gomemlimit' label value to be '157286MiB''. Found: $MACHINE_SET_REQUEST_SERVING_GOMEMLIMIT_LABEL_VALUE"
+                TEST_PASSED=false
+                break
+              fi
+              ;;
+
+            "medium")
+              if [ "$MACHINE_SET_REQUEST_SERVING_GOMEMLIMIT_LABEL_VALUE" != "78643MiB" ]; then
+                echo "ERROR. Expecting 'hypershift.openshift.io/request-serving-gomemlimit' label value to be '157286MiB''. Found: $MACHINE_SET_REQUEST_SERVING_GOMEMLIMIT_LABEL_VALUE"
+                TEST_PASSED=false
+                break
+              fi
+              ;;
+
+            "small")
+              if [ "$MACHINE_SET_REQUEST_SERVING_GOMEMLIMIT_LABEL_VALUE" != "9830MiB" ]; then
+                echo "ERROR. Expecting 'hypershift.openshift.io/request-serving-gomemlimit' label value to be '157286MiB''. Found: $MACHINE_SET_REQUEST_SERVING_GOMEMLIMIT_LABEL_VALUE"
+                TEST_PASSED=false
+                break
+              fi
+              ;;
+            *)
+              echo "ERROR. Unexpected 'hypershift.openshift.io/cluster-size' value found: '$MACHINE_SET_CLUSTER_SIZE_VALUE'"
+              TEST_PASSED=false
+          esac
+        fi
+      done
+    fi
+  done
+  update_results "OCM-6666" $TEST_PASSED
+}
+
+###### end of test OSDFM should set label with 60% of node memory limit as label (OCM-6666) ######
+
+##################################################################
+
+###### test: Delete MC before it getting OCM Id assigned (OCPQE-20732) ######
+
+function test_delete_mc () {
+  echo "[OCPQE-20732] - Delete MC before it getting OCM Id assigned"
+  TEST_PASSED=true
+  echo "Trying to find ready/ maintenance service cluster in main/ canary sector"
+  SC_CLUSTERS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters)
+  NO_OF_CLUSTERS=$(jq -n "$SC_CLUSTERS_OUTPUT" | jq -r .total)
+  MAIN_SECTOR="main"
+  CANARY_SECTOR="canary"
+  STATUS_READY="ready"
+  STATUS_MAINTENANCE="maintenance"
+  SECTOR=""
+  STATUS=""
+  SC_OSD_FM_ID=""
+  for ((i=0; i<$((NO_OF_CLUSTERS)); i+=1)); do
+    CLUSTER_STATUS=$(jq -n "$SC_CLUSTERS_OUTPUT" | jq -r .items[$i].status)
+    CLUSTER_SECTOR=$(jq -n "$SC_CLUSTERS_OUTPUT" | jq -r .items[$i].sector)
+    if [ "$CLUSTER_SECTOR" == "$MAIN_SECTOR" ] || [ "$CLUSTER_SECTOR" == "$CANARY_SECTOR" ]; then
+      if [ "$CLUSTER_STATUS" == "$STATUS_READY" ] || [ "$CLUSTER_STATUS" == "$STATUS_MAINTENANCE" ]; then
+        SC_OSD_FM_ID=$(jq -n "$SC_CLUSTERS_OUTPUT" | jq -r .items[$i].id)
+        SECTOR="$CLUSTER_SECTOR"
+        STATUS="$CLUSTER_STATUS"
+        break
+      fi
+    fi
+  done
+  echo "Found service cluster in sector: '$SECTOR' with status: '$STATUS' with osd fm ID: $SC_OSD_FM_ID"
+  echo "Creating management cluster..."
+  MC_CLUSTER_ID=$(echo '{"service_cluster_id": "'"${SC_OSD_FM_ID}"'"}' | ocm post /api/osd_fleet_mgmt/v1/management_clusters | jq -r '.id')
+  wait_for_cluster_status "$MC_CLUSTER_ID" "management_clusters" "cluster_account_provisioned" 360
+  echo "Deleting management cluster with ID: '$MC_CLUSTER_ID'"
+  ocm delete /api/osd_fleet_mgmt/v1/management_clusters/"$MC_CLUSTER_ID"
+  wait_for_cluster_status "$MC_CLUSTER_ID" "management_clusters" "cleanup_ack_pending" 120
+  ocm delete /api/osd_fleet_mgmt/v1/management_clusters/"$MC_CLUSTER_ID"/ack
+  wait_for_cluster_status "$MC_CLUSTER_ID" "management_clusters" "" 120 # empty status means cluster deleted
+  update_results "OCPQE-20732" $TEST_PASSED
+}
+
+###### end of test: Delete MC before it getting OCM Id assigned (OCPQE-20732) ######
+
+##################################################################
 
 # Test all cases and print results
 
@@ -1491,6 +1731,12 @@ test_awsendpointservices_status_output_populated
 test_serving_machine_pools
 
 test_mc_request_serving_pool_autoscaling
+
+test_delete_sc
+
+test_memory_node_limit_labels
+
+test_delete_mc
 
 printf "\nPassed tests:\n"
 for p in "${PASSED[@]}"; do

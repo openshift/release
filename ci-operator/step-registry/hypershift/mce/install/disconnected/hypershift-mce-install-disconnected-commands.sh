@@ -23,7 +23,7 @@ mirror_registry=\$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spe
 mirror_registry=\${mirror_registry%%/*}
 if [[ \$mirror_registry == "" ]] ; then
     echo "Warning: Can not find the mirror registry, abort !!!"
-    exit 0
+    exit 1
 fi
 echo "mirror registry is \${mirror_registry}"
 
@@ -48,20 +48,25 @@ MCE_INDEX_IMAGE=\$(cat /home/mce-index-image)
 echo "3: skopeo copy docker://\${MCE_INDEX_IMAGE} oci:///home/mce-local-catalog --remove-signatures"
 skopeo copy "docker://\${MCE_INDEX_IMAGE}" "oci:///home/mce-local-catalog" --remove-signatures
 
-echo "4. extract oc-mirror from image oc-mirror:v4.14.1"
-set +x
-QUAY_USER=\$(cat "/home/registry_quay.json" | jq -r '.user')
-QUAY_PASSWORD=\$(cat "/home/registry_quay.json" | jq -r '.password')
-skopeo login quay.io -u "\${QUAY_USER}" -p "\${QUAY_PASSWORD}"
-set -x
-oc_mirror_image="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:80acc20087bec702fcb2624345f3dda071cd78092e5d3c972d75615b837549de"
-oc image extract \$oc_mirror_image --path /usr/bin/oc-mirror:/home --confirm
-if ls /home/oc-mirror >/dev/null ;then
-    chmod +x /home/oc-mirror
-else
-    echo "Warning, can not find oc-mirror abort !!!"
-    exit 1
+echo "4: get oc-mirror from stable clients"
+if [[ ! -f /home/oc-mirror ]]; then
+    MIRROR2URL="https://mirror2.openshift.com/pub/openshift-v4"
+    # TODO: as for https://issues.redhat.com/browse/OCPBUGS-30859
+    # the oc-mirror lost rhel8 compatibility with OCP 4.15.3 release
+    # choose the appropriate rhel8/rhel9 binary at runtime once available.
+    # Now let's stick the the 4.14 binary as a temporary workaround
+    # CLIENTURL="\${MIRROR2URL}"/x86_64/clients/ocp/stable
+    CLIENTURL="\${MIRROR2URL}"/x86_64/clients/ocp/stable-4.14
+    ###
+    curl -s -k -L "\${CLIENTURL}/oc-mirror.tar.gz" -o om.tar.gz && tar -C /home -xzvf om.tar.gz && rm -f om.tar.gz
+    if ls /home/oc-mirror > /dev/null ; then
+        chmod +x /home/oc-mirror
+    else
+        echo "Warning, can not find oc-mirror abort !!!"
+        exit 1
+    fi
 fi
+/home/oc-mirror version
 
 echo "5. oc-mirror --config /home/imageset-config.yaml docker://\${mirror_registry} --oci-registries-config=/home/registry.conf --continue-on-error --skip-missing"
 catalog_image="acm-d/mce-custom-registry"
@@ -123,11 +128,11 @@ END
 
 pushd /home
 /home/oc-mirror --config "/home/imageset-config.yaml" docker://\${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+/home/oc-mirror --config "/home/imageset-config.yaml" docker://\${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+/home/oc-mirror --config "/home/imageset-config.yaml" docker://\${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
 popd
 
 echo "6. Create imageconentsourcepolicy and catalogsource"
-RESULTS_FILE=\$(find /home/oc-mirror-workspace -type d -name '*results*')
-oc apply -f "\$RESULTS_FILE/*.yaml"
 cat << END | oc apply -f -
 apiVersion: operator.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
@@ -139,11 +144,24 @@ spec:
     - \${mirror_registry}/multicluster-engine
     source: registry.redhat.io/rhacm2
   - mirrors:
-    - \${mirror_registry}/rh-osbs
-    source: registry-proxy.engineering.redhat.com/rh-osbs
+    - \${mirror_registry}/rh-osbs/multicluster-engine-mce-operator-bundle
+    source: registry-proxy.engineering.redhat.com/rh-osbs/multicluster-engine-mce-operator-bundle
+  - mirrors:
+    - \${mirror_registry}/rh-osbs/iib
+    source: registry-proxy.engineering.redhat.com/rh-osbs/iib
   - mirrors:
     - \${mirror_registry}/multicluster-engine
     source: registry.redhat.io/multicluster-engine
+END
+cat << END | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: cs-mce-custom-registry
+  namespace: openshift-marketplace
+spec:
+  image: \${mirror_registry}/acm-d/mce-custom-registry:2.4
+  sourceType: grpc
 END
 echo "Waiting for the new ImageContentSourcePolicy to be updated on machines"
 oc wait clusteroperators/machine-config --for=condition=Upgradeable=true --timeout=15m

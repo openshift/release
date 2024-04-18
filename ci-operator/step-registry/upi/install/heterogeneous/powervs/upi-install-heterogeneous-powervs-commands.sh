@@ -34,7 +34,14 @@ function cleanup_ibmcloud_powervs() {
     if [ -n "${VALID_GW}" ]
     then
       TG_CRN=$(echo "${VALID_GW}" | jq -r '.crn')
-      TAGS=$(ic resource search "crn:\"${TG_CRN}\"" --output json | jq -r '.items[].tags[]' | grep "mac-cicd-${version}" || true )
+      echo "WORKFLOW_TYPE: ${WORKFLOW_TYPE}"
+      if [ ! -z "${WORKFLOW_TYPE}" ]
+      then
+        CUCUSHIFT_TAG="cucushift-"
+      else
+        CUCUSHIFT_TAG=""
+      fi
+      TAGS=$(ic resource search "crn:\"${TG_CRN}\"" --output json | jq -r '.items[].tags[]' | grep "mac-cicd-${CUCUSHIFT_TAG}${version}" || true )
       if [ -n "${TAGS}" ]
       then
         for CS in $(ic tg connections "${GW}" --output json | jq -r '.[].id')
@@ -57,28 +64,28 @@ function cleanup_ibmcloud_powervs() {
   ic tg gws --output json | jq -r '.[] | select(.resource_group.id == "'$RESOURCE_GROUP_ID'" and .location == "'$region'")'
 
   echo "Cleaning up workspaces for ${workspace_name}"
-  for CRN in $(ic pi sl 2> /dev/null | grep "${workspace_name}" | awk '{print $1}' || true)
+  for CRN in $(ic pi workspace ls 2> /dev/null | grep "${workspace_name}" | awk '{print $1}' || true)
   do
     echo "Targetting power cloud instance"
-    ic pi st "${CRN}"
+    ic pi workspace target "${CRN}"
 
     echo "Deleting the PVM Instances"
-    for INSTANCE_ID in $(ic pi ins --json | jq -r '.pvmInstances[].pvmInstanceID')
+    for INSTANCE_ID in $(ic pi instance ls --json | jq -r '.pvmInstances[] | .id')
     do
       echo "Deleting PVM Instance ${INSTANCE_ID}"
-      ic pi ind "${INSTANCE_ID}" --delete-data-volumes
+      ic pi instance delete "${INSTANCE_ID}" --delete-data-volumes
       sleep 60
     done
 
     echo "Deleting the Images"
-    for IMAGE_ID in $(ic pi imgs --json | jq -r '.images[].imageID')
+    for IMAGE_ID in $(ic pi image ls --json | jq -r '.images[].imageID')
     do
       echo "Deleting Images ${IMAGE_ID}"
-      ic pi image-delete "${IMAGE_ID}"
+      ic pi image delete "${IMAGE_ID}"
       sleep 60
     done
 
-    if [ -n "$(ic pi nets 2> /dev/null | grep DHCP || true)" ]
+    if [ -n "$(ic pi network ls 2> /dev/null | grep DHCP || true)" ]
     then
        curl -L -o /tmp/pvsadm "https://github.com/ppc64le-cloud/pvsadm/releases/download/v0.1.12/pvsadm-linux-amd64"
        chmod +x /tmp/pvsadm
@@ -91,10 +98,10 @@ function cleanup_ibmcloud_powervs() {
     fi
 
     echo "Deleting the Network"
-    for NETWORK_ID in $(ic pi nets 2> /dev/null | awk '{print $1}')
+    for NETWORK_ID in $(ic pi network ls 2> /dev/null | awk '{print $1}')
     do
       echo "Deleting network ${NETWORK_ID}"
-      ic pi network-delete "${NETWORK_ID}" || true
+      ic pi network delete "${NETWORK_ID}" || true
       sleep 60
     done
 
@@ -105,7 +112,7 @@ function cleanup_ibmcloud_powervs() {
     ic resource service-instance-delete "${CRN}" --force --recursive || true
     for COUNT in $(seq 0 5)
     do
-      FIND=$(ic pi sl 2> /dev/null| grep "${CRN}" || true)
+      FIND=$(ic pi workspace ls 2> /dev/null| grep "${CRN}" || true)
       echo "FIND: ${FIND}"
       if [ -z "${FIND}" ]
       then
@@ -173,7 +180,14 @@ case "$CLUSTER_TYPE" in
       # Generates a workspace name like rdr-mac-4-14-au-syd-n1
       # this keeps the workspace unique
       CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
-      WORKSPACE_NAME=rdr-mac-${CLEAN_VERSION}-${REGION}-n1
+      echo "WORKFLOW_TYPE: ${WORKFLOW_TYPE}"
+      if [ ! -z "${WORKFLOW_TYPE}" ]
+      then
+         CUCUSHIFT="-cucushift"
+      else
+        CUCUSHIFT=""
+      fi
+      WORKSPACE_NAME=rdr-mac-${CLEAN_VERSION}-${REGION}${CUCUSHIFT}-n1
 
       PATH=${PATH}:/tmp
       mkdir -p ${IBMCLOUD_HOME_FOLDER}
@@ -261,8 +275,22 @@ case "$CLUSTER_TYPE" in
       echo "VPC Region is ${REGION}"
       echo "PowerVS region is ${POWERVS_REGION}"
       echo "Resource Group is ${RESOURCE_GROUP}"
-      ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_REGION}" -g "${RESOURCE_GROUP}" --allow-cleanup 2>&1 \
-        | tee /tmp/instance.id
+
+      ##Create a Workspace on a Power Edge Router enabled PowerVS zone
+      # Dev Note: uses a custom loop since we want to redirect errors
+      for i in {1..5}
+      do
+        echo "Attempt: $i/5"
+        ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_REGION}" -g "${RESOURCE_GROUP}" --allow-cleanup > /tmp/instance.id
+        if [ $? = 0 ]; then
+          break
+        elif [ "$i" == "5" ]; then
+          echo "All retry attempts failed! Please try running the script again after some time"
+        else
+          sleep 30
+        fi
+        [ -f /tmp/instance.id ] && cat /tmp/instance.id
+      done
 
       # Process the CRN into a variable
       CRN=$(cat /tmp/instance.id | grep crn | awk '{print $NF}')
@@ -315,9 +343,9 @@ case "$CLUSTER_TYPE" in
       # The VMs created using this image are used in support of ignition on PowerVS.
       echo "Creating the Centos Stream Image"
       echo "PowerVS Target CRN is: ${CRN}"
-      ic pi st "${CRN}"
-      ic pi images
-      ic pi image-create CentOS-Stream-8 --json
+      ic pi workspace target "${CRN}"
+      ic pi image ls
+      ic pi image create CentOS-Stream-8 --json
       echo "Import image status is: $?"
 
       # Set the values to be used for generating var.tfvars
@@ -332,8 +360,14 @@ case "$CLUSTER_TYPE" in
 
       # Invoke create-var-file.sh to generate var.tfvars file
       echo "Creating the var file"
+      if [ ! -z "${WORKFLOW_TYPE}" ]
+      then
+        CUCUSHIFT_TAG="cucushift-"
+      else
+        CUCUSHIFT_TAG=""
+      fi
       cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs \
-        && bash scripts/create-var-file.sh /tmp/ibmcloud "${ADDITIONAL_WORKERS}" "${CLEAN_VERSION}"
+        && bash scripts/create-var-file.sh /tmp/ibmcloud "${ADDITIONAL_WORKERS}" "${CUCUSHIFT_TAG}${CLEAN_VERSION}"
 
       # TODO:MAC check if the var.tfvars file is populated
       VARFILE_OUTPUT=$(cat "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars)

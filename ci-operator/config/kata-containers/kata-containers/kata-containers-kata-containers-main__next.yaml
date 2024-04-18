@@ -1,6 +1,6 @@
 base_images:
   tests-base:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: tests
 binary_build_commands: |
@@ -9,8 +9,6 @@ binary_build_commands: |
   # ensured the tools are searcheable.
   export GOPATH=/go
   export PATH="${GOPATH}/bin:/usr/local/go/bin/:$PATH"
-  source ci/lib.sh
-  clone_tests_repo
 build_root:
   project_image:
     dockerfile_path: ci/openshift-ci/images/Dockerfile.buildroot
@@ -31,12 +29,12 @@ images:
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
 resources:
   '*':
@@ -53,20 +51,16 @@ tests:
     env:
       TEST_ARGS: ' --max-parallel-tests 5 --cluster-stability Disruptive --run ^\[sig-node\].*|^\[sig-network\] '
       TEST_SKIPS: \[sig-node\] Security Context should support seccomp runtime/default\|\[sig-node\]
-        Variable Expansion should allow substituting values in a volume subpath\|\[sig-node\]
-        Container Runtime blackbox test on terminated container should report termination
-        message\|\[k8s.io\] Probing container should be restarted with a docker exec
-        liveness probe with timeout\|\[sig-node\] Probing container should be restarted
-        with a failing exec liveness probe that took longer than the timeout\|\[sig-node\]
-        Probing container should be restarted with an exec liveness probe with timeout
-        \[MinimumKubeletVersion:1.20\]\|\[sig-node\] Pods Extended Pod Container Status
-        should never report success for a pending container\|\[sig-node\] Probing
-        container should \*not\* be restarted with a GRPC liveness probe\|\[sig-node\]
-        Pods Extended Pod Container lifecycle evicted pods should be terminal\|\[sig-node\]
-        PodOSRejection \[NodeConformance\] Kubelet should reject pod when the node
-        OS doesn't match pod's OS\|\[sig-node\] Probing container should be restarted
-        with a GRPC liveness probe\|\[sig-network\].*for evicted pods\|\[sig-network\].*HAProxy\|\[sig-network\].*bond\|\[sig-network\].*all
-        sysctl on whitelist\|\[sig-network\].*sysctls should not affect\|\[sig-network\]
+        Variable Expansion should allow substituting values in a volume subpath\|\[k8s.io\]
+        Probing container should be restarted with a docker exec liveness probe with
+        timeout\|\[sig-node\] Pods Extended Pod Container lifecycle evicted pods should
+        be terminal\|\[sig-node\] PodOSRejection \[NodeConformance\] Kubelet should
+        reject pod when the node OS doesn't match pod's OS\|\[sig-network\].*for evicted
+        pods\|\[sig-network\].*HAProxy router should override the route\|\[sig-network\].*HAProxy
+        router should serve a route\|\[sig-network\].*HAProxy router should serve
+        the correct\|\[sig-network\].*HAProxy router should run\|\[sig-network\].*when
+        FIPS.*the HAProxy router\|\[sig-network\].*bond\|\[sig-network\].*all sysctl
+        on whitelist\|\[sig-network\].*sysctls should not affect\|\[sig-network\]
         pods should successfully create sandboxes by adding pod to network
     pre:
     - chain: ipi-azure-pre
@@ -85,20 +79,17 @@ tests:
         # which causes openshift-tests to fail.
         export AZURE_AUTH_LOCATION=${SHARED_DIR}/metadata.json
 
-        KATA_WORKDIR=/go/src/github.com/kata-containers/tests
-        cd $KATA_WORKDIR
-
         # The installer is instructed to configure kata containers to use
         # QEMU from the RHCOS extension and host's kernel.
         export KATA_WITH_SYSTEM_QEMU="yes"
         export KATA_WITH_HOST_KERNEL="yes"
         export KATA_RUNTIME="kata-qemu"
         # Install Kata Containers and run a smoke test.
-        .ci/openshift-ci/test.sh
+        ci/openshift-ci/test.sh
 
         # Deploy the kata-webhook so that the tests ran on next step of the
         # workflow will use the kata runtime.
-        .ci/openshift-ci/cluster/deploy_webhook.sh
+        ci/openshift-ci/cluster/deploy_webhook.sh
       from: with-deps
       resources:
         requests:

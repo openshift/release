@@ -57,10 +57,17 @@ tests:
   container:
     from: src
 - as: clientset-verify
-  commands: mkdir /tmp/codecopy && cp -a * /tmp/codecopy && cd /tmp/codecopy && make
+  commands: mkdir /tmp/codecopy && cp -a . /tmp/codecopy && cd /tmp/codecopy && make
     clientset-generate
   container:
     from: src
+- as: security
+  optional: true
+  skip_if_only_changed: \.md$|^\.github|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: kedacore-keda
+    workflow: openshift-ci-security
 - as: keda-e2e-aws-ovn
   skip_if_only_changed: \.md$|^\.github|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:

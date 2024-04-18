@@ -31,10 +31,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_golang-1.18:
+  openshift_release_golang-1.19:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.19
 build_root:
   project_image:
     dockerfile_path: Dockerfile.assisted_installer_agent-build
@@ -42,9 +42,9 @@ images:
 - dockerfile_path: Dockerfile.assisted_installer_agent
   from: coreos-centos-stream8
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.19:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: assisted-installer-agent
 - dockerfile_literal: |
     FROM base
@@ -70,14 +70,6 @@ test_binary_build_commands: |
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
 tests:
-- as: publish-multi-arch-images
-  postsubmit: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      DOCKERFILE_IMAGE_PAIRS: |
-        Dockerfile.assisted_installer_agent , quay.io/edge-infrastructure/assisted-installer-agent-multi:ocm-2.9
-    workflow: assisted-tools-multi-arch
 - as: mirror-nightly-image
   cron: '@daily'
   steps:

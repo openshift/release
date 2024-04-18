@@ -36,3 +36,14 @@ aws --region $REGION ec2 create-tags --resources $vpc_id --tags Key=kubernetes.i
 
 echo "Adding tags for private subnets:$private_subnet_ids, tags: kubernetes.io/role/internal-elb, value is empty."
 aws --region $REGION ec2 create-tags --resources $private_subnet_ids --tags Key=kubernetes.io/role/internal-elb,Value=
+
+if [[ ${ENABLE_AWS_EDGE_ZONE} == "yes" ]] && [[ ${EDGE_ZONE_TYPES} == "outpost" ]]; then
+  edge_zone_public_subnet_id=$(head -n 1 "${SHARED_DIR}/edge_zone_public_subnet_id")
+  edge_zone_private_subnet_id=$(head -n 1 "${SHARED_DIR}/edge_zone_private_subnet_id")
+  
+  # private id
+  aws --region $REGION ec2 create-tags --resources $edge_zone_private_subnet_id --tags Key=kubernetes.io/role/internal-elb,Value=1
+
+  # public id
+  aws --region $REGION ec2 create-tags --resources $edge_zone_public_subnet_id --tags Key=kubernetes.io/role/elb,Value=1
+fi

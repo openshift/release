@@ -1,3 +1,8 @@
+base_images:
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
 releases:
   initial:
     candidate:
@@ -27,24 +32,23 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-sdn
-- as: e2e-aws-sdn-techpreview
+- as: e2e-aws-ovn-techpreview
   interval: 168h
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       FEATURE_SET: TechPreviewNoUpgrade
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-aws-sdn
+    workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-no-capabilities
   interval: 168h
   steps:
     cluster_profile: aws-2
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential
+      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
       BASE_DOMAIN: aws-2.ci.openshift.org
       BASELINE_CAPABILITY_SET: None
       PERSISTENT_MONITORING: "false"
@@ -95,18 +99,17 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-serial
-- as: e2e-aws-sdn-techpreview-serial
+- as: e2e-aws-ovn-techpreview-serial
   interval: 168h
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       FEATURE_SET: TechPreviewNoUpgrade
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-aws-sdn-serial
+    workflow: openshift-e2e-aws-ovn-serial
 - as: e2e-aws-sdn-multitenant
   interval: 168h
   steps:
@@ -119,7 +122,6 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-aws-sdn-upgrade
-  cluster: build01
   interval: 168h
   steps:
     cluster_profile: aws-2
@@ -132,7 +134,6 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-sdn
 - as: e2e-aws-sdn-upgrade-out-of-change
-  cluster: build01
   interval: 168h
   steps:
     cluster_profile: aws-2
@@ -148,7 +149,6 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-sdn
 - as: e2e-aws-ovn-upgrade
-  cluster: build01
   interval: 168h
   steps:
     cluster_profile: aws-2
@@ -161,7 +161,6 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-ovn
 - as: e2e-aws-ovn-upgrade-out-of-change
-  cluster: build01
   interval: 168h
   steps:
     cluster_profile: aws-2
@@ -209,41 +208,48 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-sdn
-- as: e2e-azure-sdn-techpreview
+- as: e2e-azure-ovn-techpreview
   interval: 168h
   steps:
     cluster_profile: azure-2
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       FEATURE_SET: TechPreviewNoUpgrade
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-azure-sdn
+    workflow: openshift-e2e-azure-ovn
+- as: e2e-azure-ovn-serial
+  interval: 168h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-serial
 - as: e2e-azure-sdn-serial
   interval: 168h
   steps:
     cluster_profile: azure-2
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-sdn-serial
-- as: e2e-azure-sdn-techpreview-serial
+- as: e2e-azure-ovn-techpreview-serial
   interval: 168h
   steps:
     cluster_profile: azure-2
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       FEATURE_SET: TechPreviewNoUpgrade
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-azure-sdn-serial
+    workflow: openshift-e2e-azure-serial
 - as: e2e-azure-sdn-upgrade
   interval: 168h
   steps:
@@ -329,17 +335,16 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-sdn
-- as: e2e-gcp-sdn-techpreview
+- as: e2e-gcp-ovn-techpreview
   interval: 168h
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-gcp-sdn
+    workflow: openshift-e2e-gcp-ovn
 - as: e2e-gcp-ovn
   interval: 168h
   steps:
@@ -362,17 +367,16 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-mount-ns-hiding
-- as: e2e-gcp-sdn-techpreview-serial
+- as: e2e-gcp-ovn-techpreview-serial
   interval: 168h
   steps:
     cluster_profile: gcp-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-gcp-sdn-serial
+    workflow: openshift-e2e-gcp-serial
 - as: e2e-gcp-sdn-upgrade
   cluster: build02
   interval: 168h
@@ -535,6 +539,14 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-sdn-crun
+- as: e2e-vsphere-ovn-upgrade
+  interval: 168h
+  steps:
+    cluster_profile: vsphere-2
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-vsphere
 zz_generated_metadata:
   branch: master
   org: openshift

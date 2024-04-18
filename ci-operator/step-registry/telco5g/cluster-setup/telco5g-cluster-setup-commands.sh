@@ -74,7 +74,9 @@ fi
 
 
 if [ "$REPO_OWNER" == "openshift-kni" ]; then
-  TOPOLOGY_SELECTION="--topology 1b1v"
+  # Run PR job on openshift-kni repo with 1b1v topology and exclude cnfdu5, cnfdu6, cnfdu7, cnfdu8
+  # as they are used for nightly jobs
+  TOPOLOGY_SELECTION="--topology 1b1v --exclude cnfdu5 --exclude cnfdu6 --exclude cnfdu7 --exclude cnfdu8"
 else
   TOPOLOGY_SELECTION="--topology 1b1v --topology 2b"
 fi
@@ -113,7 +115,7 @@ EOF
 
 # Check connectivity
 ping ${BASTION_IP} -c 10 || true
-echo "exit" | curl telnet://${BASTION_IP}:22 && echo "SSH port is opened"|| echo "status = $?"
+echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
 ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment

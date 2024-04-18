@@ -28,7 +28,14 @@ PRIVATE_LINK=${PRIVATE_LINK:-false}
 PRIVATE_SUBNET_ONLY="false"
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
+CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
 ADDITIONAL_SECURITY_GROUP=${ADDITIONAL_SECURITY_GROUP:-false}
+NO_CNI=${NO_CNI:-false}
+CONFIGURE_CLUSTER_AUTOSCALER=${CONFIGURE_CLUSTER_AUTOSCALER:-false}
+
+log(){
+    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
+}
 
 # Record Cluster Configurations
 cluster_config_file="${SHARED_DIR}/cluster-config"
@@ -57,6 +64,7 @@ if [[ "$HOSTED_CP" == "true" ]]; then
 fi
 
 # Define cluster name
+CLUSTER_NAME=""
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]] && [[ -e "${SHARED_DIR}/cluster-name" ]]; then
   # For Shared VPC cluster, cluster name is determined in step aws-provision-route53-private-hosted-zone
   #   as Private Hosted Zone needs to be ready before installing Shared VPC cluster
@@ -70,8 +78,8 @@ else
   fi
   subfix=$(openssl rand -hex 2)
   CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
-  echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 fi
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
 # Configure aws
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
@@ -94,51 +102,64 @@ ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 if [[ ! -z "${ROSA_TOKEN}" ]]; then
   echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
   rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
-  if [ $? -ne 0 ]; then
-    echo "Login failed"
-    exit 1
-  fi
+  ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
 else
   echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
   exit 1
 fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
-AWS_ACCOUNT_ID_MASK=$(echo ${AWS_ACCOUNT_ID:0:4})
+AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
+
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+  if [[ ! -e "${CLUSTER_PROFILE_DIR}/.awscred_shared_account" ]]; then
+    echo "Error: Shared VPC is enabled, but not find .awscred_shared_account, exit now"
+    exit 1
+  fi
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+
+  SHARED_VPC_AWS_ACCOUNT_ID=$(aws sts get-caller-identity --output text | awk '{print $1}')
+  SHARED_VPC_AWS_ACCOUNT_ID_MASK=$(echo "${SHARED_VPC_AWS_ACCOUNT_ID:0:4}***")
+
+  # reset
+  export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
+fi
 
 # Check whether the cluster with the same cluster name exists.
 OLD_CLUSTER=$(rosa list clusters | { grep  ${CLUSTER_NAME} || true; })
 if [[ ! -z "$OLD_CLUSTER" ]]; then
   # Previous cluster was orphaned somehow. Shut it down.
-  echo -e "A cluster with the name (${CLUSTER_NAME}) already exists and will need to be manually deleted; cluster: \n${OLD_CLUSTER}"
+  log -e "A cluster with the name (${CLUSTER_NAME}) already exists and will need to be manually deleted; cluster: \n${OLD_CLUSTER}"
   exit 1
 fi
 
 # Get the openshift version
+version_cmd="rosa list versions --channel-group ${CHANNEL_GROUP} -o json"
+if [[ "$HOSTED_CP" == "true" ]]; then
+  version_cmd="$version_cmd --hosted-cp"
+fi
 if [[ ${AVAILABLE_UPGRADE} == "yes" ]] ; then
-  OPENSHIFT_VERSION=$(head -n 1 "${SHARED_DIR}/available_upgrade_version.txt")
+  version_cmd="$version_cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id'"
 else
-  versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq -r '.[].raw_id')
-  if [[ "$HOSTED_CP" == "true" ]]; then
-    versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} --hosted-cp -o json | jq -r '.[].raw_id')
-  fi
-  echo -e "Available cluster versions:\n${versionList}"
+  version_cmd="$version_cmd | jq -r '.[].raw_id'"
+fi
+versionList=$(eval $version_cmd)
+echo -e "Available cluster versions:\n${versionList}"
 
-  if [[ -z "$OPENSHIFT_VERSION" ]]; then
-    if [[ "$EC_BUILD" == "true" ]]; then
-      OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
-    else
-      OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
-    fi
-  elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
-    if [[ "$EC_BUILD" == "true" ]]; then
-      OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
-    else
-      OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
-    fi
+if [[ -z "$OPENSHIFT_VERSION" ]]; then
+  if [[ "$EC_BUILD" == "true" ]]; then
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
   else
-    # Match the whole line
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
+    OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
   fi
+elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
+  if [[ "$EC_BUILD" == "true" ]]; then
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
+  else
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
+  fi
+else
+  # Match the whole line
+  OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
 fi
 
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
@@ -149,7 +170,7 @@ fi
 # if [[ "$CHANNEL_GROUP" != "stable" ]]; then
 #   OPENSHIFT_VERSION="${OPENSHIFT_VERSION}-${CHANNEL_GROUP}"
 # fi
-echo "Choosing openshift version ${OPENSHIFT_VERSION}"
+log "Choosing openshift version ${OPENSHIFT_VERSION}"
 
 TAGS="prowci:${CLUSTER_NAME}"
 if [[ ! -z "$CLUSTER_TAGS" ]]; then
@@ -164,7 +185,8 @@ cat > ${cluster_config_file} << EOF
   "region": "${CLOUD_PROVIDER_REGION}",
   "version": {
     "channel_group": "${CHANNEL_GROUP}",
-    "raw_id": "${OPENSHIFT_VERSION}"
+    "raw_id": "${OPENSHIFT_VERSION}",
+    "major_version": "$(echo ${OPENSHIFT_VERSION} | awk -F. '{print $1"."$2}')"
   },
   "tags": "${TAGS}",
   "multi_az": ${MULTI_AZ},
@@ -240,12 +262,17 @@ if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   if [[ ${MIN_REPLICAS} -ge 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
     MIN_REPLICAS=3
   fi
-  COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"  
-  record_cluster "nodes" "max_replicas" ${MIN_REPLICAS}
-  record_cluster "nodes" "min_replicas" ${MAX_REPLICAS}
+  COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"
+  record_cluster "nodes" "min_replicas" ${MIN_REPLICAS}
+  record_cluster "nodes" "max_replicas" ${MAX_REPLICAS}
 else
   COMPUTE_NODES_SWITCH="--replicas ${REPLICAS}"
   record_cluster "nodes" "replicas" ${REPLICAS}
+fi
+
+CONFIGURE_CLUSTER_AUTOSCALER_SWITCH=""
+if [[ "$ENABLE_AUTOSCALING" == "true" ]] && [[ "$CONFIGURE_CLUSTER_AUTOSCALER" == "true" ]] && [[ "$HOSTED_CP" == "false" ]]; then
+  CONFIGURE_CLUSTER_AUTOSCALER_SWITCH="--autoscaler-balance-similar-node-groups --autoscaler-skip-nodes-with-local-storage --autoscaler-ignore-daemonsets-utilization --autoscaler-scale-down-enabled"
 fi
 
 ETCD_ENCRYPTION_SWITCH=""
@@ -268,12 +295,18 @@ fi
 HYPERSHIFT_SWITCH=""
 if [[ "$HOSTED_CP" == "true" ]]; then
   HYPERSHIFT_SWITCH="--hosted-cp"
-  if [[ "$ENABLE_SECTOR" == "true" ]]; then
-    PROVISION_SHARD_ID=$(cat ${SHARED_DIR}/provision_shard_ids | head -n 1)
-    if [[ -z "$PROVISION_SHARD_ID" ]]; then
-      echo -e "No available provision shard."
-      exit 1
+  if [[ ! -z "${CLUSTER_SECTOR}" ]]; then
+    psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('ready')" | jq -r '.items[].provision_shard_reference.id')
+    if [[ -z "$psList" ]]; then
+      echo "no ready provision shard found, trying to find maintenance status provision shard"
+      # try to find maintenance mode SC, currently osdfm api doesn't support status in ('ready', 'maintenance') query.
+      psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('maintenance')" | jq -r '.items[].provision_shard_reference.id')
+      if [[ -z "$psList" ]]; then
+        echo "No available provision shard!"
+        exit 1
+      fi
     fi
+    PROVISION_SHARD_ID=$(echo "$psList" | head -n 1)
 
     HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
     record_cluster "properties" "provision_shard_id" ${PROVISION_SHARD_ID}
@@ -321,7 +354,7 @@ if [[ "$ENABLE_PROXY" == "true" ]]; then
   record_cluster "proxy" "enabled" ${ENABLE_PROXY}
   record_cluster "proxy" "http" $proxy_private_url
   record_cluster "proxy" "https" $proxy_private_url
-  record_cluster "proxy" "trust_bundle_file" $trust_bundle_file  
+  record_cluster "proxy" "trust_bundle_file" $trust_bundle_file
 fi
 
 SUBNET_ID_SWITCH=""
@@ -332,7 +365,7 @@ if [[ "$ENABLE_BYOVPC" == "true" ]]; then
     echo -e "The private_subnet_ids are mandatory."
     exit 1
   fi
-  
+
   if [[ "${PRIVATE_SUBNET_ONLY}" == "true" ]] ; then
     SUBNET_ID_SWITCH="--subnet-ids ${PRIVATE_SUBNET_IDs}"
     record_cluster "subnets" "private_subnet_ids" ${PRIVATE_SUBNET_IDs}
@@ -372,7 +405,7 @@ if [[ "$STS" == "true" ]]; then
   if [[ -z "${account_intaller_role_arn}" ]] || [[ -z "${account_support_role_arn}" ]] || [[ -z "${account_worker_role_arn}" ]]; then
     echo -e "One or more account roles with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
     exit 1
-  fi  
+  fi
   ACCOUNT_ROLES_SWITCH="--role-arn ${account_intaller_role_arn} --support-role-arn ${account_support_role_arn} --worker-iam-role ${account_worker_role_arn}"
   record_cluster "aws.sts" "role_arn" $account_intaller_role_arn
   record_cluster "aws.sts" "support_role_arn" $account_support_role_arn
@@ -383,7 +416,7 @@ if [[ "$STS" == "true" ]]; then
     if [[ -z "${account_control_plane_role_arn}" ]]; then
       echo -e "The control plane account role with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
       exit 1
-    fi      
+    fi
     ACCOUNT_ROLES_SWITCH="${ACCOUNT_ROLES_SWITCH} --controlplane-iam-role ${account_control_plane_role_arn}"
     record_cluster "aws.sts" "control_plane_role_arn" $account_control_plane_role_arn
   fi
@@ -394,6 +427,8 @@ if [[ "$STS" == "true" ]]; then
     BYO_OIDC_SWITCH="--oidc-config-id ${oidc_config_id} --operator-roles-prefix ${operator_roles_prefix}"
     record_cluster "aws.sts" "oidc_config_id" $oidc_config_id
     record_cluster "aws.sts" "operator_roles_prefix" $operator_roles_prefix
+  else
+    STS_SWITCH="${STS_SWITCH} --mode auto"
   fi
 fi
 
@@ -402,60 +437,23 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   SAHRED_VPC_HOSTED_ZONE_ID=$(head -n 1 "${SHARED_DIR}/hosted_zone_id")
   SAHRED_VPC_ROLE_ARN=$(head -n 1 "${SHARED_DIR}/hosted_zone_role_arn")
   SAHRED_VPC_BASE_DOMAIN=$(head -n 1 "${SHARED_DIR}/rosa_dns_domain")
-
-  SHARED_VPC_SWITCH=" --private-hosted-zone-id ${SAHRED_VPC_HOSTED_ZONE_ID} "
-  SHARED_VPC_SWITCH+=" --shared-vpc-role-arn ${SAHRED_VPC_ROLE_ARN} "
-  SHARED_VPC_SWITCH+=" --base-domain ${SAHRED_VPC_BASE_DOMAIN} "
+  SHARED_VPC_SWITCH="--base-domain ${SAHRED_VPC_BASE_DOMAIN} --private-hosted-zone-id ${SAHRED_VPC_HOSTED_ZONE_ID} --shared-vpc-role-arn ${SAHRED_VPC_ROLE_ARN}"
 
   record_cluster "aws.sts" "private_hosted_zone_id" ${SAHRED_VPC_HOSTED_ZONE_ID}
   record_cluster "aws.sts" "private_hosted_zone_role_arn" ${SAHRED_VPC_ROLE_ARN}
   record_cluster "dns" "base_domain" ${SAHRED_VPC_BASE_DOMAIN}
-
-  # update shared-role policy for Shared-VPC cluster
-  #
-  if [[ ! -e "${CLUSTER_PROFILE_DIR}/.awscred_shared_account" ]]; then
-    echo "No Shared VPC account found. Exit now."
-    exit 1
-  fi
-
-  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
-
-  installer_role_arn=$(grep "Installer-Role" "${SHARED_DIR}/account-roles-arns")
-  ingress_role_arn=$(grep "ingress-operator" "${SHARED_DIR}/operator-roles-arns")
-  shared_vpc_updated_trust_policy=$(mktemp)
-  cat > $shared_vpc_updated_trust_policy <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-      {
-          "Effect": "Allow",
-          "Principal": {
-              "AWS": [
-                "${installer_role_arn}",
-                "${ingress_role_arn}"
-              ]
-          },
-          "Action": "sts:AssumeRole",
-          "Condition": {}
-      }
-  ]
-}
-EOF
-  aws iam update-assume-role-policy --role-name "$(echo ${SAHRED_VPC_ROLE_ARN} | cut -d '/' -f2)"  --policy-document file://${shared_vpc_updated_trust_policy}
-  echo "Updated Shared VPC role trust policy:"
-  cat $shared_vpc_updated_trust_policy
-  
-  echo "Sleeping 120s to make sure the policy is ready."
-  sleep 120
-
-  echo "Change AWS profile back to cluster owner"
-  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 fi
 
 DRY_RUN_SWITCH=""
 if [[ "$DRY_RUN" == "true" ]]; then
   DRY_RUN_SWITCH="--dry-run"
 fi
+
+NO_CNI_SWITCH=""
+if [[ "$NO_CNI" == "true" ]]; then
+  NO_CNI_SWITCH="--no-cni"
+fi
+
 
 # Save the cluster config to ARTIFACT_DIR
 cat "${SHARED_DIR}/cluster-config" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${ARTIFACT_DIR}/cluster-config"
@@ -484,24 +482,25 @@ echo "  Enable audit log: ${ENABLE_AUDIT_LOG}"
 echo "  Cluster Tags: ${TAGS}"
 echo "  Additional Security groups: ${ADDITIONAL_SECURITY_GROUP}"
 echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
-if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then 
+if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Min replicas: ${MIN_REPLICAS}"
-  echo "  Min replicas: ${MAX_REPLICAS}"  
+  echo "  Max replicas: ${MAX_REPLICAS}"
 else
   echo "  Replicas: ${REPLICAS}"
 fi
+echo "  Config cluster autoscaler: ${CONFIGURE_CLUSTER_AUTOSCALER}"
 
 echo "  Enable Shared VPC: ${ENABLE_SHARED_VPC}"
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   echo "    SAHRED_VPC_HOSTED_ZONE_ID: ${SAHRED_VPC_HOSTED_ZONE_ID}"
-  echo "    SAHRED_VPC_ROLE_ARN: ${SAHRED_VPC_ROLE_ARN}"
+  echo "    SAHRED_VPC_ROLE_ARN: ${SAHRED_VPC_ROLE_ARN}" | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g"
   echo "    SAHRED_VPC_BASE_DOMAIN: ${SAHRED_VPC_BASE_DOMAIN}"
 fi
 
-echo -e "
-rosa create cluster -y \
+# Provision cluster
+cmd="rosa create cluster -y \
 ${STS_SWITCH} \
---mode auto \
+${HYPERSHIFT_SWITCH} \
 --cluster-name ${CLUSTER_NAME} \
 --region ${CLOUD_PROVIDER_REGION} \
 --version ${OPENSHIFT_VERSION} \
@@ -515,7 +514,6 @@ ${COMPUTE_NODES_SWITCH} \
 ${BYO_OIDC_SWITCH} \
 ${ETCD_ENCRYPTION_SWITCH} \
 ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
-${HYPERSHIFT_SWITCH} \
 ${SUBNET_ID_SWITCH} \
 ${FIPS_SWITCH} \
 ${PRIVATE_SWITCH} \
@@ -529,109 +527,27 @@ ${COMPUTER_NODE_ZONES_SWITCH} \
 ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
 ${SHARED_VPC_SWITCH} \
 ${SECURITY_GROUP_ID_SWITCH} \
+${NO_CNI_SWITCH} \
+${CONFIGURE_CLUSTER_AUTOSCALER_SWITCH} \
 ${DRY_RUN_SWITCH}
-" | sed -E 's/\s{2,}/ /g' > "${SHARED_DIR}/create_cluster.sh"
-cat "${SHARED_DIR}/create_cluster.sh" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${ARTIFACT_DIR}/create_cluster.sh"
+"
+echo "$cmd"| sed -E 's/\s{2,}/ /g' > "${SHARED_DIR}/create_cluster.sh"
 
-mkdir -p "${SHARED_DIR}"
-CLUSTER_ID_FILE="${SHARED_DIR}/cluster-id"
-CLUSTER_INFO="${ARTIFACT_DIR}/cluster.txt"
-CLUSTER_INSTALL_LOG="${ARTIFACT_DIR}/.install.log"
-
-# The default cluster mode is sts now
-rosa create cluster -y \
-                    ${STS_SWITCH} \
-                    ${HYPERSHIFT_SWITCH} \
-                    --mode auto \
-                    --cluster-name "${CLUSTER_NAME}" \
-                    --region "${CLOUD_PROVIDER_REGION}" \
-                    --version "${OPENSHIFT_VERSION}" \
-                    --channel-group "${CHANNEL_GROUP}" \
-                    --compute-machine-type "${COMPUTE_MACHINE_TYPE}" \
-                    --tags "${TAGS}" \
-                    ${ACCOUNT_ROLES_SWITCH} \
-                    ${EC2_METADATA_HTTP_TOKENS_SWITCH} \
-                    ${MULTI_AZ_SWITCH} \
-                    ${COMPUTE_NODES_SWITCH} \
-                    ${BYO_OIDC_SWITCH} \
-                    ${ETCD_ENCRYPTION_SWITCH} \
-                    ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
-                    ${SUBNET_ID_SWITCH} \
-                    ${FIPS_SWITCH} \
-                    ${PRIVATE_SWITCH} \
-                    ${PRIVATE_LINK_SWITCH} \
-                    ${PROXY_SWITCH} \
-                    ${DISABLE_SCP_CHECKS_SWITCH} \
-                    ${DEFAULT_MP_LABELS_SWITCH} \
-                    ${STORAGE_ENCRYPTION_SWITCH} \
-                    ${AUDIT_LOG_SWITCH} \
-                    ${COMPUTER_NODE_ZONES_SWITCH} \
-                    ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
-                    ${SHARED_VPC_SWITCH} \
-                    ${SECURITY_GROUP_ID_SWITCH} \
-                    ${DRY_RUN_SWITCH} \
-                    | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${CLUSTER_INFO}"
+log "Running command:"
+cmdout=$(cat "${SHARED_DIR}/create_cluster.sh" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g")
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+  cmdout=$(echo $cmdout | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g")
+fi
+echo "$cmdout"
+CLUSTER_INFO_WITHOUT_MASK="$(mktemp)"
+eval "${cmd}" > "${CLUSTER_INFO_WITHOUT_MASK}"
 
 # Store the cluster ID for the post steps and the cluster deprovision
+CLUSTER_INFO="${ARTIFACT_DIR}/cluster.txt"
+cat ${CLUSTER_INFO_WITHOUT_MASK} | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${CLUSTER_INFO}"
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+  sed -i "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g" "${CLUSTER_INFO}"
+fi
 CLUSTER_ID=$(cat "${CLUSTER_INFO}" | grep '^ID:' | tr -d '[:space:]' | cut -d ':' -f 2)
 echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
-echo -n "${CLUSTER_ID}" > "${CLUSTER_ID_FILE}"
-
-# Watch the hypershift install log
-if [[ "$HOSTED_CP" == "true" ]]; then
-  rosa logs install -c ${CLUSTER_ID} --watch
-fi
-
-echo "Waiting for cluster ready..."
-start_time=$(date +"%s")
-while true; do
-  sleep 60
-  CLUSTER_STATE=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.state')
-  echo "Cluster state: ${CLUSTER_STATE}"
-  if [[ "${CLUSTER_STATE}" == "ready" ]]; then
-    echo "Cluster is reported as ready"
-    break
-  fi
-  if (( $(date +"%s") - $start_time >= $CLUSTER_TIMEOUT )); then
-    echo "error: Timed out while waiting for cluster to be ready"
-    exit 1
-  fi
-  if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" && "${CLUSTER_STATE}" != "waiting" && "${CLUSTER_STATE}" != "validating" ]]; then
-    rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}" || echo "error: Unable to pull installation log."
-    echo "error: Cluster reported invalid state: ${CLUSTER_STATE}"
-    exit 0
-  fi
-done
-rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}"
-
-# Output
-# Print console.url and api.url
-API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
-CONSOLE_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.console.url')
-if [[ "${API_URL}" == "null" ]]; then
-  port="6443"
-  if [[ "$HOSTED_CP" == "true" ]]; then
-    port="443"
-  fi
-  echo "warning: API URL was null, attempting to build API URL"
-  base_domain=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.dns.base_domain')
-  CLUSTER_NAME=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.name')
-  echo "info: Using baseDomain : ${base_domain} and clusterName : ${CLUSTER_NAME}"
-  API_URL="https://api.${CLUSTER_NAME}.${base_domain}:${port}"
-  CONSOLE_URL="https://console-openshift-console.apps.${CLUSTER_NAME}.${base_domain}"
-fi
-
-echo "API URL: ${API_URL}"
-echo "Console URL: ${CONSOLE_URL}"
-echo "${CONSOLE_URL}" > "${SHARED_DIR}/console.url"
-echo "${API_URL}" > "${SHARED_DIR}/api.url"
-
-PRODUCT_ID=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.product.id')
-echo "${PRODUCT_ID}" > "${SHARED_DIR}/cluster-type"
-
-INFRA_ID=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.infra_id')
-if [[ "$HOSTED_CP" == "true" ]] && [[ "${INFRA_ID}" == "null" ]]; then
-  # Currently, there is no infra_id for rosa hypershift cluster, use a fake one instead of null
-  INFRA_ID=$CLUSTER_NAME
-fi
-echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"
+echo -n "${CLUSTER_ID}" > "${SHARED_DIR}/cluster-id"

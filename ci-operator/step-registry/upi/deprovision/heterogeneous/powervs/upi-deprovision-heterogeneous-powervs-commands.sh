@@ -5,7 +5,13 @@
 OCP_VERSION=$(cat "${SHARED_DIR}/OCP_VERSION")
 REGION="${LEASED_RESOURCE}"
 CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
-WORKSPACE_NAME=rdr-mac-${CLEAN_VERSION}-${REGION}-n1
+if [ ! -z "${WORKFLOW_TYPE}" ]
+then
+  CUCUSHIFT="-cucushift"
+else
+  CUCUSHIFT=""
+fi
+WORKSPACE_NAME=rdr-mac-${CLEAN_VERSION}-${REGION}${CUCUSHIFT}-n1
 
 # Cleans up the failed prior jobs
 function cleanup_ibmcloud_powervs() {
@@ -25,7 +31,14 @@ function cleanup_ibmcloud_powervs() {
     if [ -n "${VALID_GW}" ]
     then
       TG_CRN=$(echo "${VALID_GW}" | jq -r '.crn')
-      TAGS=$(ic resource search "crn:\"${TG_CRN}\"" --output json | jq -r '.items[].tags[]' | grep "mac-cicd-${version}" || true)
+      echo "WORKFLOW_TYPE: ${WORKFLOW_TYPE}"
+      if [ ! -z "${WORKFLOW_TYPE}" ]
+      then
+        CUCUSHIFT_TAG="cucushift-"
+      else
+        CUCUSHIFT_TAG=""
+      fi
+      TAGS=$(ic resource search "crn:\"${TG_CRN}\"" --output json | jq -r '.items[].tags[]' | grep "mac-cicd-${CUCUSHIFT_TAG}${version}" || true)
       if [ -n "${TAGS}" ]
       then
         for CS in $(ic tg connections "${GW}" --output json | jq -r '.[].id')
@@ -48,24 +61,24 @@ function cleanup_ibmcloud_powervs() {
   ic tg gws --output json | jq -r '.[] | select(.resource_group.id == "'$RESOURCE_GROUP_ID'" and .location == "'$region'")'
 
   echo "Cleaning up workspaces for ${workspace_name}"
-  for CRN in $(ic pi sl 2> /dev/null | grep "${workspace_name}" | awk '{print $1}')
+  for CRN in $(ic pi workspace ls 2> /dev/null | grep "${workspace_name}" | awk '{print $1}')
   do
     echo "Targetting power cloud instance"
-    ic pi st "${CRN}"
+    ic pi workspace target "${CRN}"
 
     echo "Deleting the PVM Instances"
-    for INSTANCE_ID in $(ic pi ins --json | jq -r '.pvmInstances[].pvmInstanceID')
+    for INSTANCE_ID in $(ic pi instance ls --json | jq -r '.pvmInstances[] | .id')
     do
       echo "Deleting PVM Instance ${INSTANCE_ID}"
-      ic pi ind "${INSTANCE_ID}" --delete-data-volumes
+      ic pi instance delete "${INSTANCE_ID}" --delete-data-volumes
       sleep 60
     done
 
     echo "Deleting the Images"
-    for IMAGE_ID in $(ic pi imgs --json | jq -r '.images[].imageID')
+    for IMAGE_ID in $(ic pi image ls --json | jq -r '.images[].imageID')
     do
       echo "Deleting Images ${IMAGE_ID}"
-      ic pi image-delete "${IMAGE_ID}"
+      ic pi image delete "${IMAGE_ID}"
       sleep 60
     done
 
@@ -82,10 +95,10 @@ function cleanup_ibmcloud_powervs() {
     fi
 
     echo "Deleting the Network"
-    for NETWORK_ID in $(ic pi nets 2> /dev/null | awk '{print $1}')
+    for NETWORK_ID in $(ic pi network ls 2> /dev/null | awk '{print $1}')
     do
       echo "Deleting network ${NETWORK_ID}"
-      ic pi network-delete "${NETWORK_ID}" || true
+      ic pi network delete "${NETWORK_ID}" || true
       sleep 60
     done
 
@@ -94,7 +107,7 @@ function cleanup_ibmcloud_powervs() {
     ic resource service-instance-delete "${CRN}" --force --recursive
     for COUNT in $(seq 0 5)
     do
-      FIND=$(ic pi sl 2> /dev/null| grep "${CRN}" || true)
+      FIND=$(ic pi workspace ls 2> /dev/null| grep "${CRN}" || true)
       echo "FIND: ${FIND}"
       if [ -z "${FIND}" ]
       then

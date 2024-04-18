@@ -48,11 +48,6 @@ Parameters:
     Default: 10.0.0.0/16
     Description: CIDR block for VPC.
     Type: String
-  CidrCount:
-    ConstraintDescription: The number of CIDRs to generate, used by Cloudformation function "Cidr"
-    Description: The number of CIDRs to generate, used by Cloudformation function "Cidr"
-    Type: String
-    Default: "6"
   AvailabilityZoneCount:
     ConstraintDescription: "The number of availability zones. (Min: 1, Max: 3)"
     MinValue: 1
@@ -77,11 +72,6 @@ Parameters:
   AllowedAvailabilityZoneList:
     ConstraintDescription: "Select AZs from this list, e.g. 'us-east-2c,us-east-2a'"
     Type: CommaDelimitedList
-    Default: ""
-  OutpostArn:
-    ConstraintDescription: The Amazon Resource Name (ARN) of the Outpost.
-    Description: The Amazon Resource Name (ARN) of the Outpost.
-    Type: String
     Default: ""
   ResourceSharePrincipals:
     ConstraintDescription: ResourceSharePrincipals
@@ -114,7 +104,6 @@ Conditions:
   DoAz2: !Or [!Equals [2, !Ref AvailabilityZoneCount], Condition: DoAz3]
   DoDhcp: !Equals ["yes", !Ref DhcpOptionSet]
   AzRestriction: !Not [ !Equals [!Join ['', !Ref AllowedAvailabilityZoneList], ''] ]
-  DoOutpost: !Not [ !Equals [!Ref OutpostArn, ''] ]
   ShareSubnets: !Not [ !Equals ['', !Ref ResourceSharePrincipals] ]
 
 Resources:
@@ -131,7 +120,7 @@ Resources:
     Type: "AWS::EC2::Subnet"
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, !Ref CidrCount, !Ref SubnetBits]]
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
       AvailabilityZone:
         !If [
               "AzRestriction",
@@ -143,7 +132,7 @@ Resources:
     Condition: DoAz2
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, !Ref CidrCount, !Ref SubnetBits]]
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
       AvailabilityZone:
         !If [
               "AzRestriction",
@@ -155,7 +144,7 @@ Resources:
     Condition: DoAz3
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, !Ref CidrCount, !Ref SubnetBits]]
+      CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
       AvailabilityZone:
         !If [
               "AzRestriction",
@@ -201,7 +190,7 @@ Resources:
     Type: "AWS::EC2::Subnet"
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, !Ref CidrCount, !Ref SubnetBits]]
+      CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
       AvailabilityZone:
         !If [
               "AzRestriction",
@@ -244,7 +233,7 @@ Resources:
     Condition: DoAz2
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Select [4, !Cidr [!Ref VpcCidr, !Ref CidrCount, !Ref SubnetBits]]
+      CidrBlock: !Select [4, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
       AvailabilityZone:
         !If [
               "AzRestriction",
@@ -292,7 +281,7 @@ Resources:
     Condition: DoAz3
     Properties:
       VpcId: !Ref VPC
-      CidrBlock: !Select [5, !Cidr [!Ref VpcCidr, !Ref CidrCount, !Ref SubnetBits]]
+      CidrBlock: !Select [5, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
       AvailabilityZone:
         !If [
               "AzRestriction",
@@ -335,85 +324,6 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId:
         Ref: NAT3
-  PublicSubnetOutpost:
-    Type: "AWS::EC2::Subnet"
-    Condition: DoOutpost
-    Properties:
-      VpcId: !Ref VPC
-      CidrBlock: !Select [6, !Cidr [!Ref VpcCidr, !Ref CidrCount, !Ref SubnetBits]]
-      AvailabilityZone:
-        !If [
-              "AzRestriction",
-              !Select [0, !Ref AllowedAvailabilityZoneList ],
-              !Select [0, Fn::GetAZs: !Ref "AWS::Region"]
-            ]
-      OutpostArn: !Ref OutpostArn
-      Tags:
-      - Key: Name
-        Value: !Join [ "-", [ !Ref "AWS::StackName", "Outpost-PublicSubnet" ] ]
-      - Key: "kubernetes.io/cluster/outpost-tag"
-        Value: "owned"
-  EIPOutpost:
-    Type: "AWS::EC2::EIP"
-    Condition: DoOutpost
-    DependsOn: GatewayToInternet
-    Properties:
-      Domain: vpc
-  NATOutpost:
-    Type: "AWS::EC2::NatGateway"
-    Condition: DoOutpost
-    DependsOn:
-    - EIPOutpost
-    - PublicSubnetOutpost
-    Properties:
-      AllocationId: !GetAtt EIPOutpost.AllocationId
-      SubnetId: !Ref PublicSubnetOutpost
-      Tags:
-      - Key: Name
-        Value: !Join [ "-", [ !Ref "AWS::StackName", "Outpost-NatGateway" ] ]
-  PublicSubnetRouteTableAssociationOutpost:
-    Type: "AWS::EC2::SubnetRouteTableAssociation"
-    Condition: DoOutpost
-    Properties:
-      SubnetId: !Ref PublicSubnetOutpost
-      RouteTableId: !Ref PublicRouteTable
-  PrivateSubnetOutpost:
-    Type: "AWS::EC2::Subnet"
-    Condition: DoOutpost
-    Properties:
-      VpcId: !Ref VPC
-      CidrBlock: !Select [7, !Cidr [!Ref VpcCidr, !Ref CidrCount, !Ref SubnetBits]]
-      AvailabilityZone:
-        !If [
-              "AzRestriction",
-              !Select [0, !Ref AllowedAvailabilityZoneList ],
-              !Select [0, Fn::GetAZs: !Ref "AWS::Region"]
-            ]
-      OutpostArn: !Ref OutpostArn
-      Tags:
-        - Key: Name
-          Value: !Join [ "-", [ !Ref "AWS::StackName", "Outpost-PrivateSubnet" ] ]
-  PrivateRouteTableOutpost:
-    Type: "AWS::EC2::RouteTable"
-    Condition: DoOutpost
-    Properties:
-      VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: !Join [ "-", [ !Ref "AWS::StackName", "Outpost-PrivateRouteTable" ] ]
-  RouteOutpost:
-    Type: "AWS::EC2::Route"
-    Condition: DoOutpost
-    Properties:
-      RouteTableId: !Ref PrivateRouteTableOutpost
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NATOutpost
-  PrivateSubnetRouteTableAssociationOutpost:
-    Type: "AWS::EC2::SubnetRouteTableAssociation"
-    Condition: DoOutpost
-    Properties:
-      SubnetId: !Ref PrivateSubnetOutpost
-      RouteTableId: !Ref PrivateRouteTableOutpost
   S3Endpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
@@ -431,7 +341,6 @@ Resources:
       - !Ref PrivateRouteTable
       - !If [DoAz2, !Ref PrivateRouteTable2, !Ref "AWS::NoValue"]
       - !If [DoAz3, !Ref PrivateRouteTable3, !Ref "AWS::NoValue"]
-      - !If [DoOutpost, !Ref PrivateRouteTableOutpost, !Ref "AWS::NoValue"]
       ServiceName: !Join
       - ''
       - - com.amazonaws.
@@ -520,28 +429,29 @@ Outputs:
       !Join [
         ",",
         [
-          !Join ["=", [
-            !Select [0, "Fn::GetAZs": !Ref "AWS::Region"],
-            !Ref PrivateRouteTable
-          ]],
+          !If [
+              "AzRestriction",
+              !Join ["=", [!Select [0, !Ref AllowedAvailabilityZoneList], !Ref PrivateRouteTable]],
+              !Join ["=", [!Select [0, "Fn::GetAZs": !Ref "AWS::Region"], !Ref PrivateRouteTable]]
+          ],
           !If [DoAz2,
-               !Join ["=", [!Select [1, "Fn::GetAZs": !Ref "AWS::Region"], !Ref PrivateRouteTable2]],
+                !If [
+                  "AzRestriction",
+                  !Join ["=", [!Select [1, !Ref AllowedAvailabilityZoneList], !Ref PrivateRouteTable2]],
+                  !Join ["=", [!Select [1, "Fn::GetAZs": !Ref "AWS::Region"], !Ref PrivateRouteTable2]]
+                ],
                !Ref "AWS::NoValue"
           ],
           !If [DoAz3,
-               !Join ["=", [!Select [2, "Fn::GetAZs": !Ref "AWS::Region"], !Ref PrivateRouteTable3]],
+               !If [
+                  "AzRestriction",
+                  !Join ["=", [!Select [2, !Ref AllowedAvailabilityZoneList], !Ref PrivateRouteTable3]],
+                  !Join ["=", [!Select [2, "Fn::GetAZs": !Ref "AWS::Region"], !Ref PrivateRouteTable3]]
+                ],
                !Ref "AWS::NoValue"
           ]
         ]
       ]
-  OutpostPublicSubnetId:
-    Description: Public Subnet ID in Outpost
-    Condition: DoOutpost
-    Value: !Ref PublicSubnetOutpost
-  OutpostPrivateSubnetId:
-    Description: Private Subnet ID in Outpost
-    Condition: DoOutpost
-    Value: !Ref PrivateSubnetOutpost
 EOF
 
 MAX_ZONES_COUNT=$(aws --region "${REGION}" ec2 describe-availability-zones --filter Name=state,Values=available Name=zone-type,Values=availability-zone | jq '.AvailabilityZones | length')
@@ -568,13 +478,17 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   aws_add_param_to_json "ResourceSharePrincipals" ${CLUSTER_CREATOR_AWS_ACCOUNT_NO} "$vpc_params"
 fi
 
-if [[ ${ENABLE_AWS_OUTPOST} == "yes" ]]; then
-  outpost_arn=$(jq -r '.OutpostArn' ${CLUSTER_PROFILE_DIR}/aws_outpost_info.json)
-  outpost_zone=$(jq -r '.AvailabilityZone' ${CLUSTER_PROFILE_DIR}/aws_outpost_info.json)
-  aws_add_param_to_json "CidrCount" "8" "$vpc_params"
-  aws_add_param_to_json "OutpostArn" "${outpost_arn}" "$vpc_params"
-  aws_add_param_to_json "AllowedAvailabilityZoneList" "${outpost_zone}" "$vpc_params"
-  aws_add_param_to_json "AvailabilityZoneCount" "1" "$vpc_params"
+if [[ -n "${VPC_CIDR}" ]]; then
+     aws_add_param_to_json "VpcCidr" ${VPC_CIDR} "$vpc_params"
+fi
+
+if [[ ${ZONES_LIST} != "" ]]; then
+  zones_list_count=$(echo "$ZONES_LIST" | awk -F',' '{ print NF }')
+  if [[ "${zones_list_count}" != "${ZONES_COUNT}" ]]; then
+    echo "ERROR: ${zones_list_count} zones in the list [${ZONES_LIST}], the zone count in the list should be the same as ZONES_COUNT: ${ZONES_COUNT}, exit now"
+    exit 1
+  fi
+  aws_add_param_to_json "AllowedAvailabilityZoneList" "${ZONES_LIST}" "$vpc_params"
 fi
 
 aws --region "${REGION}" cloudformation create-stack \
@@ -640,12 +554,3 @@ echo "PublicRouteTableId: ${PublicRouteTableId}"
 PrivateRouteTableId=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="PrivateRouteTableIds") | .OutputValue | split(",")[0] | split("=")[1]' "${SHARED_DIR}/vpc_stack_output")
 echo "$PrivateRouteTableId" > "${SHARED_DIR}/private_route_table_id"
 echo "PrivateRouteTableId: ${PrivateRouteTableId}"
-
-# AWS Outpost
-if [[ ${ENABLE_AWS_OUTPOST} == "yes" ]]; then
-  o_pub_id=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="OutpostPublicSubnetId") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")
-  o_priv_id=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="OutpostPrivateSubnetId") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")
-  echo $o_pub_id > "${SHARED_DIR}/outpost_public_id"
-  echo $o_priv_id > "${SHARED_DIR}/outpost_private_id"
-  echo "outpost_public_id: ${o_pub_id}, outpost_private_id: ${o_priv_id}"
-fi

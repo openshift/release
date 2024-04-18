@@ -3,10 +3,10 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-9-golang-1.21-openshift-4.16
   operand:
     name: "4.16"
     namespace: ocp
@@ -23,15 +23,8 @@ base_images:
     name: "4.16"
     namespace: origin
     tag: operator-sdk
-  ubi-minimal:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.20-openshift-4.15
+  from_repository: true
 canonical_go_repository: github.com/kedacore/keda-olm-operator
 images:
 - dockerfile_path: Dockerfile.ci
@@ -39,12 +32,9 @@ images:
     cli:
       as:
       - registry.redhat.io/openshift4/ose-cli:latest
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
-    ubi-minimal:
-      as:
-      - registry.redhat.io/ubi8/ubi-minimal:latest
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: custom-metrics-autoscaler-operator
 operator:
   bundles:
@@ -98,10 +88,19 @@ tests:
   commands: env && GOFLAGS="" hack/cma-verify-history.sh
   container:
     from: src
+- as: security
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: custom-metrics-autoscaler-operator
+    workflow: openshift-ci-security
 - as: cma-e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
+    post:
+    - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
     test:
@@ -133,9 +132,23 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - as: test-setup
+      cli: latest
+      commands: E2E_INSTALL_KEDA=false make e2e-test-openshift-setup
+      from: custom-metrics-autoscaler-tests
+      resources:
+        requests:
+          cpu: 100m
     - as: test-run
       cli: latest
       commands: make e2e-test-openshift
+      from: custom-metrics-autoscaler-tests
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-clean
+      cli: latest
+      commands: E2E_INSTALL_KEDA=false make e2e-test-openshift-clean
       from: custom-metrics-autoscaler-tests
       resources:
         requests:

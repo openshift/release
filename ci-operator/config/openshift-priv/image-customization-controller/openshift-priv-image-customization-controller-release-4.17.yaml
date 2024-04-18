@@ -3,25 +3,25 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.16_base:
+  ocp_4.16_base-rhel9:
     name: 4.17-priv
     namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/image-customization-controller
 images:
 - inputs:
-    ocp_4.16_base:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: machine-image-customization-controller
 promotion:
   to:
@@ -59,20 +59,20 @@ tests:
   container:
     from: src
   run_if_changed: (go\.(mod|sum)$)|(^vendor/)
-- as: e2e-metal-ipi-sdn-bm
+- as: e2e-metal-ipi-bm
   cluster: build05
   skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       CLUSTERTYPE: baremetal
-    workflow: baremetalds-e2e-sdn-ipv4
+    workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-serial-ipv4
   cluster: build05
   skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-sdn-serial-ipv4
+    workflow: baremetalds-e2e-serial-ovn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   skip_if_only_changed: (^(docs|examples)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)

@@ -3,7 +3,6 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -o xtrace
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -68,6 +67,7 @@ label_filter='(Critical,High)&&(day1-post,day2)&&!Exclude'
 if [ ! -z "$CASE_LABEL_FILTER" ]; then
     label_filter="$CASE_LABEL_FILTER"
 fi
+
 echo ">>> CI run label filter is: $label_filter. Cases match label will be filtered."
 
 # Below step will skip gcc checking

@@ -7,13 +7,13 @@ cat /etc/os-release
 oc config view
 oc projects
 python3 --version
-pushd /tmp
-
 ls -la /root/kraken
-git clone https://github.com/redhat-chaos/krkn-hub.git
-pushd krkn-hub/
 
-wget -O volume_scenario.yaml https://raw.githubusercontent.com/redhat-chaos/krkn/main/CI/scenarios/volume_scenario.yaml
+ES_PASSWORD=$(cat "/secret/es/password")
+ES_USERNAME=$(cat "/secret/es/username")
+
+export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+wget -O volume_scenario.yaml https://raw.githubusercontent.com/krkn-chaos/krkn/main/CI/legacy/scenarios/volume_scenario.yaml
 
 oc create -f volume_scenario.yaml  
 
@@ -32,7 +32,7 @@ export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 
-./prow/pvc-scenario/prow_run.sh
+./pvc-scenario/prow_run.sh
 rc=$?
 echo "Finished running pvc scenario"
 echo "Return code: $rc"

@@ -268,13 +268,11 @@ tests:
   optional: true
   run_if_changed: aws
   steps:
-    cluster_profile: aws-local-zones
+    cluster_profile: aws
     env:
-      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
-    leases:
-    - env: LEASED_RESOURCE
-      resource_type: aws-local-zones-quota-slice
-    workflow: openshift-e2e-aws-local-zones-byo-vpc
+      EDGE_PUBLIC_SUBNET: "yes"
+      EDGE_ZONE_TYPES: local-zone
+    workflow: openshift-e2e-aws-edge-zones-byo-vpc
   timeout: 6h0m0s
 - as: e2e-aws-ovn-imdsv2
   optional: true
@@ -672,11 +670,7 @@ tests:
   skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
-        MIRROR_IMAGES=true
-    workflow: agent-e2e-generic
+    workflow: agent-e2e-ha-dualstack
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.13

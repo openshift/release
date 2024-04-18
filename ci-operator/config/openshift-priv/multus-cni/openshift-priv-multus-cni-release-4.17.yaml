@@ -1,8 +1,8 @@
 base_images:
-  ocp_4.16_base:
+  ocp_4.16_base-rhel9:
     name: 4.17-priv
     namespace: ocp-private
-    tag: base
+    tag: base-rhel9
   ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
@@ -17,9 +17,9 @@ canonical_go_repository: github.com/openshift/multus-cni
 images:
 - dockerfile_path: Dockerfile.openshift
   inputs:
-    ocp_4.16_base:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
     ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
@@ -121,6 +121,13 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
   timeout: 5h0m0s
+- as: security
+  optional: true
+  steps:
+    env:
+      ALL_PROJECTS: "true"
+      PROJECT_NAME: multus-cni
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.17
   org: openshift-priv

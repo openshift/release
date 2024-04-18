@@ -113,6 +113,7 @@ function extract_oc(){
         sleep 60
     done
     mv ${tmp_oc}/oc ${OC_DIR} -f
+    export PATH="$PATH"
     which oc
     oc version --client
     return 0
@@ -182,7 +183,7 @@ do
         echo "You're mirroring an unsigned images, don't apply signature"
         APPLY_SIG="false"
         SAVE_SIG_TO_DIR=""
-        if check_ota_case_enabled "OCP-30832" "OCP-27986"; then
+        if check_ota_case_enabled "OCP-30832" "OCP-27986" "OCP-69968"; then
             echo "The case need to run against a signed target image!"
             exit 1
         fi
@@ -196,7 +197,7 @@ do
 
     extract_oc
 
-    if check_ota_case_enabled "OCP-30832"; then
+    if check_ota_case_enabled "OCP-30832" "OCP-69968"; then
         MIRROR_RELEASE_IMAGE_REPO="${MIRROR_REGISTRY_HOST}/ota_auto/ocp"
         mirror_apply_sig_together="true"
     else

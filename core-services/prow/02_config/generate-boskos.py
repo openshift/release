@@ -5,13 +5,6 @@ import yaml
 
 CONFIG = {
 
-    'aws-arm64-quota-slice': {
-        # Wild guesses.  We'll see when we hit quota issues
-        'us-east-1': 10,
-        'us-east-2': 8,
-        'us-west-1': 8,
-        'us-west-2': 8,
-    },
     'aws-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'us-east-1': 50,
@@ -42,6 +35,9 @@ CONFIG = {
     'aws-qe-quota-slice': {
         'us-east-1': 25,
         'ap-northeast-1': 5,
+    },
+    'aws-autorelease-qe-quota-slice': {
+        'us-east-1': 2,
     },
     'aws-terraform-qe-quota-slice': {
         'ap-northeast-1': 2,
@@ -75,11 +71,8 @@ CONFIG = {
         'us-east-2': 5,
     },
     'aws-local-zones-quota-slice': {
-        'us-east-1': 2,
-        'us-west-2': 2
-    },
-    'aws-perf-qe-quota-slice': {
-        'us-west-2': 3,
+        'us-east-1': 5,
+        'us-west-2': 5
     },
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 10,
@@ -87,8 +80,12 @@ CONFIG = {
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
+    'aws-serverless-quota-slice': {
+        'us-east-1': 5,
+        'us-east-2': 5,
+    },
     'aws-rhtap-qe-quota-slice': {
-        'us-west-2': 10
+        'us-east-1': 10
     },
     'aws-rhtap-performance-quota-slice': {
         'eu-west-1': 10
@@ -161,7 +158,7 @@ CONFIG = {
         'usgovtexas': 5
     },
     'equinix-ocp-metal-quota-slice': {
-        'default': 50,
+        'default': 70,
     },
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
@@ -204,9 +201,6 @@ CONFIG = {
     'nutanix-qe-dis-quota-slice': {},
     'nutanix-qe-zone-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
-    'openstack-quota-slice': {
-        'default': 7,
-    },
     'openstack-vexxhost-quota-slice': {
         'default': 9,
     },
@@ -215,6 +209,9 @@ CONFIG = {
     },
     'openstack-hwoffload-quota-slice': {
         'default': 5,
+    },
+    'openstack-nerc-dev-quota-slice': {
+        'default': 1,
     },
     'openstack-nfv-quota-slice': {
         'default': 5,
@@ -242,6 +239,7 @@ CONFIG = {
     'vsphere-connected-2-quota-slice':{},
     'vsphere-multizone-2-quota-slice':{},
     'vsphere-8-vpn-quota-slice':{},
+    'vsphere-multi-vcenter-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
     },
@@ -272,6 +270,7 @@ CONFIG = {
     'powervs-4-quota-slice': {
         'wdc06': 1,
     },
+    'powervs-5-quota-slice': {},
     'powervs-multi-1-quota-slice': {
         'wdc06': 2,
     },
@@ -312,10 +311,9 @@ CONFIG = {
         'us-west-2': 5,
     },
     'azure-virtualization-quota-slice': {
-        'centralus': 5,
-        'eastus': 5,
-        'eastus2': 5,
-        'westus': 5
+        'eastus': 10,
+        'eastus2': 10,
+        'westus': 10
     },
     'gcp-virtualization-quota-slice': {
         'us-central1': 50,
@@ -363,18 +361,33 @@ CONFIG = {
         'us-east-2': 20,
     },
     'quay-aws-quota-slice': {
-        'us-east-1': 10,
-        'us-west-1': 10,
+        'us-east-1': 20,
+        'us-west-1': 20,
     },
     'aws-edge-infra-quota-slice': {
         'us-east-1': 5,
         'us-east-2': 5,
         'us-west-1': 5,
         'us-west-2': 5,
+    },
+    'rh-openshift-ecosystem-quota-slice': {
+        'us-east-1': 10,
+        'us-east-2': 10,
+        'us-west-1': 10,
+        'us-west-2': 10,
+    },
+    'odf-aws-quota-slice': {
+        'us-east-1': 25,
+        'us-east-2': 25,
+        'us-west-1': 25,
+        'us-west-2': 25,
+    },
+    'aws-ip-pools-us-east-1': {
+        'default': 256,
     }
 }
 
-for i in range(0,4):
+for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
 # Mihawk0 is updated with RHEL 8.8, adding the Mihawk back to the lease pool
@@ -422,6 +435,12 @@ for i in [1287,1289,1296,1298,1300,1302]:
 
 for i in [1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274,1283,1285,1305,1309]:
     CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
+
+for i in [956]:
+    CONFIG['vsphere-multi-vcenter-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
+
+for i in range(4):
+    CONFIG['powervs-5-quota-slice']['mad02-powervs-5-quota-slice-{}'.format(i)] = 1
 
 
 config = {

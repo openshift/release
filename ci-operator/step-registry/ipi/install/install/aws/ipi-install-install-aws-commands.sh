@@ -110,7 +110,7 @@ function patch_public_ip_for_edge_node() {
   pushd "${dir}/openshift"
 
   # For wavelength zone & byo vpc only
-  if [[ "${EDGE_ZONE_TYPE:-}"  == 'wavelength-zone' ]] && [[ -e ${SHARED_DIR}/edge_zone_subnet_id ]]; then
+  if [[ "${EDGE_ZONE_TYPES:-}"  == 'wavelength-zone' ]] && [[ -e ${SHARED_DIR}/edge_zone_subnet_id ]]; then
 
     if [ ! -f /tmp/yq ]; then
       curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$( get_arch )" \
@@ -205,47 +205,34 @@ if [ "${ADD_INGRESS_RECORDS_MANUALLY}" == "yes" ]; then
   yq-go d -i "${dir}/manifests/cluster-dns-02-config.yml" spec.publicZone
 fi
 
-if [ "${ENABLE_AWS_LOCALZONE}" == "yes" ]; then
-  if [[ -f "${SHARED_DIR}/manifest_localzone_machineset.yaml" ]]; then
+if [ "${ENABLE_AWS_EDGE_ZONE}" == "yes" ]; then
+  if [[ -f "${SHARED_DIR}/manifest_edge_node_machineset.yaml" ]]; then
     # Phase 0, inject manifests
     
     # replace PLACEHOLDER_INFRA_ID PLACEHOLDER_AMI_ID
     echo "Local Zone is enabled, updating Infran ID and AMI ID ... "
-    localzone_machineset="${SHARED_DIR}/manifest_localzone_machineset.yaml"
+    edge_node_machineset="${SHARED_DIR}/manifest_edge_node_machineset.yaml"
     infra_id=$(jq -r '."*installconfig.ClusterID".InfraID' "${dir}/.openshift_install_state.json")
     ami_id=$(grep ami "${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml" | tail -n1 | awk '{print$2}')
-    sed -i "s/PLACEHOLDER_INFRA_ID/$infra_id/g" ${localzone_machineset}
-    sed -i "s/PLACEHOLDER_AMI_ID/$ami_id/g" ${localzone_machineset}
-    cp "${localzone_machineset}" "${ARTIFACT_DIR}/"
+    sed -i "s/PLACEHOLDER_INFRA_ID/$infra_id/g" ${edge_node_machineset}
+    sed -i "s/PLACEHOLDER_AMI_ID/$ami_id/g" ${edge_node_machineset}
+    cp "${edge_node_machineset}" "${ARTIFACT_DIR}/"
   else
     # Phase 1 & 2, use install-config
-    if [[ "${LOCALZONE_WORKER_SCHEDULABLE}" == "yes" ]]; then
-      echo 'LOCALZONE_WORKER_SCHEDULABLE is set to "yes", removing spec.template.spec.taints from localzone machineset'
-      for local_zone_machineset in $(grep -lr 'cluster-api-machine-type: edge' ${dir});
+    if [[ "${EDGE_NODE_WORKER_SCHEDULABLE}" == "yes" ]]; then
+      echo 'EDGE_NODE_WORKER_SCHEDULABLE is set to "yes", removing spec.template.spec.taints from edge node machineset'
+      for edge_node_machineset in $(grep -lr 'cluster-api-machine-type: edge' ${dir});
       do
-        echo "Removing spec.template.spec.taints from $(basename ${local_zone_machineset})"
-        yq-go d "${local_zone_machineset}" spec.template.spec.taints
+        echo "Removing spec.template.spec.taints from $(basename ${edge_node_machineset})"
+        yq-go d "${edge_node_machineset}" spec.template.spec.taints
       done
     fi
   fi
 
-  if [[ "${LOCALZONE_WORKER_ASSIGN_PUBLIC_IP:-}"  == 'yes' ]]; then
+  if [[ "${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP:-}"  == 'yes' ]]; then
     patch_public_ip_for_edge_node ${dir}
   fi
   
-fi
-
-if [[ ${ENABLE_AWS_OUTPOST} == "yes" ]]; then
-  pushd "${dir}/openshift"
-  o_private_id=$(head -n 1 ${SHARED_DIR}/outpost_private_id)
-  for worker_node_manifest in $(grep -lr "machine.openshift.io/cluster-api-machine-role: worker" .);
-  do
-    echo "AWS Outpost: applying Outpost subnet id ${o_private_id} to machine set ${worker_node_manifest}"
-    sed -i "s/subnet-.*/${o_private_id}/" ${worker_node_manifest}
-    echo "worker nodes manifests: ${worker_node_manifest}"
-    cat ${worker_node_manifest}
-  done
-  popd
 fi
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"

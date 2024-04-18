@@ -41,6 +41,7 @@ presubmits:
         - --ignore=ansible/tower-qa
         - --ignore=rh-openjdk/jdkContainerOcpTests
         - --ignore=ran-telco5g/kpi-results
+        - --ignore=jws-qe/interop-ocp-ci
         command:
         - ./hack/check-gh-automation.sh
         env:
@@ -76,7 +77,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-check-gh-automation-tide
     rerun_command: /test check-gh-automation-tide
-    run_if_changed: ^ci-operator/config/.*
+    run_if_changed: ^core-services/prow/02_config/.*
     spec:
       containers:
       - args:
@@ -89,6 +90,7 @@ presubmits:
         - --github-app-private-key-path=/etc/github/cert
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
+        - --check-branch-protection=false
         - --ignore=openshift/multiarch
         - --ignore=kata-containers/kata-containers
         - --ignore=containers/gvisor-tap-vsock
@@ -160,14 +162,14 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-clusterimageset-validate
     rerun_command: /test clusterimageset-validate
-    run_if_changed: ^clusters/hive/pools/.*
+    run_if_changed: ^clusters/hosted-mgmt/hive/pools/.*
     spec:
       containers:
       - args:
         - --pools
-        - ./clusters/hive/pools
+        - ./clusters/hosted-mgmt/hive/pools
         - --imagesets
-        - ./clusters/hive/pools
+        - ./clusters/hosted-mgmt/hive/pools
         command:
         - clusterimageset-updater
         image: registry.ci.openshift.org/ci/clusterimageset-updater:latest
@@ -230,63 +232,6 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: app.ci
-    context: ci/build-farm/arm01-dry
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-arm01-dry
-    optional: true
-    rerun_command: /test arm01-dry
-    run_if_changed: ^clusters/.*
-    spec:
-      containers:
-      - args:
-        - --config-dir
-        - clusters/build-clusters/arm01
-        - --ignore-file
-        - clusters/build-clusters/common/assets/pod-scaler-admission.yaml
-        - --kubeconfig
-        - /etc/build-farm-credentials/kubeconfig
-        - --as=
-        command:
-        - applyconfig
-        env:
-        - name: HOME
-          value: /tmp
-        - name: arm01_id
-          valueFrom:
-            secretKeyRef:
-              key: arm01-id
-              name: arm01-dex-oidc
-        image: registry.ci.openshift.org/ci/applyconfig:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
-        - mountPath: /tmp
-          name: tmp
-      serviceAccountName: config-updater
-      volumes:
-      - name: build-farm-credentials
-        secret:
-          items:
-          - key: sa.config-updater.arm01.config
-            path: kubeconfig
-          secretName: config-updater
-      - emptyDir: {}
-        name: tmp
-    trigger: (?m)^/test( | .* )arm01-dry,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
     cluster: build04
     context: ci/prow/boskos-config
     decorate: true
@@ -302,7 +247,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20230908-da54d76
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20240416-59dbd6c
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -344,7 +289,6 @@ presubmits:
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-master-build-clusters
-    optional: true
     rerun_command: /test build-clusters
     spec:
       containers:
@@ -683,6 +627,60 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: app.ci
+    context: ci/build-farm/build10-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build10
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-build10-dry
+    rerun_command: /test build10-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build10
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build10_id
+          valueFrom:
+            secretKeyRef:
+              key: build10-id
+              name: build10-dex-oidc
+        image: registry.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build10.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build10-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: build04
     context: ci/prow/ci-operator-config
     decorate: true
@@ -699,7 +697,9 @@ presubmits:
         - --registry
         - ./ci-operator/step-registry/
         - --cluster-profiles-config
-        - ./core-services/cluster-profiles/_config.yaml
+        - ./ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
+        - --cluster-claim-owners-config
+        - ./core-services/cluster-pools/_config.yaml
         command:
         - ci-operator-checkconfig
         image: ci-operator-checkconfig:latest
@@ -839,7 +839,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20240116-9788709fc1
+        image: gcr.io/k8s-prow/checkconfig:v20240417-db89760fe
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -992,18 +992,18 @@ presubmits:
     - ^master$
     - ^master-
     cluster: app.ci
-    context: ci/build-farm/hive-dry
+    context: ci/build-farm/hosted-mgmt-dry
     decorate: true
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-hive-dry
-    rerun_command: /test hive-dry
+    name: pull-ci-openshift-release-master-hosted-mgmt-dry
+    rerun_command: /test hosted-mgmt-dry
     run_if_changed: ^clusters/.*
     spec:
       containers:
       - args:
         - --config-dir
-        - clusters/hive
+        - clusters/hosted-mgmt
         - --kubeconfig
         - /etc/build-farm-credentials/kubeconfig
         - --as=
@@ -1012,6 +1012,11 @@ presubmits:
         env:
         - name: HOME
           value: /tmp
+        - name: hosted_mgmt_id
+          valueFrom:
+            secretKeyRef:
+              key: hosted-mgmt-id
+              name: hosted-mgmt-dex-oidc
         image: registry.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""
@@ -1029,12 +1034,12 @@ presubmits:
       - name: build-farm-credentials
         secret:
           items:
-          - key: sa.config-updater.hive.config
+          - key: sa.config-updater.hosted-mgmt.config
             path: kubeconfig
           secretName: config-updater
       - emptyDir: {}
         name: tmp
-    trigger: (?m)^/test( | .* )hive-dry,?($|\s.*)
+    trigger: (?m)^/test( | .* )hosted-mgmt-dry,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1061,55 +1066,6 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )jira-lifecycle-config,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: app.ci
-    context: ci/build-farm/multi01-dry
-    decorate: true
-    labels:
-      ci.openshift.io/build-farm: multi01
-      ci.openshift.io/generator: cluster-init
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-multi01-dry
-    rerun_command: /test multi01-dry
-    run_if_changed: ^clusters/.*
-    spec:
-      containers:
-      - args:
-        - --config-dir=clusters/build-clusters/multi01
-        - --as=
-        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
-        command:
-        - applyconfig
-        env:
-        - name: HOME
-          value: /tmp
-        image: registry.ci.openshift.org/ci/applyconfig:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
-        - mountPath: /tmp
-          name: tmp
-      serviceAccountName: config-updater
-      volumes:
-      - name: build-farm-credentials
-        secret:
-          items:
-          - key: sa.config-updater.multi01.config
-            path: kubeconfig
-          secretName: config-updater
-      - emptyDir: {}
-        name: tmp
-    trigger: (?m)^/test( | .* )multi01-dry,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1486,30 +1442,6 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )step-registry-shellcheck,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build04
-    context: ci/prow/supplemental-ci-images-mapping-files
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-supplemental-ci-images-mapping-files
-    rerun_command: /test supplemental-ci-images-mapping-files
-    run_if_changed: ^(core-services/image-mirroring/supplemental-ci-images/mapping_supplemental_ci_images_.*)
-    spec:
-      containers:
-      - command:
-        - hack/validate-supplemental-ci-images-mapping-files.sh
-        image: centos:8
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-    trigger: (?m)^/test( | .* )supplemental-ci-images-mapping-files,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

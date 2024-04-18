@@ -6,7 +6,7 @@ set -o pipefail
 
 echo "Updating install-config.yaml to a single ${SINGLE_NODE_AZURE_INSTANCE_TYPE} control plane node and 0 workers"
 
-pip3 install pyyaml --user
+pip3 install pyyaml==6.0 --user
 python3 -c '
 import yaml
 import sys

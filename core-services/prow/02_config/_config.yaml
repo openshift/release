@@ -104,7 +104,6 @@ deck:
     gcs_browser_prefixes:
       '*': https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-priv: https://gcsweb-private-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
-      openshift-psap/ci-artifacts-priv: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/cucushift: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/distributed-tracing-qe: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/openshift-tests-private: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
@@ -170,8 +169,6 @@ deck:
     size_limit: 500000000
   tide_update_period: 10s
 default_job_timeout: 24h0m0s
-disabled_clusters:
-- arm01
 gangway:
   allowed_api_clients:
   - allowed_jobs_filters:
@@ -221,6 +218,13 @@ plank:
       censor_secrets: true
       gcs_configuration:
         bucket: test-platform-results
+        compress_file_types:
+        - txt
+        - log
+        - json
+        - tar
+        - html
+        - yaml
         default_org: openshift
         default_repo: origin
         mediaTypes:
@@ -255,17 +259,10 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20240116-9788709fc1
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20240116-9788709fc1
-        initupload: gcr.io/k8s-prow/initupload:v20240116-9788709fc1
-        sidecar: gcr.io/k8s-prow/sidecar:v20240116-9788709fc1
-  - cluster: arm01
-    config:
-      utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20240116-9788709fc1-arm64
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20240116-9788709fc1-arm64
-        initupload: gcr.io/k8s-prow/initupload:v20240116-9788709fc1-arm64
-        sidecar: gcr.io/k8s-prow/sidecar:v20240116-9788709fc1-arm64
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20240417-db89760fe
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20240417-db89760fe
+        initupload: gcr.io/k8s-prow/initupload:v20240417-db89760fe
+        sidecar: gcr.io/k8s-prow/sidecar:v20240417-db89760fe
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -286,7 +283,7 @@ plank:
         mediaTypes:
           log: text/plain
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
-      timeout: 23h0m0s
+      timeout: 22h0m0s
     repo: openshift/openshift-tests-private
   - config:
       gcs_configuration:
@@ -302,16 +299,18 @@ plank:
         mediaTypes:
           log: text/plain
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
-      timeout: 23h0m0s
+      timeout: 22h0m0s
     repo: openshift/verification-tests
   - config:
       timeout: 6h0m0s
     repo: openshift/osde2e
+  - config:
+      timeout: 23h0m0s
+    repo: openshift/svt
   job_url_prefix_config:
     '*': https://prow.ci.openshift.org/view/
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-priv/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
-    openshift-psap/ci-artifacts-priv: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/cucushift: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/distributed-tracing-qe: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
@@ -321,7 +320,7 @@ plank:
     ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if
     eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else
     if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/
-  max_concurrency: 1200
+  max_concurrency: 1500
   max_goroutines: 20
   pod_pending_timeout: 30m0s
   pod_running_timeout: 48h0m0s
@@ -366,14 +365,13 @@ prowjob_default_entries:
   config:
     tenant_id: qe-private
   repo: openshift/verification-tests
-- cluster: '*'
-  config:
-    tenant_id: qe-private
-  repo: openshift-psap/ci-artifacts-priv
 prowjob_namespace: ci
 push_gateway:
   interval: 1m0s
   serve_metrics: false
+scheduler:
+  enabled: true
+  failover: {}
 sinker:
   max_pod_age: 6h0m0s
   max_prowjob_age: 24h0m0s
@@ -399,8 +397,16 @@ tide:
       containers:
         repos:
           aardvark-dns:
+            required-contexts:
+            - Total success
+            skip-unknown-contexts: true
+          buildah:
+            required-contexts:
+            - Total Success
             skip-unknown-contexts: true
           common:
+            required-contexts:
+            - Total Success
             skip-unknown-contexts: true
           dnsname:
             skip-unknown-contexts: true
@@ -411,12 +417,18 @@ tide:
           luksy:
             skip-unknown-contexts: true
           netavark:
+            required-contexts:
+            - Total success
             skip-unknown-contexts: true
           podman:
+            required-contexts:
+            - Total Success
             skip-unknown-contexts: true
           podman-py:
             skip-unknown-contexts: true
           storage:
+            required-contexts:
+            - Total Success
             skip-unknown-contexts: true
       cri-o:
         repos:
@@ -477,7 +489,6 @@ tide:
     '*': https://prow.ci.openshift.org/pr
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-priv/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
-    openshift-psap/ci-artifacts-priv: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift/cucushift: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift/distributed-tracing-qe: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr

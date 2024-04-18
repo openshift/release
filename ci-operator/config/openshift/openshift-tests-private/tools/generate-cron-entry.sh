@@ -52,6 +52,13 @@ let DAY_OF_MONTH=10#${NUMBERS:4:2}%30+1
 let MONTH=10#${NUMBERS:6:2}%12+1
 let DAY_OF_WEEK=10#${NUMBERS:8:1}%7
 
+# For f360 jobs, hard code the cron to:
+# 	Feb 16
+if [[ "${TEST_NAME}" =~ -f360 ]] ; then
+	DAY_OF_MONTH=16
+	MONTH=2
+fi
+
 if [[ "${TEST_NAME}" =~ baremetal- ]] ; then
 	# Raleigh working hours, 8~17 (in UTC, 13~22)
 	WK_HOUR_BEGIN=13
@@ -75,7 +82,7 @@ case "$FN" in
 	1)
 		echo "$MINUTE $HOUR * * *"
 		;;
-	2|3|4|5|6|7|10|14|28|30)
+	2|3|4|5|6|7|9|10|14|28|30)
 		DAY_OF_MONTH_TMP=$DAY_OF_MONTH
 		for ((i=1 ; i<31/FN; ++i)) ; do
 			let TMP=(i*FN+DAY_OF_MONTH-1)%30+1

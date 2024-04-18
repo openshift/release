@@ -16,6 +16,9 @@ chain:
     - name: HYPERSHIFT_AZURE_LOCATION
       default: "eastus"
       documentation: "The Azure location of the cluster."
+    - name: ENABLE_ICSP
+      default: "false"
+      documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
     commands: |-
       set -exuo pipefail
 
@@ -24,11 +27,20 @@ chain:
       
       RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
       
-      /usr/bin/hypershift create cluster azure \
+      PULL_SECRET_PATH="/etc/ci-pull-credentials/.dockerconfigjson"
+      ICSP_COMMAND=""
+      if [[ $ENABLE_ICSP == "true" ]]; then
+        ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml")
+        echo "extract secret/pull-secret"
+        oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+        PULL_SECRET_PATH="/tmp/.dockerconfigjson"
+      fi
+      
+      /usr/bin/hypershift create cluster azure ${ICSP_COMMAND} \
         --name ${CLUSTER_NAME} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
         --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
-        --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+        --pull-secret ${PULL_SECRET_PATH} \
         --azure-creds ${CLUSTER_PROFILE_DIR}/osServicePrincipal.json \
         --location ${HYPERSHIFT_AZURE_LOCATION} \
         --release-image ${RELEASE_IMAGE}

@@ -19,6 +19,10 @@ fi
 
 ret=0
 
+# save for debugging
+oc get machineset.machine.openshift.io -n openshift-machine-api -o json > ${ARTIFACT_DIR}/machinesets.json
+oc get machines.machine.openshift.io -n openshift-machine-api -o json > ${ARTIFACT_DIR}/machine.json
+oc get nodes -o json > ${ARTIFACT_DIR}/nodes.json
 
 # --------------------------------
 # Node Count
@@ -26,19 +30,42 @@ ret=0
 echo ">>>>>> Checking Outpost nodes count"
 
 outpost_id=$(jq -r '.OutpostId' ${CLUSTER_PROFILE_DIR}/aws_outpost_info.json)
-outpost_node_count=$(oc get nodes --selector='node-role.kubernetes.io/worker' --show-labels --no-headers | grep "outpost-id=${outpost_id}" | wc -l)
+outpost_node_count=$(oc get nodes --selector='node-role.kubernetes.io/outposts' --show-labels --no-headers | grep "outpost-id=${outpost_id}" | wc -l)
 echo "Outpost node count: ${outpost_node_count}, expect: ${EXPECTED_OUTPOST_NODE}"
 
 if [[ "${outpost_node_count}" != "${EXPECTED_OUTPOST_NODE}" ]]; then
-  echo "--------- MACHINES ---------"
-  oc get machine --selector machine.openshift.io/cluster-api-machine-type=worker -n openshift-machine-api -o yaml
-  echo "--------- NODES ---------"
-  oc get nodes --selector='node-role.kubernetes.io/worker' -o yaml
   echo "FAIL: Outpost nodes count"
   ret=$((ret+1))
 else
   echo "PASS: Outpost nodes count"
 fi
+
+# --------------------------------
+# Public/Internal IP
+# --------------------------------
+edge_node_day2_machineset_name=$(head -n 1 ${SHARED_DIR}/edge_node_day2_machineset_name)
+
+MACHINES=$(oc get machines.machine.openshift.io -n openshift-machine-api -ojson | jq -r --arg n "$edge_node_day2_machineset_name" '.items[] | select(.metadata.labels."machine.openshift.io/cluster-api-machineset"==$n) | .metadata.name')
+for machine in $MACHINES;
+do
+  instance_id=$(oc get machines.machine.openshift.io -n openshift-machine-api ${machine} -o json | jq -r '.status.providerStatus.instanceId')
+  external_dns=$(oc get machines.machine.openshift.io -n openshift-machine-api ${machine} -o json | jq -r '.status.addresses[] | select(.type=="ExternalDNS") | .address')
+  internal_dns=$(oc get machines.machine.openshift.io -n openshift-machine-api ${machine} -o json | jq -r '.status.addresses[] | select(.type=="InternalDNS") | .address')
+
+  machine_info="instance_id:[${instance_id}], external_dns:[${external_dns}], internal_dns:[${internal_dns}]"
+
+  echo "MACHINE: ${machine}: ${machine_info}"
+  
+  # Checking
+  if [[ ${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP} == "yes" ]] && [[ ${external_dns} == ec2* ]]; then
+    echo "PASS: machine public ip assignment: ${machine}"
+  elif [[ ${EDGE_NODE_WORKER_ASSIGN_PUBLIC_IP} == "no" ]] && ([[ "${external_dns}" == "" ]] || [[ "${external_dns}" == "null" ]]); then
+    echo "PASS: machine public ip assignment: ${machine}"
+  else
+    echo "FAIL: machine public ip assignment: ${machine}"
+    ret=$((ret+1))
+  fi
+done
 
 # --------------------------------
 # MTU

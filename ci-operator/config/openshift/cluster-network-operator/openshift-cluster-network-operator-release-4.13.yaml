@@ -115,7 +115,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      WINDOWS_SERVER_VERSION: "2019"
+      CUSTOM_VXLAN_PORT: "true"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
@@ -144,11 +144,13 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-ovn
-- as: e2e-vsphere-ovn-windows
+- always_run: false
+  as: e2e-vsphere-ovn-windows
+  optional: true
   steps:
     cluster_profile: vsphere-2
     test:
-    - ref: windows-e2e-operator-test-with-custom-vxlan-port
+    - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
 - as: e2e-openstack-kuryr
   optional: true
@@ -297,6 +299,13 @@ tests:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-sdn
   timeout: 5h0m0s
+- as: security
+  optional: true
+  steps:
+    env:
+      ALL_PROJECTS: "true"
+      PROJECT_NAME: cluster-network-operator
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.13
   org: openshift

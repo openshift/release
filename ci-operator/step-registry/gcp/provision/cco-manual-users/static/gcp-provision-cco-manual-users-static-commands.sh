@@ -102,33 +102,17 @@ then
 fi
 
 ## For OCP 4.15+
-# With OCP 4.15 and 4.16, the credentials requests YAML files of CCO and 
-# image-registry-operator don't have the section "spec.providerSpec.predefinedRoles", 
-# and instead there's section "spec.providerSpec.permissions" in them. 
-# So we pre-configured 2 custom roles accordingly. 
-# Refer to https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/qe-private-deck/pr-logs/pull/openshift_release/47131/rehearse-47131-periodic-ci-openshift-verification-tests-master-installation-nightly-4.15-gcp-ipi-cco-manual-users-static-f28/1742084668368359424/artifacts/gcp-ipi-cco-manual-users-static-f28/gcp-provision-cco-manual-users-static/build-log.txt
-CCO_CUSTOM_ROLE="projects/${GOOGLE_PROJECT_ID}/roles/installer_qe_cco_permissions"
-# The custom role includes below permissions, 
-# - iam.roles.get
-# - iam.serviceAccounts.get
-# - iam.serviceAccountKeys.list
-# - resourcemanager.projects.get
-# - resourcemanager.projects.getIamPolicy
-# - serviceusage.services.list
-
-IMAGE_REGISTRY_CUSTOM_ROLE="projects/${GOOGLE_PROJECT_ID}/roles/installer_qe_image_registry_permissions"
-# The custom role includes below permissions, 
-# - storage.buckets.create
-# - storage.buckets.delete
-# - storage.buckets.get
-# - storage.buckets.list
-# - storage.buckets.createTagBinding
-# - storage.buckets.listEffectiveTags
-# - storage.objects.create
-# - storage.objects.delete
-# - storage.objects.get
-# - storage.objects.list
-##
+# With OCP 4.15 and 4.16, the credentials requests YAML files have the section 
+# "spec.providerSpec.permissions", for which we need to use the pre-configured custom roles. 
+# Note: those custom roles were created, and would be maintained, by 'ccoctl', see https://console.cloud.google.com/iam-admin/roles.
+CCO_CUSTOM_ROLE="projects/${GOOGLE_PROJECT_ID}/roles/openshiftqe_cloudcredentialoperatorgcprocre"
+CNCC_CUSTOM_ROLE="projects/${GOOGLE_PROJECT_ID}/roles/openshiftqe_openshiftcloudnetworkconfigcont"
+CLUSTER_API_CUSTOM_ROLE="projects/${GOOGLE_PROJECT_ID}/roles/openshiftqe_openshiftclusterapigcp"
+CCM_CUSTOM_ROLE="projects/${GOOGLE_PROJECT_ID}/roles/openshiftqe_openshiftgcpccm"
+STORAGE_CUSTOM_ROLE="projects/${GOOGLE_PROJECT_ID}/roles/openshiftqe_openshiftgcppdcsidriveroperator"
+IMAGE_REGISTRY_CUSTOM_ROLE="projects/${GOOGLE_PROJECT_ID}/roles/openshiftqe_openshiftimageregistrygcs"
+INGRESS_CUSTOM_ROLE="projects/${GOOGLE_PROJECT_ID}/roles/openshiftqe_openshiftingressgcp"
+MACHINE_API_CUSTOM_ROLE="projects/${GOOGLE_PROJECT_ID}/roles/openshiftqe_openshiftmachineapigcp"
 
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 MPREFIX="${SHARED_DIR}/manifest"
@@ -171,6 +155,7 @@ sa_suffix=${GCP_SERVICE_ACCOUNT#*@}
 for yaml_filename in $(ls -p "${creds_requests_dir}"/*.yaml | awk -F'/' '{print $NF}'); do
   echo "$(date -u --rfc-3339=seconds) - Processing ${yaml_filename}"
   readarray -t roles < <(yq-go r "${creds_requests_dir}/${yaml_filename}" "spec.providerSpec.predefinedRoles" | sed 's/- //g')
+  readarray -t permissions < <(yq-go r "${creds_requests_dir}/${yaml_filename}" "spec.providerSpec.permissions" | sed 's/- //g')
   secret_name=$(yq-go r "${creds_requests_dir}/${yaml_filename}" "spec.secretRef.name")
   secret_namespace=$(yq-go r "${creds_requests_dir}/${yaml_filename}" "spec.secretRef.namespace")
   metadata_name=$(yq-go r "${creds_requests_dir}/${yaml_filename}" "metadata.name")
@@ -179,26 +164,51 @@ for yaml_filename in $(ls -p "${creds_requests_dir}"/*.yaml | awk -F'/' '{print 
     cat "${creds_requests_dir}/${yaml_filename}"
     exit 1
   fi
-  if [ -z "${roles:-}" ]; then
-    if [[ "${metadata_name}" =~ cloud-credential-operator ]]; then
-      echo "$(date -u --rfc-3339=seconds) - Using pre-configured custom role for cloud-credential-operator"
-      cmd="gcloud iam roles describe $(basename ${CCO_CUSTOM_ROLE}) --project=${GOOGLE_PROJECT_ID}"
-      run_command "${cmd}"
-      cmd="yq-go r ${creds_requests_dir}/${yaml_filename} spec.providerSpec.permissions"
-      run_command "${cmd}"
-      roles=("${CCO_CUSTOM_ROLE}")
-    elif [[ "${metadata_name}" =~ openshift-image-registry ]]; then
-      echo "$(date -u --rfc-3339=seconds) - Using pre-configured custom role for openshift-image-registry"
-      cmd="gcloud iam roles describe $(basename ${IMAGE_REGISTRY_CUSTOM_ROLE}) --project=${GOOGLE_PROJECT_ID}"
-      run_command "${cmd}"
-      cmd="yq-go r ${creds_requests_dir}/${yaml_filename} spec.providerSpec.permissions"
-      run_command "${cmd}"
-      roles=("${IMAGE_REGISTRY_CUSTOM_ROLE}")
-    else
-      echo "$(date -u --rfc-3339=seconds) - ERROR: Failed to determine the required permissions/roles"
+  if [ -n "${permissions:-}" ]; then
+    case "${metadata_name}" in
+      cloud-credential-operator-gcp-ro-creds)
+      additional_custom_role="${CCO_CUSTOM_ROLE}"
+      echo "$(date -u --rfc-3339=seconds) - Using pre-configured custom role '${additional_custom_role}' for openshift-cloud-credential-operator"
+      ;;
+      openshift-cloud-network-config-controller-gcp)
+      additional_custom_role="${CNCC_CUSTOM_ROLE}"
+      echo "$(date -u --rfc-3339=seconds) - Using pre-configured custom role '${additional_custom_role}' for openshift-cloud-network-config-controller"
+      ;;
+      openshift-cluster-api-gcp)
+      additional_custom_role="${CLUSTER_API_CUSTOM_ROLE}"
+      echo "$(date -u --rfc-3339=seconds) - Using pre-configured custom role '${additional_custom_role}' for openshift-cluster-api"
+      ;;
+      openshift-gcp-ccm)
+      additional_custom_role="${CCM_CUSTOM_ROLE}"
+      echo "$(date -u --rfc-3339=seconds) - Using pre-configured custom role '${additional_custom_role}' for openshift-cloud-controller-manager"
+      ;;
+      openshift-gcp-pd-csi-driver-operator)
+      additional_custom_role="${STORAGE_CUSTOM_ROLE}"
+      echo "$(date -u --rfc-3339=seconds) - Using pre-configured custom role '${additional_custom_role}' for openshift-cluster-csi-drivers"
+      ;;
+      openshift-image-registry-gcs)
+      additional_custom_role="${IMAGE_REGISTRY_CUSTOM_ROLE}"
+      echo "$(date -u --rfc-3339=seconds) - Using pre-configured custom role '${additional_custom_role}' for openshift-image-registry"
+      ;;
+      openshift-ingress-gcp)
+      additional_custom_role="${INGRESS_CUSTOM_ROLE}"
+      echo "$(date -u --rfc-3339=seconds) - Using pre-configured custom role '${additional_custom_role}' for openshift-ingress-operator"
+      ;;
+      openshift-machine-api-gcp)
+      additional_custom_role="${MACHINE_API_CUSTOM_ROLE}"
+      echo "$(date -u --rfc-3339=seconds) - Using pre-configured custom role '${additional_custom_role}' for openshift-machine-api"
+      ;;
+      *)
+      echo "$(date -u --rfc-3339=seconds) - ERROR: Failed to determine the required custom role by 'spec.providerSpec.permissions'"
       cat "${creds_requests_dir}/${yaml_filename}"
       exit 1
-    fi
+      ;;
+    esac
+    cmd="gcloud iam roles describe $(basename ${additional_custom_role}) --project=${GOOGLE_PROJECT_ID}"
+    run_command "${cmd}"
+    cmd="yq-go r ${creds_requests_dir}/${yaml_filename} spec.providerSpec.permissions"
+    run_command "${cmd}"
+    roles=("${roles[@]}" "${additional_custom_role}")
   fi
   echo "$(date -u --rfc-3339=seconds) - The interested roles '${roles[*]}'"
 
