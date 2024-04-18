@@ -15,11 +15,16 @@ QUAY_ACCESS_TOKEN=$(cat "$SHARED_DIR"/quay_oauth2_token)
 QUAY_OAUTH2_TOEKN="Bearer $QUAY_ACCESS_TOKEN"
 
 # Registry details
-export OCI_ROOT_URL=$(cat "$SHARED_DIR"/quayroute)
+OCI_ROOT_URL=$(cat "$SHARED_DIR"/quayroute)
+OCI_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
+OCI_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
+
+
+export OCI_ROOT_URL
+export OCI_USERNAME
+export OCI_PASSWORD
 export OCI_NAMESPACE="myorg/myrepo"
 export OCI_CROSSMOUNT_NAMESPACE="myorg/other"
-export OCI_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-export OCI_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
 
 # Which workflows to run
 export OCI_TEST_PULL=1
@@ -33,7 +38,7 @@ export OCI_DEBUG=0
 export OCI_DELETE_MANIFEST_BEFORE_BLOBS=0 # defaults to OCI_DELETE_MANIFEST_BEFORE_BLOBS=1 if not set
 
 echo "parameterssss...."
-echo $OCI_ROOT_URL $OCI_USERNAME $OCI_PASSWORD $QUAY_URL $QUAY_ACCESS_TOKEN
+echo $OCI_ROOT_URL $OCI_USERNAME $OCI_PASSWORD $QUAY_URL $QUAY_ACCESS_TOKEN $QUAY_OAUTH2_TOEKN
 ./conformance.test
 
 go test -c   && ls  || true
