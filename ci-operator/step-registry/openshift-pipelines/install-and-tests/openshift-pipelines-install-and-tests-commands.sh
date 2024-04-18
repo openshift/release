@@ -31,7 +31,7 @@ echo "Running olm.spec to install operator"
 CATALOG_SOURCE=redhat-operators CHANNEL=${OLM_CHANNEL} gauge run --log-level=debug --verbose --tags install specs/olm.spec || true
 
 echo "Running gauge specs"
-declare -a specs=("specs/clustertasks/clustertask-s2i.spec" "specs/clustertasks/clustertask.spec" "specs/pipelines/" "specs/triggers/" "specs/metrics/" "-p specs/operator/addon.spec specs/operator/auto-prune.spec")
+IFS=',' read -r -a specs <<< "$SPECS"
 for spec in "${specs[@]}"; do
   gauge run --log-level=debug --verbose --tags 'sanity & !tls' ${spec} || true
 done
