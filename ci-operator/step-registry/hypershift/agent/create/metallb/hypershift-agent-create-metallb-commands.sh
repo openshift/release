@@ -92,7 +92,6 @@ metadata:
   name: ingress-public-ip
   namespace: metallb-system
 spec:
-  protocol: layer2
   autoAssign: false
   addresses:
   - 192.168.111.30-192.168.111.30
@@ -105,7 +104,6 @@ metadata:
   name: ingress-public-ip
   namespace: metallb-system
 spec:
-  protocol: layer2
   autoAssign: false
   addresses:
   - 192.168.111.30-192.168.111.30
@@ -118,13 +116,13 @@ fi
 
 oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1
-kind: BGPAdvertisement
+kind: L2Advertisement
 metadata:
   name: ingress-public-ip
   namespace: metallb-system
 spec:
-  aggregationLength: 32
-  aggregationLengthV6: 128
+  ipAddressPools:
+  - ingress-public-ip
 EOF
 
 oc create -f - <<EOF
