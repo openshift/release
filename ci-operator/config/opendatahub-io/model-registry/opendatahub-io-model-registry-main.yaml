@@ -70,12 +70,20 @@ tests:
     - as: main
       cli: latest
       commands: |
+        # Print current action
+        echo "Waiting for readiness of community-operators CatalogSource..."
+        # Wait for readiness of community-operators CatalogSource
+        STATUS=$(oc get catalogsource -n openshift-marketplace community-operators -o=jsonpath='{.status.connectionState.lastObservedState}')
+        while [ "${STATUS}" != "READY" ]
+        do
+          echo "Waiting for 30s to check again..."
+          sleep 30
+          STATUS=$(oc get catalogsource -n openshift-marketplace community-operators -o=jsonpath='{.status.connectionState.lastObservedState}')
+        done
         # Print last commit of current code
         git show
         # Check state of ODH operator source
         oc describe catalogsource -n openshift-marketplace community-operators
-        # Sleep for debugging
-        sleep 2h
         # Deploy ODH operator and other necessary resources
         ./openshift-ci/scripts/oci-model-registry-deploy.sh
         # Install Robot Framework tests requirements
