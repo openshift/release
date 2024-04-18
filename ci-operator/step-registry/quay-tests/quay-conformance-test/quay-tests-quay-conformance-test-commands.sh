@@ -33,7 +33,7 @@ export OCI_DEBUG=0
 export OCI_DELETE_MANIFEST_BEFORE_BLOBS=0 # defaults to OCI_DELETE_MANIFEST_BEFORE_BLOBS=1 if not set
 
 echo "parameterssss...."
-echo $OCI_ROOT_URL $OCI_USERNAME $OCI_PASSWORD
+echo $OCI_ROOT_URL $OCI_USERNAME $OCI_PASSWORD $QUAY_URL $QUAY_ACCESS_TOKEN
 ./conformance.test
 
 go test -c   && ls  || true
