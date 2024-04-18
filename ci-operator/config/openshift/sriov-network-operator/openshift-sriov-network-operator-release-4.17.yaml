@@ -129,6 +129,25 @@ tests:
       OO_PACKAGE: sriov-network-operator
       OO_TARGET_NAMESPACES: '!install'
     test:
+    - as: start-sriov-operator
+      cli: latest
+      commands: |
+        oc apply -f - <<EOF
+        apiVersion: sriovnetwork.openshift.io/v1
+        kind: SriovOperatorConfig
+        metadata:
+          name: default
+          namespace: openshift-sriov-network-operator
+        spec:
+          enableInjector: true
+          enableOperatorWebhook: true
+          logLevel: 2
+        EOF
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
     - as: e2e
       commands: make test-e2e-validation-only
       from: src
@@ -156,6 +175,27 @@ tests:
       ADDITIONAL_WORKERS_NETWORKS: ""
       OPENSTACK_SRIOV_NETWORK: mellanox-hwoffload
     workflow: openshift-e2e-openstack-sriov-cgroupsv1
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: sriov-network-operator
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
+- always_run: false
+  as: e2e-telco5g-cnftests
+  cluster: build05
+  optional: true
+  steps:
+    env:
+      E2E_TESTS_CONFIG: |
+        CNF_E2E_TESTS=true
+        CNF_ORIGIN_TESTS=false
+      T5CI_JOB_TYPE: cnftests
+      T5CI_VERSION: "4.16"
+      TEST_RUN_FEATURES: dpdk sriov multinetworkpolicy sctp vrf tuningcni bondcni
+    workflow: telco5g-cnf
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

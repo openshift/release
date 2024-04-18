@@ -30,6 +30,8 @@ else
   echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
   exit 1
 fi
+AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
+AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
 # If the oidc config exists, do deletion.
 OIDC_CONFIG_FILE="${SHARED_DIR}/oidc-config"
@@ -37,7 +39,7 @@ if [[ -e "${OIDC_CONFIG_FILE}" ]]; then
   oidc_config_id=$(cat "${OIDC_CONFIG_FILE}" | jq -r '.id')
 
   echo "Start deleting the oidc config ${oidc_config_id}..."
-  rosa delete oidc-provider -y --mode auto --oidc-config-id ${oidc_config_id} || true
+  rosa delete oidc-provider -y --mode auto --oidc-config-id ${oidc_config_id} | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" || true
   rosa delete oidc-config -y --mode auto --oidc-config-id ${oidc_config_id}
 else
   echo "No oidc config created in the pre step"

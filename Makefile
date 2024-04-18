@@ -67,7 +67,7 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20240131-27b33826e4 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20240417-db89760fe --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
@@ -75,7 +75,7 @@ jobs: ci-operator-checkconfig
 
 ci-operator-checkconfig:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/ci-operator-checkconfig:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/core-services/cluster-profiles:/core-services/cluster-profiles$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/ci-operator-checkconfig:latest --config-dir /ci-operator/config --registry /ci-operator/step-registry --cluster-profiles-config /core-services/cluster-profiles/_config.yaml
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry/cluster-profiles:/ci-operator/step-registry/cluster-profiles$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/core-services/cluster-pools:/core-services/cluster-pools$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/ci-operator-checkconfig:latest --config-dir /ci-operator/config --registry /ci-operator/step-registry --cluster-profiles-config /ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml --cluster-claim-owners-config /core-services/cluster-pools/_config.yaml
 .PHONY: ci-operator-checkconfig
 
 ci-operator-config:
@@ -102,6 +102,8 @@ prow-config:
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --sharded-plugin-config-base-dir /config
 
 acknowledge-critical-fixes-only:
+	./hack/generate-acknowledge-critical-fixes-repo-list.sh
+	$(eval REPOS ?= ./hack/acknowledge-critical-fix-repos.txt)
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/tide-config-manager:latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(REPOS):/repos" registry.ci.openshift.org/ci/tide-config-manager:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase acknowledge-critical-fixes-only --repos-guarded-by-ack-critical-fixes /repos
 	$(MAKE) prow-config
@@ -303,7 +305,7 @@ openshift-image-mirror-mappings:
 .PHONY: openshift-image-mirror-mappings
 
 config_updater_vault_secret: build_farm_credentials_folder
-	@[[ $$cluster ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
+	@[[ $$CLUSTER ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/applyconfig:latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) \
 		--rm \
@@ -311,11 +313,11 @@ config_updater_vault_secret: build_farm_credentials_folder
 		-v "$(kubeconfig_path):/_kubeconfig$(VOLUME_MOUNT_FLAGS)" \
 		registry.ci.openshift.org/ci/applyconfig:latest \
 		--config-dir=/manifests \
-		--context=$(cluster) \
+		--context=$(CLUSTER) \
 		--confirm \
 		--kubeconfig=/_kubeconfig
 
-	./clusters/psi/create_kubeconfig.sh "$(build_farm_credentials_folder)/sa.config-updater.${cluster}.config" ${cluster} config-updater ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
+	./clusters/psi/create_kubeconfig.sh "$(build_farm_credentials_folder)/sa.config-updater.${CLUSTER}.config" ${CLUSTER} config-updater ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
 
 	ls $(build_farm_credentials_folder)
 
@@ -394,7 +396,7 @@ refresh-token-version:
 
 DRY_RUN ?= server
 CLUSTER ?= app.ci
-API_SERVER_URL ?= "https://api.ci.l2s4.p1.openshiftapps.com:6443"
+API_SERVER_URL ?= $(shell oc --context ${CLUSTER} config view --minify --output jsonpath="{.clusters[*].cluster.server}")
 TMPDIR ?= /tmp
 
 expire-token-version:
@@ -417,15 +419,13 @@ config-updater-kubeconfig:
 secret-config-updater:
 	oc --context app.ci -n ci create secret generic config-updater \
 	--from-file=sa.config-updater.app.ci.config=$(TMPDIR)/sa.config-updater.app.ci.config \
-	--from-file=sa.config-updater.arm01.config=$(TMPDIR)/sa.config-updater.arm01.config \
 	--from-file=sa.config-updater.build01.config=$(TMPDIR)/sa.config-updater.build01.config \
 	--from-file=sa.config-updater.build02.config=$(TMPDIR)/sa.config-updater.build02.config \
 	--from-file=sa.config-updater.build03.config=$(TMPDIR)/sa.config-updater.build03.config \
 	--from-file=sa.config-updater.build04.config=$(TMPDIR)/sa.config-updater.build04.config \
 	--from-file=sa.config-updater.build05.config=$(TMPDIR)/sa.config-updater.build05.config \
 	--from-file=sa.config-updater.build09.config=$(TMPDIR)/sa.config-updater.build09.config \
-	--from-file=sa.config-updater.hive.config=$(TMPDIR)/sa.config-updater.hive.config \
-	--from-file=sa.config-updater.multi01.config=$(TMPDIR)/sa.config-updater.multi01.config \
+	--from-file=sa.config-updater.hosted-mgmt.config=$(TMPDIR)/sa.config-updater.hosted-mgmt.config \
 	--from-file=sa.config-updater.vsphere02.config=$(TMPDIR)/sa.config-updater.vsphere02.config \
 	--dry-run=client -o json | oc --context app.ci apply --dry-run=${DRY_RUN} --as system:admin -f -
 .PHONY: secret-config-updater
@@ -457,12 +457,12 @@ generate-hypershift-deployment:
 		-v "$(MGMT_AWS_CONFIG_PATH):/mgmt-aws$(VOLUME_MOUNT_FLAGS)" \
 		registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
 		install \
-		--oidc-storage-provider-s3-bucket-name=hypershift-oidc-provider \
+		--oidc-storage-provider-s3-bucket-name=dptp-hypershift-oidc-provider \
 		--oidc-storage-provider-s3-credentials=/mgmt-aws \
 		--oidc-storage-provider-s3-region=us-east-1 \
 		--hypershift-image=registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
 		--enable-uwm-telemetry-remote-write=false \
-		render | $(yq) eval 'select(.kind != "Secret")' > clusters/hive/hypershift/hypershift-install.yaml
+		render | $(yq) eval 'select(.kind != "Secret")' > clusters/hosted-mgmt/hypershift/SS_hypershift-install.yaml
 .PHONY: generate-hypershift-deployment
 
 build-hypershift-deployment: TAG ?= $(shell date +%Y%m%d)

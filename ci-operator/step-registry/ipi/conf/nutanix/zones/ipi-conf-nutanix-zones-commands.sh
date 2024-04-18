@@ -7,8 +7,6 @@ set -o pipefail
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH="${SHARED_DIR}/install-config-failureDomains.yaml"
 
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/nutanix_context.sh"
 NUTANIX_AUTH_PATH=${CLUSTER_PROFILE_DIR}/secrets.sh
 
 declare prism_element1_host
@@ -19,16 +17,26 @@ declare prism_element2_host
 declare prism_element2_port
 declare prism_element2_uuid
 declare prism_element2_subnet
+declare prism_element3_host
+declare prism_element3_port
+declare prism_element3_uuid
+declare prism_element3_subnet
 # shellcheck source=/dev/null
 source "${NUTANIX_AUTH_PATH}"
+
+failureDomains="- failure-domain-1
+        - failure-domain-2
+        - failure-domain-3"
+if [[ "$SINGLE_ZONE" == "true" ]]; then
+  failureDomains="- failure-domain-1"
+fi
 
 cat >"${PATCH}" <<EOF
 platform:
   nutanix:
     defaultMachinePlatform:
       failureDomains:
-        - failure-domain-1
-        - failure-domain-2
+        $failureDomains
     failureDomains:
     - name: failure-domain-1
       prismElement:
@@ -47,6 +55,15 @@ platform:
           port: $prism_element2_port
       subnetUUIDs:
       - $prism_element2_subnet
+
+    - name: failure-domain-3
+      prismElement:
+        uuid: $prism_element3_uuid
+        endpoint:
+          address: $prism_element3_host
+          port: $prism_element3_port
+      subnetUUIDs:
+      - $prism_element3_subnet
 EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"

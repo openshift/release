@@ -7,6 +7,13 @@ set -o pipefail
 # shellcheck disable=SC1091
 source "$SHARED_DIR/main.env"
 
+# Set go version
+if [[ "$T5CI_VERSION" == "4.12" ]] || [[ "$T5CI_VERSION" == "4.13" ]]; then
+    source $HOME/golang-1.19
+else
+    source $HOME/golang-1.20
+fi
+
 export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy}" # next: ovs_qos
 export CNF_REPO="${CNF_REPO:-https://github.com/openshift-kni/cnf-features-deploy.git}"
 export CNF_BRANCH="${CNF_BRANCH:-master}"
@@ -237,8 +244,6 @@ cat << EOF > run-openshift-tests.yml
       ignore_errors: true
 EOF
 
-# Install posix collection so that we can use debug callback
-ansible-galaxy collection install ansible.posix
 # Run OpenShift's conformance test suite
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i "$SHARED_DIR/inventory" run-openshift-tests.yml -vv
 

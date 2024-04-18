@@ -1,0 +1,37 @@
+ref:
+  as: cucushift-upgrade-toversion
+  from_image:
+    namespace: ci
+    name: verification-tests
+    tag: latest
+  cli: latest
+  timeout: 22h
+  grace_period: 10m
+  commands: cucushift-upgrade-toversion-commands.sh
+  resources:
+    limits:
+      cpu: "1"
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: ENABLE_OTA_TEST
+    default: "false"
+    documentation: |-
+      Detemine if OTA test will be included
+  - name: UPGRADE_TO_VERSION
+    default: "latest"
+    documentation: |-
+      latest: run upgrade with "oc adm upgrade --to-latest";
+      x.y.z: run upgrade with "oc adm upgrade --to x.y.z";
+      "": run upgrade with "oc adm upgrade --to $latest_version_in_available_update"
+  - name: TIMEOUT
+    default: "130"
+    documentation: Time to wait for upgrade finish
+  - name: UPGRADE_CCO_MANUAL_MODE
+    default: ""
+    documentation: |-
+      Detemine what's the cco manual mode of the cluster to be upgraded
+  dependencies:
+  - name: "release:target"
+    env: "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"

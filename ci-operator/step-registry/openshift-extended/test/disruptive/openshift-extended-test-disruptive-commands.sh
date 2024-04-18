@@ -4,6 +4,23 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+trap 'warn_0_case_executed' INT TERM EXIT
+function warn_0_case_executed {
+    local count
+    count="$(ls ${ARTIFACT_DIR} | wc -l)"
+    if [ $((count)) == 0 ] ; then
+        mkdir --parents "${ARTIFACT_DIR}"
+        cat >"${ARTIFACT_DIR}/junit-ginkgo-result.xml" <<- EOF
+<testsuite name="openshift-extended-test" tests="1" errors="1">
+  <testcase name="Overall status of openshift-extended test">
+    <failure message="">Caution: NO test cases executed.</failure>
+  </testcase>
+</testsuite>
+EOF
+
+    fi
+}
+
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
@@ -166,7 +183,7 @@ ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal|equinix-ocp-metal-qe|powervs-1)
+equinix-ocp-metal|equinix-ocp-metal-qe|powervs-*)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
@@ -209,7 +226,7 @@ oc get clusterversion version -o yaml || true
 # execute the cases
 function run {
     test_scenarios=""
-    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
+    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
     echo "TEST_SCENARIOS: \"${TEST_SCENARIOS:-}\""
     echo "TEST_ADDITIONAL: \"${TEST_ADDITIONAL:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
@@ -317,6 +334,7 @@ function run {
     # summarize test results
     echo "Summarizing test results..."
     failures=0 errors=0 skipped=0 tests=0
+    [[ -e "${ARTIFACT_DIR}" ]] || exit 0
     grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
     while read -a row ; do
         # if the last ARG of command `let` evaluates to 0, `let` returns 1

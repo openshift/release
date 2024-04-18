@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.17-openshift-4.10
+    tag: rhel-8-release-golang-1.19-openshift-4.14
 images:
 - context_dir: base/ubi8-python-3.8
   dockerfile_path: Dockerfile
@@ -31,18 +31,14 @@ images:
   dockerfile_path: Dockerfile
   from: jupyter-datascience-ubi8-python-3.8
   to: jupyter-trustyai-ubi8-python-3.8
-- context_dir: habana/1.9.0/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: jupyter-datascience-ubi8-python-3.8
-  to: habana-jupyter-1.9.0-ubi8-python-3.8
 - context_dir: habana/1.10.0/ubi8-python-3.8
   dockerfile_path: Dockerfile
   from: jupyter-datascience-ubi8-python-3.8
   to: habana-jupyter-1.10.0-ubi8-python-3.8
-- context_dir: habana/1.11.0/ubi8-python-3.8
+- context_dir: habana/1.13.0/ubi8-python-3.8
   dockerfile_path: Dockerfile
   from: jupyter-datascience-ubi8-python-3.8
-  to: habana-jupyter-1.11.0-ubi8-python-3.8
+  to: habana-jupyter-1.13.0-ubi8-python-3.8
 - context_dir: runtimes/minimal/ubi8-python-3.8
   dockerfile_path: Dockerfile
   from: base-ubi8-python-3.8
@@ -110,6 +106,34 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-ubi9-python-3.9
   to: runtime-cuda-tensorflow-ubi9-python-3.9
+- context_dir: intel/base/gpu/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: base-ubi9-python-3.9
+  to: intel-base-gpu-ubi9-python-3.9
+- context_dir: intel/runtimes/tensorflow/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: intel-base-gpu-ubi9-python-3.9
+  to: intel-runtime-tensorflow-ubi9-python-3.9
+- context_dir: jupyter/intel/tensorflow/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: intel-runtime-tensorflow-ubi9-python-3.9
+  to: jupyter-intel-tensorflow-ubi9-python-3.9
+- context_dir: intel/runtimes/pytorch/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: intel-base-gpu-ubi9-python-3.9
+  to: intel-runtime-pytorch-ubi9-python-3.9
+- context_dir: jupyter/intel/pytorch/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: intel-runtime-pytorch-ubi9-python-3.9
+  to: jupyter-intel-pytorch-ubi9-python-3.9
+- context_dir: intel/runtimes/ml/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: base-ubi9-python-3.9
+  to: intel-runtime-ml-ubi9-python-3.9
+- context_dir: jupyter/intel/ml/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: intel-runtime-ml-ubi9-python-3.9
+  to: jupyter-intel-ml-ubi9-python-3.9
 - context_dir: base/c9s-python-3.9
   dockerfile_path: Dockerfile
   to: base-c9s-python-3.9
@@ -129,6 +153,13 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-c9s-python-3.9
   to: cuda-rstudio-c9s-python-3.9
+- context_dir: base/anaconda-python-3.8
+  dockerfile_path: Dockerfile
+  to: base-anaconda-python-3.8
+- context_dir: jupyter/datascience/anaconda-python-3.8
+  dockerfile_path: Dockerfile
+  from: base-anaconda-python-3.8
+  to: jupyter-datascience-anaconda-python-3.8
 promotion:
   to:
   - namespace: opendatahub-io
@@ -285,26 +316,6 @@ tests:
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: jupyter-trustyai-ubi8-python-3.8
     workflow: opendatahub-io-ci-image-mirror
-- as: notebook-habana-1-9-0-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: habana-jupyter-1.9.0-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: habana-jupyter-1.9.0-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
-- as: notebook-habana-1-9-0-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(habana\/1.9.0\/ubi8-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: habana-jupyter-1.9.0-ubi8-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: habana-jupyter-1.9.0-ubi8-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
 - as: notebook-habana-1-10-0-ubi8-python-3-8-image-mirror
   postsubmit: true
   steps:
@@ -325,25 +336,25 @@ tests:
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: habana-jupyter-1.10.0-ubi8-python-3.8
     workflow: opendatahub-io-ci-image-mirror
-- as: notebook-habana-1-11-0-ubi8-python-3-8-image-mirror
+- as: notebook-habana-1-13-0-ubi8-python-3-8-image-mirror
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: habana-jupyter-1.11.0-ubi8-python-3.8
+      SOURCE_IMAGE_REF: habana-jupyter-1.13.0-ubi8-python-3.8
     env:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
-      RELEASE_VERSION: habana-jupyter-1.11.0-ubi8-python-3.8
+      RELEASE_VERSION: habana-jupyter-1.13.0-ubi8-python-3.8
     workflow: opendatahub-io-ci-image-mirror
-- as: notebook-habana-1-11-0-ubi8-python-3-8-pr-image-mirror
-  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(habana\/1.11.0\/ubi8-python-3.8\/*)
+- as: notebook-habana-1-13-0-ubi8-python-3-8-pr-image-mirror
+  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(habana\/1.13.0\/ubi8-python-3.8\/*)
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: habana-jupyter-1.11.0-ubi8-python-3.8
+      SOURCE_IMAGE_REF: habana-jupyter-1.13.0-ubi8-python-3.8
     env:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
-      RELEASE_VERSION: habana-jupyter-1.11.0-ubi8-python-3.8
+      RELEASE_VERSION: habana-jupyter-1.13.0-ubi8-python-3.8
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-minimal-ubi8-python-3-8-image-mirror
   postsubmit: true
@@ -407,6 +418,60 @@ tests:
     env:
       IMAGE_REPO: workbench-images
       RELEASE_VERSION: runtime-cuda-tensorflow-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: runtime-intel-tf-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (base\/ubi9-python-3.9\/*)|(intel\/base\/gpu\/ubi9-python-3.9\/*)|(intel\/runtimes\/tensorflow\/ubi9-python-3.9\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: intel-runtime-tensorflow-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      RELEASE_VERSION: intel-runtime-tensorflow-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: runtime-intel-tf-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: intel-runtime-tensorflow-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      RELEASE_VERSION: intel-runtime-tensorflow-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: runtime-intel-pyt-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (base\/ubi9-python-3.9\/*)|(intel\/base\/gpu\/ubi9-python-3.9\/*)|(intel\/runtimes\/pytorch\/ubi9-python-3.9\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: intel-runtime-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      RELEASE_VERSION: intel-runtime-pytorch-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: runtime-intel-pyt-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: intel-runtime-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      RELEASE_VERSION: intel-runtime-pytorch-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: runtime-intel-ml-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (base\/ubi9-python-3.9\/*)|(intel\/runtimes\/ml\/ubi9-python-3.9\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: intel-runtime-ml-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      RELEASE_VERSION: intel-runtime-ml-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: runtime-intel-ml-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: intel-runtime-ml-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      RELEASE_VERSION: intel-runtime-ml-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-cuda-tensorflow-ubi8-python-3-8-pr-image-mirror
   run_if_changed: (base\/ubi8-python-3.8\/*)|(cuda\/ubi8-python-3.8\/*)|(runtimes\/tensorflow\/ubi8-python-3.8\/*)
@@ -575,6 +640,66 @@ tests:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: cuda-jupyter-tensorflow-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-intel-tf-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-intel-tensorflow-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: jupyter-intel-tensorflow-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-intel-tf-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (base\/ubi9-python-3.9\/*)|(intel\/base\/gpu\/ubi9-python-3.9\/*)|(intel\/runtimes\/tensorflow\/ubi9-python-3.9\/*)|(jupyter\/intel\/tensorflow\/ubi9-python-3.9\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-intel-tensorflow-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: jupyter-intel-tensorflow-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-intel-pyt-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-intel-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: jupyter-intel-pytorch-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-intel-pyt-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (base\/ubi9-python-3.9\/*)|(intel\/base\/gpu\/ubi9-python-3.9\/*)|(intel\/runtimes\/pytorch\/ubi9-python-3.9\/*)|(jupyter\/intel\/pytorch\/ubi9-python-3.9\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-intel-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: jupyter-intel-pytorch-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-intel-ml-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-intel-ml-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: jupyter-intel-ml-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-intel-ml-ubi9-python-3-9-pr-image-mirror
+  run_if_changed: (base\/ubi9-python-3.9\/*)|(intel\/runtimes\/ml\/ubi9-python-3.9\/*)|(jupyter\/intel\/ml\/ubi9-python-3.9\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-intel-ml-ubi9-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: jupyter-intel-ml-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: notebook-jupyter-trustyai-ubi9-python-3-9-image-mirror
   postsubmit: true
@@ -768,6 +893,16 @@ tests:
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: cuda-rstudio-c9s-python-3.9
     workflow: opendatahub-io-ci-image-mirror
+- as: jupyter-datascience-anaconda-python-3-8-pr-image-mirror
+  run_if_changed: (base\/anaconda-python-3.8\/*)|(jupyter\/datascience\/anaconda-python-3.8\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-datascience-anaconda-python-3.8
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: jupyter-datascience-anaconda-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
 - as: notebooks-e2e-tests
   skip_if_only_changed: ^docs\/|.github\/workflows\/*|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
   steps:
@@ -904,6 +1039,108 @@ tests:
       dependencies:
       - env: RUNTIME_TENSORFLOW_IMAGE
         name: runtime-cuda-tensorflow-ubi8-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: intel-runtimes-tf-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project intel-runtimes-tensorflow-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_INTEL_TENSORFLOW_IMAGE}"
+        make deploy9-intel-runtimes-tensorflow-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make validate-runtime-image image=intel-runtime-tensorflow-ubi9-python-3.9
+        make undeploy9-intel-runtimes-tensorflow-ubi9-python-3.9
+      dependencies:
+      - env: RUNTIME_INTEL_TENSORFLOW_IMAGE
+        name: intel-runtime-tensorflow-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: intel-runtimes-pyt-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project intel-runtimes-pytorch-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_INTEL_PYTORCH_IMAGE}"
+        make deploy9-intel-runtimes-pytorch-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make validate-runtime-image image=intel-runtime-pytorch-ubi9-python-3.9
+        make undeploy9-intel-runtimes-pytorch-ubi9-python-3.9
+      dependencies:
+      - env: RUNTIME_INTEL_PYTORCH_IMAGE
+        name: intel-runtime-pytorch-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: intel-runtimes-ml-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project intel-runtimes-ml-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${RUNTIME_INTEL_ML_IMAGE}"
+        make deploy9-intel-runtimes-ml-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make validate-runtime-image image=intel-runtime-ml-ubi9-python-3.9
+        make undeploy9-intel-runtimes-ml-ubi9-python-3.9
+      dependencies:
+      - env: RUNTIME_INTEL_ML_IMAGE
+        name: intel-runtime-ml-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: jupyter-intel-tf-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-intel-tensorflow-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_INTEL_TENSORFLOW_IMAGE}"
+        make deploy9-jupyter-intel-tensorflow-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-intel-tensorflow-ubi9-python-3.9
+        make undeploy9-jupyter-intel-tensorflow-ubi9-python-3.9
+      dependencies:
+      - env: RUNTIME_INTEL_TENSORFLOW_IMAGE
+        name: intel-runtime-tensorflow-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: jupyter-intel-pyt-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-intel-pytorch-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_INTEL_PYTORCH_IMAGE}"
+        make deploy9-jupyter-intel-pytorch-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-intel-pytorch-ubi9-python-3.9
+        make undeploy9-jupyter-intel-pytorch-ubi9-python-3.9
+      dependencies:
+      - env: RUNTIME_INTEL_PYTORCH_IMAGE
+        name: intel-runtime-pytorch-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: jupyter-intel-ml-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-intel-ml-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_INTEL_ML_IMAGE}"
+        make deploy9-jupyter-intel-ml-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-intel-ml-ubi9-python-3.9
+        make undeploy9-jupyter-intel-ml-ubi9-python-3.9
+      dependencies:
+      - env: RUNTIME_INTEL_ML_IMAGE
+        name: intel-runtime-ml-ubi9-python-3.9
       from: src
       resources:
         requests:
@@ -1113,6 +1350,23 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - as: jupyter-datascience-anaconda-python-3.8-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-datascience-anaconda-python-3-8
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_ANACONDA_IMAGE}"
+        make deploy8-jupyter-datascience-anaconda-python-3.8 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-datascience-anaconda-python-3.8
+        make undeploy8-jupyter-datascience-anaconda-python-3.8
+      dependencies:
+      - env: JUPYTER_ANACONDA_IMAGE
+        name: jupyter-datascience-anaconda-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: ipi-gcp
 - as: habana-notebooks-e2e-tests
   run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(habana\/*)
@@ -1162,6 +1416,23 @@ tests:
             -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
         make test-habana-1.11.0-ubi8-python-3.8
         make undeploy8-habana-1.11.0-ubi8-python-3.8
+      dependencies:
+      - env: JUPYTER_HABANA_1_11_0_IMAGE
+        name: habana-jupyter-1.11.0-ubi8-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: habana-jupyter-1.13.0-ubi8-python-3.8-test-e2e
+      cli: latest
+      commands: |
+        oc new-project habana-jupyter-1-13-0-ubi8-python-3-8
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_HABANA_1_13_0_IMAGE}"
+        make deploy8-habana-1.13.0-ubi8-python-3.8 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-habana-1.13.0-ubi8-python-3.8
+        make undeploy8-habana-1.13.0-ubi8-python-3.8
       dependencies:
       - env: JUPYTER_HABANA_1_11_0_IMAGE
         name: habana-jupyter-1.11.0-ubi8-python-3.8

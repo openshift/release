@@ -65,7 +65,26 @@ more "${SHARED_DIR}"/*.yaml |& sed 's/pass.*$/pass ** HIDDEN **/g'
 echo "${AUX_HOST}" >> "${SHARED_DIR}/bastion_public_address"
 echo "root" > "${SHARED_DIR}/bastion_ssh_user"
 
+echo "Copying the env result to the bastion host"
+env > /tmp/prow.env
+JOB_URL=$(echo "$JOB_SPEC" |  yq \
+  '.decoration_config.gcs_configuration.job_url_prefix, "gs/", .decoration_config.gcs_configuration.bucket' | \
+  tr -d '\n')
 
+if [ -n "${PULL_NUMBER:-}" ]; then
+  JOB_URL=${JOB_URL}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}
+else
+  JOB_URL=${JOB_URL}/logs/${JOB_NAME}/${BUILD_ID}
+fi
+echo "JOB_URL=${JOB_URL}" >> /tmp/prow.env
+
+scp "${SSHOPTS[@]}" /tmp/prow.env "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/prow.env"
+
+# We set the MAC Address and IP for a possible bootstrap VM to be used for IPI installations.
+VLAN_ID=$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
+VLAN_ID=${VLAN_ID//*\./}
+echo "52:54:00:00:00:$(printf '%02x' "${VLAN_ID}")" > "${SHARED_DIR}/ipi_bootstrap_mac_address"
+echo "192.168.80.${VLAN_ID}" > "${SHARED_DIR}/ipi_bootstrap_ip_address"
 # Example host element from the list in the hosts.yaml file:
 # - mac: 34:73:5a:9d:eb:e1 # The mac address of the interface connected to the baremetal network
 #  vendor: dell
