@@ -157,8 +157,10 @@ echo "[INFO] Looking for extra manifests..."
 if [ -n "${EXTRA_MANIFEST_URL}" ] && [ -n "${EXTRA_MANIFEST_PATH}" ]; then
   echo "[INFO] Extra manifests defined"
   mkdir -p "${INSTALL_DIR}/openshift"
+  echo "[INFO] Cloning manifests repo"
   git clone "${EXTRA_MANIFEST_URL}" "${ARTIFACT_DIR}/extra-manifests"
-  cp -r "${ARTIFACT_DIR}/extra-manifests/${EXTRA_MANIFEST_PATH}/" "${INSTALL_DIR}/openshift"
+  echo "[INFO] Copying manifests to openshift/ dir"
+  cp -rT "${ARTIFACT_DIR}/extra-manifests/${EXTRA_MANIFEST_PATH}/" "${INSTALL_DIR}/openshift/"
 fi
 
 # From now on, we assume no more patches to the install-config.yaml are needed.
