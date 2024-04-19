@@ -152,6 +152,15 @@ done
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
 
+echo "[INFO] Looking for extra manifests..."
+
+if [ -n "${EXTRA_MANIFEST_URL}" ] && [ -n "${EXTRA_MANIFEST_PATH}" ] then
+  echo "[INFO] Extra manifests defined"
+  mkdir -p "${INSTALL_DIR}/openshift"
+  git clone "${EXTRA_MANIFEST_URL}" "${ARTIFACT_DIR}/extra-manifests"
+  cp -r "${ARTIFACT_DIR}/extra-manifests/${EXTRA_MANIFEST_PATH}/" "${INSTALL_DIR}/openshift"
+fi
+
 # From now on, we assume no more patches to the install-config.yaml are needed.
 # Also, we assume that the agent-config.yaml is already in place in the SHARED_DIR.
 # We can create the installation dir with the install-config.yaml and agent-config.yaml.
@@ -177,6 +186,9 @@ case "${BOOT_MODE}" in
   ### Create ISO image
   echo -e "\nCreating image..."
   oinst agent create image
+  if [ -n "${EXTRA_MANIFEST_URL}" ] && [ -n "${EXTRA_MANIFEST_PATH}" ] then
+    coreos-installer iso ignition show "${INSTALL_DIR}/agent.$gnu_arch.iso" | jq -r > "${ARTIFACT_DIR}/ignition_show.json"
+  fi
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the ISO image into the bastion host..."
   scp "${SSHOPTS[@]}" "${INSTALL_DIR}/agent.$gnu_arch.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.${gnu_arch}.iso"
