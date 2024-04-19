@@ -83,7 +83,6 @@ case "${PLATFORM}" in
       --release-image "${RELEASE_IMAGE}" \
       --control-plane-operator-image "${CONTROLPLANE_OPERATOR_IMAGE:-}" \
       --node-selector "hypershift.openshift.io/control-plane=true" \
-      --olm-catalog-placement guest \
       --additional-tags "expirationDate=${EXPIRATION_DATE}" \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
       --annotations "cluster-profile=${CLUSTER_PROFILE_NAME}" \
