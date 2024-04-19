@@ -154,7 +154,7 @@ cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
 
 echo "[INFO] Looking for extra manifests..."
 
-if [ -n "${EXTRA_MANIFEST_URL}" ] && [ -n "${EXTRA_MANIFEST_PATH}" ] then
+if [ -n "${EXTRA_MANIFEST_URL}" ] && [ -n "${EXTRA_MANIFEST_PATH}" ]; then
   echo "[INFO] Extra manifests defined"
   mkdir -p "${INSTALL_DIR}/openshift"
   git clone "${EXTRA_MANIFEST_URL}" "${ARTIFACT_DIR}/extra-manifests"
