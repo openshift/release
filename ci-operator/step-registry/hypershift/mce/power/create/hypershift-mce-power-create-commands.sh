@@ -388,7 +388,7 @@ done
 echo "$(date) Approve the agents as they appear"
 instanceNameIndex=0
 agentsApproved=0
-for ((i=1; i<=20; i++)); do
+for ((i=1; i<=50; i++)); do
     agents=$(oc get agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} -o json)
 
     while IFS= read -r agent; do
