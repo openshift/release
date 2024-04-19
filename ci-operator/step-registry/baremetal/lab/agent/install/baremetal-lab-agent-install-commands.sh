@@ -186,7 +186,7 @@ case "${BOOT_MODE}" in
   ### Create ISO image
   echo -e "\nCreating image..."
   oinst agent create image
-  if [ -n "${EXTRA_MANIFEST_URL}" ] && [ -n "${EXTRA_MANIFEST_PATH}" ] then
+  if [ -n "${EXTRA_MANIFEST_URL}" ] && [ -n "${EXTRA_MANIFEST_PATH}" ]; then
     coreos-installer iso ignition show "${INSTALL_DIR}/agent.$gnu_arch.iso" | jq -r > "${ARTIFACT_DIR}/ignition_show.json"
   fi
   ### Copy the image to the auxiliary host
