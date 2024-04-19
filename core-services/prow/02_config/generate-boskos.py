@@ -74,9 +74,6 @@ CONFIG = {
         'us-east-1': 5,
         'us-west-2': 5
     },
-    'aws-perf-qe-quota-slice': {
-        'us-west-2': 3,
-    },
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 10,
     },
@@ -314,10 +311,9 @@ CONFIG = {
         'us-west-2': 5,
     },
     'azure-virtualization-quota-slice': {
-        'centralus': 5,
-        'eastus': 5,
-        'eastus2': 5,
-        'westus': 5
+        'eastus': 10,
+        'eastus2': 10,
+        'westus': 10
     },
     'gcp-virtualization-quota-slice': {
         'us-central1': 50,
@@ -431,7 +427,7 @@ for i in [1148,1197,1207,1225,1227,1229,1232,1233,1234,1235,1237,1238,1240,1243,
 for i in [990,1169,1166,1164,1146]:
     CONFIG['vsphere-dis-2-quota-slice']['bcr01a.dal12.{}'.format(i)] = 1
 
-for i in [991,1165,1154,1148,1140]:
+for i in [871,991,1165,1154,1148,1140]:
     CONFIG['vsphere-connected-2-quota-slice']['bcr01a.dal12.{}'.format(i)] = 1
 
 for i in [1287,1289,1296,1298,1300,1302]:

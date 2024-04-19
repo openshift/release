@@ -166,7 +166,7 @@ cat << EOF > ~/ocp-install.yml
     shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Progressing'\'')].status}'
     register: oc_status
     until: "'False' in oc_status.stdout"
-    retries: 30
+    retries: 60
     delay: 60
     ignore_errors: true
 

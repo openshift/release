@@ -33,8 +33,8 @@ then
   exit 0
 fi
 
-export PROMTAIL_IMAGE="quay.io/openshift-logging/promtail"
-export PROMTAIL_VERSION="v2.9.4"
+export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
+export PROMTAIL_VERSION="v2.4.1"
 # openshift-trt taken from the tenants list in the LokiStack CR on DPCR:
 export LOKI_ENDPOINT=https://logging-loki-openshift-operators-redhat.apps.cr.j7t7.p1.openshiftapps.com/api/logs/v1/openshift-trt/loki/api/v1
 
@@ -431,6 +431,7 @@ spec:
           readOnlyRootFilesystem: true
           runAsGroup: 0
           runAsUser: 0
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: "/etc/promtail"
           name: config
@@ -469,7 +470,7 @@ spec:
             cpu: 20m
             memory: 50Mi
         terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /etc/tls/private
           name: proxy-tls
@@ -487,6 +488,7 @@ spec:
         - --oidc.issuer-url=https://sso.redhat.com/auth/realms/redhat-external
         - --margin=10m
         - --file=/tmp/shared/prod_bearer_token
+        terminationMessagePolicy: FallbackToLogsOnError
         env:
           - name: CLIENT_ID
             valueFrom:
@@ -744,6 +746,7 @@ spec:
               memory: 20Mi
           args:
             - -conf=/data/config.yaml
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - mountPath: /data
               name: cfg

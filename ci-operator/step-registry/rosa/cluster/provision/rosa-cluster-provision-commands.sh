@@ -97,10 +97,9 @@ else
 fi
 
 # Log in
-ROSA_VERSION=$(rosa version)
 ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli"
   rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
   ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
 else
@@ -185,7 +184,8 @@ cat > ${cluster_config_file} << EOF
   "region": "${CLOUD_PROVIDER_REGION}",
   "version": {
     "channel_group": "${CHANNEL_GROUP}",
-    "raw_id": "${OPENSHIFT_VERSION}"
+    "raw_id": "${OPENSHIFT_VERSION}",
+    "major_version": "$(echo ${OPENSHIFT_VERSION} | awk -F. '{print $1"."$2}')"
   },
   "tags": "${TAGS}",
   "multi_az": ${MULTI_AZ},
@@ -261,7 +261,7 @@ if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   if [[ ${MIN_REPLICAS} -ge 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
     MIN_REPLICAS=3
   fi
-  COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"  
+  COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"
   record_cluster "nodes" "min_replicas" ${MIN_REPLICAS}
   record_cluster "nodes" "max_replicas" ${MAX_REPLICAS}
 else
@@ -353,7 +353,7 @@ if [[ "$ENABLE_PROXY" == "true" ]]; then
   record_cluster "proxy" "enabled" ${ENABLE_PROXY}
   record_cluster "proxy" "http" $proxy_private_url
   record_cluster "proxy" "https" $proxy_private_url
-  record_cluster "proxy" "trust_bundle_file" $trust_bundle_file  
+  record_cluster "proxy" "trust_bundle_file" $trust_bundle_file
 fi
 
 SUBNET_ID_SWITCH=""
@@ -364,7 +364,7 @@ if [[ "$ENABLE_BYOVPC" == "true" ]]; then
     echo -e "The private_subnet_ids are mandatory."
     exit 1
   fi
-  
+
   if [[ "${PRIVATE_SUBNET_ONLY}" == "true" ]] ; then
     SUBNET_ID_SWITCH="--subnet-ids ${PRIVATE_SUBNET_IDs}"
     record_cluster "subnets" "private_subnet_ids" ${PRIVATE_SUBNET_IDs}
@@ -404,7 +404,7 @@ if [[ "$STS" == "true" ]]; then
   if [[ -z "${account_intaller_role_arn}" ]] || [[ -z "${account_support_role_arn}" ]] || [[ -z "${account_worker_role_arn}" ]]; then
     echo -e "One or more account roles with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
     exit 1
-  fi  
+  fi
   ACCOUNT_ROLES_SWITCH="--role-arn ${account_intaller_role_arn} --support-role-arn ${account_support_role_arn} --worker-iam-role ${account_worker_role_arn}"
   record_cluster "aws.sts" "role_arn" $account_intaller_role_arn
   record_cluster "aws.sts" "support_role_arn" $account_support_role_arn
@@ -415,7 +415,7 @@ if [[ "$STS" == "true" ]]; then
     if [[ -z "${account_control_plane_role_arn}" ]]; then
       echo -e "The control plane account role with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
       exit 1
-    fi      
+    fi
     ACCOUNT_ROLES_SWITCH="${ACCOUNT_ROLES_SWITCH} --controlplane-iam-role ${account_control_plane_role_arn}"
     record_cluster "aws.sts" "control_plane_role_arn" $account_control_plane_role_arn
   fi
@@ -481,9 +481,9 @@ echo "  Enable audit log: ${ENABLE_AUDIT_LOG}"
 echo "  Cluster Tags: ${TAGS}"
 echo "  Additional Security groups: ${ADDITIONAL_SECURITY_GROUP}"
 echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
-if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then 
+if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Min replicas: ${MIN_REPLICAS}"
-  echo "  Max replicas: ${MAX_REPLICAS}"  
+  echo "  Max replicas: ${MAX_REPLICAS}"
 else
   echo "  Replicas: ${REPLICAS}"
 fi
@@ -529,7 +529,7 @@ ${SECURITY_GROUP_ID_SWITCH} \
 ${NO_CNI_SWITCH} \
 ${CONFIGURE_CLUSTER_AUTOSCALER_SWITCH} \
 ${DRY_RUN_SWITCH}
-" 
+"
 echo "$cmd"| sed -E 's/\s{2,}/ /g' > "${SHARED_DIR}/create_cluster.sh"
 
 log "Running command:"

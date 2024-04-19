@@ -141,7 +141,6 @@ tests:
       FEATURE_GATES: '[InstallAlternateInfrastructureAWS=true]'
       FEATURE_SET: CustomNoUpgrade
       SIZE_VARIANT: compact
-      TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
@@ -610,6 +609,18 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: aws-ipi-sdn-migration-ovn-amd-f28
+  cron: 8 19 25 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+    test:
+    - chain: cucushift-sdn-migration-ovn
+    workflow: cucushift-installer-rehearse-aws-ipi-sdn
 - as: aws-ipi-usertags-custom-sg-arm-f5
   cron: 4 17 1,6,11,16,21,26 * *
   steps:
@@ -1180,6 +1191,18 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-proxy
+- as: azure-ipi-sdn-migration-ovn-amd-f28
+  cron: 31 11 8 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+    test:
+    - chain: cucushift-sdn-migration-ovn
+    workflow: cucushift-installer-rehearse-azure-ipi-sdn
 - as: azure-ipi-sno-etcd-encryption-amd-f9-destructive
   cron: 41 19 7,16,25 * *
   steps:
@@ -1498,6 +1521,30 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi
+- as: baremetal-upi-ovn-ipv4-arm-mixarch-f14-day2-64k-pagesize
+  cluster: build05
+  cron: 36 18 8,24 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "1"
+      ADDITIONAL_WORKERS_DAY2: "false"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      MCO_CONF_DAY2_CUSTOM_MCP_FROM_LABEL: node-role.kubernetes.io/worker=,kubernetes.io/arch=arm64
+      MCO_CONF_DAY2_CUSTOM_MCP_NAME: 64k-pages
+      MCO_CONF_DAY2_INSTALL_KERNEL_MCPS: 64k-pages
+      MCO_CONF_DAY2_INSTALL_KERNEL_TYPE: 64k-pages
+      architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - ref: mco-conf-day2-create-custom-mcp
+    - ref: mco-conf-day2-kerneltype
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi
 - as: gcp-ipi-basecap-none-additionalcaps-amd-f28-destructive
   cron: 11 21 15 * *
   steps:
@@ -1769,6 +1816,19 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
+- as: gcp-ipi-sdn-migration-ovn-arm-f28
+  cron: 2 20 18 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
+    test:
+    - chain: cucushift-sdn-migration-ovn
+    workflow: cucushift-installer-rehearse-gcp-ipi-sdn
 - as: gcp-ipi-sno-etcd-encryption-amd-f28-destructive
   cron: 8 4 25 * *
   steps:
