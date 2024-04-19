@@ -33,6 +33,16 @@ tests:
     - as: e2e-odh-mr
       cli: latest
       commands: |
+        # Print current action
+        echo "Waiting for readiness of community-operators CatalogSource..."
+        # Wait for readiness of community-operators CatalogSource
+        STATUS=$(oc get catalogsource -n openshift-marketplace community-operators -o=jsonpath='{.status.connectionState.lastObservedState}')
+        while [ "${STATUS}" != "READY" ]
+        do
+          echo "Waiting for 30s to check again..."
+          sleep 30
+          STATUS=$(oc get catalogsource -n openshift-marketplace community-operators -o=jsonpath='{.status.connectionState.lastObservedState}')
+        done
         ./openshift-ci/scripts/oci-model-registry-deploy.sh
       from: src
       resources:
