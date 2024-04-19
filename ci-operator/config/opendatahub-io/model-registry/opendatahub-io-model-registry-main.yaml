@@ -66,38 +66,57 @@ tests:
       BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
       HYPERSHIFT_AWS_REGION: us-west-2
       HYPERSHIFT_NODE_COUNT: "3"
+      WAIT_FOR_OLM: "true"
     test:
     - as: main
       cli: latest
       commands: |
-        # Print current action
-        echo "Waiting for readiness of community-operators CatalogSource..."
-        # Wait for readiness of community-operators CatalogSource
-        STATUS=$(oc get catalogsource -n openshift-marketplace community-operators -o=jsonpath='{.status.connectionState.lastObservedState}')
-        while [ "${STATUS}" != "READY" ]
-        do
-          echo "Waiting for 30s to check again..."
-          sleep 30
-          STATUS=$(oc get catalogsource -n openshift-marketplace community-operators -o=jsonpath='{.status.connectionState.lastObservedState}')
-        done
+        ### PREPARE NECESSARY VARIABLES ###
+        # Set name of pod to run Python client tests in
+        POD_NAME="test-python-client"
+        # Set name of namespace for pod to run Python client tests in
+        POD_NAMESPACE_NAME="opendatahub"
+        # Set name of repository directory
+        REPO_DIR="model-registry"
+        # Construct script to run in Python client tests pod
+        SCRIPT="""
+        # Clone model-registry repository
+        git clone https://github.com/opendatahub-io/model-registry
+        # Change directory to repository
+        cd \"${REPO_DIR}\"
+        # Install Robot Framework tests requirements
+        pip3.9 install -r test/robot/requirements.txt
+        # Install Python client for model-registry
+        pip3.9 install -e clients/python
+        # Update host for tests in Python files
+        sed -i -e \"s/localhost/modelregistry-sample/g\" test/robot/*.py
+        # Run Robot Framework tests
+        TEST_MODE=Python python3.9 -m robot test/robot/MRandLogicalModel.robot
+        """
+
+        ### RUN TEST CODE ###
         # Print last commit of current code
         git show
         # Check state of ODH operator source
         oc describe catalogsource -n openshift-marketplace community-operators
         # Deploy ODH operator and other necessary resources
         ./openshift-ci/scripts/oci-model-registry-deploy.sh
-        # Install Robot Framework tests requirements
-        pip3.9 install -r test/robot/requirements.txt
-        # Install Python client for model-registry
-        pip3.9 install -e clients/python
-        # Sleep for debug
-        sleep 2h
-        # Update host for tests in Python files
-        sed -i -e "s/localhost/modelregistry-sample/g" test/robot/*.py
-        # Run Robot Framework tests
-        TEST_MODE=Python python3.9 -m robot test/robot/MRandLogicalModel.robot
-        # Save tests logs
-        cp output.xml log.html report.html "${ARTIFACT_DIR}"
+        # Create Python client tests pod
+        oc run "${POD_NAME}" -n "${POD_NAMESPACE_NAME}" --image=ubi8/python-39 sleep 99d
+        # Wait for Python client tests pod to be ready
+        oc wait pod --for=condition=Ready -n "${POD_NAMESPACE_NAME}" "${POD_NAME}"
+        # Run script to test Python client in pod
+        oc exec "${POD_NAME}" -n "${POD_NAMESPACE_NAME}" -- /bin/bash -c "${SCRIPT}"
+        # Save return code of the last command
+        EXIT_STATUS=$?
+        # Save artifacts
+        oc rsync "${POD_NAME}":"${REPO_DIR}"/output.xml "${ARTIFACT_DIR}" -n "${POD_NAMESPACE_NAME}"
+        oc rsync "${POD_NAME}":"${REPO_DIR}"/log.html "${ARTIFACT_DIR}" -n "${POD_NAMESPACE_NAME}"
+        oc rsync "${POD_NAME}":"${REPO_DIR}"/report.html "${ARTIFACT_DIR}" -n "${POD_NAMESPACE_NAME}"
+        # Delete Python client tests pod
+        oc delete pod -n "${POD_NAMESPACE_NAME}" "${POD_NAME}"
+        # Exit with return code of tests
+        exit $EXIT_STATUS
       from: src
       resources:
         requests:
