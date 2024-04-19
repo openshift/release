@@ -317,6 +317,7 @@ periodics:
     ci.openshift.io/role: image-mirroring
   name: periodic-image-mirroring-kubefed
   spec:
+    automountServiceAccountToken: true
     containers:
     - command:
       - /tp-entrypoint.sh
@@ -327,18 +328,14 @@ periodics:
         value: mapping_kubefed
       - name: dry_run
         value: "false"
-      image: registry.ci.openshift.org/ci/skopeo:skopeo-stable-v1.15.0-jq
+      image: registry.ci.openshift.org/ci/image-mirror:oc-415
       imagePullPolicy: Always
       name: ""
       resources:
         requests:
           cpu: 500m
       volumeMounts:
-      - mountPath: /home/mirror/.docker/pull-config.json
-        name: pull
-        readOnly: true
-        subPath: .dockerconfigjson
-      - mountPath: /home/mirror/.docker/push-config.json
+      - mountPath: /home/mirror/.docker/config.json
         name: push
         readOnly: true
         subPath: config.json
@@ -348,9 +345,6 @@ periodics:
     - name: push
       secret:
         secretName: registry-push-credentials-quay.io
-    - name: pull
-      secret:
-        secretName: registry-pull-credentials
     - configMap:
         name: image-mirror-mappings
       name: config
