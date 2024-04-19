@@ -53,7 +53,7 @@ cat << 'EOZ' > /tmp/approve-csrs-with-timeout.sh
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
   echo -n "Approving CSRs"
   attempts=0
-  max_attempts=10
+  max_attempts=5
   while true; do
     echo -n '.'
     mapfile -d ' ' -t csrs < <(oc get csr --field-selector=spec.signerName='kubernetes.io/kube-apiserver-client-kubelet' --no-headers | grep Pending | cut -f1 -d" ")
@@ -68,7 +68,7 @@ cat << 'EOZ' > /tmp/approve-csrs-with-timeout.sh
       echo "Timeout waiting for new CSRs"
       break
     fi
-    sleep 15s
+    sleep 5s
   done
   echo "Done"
 EOZ
