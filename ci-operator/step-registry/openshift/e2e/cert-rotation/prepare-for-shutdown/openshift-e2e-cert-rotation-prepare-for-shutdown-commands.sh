@@ -58,11 +58,13 @@ cat << 'EOZ' > /tmp/approve-csrs-with-timeout.sh
     echo -n '.'
     mapfile -d ' ' -t csrs < <(oc get csr --field-selector=spec.signerName='kubernetes.io/kube-apiserver-client-kubelet' --no-headers | grep Pending | cut -f1 -d" ")
     if [[ ${#csrs[@]} -gt 0 ]]; then
+      echo ""
       oc adm certificate approve ${csrs} && attempts=0
     else
       (( attempts++ ))
     fi
     if (( attempts > max_attempts )); then
+      echo ""
       echo "Timeout waiting for new CSRs"
       break
     fi
