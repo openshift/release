@@ -171,7 +171,7 @@ scp "${SSHOPTS[@]}" "/tmp/mce-index-image" "root@${IP}:/home/mce-index-image"
 #apiVersion: v1
 #kind: Namespace
 #metadata:
-#  name: multicluster-engine
+#  name: multicluster-engine xxxx
 #END
 #
 #oc apply -f - <<END
