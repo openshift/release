@@ -65,6 +65,10 @@ if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
 fi
 export AZURE_AUTH_LOCATION
 
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
+
 pushd ${ARTIFACT_DIR}/installer
 
 CLUSTER_NAME=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'metadata.name')
