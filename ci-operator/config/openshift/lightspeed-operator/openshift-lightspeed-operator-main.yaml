@@ -90,6 +90,22 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - as: e2e-test
+      cli: latest
+      commands: |
+        export LLM_PROVIDER=openai
+        export LLM_MODEL=gpt-3.5-turbo
+        export LLM_TOKEN=$(cat /var/run/openai/token)
+        export CONDITION_TIMEOUT=600
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main
