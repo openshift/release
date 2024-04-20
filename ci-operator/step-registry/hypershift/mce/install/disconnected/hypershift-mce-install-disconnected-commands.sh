@@ -34,7 +34,7 @@ scp "${SSHOPTS[@]}" "/tmp/mce-index-image" "root@${IP}:/home/mce-index-image"
 #mirror_token=\$(cat "/tmp/.dockerconfigjson" | jq -r --arg var1 "\${mirror_registry}" '.auths[\$var1]["auth"]'|base64 -d)
 #skopeo login "\${mirror_registry}" -u "\${mirror_token%:*}" -p "\${mirror_token#*:}"
 #BREW_USER=\$(cat "/home/registry_brew.json" | jq -r '.user')
-#BREW_PASSWORD=\$(cat "/home/registry_brew.json" | jq -r '.password')
+#BREW_PASSWORD=\$(cat "/home/registry_brew.json" | jq -r '.password')sdf
 #skopeo login -u "\$BREW_USER" -p "\$BREW_PASSWORD" brew.registry.redhat.io
 #ACM_D_QUAY_USER=\$(cat /home/acm_d_mce_quay_username)
 #ACM_D_QUAY_PASSWORD=\$(cat /home/acm_d_mce_quay_pullsecret)
