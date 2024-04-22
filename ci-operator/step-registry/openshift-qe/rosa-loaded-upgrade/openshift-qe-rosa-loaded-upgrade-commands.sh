@@ -11,11 +11,10 @@ function rosa_login()
   fi
 
   OCM_LOGIN_ENV=${OCM_LOGIN_ENV:="staging"}
-  ROSA_VERSION=$(rosa version)
   ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 
   if [[ ! -z "${ROSA_TOKEN}" ]]; then
-     echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+     echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli"
      rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
      if [ $? -ne 0 ]; then
        echo "Login failed"

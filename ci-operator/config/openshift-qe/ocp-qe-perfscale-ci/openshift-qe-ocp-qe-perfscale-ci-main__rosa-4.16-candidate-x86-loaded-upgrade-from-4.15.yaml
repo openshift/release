@@ -1,0 +1,169 @@
+base_images:
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: prow/Dockerfile
+  to: ocp-qe-perfscale-ci-rosa-loaded-upgrade-415to416
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+releases:
+  latest:
+    release:
+      channel: candidate
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: perfscale-rosa-24nodes-loaded-upgrade-415to416
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      CHANNEL_GROUP: candidate
+      CHURN: "false"
+      CLUSTER_NAME: rosalg24wrk416
+      CLUSTER_TAGS: TicketId:382
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
+      GC: "false"
+      HOSTED_CP: "false"
+      IDP_TIMEOUT: "1200"
+      IF_INTERMEDIATE_UPGRADE: "false"
+      ITERATION_MULTIPLIER_ENV: "6"
+      MULTI_AZ: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.15"
+      PROFILE_TYPE: reporting
+      READY_WAIT_TIMEOUT: 30m
+      REGION: us-west-2
+      REPLICAS: "24"
+    test:
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - chain: openshift-qe-cluster-density-v2
+    - chain: openshift-qe-rosa-loaded-upgrade
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
+- always_run: false
+  as: perfscale-rosa-120nodes-loaded-upgrade-415to416
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    dependencies:
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      CHANNEL_GROUP: candidate
+      CHURN: "false"
+      CLUSTER_NAME: rosalg120wrk416
+      CLUSTER_TAGS: TicketId:382
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
+      GC: "false"
+      HOSTED_CP: "false"
+      IDP_TIMEOUT: "1200"
+      IF_INTERMEDIATE_UPGRADE: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MULTI_AZ: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.15"
+      PROFILE_TYPE: reporting
+      READY_WAIT_TIMEOUT: 30m
+      REGION: us-west-2
+      REPLICAS: "120"
+    test:
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - chain: openshift-qe-cluster-density-v2
+    - chain: openshift-qe-rosa-loaded-upgrade
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
+- always_run: false
+  as: perfscale-aws-180nodes-loaded-upgrade-415to416
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    dependencies:
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      CHANNEL_GROUP: candidate
+      CHURN: "false"
+      CLUSTER_NAME: rosalg180wrk416
+      CLUSTER_TAGS: TicketId:382
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
+      GC: "false"
+      HOSTED_CP: "false"
+      IDP_TIMEOUT: "1200"
+      IF_INTERMEDIATE_UPGRADE: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MULTI_AZ: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.15"
+      PROFILE_TYPE: reporting
+      READY_WAIT_TIMEOUT: 30m
+      REGION: us-west-2
+      REPLICAS: "180"
+    test:
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - chain: openshift-qe-cluster-density-v2
+    - chain: openshift-qe-rosa-loaded-upgrade
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
+- always_run: false
+  as: perfscale-aws-252nodes-loaded-upgrade-415to416
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    dependencies:
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      CHANNEL_GROUP: candidate
+      CHURN: "false"
+      CLUSTER_NAME: rosalg252wrk416
+      CLUSTER_TAGS: TicketId:382
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
+      GC: "false"
+      HOSTED_CP: "false"
+      IDP_TIMEOUT: "1200"
+      IF_INTERMEDIATE_UPGRADE: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MULTI_AZ: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.15"
+      PROFILE_TYPE: reporting
+      READY_WAIT_TIMEOUT: 30m
+      REGION: us-west-2
+      REPLICAS: "252"
+    test:
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - chain: openshift-qe-cluster-density-v2
+    - chain: openshift-qe-rosa-loaded-upgrade
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: rosa-4.16-candidate-x86-loaded-upgrade-from-4.15
