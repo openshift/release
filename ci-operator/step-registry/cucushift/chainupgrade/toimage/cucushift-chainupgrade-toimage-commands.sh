@@ -752,14 +752,17 @@ function filter_test_by_network() {
     networktype="$(oc get network.config/cluster -o yaml | yq '.spec.networkType')"
     case "${networktype,,}" in
         openshiftsdn)
-        networktag='@network-openshiftsdn'
-        ;;
+            networktag='@network-openshiftsdn'
+            ;;
         ovnkubernetes)
-        networktag='@network-ovnkubernetes'
-        ;;
+            networktag='@network-ovnkubernetes'
+            ;;
+        other)
+            networktag=''
+            ;;
         *)
-        echo "######Expected network to be SDN/OVN, but got: $networktype"
-        ;; 
+            echo "######Expected network to be SDN/OVN/Other, but got: $networktype"
+            ;;
     esac
     if [[ -n $networktag ]] ; then
         export E2E_RUN_TAGS="${networktag} and ${E2E_RUN_TAGS}"
