@@ -2,7 +2,7 @@ build_root:
   project_image:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi8/ubi
-      RUN yum install -y --nodocs make git golang
+      RUN yum install -y --nodocs make git golang jq
       RUN ln -s /cli/oc /usr/bin/kubectl
 images:
 - dockerfile_path: Dockerfile
@@ -12,7 +12,7 @@ releases:
     release:
       architecture: multi
       channel: stable
-      version: "4.14"
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -21,18 +21,39 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-odh-cfo
+- as: e2e-odh-mro-cron
+  cron: 0 1 * * *
   steps:
     cluster_profile: aws-opendatahub
     env:
       BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
       HYPERSHIFT_AWS_REGION: us-west-2
       HYPERSHIFT_NODE_COUNT: "3"
+      WAIT_FOR_OLM: "true"
     test:
     - as: e2e-odh-mr
       cli: latest
       commands: |
-        echo "Testing for Model-Registry Openshift-CI will happen here."
+        ./openshift-ci/scripts/oci-model-registry-deploy.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
+- as: e2e-odh-mro-optional
+  optional: true
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+      WAIT_FOR_OLM: "true"
+    test:
+    - as: e2e-odh-mr
+      cli: latest
+      commands: |
+        ./openshift-ci/scripts/oci-model-registry-deploy.sh
       from: src
       resources:
         requests:
