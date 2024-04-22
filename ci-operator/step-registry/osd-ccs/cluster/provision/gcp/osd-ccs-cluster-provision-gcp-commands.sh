@@ -103,7 +103,11 @@ function wait_for_bootstrap() {
 
   cmd="gcloud compute instances list --filter='name~${CLUSTER_NAME}' | grep ${CLUSTER_NAME}"
   logger "INFO" "Running Command '${cmd}'"
-  eval "${cmd}" || (logger "ERROR" "Failed to find cluster machines on GCP" && return 1)
+  eval "${cmd}"
+  if [ $? -ne 0 ]; then
+    logger "ERROR" "Failed to find cluster machines on GCP"
+    return 1
+  fi
 
   CLUSTER_MACHINES_CREATED=true
   return 0
