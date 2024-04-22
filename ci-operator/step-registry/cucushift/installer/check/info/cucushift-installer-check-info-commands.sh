@@ -1,5 +1,6 @@
 #!/bin/bash
 
+sleep 10080
 set -o nounset
 # set -o errexit
 # set -o pipefail
@@ -34,5 +35,4 @@ run_command "oc get networks.config.openshift.io cluster -oyaml"
 run_command "oc get networks.operator.openshift.io cluster -oyaml"
 run_command "oc -n openshift-ingress-operator get ingresscontroller -oyaml"
 run_command "oc -n openshift-marketplace get catalogsources.operators.coreos.com"
-sleep 10080
 set -e
