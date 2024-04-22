@@ -29,6 +29,28 @@ tests:
             {"name": "openshift-pipelines-operator-rh", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators"}
         ]
     test:
+    - as: wait-for-olm
+      cli: latest
+      commands: |
+        set +e
+        echo "Waiting for catalog sources to be available as they are not ready immediately due to a current issue with hypershift"
+        date
+        for i in {1..60}
+        do
+          oc get packagemanifest openshift-pipelines-operator-rh >/dev/null 2>&1
+          if [ "$?" == 0 ]; then
+            echo "packagemanifest openshift-pipelines-operator-rh found" && date && break
+          elif [ "$i" == 60 ]; then
+            echo "waiting for packagemanifest openshift-pipelines-operator-rh timed out" && date && exit 1
+          else
+            echo "packagemanifest openshift-pipelines-operator-rh NOT found, sleeping for 15s"
+            sleep 15
+          fi
+        done
+      from: src
+      resources:
+        requests:
+          cpu: 500m
     - ref: install-operators
     - as: test-ai-edge
       cli: latest
@@ -62,6 +84,28 @@ tests:
             {"name": "openshift-pipelines-operator-rh", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators"}
         ]
     test:
+    - as: wait-for-olm
+      cli: latest
+      commands: |
+        set +e
+        echo "Waiting for catalog sources to be available as they are not ready immediately due to a current issue with hypershift"
+        date
+        for i in {1..60}
+        do
+          oc get packagemanifest openshift-pipelines-operator-rh >/dev/null 2>&1
+          if [ "$?" == 0 ]; then
+            echo "packagemanifest openshift-pipelines-operator-rh found" && date && break
+          elif [ "$i" == 60 ]; then
+            echo "waiting for packagemanifest openshift-pipelines-operator-rh timed out" && date && exit 1
+          else
+            echo "packagemanifest openshift-pipelines-operator-rh NOT found, sleeping for 15s"
+            sleep 15
+          fi
+        done
+      from: src
+      resources:
+        requests:
+          cpu: 500m
     - ref: install-operators
     - as: test-ai-edge
       cli: latest
