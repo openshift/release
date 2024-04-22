@@ -6,7 +6,18 @@ echo HyperShift CLI version
 
 echo Generating pull secret to current build farm
 oc registry login --to=${SHARED_DIR}/pull-secret-build-farm.json
-echo "Set KUBECONFIG to Hive cluster"
+
+RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
+
+# is the image multiarch?
+MULTI_ARCH_IMAGE="false"
+NUM_IMAGES="$(oc image info ${RELEASE_IMAGE} -a ${SHARED_DIR}/pull-secret-build-farm.json --show-multiarch true -o json 2>/dev/null | jq '.[].config.architecture' | wc -l || true)"
+if [[ $NUM_IMAGES -gt 1 ]]; then
+  MULTI_ARCH_IMAGE="true"
+fi
+echo "Is multiarch image: ${MULTI_ARCH_IMAGE}"
+
+echo "Set KUBECONFIG to management cluster"
 export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
 
 if [[ "${PLATFORM}" == "aws" ]]; then
@@ -25,8 +36,6 @@ else
   echo "Currently only AWS and PowerVS platforms are supported"
   exit 1
 fi
-RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
-
 
 [[ ! -z "$BASE_DOMAIN" ]] && DOMAIN=${BASE_DOMAIN}
 [[ ! -z "$HYPERSHIFT_BASE_DOMAIN" ]] && DOMAIN=${HYPERSHIFT_BASE_DOMAIN}
@@ -58,31 +67,42 @@ if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
 fi
 
 echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
+EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 case "${PLATFORM}" in
   "aws")
-    /usr/bin/hypershift create cluster aws \
-      ${EXTRA_ARGS} \
-      --name ${CLUSTER_NAME} \
-      --infra-id ${INFRA_ID} \
-      --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
-      --instance-type=${COMPUTE_NODE_TYPE} \
-      --base-domain ${DOMAIN} \
-      --region ${HYPERSHIFT_AWS_REGION} \
-      --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
-      --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
-      --pull-secret=/tmp/pull-secret.json \
-      --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
-      --release-image ${RELEASE_IMAGE} \
-      --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
+    ARGS=( --name "${CLUSTER_NAME}" \
+      --infra-id "${INFRA_ID}" \
+      --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
+      --instance-type "${COMPUTE_NODE_TYPE}" \
+      --base-domain "${DOMAIN}" \
+      --region "${HYPERSHIFT_AWS_REGION}" \
+      --control-plane-availability-policy "${HYPERSHIFT_CP_AVAILABILITY_POLICY}" \
+      --infra-availability-policy "${HYPERSHIFT_INFRA_AVAILABILITY_POLICY}" \
+      --pull-secret /tmp/pull-secret.json \
+      --aws-creds "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" \
+      --release-image "${RELEASE_IMAGE}" \
+      --control-plane-operator-image "${CONTROLPLANE_OPERATOR_IMAGE:-}" \
       --node-selector "hypershift.openshift.io/control-plane=true" \
-      --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+      --olm-catalog-placement guest \
+      --additional-tags "expirationDate=${EXPIRATION_DATE}" \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
       --annotations "cluster-profile=${CLUSTER_PROFILE_NAME}" \
       --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
-      --annotations resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m \
+      --annotations "resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m" \
       --annotations hypershift.openshift.io/cleanup-cloud-resources="false" \
       --additional-tags "prow.k8s.io/job=${JOB_NAME}" \
-      --additional-tags "prow.k8s.io/build-id=${BUILD_ID}" 
+      --additional-tags "prow.k8s.io/build-id=${BUILD_ID}"
+    )
+
+    if [[ "${MULTI_ARCH_IMAGE}" == "true" ]]; then
+      ARGS+=( "--multi-arch" )
+    fi
+
+    if [[ -n "${CONTROL_PLANE_NODE_SELECTOR}" ]]; then
+      ARGS+=( "--node-selector ${CONTROL_PLANE_NODE_SELECTOR}" )
+    fi
+
+    /usr/bin/hypershift create cluster aws "${ARGS[@]}"
     ;;
   "powervs")
     if [[ -z "${POWERVS_GUID}" ]]; then
@@ -114,6 +134,7 @@ case "${PLATFORM}" in
       --resource-group ${POWERVS_RESOURCE_GROUP} \
       --pull-secret=/etc/registry-pull-credentials/.dockerconfigjson \
       --release-image ${RELEASE_IMAGE} \
+      --olm-catalog-placement guest \
       --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
       --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
       --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \

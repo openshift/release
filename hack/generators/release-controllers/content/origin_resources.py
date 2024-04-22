@@ -212,7 +212,7 @@ def _add_origin_resources(gendoc):
                                     "--job-config=/var/repo/release/ci-operator/jobs",
                                     "--prow-namespace=ci",
                                     "--job-namespace=ci-release",
-                                    "--tools-image-stream-tag=release-controller-bootstrap:tests",
+                                    "--tools-image-stream-tag=release-controller-bootstrap:tools",
                                     "--release-architecture=amd64",
                                     "-v=4",
                                     "--manifest-list-mode"
@@ -275,7 +275,7 @@ def _add_origin_resources(gendoc):
                                     "--release-namespace=origin",
                                     "--prow-namespace=ci",
                                     "--job-namespace=ci-release",
-                                    "--tools-image-stream-tag=release-controller-bootstrap:tests",
+                                    "--tools-image-stream-tag=release-controller-bootstrap:tools",
                                     "--release-architecture=amd64",
                                     "--enable-jira",
                                     "--jira-endpoint=https://issues.redhat.com",

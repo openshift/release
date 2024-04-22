@@ -15,6 +15,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: "4.16"
+    namespace: ocp
+    tag: hypershift-operator
   openstack-installer:
     name: "4.16"
     namespace: ocp
@@ -24,6 +28,14 @@ base_images:
     namespace: ci
     tag: latest
   tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
+  tests-private-preupg:
     name: tests-private
     namespace: ci
     tag: "4.16"
@@ -87,6 +99,17 @@ tests:
           memory: 200Mi
     - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
+- as: aws-ipi-ovn-hypershift-inplace-f7
+  cron: 34 23 7,14,23,30 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_ARGS: --node-upgrade-type=inplace
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift-rollback
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: azure-upi-f14
   cron: 13 18 15,29 * *
   steps:

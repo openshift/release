@@ -175,13 +175,13 @@ function getDesiredComputeCount {
   fi
   MP_NAME=$(cat $SHARED_DIR/mp_name|| true)
   if [[ ! -z ${MP_NAME} ]];then
-    compute_count=$(rosa describe machinepool ${MP_NAME}  -c "$CLUSTER_ID"  -o json  |jq -r '.replicas')
+    compute_count=$(rosa describe machinepool --machinepool ${MP_NAME}  -c "$CLUSTER_ID"  -o json  |jq -r '.replicas')
       if [[ "$compute_count" = "null" ]]; then 
         echo "--auto-scaling enabled, retrieving min_replica count desired"
         if [[ $HOSTED_CP = "true" ]];then
-          compute_count=$(rosa describe machinepool  ${MP_NAME} -c "$CLUSTER_ID" -o json  | jq -r '.autoscaling.min_replica') 
+          compute_count=$(rosa describe machinepool --machinepool ${MP_NAME} -c "$CLUSTER_ID" -o json  | jq -r '.autoscaling.min_replica') 
         else
-          compute_count=$(rosa describe machinepool  ${MP_NAME} -c "$CLUSTER_ID" -o json  | jq -r '.autoscaling.min_replicas') 
+          compute_count=$(rosa describe machinepool --machinepool ${MP_NAME} -c "$CLUSTER_ID" -o json  | jq -r '.autoscaling.min_replicas') 
         fi
       fi
     desired_compute_count=$(expr $desired_compute_count + $compute_count)
@@ -221,15 +221,10 @@ else
 fi
 
 # Log in
-ROSA_VERSION=$(rosa version)
 ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli"
   rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
-  if [ $? -ne 0 ]; then
-    echo "Login failed"
-    exit 1
-  fi
 else
   echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
   exit 1
