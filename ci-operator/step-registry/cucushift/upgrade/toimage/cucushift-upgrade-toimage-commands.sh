@@ -458,9 +458,6 @@ function dump_status_if_unexpected() {
             if ! grep -qE 'The cluster version is not updating|Upgrade is proceeding well' <<< "${out}" ; then
                 echo "${out}"
             fi
-        else
-            # skip for older oc with no status command, or TARGET_MINOR_VERSION unset
-            return 0
         fi
 }
 
