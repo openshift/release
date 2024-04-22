@@ -11,7 +11,7 @@ APISRV=""
 INGRESS80=""
 INGRESS443=""
 echo "Filling the load balancer targets..."
-num_workers="$(yq e '[.[] | select(.name|test("worker"))]|length' "$SHARED_DIR/hosts.yaml")"
+num_workers="$(yq e '[.[] | select(.name|test("worker-[0-9]"))]|length' "$SHARED_DIR/hosts.yaml")"
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
@@ -30,7 +30,8 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
       server $name $ip:6443 check inter 1s
       server $name-v6 [$ipv6]:6443 check inter 1s"
   fi
-  if [ "$num_workers" -eq 0 ] || [[ "$name" =~ worker* ]]; then
+  # if number of worker hosts less then 2, then master hosts might get the worker role
+  if [ "$num_workers" -lt 2 ] || [[ "$name" =~ worker* ]]; then
     INGRESS80="$INGRESS80
       server $name $ip:80 check inter 1s
       server $name-v6 [$ipv6]:80 check inter 1s"

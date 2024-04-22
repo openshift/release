@@ -1,0 +1,68 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- build_args:
+  - name: DOCKER_BUILDKIT
+    value: "1"
+  - name: BUILDKIT_PROGRESS
+    value: plain
+  context_dir: .
+  dockerfile_path: Dockerfile
+  to: vllm-main-cuda-intel-gpu
+promotion:
+  to:
+  - namespace: opendatahub-io
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+  model-server-main-cuda-intel-gpu:
+    limits:
+      cpu: "16"
+      memory: 24Gi
+    requests:
+      cpu: "16"
+      memory: 24Gi
+tests:
+- as: pr-image-mirror
+  run_if_changed: ^(Dockerfile)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-main-cuda-intel-gpu
+    env:
+      IMAGE_REPO: vllm
+    workflow: opendatahub-io-ci-image-mirror
+- as: fast-image-mirror
+  postsubmit: true
+  run_if_changed: ^(Dockerfile)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-main-cuda-intel-gpu
+    env:
+      IMAGE_REPO: vllm
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- as: nightly-image-mirror
+  cron: 0 0 * * 0
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-main-cuda-intel-gpu
+    env:
+      IMAGE_REPO: vllm
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: vllm
