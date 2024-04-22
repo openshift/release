@@ -1,7 +1,7 @@
 #!/bin/bash
 
 sleep 10080
-set -o nounset
+#set -o nounset
 # set -o errexit
 # set -o pipefail
 
