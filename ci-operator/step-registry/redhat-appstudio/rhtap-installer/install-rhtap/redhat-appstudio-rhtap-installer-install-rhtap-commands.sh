@@ -155,6 +155,12 @@ e2e_test(){
   ./bin/make.sh -n "$NAMESPACE" test
 }
 
+verify_template(){
+  echo "[INFO]Verify the template..."
+  ./test/e2e.sh -t template
+}
+
 clone_repo
+verify_template
 install_rhtap
 e2e_test
