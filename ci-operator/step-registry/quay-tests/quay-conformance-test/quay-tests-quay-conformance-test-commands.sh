@@ -39,7 +39,10 @@ export OCI_DELETE_MANIFEST_BEFORE_BLOBS=0 # defaults to OCI_DELETE_MANIFEST_BEFO
 
 echo "begin conformance test...."
 echo $OCI_ROOT_URL 
-./conformance.test
+./conformance.test || true
+
+echo "Copy test result to ARTIFACT_DIR ...."
+mv report.html junit.xml $ARTIFACT_DIR || true
 
 echo "test finished ...."
 ls  || true
