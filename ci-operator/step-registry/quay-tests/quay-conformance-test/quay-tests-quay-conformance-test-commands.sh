@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -uo pipefail
+set -euo pipefail
 go version
 
 echo "Clone opencontainers distribution-spec Repository..."
