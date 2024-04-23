@@ -63,6 +63,9 @@ case $SEED_IMAGE_TAG_FORMAT in
   "nightly")
     SEED_IMAGE_TAG="nightly-${SEED_VERSION}-$(date +%F)"
     ;;
+  "e2e")
+    SEED_IMAGE_TAG="e2e-${SEED_VERSION}-$(date +%F)"
+    ;;
   "presubmit")
     SEED_IMAGE_TAG="pre-${PULL_PULL_SHA}"
     ;;
