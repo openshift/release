@@ -15,6 +15,7 @@ OCI_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
 OCI_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
 OCI_NAMESPACE="myconformanceorg/myrepo"
 OCI_CROSSMOUNT_NAMESPACE="myconformanceorg/other"
+OCI_REPORT_DIR=$ARTIFACT_DIR
 
 export OCI_ROOT_URL
 export OCI_USERNAME
@@ -33,7 +34,8 @@ export OCI_HIDE_SKIPPED_WORKFLOWS=0
 export OCI_DEBUG=0
 export OCI_DELETE_MANIFEST_BEFORE_BLOBS=0 # defaults to OCI_DELETE_MANIFEST_BEFORE_BLOBS=1 if not set
 
+#Generate test result to ARTIFACT_DIR
+export OCI_REPORT_DIR
 
 echo "Begin conformance test"
-echo "and copy test result to ARTIFACT_DIR"
-./conformance.test || mv report.html junit.xml $ARTIFACT_DIR
+./conformance.test 
