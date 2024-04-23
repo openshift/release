@@ -21,8 +21,9 @@ then
     PROXYCFGLINE="        proxy_url: http://[fd00:1101::1]:8213"
     PROXYLINE="          - name: https_proxy
             value: http://[fd00:1101::1]:8213"
-# Some kinds of jobs need to skip installing loki by default
-elif [[ "$JOB_NAME" =~ .*proxy.* ]]
+# Some kinds of jobs need to skip installing loki by default; but to make
+# sure we rightfully skip them, we have two different conditions.
+elif [[ "$JOB_NAME" =~ .*proxy.* ]] || test -f "${SHARED_DIR}/proxy-conf.sh"
 then
   echo "Clusters using a proxy are not yet supported for loki"
   exit 0
