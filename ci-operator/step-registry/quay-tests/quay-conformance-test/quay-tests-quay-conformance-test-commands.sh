@@ -33,8 +33,7 @@ export OCI_HIDE_SKIPPED_WORKFLOWS=0
 export OCI_DEBUG=0
 export OCI_DELETE_MANIFEST_BEFORE_BLOBS=0 # defaults to OCI_DELETE_MANIFEST_BEFORE_BLOBS=1 if not set
 
-echo "Begin conformance test"
-./conformance.test || true
 
-echo "Copy test result to ARTIFACT_DIR"
-mv report.html junit.xml $ARTIFACT_DIR
+echo "Begin conformance test"
+echo "and copy test result to ARTIFACT_DIR"
+./conformance.test || mv report.html junit.xml $ARTIFACT_DIR
