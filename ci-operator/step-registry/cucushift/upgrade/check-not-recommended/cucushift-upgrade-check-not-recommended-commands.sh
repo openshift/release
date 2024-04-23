@@ -46,7 +46,7 @@ extract_oc
 
 retry=3
 while (( retry > 0 )); do
-    conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]?.release.version' | xargs)
+    conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select (.conditions[].status!="True")| .release.version' | xargs)
     if [[ -z "${conditional_updates}" ]]; then
         retry=$((retry - 1))
         sleep 60
@@ -55,7 +55,7 @@ while (( retry > 0 )); do
         #shellcheck disable=SC2076
         if [[ " $conditional_updates " =~ " $TARGET_VERSION " ]]; then
             echo "Error: $TARGET_VERSION is not recommended, for details please refer:"
-            oc get clusterversion version -o json | jq -r '.status.conditionalUpdates'
+            oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select (.conditions[].status!="True")'
             exit 1
         fi
         break
