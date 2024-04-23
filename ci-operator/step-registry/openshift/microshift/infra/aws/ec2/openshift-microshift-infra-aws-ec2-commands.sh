@@ -12,11 +12,15 @@ trap 'save_stack_events_to_shared' EXIT TERM INT
 
 # This map should be extended everytime AMIs from different regions/architectures/os versions
 # are added.
+# Command to get AMIs without using WebUI/AWS console:
+# aws ec2 describe-images --region us-west-2 --filters 'Name=name,Values=RHEL-9.*' --query 'Images[*].[Name,ImageId,Architecture]' --output text | sort --reverse
 declare -A ami_map=(
-  [us-west-2,x86_64,rhel-9.2]=ami-0d5b3039c1132e1b2
-  [us-west-2,x86_64,rhel-9.3]=ami-04b4d3355a2e2a403
-  [us-west-2,arm64,rhel-9.2]=ami-0addfb94c944af1cc
-  [us-west-2,arm64,rhel-9.3]=ami-0086e25ab5453b65e
+  [us-west-2,x86_64,rhel-9.2]=ami-0378fd0689802d015    # RHEL-9.2.0_HVM-20240229-x86_64-33-Hourly2-GP3
+  [us-west-2,x86_64,rhel-9.3]=ami-0c2f1f1137a85327e    # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
+  [us-west-2,x86_64,rhel-9.4]=ami-0c0178316edfbe8d4    # RHEL-9.4.0_HVM_BETA-20240411-x86_64-30-Hourly2-GP3
+  [us-west-2,arm64,rhel-9.2]=ami-0cb125bb261a63f52     # RHEL-9.2.0_HVM-20240229-arm64-33-Hourly2-GP3
+  [us-west-2,arm64,rhel-9.3]=ami-04379fa947a959c92     # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
+  [us-west-2,arm64,rhel-9.4]=ami-04f55670af52c6a38     # RHEL-9.4.0_HVM_BETA-20240411-arm64-30-Hourly2-GP3
 )
 
 MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
