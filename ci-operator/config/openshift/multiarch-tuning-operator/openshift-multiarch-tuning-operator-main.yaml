@@ -79,42 +79,52 @@ resources:
       memory: 400Mi
 tests:
 - as: fmt
+  cluster: build10
   commands: NO_DOCKER=1 make fmt && make verify-diff
   container:
     from: src
 - as: vet
+  cluster: build10
   commands: NO_DOCKER=1 make vet && make verify-diff
   container:
     from: src
 - as: vendor
+  cluster: build10
   commands: NO_DOCKER=1 make vendor && make verify-diff
   container:
     from: src
 - as: goimports
+  cluster: build10
   commands: NO_DOCKER=1 make goimports && make verify-diff
   container:
     from: src
 - as: lint
+  cluster: build10
   commands: NO_DOCKER=1 make lint && make verify-diff
   container:
     from: src
 - as: sast
+  cluster: build10
   commands: NO_DOCKER=1 make gosec && make verify-diff
   container:
     from: src
 - as: manifests
+  cluster: build10
   commands: NO_DOCKER=1 make manifests && make verify-diff
   container:
     from: src
 - as: generate
+  cluster: build10
   commands: NO_DOCKER=1 make generate && make verify-diff
   container:
     from: src
 - as: unit
+  cluster: build10
   commands: NO_DOCKER=1 make unit
   container:
     from: src
 - as: e2e-gcp-multi-operator-olm
+  cluster: build10
   steps:
     cluster_profile: gcp
     dependencies:
@@ -145,6 +155,7 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-multi-operator
+  cluster: build10
   optional: true
   steps:
     cluster_profile: gcp
@@ -173,12 +184,14 @@ tests:
           memory: 200Mi
     workflow: ipi-gcp
 - as: security
+  cluster: build10
   optional: true
   steps:
     env:
       PROJECT_NAME: multiarch-tuning-operator
     workflow: openshift-ci-security
 - as: bundle
+  cluster: build10
   commands: unset VERSION; NO_DOCKER=1 make bundle-verify
   container:
     from: operator-sdk-src
