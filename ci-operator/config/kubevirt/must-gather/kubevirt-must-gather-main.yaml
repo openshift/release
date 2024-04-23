@@ -1,10 +1,10 @@
 base_images:
   base:
-    name: "4.14"
+    name: "4.16"
     namespace: ocp
     tag: base
   cli:
-    name: "4.14"
+    name: "4.16"
     namespace: ocp
     tag: cli
 binary_build_commands: make install
@@ -20,12 +20,12 @@ images:
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.16"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.16"
       namespace: ocp
 resources:
   '*':
@@ -70,7 +70,33 @@ tests:
     - as: test-targeted
       cli: latest
       commands: |
-        oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- /usr/bin/gather --vms_details
+        oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- /usr/bin/gather --vms_details --images
+        mkdir -p ${ARTIFACT_DIR}/junit
+        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} /go/bin/must-gather.test --ginkgo.label-filter=level:workloads --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
+      dependencies:
+      - env: KMG_IMAGE
+        name: kubevirt-must-gather
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-since
+      cli: latest
+      commands: |
+        oc adm must-gather --since=10m --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- /usr/bin/gather --vms_details --images
+        mkdir -p ${ARTIFACT_DIR}/junit
+        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} /go/bin/must-gather.test --ginkgo.label-filter=level:workloads --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
+      dependencies:
+      - env: KMG_IMAGE
+        name: kubevirt-must-gather
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-sincetime
+      cli: latest
+      commands: |
+        oc adm must-gather --since-time=$(date -d '-10 minutes' +%Y-%m-%dT%T.%9N%:z ) --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- /usr/bin/gather --vms_details --images
         mkdir -p ${ARTIFACT_DIR}/junit
         (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} /go/bin/must-gather.test --ginkgo.label-filter=level:workloads --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
       dependencies:
@@ -112,7 +138,33 @@ tests:
     - as: test-targeted
       cli: latest
       commands: |
-        oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- /usr/bin/gather --vms_details
+        oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- /usr/bin/gather --vms_details --images
+        mkdir -p ${ARTIFACT_DIR}/junit
+        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} /go/bin/must-gather.test --ginkgo.label-filter=level:workloads --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
+      dependencies:
+      - env: KMG_IMAGE
+        name: kubevirt-must-gather
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-since
+      cli: latest
+      commands: |
+        oc adm must-gather --since=10m --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- /usr/bin/gather --vms_details --images
+        mkdir -p ${ARTIFACT_DIR}/junit
+        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} /go/bin/must-gather.test --ginkgo.label-filter=level:workloads --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
+      dependencies:
+      - env: KMG_IMAGE
+        name: kubevirt-must-gather
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-sincetime
+      cli: latest
+      commands: |
+        oc adm must-gather --since-time=$(date -d '-10 minutes' +%Y-%m-%dT%T.%9N%:z ) --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- /usr/bin/gather --vms_details --images
         mkdir -p ${ARTIFACT_DIR}/junit
         (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} /go/bin/must-gather.test --ginkgo.label-filter=level:workloads --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
       dependencies:
