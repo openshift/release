@@ -12,6 +12,9 @@ if [ -z "${RHCS_TOKEN}" ]; then
 fi
 export RHCS_TOKEN
 
+RHCS_URL=https://api.stage.openshift.com
+export RHCS_URL
+
 AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 if [ ! -f ${AWS_SHARED_CREDENTIALS_FILE} ];then
     error_exit "missing mandatory aws credential file ${AWS_SHARED_CREDENTIALS_FILE}"

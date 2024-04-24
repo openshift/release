@@ -1,21 +1,5 @@
 #!/bin/bash
 
-# install jq if not installed
-if ! [ -x "$(command -v jq)" ]; then
-    mkdir -p /tmp/bin
-    JQ_CHECKSUM="2f312b9587b1c1eddf3a53f9a0b7d276b9b7b94576c85bda22808ca950569716"
-    curl -Lo /tmp/bin/jq "https://github.com/jqlang/jq/releases/download/jq-1.7/jq-linux-amd64"
-
-    actual_checksum=$(sha256sum /tmp/bin/jq | cut -d ' ' -f 1)
-    if [ "${actual_checksum}" != "${JQ_CHECKSUM}" ]; then
-        echo "Checksum of downloaded JQ didn't match expected checksum"
-        exit 1
-    fi
-
-    chmod +x /tmp/bin/jq
-    export PATH=${PATH}:/tmp/bin
-fi
-
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "Failed to acquire lease"
@@ -29,7 +13,7 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
 fi
 
 # ensure hostname can be found
-HOSTNAME="$(jq -r ".\"${LEASED_RESOURCE}\".hostname" "${CLUSTER_PROFILE_DIR}/leases")"
+HOSTNAME="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".hostname" "${CLUSTER_PROFILE_DIR}/leases")"
 if [[ -z "${HOSTNAME}" ]]; then
   echo "Couldn't retrieve hostname from lease config"
   exit 1

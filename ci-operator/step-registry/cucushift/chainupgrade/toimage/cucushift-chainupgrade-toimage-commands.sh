@@ -623,7 +623,7 @@ function upgrade() {
     set_channel $TARGET_VERSION
     local retry=3 conditional_updates
     while (( retry > 0 )); do
-        conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]?.release.version' | xargs)
+        conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select (.conditions[].status!="True")| .release.version' | xargs)
         if [[ -z "${conditional_updates}" ]]; then
             retry=$((retry - 1))
             sleep 60
@@ -632,7 +632,7 @@ function upgrade() {
             #shellcheck disable=SC2076
             if [[ " $conditional_updates " =~ " $TARGET_VERSION " ]]; then
                 echo "Error: $TARGET_VERSION is not recommended, for details please refer:"
-                oc get clusterversion version -o json | jq -r '.status.conditionalUpdates'
+                oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select (.conditions[].status!="True")'
                 exit 1
             fi
             break
@@ -752,14 +752,17 @@ function filter_test_by_network() {
     networktype="$(oc get network.config/cluster -o yaml | yq '.spec.networkType')"
     case "${networktype,,}" in
         openshiftsdn)
-        networktag='@network-openshiftsdn'
-        ;;
+            networktag='@network-openshiftsdn'
+            ;;
         ovnkubernetes)
-        networktag='@network-ovnkubernetes'
-        ;;
+            networktag='@network-ovnkubernetes'
+            ;;
+        other)
+            networktag=''
+            ;;
         *)
-        echo "######Expected network to be SDN/OVN, but got: $networktype"
-        ;; 
+            echo "######Expected network to be SDN/OVN/Other, but got: $networktype"
+            ;;
     esac
     if [[ -n $networktag ]] ; then
         export E2E_RUN_TAGS="${networktag} and ${E2E_RUN_TAGS}"
