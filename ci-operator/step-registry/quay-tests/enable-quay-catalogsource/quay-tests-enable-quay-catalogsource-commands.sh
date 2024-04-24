@@ -7,10 +7,13 @@ set -o pipefail
 QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 QUAY_INDEX_IMAGE_BUILD="$QUAY_INDEX_IMAGE_BUILD"
 
-#By default, install Quay Operator with released build
-if [ -z "$QUAY_INDEX_IMAGE_BUILD" ] && [ QUAY_OPERATOR_SOURCE == "redhat-operators"]; then
+#"redhat-operators" is official catalog source for released build
+if [ QUAY_OPERATOR_SOURCE == "redhat-operators" ]; then #Install Quay Operator with released build
   echo "Installing Quay from released build"
-else  #Install Quay operator with iib
+else if [ -z "$QUAY_INDEX_IMAGE_BUILD" ]; then  
+  echo "Installing from $QUAY_OPERATOR_SOURCE, but not provoide index image: $QUAY_INDEX_IMAGE_BUILD"
+  exit 1
+else #Install Quay operator with iib
   echo "Installing Quay from unreleased iib: $QUAY_INDEX_IMAGE_BUILD" 
   # QUAY_OPERATOR_SOURCE="brew-operator-catalog"
   
