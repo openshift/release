@@ -35,6 +35,18 @@ log_events() {
 		-o custom-columns=FirstSeen:.firstTimestamp,LastSeen:.lastTimestamp,Count:.count,From:.source.component,Type:.type,Reason:.reason,Message:.message \
 		-n "$ns" | tee "$LOGS_DIR/$ns-events.log"
 }
+
+pull_img() {
+	for node in $(oc get nodes -o name); do
+		echo "$node"
+		# until [ -f /tmp/unsleep ]; do
+		# 	echo "sleeping...."
+		# 	sleep 300
+		# done
+		oc -n default debug "$node" -- chroot /host /bin/sh -c 'podman pull quay.io/sustainable_computing_io/kepler_model_server:v0.7.7'
+	done
+}
+
 main() {
 	mkdir -p "$LOGS_DIR"
 	validate_install || {
@@ -42,6 +54,8 @@ main() {
 		echo "Operator validation failed"
 		return 1
 	}
+
+	pull_img
 
 	[[ -z "$KEPLER_DEPLOYMENT_NS" ]] && {
 		KEPLER_DEPLOYMENT_NS=$(oc get "deployment/$OPERATOR_DEPLOY_NAME" -n "$OPERATORS_NS" \

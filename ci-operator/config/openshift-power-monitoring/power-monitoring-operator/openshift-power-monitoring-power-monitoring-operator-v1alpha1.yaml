@@ -55,16 +55,27 @@ tests:
   container:
     from: shellcheck
 - as: security
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.15"
   steps:
     env:
       PROJECT_NAME: openshift-power-monitoring/power-monitoring-operator
       SNYK_PRE_EXECUTION_HOOK_CMD: go mod vendor && go mod tidy
     workflow: openshift-ci-security
 - as: power-monitoring-operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.15"
   steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
     test:
     - as: install
       cli: latest
@@ -79,7 +90,7 @@ tests:
           cpu: 100m
           memory: 400Mi
     - ref: openshift-power-monitoring-tests-power-monitoring-operator
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: v1alpha1
   org: openshift-power-monitoring
