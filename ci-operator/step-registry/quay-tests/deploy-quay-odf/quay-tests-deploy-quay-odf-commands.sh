@@ -75,10 +75,10 @@ for _ in {1..60}; do
 done
 echo "ODF/OCS Operator is deployed successfully"
 
-#By default, install Quay with released build
+#By default, install Quay Operator with released build
 if [[ -z "$QUAY_INDEX_IMAGE_BUILD" ]]; then
   echo "Installing Quay from released build"
-else  #Prepare icsp and catalogsource for Quay operator 
+else  #Install Quay operator with IIB
   echo "Installing Quay from unreleased iib: $QUAY_INDEX_IMAGE_BUILD" 
   QUAY_OPERATOR_SOURCE="brew-operator-catalog"
   
