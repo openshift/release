@@ -15,6 +15,4 @@ TAG_NAME="next"
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd backstage-showcase || exit
 
-IMAGE_NAME="${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}:${TAG_NAME}"
-
 bash ./.ibm/pipelines/openshift-ci-tests.sh
