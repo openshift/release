@@ -165,28 +165,11 @@ function waitForReady() {
 
 # Determine count of desired compute node count
 function getDesiredComputeCount {
-  compute_count=$(rosa describe cluster -c "$CLUSTER_ID"  -o json  |jq -r '.nodes.compute')
-  if [[ "$compute_count" = "null" ]]; then
-    echo "--auto-scaling enabled, retrieving min_replicas count desired"
-    desired_compute_count=$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r '.nodes.autoscale_compute.min_replicas')
-  else
-    echo "--auto-scaling disabled, --replicas set, retrieving replica count desired"
-    desired_compute_count=$(rosa describe cluster -c "$CLUSTER_ID"  -o json  |jq -r '.nodes.compute')
-  fi
-  MP_NAME=$(cat $SHARED_DIR/mp_name|| true)
-  if [[ ! -z ${MP_NAME} ]];then
-    compute_count=$(rosa describe machinepool --machinepool ${MP_NAME}  -c "$CLUSTER_ID"  -o json  |jq -r '.replicas')
-      if [[ "$compute_count" = "null" ]]; then 
-        echo "--auto-scaling enabled, retrieving min_replica count desired"
-        if [[ $HOSTED_CP = "true" ]];then
-          compute_count=$(rosa describe machinepool --machinepool ${MP_NAME} -c "$CLUSTER_ID" -o json  | jq -r '.autoscaling.min_replica') 
-        else
-          compute_count=$(rosa describe machinepool --machinepool ${MP_NAME} -c "$CLUSTER_ID" -o json  | jq -r '.autoscaling.min_replicas') 
-        fi
-      fi
+  desired_compute_count=0
+  for compute_count in $(rosa list machinepool -c "$CLUSTER_ID" | grep -v ID | awk '{print $3}' | cut -d'/' -f2 | cut -d'-' -f1); do
     desired_compute_count=$(expr $desired_compute_count + $compute_count)
-  fi
-
+  done
+ 
   export desired_compute_count
   echo "Total desired node count: $desired_compute_count"
 }
