@@ -81,6 +81,10 @@ else
   #Copy the opentelemetry-operator repo files to a writable directory by kuttl
   cp -R /tmp/opentelemetry-operator /tmp/opentelemetry-tests && cd /tmp/opentelemetry-tests
 
+  # Add additional OpenTelemetry tests
+  git clone https://github.com/openshift/distributed-tracing-qe.git /tmp/distributed-tracing-qe \
+  && mv /tmp/distributed-tracing-qe/tests/e2e-otel /tmp/opentelemetry-tests/tests/
+
   #Enable user workload monitoring
   oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
 
@@ -130,6 +134,7 @@ else
   tests/e2e-instrumentation \
   tests/e2e-pdb \
   tests/e2e-opampbridge \
+  tests/e2e-otel \
   tests/e2e-targetallocator || any_errors=true
 
   # Set the operator args required for tests execution.

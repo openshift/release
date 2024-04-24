@@ -42,7 +42,7 @@ for line in "${machines[@]}"; do
     ret=1
   fi
 
-  if [[ "${cpu_platform}" == "AMD Rome" ]]; then
+  if [[ "${cpu_platform}" == "AMD Rome" ]] || [[ "${cpu_platform}" == "AMD Milan" ]]; then
     echo "$(date -u --rfc-3339=seconds) - Matched .cpuPlatform '${cpu_platform}' for '${machine_name}'."
   else
     echo "$(date -u --rfc-3339=seconds) - Unexpected .cpuPlatform '${cpu_platform}' for '${machine_name}'."
