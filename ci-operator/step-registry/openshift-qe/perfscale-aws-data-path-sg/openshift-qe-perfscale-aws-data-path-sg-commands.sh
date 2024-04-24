@@ -1,5 +1,4 @@
 #!/bin/bash
-set -x
 
 set -o nounset
 set -o errexit
