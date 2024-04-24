@@ -165,7 +165,7 @@ rosa create machinepool -y \
                         ${AUTO_REPAIR_SWITCH} \
                         ${MP_SECURITY_GROUP_ID_SWITCH}
 # echo the machinepool name to a file
-echo $MP_NAME > $SHARED_DIR/mp_name
+echo $MP_NAME >> $SHARED_DIR/mp_name
 } 
 
 if [[ ! -z "$MP_ZONE" ]]; then
