@@ -26,6 +26,7 @@ then
     export PATH="${HOME}/.local/bin:${PATH}"
     if command -v pip3 &> /dev/null
     then
+        python -m ensurepip
         pip3 install --user awscli
     else
         if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]
