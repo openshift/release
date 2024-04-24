@@ -78,6 +78,31 @@ tests:
     - chain: ipi-install-heterogeneous-day2-kerneltype
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-byo-route53-compact-arm-f28
+  cron: 1 0 7 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      SIZE_VARIANT: compact
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
+- as: aws-ipi-ingress-lbtype-nlb-arm-f28
+  cron: 11 12 12 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-nlb
 - as: aws-ipi-ovn-ipsec-arm-mixarch-f14
   cron: 26 21 5,19 * *
   steps:
@@ -115,6 +140,19 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: aws-ipi-proxy-sts-arm-f14
+  cron: 1 11 3,19 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: aws-ipi-sno-lvms-arm-f28
   cron: 14 22 4 * *
   steps:
@@ -130,6 +168,18 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
+- as: aws-upi-basecap-none-amd-f28
+  cron: 31 17 18 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      PERSISTENT_MONITORING: "false"
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-upi
 - as: azure-ipi-arm-mixarch-disc-fullypriv-f28-day2-64k-pagesize
   cron: 23 17 30 * *
   steps:
