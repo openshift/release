@@ -22,12 +22,15 @@ fi
 
 echo "Generating the DHCP/PXE config..."
 
-DHCP_CONF_OPTS="# DO NOT EDIT; BEGIN $CLUSTER_NAME
-dhcp-option-force=tag:$CLUSTER_NAME,15,$CLUSTER_NAME.$BASE_DOMAIN
-dhcp-option-force=tag:$CLUSTER_NAME,119,$CLUSTER_NAME.$BASE_DOMAIN
-# DO NOT EDIT; END $CLUSTER_NAME"
+# DHCP unique identifier (DUID)
+DUID="00:03:00:01"
 
-DHCP_CONF="# DO NOT EDIT; BEGIN $CLUSTER_NAME"
+DHCP_CONF_OPTS="
+tag:$CLUSTER_NAME,15,$CLUSTER_NAME.$BASE_DOMAIN
+tag:$CLUSTER_NAME,119,$CLUSTER_NAME.$BASE_DOMAIN
+"
+
+DHCP_CONF=""
 
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
@@ -39,10 +42,20 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   fi
   DHCP_CONF="${DHCP_CONF}
 $mac,$ip,set:$CLUSTER_NAME,infinite"
+  
+  if [ "${ipv6_enabled:-}" == "true" ]; then
+    # shellcheck disable=SC2154
+    if [ ${#ipv6} -eq 0 ] || [ ${#name} -eq 0 ]; then
+      echo "Error when parsing the Bare Metal Host metadata"
+      exit 1
+    fi
+    DHCP_CONF="${DHCP_CONF}
+id:$DUID:$mac,$name,[$ipv6],infinite"
+  fi
 done
 
 DHCP_CONF="${DHCP_CONF}
-# DO NOT EDIT; END $CLUSTER_NAME"
+$(<"${SHARED_DIR}/ipi_bootstrap_mac_address"),$(<"${SHARED_DIR}/ipi_bootstrap_ip_address"),set:$CLUSTER_NAME,infinite"
 
 echo "Setting the DHCP/PXE config in the auxiliary host..."
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \

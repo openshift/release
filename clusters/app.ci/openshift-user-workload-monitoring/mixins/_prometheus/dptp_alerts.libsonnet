@@ -71,7 +71,8 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'Many mirroring tasks to quay.io have been failed in the last minute. Please check errors in the pod logs to figure out the cause.',
+              message: 'Many mirroring tasks to quay.io have been failed in the last minute. Please check errors in the pod logs to figure out the cause: <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures|SOP>.',
+              runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures',
             },
           },
         ],
@@ -104,7 +105,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which is an infrastructure issue. See <https://search.ci.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
+              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which is an infrastructure issue. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
             },
           }
         ],
@@ -122,7 +123,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated. See <https://search.ci.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
+              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
             },
           }
         ],
@@ -213,7 +214,7 @@
             |||,
             'for': '1m',
             labels: {
-              severity: 'critical',
+              severity: 'warning',
             },
             annotations: {
               message: 'Workload {{ $labels.workload_name }} ({{ $labels.workload_type }}) used 10x more than configured amount of {{ $labels.resource_type }} (actual: {{ $labels.determined_amount }}, configured: {{ $labels.configured_amount }}. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/pod-scaler-admission.md|SOP>.',

@@ -3,7 +3,6 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -o xtrace
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -34,7 +33,9 @@ if [ -z "${RHCS_TOKEN}" ]; then
 fi
 export RHCS_TOKEN=${RHCS_TOKEN}
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
-
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred_shared_account
+fi
 
 if [ ! -f ${CLUSTER_PROFILE_DIR}/.awscred ];then
     error_exit "missing mandatory aws credential file ${CLUSTER_PROFILE_DIR}/.awscred"
@@ -56,6 +57,12 @@ export CHANNEL_GROUP=${CHANNEL_GROUP}
 export RHCS_ENV=${RHCS_ENV}
 export VERSION=${VERSION}
 export REGION=${REGION}
+if [ ! -z "$RHCS_SOURCE" ];then
+    export RHCS_SOURCS=$RHCS_SOURCE
+fi
+if [ ! -z "$RHCS_VERSION" ]; then
+    export RHCS_VERSION=$RHCS_VERSION
+fi
 
 # Define the junit name
 junitFileName="result.xml"

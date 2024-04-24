@@ -51,19 +51,39 @@ v411_set="vCurrent v4.11"
 v412_set="${v411_set} v4.12"
 v413_set="${v412_set} v4.13"
 v414_set="${v413_set} v4.14"
-# shellcheck disable=SC2034
 v415_set="${v414_set} v4.15"
-latest_version_set="v415_set"
+# shellcheck disable=SC2034
+v416_set="${v415_set} v4.16"
+latest_version_set="v416_set"
+
+# the content of each capset
+v411="baremetal marketplace openshift-samples"
+(( ocp_minor_version > 13 )) && v411="${v411} MachineAPI"
+v412=" ${v411} Console Insights Storage CSISnapshot"
+v413=" ${v412} NodeTuning"
+v414=" ${v413} Build DeploymentConfig ImageRegistry"
+v415=" ${v414} OperatorLifecycleManager CloudCredential"
+# shellcheck disable=SC2034
+v416=" ${v415} CloudControllerManager Ingress"
+latest_version="v416"
+
+# define capability dependency
+declare -A dependency_caps
+dependency_caps["marketplace"]="OperatorLifecycleManager"
 
 declare "v${ocp_major_version}${ocp_minor_version}_set"
-v_current_version="v${ocp_major_version}${ocp_minor_version}_set"
+declare "v${ocp_major_version}${ocp_minor_version}"
+v_current_version="v${ocp_major_version}${ocp_minor_version}"
+v_current_version_set="v${ocp_major_version}${ocp_minor_version}_set"
 
-if [[ ${!v_current_version:-} == "" ]]; then
-  echo "vCurrent: No default value for ${v_current_version}, use default value from ${latest_version_set}"
+if [[ ${!v_current_version_set:-} == "" ]]; then
+  echo "vCurrent: No default value for ${v_current_version_set}, use default value from ${latest_version_set}"
   v_current_set=${!latest_version_set}
+  v_current=${!latest_version}
 else
-  echo "vCurrent: Use exsting value from ${v_current_version}: ${!v_current_version}"
-  v_current_set=${!v_current_version}
+  echo "vCurrent: Use exsting value from ${v_current_version_set}: ${!v_current_version_set}"
+  v_current_set=${!v_current_version_set}
+  v_current=${!v_current_version}
 fi
 
 # shellcheck disable=SC2206
@@ -74,6 +94,7 @@ echo "baselineCapabilitySet: ${baseline_caps_set_array[*]}"
 selected_cap_set_index=$((RANDOM % ${#baseline_caps_set_array[@]}))
 selected_cap_set="${baseline_caps_set_array[$selected_cap_set_index]}"
 echo "Selected baseline capability set: ${selected_cap_set}"
+echo "vcurrent version is ${v_current_version}"
 
 # apply patch to install-config
 CONFIG="${SHARED_DIR}/install-config.yaml"
@@ -84,12 +105,30 @@ capabilities:
 EOF
 
 #To enable required capablities whatever baselineCapabilitySet setting
+additional_caps=""
 if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "" ]]; then
     echo "Enable required capabilities: ${ADDITIONAL_ENABLED_CAPABILITIES}"
+    additional_caps="${ADDITIONAL_ENABLED_CAPABILITIES}"
+fi
+
+# Capablities dependency
+if [[ "${selected_cap_set}" != "vCurrent" ]]; then
+    # cap marketplace must be enabled along with OperatorLifecycleManager
+    selected_set=${selected_cap_set//.}
+    for key in "${!dependency_caps[@]}"; do
+        #shellcheck disable=SC2076
+        if [[ " ${!selected_set} " =~ " ${key} " ]] && [[ ! " ${!selected_set} " =~ " ${dependency_caps[$key]} " ]] && [[ " ${v_current} " =~ " ${dependency_caps[$key]} " ]]; then
+            echo "capability ${key} in capset '${selected_cap_set}' requires ${dependency_caps[$key]}, enabling ${dependency_caps[$key]}"
+            additional_caps="${additional_caps} ${dependency_caps[$key]}"
+        fi
+    done
+fi
+
+if [[ -n "${additional_caps}" ]]; then
     cat >> "${PATCH}" << EOF
   additionalEnabledCapabilities:
 EOF
-    for item in ${ADDITIONAL_ENABLED_CAPABILITIES}; do
+    for item in ${additional_caps}; do
         cat >> "${PATCH}" << EOF
     - ${item}
 EOF

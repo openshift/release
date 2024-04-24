@@ -1,0 +1,30 @@
+chain:
+  as: cucushift-installer-rehearse-azure-ipi-private-networking-type-minimal-permission-provision
+  steps:
+  - ref: azure-provision-service-principal-minimal-permission
+  - ref: azure-provision-resourcegroup
+  - ref: azure-provision-vnet
+  - chain: azure-provision-bastionhost
+  - ref: proxy-config-generate
+  - chain: ipi-conf-azure
+  - ref: ipi-conf-azure-resourcegroup
+  - ref: ipi-conf-azure-provisionednetwork
+  - ref: ipi-conf-azure-networking-type
+  - chain: ipi-install
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - chain: cucushift-installer-check-azure-private
+  env:
+  - name: PUBLISH
+    default: "Internal"
+  - name: AZURE_PERMISSION_FOR_VNET_RG
+    default: "Network Contributor"
+  - name: AZURE_PERMISSION_FOR_CLUSTER_RG
+    default: "Contributor"
+  - name: AZURE_PERMISSION_FOR_CLUSTER_SP
+    default: "User Access Administrator"
+  documentation: |-
+    Create an private IPI cluster with customizing networking type on Azure for QE e2e tests.
+    Assign system role "User Access Administrator" to cluster sp on scope of subscription.
+    Assign system role "Contributor" to cluster sp on scope of resource group where cluster to be created.
+    Assign system role "Network Contributor" to cluster sp on scope of resource group where vnet reside in.

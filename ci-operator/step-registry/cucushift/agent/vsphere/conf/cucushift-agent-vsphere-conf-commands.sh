@@ -43,26 +43,19 @@ declare dns_server
 declare vsphere_cluster
 
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
-if [[ ${vsphere_portgroup} == *"segment"* ]]; then
-  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${vsphere_portgroup}"))
-  gateway="192.168.${third_octet}.1"
-  rendezvous_ip_address="192.168.${third_octet}.4"
-else
-  if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-    echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
-    exit 1
-  fi
-
-  dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
-  gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
-  gateway_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gatewayipv6' "${SUBNETS_CONFIG}")
-  cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].cidr' "${SUBNETS_CONFIG}")
-  cidr_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].CidrIPv6' "${SUBNETS_CONFIG}")
-  machine_cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
-  # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
-  rendezvous_ip_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[4]' "${SUBNETS_CONFIG}")
-
+if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
+  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+  exit 1
 fi
+
+dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
+gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
+gateway_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gatewayipv6' "${SUBNETS_CONFIG}")
+cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].cidr' "${SUBNETS_CONFIG}")
+cidr_ipv6=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].CidrIPv6' "${SUBNETS_CONFIG}")
+machine_cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
+# ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
+rendezvous_ip_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[4]' "${SUBNETS_CONFIG}")
 
 echo "${rendezvous_ip_address}" >"${SHARED_DIR}"/node-zero-ip.txt
 
@@ -92,7 +85,14 @@ pullSecret: >
 EOF
 fi
 
-yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "${SHARED_DIR}/install-config.yaml" - <<<"
+echo "Installing from initial release $RELEASE_IMAGE_LATEST"
+oc adm release extract -a "$pull_secret_path" "$RELEASE_IMAGE_LATEST" \
+  --command=openshift-install --to=/tmp
+
+version=$(/tmp/openshift-install version | grep 'openshift-install' | awk '{print $2}' | cut -d '.' -f 1,2 --output-delimiter='')
+# Add vSphere credentials if the version is 4.15 or more
+if [[ "${version}" -ge "415" ]]; then
+  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "${SHARED_DIR}/install-config.yaml" - <<<"
 platform:
   vsphere:
     failureDomains:
@@ -115,6 +115,7 @@ platform:
       password: ${GOVC_PASSWORD}
       user: ${GOVC_USERNAME}
 "
+fi
 
 if [ "${MASTERS}" -eq 1 ]; then
   yq --inplace 'del(.platform)' "${SHARED_DIR}"/install-config.yaml
@@ -178,14 +179,9 @@ for ((i = 0; i < total_host; i++)); do
 done >"${SHARED_DIR}"/hostnames.txt
 
 for ((i = 0; i < total_host; i++)); do
-  ipaddress=""
-  if [[ ${vsphere_portgroup} == *"segment"* ]]; then
-    ipaddress=192.168.${third_octet}.$((i + 4))
-    cidr=25
-  else
-    ipaddress=$(jq -r --argjson N $((i + 4)) --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
-    ipv6_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].StartIPv6Address' "${SUBNETS_CONFIG}")
-  fi
+  ipaddress=$(jq -r --argjson N $((i + 4)) --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
+  ipv6_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].StartIPv6Address' "${SUBNETS_CONFIG}")
+
   ipv4="
         ipv4:
           enabled: true
@@ -246,17 +242,12 @@ agent_config="${SHARED_DIR}/agent-config.yaml"
 yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
   "${agent_config}" - <<<"$(cat "${agent_config_patch}")"
 
-echo "Installing from initial release $RELEASE_IMAGE_LATEST"
-oc adm release extract -a "$pull_secret_path" "$RELEASE_IMAGE_LATEST" \
-  --command=openshift-install --to=/tmp
-
+echo "Creating agent image..."
 dir=/tmp/installer
 mkdir "${dir}/"
 pushd ${dir}
-cp -t "${dir}" \
-  "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
+cp -t "${dir}" "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
 
-echo "Creating agent image..."
 /tmp/openshift-install agent create image --dir="${dir}" --log-level debug &
 
 if ! wait $!; then

@@ -3,13 +3,27 @@ chain:
   steps:
   - as: cluster-claim-check
     commands: |-
-      oc --kubeconfig="${MANAGEMENT_CLUSTER_KUBECONFIG}" get deploy -n hypershift operator || exit 0
-      BUILD_ID=$(oc --kubeconfig="${MANAGEMENT_CLUSTER_KUBECONFIG}" get deploy -n hypershift operator -o jsonpath='{.metadata.labels.build-id}')
-      echo "HyperShift operator deployment found on the PR test cluster. There may be another PR test in progress."
-      if [[ "${BUILD_ID}" != "" ]]; then
-        echo "Build ${BUILD_ID} installed the current HO deployment."
+      export KUBECONFIG="${MANAGEMENT_CLUSTER_KUBECONFIG}"
+      STATUS=$(oc get deploy -n hypershift operator -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null)
+      BUILD_ID=$(oc get deploy -n hypershift operator -o jsonpath='{.metadata.labels.build-id}')
+      AGE=$(oc get deploy -n hypershift operator -o jsonpath='{.metadata.creationTimestamp}')
+      CREATION_TIME=$(date -d"${AGE}" +"%s")
+      CURRENT_TIME=$(date -u +"%s")
+      AGE_IN_SECONDS=$((CURRENT_TIME - CREATION_TIME))
+      
+      if [[ -n "${BUILD_ID}" ]]; then
+          echo "HyperShift operator deployment found on the PR test cluster. There may be another PR test in progress." && echo "Build ${BUILD_ID} installed the current HO deployment."
       fi
-      exit 1
+
+      # Check if deployment exists and its unhealthy then delete
+      if [[ "$STATUS" != "True" ]] || [[ $AGE_IN_SECONDS -gt 86400 ]]; then
+          echo "HyperShift operator deployment is stale. Deleting."
+          oc delete deploy -n hypershift operator
+      else
+          echo "ERROR: Failing."
+          exit 1
+      fi
+
     credentials:
     - mount_path: /etc/ibmcloud/secrets
       name: hypershift-ibm-managed-ci-creds

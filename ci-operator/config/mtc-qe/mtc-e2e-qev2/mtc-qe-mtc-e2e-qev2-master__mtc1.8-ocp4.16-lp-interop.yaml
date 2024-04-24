@@ -54,8 +54,8 @@ tests:
   steps:
     cluster_profile: aws-cspi-qe
     env:
-      CLUSTER1_CONFIG: name=mtc-aws-ipi-source;base-domain=cspilp.interop.ccitredhat.com;platform=aws;region=us-east-2;version=4.15;stream=stable;worker-flavor=m5.xlarge;timeout=2h
-      CLUSTER2_CONFIG: name=mtc-aws-ipi-target;base-domain=cspilp.interop.ccitredhat.com;platform=aws;region=us-east-2;version=4.16;stream=nightly;worker-flavor=m5.xlarge;timeout=2h
+      CLUSTER1_CONFIG: name-prefix=mtc-source;base-domain=cspilp.interop.ccitredhat.com;platform=aws;region=us-east-2;version=4.15;stream=stable;worker-flavor=m5.xlarge;timeout=2h
+      CLUSTER2_CONFIG: name-prefix=mtc-target;base-domain=cspilp.interop.ccitredhat.com;platform=aws;region=us-east-2;version=4.16;stream=nightly;worker-flavor=m5.xlarge;timeout=2h
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -65,12 +65,17 @@ tests:
               {"step": "cluster-uninstall", "failure_type": "all", "classification": "Infrastructure Deprovisioning - Cluster", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "mtc-execute-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "mtc-execute-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "MIG", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]}
+            ],
+          "success_rules":
+            [
+              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
             ]
         }
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","mtc-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       MTC_VERSION: "1.8"
       PULL_SECRET_NAME: pull-secret
+      RE_TRIGGER_ON_FAILURE: "true"
       S3_BUCKET_NAME: openshift-cli-installer-cspi-interop
       S3_BUCKET_PATH: openshift-ci
     test:

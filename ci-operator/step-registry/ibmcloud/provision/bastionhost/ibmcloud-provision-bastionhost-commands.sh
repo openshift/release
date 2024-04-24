@@ -19,6 +19,7 @@ function ibmcloud_login {
   "${IBMCLOUD_CLI}" config --check-version=false
   echo "Try to login..."
   "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+  "${IBMCLOUD_CLI}" plugin list
 }
 
 function check_vpc() {
@@ -48,16 +49,11 @@ if [[ ! -f "${bastion_ignition_file}" ]]; then
   echo "'${bastion_ignition_file}' not found, ignition-bastionhost step is required, abort." && exit 1
 fi
 
-VPC_CONFIG="${SHARED_DIR}/customer_vpc_subnets.yaml"
-if [[ ! -f "${VPC_CONFIG}" ]]; then
-  echo "Fail to find of VPC info file ${VPC_CONFIG}, abort." && exit 1
-fi
-echo "Reading variables from ${VPC_CONFIG}..."
-vpcName=$(yq-go r "${VPC_CONFIG}" 'platform.ibmcloud.vpcName')
+echo "Reading variables from ibmcloud_vpc_name and ibmcloud_resource_group files..."
+vpcName=$(<"${SHARED_DIR}/ibmcloud_vpc_name")
+resource_group=$(<"${SHARED_DIR}/ibmcloud_resource_group")
 
-resource_group=$(yq-go r "${VPC_CONFIG}" 'platform.ibmcloud.resourceGroupName')
 echo "Using region: ${region}  resource_group: ${resource_group} vpc: ${vpcName}"
-
 ${IBMCLOUD_CLI} target -g ${resource_group}
 
 vpc_info_file=$(mktemp)
@@ -98,10 +94,12 @@ run_command "${IBMCLOUD_CLI} is instance ${bastion_name} --output JSON > ${insFi
 echo "INFO" "Created bastion instance ${bastion_name} status: $(jq -r '.status' ${insFile})"
 bastion_private_ip="$(jq -r '.network_interfaces[0].primary_ip.address' ${insFile})"
 
-nic=$(jq -r '.network_interfaces[0].id' ${insFile})
+nac=$(jq -r '.network_attachments[0].id' ${insFile})
+nic=$(${IBMCLOUD_CLI} is instance-network-attachment ${bastion_name} ${nac} --output JSON | jq -r ".virtual_network_interface.id")
 fip="${cluster_name}-fip"
-bastion_public_ip=$(${IBMCLOUD_CLI} is floating-ip-reserve ${fip} --nic-id $nic --output JSON | jq -r .address)
-
+${IBMCLOUD_CLI} is floating-ip-reserve ${fip} --nic-id $nic --output JSON > "${workdir}/${bastion_name}_ip.json"
+bastion_public_ip=$(jq -r '.address' "${workdir}/${bastion_name}_ip.json")
+echo "bastion_public_ip: $bastion_public_ip"
 if [ X"${bastion_public_ip}" == X"" ] || [ X"${bastion_private_ip}" == X"" ] ; then
     echo "ERROR" "Failed to find bastion's public and private IP!"
     exit 1
@@ -114,10 +112,8 @@ bastionHost: ${bastion_name}
 vpcName: ${vpcName}
 EOF
 
-run_command "${IBMCLOUD_CLI} is instance-network-interface-floating-ip-add ${bastion_name} ${nic} ${fip}"
-
 #dump the info 
-run_command "${IBMCLOUD_CLI} is instance-network-interface-floating-ips ${bastion_name} $nic"
+run_command "${IBMCLOUD_CLI} is instance-network-interface-floating-ips ${bastion_name} $nac"
 run_command "${IBMCLOUD_CLI} is sg-rules $sg --vpc ${vpcName}"
 
 #####################################

@@ -75,7 +75,7 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: aws-c2s-ipi-disconnected-private-fips-f14
+- as: aws-c2s-ipi-disc-priv-fips-f14
   cron: 37 2 6,21 * *
   steps:
     cluster_profile: aws-c2s-qe
@@ -85,7 +85,7 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
-- as: aws-ipi-disconnected-mtu-localzone-fips-f14
+- as: aws-ipi-disc-priv-mtu-localzone-fips-f14
   cron: 14 5 12,27 * *
   steps:
     cluster_profile: aws-1-qe
@@ -95,7 +95,7 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-network-mtu-edge-zone
-- as: aws-ipi-disconnected-private-sno-f14
+- as: aws-ipi-disc-priv-sno-f14
   cron: 37 19 2,17 * *
   steps:
     cluster_profile: aws-qe
@@ -104,7 +104,7 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
-- as: aws-ipi-disconnected-sts-ep-fips-f14
+- as: aws-ipi-disc-priv-sts-ep-fips-f14
   cron: 38 19 14,29 * *
   steps:
     cluster_profile: aws-qe
@@ -122,10 +122,8 @@ tests:
       ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and @heterogeneous
-        and @network-ovnkubernetes and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi and @heterogeneous
-        and @network-ovnkubernetes and not @fips'
+      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
+      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
     - chain: openshift-upgrade-qe-test-arch-migration
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
@@ -158,8 +156,8 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-usertags
-- as: aws-ocm-osd-ccs-f14
-  cron: 26 9 7,22 * *
+- as: aws-ocm-osd-ccs-f28
+  cron: 46 3 28 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -168,8 +166,8 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: osd-ccs-aws
-- as: gcp-ocm-osd-ccs-marketplace-f14
-  cron: 13 21 2,17 * *
+- as: gcp-ocm-osd-ccs-marketplace-f28
+  cron: 25 14 16 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -179,8 +177,29 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: osd-ccs-gcp
-- as: aws-rosa-non-sts-advanced-f14
-  cron: 13 17 5,20 * *
+- as: gcp-ocm-osd-ccs-xpn-f28
+  cron: 35 10 4 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      CHANNEL_GROUP: candidate
+      OPENSHIFT_VERSION: "4.13"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: osd-ccs-gcp-xpn
+- as: gcp-ocm-osd-ccs-xpn-private-marketplace-f28
+  cron: 22 18 20 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      CHANNEL_GROUP: candidate
+      OPENSHIFT_VERSION: "4.13"
+      SUBSCRIPTION_TYPE: marketplace-gcp
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: osd-ccs-gcp-xpn-private
+- as: aws-rosa-non-sts-byo-vpc-kms-proxy-f28
+  cron: 24 19 30 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -188,9 +207,9 @@ tests:
       OPENSHIFT_VERSION: "4.13"
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: rosa-aws-non-sts-advanced
-- as: aws-rosa-sts-f14
-  cron: 26 18 4,19 * *
+    workflow: rosa-aws-non-sts-byo-vpc-kms-proxy
+- as: aws-rosa-sts-f28
+  cron: 24 21 28 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -199,8 +218,8 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: rosa-aws-sts
-- as: aws-rosa-sts-advanced-f14
-  cron: 41 19 2,17 * *
+- as: aws-rosa-sts-byo-kms-oidc-f28
+  cron: 43 8 19 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -208,9 +227,9 @@ tests:
       OPENSHIFT_VERSION: "4.13"
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: rosa-aws-sts-advanced
-- as: aws-rosa-sts-private-link-f14
-  cron: 17 22 8,23 * *
+    workflow: rosa-aws-sts-byo-kms-oidc
+- as: aws-rosa-sts-localzone-f28
+  cron: 29 13 24 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -218,9 +237,19 @@ tests:
       OPENSHIFT_VERSION: "4.13"
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: rosa-aws-sts-private-link
-- as: aws-rosa-sts-shared-vpc-f14
-  cron: 21 3 3,18 * *
+    workflow: rosa-aws-sts-localzone
+- as: aws-rosa-sts-private-proxy-f28
+  cron: 55 10 18 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: candidate
+      OPENSHIFT_VERSION: "4.13"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: rosa-aws-sts-private-proxy
+- as: aws-rosa-sts-shared-vpc-f28
+  cron: 33 1 30 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -238,7 +267,7 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
-- as: azure-ipi-disconnected-fullyprivate-f14
+- as: azure-ipi-disc-fullyprivate-f14
   cron: 24 23 4,19 * *
   steps:
     cluster_profile: azure-qe
@@ -265,10 +294,9 @@ tests:
       ADDITIONAL_WORKERS: "1"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "2"
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @azure-ipi and @heterogeneous
-        and @network-ovnkubernetes and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @azure-ipi and @heterogeneous
-        and @network-ovnkubernetes and not @fips'
+      ENABLE_OTA_TEST: OCP-53921
+      UPGRADE_CHECK_RUN_TAGS: '@heterogeneous'
+      UPGRADE_PRE_RUN_TAGS: '@heterogeneous'
     test:
     - chain: openshift-upgrade-qe-test-arch-migration
     workflow: cucushift-installer-rehearse-azure-ipi
@@ -304,7 +332,7 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-filestore-csi
-- as: gcp-ipi-disconnected-private-workload-identity-f14
+- as: gcp-ipi-disc-priv-oidc-f14
   cron: 16 7 12,27 * *
   steps:
     cluster_profile: gcp-qe
@@ -336,11 +364,13 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
-- as: nutanix-ipi-disconnected-f14
+- as: nutanix-ipi-disc-rt-f14
   cluster: build01
   cron: 19 17 5,20 * *
   steps:
     cluster_profile: nutanix-qe-dis
+    env:
+      RT_ENABLED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-nutanix-ipi-disconnected
@@ -354,7 +384,7 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
-- as: vsphere-ipi-disconnected-f14
+- as: vsphere-ipi-disc-f14
   cron: 31 19 3,18 * *
   steps:
     cluster_profile: vsphere-dis-2

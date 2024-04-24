@@ -14,14 +14,12 @@ function create_csb_project_and_policies()
 
 function create_csb_configmaps()
 {
-  CREDENTIALS=$(cat /tmp/secrets/tnb/credentials)
   CONSOLE_URL=$(cat "$SHARED_DIR"/console.url)
   API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
   NGINX_DOMAIN="nginx.${CONSOLE_URL#"https://console-openshift-console."}"
   KUBEADMIN_PWD=$(cat "$SHARED_DIR"/kubeadmin-password)
   NGINX_ROUTE="http://${NGINX_DOMAIN}"
 
-  export CREDENTIALS
   export QUAY_IO_AUTH
   export API_URL
   export KUBEADMIN_PWD
@@ -395,11 +393,6 @@ function create_csb_configmaps()
 </settings>
 EOF
 
- cat << EOF > /tmp/credentials.yaml
-$CREDENTIALS
-EOF
-
-  oc create secret generic credentials -n "${1}" --from-file=/tmp/credentials.yaml
   oc create configmap mvn-settings -n "${1}" --from-file=/tmp/settings.xml
 }
 
@@ -584,7 +577,6 @@ EOF
   cat << EOF > /tmp/test.properties
 openshift.namespace=tnb-tests
 openshift.namespace.delete=false
-test.credentials.file=/deployments/tnb-tests/credentials.yaml
 test.maven.repository=https://maven.repository.redhat.com/ga/
 dballocator.url=http://dballocator.mw.lab.eng.bos.redhat.com:8080
 dballocator.requestee=software.tnb.db.dballocator.service
@@ -718,6 +710,13 @@ function restartPodAfterFailure() {
   echo "TNB pod restarted."
 }
 
+function copy_deploy_pod_logs() {
+  TNB_POD=$(oc get pods -n csb-interop -l deployment=tnb --no-headers=true | awk '{print $1}')
+  echo "get logs from pod ${TNB_POD}"
+  mkdir -p "${ARTIFACT_DIR}"/tnb
+  oc logs --tail=5000 "$TNB_POD" -n csb-interop > "${ARTIFACT_DIR}"/tnb/deploy-and-compile.log
+}
+
 echo "Create project"
 create_csb_project_and_policies csb-interop
 
@@ -738,3 +737,6 @@ oc import-image tnb-tests:latest --from=quay.io/rh_integration/tnb-tests:latest 
 
 echo "Compile TNB project through Pod creation"
 create_dc_and_tnb_framework_pod
+
+echo "Copy TNB Pod logs"
+copy_deploy_pod_logs

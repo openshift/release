@@ -40,7 +40,7 @@ function all_nodes()
 }
 
 try=1
-total=10
+total=30
 interval=60
 while [[ ${try} -le ${total} ]]; do
 

@@ -4,27 +4,27 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-image-service:
-    name: ocm-2.9
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.9
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.9
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.9
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.9
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.9
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -79,11 +79,6 @@ releases:
       stream: nightly
       version: "4.16"
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.16"
-  oldest-supported-z-rollback:
     candidate:
       product: ocp
       stream: nightly
@@ -188,20 +183,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-sdn-ipv4
-- as: e2e-metal-ipi-ovn-dualstack-local-gateway
-  cluster: build05
-  interval: 168h
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        NETWORK_TYPE=OVNKubernetes
-        OVN_LOCAL_GATEWAY_MODE=true
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: baremetalds-e2e
 - as: e2e-metal-ipi-sdn-serial-ipv4
   cluster: build05
   interval: 168h
@@ -211,6 +192,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-sdn-serial-ipv4
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ovn-ipv6
   cluster: build05
   interval: 168h
@@ -220,7 +202,8 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6
-- as: e2e-metal-ipi-ovn-serial-virtualmedia-bond
+  timeout: 5h0m0s
+- as: e2e-metal-ipi-ovn-serial-virtualmedia
   cluster: build05
   interval: 168h
   steps:
@@ -228,7 +211,8 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: baremetalds-e2e-serial-virtualmedia-bond
+    workflow: baremetalds-e2e-serial-virtualmedia
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ovn-dualstack
   cluster: build05
   interval: 168h
@@ -238,6 +222,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-sdn-bm-upgrade
   cluster: build05
   cron: 0 12 1 1 *
@@ -337,8 +322,6 @@ tests:
   interval: 168h
   steps:
     cluster_profile: vsphere-8-vpn
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
       - observers-resource-watch
@@ -599,18 +582,6 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-xpn
   timeout: 6h0m0s
-- as: e2e-aws-ovn-upgrade-rollback-oldest-supported
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      TEST_TYPE: upgrade-conformance
-      TEST_UPGRADE_OPTIONS: abort-at=100
-    workflow: openshift-upgrade-aws
 - as: e2e-aws-sdn-upgrade
   interval: 168h
   steps:
@@ -781,7 +752,7 @@ tests:
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 00 13 */1 * 1-5
+  cron: 0 9 */1 * *
   steps:
     env:
       T5CI_JOB_TYPE: ptp
@@ -1010,6 +981,7 @@ tests:
     cluster_profile: packet-sno
     env:
       CLUSTER_AGE_DAYS: "365"
+      CLUSTER_AGE_STEP: "150"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-2y-age-90d
@@ -1018,6 +990,79 @@ tests:
     cluster_profile: packet-sno
     env:
       CLUSTER_AGE_DAYS: "730"
+      CLUSTER_AGE_STEP: "300"
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-3y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "1100"
+      CLUSTER_AGE_STEP: "300"
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-4y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "1470"
+      CLUSTER_AGE_STEP: "300"
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-5y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "1830"
+      CLUSTER_AGE_STEP: "300"
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-6y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "2190"
+      CLUSTER_AGE_STEP: "300"
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-7y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "2560"
+      CLUSTER_AGE_STEP: "300"
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-8y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "2930"
+      CLUSTER_AGE_STEP: "300"
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-9y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "3290"
+      CLUSTER_AGE_STEP: "300"
+      SKEW: 90d
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-10y-age-90d
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    env:
+      CLUSTER_AGE_DAYS: "3650"
+      CLUSTER_AGE_STEP: "300"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-60d
@@ -1130,7 +1175,7 @@ tests:
   steps:
     cluster_profile: aws-2
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential
+      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
       BASE_DOMAIN: aws-2.ci.openshift.org
       BASELINE_CAPABILITY_SET: None
       PERSISTENT_MONITORING: "false"
@@ -1149,6 +1194,12 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
   timeout: 6h0m0s
+- as: e2e-aws-ovn-edge-zones-manifest-validation
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-local-zones
+    workflow: openshift-installer-manifests-aws-edge-zones
+  timeout: 1h0m0s
 - as: e2e-aws-overlay-mtu-ovn-5000
   cron: '@weekly'
   steps:
@@ -1165,6 +1216,15 @@ tests:
       CLUSTER_NETWORK_MTU: "1100"
     workflow: openshift-e2e-aws-network-mtu-edge-zones
   timeout: 6h0m0s
+- as: baremetalds-sno-recert-cluster-rename
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    test:
+    - ref: baremetalds-sno-conf
+    - ref: baremetalds-sno-rename
+    - ref: baremetalds-sno-test
+    workflow: baremetalds-sno
 zz_generated_metadata:
   branch: master
   org: openshift

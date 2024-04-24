@@ -26,10 +26,10 @@ source "${SHARED_DIR}/vsphere_context.sh"
 openshift_install_path="/var/lib/openshift-install"
 
 start_master_num=4
-end_master_num=$((start_master_num + MASTER_REPLICAS - 1))
+end_master_num=$((start_master_num + CONTROL_PLANE_REPLICAS - 1))
 
 start_worker_num=$((end_master_num + 1))
-end_worker_num=$((start_worker_num + WORKER_REPLICAS - 1))
+end_worker_num=$((start_worker_num + COMPUTE_NODE_REPLICAS - 1))
 
 SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
 if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
@@ -175,7 +175,7 @@ then
   }'
 
   # Generate control plane DNS entries
-  for (( node=0; node < ${MASTER_REPLICAS}; node++)); do
+  for (( node=0; node < ${CONTROL_PLANE_REPLICAS}; node++)); do
     echo "Creating DNS entry for ${control_plane_hostnames[$node]}"
     node_record=$(echo "${DNS_RECORD}" |
       jq -r --arg ACTION "CREATE" \
@@ -192,7 +192,7 @@ then
     ROUTE53_DELETE_JSON=$(echo "${ROUTE53_DELETE_JSON}" | jq --argjson DNS_RECORD "$node_record" -r '.Changes[.Changes|length] |= .+ $DNS_RECORD')
   done
   # Generate compute DNS entries
-  for (( node=0; node < ${WORKER_REPLICAS}; node++)); do
+  for (( node=0; node < ${COMPUTE_NODE_REPLICAS}; node++)); do
     echo "Creating DNS entry for ${compute_hostnames[$node]}"
     node_record=$(echo "${DNS_RECORD}" |
       jq -r --arg ACTION "CREATE" \
@@ -220,7 +220,7 @@ ${platform_required} && cat >>"${install_config}" <<EOF
 baseDomain: $base_domain
 controlPlane:
   name: "master"
-  replicas: ${MASTER_REPLICAS}
+  replicas: ${CONTROL_PLANE_REPLICAS}
   platform:
     vsphere:
       zones:
@@ -229,7 +229,7 @@ controlPlane:
        - "us-east-3"
 compute:
 - name: "worker"
-  replicas: ${WORKER_REPLICAS}
+  replicas: ${COMPUTE_NODE_REPLICAS}
   platform:
     vsphere:
       zones:
@@ -317,8 +317,8 @@ lb_ip_address = "${lb_ip_address}"
 
 compute_ip_addresses = ${compute_ip_addresses}
 control_plane_ip_addresses = ${control_plane_ip_addresses}
-control_plane_count = ${MASTER_REPLICAS}
-compute_count = ${WORKER_REPLICAS}
+control_plane_count = ${CONTROL_PLANE_REPLICAS}
+compute_count = ${COMPUTE_NODE_REPLICAS}
 failure_domains = [
     {
         datacenter = "IBMCloud"
@@ -375,13 +375,13 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 
 \$control_plane_memory = 16384
 \$control_plane_num_cpus = 4
-\$control_plane_count = ${MASTER_REPLICAS}
+\$control_plane_count = ${CONTROL_PLANE_REPLICAS}
 \$control_plane_ip_addresses = $(echo ${control_plane_ip_addresses} | tr -d [])
 \$control_plane_hostnames = $(printf "\"%s\"," "${control_plane_hostnames[@]}" | sed 's/,$//')
 
 \$compute_memory = 16384
 \$compute_num_cpus = 4
-\$compute_count = ${WORKER_REPLICAS}
+\$compute_count = ${COMPUTE_NODE_REPLICAS}
 \$compute_ip_addresses = $(echo ${compute_ip_addresses} | tr -d [])
 \$compute_hostnames = $(printf "\"%s\"," "${compute_hostnames[@]}" | sed 's/,$//')
 
@@ -460,6 +460,10 @@ rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 ### Remove compute machinesets (optional)
 echo "Removing compute machinesets..."
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+
+### Remove control-plane machinesets
+echo "Removing control-plane machineset..."
+rm -f openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
 
 ### Make control-plane nodes unschedulable
 echo "Making control-plane nodes unschedulable..."

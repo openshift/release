@@ -3,9 +3,16 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -o xtrace
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+save_state_files() {
+    # tar the shared manifest dir to make it share between pods
+    cd ${SHARED_DIR}
+    find ./tf-manifests -name 'terraform.[tfstate|tfvars]*' -print0|tar --null -T - -zcvf statefiles.tar.gz
+    ls ${SHARED_DIR}
+    cd -
+}
+
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; save_state_files' TERM
 
 
 export GOCACHE="/tmp/cache"
@@ -34,6 +41,11 @@ if [ -z "${RHCS_TOKEN}" ]; then
 fi
 export RHCS_TOKEN=${RHCS_TOKEN}
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred_shared_account
+fi
+
 if [ ! -f ${CLUSTER_PROFILE_DIR}/.awscred ];then
     error_exit "missing mandatory aws credential file ${CLUSTER_PROFILE_DIR}/.awscred"
 fi
@@ -58,6 +70,12 @@ export RHCS_ENV=${RHCS_ENV}
 export RHCS_TOKEN=${RHCS_TOKEN}
 export VERSION=${VERSION}
 export REGION=${REGION}
+if [ ! -z "$RHCS_SOURCE" ];then
+    export RHCS_SOURCS=$RHCS_SOURCE
+fi
+if [ ! -z "$RHCS_VERSION" ]; then
+    export RHCS_VERSION=$RHCS_VERSION
+fi
 
 make tools
 make install
@@ -71,11 +89,7 @@ ginkgo run \
     -r \
     --focus-file tests/e2e/.* 2>&1| tee ${SHARED_DIR}/rhcs_preparation.log || true
 
-# tar the shared manifest dir to make it share between pods
-cd ${SHARED_DIR}
-find ./tf-manifests -name 'terraform.[tfstate|tfvars]*' -print0|tar --null -T - -zcvf statefiles.tar.gz
-ls ${SHARED_DIR}
-cd -
+save_state_files
 
 prepareFailure=$(tail -n 100 ${SHARED_DIR}/rhcs_preparation.log | { grep "\[FAIL\]" || true; })
 if [ ! -z "$prepareFailure" ]; then

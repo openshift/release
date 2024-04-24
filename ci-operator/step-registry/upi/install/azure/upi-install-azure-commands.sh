@@ -59,7 +59,15 @@ echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 cp ${SHARED_DIR}/install-config.yaml ${ARTIFACT_DIR}/installer/install-config.yaml
 export PATH=${HOME}/.local/bin:${PATH}
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
+  echo "Setting AZURE credential with minimal permissions to install UPI"
+  AZURE_AUTH_LOCATION="${SHARED_DIR}/azure_minimal_permission"
+fi
 export AZURE_AUTH_LOCATION
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 pushd ${ARTIFACT_DIR}/installer
 
@@ -164,13 +172,15 @@ else
   VHD_URL="$(jq -r .azure.url /var/lib/openshift-install/rhcos.json)"
 fi
 
+# change to use --account-key instead of --auth-mode login to avoid issue
+# https://github.com/MicrosoftDocs/azure-docs/issues/53299
 echo "Copying VHD image from ${VHD_URL}"
-az storage container create --name vhd --account-name $ACCOUNT_NAME --auth-mode login
+az storage container create --name vhd --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY
 
 status="false"
 while [ "$status" == "false" ]
 do
-  status=$(az storage container exists --account-name $ACCOUNT_NAME --name vhd --auth-mode login -o tsv --query exists)
+  status=$(az storage container exists --account-name $ACCOUNT_NAME --name vhd --account-key $ACCOUNT_KEY -o tsv --query exists)
 done
 
 az storage blob copy start --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --destination-container vhd --destination-blob "rhcos.vhd" --source-uri "$VHD_URL"
@@ -181,9 +191,11 @@ do
 done
 
 status="pending"
-while [ "$status" == "pending" ]
+cmd_result=1
+while [[ ${cmd_result} -eq 1 ]] || [[ "$status" == "pending" ]]
 do
-  status=$(az storage blob show --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --container-name vhd --name "rhcos.vhd" -o tsv --query properties.copy.status)
+  cmd_result=0
+  status=$(az storage blob show --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --container-name vhd --name "rhcos.vhd" -o tsv --query properties.copy.status) || cmd_result=1
 done
 if [[ "$status" != "success" ]]; then
   echo "Error copying VHD image ${VHD_URL}"

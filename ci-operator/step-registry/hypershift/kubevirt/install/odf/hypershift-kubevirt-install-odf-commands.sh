@@ -198,4 +198,5 @@ for item in $(oc get sc --no-headers | awk '{print $1}'); do
 	oc annotate --overwrite sc $item storageclass.kubernetes.io/is-default-class='false'
 done
 oc annotate --overwrite sc ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class='true'
+oc annotate --overwrite volumesnapshotclass ocs-storagecluster-rbdplugin-snapclass snapshot.storage.kubernetes.io/is-default-class='true'
 echo "ocs-storagecluster-ceph-rbd is set as default storage class"

@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.10
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.10
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.10
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.10
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.10
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.10
+    name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -30,7 +30,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.53.1
+    tag: v1.54.2
   ocp_4.10_cli:
     name: 4.17-priv
     namespace: ocp-private
@@ -82,6 +82,9 @@ images:
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   inputs:
+    ocp_4.16_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:cli
     ocp_4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
@@ -299,6 +302,13 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
   timeout: 6h0m0s
+- always_run: true
+  as: e2e-aws-ovn-edge-zones-manifest-validation
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws-local-zones
+    workflow: openshift-installer-manifests-aws-edge-zones
+  timeout: 3h0m0s
 - as: e2e-aws-ovn-imdsv2
   optional: true
   run_if_changed: aws
@@ -402,7 +412,7 @@ tests:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp-latestinstaller
   timeout: 6h0m0s
-- as: e2e-metal-ipi-sdn
+- as: e2e-metal-ipi-ovn
   cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
@@ -411,10 +421,10 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
+        NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
   timeout: 6h0m0s
-- as: e2e-metal-ipi-sdn-swapped-hosts
+- as: e2e-metal-ipi-ovn-swapped-hosts
   cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
@@ -423,7 +433,7 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
+        NETWORK_TYPE=OVNKubernetes
         HOSTS_SWAP_DEFINITION=true
     workflow: baremetalds-e2e
   timeout: 6h0m0s
@@ -468,29 +478,22 @@ tests:
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
-- as: e2e-openstack-upi
+- as: e2e-openstack-dualstack-upi
   optional: true
   run_if_changed: (^images/openstack/)|(^docs/user/openstack/install_upi\.md$)|(^upi/openstack/)
   steps:
-    cluster_profile: openstack-vexxhost
+    cluster_profile: openstack-hwoffload
     env:
+      CONFIG_TYPE: dual-stack-upi
+      OPENSTACK_COMPUTE_FLAVOR: m1.xlarge
       OPENSTACK_TEST_SKIPS: The OpenStack platform creates Worker nodes in a server
         group\|The OpenStack platform creates Control plane nodes in a server group
+      TEST_SKIPS: Services Secondary IP Family \[LinuxOnly\] should function for service
+        endpoints using hostNetwork\| Services Secondary IP Family \[LinuxOnly\] should
+        function for node-Service\| Services Secondary IP Family \[LinuxOnly\] should
+        function for pod-Service
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-upi
-  timeout: 6h0m0s
-- as: e2e-openstack-sdn-parallel
-  optional: true
-  run_if_changed: openstack
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: OpenShiftSDN
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_SUITE: openshift/conformance/parallel
-    workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
 - as: e2e-openstack-proxy
   optional: true
@@ -569,8 +572,6 @@ tests:
   optional: true
   steps:
     cluster_profile: vsphere-8-vpn
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
 - as: e2e-vsphere-upi
@@ -608,13 +609,6 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-crc
-  timeout: 6h0m0s
-- as: e2e-libvirt
-  optional: true
-  run_if_changed: libvirt
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-e2e-gcp-libvirt
   timeout: 6h0m0s
 - as: e2e-metal-assisted
   optional: true
@@ -690,24 +684,14 @@ tests:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix-ovn
   timeout: 6h0m0s
-- as: e2e-nutanix-sdn
-  cluster: build01
-  optional: true
-  run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
-  steps:
-    cluster_profile: nutanix
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    workflow: openshift-e2e-nutanix-sdn
-  timeout: 6h0m0s
 - as: agent-integration-tests
   commands: hack/go-integration-test.sh
   container:
     from: src-oc
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
 - as: e2e-agent-compact-ipv4
   cluster: build05
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -720,7 +704,7 @@ tests:
 - as: e2e-agent-compact-ipv4-none-platform
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -733,7 +717,7 @@ tests:
 - as: e2e-agent-compact-ipv4-appliance
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -746,7 +730,7 @@ tests:
 - as: e2e-agent-compact-ipv4-appliance-diskimage
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     allow_skip_on_success: true
     cluster_profile: equinix-ocp-metal
@@ -764,7 +748,7 @@ tests:
 - as: e2e-agent-sno-ipv6
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-sno-ipv6
@@ -772,7 +756,7 @@ tests:
 - as: e2e-agent-sno-ipv4-pxe
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -784,14 +768,10 @@ tests:
 - as: e2e-agent-ha-dualstack
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
-        MIRROR_IMAGES=true
-    workflow: agent-e2e-generic
+    workflow: agent-e2e-ha-dualstack
   timeout: 6h0m0s
 - as: e2e-aws-ovn-public-subnets
   optional: true
@@ -814,13 +794,6 @@ tests:
     env:
       CLUSTER_NETWORK_MTU: "1200"
     workflow: openshift-e2e-aws-network-mtu
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-ovn-public-ipv4-pool
-  optional: true
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-ovn-public-ipv4-pool
   timeout: 6h0m0s
 - always_run: false
   as: azure-ovn-marketplace-images

@@ -19,28 +19,18 @@ source "${SHARED_DIR}/vsphere_context.sh"
 
 SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
 
-if [[ ${LEASED_RESOURCE} == *"segment"* ]]; then
+if ! jq -e --arg PRH "${primaryrouterhostname}" --arg VLANID "${vlanid}" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
+  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+  exit 1
+fi
 
-  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
-
-  cat >>"${SHARED_DIR}/platform-conf.sh" <<EOF
-export API_VIPS="[{\"ip\": \"192.168.${third_octet}.2\"}]"
-export INGRESS_VIPS="[{\"ip\": \"192.168.${third_octet}.3\"}]"
-EOF
-else
-  if ! jq -e --arg PRH "${primaryrouterhostname}" --arg VLANID "${vlanid}" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-    echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
-    exit 1
-  fi
-
-  api_vip=$(jq -r --argjson N 2 --arg PRH "${primaryrouterhostname}" --arg VLANID "${vlanid}" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
-  ingress_vip=$(jq -r --argjson N 3 --arg PRH "${primaryrouterhostname}" --arg VLANID "${vlanid}" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
+api_vip=$(jq -r --argjson N 2 --arg PRH "${primaryrouterhostname}" --arg VLANID "${vlanid}" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
+ingress_vip=$(jq -r --argjson N 3 --arg PRH "${primaryrouterhostname}" --arg VLANID "${vlanid}" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
 
   cat >>"${SHARED_DIR}/platform-conf.sh" <<EOF
 export API_VIPS="[{\"ip\": \"${api_vip}\"}]"
 export INGRESS_VIPS="[{\"ip\": \"${ingress_vip}\"}]"
 EOF
-fi
 
 echo "$(date -u --rfc-3339=seconds) - Creating platform-conf.sh file..."
 cat >>"${SHARED_DIR}/platform-conf.sh" <<EOF
