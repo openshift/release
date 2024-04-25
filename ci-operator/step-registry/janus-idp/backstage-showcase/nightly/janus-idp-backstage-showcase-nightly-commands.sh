@@ -8,7 +8,7 @@ export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME NAME_SPACE TAG_NAME
 
 GITHUB_ORG_NAME="janus-idp"
 GITHUB_REPOSITORY_NAME="backstage-showcase"
-NAME_SPACE=showcase-ci-nightly
+NAME_SPACE="showcase-ci-nightly"
 TAG_NAME="next"
 
 # Clone and checkout the specific PR
