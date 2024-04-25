@@ -101,6 +101,26 @@ data:
         insecure = false
 EOF
 
+oc adm release info ${OCP_IMAGE_MULTI} --filter-by-os=linux/s390x -o json > ocpversion.json
+OPENSHIFT_VERSION="$(cat ocpversion.json | jq -r . | grep "BUILD_VERSION=v" |  tr -d 'v",' | awk -F '=' '{print $2}')"
+export OPENSHIFT_VERSION
+
+if [[ "${OPENSHIFT_VERSION}" == *"4.14."* ]]
+then
+  RHCOS_VERSION="4.14-9.2"
+elif [[ "${OPENSHIFT_VERSION}" == *"4.15."* ]]
+then
+  RHCOS_VERSION="4.15-9.2"
+else
+  echo "unrecognized version for RHCOS"
+  exit 1
+fi
+
+RHCOS_BUILD_VERSION=$(cat ocpversion.json | jq -r '.displayVersions."machine-os".Version')
+export RHCOS_BUILD_VERSION
+export ISO_URL="https://rhcos.mirror.openshift.com/art/storage/prod/streams/${RHCOS_VERSION}/builds/${RHCOS_BUILD_VERSION}/s390x/rhcos-${RHCOS_BUILD_VERSION}-live.s390x.iso"
+export ROOT_FS_URL="https://rhcos.mirror.openshift.com/art/storage/prod/streams/${RHCOS_VERSION}/builds/${RHCOS_BUILD_VERSION}/s390x/rhcos-${RHCOS_BUILD_VERSION}-live-rootfs.s390x.img"
+
 # Creating AgentServiceConfig
 echo "$(date) Creating AgentServiceConfig"
 envsubst <<"EOF" | oc apply -f -
