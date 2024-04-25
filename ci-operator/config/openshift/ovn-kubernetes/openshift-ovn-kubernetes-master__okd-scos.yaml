@@ -1,0 +1,58 @@
+base_images:
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.16
+  origin_scos-4.16_ovn-kubernetes-base:
+    name: scos-4.16
+    namespace: origin
+    tag: ovn-kubernetes-base
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
+images:
+- dockerfile_path: Dockerfile
+  from: origin_scos-4.16_ovn-kubernetes-base
+  inputs:
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      as:
+      - rhel8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: ovn-kubernetes
+- dockerfile_path: Dockerfile.microshift
+  from: origin_scos-4.16_ovn-kubernetes-base
+  inputs:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: ovn-kubernetes-microshift
+promotion:
+  to:
+  - name: scos-4.16
+    namespace: origin
+releases:
+  latest:
+    integration:
+      name: scos-4.16
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: ovn-kubernetes
+  variant: okd-scos
