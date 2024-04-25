@@ -1,4 +1,8 @@
 base_images:
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.16
   origin_scos-4.16_base-stream9:
     name: scos-4.16
     namespace: origin
@@ -8,11 +12,15 @@ build_root:
     name: builder-priv
     namespace: ocp-private
     tag: rhel-8-golang-1.21-openshift-4.16
-canonical_go_repository: github.com/operator-framework/operator-marketplace
+canonical_go_repository: github.com/openshift/kubernetes-metrics-server
 images:
-- dockerfile_path: Dockerfile.rhel7
+- dockerfile_path: Dockerfile.ocp
   from: origin_scos-4.16_base-stream9
-  to: operator-marketplace
+  inputs:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: kube-metrics-server
 promotion:
   to:
   - disabled: true
@@ -31,5 +39,5 @@ resources:
 zz_generated_metadata:
   branch: master
   org: openshift-priv
-  repo: operator-marketplace
+  repo: kubernetes-metrics-server
   variant: okd-scos
