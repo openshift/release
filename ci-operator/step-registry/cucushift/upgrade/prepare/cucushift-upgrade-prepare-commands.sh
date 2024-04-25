@@ -77,12 +77,8 @@ function filter_test_by_platform() {
     extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            none|powervs)
+            external|none|powervs)
                 export UPGRADE_PRE_RUN_TAGS="@baremetal-upi and ${UPGRADE_PRE_RUN_TAGS}"
-                eval "$extrainfoCmd"
-                ;;
-            external)
-                echo "Expected, got platform as '$platform'"
                 eval "$extrainfoCmd"
                 ;;
             alibabacloud)
@@ -109,8 +105,11 @@ function filter_test_by_network() {
         ovnkubernetes)
 	    networktag='@network-ovnkubernetes'
 	    ;;
+        other)
+	    networktag=''
+	    ;;
         *)
-	    echo "######Expected network to be SDN/OVN, but got: $networktype"
+	    echo "######Expected network to be SDN/OVN/Other, but got: $networktype"
 	    ;;
     esac
     if [[ -n $networktag ]] ; then

@@ -210,7 +210,7 @@ mkdir /tmp/hc-manifests
 
 ICSP_COMMAND=""
 if [[ $ENABLE_ICSP == "true" ]]; then
-  ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_iscp.yaml")
+  ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml")
 fi
 
 ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
@@ -377,9 +377,10 @@ done
 echo "$(date) Setup pxe boot in bastion"
 ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR} && ./setup-pxe-boot.sh ${HOSTED_CLUSTER_NAME} ${HYPERSHIFT_NODE_COUNT} ${serverArgs}"
 
+sleep 240
+
 # Rebooting vm to boot from the network
 for instance in "${INSTANCE_ID[@]}"; do
-    sleep 120
     ibmcloud pi ins act $instance -o soft-reboot
 done
 

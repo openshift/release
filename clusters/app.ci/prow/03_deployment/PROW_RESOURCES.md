@@ -58,12 +58,6 @@
 * cpu: "100m"
 * ephemeral-storage: "1Mi"
 
-# [ kata-jenkins-operator ]
-### requests:
-* memory: "500Mi"
-* cpu: "100m"
-* ephemeral-storage: "10Mi"
-
 # [ refresh ] 
 ### requests:
 * memory: "250Mi"

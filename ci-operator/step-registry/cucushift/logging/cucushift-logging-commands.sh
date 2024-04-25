@@ -45,6 +45,7 @@ function summarize_test_results() {
     # summarize test results
     echo "Summarizing test results..."
     failures=0 errors=0 skipped=0 tests=0
+    [[ -e "${ARTIFACT_DIR}" ]] || exit 0
     grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
     while read -a row ; do
         # if the last ARG of command `let` evaluates to 0, `let` returns 1
@@ -80,11 +81,11 @@ CUCUSHIFT_FORCE_SKIP_TAGS="not @customer
         and not @upgrade-prepare
 "
 if [[ -z "$E2E_RUN_TAGS" ]] ; then
-    export E2E_RUN_TAGS="$CUCUSHIFT_FORCE_SKIP_TAGS"
+    echo "No need to run cucushift tests"
 else
     export E2E_RUN_TAGS="$E2E_RUN_TAGS and $CUCUSHIFT_FORCE_SKIP_TAGS"
+    set_cluster_access
+    preparation_for_test
+    test_execution
+    summarize_test_results
 fi
-set_cluster_access
-preparation_for_test
-test_execution
-summarize_test_results

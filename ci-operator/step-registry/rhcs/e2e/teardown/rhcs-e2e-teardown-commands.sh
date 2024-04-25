@@ -3,7 +3,6 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -o xtrace
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -39,6 +38,10 @@ export RHCS_TOKEN=${RHCS_TOKEN}
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 if [ ! -f ${CLUSTER_PROFILE_DIR}/.awscred ];then
     error_exit "missing mandatory aws credential file ${CLUSTER_PROFILE_DIR}/.awscred"
+fi
+
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred_shared_account
 fi
 
 REGION=${REGION:-$LEASED_RESOURCE}

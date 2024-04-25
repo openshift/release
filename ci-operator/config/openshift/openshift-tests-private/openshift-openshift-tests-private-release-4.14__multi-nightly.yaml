@@ -103,7 +103,6 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       SIZE_VARIANT: compact
-      TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
@@ -224,7 +223,7 @@ tests:
       BASELINE_CAPABILITY_SET: None
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@disconnected and not @workloads'
+      E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
       OCP_ARCH: arm64
       PERSISTENT_MONITORING: "false"
@@ -242,7 +241,7 @@ tests:
       ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
       BASE_DOMAIN: qe.devcluster.openshift.com
       BASELINE_CAPABILITY_SET: None
-      E2E_RUN_TAGS: '@disconnected and not @workloads'
+      E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
       PERSISTENT_MONITORING: "false"
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
@@ -392,6 +391,28 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-nlb
+- as: aws-ipi-minimal-permission-arm-f28
+  cron: 40 6 15 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-minimal-permission
+- as: aws-ipi-minimal-permission-amd-f28-destructive
+  cron: 55 17 4 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-minimal-permission
 - as: aws-ipi-ovn-efs-arm-f14
   cron: 34 2 7,23 * *
   steps:
@@ -610,33 +631,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-usertags-custom-security-groups
-- as: aws-upi-arm-f28
-  cron: 13 15 15 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BOOTSTRAP_INSTANCE_TYPE: m6g.large
-      MASTER_INSTANCE_TYPE: m6g.xlarge
-      OCP_ARCH: arm64
-      WORKER_INSTANCE_TYPE: m6g.xlarge
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-upi
-- as: aws-upi-amd-f28-destructive
-  cron: 5 12 7 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      TEST_ADDITIONAL: Network_Observability
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-upi
 - as: aws-upi-basecap-none-amd-f28-destructive
   cron: 5 17 23 * *
   steps:
@@ -646,7 +640,6 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       BASELINE_CAPABILITY_SET: None
-      E2E_RUN_TAGS: not @workloads
       PERSISTENT_MONITORING: "false"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -661,7 +654,6 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       BASELINE_CAPABILITY_SET: None
       BOOTSTRAP_INSTANCE_TYPE: m6g.large
-      E2E_RUN_TAGS: not @workloads
       MASTER_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
       PERSISTENT_MONITORING: "false"
@@ -736,7 +728,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: not @workloads
       PERSISTENT_MONITORING: "false"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -750,7 +741,6 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      E2E_RUN_TAGS: not @workloads
       OCP_ARCH: arm64
       PERSISTENT_MONITORING: "false"
     test:
@@ -1195,7 +1185,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASELINE_CAPABILITY_SET: None
-      E2E_RUN_TAGS: not @workloads
       PERSISTENT_MONITORING: "false"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -1209,7 +1198,6 @@ tests:
     env:
       BASELINE_CAPABILITY_SET: None
       COMPUTE_NODE_TYPE: t2a-standard-4
-      E2E_RUN_TAGS: not @workloads
       OCP_ARCH: arm64
       PERSISTENT_MONITORING: "false"
     test:

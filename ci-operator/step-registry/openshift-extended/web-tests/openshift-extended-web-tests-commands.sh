@@ -17,7 +17,23 @@ fi
 ## determine if it is hypershift guest cluster or not
 if ! (oc get node --kubeconfig=${KUBECONFIG} | grep master) ; then
   echo "Testing on hypershift guest cluster"
-  ./console-test-frontend-hypershift.sh || true
+  if (oc get authentication cluster -ojsonpath='{.spec.type}' --kubeconfig="${KUBECONFIG}" | grep OIDC);then
+    echo "Testing on Cluster using external OIDC"
+    USER_EMAIL="$(cat /var/run/hypershift-qe-ci-rh-sso-service-account/email)"
+    export USER_EMAIL
+    USER="$(cat /var/run/hypershift-qe-ci-rh-sso-service-account/rh-username)"
+    export USER
+    PASSWORD="$(cat /var/run/hypershift-qe-ci-rh-sso-service-account/rh-password)"
+    export PASSWORD
+    issuer_url="$(cat /var/run/hypershift-ext-oidc-cli/issuer-url)"
+    export issuer_url
+    cli_client_id="$(cat /var/run/hypershift-ext-oidc-cli/client-id)"
+    export cli_client_id
+    set -e
+    ./console-test-azure-external-oidc.sh
+  else
+    ./console-test-frontend-hypershift.sh || true
+  fi
 else
   export E2E_RUN_TAGS="${E2E_RUN_TAGS}"
   echo "E2E_RUN_TAGS is: ${E2E_RUN_TAGS}"
@@ -25,11 +41,22 @@ else
   if [[ $E2E_RUN_TAGS =~ @osd_ccs|@rosa ]] ; then
     echo "Testing against online cluster"
     ./console-test-managed-service.sh || true
+  elif [[ $E2E_RUN_TAGS =~ @level0 ]]; then
+    echo "only run level0 scenarios"
+    ./console-test-frontend.sh --tags @level0 || true
   # if the TYPE is ui, then it's a job specific for UI, run full tests
   # or else, we run smoke tests to balance coverage and cost
   elif [[ "X${E2E_TEST_TYPE}X" == 'XuiX' ]]; then
     echo "Testing on normal cluster"
     ./console-test-frontend.sh || true
+  elif [[ "X${E2E_RUN_TAGS}X" == 'XNetwork_ObservabilityX' ]]; then
+    # not using --grepTags here since cypress in 4.12 doesn't have that plugin
+    echo "Running Network_Observability tests"
+    ./console-test-frontend.sh --spec tests/netobserv/* || true
+  elif [[ $E2E_RUN_TAGS =~ @wrs ]]; then
+    # WRS specific testing
+    echo 'WRS testing'
+    ./console-test-frontend.sh --tags @wrs || true
   else
     echo "only run smoke scenarios"
     ./console-test-frontend.sh --tags @smoke || true

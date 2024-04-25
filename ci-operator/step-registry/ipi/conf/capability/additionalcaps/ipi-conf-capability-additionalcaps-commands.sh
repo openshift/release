@@ -60,11 +60,11 @@ ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}
 v411="baremetal marketplace openshift-samples"
 v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
-# shellcheck disable=SC2034
 v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
-# shellcheck disable=SC2034
 v415=" ${v414} OperatorLifecycleManager CloudCredential"
-latest_version="v415"
+# shellcheck disable=SC2034
+v416=" ${v415} CloudControllerManager Ingress"
+latest_version="v416"
 
 # define capability dependency
 declare -A dependency_caps
@@ -104,6 +104,16 @@ while [[ -z "${selected_capability}" ]]; do
         echo "WARNING: MachineAPI is selected, but it requires on IPI, could not be disabled!"
         selected_capability=""
         ;;
+    "CloudControllerManager")
+        platform_type=$(yq-go r -j "${SHARED_DIR}/install-config.yaml" "platform" | jq -r 'keys[]')
+        ccm_type=$(yq-go r "${SHARED_DIR}/install-config.yaml" "platform.external.cloudControllerManager")
+        if [[ "${platform_type}" == "none" || "${platform_type}" == "baremetal" || "${ccm_type}" == "None" ]]; then
+            enabled_capabilities=${enabled_capabilities/${selected_capability}}
+        else
+            echo "WARNING: CloudControllerManager is selected, but it is required on Cloud platform and External platform with cloudControllerManager state External, could not be disabled!"
+            selected_capability=""
+        fi
+        ;;
     # To be updated once OCP 4.16 is released
     "CloudCredential")
         if [[ "${CLUSTER_TYPE}" =~ ^packet.*$|^equinix.*$ ]]; then
@@ -112,6 +122,10 @@ while [[ -z "${selected_capability}" ]]; do
             echo "WARNING: non-BareMetal platforms require CCO for OCP 4.15, could not be disabled!"
             selected_capability=""
         fi
+        ;;
+    "Ingress")
+        echo "WARNING: Ingress should be always enabled, could not be disabled!"
+        selected_capability=""
         ;;
     *)
         enabled_capabilities=${enabled_capabilities/${selected_capability}}
