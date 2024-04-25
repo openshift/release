@@ -5,7 +5,7 @@ build_root:
     tag: golang-1.18
 images:
 - dockerfile_path: Containerfile
-  to: ci-tools-nvidia-gpu-operator
+  to: nvidia-ci
 releases:
   latest:
     candidate:
@@ -20,7 +20,7 @@ resources:
       cpu: 2000m
       memory: 2Gi
 tests:
-- as: nvidia-gpu-operator-e2e
+- as: nvidia-gpu-operator-e2e-latest
   steps:
     cluster_profile: aws-edge-infra
     env:
@@ -33,22 +33,16 @@ tests:
     - ref: single-node-conf-e2e
     - chain: ipi-install
     test:
-    - as: scale-gpu-nodes
-      commands: make scale_aws_gpu_nodes
-      from: ci-tools-nvidia-gpu-operator
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
     - as: gpu-operator-e2e
-      commands: make e2e_gpu_test CHANNEL=v23.9
-      from: ci-tools-nvidia-gpu-operator
+      commands: TEST_FEATURES="nvidiagpu" NVIDIAGPU_GPU_MACHINESET_INSTANCE_TYPE="g4dn.xlarge"
+        make run-tests
+      from: nvidia-ci
       resources:
         requests:
           cpu: 2000m
           memory: 2Gi
-- as: nvidia-gpu-operator-e2e-master
-  cron: 0 19 * * *
+- as: nvidia-gpu-operator-e2e-23-6-x
+  cron: 0 21 * * 1-5
   steps:
     cluster_profile: aws-edge-infra
     env:
@@ -61,16 +55,32 @@ tests:
     - ref: single-node-conf-e2e
     - chain: ipi-install
     test:
-    - as: scale-gpu-nodes
-      commands: make scale_aws_gpu_nodes
-      from: ci-tools-nvidia-gpu-operator
+    - as: gpu-operator-e2e
+      commands: NVIDIAGPU_SUBSCRIPTION_CHANNEL="v23.6" TEST_FEATURES="nvidiagpu" NVIDIAGPU_GPU_MACHINESET_INSTANCE_TYPE="g4dn.xlarge"
+        make run-tests
+      from: nvidia-ci
       resources:
         requests:
           cpu: 2000m
           memory: 2Gi
+- as: nvidia-gpu-operator-e2e-23-9-x
+  cron: 0 23 * * 1-5
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: single-node-conf-aws
+    - ref: single-node-conf-e2e
+    - chain: ipi-install
+    test:
     - as: gpu-operator-e2e
-      commands: make master_e2e_gpu_test
-      from: ci-tools-nvidia-gpu-operator
+      commands: NVIDIAGPU_SUBSCRIPTION_CHANNEL="v23.9" TEST_FEATURES="nvidiagpu" NVIDIAGPU_GPU_MACHINESET_INSTANCE_TYPE="g4dn.xlarge"
+        make run-tests
+      from: nvidia-ci
       resources:
         requests:
           cpu: 2000m
@@ -78,5 +88,5 @@ tests:
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
-  repo: ci-tools-nvidia-gpu-operator
+  repo: nvidia-ci
   variant: "4.14"
