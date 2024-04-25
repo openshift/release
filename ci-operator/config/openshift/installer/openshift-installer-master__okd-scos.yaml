@@ -1,198 +1,71 @@
 base_images:
-  ocp_4.16_base:
-    name: "4.16"
-    namespace: origin
-    tag: base
-  ocp_4.16_cli:
-    name: "4.16"
-    namespace: ocp
-    tag: cli
-  ocp_4.16_installer-terraform-providers:
-    name: "4.16"
-    namespace: ocp
-    tag: installer-terraform-providers
   ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.21-openshift-4.16
+  origin_scos-4.16_base-stream8:
+    name: scos-4.16
+    namespace: origin
+    tag: base-stream8
+  origin_scos-4.16_installer-terraform-providers:
+    name: scos-4.16
+    namespace: origin
+    tag: installer-terraform-providers
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
 images:
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: images/installer/Dockerfile.ci
+- context_dir: images/installer-altinfra
+  dockerfile_path: Dockerfile.ci
+  from: origin_scos-4.16_base-stream8
   inputs:
-    ocp_4.16_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base
-    ocp_4.16_installer-terraform-providers:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
+      - builder
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-  to: installer
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+  to: installer-altinfra
+- context_dir: images/installer-artifacts
+  dockerfile_path: Dockerfile.rhel
+  from: origin_scos-4.16_base-stream8
   inputs:
-    ocp_4.16_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base
-    ocp_4.16_installer-terraform-providers:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
+      - builder
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+    origin_scos-4.16_installer-terraform-providers:
+      as:
+      - providers
+      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
   to: installer-artifacts
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
+- context_dir: images/installer
+  dockerfile_path: Dockerfile.ci
+  from: origin_scos-4.16_base-stream8
   inputs:
-    ocp_4.16_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base
-    ocp_4.16_installer-terraform-providers:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
     ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
+      - builder
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-  to: upi-installer
-- build_args:
-  - name: TAGS
-    value: scos
-  dockerfile_path: images/openstack/Dockerfile.ci
-  inputs:
-    ocp_4.16_base:
+    origin_scos-4.16_installer-terraform-providers:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base
-    ocp_4.16_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:cli
-    ocp_4.16_installer-terraform-providers:
-      as:
+      - providers
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-  to: openstack-installer
-- build_args:
-  - name: TAGS
-    value: baremetal libvirt scos
-  dockerfile_path: images/baremetal/Dockerfile.ci
-  inputs:
-    ocp_4.16_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base
-    ocp_4.16_installer-terraform-providers:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-  to: baremetal-installer
+  to: installer
 promotion:
   to:
-  - name: scos-4.15
+  - name: scos-4.16
     namespace: origin
 releases:
-  initial:
-    integration:
-      name: scos-4.15
-      namespace: origin
   latest:
     integration:
-      include_built_images: true
-      name: scos-4.15
+      name: scos-4.16
       namespace: origin
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-  baremetal-installer:
-    requests:
-      cpu: "3"
-      memory: 5Gi
-  govet:
-    requests:
-      cpu: "3"
-      memory: 5Gi
-  installer:
-    requests:
-      cpu: "3"
-      memory: 5Gi
-  installer-artifacts:
-    requests:
-      cpu: "3"
-      memory: 5Gi
-  libvirt-installer:
-    requests:
-      cpu: "3"
-      memory: 5Gi
-  openstack-installer:
-    requests:
-      cpu: "3"
-      memory: 5Gi
-  ovirt-installer:
-    requests:
-      cpu: "3"
-      memory: 5Gi
-  unit:
-    requests:
-      cpu: "3"
-      memory: 5Gi
-  upi-installer:
-    requests:
-      cpu: "3"
-      memory: 5Gi
-tests:
-- as: unit
-  commands: go test ./pkg/...
-  container:
-    from: src
-  optional: true
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
-- as: verify-codegen
-  commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
-  container:
-    from: src
-  optional: true
-- as: e2e-aws-ovn
-  optional: true
-  run_if_changed: (fcos|scos|okd)
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws
-- always_run: false
-  as: e2e-gcp
-  optional: true
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-e2e-gcp
-- always_run: false
-  as: e2e-aws-upgrade
-  optional: true
-  steps:
-    cluster_profile: aws
-    workflow: openshift-upgrade-aws
-- always_run: false
-  as: e2e-gcp-ovn-upgrade
-  optional: true
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-upgrade-gcp
-- always_run: false
-  as: e2e-vsphere
-  optional: true
-  steps:
-    cluster_profile: vsphere-2
-    workflow: openshift-e2e-vsphere
 zz_generated_metadata:
   branch: master
   org: openshift
