@@ -19,20 +19,21 @@ KUBECONFIG="" oc --loglevel=8 registry login
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
     if (( FRC != 0 )); then
-        echo -e "oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
-        echo -e "oc get machineconfig\n$(oc get machineconfig)"
-        echo -e "Describing abnormal nodes...\n"
+        echo -e "\n# oc adm upgrade status\n$(env OC_ENABLE_CMD_UPGRADE_STATUS='true' oc adm upgrade status)"
+        echo -e "\n# oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
+        echo -e "\n# oc get machineconfig\n$(oc get machineconfig)"
+        echo -e "\n# Describing abnormal nodes...\n"
         oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
-        echo -e "Describing abnormal operators...\n"
+        echo -e "\n# Describing abnormal operators...\n"
         oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
-        echo -e "Describing abnormal mcp...\n"
+        echo -e "\n# Describing abnormal mcp...\n"
         oc get mcp --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
     fi
 }
 
 # Generate the Junit for upgrade
 function createUpgradeJunit() {
-    echo "Generating the Junit for upgrade"
+    echo -e "\n# Generating the Junit for upgrade"
     if (( FRC == 0 )); then
       cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -643,6 +644,18 @@ function upgrade() {
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
+# Log abnormal cluster status
+function dump_status_if_unexpected() {
+    # expecting oc to equal TARGET_MINOR_VERSION, skip if less than .16
+        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+            local out; out="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status)"
+            # if upgrading, and not progressing well, dump status to log
+            if ! grep -qE 'The cluster version is not updating|Upgrade is proceeding well' <<< "${out}" ; then
+                echo "${out}"
+            fi
+        fi
+}
+
 # Monitor the upgrade status
 function check_upgrade_status() {
     local wait_upgrade="${TIMEOUT}" out avail progress
@@ -668,6 +681,7 @@ function check_upgrade_status() {
             echo -e "Upgrade stuck at updating RHEL worker, run the RHEL worker upgrade now...\n\n"
             return 0
         fi
+        dump_status_if_unexpected
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
         echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
