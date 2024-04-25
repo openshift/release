@@ -28,7 +28,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 export TF_LOG=DEBUG
 
 function oinst() {
-  /tmp/openshift-baremetal-install --dir="${INSTALL_DIR}" --log-level=debug "${@}" 2>&1 | grep\
+  /tmp/openshift-install --dir="${INSTALL_DIR}" --log-level=debug "${@}" 2>&1 | grep\
    --line-buffered -v 'password\|X-Auth-Token\|UserData:'
 }
 
@@ -65,7 +65,7 @@ echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
 # the installer for different architectures in the same single-arch payload (and then support using a remote libvirt uri
 # for the provisioning host).
 oc adm release extract -a "$PULL_SECRET_PATH" "${MULTI_RELEASE_IMAGE}" \
-  --command=openshift-baremetal-install --to=/tmp
+  --command=openshift-install --to=/tmp
 
 # We change the payload image to the one in the mirror registry only when the mirroring happens.
 # For example, in the case of clusters using cluster-wide proxy, the mirroring is not required.
@@ -85,7 +85,7 @@ metadata:
   name: ${CLUSTER_NAME}
 networking:
   machineNetwork:
-  - cidr: ${INTERNAL_NET_CIDR}
+  - cidr: ${INTERNAL_NET_CIDR_V6}
 controlPlane:
    architecture: ${architecture}
    hyperthreading: Enabled
