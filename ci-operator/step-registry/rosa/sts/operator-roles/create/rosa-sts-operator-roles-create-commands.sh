@@ -61,4 +61,9 @@ rosa create operator-roles -y --mode auto \
 # Store the operator-roles for the post steps and the operator roles deletion
 echo -n "${OPERATOR_ROLES_PREFIX}" > "${SHARED_DIR}/operator-roles-prefix"
 # rosa list operator-roles --prefix ${OPERATOR_ROLES_PREFIX} --output json > "${SHARED_DIR}/operator-roles-arns"
-rosa list operator-roles --prefix ${OPERATOR_ROLES_PREFIX} |grep -v OPERATOR | awk '{print $4}' > "${SHARED_DIR}/operator-roles-arns"
+ret=0
+rosa list operator-roles --prefix ${OPERATOR_ROLES_PREFIX} |grep -v OPERATOR | awk '{print $4}' > "${SHARED_DIR}/operator-roles-arns" || ret=$?
+if [[ "$ret" != 0 ]]; then
+    rosa list operator-roles --prefix ${OPERATOR_ROLES_PREFIX} |grep -v OPERATOR | awk '{print $4}' > "${SHARED_DIR}/operator-roles-arns"
+fi
+echo "Storing successfully"
