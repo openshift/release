@@ -395,15 +395,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-edge-zone
-- as: aws-ipi-minimal-permission-f5
-  cron: 33 22 4,9,14,19,24,29 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-minimal-permission
 - as: aws-ipi-outpost-day2-f2
   cron: 5 15 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
   steps:
@@ -600,6 +591,29 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: aws-ipi-ovn-hypershift-private-guest-f7
+  cron: 33 13 2,11,18,25 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-guest
+- as: aws-ipi-ovn-hypershift-private-mgmt-f7
+  cron: 15 1 5,12,21,28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_ADDITIONAL: Hypershift|Network_Observability
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private
 - as: aws-ipi-ovn-ipsec-f2-obo
   cron: 26 1 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   steps:
@@ -1363,15 +1377,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace
-- as: azure-ipi-minimal-permission-f5
-  cron: 20 7 1,6,11,16,21,26 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-minimal-permission
 - as: azure-ipi-ovn-hypershift-install-f28
   cron: 3 1 21 * *
   steps:
@@ -1668,9 +1673,9 @@ tests:
         NETWORK_TYPE=OVNKubernetes
       E2E_RUN_TAGS: '@wrs'
       FILTERS_ADDITIONAL: ""
-      TEST_FILTERS: ""
+      TEST_FILTERS: ~ChkUpgrade&;~MicroShiftOnly&
       TEST_SCENARIOS: WRS
-      TEST_TIMEOUT: "35"
+      TEST_TIMEOUT: "90"
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn

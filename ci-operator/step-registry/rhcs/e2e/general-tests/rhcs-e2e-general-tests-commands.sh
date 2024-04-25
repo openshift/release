@@ -6,7 +6,6 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-
 ls ${SHARED_DIR}
 
 cp -r /root/terraform-provider-rhcs ~/
