@@ -23,7 +23,7 @@ set -euxo pipefail
 sudo systemctl stop chronyd
 
 CLUSTER_AGE_DAYS=${1:-90}
-SKEW_STEP=${2:-30}
+CLUSTER_AGE_STEP=${2:-30}
 
 # HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
 if [ -d "$KUBECONFIG" ]; then
@@ -55,14 +55,31 @@ function emulate-cluster-age {
   pod-restart-workarounds
 
   wait-for-operators-to-stabilize
+
+  oc get nodes
 }
 
-full_steps=$((${CLUSTER_AGE_DAYS}/${SKEW_STEP}))
-modulo=$((${CLUSTER_AGE_DAYS}%${SKEW_STEP}))
+function copy-ingress-cert-to-authentication {
+  oc --request-timeout=5s -n openshift-ingress-operator delete secret router-ca
+  oc --request-timeout=5s -n openshift-ingress -n openshift-ingress delete secret router-certs-default
+  oc --request-timeout=5s -n openshift-ingress-operator delete pods --all --force --grace-period=0
+}
+
+full_steps=$((${CLUSTER_AGE_DAYS}/${CLUSTER_AGE_STEP}))
+modulo=$((${CLUSTER_AGE_DAYS}%${CLUSTER_AGE_STEP}))
+ingress_certificate_age=0
 
 if [[ ${full_steps} -gt 0 ]]; then
   for i in $(seq 1 ${full_steps}); do
-    emulate-cluster-age ${SKEW_STEP}
+    emulate-cluster-age ${CLUSTER_AGE_STEP}
+
+    # Rotate ingress certificate every ~two years
+    ingress_certificate_age=$((${ingress_certificate_age} + ${CLUSTER_AGE_STEP}))
+    if [[ ${ingress_certificate_age} -ge 600 ]]; then
+      copy-ingress-cert-to-authentication
+      wait-for-operators-to-stabilize
+      ingress_certificate_age=0
+    fi
   done
 fi
 if [[ ${modulo} -gt 0 ]]; then
@@ -82,4 +99,4 @@ timeout \
 	"root@${IP}" \
 	/usr/local/bin/cluster-age-test.sh \
 	${CLUSTER_AGE_DAYS} \
-  ${SKEW_STEP}
+  ${CLUSTER_AGE_STEP}
