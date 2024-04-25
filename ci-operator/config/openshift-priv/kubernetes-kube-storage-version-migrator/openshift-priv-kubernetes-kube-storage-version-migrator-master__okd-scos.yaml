@@ -9,21 +9,23 @@ base_images:
     tag: base-stream9
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
+    name: builder-priv
+    namespace: ocp-private
     tag: rhel-8-golang-1.21-openshift-4.16
+canonical_go_repository: github.com/openshift/kubernetes-kube-storage-version-migrator
 images:
-- context_dir: images/ci
+- context_dir: images/release
   dockerfile_path: Dockerfile
   from: origin_scos-4.16_base-stream9
   inputs:
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: cluster-kube-storage-version-migrator-operator
+  to: kube-storage-version-migrator
 promotion:
   to:
-  - name: scos-4.16
+  - disabled: true
+    name: scos-4.16
     namespace: origin
 releases:
   latest:
@@ -37,6 +39,6 @@ resources:
       memory: 200Mi
 zz_generated_metadata:
   branch: master
-  org: openshift
-  repo: cluster-kube-storage-version-migrator-operator
+  org: openshift-priv
+  repo: kubernetes-kube-storage-version-migrator
   variant: okd-scos
