@@ -4,6 +4,6 @@ set -o nounset
 set -o pipefail
 set -x
 
-bastion=$(cat "/secret/hostname")
+bastion=$(cat "/secret/address")
 
 ping -c 5 $bastion
