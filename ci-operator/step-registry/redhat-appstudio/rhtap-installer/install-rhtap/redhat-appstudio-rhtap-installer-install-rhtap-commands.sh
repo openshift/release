@@ -37,10 +37,13 @@ export ACS__API_TOKEN \
   RHTAP_ENABLE_DEVELOPER_HUB \
   RHTAP_ENABLE_TAS \
   RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES \
-  RHTAP_ENABLE_TPA
+  RHTAP_ENABLE_TPA \
+  GITLAB__OAUTH__CLIENT_ID \
+  GITLAB__OAUTH__CLIENT_SECRET \
+  GITLAB_TOKEN
 
-RHTAP_ENABLE_GITHUB=${RHTAP_ENABLE_GITHUB:-'true'} 
-RHTAP_ENABLE_GITLAB=${RHTAP_ENABLE_GITLAB:-'false'}
+RHTAP_ENABLE_GITHUB=${RHTAP_ENABLE_GITHUB:-'true'}
+RHTAP_ENABLE_GITLAB=${RHTAP_ENABLE_GITLAB:-'true'}
 RHTAP_ENABLE_DEVELOPER_HUB=${RHTAP_ENABLE_DEVELOPER_HUB:-'true'}
 RHTAP_ENABLE_TAS=${RHTAP_ENABLE_TAS:-'true'}
 RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES=${RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES:-'true'}
@@ -58,6 +61,9 @@ GITOPS__GIT_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
 QUAY__DOCKERCONFIGJSON=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhtap_quay_ci_token)
 SPRAYPROXY_SERVER_URL=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-url)
 SPRAYPROXY_SERVER_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-token)
+GITLAB__OAUTH__CLIENT_ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_oauth_client_id)
+GITLAB__OAUTH__CLIENT_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_oauth_client_secret)
+GITLAB_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_token)
 
 TPA__GUAC__PASSWORD="guac1234" # notsecret
 TPA__KEYCLOAK__ADMIN_PASSWORD="admin123456" # notsecret
