@@ -121,7 +121,7 @@ resource "aws_db_subnet_group" "quayrds" {
 resource "aws_security_group" "quayrds" {
   name        = var.quay_security_group
   description = "Allow all inbound traffic"
-  vpc_id      = "${aws_vpc.quayrds.id}"
+  vpc_id      = aws_vpc.quayrds.id
 
   ingress {
     description = "traffic into quaybuilder VPC"
