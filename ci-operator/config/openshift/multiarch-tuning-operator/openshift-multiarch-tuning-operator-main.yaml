@@ -193,6 +193,108 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-ovn-mto-heterogeneous-origin
+  cluster: build10
+  interval: 72h
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPERATOR_IMAGE: pipeline:multiarch-tuning-operator
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod\|APIs for openshift.io must have stable
+        versions
+    test:
+    - ref: ipi-install-heterogeneous
+    - as: test
+      cli: latest
+      commands: |
+        wait_created() {
+          for _ in $(seq 1 10); do
+            if oc get "${@}" | grep -v -q "No resources found"; then
+              return 0
+            fi
+            sleep 10
+          done
+          return 1
+        }
+
+        mkdir -p /tmp/kustomization
+        cat <<EOF > /tmp/kustomization/kustomization.yaml
+          apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+          resources:
+          - github.com/openshift/multiarch-tuning-operator/deploy/envs/prow?ref=fbc-4.16
+        EOF
+        oc apply -k /tmp/kustomization
+        #while ! [ -e /tmp/wait ]; do
+        #  sleep 10
+        #done
+        NAMESPACE=openshift-multiarch-tuning-operator
+        wait_created deployments -n ${NAMESPACE} -l app.kubernetes.io/part-of=multiarch-tuning-operator
+        oc wait deployments -n ${NAMESPACE} \
+         -l app.kubernetes.io/part-of=multiarch-tuning-operator \
+          --for=condition=Available=True
+        wait_created pods -n ${NAMESPACE} -l control-plane=controller-manager
+        oc wait pods -n ${NAMESPACE} \
+          -l control-plane=controller-manager \
+          --for=condition=Ready=True
+        make e2e
+
+        # Deploy Pod Placement operand
+        oc create -f - <<EOF
+        apiVersion: multiarch.openshift.io/v1alpha1
+        kind: ClusterPodPlacementConfig
+        metadata:
+          name: cluster
+        spec:
+          logVerbosityLevel: Normal
+          namespaceSelector:
+            matchExpressions:
+              - key: multiarch.openshift.io/exclude-pod-placement
+                operator: DoesNotExist
+        EOF
+        echo "Waiting for operand to be ready"
+        oc get pods -n openshift-multiarch-tuning-operator
+        echo "Waiting for pod-placement-controller"
+        wait_created pods -n openshift-multiarch-tuning-operator -l controller=pod-placement-controller
+        oc get pods -n openshift-multiarch-tuning-operator -l controller=pod-placement-controller
+        oc wait pods --timeout=300s -n openshift-multiarch-tuning-operator -l controller=pod-placement-controller --for=condition=Ready=True
+        echo "Waiting for pod-placement-web-hook"
+        wait_created pods -n openshift-multiarch-tuning-operator -l controller=pod-placement-web-hook
+        oc get pods -n openshift-multiarch-tuning-operator -l controller=pod-placement-web-hook
+        oc wait pods --timeout=300s -n openshift-multiarch-tuning-operator -l controller=pod-placement-web-hook --for=condition=Ready=True
+        echo "The operand is ready"
+        oc get pods -n openshift-multiarch-tuning-operator
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: pipeline:multiarch-tuning-operator
+      - env: OO_BUNDLE
+        name: pipeline:multiarch-tuning-operator-bundle
+      from: operator-sdk-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-gcp-ovn
 - as: e2e-aws-post-multi-operator-olm
   cluster: build10
   postsubmit: true
