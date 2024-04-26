@@ -31,13 +31,13 @@ echo "Get install-gather, if there is one..."
 cp /root/dev-scripts/ocp/*/log-bundle*.tar.gz /tmp/artifacts/log-bundle-\$HOSTNAME.tar.gz || true
 
 echo "Get sosreport including sar data..."
-sos report --case-id "\$HOSTNAME" --batch \
+sos report --batch \
   -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh \
   -k podman.all -k podman.logs \
   --tmp-dir /tmp/artifacts
 
 echo "Get libvirt logs..."
-tar -czC "/var/log/libvirt/qemu" -f "/tmp/artifacts/libvirt-logs-\$HOSTNAME.tar.gz" --transform "s?^\.?libvirt-logs-\$HOSTNAME?" .
+tar -czC "/var/log/libvirt/qemu" -f "/tmp/artifacts/libvirt-logs.tar.gz" --transform "s?^\.?libvirt-logs?" .
 
 . common.sh
 . network.sh
@@ -77,7 +77,7 @@ for NODE_IP in \${NODE_IPS[@]}; do
   ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} sudo mkdir /run/artifacts &&
   ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} \
     sudo podman run -it --name toolbox --authfile /var/lib/kubelet/config.json --privileged --ipc=host --net=host --pid=host -e HOST=/host -e NAME=toolbox- -e IMAGE=registry.redhat.io/rhel8/support-tools:latest -v /run:/run -v /var/log:/var/log -v /etc/machine-id:/etc/machine-id -v /etc/localtime:/etc/localtime -v /:/host registry.redhat.io/rhel8/support-tools:latest \
-        sos report --case-id "\$HOSTNAME" --batch \
+        sos report --batch \
           -o container_log,filesys,logs,networkmanager,podman,processor,sar \
           -k podman.all -k podman.logs \
           --tmp-dir /run/artifacts && \
