@@ -43,7 +43,7 @@ cat >>aws_rds_postgresql_parameter_groups.json <<EOF
 EOF
 
 AWS_RDS_PARAMETER_GROUP=$(jq -r .aws.rds.postgresql[\"${QUAY_AWS_RDS_POSTGRESQL_VERSION}\"].parameter_group <aws_rds_postgresql_parameter_groups.json)
-echo "The current using database parameter group is $aws_rds_parameter_group"
+echo "The current using database parameter group is $AWS_RDS_PARAMETER_GROUP"
 
 cat >>variables.tf <<EOF
 variable "region" {
@@ -303,7 +303,7 @@ DISTRIBUTED_STORAGE_CONFIG:
 DB_CONNECTION_ARGS:
   autorollback: true
   threadlocals: true
-DB_URI: postgresql://$QUAY_AWS_RDS_POSTGRESQL_DBNAME:$QUAY_AWS_RDS_POSTGRESQL_PASSWORD@$QUAY_AWS_RDS_POSTGRESQL_ADDRESS:5432/$QUAY_AWS_RDS_POSTGRESQL_DBNAME
+DB_URI: postgresql://$QUAY_AWS_RDS_POSTGRESQL_USERNAME:$QUAY_AWS_RDS_POSTGRESQL_PASSWORD@$QUAY_AWS_RDS_POSTGRESQL_ADDRESS:5432/$QUAY_AWS_RDS_POSTGRESQL_DBNAME
 EOF
 
 oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
