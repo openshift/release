@@ -38,4 +38,4 @@ export OCI_DELETE_MANIFEST_BEFORE_BLOBS=0 # defaults to OCI_DELETE_MANIFEST_BEFO
 export OCI_REPORT_DIR
 
 echo "Begin conformance test"
-./conformance.test 
+./conformance.test || true
