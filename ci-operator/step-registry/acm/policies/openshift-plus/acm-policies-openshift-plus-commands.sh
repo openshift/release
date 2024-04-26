@@ -14,7 +14,8 @@ git clone https://github.com/stolostron/policy-collection.git
 sleep 60
 
 cd policy-collection/deploy/ 
-echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
+# echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
+echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/gparvin/policy-collection.git -a openshift-plus -b vmware-storage
 
 sleep 120
 
