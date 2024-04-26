@@ -88,17 +88,17 @@ resource "aws_vpc" "quayrds" {
 }
 
 resource "aws_internet_gateway" "quaydbigw" {
-  vpc_id = "${aws_vpc.quayrds.id}"
+  vpc_id = aws_vpc.quayrds.id
 }
 
 resource "aws_route" "route-public" {
-  route_table_id         = "${aws_vpc.quayrds.main_route_table_id}"
+  route_table_id         = aws_vpc.quayrds.main_route_table_id
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = "${aws_internet_gateway.quaydbigw.id}"
+  gateway_id             = aws_internet_gateway.quaydbigw.id
 }
 
 resource "aws_subnet" "quayrds1" {
-  vpc_id            = "${aws_vpc.quayrds.id}"
+  vpc_id            = aws_vpc.quayrds.id
   cidr_block        = "10.0.1.0/24"
   availability_zone = "us-west-2b"
 }
@@ -111,7 +111,7 @@ resource "aws_subnet" "quayrds2" {
 
 resource "aws_db_subnet_group" "quayrds" {
   name       = var.quay_subnet_group
-  subnet_ids = ["${aws_subnet.quayrds1.id}","${aws_subnet.quayrds2.id}"]
+  subnet_ids = [aws_subnet.quayrds1.id,aws_subnet.quayrds2.id]
 
   tags = {
     Name = "Quay DB subnet group"
@@ -152,8 +152,8 @@ resource "aws_db_instance" "quaydb" {
   parameter_group_name = "${AWS_RDS_PARAMETER_GROUP}"
   publicly_accessible  = true
   skip_final_snapshot  = true
-  db_subnet_group_name = "${aws_db_subnet_group.quayrds.id}"
-  vpc_security_group_ids = ["${aws_security_group.quayrds.id}"]
+  db_subnet_group_name = aws_db_subnet_group.quayrds.id
+  vpc_security_group_ids = [aws_security_group.quayrds.id]
 }
 
 provider "postgresql" {
