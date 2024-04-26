@@ -21,8 +21,6 @@ echo "Azure region: ${REGION}"
 command -v az
 az --version
 
-sleep 600
-
 # set the parameters we'll need as env vars
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then
