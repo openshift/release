@@ -139,6 +139,15 @@ oc patch mce multiclusterengine-sample --type=merge -p '{"spec":{"overrides":{"c
 echo "wait for mce to Available"
 oc wait --timeout=20m --for=condition=Available MultiClusterEngine/multiclusterengine-sample
 
+oc apply -f - <<END
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: hypershift-operator-install-flags
+  namespace: local-cluster
+data:
+  installFlagsToAdd: "--platform-monitoring All"
+END
 oc apply -f - <<EOF
 apiVersion: cluster.open-cluster-management.io/v1
 kind: ManagedCluster

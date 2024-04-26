@@ -66,6 +66,7 @@ fi
   --base-domain=\${BASEDOMAIN} \
   --api-server-address=api.\${CLUSTER_NAME}.\${BASEDOMAIN} \
   --image-content-sources "/home/mgmt_icsp.yaml" \
+  --network-type=OVNKubernetes \
   --release-image \${PLAYLOADIMAGE}
 
 echo "Waiting for cluster to become available"

@@ -26,6 +26,11 @@ chain:
         fi
 
         CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+
+        oc get machine -n "local-cluster-$CLUSTER_NAME" -o=jsonpath='{.items[*].metadata.name}' | \
+        while read -r machine_name; do
+          oc patch machine "$machine_name" -n "local-cluster-$CLUSTER_NAME" -p '{"metadata":{"finalizers":[]}}' --type=merge
+        done
         
         echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
         /tmp/${HYPERSHIFT_NAME} destroy cluster agent \
