@@ -11,6 +11,10 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: base-rhel9
+  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
@@ -30,6 +34,9 @@ images:
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
   inputs:
+    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
@@ -181,6 +188,20 @@ tests:
     env:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+- as: e2e-metal-ipi-ovn-dualstack-local-gateway
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        OVN_LOCAL_GATEWAY_MODE=true
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e
 - as: e2e-aws-ovn-hypershift
   steps:
     cluster_profile: hypershift

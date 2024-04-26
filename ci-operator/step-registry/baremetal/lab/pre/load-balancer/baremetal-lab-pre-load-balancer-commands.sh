@@ -11,22 +11,33 @@ APISRV=""
 INGRESS80=""
 INGRESS443=""
 echo "Filling the load balancer targets..."
-num_workers="$(yq e '[.[] | select(.name|test("worker"))]|length' "$SHARED_DIR/hosts.yaml")"
+num_workers="$(yq e '[.[] | select(.name|test("worker-[0-9]"))]|length' "$SHARED_DIR/hosts.yaml")"
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  # shellcheck disable=SC2154
+  if [ ${#name} -eq 0 ] || [ ${#ip} -eq 0 ] || [ ${#ipv6} -eq 0 ]; then
+    echo "Error when parsing the Bare Metal Host metadata"
+    exit 1
+  fi
+
   if [[ "$name" =~ bootstrap* ]] || [[ "$name" =~ master* ]]; then
     MC="$MC
-      server $name $ip:22623 check inter 1s"
+      server $name $ip:22623 check inter 1s
+      server $name-v6 [$ipv6]:22623 check inter 1s"
     APISRV="$APISRV
-      server $name $ip:6443 check inter 1s"
+      server $name $ip:6443 check inter 1s
+      server $name-v6 [$ipv6]:6443 check inter 1s"
   fi
-  if [ "$num_workers" -eq 0 ] || [[ "$name" =~ worker* ]]; then
+  # if number of worker hosts less then 2, then master hosts might get the worker role
+  if [ "$num_workers" -lt 2 ] || [[ "$name" =~ worker* ]]; then
     INGRESS80="$INGRESS80
-      server $name $ip:80 check inter 1s"
+      server $name $ip:80 check inter 1s
+      server $name-v6 [$ipv6]:80 check inter 1s"
     INGRESS443="$INGRESS443
-      server $name $ip:443 check inter 1s"
+      server $name $ip:443 check inter 1s
+      server $name-v6 [$ipv6]:443 check inter 1s"
   fi
 done
 echo "Generating the template..."

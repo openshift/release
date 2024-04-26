@@ -4,7 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+save_state_files() {
+    # tar the shared manifest dir to make it share between pods
+    cd ${SHARED_DIR}
+    find ./tf-manifests -name 'terraform.[tfstate|tfvars]*' -print0|tar --null -T - -zcvf statefiles.tar.gz
+    ls ${SHARED_DIR}
+    cd -
+}
+
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; save_state_files' TERM
 
 
 export GOCACHE="/tmp/cache"
@@ -81,11 +89,7 @@ ginkgo run \
     -r \
     --focus-file tests/e2e/.* 2>&1| tee ${SHARED_DIR}/rhcs_preparation.log || true
 
-# tar the shared manifest dir to make it share between pods
-cd ${SHARED_DIR}
-find ./tf-manifests -name 'terraform.[tfstate|tfvars]*' -print0|tar --null -T - -zcvf statefiles.tar.gz
-ls ${SHARED_DIR}
-cd -
+save_state_files
 
 prepareFailure=$(tail -n 100 ${SHARED_DIR}/rhcs_preparation.log | { grep "\[FAIL\]" || true; })
 if [ ! -z "$prepareFailure" ]; then

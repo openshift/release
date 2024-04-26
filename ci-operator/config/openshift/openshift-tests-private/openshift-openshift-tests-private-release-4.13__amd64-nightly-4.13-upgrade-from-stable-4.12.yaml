@@ -136,8 +136,8 @@ tests:
       BASELINE_CAPABILITY_SET: None
       PERSISTENT_MONITORING: "false"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@disconnected and not @console and not @storage'
-      UPGRADE_PRE_RUN_TAGS: '@disconnected and not @console and not @storage'
+      UPGRADE_CHECK_RUN_TAGS: '@disconnected'
+      UPGRADE_PRE_RUN_TAGS: '@disconnected'
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
@@ -262,19 +262,6 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-usertags
-- as: aws-upi-basecap-none-f28
-  cron: 12 9 25 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: None
-      PERSISTENT_MONITORING: "false"
-      UPGRADE_CHECK_RUN_TAGS: not @console and not @storage
-      UPGRADE_PRE_RUN_TAGS: not @console and not @storage
-    test:
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-upi
 - as: aws-usgov-ipi-private-f28
   cron: 53 22 18 * *
   steps:
@@ -482,12 +469,13 @@ tests:
     - ref: nutanix-upgrade-pre-config
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
-- as: nutanix-ipi-disc-f28
+- as: nutanix-ipi-disc-rt-f28
   cluster: build01
   cron: 24 10 28 * *
   steps:
     cluster_profile: nutanix-qe-dis
     env:
+      RT_ENABLED: "true"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - ref: nutanix-upgrade-pre-config

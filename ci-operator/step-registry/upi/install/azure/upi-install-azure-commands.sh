@@ -65,6 +65,10 @@ if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
 fi
 export AZURE_AUTH_LOCATION
 
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
+
 pushd ${ARTIFACT_DIR}/installer
 
 CLUSTER_NAME=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'metadata.name')
@@ -188,7 +192,7 @@ done
 
 status="pending"
 cmd_result=1
-while [[ ${cmd_result} -eq 1 ]]
+while [[ ${cmd_result} -eq 1 ]] || [[ "$status" == "pending" ]]
 do
   cmd_result=0
   status=$(az storage blob show --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --container-name vhd --name "rhcos.vhd" -o tsv --query properties.copy.status) || cmd_result=1

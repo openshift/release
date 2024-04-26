@@ -19,20 +19,21 @@ KUBECONFIG="" oc --loglevel=8 registry login
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
     if (( FRC != 0 )); then
-        echo -e "oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
-        echo -e "oc get machineconfig\n$(oc get machineconfig)"
-        echo -e "Describing abnormal nodes...\n"
+        echo -e "\n# oc adm upgrade status\n$(env OC_ENABLE_CMD_UPGRADE_STATUS='true' oc adm upgrade status)"
+        echo -e "\n# oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
+        echo -e "\n# oc get machineconfig\n$(oc get machineconfig)"
+        echo -e "\n# Describing abnormal nodes...\n"
         oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
-        echo -e "Describing abnormal operators...\n"
+        echo -e "\n# Describing abnormal operators...\n"
         oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
-        echo -e "Describing abnormal mcp...\n"
+        echo -e "\n# Describing abnormal mcp...\n"
         oc get mcp --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
     fi
 }
 
 # Generate the Junit for upgrade
 function createUpgradeJunit() {
-    echo "Generating the Junit for upgrade"
+    echo -e "\n# Generating the Junit for upgrade"
     if (( FRC == 0 )); then
       cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -88,6 +89,7 @@ function extract_ccoctl(){
     else
         chmod 775 /tmp/ccoctl
     fi
+    export PATH="$PATH"
 }
 
 function update_cloud_credentials_oidc(){
@@ -224,7 +226,9 @@ function rhel_repo(){
     command: yum clean all
 EOF
 
-    version_info="$(oc version | grep Server | sed -E 's/.*: ([4-9].[0-9]+)/\1/' | cut -d '.' -f 1,2)"
+    # current Server version may not be the expected branch when cluster is not fully upgraded 
+    # using TARGET_REPO_VERSION instead directly
+    version_info="${TARGET_REPO_VERSION}"
     openshift_ansible_branch='master'
     if [[ "$version_info" =~ [4-9].[0-9]+ ]] ; then
         openshift_ansible_branch="release-${version_info}"
@@ -285,6 +289,7 @@ function extract_oc(){
         sleep 60
     done
     mv ${tmp_oc}/oc ${OC_DIR} -f
+    export PATH="$PATH"
     which oc
     oc version --client
     return 0
@@ -443,6 +448,18 @@ function upgrade() {
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
+# Log abnormal cluster status
+function dump_status_if_unexpected() {
+    # expecting oc to equal TARGET_MINOR_VERSION, skip if less than .16
+        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+            local out; out="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status)"
+            # if upgrading, and not progressing well, dump status to log
+            if ! grep -qE 'The cluster version is not updating|Upgrade is proceeding well' <<< "${out}" ; then
+                echo "${out}"
+            fi
+        fi
+}
+
 # Monitor the upgrade status
 function check_upgrade_status() {
     local wait_upgrade="${TIMEOUT}" out avail progress cluster_version
@@ -468,6 +485,12 @@ function check_upgrade_status() {
             echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
             return 0
         fi
+        if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${cluster_version}"* ]]; then
+	    UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
+            echo -e "Upgrade stuck at updating RHEL worker, run the RHEL worker upgrade now...\n\n"
+            return 0
+        fi
+        dump_status_if_unexpected
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
         echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
@@ -552,10 +575,14 @@ if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
 fi
 upgrade
 check_upgrade_status
-check_history
 
 if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
     echo -e "oc get node -owide\n$(oc get node -owide)"
     rhel_repo
     rhel_upgrade
+    if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "triggered" ]]; then
+	echo -e "RHEL worker upgrade completed, but the cluster upgrade hasn't been finished, check the cluster status again...\    n"
+	check_upgrade_status
+    fi
 fi
+check_history

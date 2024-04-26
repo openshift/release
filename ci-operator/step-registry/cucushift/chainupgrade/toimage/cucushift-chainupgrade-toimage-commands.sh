@@ -19,20 +19,21 @@ KUBECONFIG="" oc --loglevel=8 registry login
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
     if (( FRC != 0 )); then
-        echo -e "oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
-        echo -e "oc get machineconfig\n$(oc get machineconfig)"
-        echo -e "Describing abnormal nodes...\n"
+        echo -e "\n# oc adm upgrade status\n$(env OC_ENABLE_CMD_UPGRADE_STATUS='true' oc adm upgrade status)"
+        echo -e "\n# oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
+        echo -e "\n# oc get machineconfig\n$(oc get machineconfig)"
+        echo -e "\n# Describing abnormal nodes...\n"
         oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
-        echo -e "Describing abnormal operators...\n"
+        echo -e "\n# Describing abnormal operators...\n"
         oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
-        echo -e "Describing abnormal mcp...\n"
+        echo -e "\n# Describing abnormal mcp...\n"
         oc get mcp --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
     fi
 }
 
 # Generate the Junit for upgrade
 function createUpgradeJunit() {
-    echo "Generating the Junit for upgrade"
+    echo -e "\n# Generating the Junit for upgrade"
     if (( FRC == 0 )); then
       cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -88,6 +89,7 @@ function extract_ccoctl(){
     else
         chmod 775 /tmp/ccoctl
     fi
+    export PATH="$PATH"
 }
 
 function update_cloud_credentials_oidc(){
@@ -224,7 +226,9 @@ function rhel_repo(){
     command: yum clean all
 EOF
 
-    version_info="$(oc version | grep Server | sed -E 's/.*: ([4-9].[0-9]+)/\1/' | cut -d '.' -f 1,2)"
+    # current Server version may not be the expected branch when cluster is not fully upgraded 
+    # using TARGET_REPO_VERSION instead directly
+    version_info="${TARGET_REPO_VERSION}"
     openshift_ansible_branch='master'
     if [[ "$version_info" =~ [4-9].[0-9]+ ]] ; then
         openshift_ansible_branch="release-${version_info}"
@@ -285,6 +289,7 @@ function extract_oc(){
         sleep 60
     done
     mv ${tmp_oc}/oc ${OC_DIR} -f
+    export PATH="$PATH"
     which oc
     oc version --client
     return 0
@@ -616,8 +621,39 @@ function admin_ack() {
 
 # Upgrade the cluster to target release
 function upgrade() {
+    set_channel $TARGET_VERSION
+    local retry=3 unrecommened_conditional_updates
+    while (( retry > 0 )); do
+        unrecommened_conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True")) | .release.version' | xargs)
+        if [[ -z "${unrecommened_conditional_updates}" ]]; then
+            retry=$((retry - 1))
+            sleep 60
+            echo "No conditionalUpdates update available! Retry..."
+        else
+            #shellcheck disable=SC2076
+            if [[ " $unrecommened_conditional_updates " =~ " $TARGET_VERSION " ]]; then
+                echo "Error: $TARGET_VERSION is not recommended, for details please refer:"
+                oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True"))'
+                exit 1
+            fi
+            break
+        fi
+    done
+
     run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
+}
+
+# Log abnormal cluster status
+function dump_status_if_unexpected() {
+    # expecting oc to equal TARGET_MINOR_VERSION, skip if less than .16
+        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+            local out; out="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status)"
+            # if upgrading, and not progressing well, dump status to log
+            if ! grep -qE 'The cluster version is not updating|Upgrade is proceeding well' <<< "${out}" ; then
+                echo "${out}"
+            fi
+        fi
 }
 
 # Monitor the upgrade status
@@ -640,6 +676,12 @@ function check_upgrade_status() {
             echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
             return 0
         fi
+	if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${TARGET_VERSION}"* ]]; then
+	    UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
+            echo -e "Upgrade stuck at updating RHEL worker, run the RHEL worker upgrade now...\n\n"
+            return 0
+        fi
+        dump_status_if_unexpected
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
         echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
@@ -673,12 +715,8 @@ function filter_test_by_platform() {
     extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            none|powervs)
+            external|none|powervs)
                 export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
-                eval "$extrainfoCmd"
-                ;;
-            external)
-                echo "Expected, got platform as '$platform'"
                 eval "$extrainfoCmd"
                 ;;
             alibabacloud)
@@ -728,14 +766,17 @@ function filter_test_by_network() {
     networktype="$(oc get network.config/cluster -o yaml | yq '.spec.networkType')"
     case "${networktype,,}" in
         openshiftsdn)
-        networktag='@network-openshiftsdn'
-        ;;
+            networktag='@network-openshiftsdn'
+            ;;
         ovnkubernetes)
-        networktag='@network-ovnkubernetes'
-        ;;
+            networktag='@network-ovnkubernetes'
+            ;;
+        other)
+            networktag=''
+            ;;
         *)
-        echo "######Expected network to be SDN/OVN, but got: $networktype"
-        ;; 
+            echo "######Expected network to be SDN/OVN/Other, but got: $networktype"
+            ;;
     esac
     if [[ -n $networktag ]] ; then
         export E2E_RUN_TAGS="${networktag} and ${E2E_RUN_TAGS}"
@@ -862,6 +903,18 @@ function run_upgrade_e2e() {
     echo "e2e test take $(( ($e2e_end_time - $e2e_start_time)/60 )) minutes"
 }
 
+function set_channel(){
+    local x_ver y_ver version="$1"
+    x_ver=$( echo "${version}" | cut -f1 -d. )
+    y_ver=$( echo "${version}" | cut -f2 -d. )
+    ver="${x_ver}.${y_ver}"
+    target_channel="${UPGRADE_CHANNEL}-${ver}"
+    if ! oc adm upgrade channel ${target_channel}; then
+        echo "Fail to change channel to ${target_channel}!"
+        exit 1
+    fi
+}
+
 if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
@@ -922,13 +975,17 @@ do
     fi
     upgrade
     check_upgrade_status
-    check_history
 
     if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
         echo -e "oc get node -owide\n$(oc get node -owide)"
         rhel_repo
         rhel_upgrade
+	if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "triggered" ]]; then
+	    echo -e "RHEL worker upgrade completed, but the cluster upgrade hasn't been finished, check the cluster status again...\    n"
+	    check_upgrade_status
+        fi
     fi
+    check_history
     health_check
     if [[ -n "${E2E_RUN_TAGS}" ]]; then
         run_upgrade_e2e "${index}"

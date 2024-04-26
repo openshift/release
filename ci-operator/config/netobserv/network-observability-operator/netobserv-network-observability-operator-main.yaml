@@ -12,7 +12,7 @@ base_images:
     namespace: netobserv
     tag: ci
   operator-sdk:
-    name: "4.15"
+    name: "4.16"
     namespace: origin
     tag: operator-sdk
   ubi:
@@ -75,8 +75,7 @@ tests:
       cli: latest
       commands: |
         oc create ns openshift-netobserv-operator
-        oc label --overwrite ns openshift-netobserv-operator security.openshift.io/scc.podSecurityLabelSync=true
-        operator-sdk run bundle "$OO_BUNDLE" -n openshift-netobserv-operator --verbose
+        operator-sdk run bundle "$OO_BUNDLE" -n openshift-netobserv-operator --verbose --security-context-config restricted
         oc wait deployment --for condition=Available --timeout=120s netobserv-controller-manager -n openshift-netobserv-operator
       dependencies:
       - env: OO_BUNDLE
