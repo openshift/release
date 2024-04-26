@@ -100,6 +100,9 @@ if [[ -z \${MCE} ]] ; then
 
   ### workaround for https://issues.redhat.com/browse/OCPBUGS-32765
   echo "workaround for https://issues.redhat.com/browse/OCPBUGS-32765"
+  # please remember to keep it consistent when the image reference on
+  # https://github.com/openshift/hypershift/blob/94092458fd77a0ae7f5d5126aa45fc03f9b74323/cmd/install/install.go#L51-L55
+  # gets bumped
   oc image mirror --keep-manifest-list=true registry.redhat.io/edo/external-dns-rhel8@sha256:638fb6b5fc348f5cf52b9800d3d8e9f5315078fc9b1e57e800cb0a4a50f1b4b9 \${mirror_registry}/\${LOCALIMAGES}/external-dns-rhel8
   oc apply -f - <<EOF2
 apiVersion: config.openshift.io/v1
