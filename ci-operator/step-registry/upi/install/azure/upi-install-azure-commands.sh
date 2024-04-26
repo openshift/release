@@ -191,11 +191,10 @@ done
 
 status="pending"
 cmd_result=1
-while [[ ${cmd_result} -eq 1 ]] || [[ "$status" == "pending" ]]
+while [[ ${cmd_result} -eq 1 ]]
 do
   cmd_result=0
   status=$(az storage blob show --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --container-name vhd --name "rhcos.vhd" -o tsv --query properties.copy.status) || cmd_result=1
-  echo "status: ${status}"
 done
 if [[ "$status" != "success" ]]; then
   echo "Error copying VHD image ${VHD_URL}"

@@ -35,5 +35,4 @@ cat > scaleup-pre-hook-azure.yaml <<- 'EOF'
 EOF
 
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
-ansible-playbook -i "${SHARED_DIR}/ansible-hosts" scaleup-pre-hook-azure.yaml -vvv || true
-sleep 7200
+ansible-playbook -i "${SHARED_DIR}/ansible-hosts" scaleup-pre-hook-azure.yaml -vvv
