@@ -11,13 +11,29 @@ images:
     value: plain
   - name: max_jobs
     value: "8"
+  - name: nvcc_threads
+    value: "16"
+  - name: TORCH_CUDA_ARCH_LIST
+    value: 7.0 7.5 8.0 8.6 8.9 9.0+PTX
+  - name: BASE_UBI_IMAGE_TAG
+    value: 9.3-1612
+  - name: PYTHON_VERSION
+    value: "3.11"
+  - name: PYTORCH_INDEX
+    value: https://download.pytorch.org/whl
+  - name: PYTORCH_VERSION
+    value: 2.1.2
+  - name: flash_attn_version
+    value: v2.5.6
+  - name: MINIFORGE_VERSION
+    value: 23.11.0-0
   context_dir: .
-  dockerfile_path: Dockerfile
+  dockerfile_path: Dockerfile.ubi
   to: vllm-main-cuda-intel-gpu
 promotion:
   to:
   - namespace: opendatahub-io
-    tag: latest
+    tag: latest-ibm
 releases:
   latest:
     release:
@@ -51,7 +67,7 @@ tests:
       SOURCE_IMAGE_REF: vllm-main-cuda-intel-gpu
     env:
       IMAGE_REPO: vllm
-      RELEASE_VERSION: fast
+      RELEASE_VERSION: fast-ibm
     workflow: opendatahub-io-ci-image-mirror
 - as: nightly-image-mirror
   cron: 0 0 * * *
@@ -60,9 +76,9 @@ tests:
       SOURCE_IMAGE_REF: vllm-main-cuda-intel-gpu
     env:
       IMAGE_REPO: vllm
-      RELEASE_VERSION: fast
+      RELEASE_VERSION: fast-ibm
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: ibm_main
   org: opendatahub-io
   repo: vllm
