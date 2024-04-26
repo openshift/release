@@ -20,28 +20,28 @@ function mirror_ccs() {
     scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:/home/pull-secret"
 
     # shellcheck disable=SC2087
-    ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+    ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOF'
     set -xeo pipefail
 
-    CCS_CATALOG_IMAGE=\$(cat /home/ccs-catalog-image)
-    CCS_VERSION=\$(cat /home/ccs-version)
-    CCS_OPERATOR_PACKAGES=\$(cat /home/ccs-packages)
-    CCS_OPERATOR_CHANNELS=\$(cat /home/ccs-channels)
+    CCS_CATALOG_IMAGE=$(cat /home/ccs-catalog-image)
+    CCS_VERSION=$(cat /home/ccs-version)
+    CCS_OPERATOR_PACKAGES=$(cat /home/ccs-packages)
+    CCS_OPERATOR_CHANNELS=$(cat /home/ccs-channels)
 
     echo "1. Get mirror registry"
-    mirror_registry=\$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]')
-    mirror_registry=\${mirror_registry%%/*}
-    if [[ \$mirror_registry == "" ]] ; then
+    mirror_registry=$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]')
+    mirror_registry=${mirror_registry%%/*}
+    if [[ $mirror_registry == "" ]] ; then
         echo "Warning: Can not find the mirror registry, abort !!!"
         exit 1
     fi
-    echo "mirror registry is \${mirror_registry}"
+    echo "mirror registry is ${mirror_registry}"
 
     echo "2: get oc-mirror from stable clients"
     if [[ ! -f /home/oc-mirror ]]; then
         MIRROR2URL="https://mirror2.openshift.com/pub/openshift-v4"
-        CLIENTURL="\${MIRROR2URL}"/x86_64/clients/ocp/stable
-        curl -s -k -L "\${CLIENTURL}/oc-mirror.tar.gz" -o om.tar.gz && tar -C /home -xzvf om.tar.gz && rm -f om.tar.gz
+        CLIENTURL="${MIRROR2URL}"/x86_64/clients/ocp/stable
+        curl -s -k -L "${CLIENTURL}/oc-mirror.tar.gz" -o om.tar.gz && tar -C /home -xzvf om.tar.gz && rm -f om.tar.gz
         if ls /home/oc-mirror > /dev/null ; then
             chmod +x /home/oc-mirror
         else
@@ -56,16 +56,16 @@ function mirror_ccs() {
         yum install -y skopeo
         oc -n openshift-config extract secret/pull-secret --to="/tmp" --confirm
         set +x
-        mirror_token=\$(cat "/tmp/.dockerconfigjson" | jq -r --arg var1 "\${mirror_registry}" '.auths[\$var1]["auth"]'|base64 -d)
-        skopeo login "\${mirror_registry}" -u "\${mirror_token%:*}" -p "\${mirror_token#*:}"
-        REGISTRY_REDHAT_IO_USER=\$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 1)
-        REGISTRY_REDHAT_IO_PASSWORD=\$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 2)
-        skopeo login registry.redhat.io -u "\${REGISTRY_REDHAT_IO_USER}" -p "\${REGISTRY_REDHAT_IO_PASSWORD}"
+        mirror_token=$(cat "/tmp/.dockerconfigjson" | jq -r --arg var1 "${mirror_registry}" '.auths[$var1]["auth"]'|base64 -d)
+        skopeo login "${mirror_registry}" -u "${mirror_token%:*}" -p "${mirror_token#*:}"
+        REGISTRY_REDHAT_IO_USER=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 1)
+        REGISTRY_REDHAT_IO_PASSWORD=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 2)
+        skopeo login registry.redhat.io -u "${REGISTRY_REDHAT_IO_USER}" -p "${REGISTRY_REDHAT_IO_PASSWORD}"
         set -x
     fi
 
-    echo "4: skopeo copy docker://\${CCS_CATALOG_IMAGE} oci:///home/ccs-local-catalog --remove-signatures"
-    skopeo copy "docker://\${CCS_CATALOG_IMAGE}" "oci:///home/ccs-local-catalog" --remove-signatures
+    echo "4: skopeo copy docker://${CCS_CATALOG_IMAGE} oci:///home/ccs-local-catalog --remove-signatures"
+    skopeo copy "docker://${CCS_CATALOG_IMAGE}" "oci:///home/ccs-local-catalog" --remove-signatures
 
     echo "5: oc-mirror"
     catalog_image="ccs-local-catalog/ccs-local-catalog"
@@ -91,10 +91,10 @@ END
 
     rm -rf /home/imageset-config.yaml
 
-    IFS=',' read -r -a p_array <<< "\$CCS_OPERATOR_PACKAGES"
-    IFS=',' read -r -a c_array <<< "\$CCS_OPERATOR_CHANNELS"
+    IFS=',' read -r -a p_array <<< "$CCS_OPERATOR_PACKAGES"
+    IFS=',' read -r -a c_array <<< "$CCS_OPERATOR_CHANNELS"
 
-    if [[ "\${#p_array[@]}" != "\${#c_array[@]}" ]];
+    if [[ "${#p_array[@]}" != "${#c_array[@]}" ]];
     then
         echo "CCS_OPERATOR_PACKAGES and CCS_OPERATOR_CHANNELS don't contain the same number of items"
         exit 1
@@ -109,17 +109,17 @@ END
     mirror:
       operators:
       - catalog: "oci:///home/ccs-local-catalog"
-        targetCatalog: \${catalog_image}
-        targetTag: "\${CCS_VERSION}"
+        targetCatalog: ${catalog_image}
+        targetTag: "${CCS_VERSION}"
         packages:
 END
 
-    for index in "\${!p_array[@]}"
+    for index in "${!p_array[@]}"
     do
     cat <<END >> "/home/imageset-config.yaml"
-        - name: \${p_array[index]}
+        - name: ${p_array[index]}
           channels:
-          - name: \${c_array[index]}
+          - name: ${c_array[index]}
 END
     done
 
@@ -128,13 +128,13 @@ END
 
     pushd /home
     # try at least 3 times to be sure to get all the images...
-    /home/oc-mirror --config "/home/imageset-config.yaml" docker://\${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-    /home/oc-mirror --config "/home/imageset-config.yaml" docker://\${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-    /home/oc-mirror --config "/home/imageset-config.yaml" docker://\${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+    /home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+    /home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+    /home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
     popd
 
     echo "6: Create imageconentsourcepolicy and catalogsource"
-    for d in /home/oc-mirror-workspace/results* ; do sed -i "s|name: operator-0\$|name: operator-\${d#/home/oc-mirror-workspace/results-}|g" \${d}/imageContentSourcePolicy.yaml; done
+    for d in /home/oc-mirror-workspace/results* ; do sed -i "s|name: operator-0$|name: operator-${d#/home/oc-mirror-workspace/results-}|g" ${d}/imageContentSourcePolicy.yaml; done
     find /home/oc-mirror-workspace -type d -name '*results*' -exec oc apply -f {}/*.yaml \;
 
     echo "7: Waiting for the new ImageContentSourcePolicy to be updated on machines"

@@ -36,44 +36,44 @@ scp "${SSHOPTS[@]}" "/tmp/cnv-prerelease-version" "root@${IP}:/home/cnv-prerelea
 
 
 # shellcheck disable=SC2087
-ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOF'
 set -xeo pipefail
 
 
 echo "1. Get mirror registry"
-mirror_registry=\$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]')
-mirror_registry=\${mirror_registry%%/*}
-if [[ \$mirror_registry == "" ]] ; then
+mirror_registry=$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]')
+mirror_registry=${mirror_registry%%/*}
+if [[ $mirror_registry == "" ]] ; then
     echo "Warning: Can not find the mirror registry, abort !!!"
     exit 1
 fi
-echo "mirror registry is \${mirror_registry}"
+echo "mirror registry is ${mirror_registry}"
 
 echo "2: Set registry credentials"
 yum install -y skopeo
 oc -n openshift-config extract secret/pull-secret --to="/tmp" --confirm
 set +x
-mirror_token=\$(cat "/tmp/.dockerconfigjson" | jq -r --arg var1 "\${mirror_registry}" '.auths[\$var1]["auth"]'|base64 -d)
-skopeo login "\${mirror_registry}" -u "\${mirror_token%:*}" -p "\${mirror_token#*:}"
+mirror_token=$(cat "/tmp/.dockerconfigjson" | jq -r --arg var1 "${mirror_registry}" '.auths[$var1]["auth"]'|base64 -d)
+skopeo login "${mirror_registry}" -u "${mirror_token%:*}" -p "${mirror_token#*:}"
 QUAY_USERNAME=openshift-cnv+openshift_ci
-QUAY_PASSWORD=\$(cat /home/openshift_cnv_pullsecret)
-skopeo login -u "\$QUAY_USERNAME" -p "\$QUAY_PASSWORD" quay.io/openshift-cnv
+QUAY_PASSWORD=$(cat /home/openshift_cnv_pullsecret)
+skopeo login -u "$QUAY_USERNAME" -p "$QUAY_PASSWORD" quay.io/openshift-cnv
 set -x
 
-CNV_PRERELEASE_CATALOG_IMAGE=\$(cat /home/cnv-prerelease-catalog-image)
-CNV_PRERELEASE_VERSION=\$(cat /home/cnv-prerelease-version)
+CNV_PRERELEASE_CATALOG_IMAGE=$(cat /home/cnv-prerelease-catalog-image)
+CNV_PRERELEASE_VERSION=$(cat /home/cnv-prerelease-version)
 # TODO: handle stable when needed
 #CNV_CHANNEL="stable"
-CNV_CHANNEL="nightly-\${CNV_PRERELEASE_VERSION}"
+CNV_CHANNEL="nightly-${CNV_PRERELEASE_VERSION}"
 
-echo "3: skopeo copy docker://\${CNV_PRERELEASE_CATALOG_IMAGE} oci:///home/cnv-local-catalog --remove-signatures"
-skopeo copy "docker://\${CNV_PRERELEASE_CATALOG_IMAGE}" "oci:///home/cnv-local-catalog" --remove-signatures
+echo "3: skopeo copy docker://${CNV_PRERELEASE_CATALOG_IMAGE} oci:///home/cnv-local-catalog --remove-signatures"
+skopeo copy "docker://${CNV_PRERELEASE_CATALOG_IMAGE}" "oci:///home/cnv-local-catalog" --remove-signatures
 
 echo "4: get oc-mirror from stable clients"
 if [[ ! -f /home/oc-mirror ]]; then
     MIRROR2URL="https://mirror2.openshift.com/pub/openshift-v4"
-    CLIENTURL="\${MIRROR2URL}"/x86_64/clients/ocp/stable
-    curl -s -k -L "\${CLIENTURL}/oc-mirror.tar.gz" -o om.tar.gz && tar -C /home -xzvf om.tar.gz && rm -f om.tar.gz
+    CLIENTURL="${MIRROR2URL}"/x86_64/clients/ocp/stable
+    curl -s -k -L "${CLIENTURL}/oc-mirror.tar.gz" -o om.tar.gz && tar -C /home -xzvf om.tar.gz && rm -f om.tar.gz
     if ls /home/oc-mirror > /dev/null ; then
         chmod +x /home/oc-mirror
     else
@@ -83,7 +83,7 @@ if [[ ! -f /home/oc-mirror ]]; then
 fi
 /home/oc-mirror version
 
-echo "5: oc-mirror --config /home/imageset-config.yaml docker://\${mirror_registry} --oci-registries-config=/home/registry.conf --continue-on-error --skip-missing"
+echo "5: oc-mirror --config /home/imageset-config.yaml docker://${mirror_registry} --oci-registries-config=/home/registry.conf --continue-on-error --skip-missing"
 catalog_image="openshift-cnv/nightly-catalog" # TODO: handle stable when needed
 
 cat <<END |tee "/home/registry.conf"
@@ -114,23 +114,23 @@ storageConfig:
 mirror:
   operators:
   - catalog: "oci:///home/cnv-local-catalog"
-    targetCatalog: \${catalog_image}
-    targetTag: "\${CNV_PRERELEASE_VERSION}"
+    targetCatalog: ${catalog_image}
+    targetTag: "${CNV_PRERELEASE_VERSION}"
     packages:
     - name: kubevirt-hyperconverged
       channels:
-      - name: \${CNV_CHANNEL}
+      - name: ${CNV_CHANNEL}
 END
 
 pushd /home
 # try at least 3 times to be sure to get all the images...
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://\${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://\${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-/home/oc-mirror --config "/home/imageset-config.yaml" docker://\${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+/home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
 popd
 
 echo "6: Create imageconentsourcepolicy and catalogsource"
-for d in /home/oc-mirror-workspace/results* ; do sed -i "s|name: operator-0\$|name: operator-\${d#/home/oc-mirror-workspace/results-}|g" \${d}/imageContentSourcePolicy.yaml; done
+for d in /home/oc-mirror-workspace/results* ; do sed -i "s|name: operator-0$|name: operator-${d#/home/oc-mirror-workspace/results-}|g" ${d}/imageContentSourcePolicy.yaml; done
 find /home/oc-mirror-workspace -type d -name '*results*' -exec oc apply -f {}/*.yaml \;
 
 cat << END | oc apply -f -
@@ -141,7 +141,7 @@ metadata:
 spec:
   repositoryDigestMirrors:
   - mirrors:
-    - \${mirror_registry}/openshift-cnv
+    - ${mirror_registry}/openshift-cnv
     source: quay.io/openshift-cnv
 END
 
@@ -153,7 +153,7 @@ metadata:
 spec:
   imageDigestMirrors:
   - mirrors:
-    - \${mirror_registry}/openshift4/ose-kube-rbac-proxy
+    - ${mirror_registry}/openshift4/ose-kube-rbac-proxy
     source: registry.redhat.io/openshift4/ose-kube-rbac-proxy
 END
 
@@ -254,20 +254,20 @@ oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=
 
 echo "Installing VM console logger in order to aid debugging potential VM boot issues"
 
-ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOF'
 set -xeo pipefail
 
 echo "1. Get mirror registry"
-mirror_registry=\$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]')
-mirror_registry=\${mirror_registry%%/*}
-if [[ \$mirror_registry == "" ]] ; then
+mirror_registry=$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]')
+mirror_registry=${mirror_registry%%/*}
+if [[ $mirror_registry == "" ]] ; then
     echo "Warning: Can not find the mirror registry, abort !!!"
     exit 0
 fi
-echo "mirror registry is \${mirror_registry}"
+echo "mirror registry is ${mirror_registry}"
 
 echo "2. oc mirror kubevirt-console-debugger image and config ICSP"
-oc image mirror quay.io/dvossel/kubevirt-console-debugger:latest \${mirror_registry}/dvossel/kubevirt-console-debugger:latest
+oc image mirror quay.io/dvossel/kubevirt-console-debugger:latest ${mirror_registry}/dvossel/kubevirt-console-debugger:latest
 cat << END | oc apply -f -
 apiVersion: operator.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
@@ -276,7 +276,7 @@ metadata:
 spec:
   repositoryDigestMirrors:
   - mirrors:
-    - \${mirror_registry}/dvossel
+    - ${mirror_registry}/dvossel
     source: quay.io/dvossel
 END
 
