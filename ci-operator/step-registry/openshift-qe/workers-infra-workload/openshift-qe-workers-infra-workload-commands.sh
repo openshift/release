@@ -710,7 +710,7 @@ esac
 create_machineconfigpool infra
 
 if [[ $IF_CREATE_WORKLOAD_NODE == "true" ]];then
-create_machineconfigpool workload
+  create_machineconfigpool workload
 fi
 #Set default value to none if no specified value, using cpu and ram of worker nodes to create machineset
 #This also used for some property don't exist in a certain cloud provider, but need to pass correct parameter for create_machineset
