@@ -298,8 +298,8 @@ DISTRIBUTED_STORAGE_CONFIG:
       storage_path: /quay
       s3_access_key: $QUAY_AWS_ACCESS_KEY
       s3_secret_key: $QUAY_AWS_SECRET_KEY
-      host: s3.us-east-2.amazonaws.com
-      s3_region: us-east-2
+      host: s3.us-west-2.amazonaws.com
+      s3_region: us-west-2
 DB_CONNECTION_ARGS:
   autorollback: true
   threadlocals: true
