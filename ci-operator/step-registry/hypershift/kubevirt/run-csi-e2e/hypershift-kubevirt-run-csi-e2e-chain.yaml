@@ -10,7 +10,15 @@ chain:
       export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
       export TEST_PROVIDER='{"type":"kubevirt"}'
       export TEST_CSI_DRIVER_MANIFEST="kubevirt-driver.yaml"
-      curl -L -o ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST} https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/master/hack/test-driver.yaml
+      echo "Source git commit is ${SOURCE_GIT_COMMIT}"
+      response=$(curl -L --head --write-out '%{http_code}' --silent --output /dev/null https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/${SOURCE_GIT_COMMIT}/hack/test-driver.yaml)
+      if [ $response != "200" ]; then
+        echo "Getting test-driver.yaml from the master branch"
+        curl -L -o ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST} https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/master/hack/test-driver.yaml
+      else
+         echo "Getting test-driver.yaml from PR"
+        curl -L -o ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST} https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/${SOURCE_GIT_COMMIT}/hack/test-driver.yaml
+      fi
       sed -i 's/FromExistingClassName: kubevirt/FromExistingClassName: kubevirt-csi-infra-default/' ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
       cat ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
       export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
@@ -35,19 +43,26 @@ chain:
       
       export TEST_CSI_DRIVER_MANIFEST="kubevirt-driver-rwx.yaml"
       export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
-      ocp_version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
-      rwx_driver_file_url="https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/release-${ocp_version}/hack/test-driver-rwx.yaml"
-      rwx_supported_http_code=$(curl -o "${TEST_CSI_DRIVER_FILES}" -L -w "%{http_code}" "${rwx_driver_file_url}")
-      if [[ ${rwx_supported_http_code} == "404" ]]; then
-        echo "Read-Write-Many is not supported in version ${ocp_version}. Skipping RWX test"
-        exit ${csi_exit_code}
-      elif [[ ${rwx_supported_http_code} != "200" ]]; then
-        echo "Failed to get the test-driver-rwx.yaml file."
-        # the file should include the http response body 
-        cat "${TEST_CSI_DRIVER_FILES}"
-        exit 1
+      response=$(curl -L --head --write-out '%{http_code}' --silent --output /dev/null https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/${SOURCE_GIT_COMMIT}/hack/test-driver-rwx.yaml)
+      if [ $response != "200" ]; then
+        ocp_version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
+        echo "Getting test-driver-rwx.yaml from the ocp version ${ocp_version} branch"
+        rwx_driver_file_url="https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/release-${ocp_version}/hack/test-driver-rwx.yaml"
+        rwx_supported_http_code=$(curl -o "${TEST_CSI_DRIVER_FILES}" -L -w "%{http_code}" "${rwx_driver_file_url}")
+        if [[ ${rwx_supported_http_code} == "404" ]]; then
+          echo "Read-Write-Many is not supported in version ${ocp_version}. Skipping RWX test"
+          exit ${csi_exit_code}
+        elif [[ ${rwx_supported_http_code} != "200" ]]; then
+          echo "Failed to get the test-driver-rwx.yaml file."
+          # the file should include the http response body
+          cat "${TEST_CSI_DRIVER_FILES}"
+          exit 1
+        fi
+      else
+         echo "Getting test-driver.yaml from PR"
+        curl -L -o ${TEST_CSI_DRIVER_FILES} https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/${SOURCE_GIT_COMMIT}/hack/test-driver-rwx.yaml
       fi
-      
+
       sed -i 's/FromExistingClassName: kubevirt/FromExistingClassName: kubevirt-csi-infra-default/' "${TEST_CSI_DRIVER_FILES}"
       cat "${TEST_CSI_DRIVER_FILES}"
       openshift-tests run --dry-run --provider "${TEST_PROVIDER}" openshift/csi | \
