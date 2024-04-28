@@ -260,6 +260,11 @@ function rhel_upgrade(){
     sed -i 's|^remote_tmp.*|remote_tmp = /tmp/.ansible|g' /usr/share/ansible/openshift-ansible/ansible.cfg
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv
 
+    if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "triggered" ]]; then
+        echo -e "RHEL worker upgrade completed, but the cluster upgrade hasn't been finished, check the cluster status again...\    n"
+        check_upgrade_status
+    fi
+
     echo "Check K8s version on the RHEL node"
     master_0=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
     rhel_0=$(oc get nodes -l node.openshift.io/os_id=rhel -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
@@ -273,7 +278,6 @@ function rhel_upgrade(){
         echo "RHEL worker has incorrect K8s version" && exit 1
     fi
     echo -e "oc get node -owide\n$(oc get node -owide)"
-    echo "RHEL worker upgrade complete"
 }
 
 # Extract oc binary which is supposed to be identical with target release
@@ -580,9 +584,5 @@ if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
     echo -e "oc get node -owide\n$(oc get node -owide)"
     rhel_repo
     rhel_upgrade
-    if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "triggered" ]]; then
-	echo -e "RHEL worker upgrade completed, but the cluster upgrade hasn't been finished, check the cluster status again...\    n"
-	check_upgrade_status
-    fi
 fi
 check_history
