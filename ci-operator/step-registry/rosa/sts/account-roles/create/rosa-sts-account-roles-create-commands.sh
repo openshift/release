@@ -77,9 +77,14 @@ rosa create account-roles -y --mode auto \
                           | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
 
 # Store the account-role-prefix for the next pre steps and the account roles deletion
-echo "Store the account-role-prefix and the account-roles-arn ..."
+echo "Store the account-role-prefix and the account-roles-arns ..."
 echo -n "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-prefix"
-rosa list account-roles -o json | jq -r '.[].RoleARN' | grep "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-arns"
+ret=0
+rosa list account-roles -o json | jq -r '.[].RoleARN' | grep "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-arns" || ret=$?
+if [[ "$ret" != 0 ]]; then
+    rosa list account-roles -o json | jq -r '.[].RoleARN' | grep "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-arns"
+fi
+echo "Storing successfully"
 
 # Workaround for missing 'ec2:DisassociateAddress' policy for 4.16
 account_intaller_role_name=$(cat "${SHARED_DIR}/account-roles-arns" | grep "Installer-Role" | awk -F '/' '{print $NF}')
