@@ -46,6 +46,7 @@ EOF
 AWS_RDS_PARAMETER_GROUP=$(jq -r .aws.rds.postgresql[\"${QUAY_AWS_RDS_POSTGRESQL_VERSION}\"].parameter_group <aws_rds_postgresql_parameter_groups.json)
 echo "The current using database parameter group is $AWS_RDS_PARAMETER_GROUP"
 
+#Create new directory to create terraform resources
 mkdir -p terraform_aws_rds && cd terraform_aws_rds
 
 cat >>variables.tf <<EOF
