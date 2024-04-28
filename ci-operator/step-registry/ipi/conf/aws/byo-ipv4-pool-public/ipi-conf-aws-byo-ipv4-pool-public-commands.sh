@@ -33,6 +33,8 @@ export AWS_REGION="${LEASED_RESOURCE}"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
+sleep 7200
+
 # Total Public IPs once LBs and NAT GW support custom pools:
 ## bootstrap + (( Public LBs[API+Router] + Nat GWs) * Zones) = 1 + (3*2) = 7
 zone_count=$(yq-go r -j "$CONFIG" | jq -r '.controlPlane.platform.aws.zones | length')
@@ -80,3 +82,4 @@ echo "Custom Pool Patch:"
 cat ${CONFIG_PATCH}
 
 yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"
+
