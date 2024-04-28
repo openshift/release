@@ -185,23 +185,25 @@ for image in "${images[@]}"; do
 done
 
 mkdir -p "${ARTIFACT_DIR}/junit"
+echo "Generating the Junit for fips-or-die scan"
+filename="junit_fips-or-die"
+testsuite="fips-or-die"
+subteam="Security_and_Compliance"
 if $pass; then
-    echo "All tests pass!"
-    cat >"${ARTIFACT_DIR}/junit/fips-or-die-result.xml" <<EOF
-    <testsuite name="fips" tests="1" failures="0">
-        <testcase name="fips-or-die"/>
+    cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
+    <testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="$SECONDS">
+        <testcase name="${subteam}:Fips-or-die check should succeedded or skipped"/>
     </testsuite>
 EOF
 else
-    echo "Test fail, please check log."
-    cat >"${ARTIFACT_DIR}/junit/fips-or-die-result.xml" <<EOF
-    <testsuite name="fips" tests="1" failures="1">
-      <testcase name="fips-or-die">
-        <failure message="">Test fail, please check full log in Prow.</failure>
-        <system-out>
-          $log
-        </system-out>
-      </testcase>
+    cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
+    <testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="$SECONDS">
+        <testcase name="${subteam}:Fips-or-die check should succeedded or skipped">
+            <failure message="">Test fail, please check full log in Prow.</failure>
+            <system-out>
+            $log
+            </system-out>
+        </testcase>
     </testsuite>
 EOF
 fi
