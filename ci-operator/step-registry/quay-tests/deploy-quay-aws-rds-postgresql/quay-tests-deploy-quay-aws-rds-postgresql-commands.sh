@@ -19,6 +19,7 @@ QUAY_AWS_RDS_POSTGRESQL_DBNAME=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/
 QUAY_AWS_RDS_POSTGRESQL_USERNAME=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/username)
 QUAY_AWS_RDS_POSTGRESQL_PASSWORD=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/password)
 
+
 cat >>aws_rds_postgresql_parameter_groups.json <<EOF
 {
   "aws": {
@@ -44,6 +45,8 @@ EOF
 
 AWS_RDS_PARAMETER_GROUP=$(jq -r .aws.rds.postgresql[\"${QUAY_AWS_RDS_POSTGRESQL_VERSION}\"].parameter_group <aws_rds_postgresql_parameter_groups.json)
 echo "The current using database parameter group is $AWS_RDS_PARAMETER_GROUP"
+
+mkdir -p terraform_aws_rds && cd terraform_aws_rds
 
 cat >>variables.tf <<EOF
 variable "region" {
