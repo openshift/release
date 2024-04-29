@@ -31,6 +31,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.16"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.16"
 resources:
   '*':
     requests:
@@ -41,15 +47,22 @@ tests:
   cron: '@yearly'
   steps:
     cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.16
     env:
-      COMPUTE_NODE_REPLICAS: "0"
-      CONTROL_PLANE_REPLICAS: "1"
-      SLEEP_DURATION: 10m
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+      SIZE_VARIANT: compact
+      SLEEP_DURATION: 1h
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-deprovision
+    - ref: storage-destroy-csi-gcp-filestore
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-provision
+    - chain: cucushift-installer-rehearse-gcp-ipi-provision
+    - chain: storage-conf-csi-optional-gcp-filestore
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
