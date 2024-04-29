@@ -101,7 +101,10 @@ data:
         insecure = false
 EOF
 
-oc adm release info ${OCP_IMAGE_MULTI} --filter-by-os=linux/s390x -o json > ocpversion.json
+echo "Json file" 
+oc adm release info ${OCP_IMAGE_MULTI} --filter-by-os=linux/s390x -o json 
+
+echo "Json ends here "
 OPENSHIFT_VERSION="$(cat ocpversion.json | jq -r . | grep "BUILD_VERSION=v" |  tr -d 'v",' | awk -F '=' '{print $2}')"
 export OPENSHIFT_VERSION
 
