@@ -17,5 +17,6 @@ echo "Start to destroy quay aws rds postgresql and s3 buckets ..."
 export TF_VAR_aws_bucket="${QUAY_AWS_S3_BUCKET}"
 export TF_VAR_quay_subnet_group="${QUAY_SUBNET_GROUP}"
 export TF_VAR_quay_security_group="${QUAY_SECURITY_GROUP}"
+terraform --version
 terraform init
 terraform destroy -auto-approve || true

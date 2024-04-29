@@ -68,15 +68,6 @@ variable "aws_bucket" {
 EOF
 
 cat >>create_aws_s3_rds_postgresql.tf <<EOF
-terraform {
-  required_providers {
-    postgresql = {
-      source = "cyrilgdn/postgresql"
-      version = "1.22.0"
-    }
-  }
-}
-
 provider "aws" {
   region = "us-west-2"
   access_key = "${QUAY_AWS_ACCESS_KEY}"
@@ -150,28 +141,14 @@ resource "aws_db_instance" "quaydb" {
   engine               = "postgres"
   engine_version       = "${QUAY_AWS_RDS_POSTGRESQL_VERSION}"
   instance_class       = "db.m5.large"
-  db_name              = "quay"
-  username             = "quayrdsdb"
-  password             = "quayrdsdb"
+  db_name              = "${QUAY_AWS_RDS_POSTGRESQL_DBNAME}"
+  username             = "${QUAY_AWS_RDS_POSTGRESQL_USERNAME}"
+  password             = "${QUAY_AWS_RDS_POSTGRESQL_PASSWORD}"
   parameter_group_name = "${AWS_RDS_PARAMETER_GROUP}"
   publicly_accessible  = true
   skip_final_snapshot  = true
   db_subnet_group_name = aws_db_subnet_group.quayrds.id
   vpc_security_group_ids = [aws_security_group.quayrds.id]
-}
-
-provider "postgresql" {
-  host            = aws_db_instance.quaydb.address
-  username        = aws_db_instance.quaydb.username
-  password        = aws_db_instance.quaydb.password
-  expected_version = "16"
-  sslmode         = "require"
-  connect_timeout = 15
-}
-
-resource "postgresql_extension" "pg_trgm" {
-  name     = "pg_trgm"
-  database = "quay"
 }
 
 resource "aws_s3_bucket" "quayaws" {
@@ -218,8 +195,9 @@ EOF
 export TF_VAR_aws_bucket="${QUAY_AWS_S3_BUCKET}"
 export TF_VAR_quay_subnet_group="${QUAY_SUBNET_GROUP}"
 export TF_VAR_quay_security_group="${QUAY_SECURITY_GROUP}"
-terraform init || true
-terraform apply -auto-approve || true
+terraform --version
+terraform init 
+terraform apply -auto-approve 
 
 QUAY_AWS_RDS_POSTGRESQL_ADDRESS=$(terraform output quaydb_address | tr -d '""' | tr -d '\n')
 
@@ -229,6 +207,43 @@ cp terraform.tgz ${SHARED_DIR}
 echo "${QUAY_AWS_S3_BUCKET}" >${SHARED_DIR}/QUAY_AWS_S3_BUCKET
 echo "${QUAY_SUBNET_GROUP}" >${SHARED_DIR}/QUAY_SUBNET_GROUP
 echo "${QUAY_SECURITY_GROUP}" >${SHARED_DIR}/QUAY_SECURITY_GROUP
+
+cd .. && mkdir -p terraform_install_extension && cd terraform_install_extension
+
+cat >>variables.tf <<EOF
+variable "quay_db_host" {
+
+}
+EOF
+
+cat >>install_extension.tf <<EOF
+terraform {
+  required_providers {
+    postgresql = {
+      source = "cyrilgdn/postgresql"
+      version = "1.22.0"
+    }
+  }
+}
+
+provider "postgresql" {
+  host            = var.quay_db_host
+  username        = "${QUAY_AWS_RDS_POSTGRESQL_USERNAME}"
+  password        = "${QUAY_AWS_RDS_POSTGRESQL_PASSWORD}"
+  expected_version = "${QUAY_AWS_RDS_POSTGRESQL_VERSION}"
+  sslmode         = "require"
+  connect_timeout = 15
+}
+
+resource "postgresql_extension" "pg_trgm" {
+  name     = "pg_trgm"
+  database = "${QUAY_AWS_RDS_POSTGRESQL_DBNAME}"
+}
+EOF
+
+export TF_VAR_quay_db_host="${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}"
+terraform init 
+terraform apply -auto-approve 
 
 #Deploy Quay Operator to OCP namespace 'quay-enterprise'
 cat <<EOF | oc apply -f -
