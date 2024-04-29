@@ -19,6 +19,7 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     # if this is executed as PR check of https://github.com/janus-idp/backstage-showcase.git repo, switch to PR branch.
     git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
     git checkout PR"${GIT_PR_NUMBER}"
+    git merge origin/main --no-edit
     GIT_PR_RESPONSE=$(curl -s "https://api.github.com/repos/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/pulls/${GIT_PR_NUMBER}")
     LONG_SHA=$(echo "$GIT_PR_RESPONSE" | jq -r '.head.sha')
     SHORT_SHA=$(git rev-parse --short ${LONG_SHA})
