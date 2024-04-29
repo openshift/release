@@ -95,11 +95,13 @@ else
   # Execute Tempo e2e tests
   chainsaw test \
   --config .chainsaw-openshift.yaml \
+  --skip-delete \
   --report-name "$REPORT_NAME" \
   --report-path "$ARTIFACT_DIR" \
   --report-format "XML" \
   --test-dir \
   tests/e2e \
   tests/e2e-openshift \
-  tests/e2e-openshift-ossm
+  tests/e2e-openshift-ossm || true
+  sleep 18000
 fi
