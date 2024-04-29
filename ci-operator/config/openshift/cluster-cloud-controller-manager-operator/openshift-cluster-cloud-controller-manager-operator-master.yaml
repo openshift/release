@@ -146,6 +146,18 @@ tests:
   steps:
     cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
+- as: regression-vsphere-ipi-ccmo
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
+  steps:
+    cluster_profile: vsphere-multizone-2
+    env:
+      TEST_FILTERS: CCM
+      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_TIMEOUT: "1200"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-zones
 - as: e2e-nutanix-ovn
   cluster: build01
   optional: true
