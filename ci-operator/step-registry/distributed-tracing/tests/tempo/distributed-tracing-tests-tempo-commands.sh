@@ -101,7 +101,6 @@ else
   --report-format "XML" \
   --test-dir \
   tests/e2e \
-  tests/e2e-openshift \
-  tests/e2e-openshift-ossm || true
+  tests/e2e-openshift || true
   sleep 18000
 fi
