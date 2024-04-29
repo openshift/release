@@ -4,6 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function run_command() {
+    local CMD="$1"
+    echo "Running Command: ${CMD}"
+    eval "${CMD}"
+}
+
+run_command "oc whoami"
+run_command "oc version -o yaml"
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 new_pull_secret="${SHARED_DIR}/new_pull_secret"
@@ -19,7 +28,7 @@ echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
 
 # since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
 # unset KUBECONFIG to ensure this step always interact with the build farm.
-unset KUBECONFIG
+#unset KUBECONFIG
 
 # Create list of images required to run the Windows e2e test suite
 cat <<EOF > "/tmp/mirror-images-list.yaml"
@@ -33,12 +42,36 @@ registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base
 
 jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
 
-sed -i "s/MIRROR_REGISTRY_PLACEHOLDER/${MIRROR_REGISTRY_HOST}/g" "/tmp/mirror-images-list.yaml" 
+sed -i "s/MIRROR_REGISTRY_PLACEHOLDER/${MIRROR_REGISTRY_HOST}/g" "/tmp/mirror-images-list.yaml"
+
+itms_content="apiVersion: config.openshift.io/v1\n"
+itms_content+="kind: ImageTagMirrorSet\n"
+itms_content+="metadata:\n"
+itms_content+="  name: wmco-e2e-mirrorset\n"
+itms_content+="spec:\n"
+itms_content+="  imageTagMirrors:\n"
 
 for image in $(cat /tmp/mirror-images-list.yaml)
 do
-    oc image mirror $image  --insecure=true -a "${new_pull_secret}" \
- --skip-missing=true --skip-verification=true --keep-manifest-list=true --filter-by-os='.*'
+   oc image mirror $image  --insecure=true -a "${new_pull_secret}" \
+ -skip-verification=true --keep-manifest-list=true --filter-by-os='.*'
+
+    source_image=$(echo "$image" | cut -d'=' -f1)
+    mirror_registry=$(echo "$image" | cut -d'=' -f2)
+
+    # Remove the tag and its preceding colon
+    # e.g. mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022 turns into mcr.microsoft.com/powershell
+    source_tag_removed="${source_image%:*}"
+    mirror_tag_removed="${mirror_registry%:*}"
+
+    itms_content+="  - source: $source_tag_removed\n"
+    itms_content+="    mirrors:\n"
+    itms_content+="    - $mirror_tag_removed\n"
 done
+
+echo -e "$itms_content" > "/tmp/image-tag-mirror-set.yaml"
+run_command "cat /tmp/image-tag-mirror-set.yaml"
+
+run_command "oc create -f /tmp/image-tag-mirror-set.yaml"
 
 rm -f "${new_pull_secret}"
