@@ -3,14 +3,22 @@ base_images:
     name: 4.16-priv
     namespace: ocp-private
     tag: cli
-  ocp_4.16_base:
+  ocp_4.16_base-rhel9:
     name: 4.16-priv
     namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    tag: base-rhel9
+  ocp_4.16_etcd:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: etcd
+  ocp_4.16_hyperkube:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: hyperkube
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/installer
@@ -20,12 +28,18 @@ images:
     value: "true"
   dockerfile_path: images/installer-altinfra/Dockerfile.ci
   inputs:
-    ocp_4.16_base:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_4.16_etcd:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/4.16:etcd
+    ocp_4.16_hyperkube:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:hyperkube
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: installer
 - dockerfile_literal: |
     FROM src
@@ -83,6 +97,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-custom-security-groups
@@ -94,6 +109,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       USER_TAGS: |
@@ -108,6 +124,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       FIPS_ENABLED: "true"
@@ -126,6 +143,7 @@ tests:
     cluster_profile: aws
     env:
       AWS_METADATA_SERVICE_AUTH: Required
+      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws
@@ -152,7 +170,10 @@ tests:
         keyA valueA
         keyB valueB
         keyC valueC
-    workflow: openshift-e2e-aws-ovn-public-ipv4-pool
+    leases:
+    - env: LEASED_RESOURCE
+      resource_type: aws-3-quota-slice
+    workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-shared-vpc
@@ -160,6 +181,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-sharednetwork
@@ -170,6 +192,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-single-node
@@ -180,6 +203,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: local-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -191,6 +215,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: wavelength-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -202,6 +227,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: local-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -213,6 +239,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: wavelength-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -333,11 +360,22 @@ tests:
       OPENSTACK_TEST_SKIPS: The OpenStack platform creates Worker nodes in a server
         group\|The OpenStack platform creates Control plane nodes in a server group
       TEST_SKIPS: Services Secondary IP Family \[LinuxOnly\] should function for service
-        endpoints using hostNetwork\| Services Secondary IP Family \[LinuxOnly\] should
-        function for node-Service\| Services Secondary IP Family \[LinuxOnly\] should
-        function for pod-Service
+        endpoints using hostNetwork
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-upi
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-capi-dualstack-v6primary
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    env:
+      CONFIG_TYPE: dualstack-v6primary
+      FEATURE_GATES: ClusterAPIInstall=true
+      FEATURE_SET: CustomNoUpgrade
+      TEST_SKIPS: when FIPS is disabled the HAProxy router should serve routes when
+        configured with a 1024-bit RSA key\|should redirect on blob pull
+    workflow: openshift-e2e-openstack-dualstack
   timeout: 6h0m0s
 - always_run: false
   as: e2e-openstack-capi-proxy

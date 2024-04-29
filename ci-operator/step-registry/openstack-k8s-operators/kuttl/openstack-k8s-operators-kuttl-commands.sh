@@ -74,6 +74,10 @@ fi
 # changes in the PR)
 export ${SERVICE_NAME^^}_REPO=/go/src/github.com/${ORG}/${BASE_OP}
 
+# Use built META_OPERATOR index image
+# This is required by dataplane kuttl tests which installs openstack-operator
+export OPENSTACK_IMG=${REGISTRY}/${ORGANIZATION}/${META_OPERATOR}-index:${BUILD_TAG}
+
 # Use built META_OPERATOR bundle image
 export OPENSTACK_BUNDLE_IMG=${REGISTRY}/${ORGANIZATION}/${META_OPERATOR}-bundle:${BUILD_TAG}
 

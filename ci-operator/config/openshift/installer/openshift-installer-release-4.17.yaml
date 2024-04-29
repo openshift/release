@@ -30,7 +30,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.53.1
+    tag: v1.54.2
   ocp_4.10_cli:
     name: "4.17"
     namespace: ocp
@@ -43,6 +43,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: cli
+  ocp_4.16_cli-artifacts:
+    name: "4.17"
+    namespace: ocp
+    tag: cli-artifacts
   ocp_4.16_installer-terraform-providers:
     name: "4.17"
     namespace: ocp
@@ -60,6 +64,9 @@ images:
     ocp_4.16_base:
       as:
       - registry.ci.openshift.org/ocp/4.16:base
+    ocp_4.16_cli-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:cli-artifacts
     ocp_4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
@@ -113,6 +120,9 @@ images:
     ocp_4.16_base:
       as:
       - registry.ci.openshift.org/ocp/4.16:base
+    ocp_4.16_cli-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:cli-artifacts
     ocp_4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
@@ -125,6 +135,9 @@ images:
     ocp_4.16_base:
       as:
       - registry.ci.openshift.org/ocp/4.16:base
+    ocp_4.16_cli-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:cli-artifacts
     ocp_4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
@@ -571,8 +584,6 @@ tests:
   optional: true
   steps:
     cluster_profile: vsphere-8-vpn
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
 - as: e2e-vsphere-upi
@@ -689,10 +700,10 @@ tests:
   commands: hack/go-integration-test.sh
   container:
     from: src-oc
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
 - as: e2e-agent-compact-ipv4
   cluster: build05
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -705,7 +716,7 @@ tests:
 - as: e2e-agent-compact-ipv4-none-platform
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -718,7 +729,7 @@ tests:
 - as: e2e-agent-compact-ipv4-appliance
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -731,7 +742,7 @@ tests:
 - as: e2e-agent-compact-ipv4-appliance-diskimage
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     allow_skip_on_success: true
     cluster_profile: equinix-ocp-metal
@@ -749,7 +760,7 @@ tests:
 - as: e2e-agent-sno-ipv6
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-sno-ipv6
@@ -757,7 +768,7 @@ tests:
 - as: e2e-agent-sno-ipv4-pxe
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -769,7 +780,7 @@ tests:
 - as: e2e-agent-ha-dualstack
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-ha-dualstack
@@ -795,13 +806,6 @@ tests:
     env:
       CLUSTER_NETWORK_MTU: "1200"
     workflow: openshift-e2e-aws-network-mtu
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-ovn-public-ipv4-pool
-  optional: true
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-ovn-public-ipv4-pool
   timeout: 6h0m0s
 - always_run: false
   as: azure-ovn-marketplace-images

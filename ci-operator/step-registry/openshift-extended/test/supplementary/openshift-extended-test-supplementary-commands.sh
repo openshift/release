@@ -188,8 +188,8 @@ cd /tmp/output
 
 if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     pushd /tmp
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
-    tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
+    tar -xzf google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
     export PATH=$PATH:/tmp/google-cloud-sdk/bin
     mkdir -p gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig
@@ -254,8 +254,18 @@ function run {
     fi
 
     echo "final scenarios: ${test_scenarios}"
+    ret_grep=0
     extended-platform-tests run all --dry-run | \
-        grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
+        grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected || ret_grep=$?
+    if [ "W${ret_grep}W" != "W0W" ]; then
+        echo "fail to select case. possible no case, and please check it"
+        if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
+            echo "do not force success exit"
+            exit 1
+        fi
+            echo "force success exit"
+            exit 0
+    fi
 
     hardcoded_filters="~NonUnifyCI&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
     if [[ "${test_scenarios}" == *"Stagerun"* ]] && [[ "${test_scenarios}" != *"~Stagerun"* ]]; then

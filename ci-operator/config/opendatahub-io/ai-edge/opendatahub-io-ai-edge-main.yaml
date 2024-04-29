@@ -6,7 +6,7 @@ build_root:
 releases:
   latest:
     release:
-      architecture: amd64
+      architecture: multi
       channel: stable
       version: "4.14"
 resources:
@@ -18,7 +18,7 @@ resources:
       memory: 200Mi
 tests:
 - as: test-ai-edge
-  skip_if_only_changed: \.github|\.md$|^LICENSE$|^OWNERS$|THIRD-PARTY-NOTICES.txt|^acm/|^gitea/|pipelines/model-upload|pipelines/models|pipelines/tekton/gitops-update-pipeline|test/acm|test/gitops
+  skip_if_only_changed: \.github|\.md$|^LICENSE$|^OWNERS$|THIRD-PARTY-NOTICES.txt|^acm/|^byo-mgmt/|^docs/|^gitea/|pipelines/model-upload|pipelines/models|test/acm|test/gitops
   steps:
     cluster_profile: aws-opendatahub
     env:
@@ -29,6 +29,28 @@ tests:
             {"name": "openshift-pipelines-operator-rh", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators"}
         ]
     test:
+    - as: wait-for-olm
+      cli: latest
+      commands: |
+        set +e
+        echo "Waiting for catalog sources to be available as they are not ready immediately due to a current issue with hypershift"
+        date
+        for i in {1..60}
+        do
+          oc get packagemanifest openshift-pipelines-operator-rh >/dev/null 2>&1
+          if [ "$?" == 0 ]; then
+            echo "packagemanifest openshift-pipelines-operator-rh found" && date && break
+          elif [ "$i" == 60 ]; then
+            echo "waiting for packagemanifest openshift-pipelines-operator-rh timed out" && date && exit 1
+          else
+            echo "packagemanifest openshift-pipelines-operator-rh NOT found, sleeping for 15s"
+            sleep 15
+          fi
+        done
+      from: src
+      resources:
+        requests:
+          cpu: 500m
     - ref: install-operators
     - as: test-ai-edge
       cli: latest
@@ -62,6 +84,28 @@ tests:
             {"name": "openshift-pipelines-operator-rh", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators"}
         ]
     test:
+    - as: wait-for-olm
+      cli: latest
+      commands: |
+        set +e
+        echo "Waiting for catalog sources to be available as they are not ready immediately due to a current issue with hypershift"
+        date
+        for i in {1..60}
+        do
+          oc get packagemanifest openshift-pipelines-operator-rh >/dev/null 2>&1
+          if [ "$?" == 0 ]; then
+            echo "packagemanifest openshift-pipelines-operator-rh found" && date && break
+          elif [ "$i" == 60 ]; then
+            echo "waiting for packagemanifest openshift-pipelines-operator-rh timed out" && date && exit 1
+          else
+            echo "packagemanifest openshift-pipelines-operator-rh NOT found, sleeping for 15s"
+            sleep 15
+          fi
+        done
+      from: src
+      resources:
+        requests:
+          cpu: 500m
     - ref: install-operators
     - as: test-ai-edge
       cli: latest
@@ -74,6 +118,9 @@ tests:
         namespace: test-credentials
       - mount_path: /secrets/ai-edge-quay
         name: ai-edge-quay
+        namespace: test-credentials
+      - mount_path: /secrets/ai-edge-github
+        name: ai-edge-github
         namespace: test-credentials
       from: src
       resources:
