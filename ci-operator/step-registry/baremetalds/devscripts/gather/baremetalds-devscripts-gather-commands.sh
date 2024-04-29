@@ -27,6 +27,9 @@ echo "### Gathering logs..."
 timeout -s 9 15m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 cd dev-scripts
 
+echo "Testing API access"
+oc get clusterversion || true
+
 echo "Get install-gather, if there is one..."
 cp /root/dev-scripts/ocp/*/log-bundle*.tar.gz /tmp/artifacts/log-bundle-\$HOSTNAME.tar.gz || true
 
