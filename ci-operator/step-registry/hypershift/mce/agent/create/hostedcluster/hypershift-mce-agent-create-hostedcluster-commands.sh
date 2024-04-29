@@ -42,7 +42,7 @@ fi
   --agent-namespace="${CLUSTER_NAMESPACE}" \
   --namespace local-cluster \
   --base-domain=${BASEDOMAIN} \
-  --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
+  --api-server-address=\"api.${CLUSTER_NAME}.${BASEDOMAIN}:32443\" \
   --image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml" \
   --ssh-key="${SHARED_DIR}/id_rsa.pub" \
   --release-image ${RELEASE_IMAGE}
