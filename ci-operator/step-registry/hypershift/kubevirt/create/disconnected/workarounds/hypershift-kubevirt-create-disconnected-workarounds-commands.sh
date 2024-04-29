@@ -11,18 +11,17 @@ source "${SHARED_DIR}/packet-conf.sh"
 scp "${SSHOPTS[@]}" "/etc/quay-pull-credentials/registry_quay.json" "root@${IP}:/home/registry_quay.json"
 
 MCE=${MCE_VERSION:-""}
-echo "$MCE" > /tmp/mce
-scp "${SSHOPTS[@]}" "/tmp/mce" "root@${IP}:/home/mce"
 
 # shellcheck disable=SC2087
-ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOF'
+ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "$MCE" << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
+
+MCE="${1}"
+
 set -xeo pipefail
 
 if [ -f /root/config ] ; then
 source /root/config
 fi
-
-MCE=$(cat /home/mce)
 
 ### workaround for https://issues.redhat.com/browse/OCPBUGS-29408
 echo "workaround for https://issues.redhat.com/browse/OCPBUGS-29408"

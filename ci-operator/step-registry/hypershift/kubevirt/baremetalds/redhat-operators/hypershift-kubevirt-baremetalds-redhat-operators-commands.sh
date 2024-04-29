@@ -9,24 +9,19 @@ function mirror_ccs() {
     echo "### Mirroring the selected operators to the internal registry"
     source "${SHARED_DIR}/packet-conf.sh"
 
-    echo "registry.redhat.io/redhat/redhat-operator-index:${REDHAT_OPERATORS_INDEX_TAG}" > /tmp/ccs-catalog-image
-    scp "${SSHOPTS[@]}" "/tmp/ccs-catalog-image" "root@${IP}:/home/ccs-catalog-image"
-    echo "${REDHAT_OPERATORS_INDEX_TAG}" > /tmp/ccs-version
-    scp "${SSHOPTS[@]}" "/tmp/ccs-version" "root@${IP}:/home/ccs-version"
-    echo "${CCS_OPERATOR_PACKAGES}" > /tmp/ccs-packages
-    scp "${SSHOPTS[@]}" "/tmp/ccs-packages" "root@${IP}:/home/ccs-packages"
-    echo "${CCS_OPERATOR_CHANNELS}" > /tmp/ccs-channels
-    scp "${SSHOPTS[@]}" "/tmp/ccs-channels" "root@${IP}:/home/ccs-channels"
+    CCS_CATALOG_IMAGE="registry.redhat.io/redhat/redhat-operator-index:${REDHAT_OPERATORS_INDEX_TAG}"
+    CCS_VERSION="${REDHAT_OPERATORS_INDEX_TAG}"
+
     scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:/home/pull-secret"
 
     # shellcheck disable=SC2087
-    ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOF'
-    set -xeo pipefail
+    ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${CCS_CATALOG_IMAGE}" "${CCS_VERSION}" "${CCS_OPERATOR_PACKAGES}" "${CCS_OPERATOR_CHANNELS}" << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
+    CCS_CATALOG_IMAGE="${1}"
+    CCS_VERSION="${2}"
+    CCS_OPERATOR_PACKAGES="${3}"
+    CCS_OPERATOR_CHANNELS="${4}"
 
-    CCS_CATALOG_IMAGE=$(cat /home/ccs-catalog-image)
-    CCS_VERSION=$(cat /home/ccs-version)
-    CCS_OPERATOR_PACKAGES=$(cat /home/ccs-packages)
-    CCS_OPERATOR_CHANNELS=$(cat /home/ccs-channels)
+    set -xeo pipefail
 
     echo "1. Get mirror registry"
     mirror_registry=$(oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]')
