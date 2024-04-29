@@ -105,6 +105,14 @@ oc adm release info ${OCP_IMAGE_MULTI} --filter-by-os=linux/s390x -o json > ocpv
 OPENSHIFT_VERSION="$(cat ocpversion.json | jq -r . | grep "BUILD_VERSION=v" |  tr -d 'v",' | awk -F '=' '{print $2}')"
 export OPENSHIFT_VERSION
 
+echo "Openshift version "
+echo $OPENSHIFT_VERSION
+
+echo "Multi version : $OCP_IMAGE_MULTI "
+
+
+
+
 if [[ "${OPENSHIFT_VERSION}" == *"4.14."* ]]
 then
   RHCOS_VERSION="4.14-9.2"
