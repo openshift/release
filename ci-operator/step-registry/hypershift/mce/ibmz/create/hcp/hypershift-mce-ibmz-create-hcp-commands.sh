@@ -139,8 +139,8 @@ spec:
       requests:
         storage: 10Gi
   osImages:
-    - openshiftVersion: "${OCP_VERSION}"
-      version: "${OCP_RELEASE_VERSION}"
+    - openshiftVersion: "${OPENSHIFT_VERSION}"
+      version: "${RHCOS_BUILD_VERSION}"
       url: "${ISO_URL}"
       rootFSUrl: "${ROOT_FS_URL}"
       cpuArchitecture: s390x
