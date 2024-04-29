@@ -1687,9 +1687,35 @@ function test_delete_mc () {
 
 ##################################################################
 
+###### test: Fleet Manager should not label SCs with Dynatrace Tenant ID (OCPQE-21268) ######
+
+function test_do_not_label_with_dynatrace_tenant_id () {
+  echo "[OCPQE-21268] - Fleet Manager should not label SCs with Dynatrace Tenant ID"
+  TEST_PASSED=true
+  sc_cluster_id=$(cat "${SHARED_DIR}/ocm-sc-id")
+
+  DT_LABEL_KEY="sre-capabilities.dtp.tenant"
+
+  SUBSCRIPTION_HREF=$(ocm get /api/clusters_mgmt/v1/clusters/"$sc_cluster_id" | jq -r .subscription.href)
+
+  LABEL_COUNT=$(ocm get "$SUBSCRIPTION_HREF"/labels | grep -c "$DT_LABEL_KEY")
+
+  if [ "$LABEL_COUNT" -ne 0 ]; then
+    TEST_PASSED=false
+    echo "ERROR. Unexpected label: 'DT_LABEL_KEY' found in subscription for SC"
+  fi
+  update_results "OCPQE-21268" $TEST_PASSED
+}
+
+###### end of test: Fleet Manager should not label SCs with Dynatrace Tenant ID (OCPQE-21268) ######
+
+##################################################################
+
 # Test all cases and print results
 
 test_monitoring_disabled
+
+test_do_not_label_with_dynatrace_tenant_id
 
 # temporarily disabling this test, as autoscaling work is ongoing and it won't pass
 # test_autoscaler
