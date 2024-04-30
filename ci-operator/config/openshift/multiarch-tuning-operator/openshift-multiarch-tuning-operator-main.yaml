@@ -24,12 +24,9 @@ images:
 - dockerfile_path: bundle.Dockerfile
   to: multiarch-tuning-op-bundle
 - dockerfile_literal: |
-    FROM quay.io/operator-framework/operator-sdk:v1.26.0 as osdk
+    FROM quay.io/operator-framework/operator-sdk:v1.31.0 as osdk
     FROM src
-    COPY . /code
     COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
-    RUN chmod -R g+rwX /code
-    WORKDIR /code
   from: src
   to: operator-sdk-src
 operator:
@@ -68,6 +65,12 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  lint:
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
   sast:
     limits:
       memory: 6Gi
@@ -175,6 +178,10 @@ tests:
     env:
       PROJECT_NAME: multiarch-tuning-operator
     workflow: openshift-ci-security
+- as: bundle
+  commands: unset VERSION; NO_DOCKER=1 make bundle-verify
+  container:
+    from: operator-sdk-src
 zz_generated_metadata:
   branch: main
   org: openshift

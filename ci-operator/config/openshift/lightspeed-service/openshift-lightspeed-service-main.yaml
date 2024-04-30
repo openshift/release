@@ -185,7 +185,7 @@ tests:
     workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: response-sanity-check
-  cron: 0 11 * * 1
+  cron: 30 10 * * 1
   steps:
     cluster_profile: aws-2
     env:
@@ -203,6 +203,9 @@ tests:
         export PROVIDER=openai
         export MODEL=gpt-3.5-turbo-1106
         export RESPONSE_EVALUATION=true
+
+        export CP_OFFLINE_TOKEN=$(cat /var/run/insights-stage-upload-offline-token/token)
+
         tests/scripts/test-e2e-cluster.sh
       credentials:
       - mount_path: /var/run/azure_openai
@@ -216,6 +219,9 @@ tests:
         namespace: test-credentials
       - mount_path: /var/run/watsonx
         name: watsonx-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/insights-stage-upload-offline-token
+        name: insights-stage-upload-offline-token
         namespace: test-credentials
       dependencies:
       - env: OLS_IMAGE
