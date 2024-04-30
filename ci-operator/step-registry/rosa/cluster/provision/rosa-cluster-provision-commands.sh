@@ -92,7 +92,9 @@ else
   #set the domain prefix of length (<=15)
   MAX_DOMAIN_PREFIX_LENGTH=15
   if [[ "$SPECIFY_DOMAIN_PREFIX" == "true" ]]; then
-    DOMAIN_PREFIX="$(head /dev/urandom | tr -dc 'a-z0-9' | head -c $MAX_DOMAIN_PREFIX_LENGTH)"
+    first_char=$(head /dev/urandom | tr -dc 'a-z' | head -c 1)
+    remaining_chars=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c $((MAX_DOMAIN_PREFIX_LENGTH - 1)))
+    DOMAIN_PREFIX="$first_char$remaining_chars"
     DOMAIN_PREFIX_SWITCH="--domain-prefix $DOMAIN_PREFIX"
   fi
   #else the domain prefix will be auto generated.
