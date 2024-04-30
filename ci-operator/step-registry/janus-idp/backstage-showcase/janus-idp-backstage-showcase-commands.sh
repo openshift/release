@@ -18,13 +18,6 @@ cd backstage-showcase || exit
 git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
 
-GIT_PR_NUMBER=1216
-git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
-git checkout PR"${GIT_PR_NUMBER}"
-git merge origin/main --no-edit
-PR_CHANGESET=$(git diff --name-only main)
-echo "Changeset: $PR_CHANGESET"
-
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     # if this is executed as PR check of https://github.com/janus-idp/backstage-showcase.git repo, switch to PR branch.
     git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
