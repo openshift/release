@@ -43,7 +43,7 @@ for change in $PR_CHANGESET; do
     fi
 done
 
-if [ $ONLY_IN_DIRS ] || [[ "$JOB_NAME" == rehearse-* ]]; then
+if $ONLY_IN_DIRS || [[ "$JOB_NAME" == rehearse-* ]]; then
     echo "Skipping wait for new PR image and proceeding with image tag : next"
     echo "updated image tag : next"
     TAG_NAME="next"
