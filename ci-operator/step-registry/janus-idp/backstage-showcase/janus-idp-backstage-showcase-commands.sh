@@ -15,6 +15,9 @@ NAME_SPACE=showcase-ci
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd backstage-showcase || exit
 
+git config --global user.name "rhdh-qe"
+git config --global user.email "rhdh-qe@redhat.com"
+
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     # if this is executed as PR check of https://github.com/janus-idp/backstage-showcase.git repo, switch to PR branch.
     git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
@@ -43,7 +46,7 @@ for change in $PR_CHANGESET; do
     fi
 done
 
-if [ $ONLY_IN_DIRS ] || [[ "$JOB_NAME" == rehearse-* ]]; then
+if $ONLY_IN_DIRS || [[ "$JOB_NAME" == rehearse-* ]]; then
     echo "Skipping wait for new PR image and proceeding with image tag : next"
     echo "updated image tag : next"
     TAG_NAME="next"
