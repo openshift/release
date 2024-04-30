@@ -7,11 +7,11 @@ set -o xtrace
 set -x
 ls
 
-krkn_start_file="${SHARED_DIR}/krkn_start.txt"
+krkn_start_file=${SHARED_DIR}/krkn_start.txt
 
-while [ ! -f $krkn_start_file ]; do
+while [ ! -f $krkn_start_file ] ; do
   printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${krkn_start_file}"
-  sleep 10
+  sleep 3
 done
 printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${krkn_start_file}"
 
