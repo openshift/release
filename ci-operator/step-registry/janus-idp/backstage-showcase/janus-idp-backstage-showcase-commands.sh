@@ -15,10 +15,13 @@ NAME_SPACE=showcase-ci
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd backstage-showcase || exit
 
+git config --global user.name "rhdh-qe"
+git config --global user.email "rhdh-qe@redhat.com"
+
 GIT_PR_NUMBER=1216
 git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
 git checkout PR"${GIT_PR_NUMBER}"
-git rebase origin/main
+git merge origin/main --no-edit
 PR_CHANGESET=$(git diff --name-only main)
 echo "Changeset: $PR_CHANGESET"
 
