@@ -291,6 +291,9 @@ function test_execution_ui() {
     test_execution_cucumber 'ui1' 'not @destructive'
     test_execution_cucumber 'ui2' '@destructive'
 }
+function test_execution_ui_destructive {
+    test_execution_cucumber 'uidestructive' '@console and @destructive'
+}
 function test_execution() {
     pushd verification-tests
     case "$E2E_TEST_TYPE" in
@@ -309,6 +312,9 @@ function test_execution() {
         ui)
             export E2E_RUN_TAGS="${E2E_RUN_TAGS} and @console"
             test_execution_ui
+            ;;
+        ui_destructive)
+            test_execution_ui_destructive
             ;;
         *)
             echo "Got unexpected test type: $E2E_TEST_TYPE"
