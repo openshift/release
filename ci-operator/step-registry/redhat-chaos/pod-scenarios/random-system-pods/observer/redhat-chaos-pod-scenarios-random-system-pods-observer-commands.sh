@@ -10,7 +10,7 @@ ls
 krkn_start_file=${SHARED_DIR}/krkn_start.txt
 
 while [ ! -f $krkn_start_file ] ; do
-  printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${krkn_start_file}"
+  printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${SHARED_DIR}"
   sleep 3
 done
 printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${krkn_start_file}"

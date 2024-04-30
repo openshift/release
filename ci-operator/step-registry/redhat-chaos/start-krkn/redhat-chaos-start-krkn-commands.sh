@@ -5,12 +5,15 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 set -x
-ls
 
 sleep 30
 
-echo "START" >> ${SHARED_DIR}/krkn_start.txt
+echo $SHARED_DIR
 
-cat ${SHARED_DIR}/krkn_start.txt
+env | grep SHARED_DIR
+
+echo "START" >> $SHARED_DIR/krkn_start.txt
+
+cat $SHARED_DIR/krkn_start.txt
 
 sleep 1000
