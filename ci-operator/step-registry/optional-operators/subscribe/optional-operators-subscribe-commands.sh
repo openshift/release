@@ -133,7 +133,7 @@ enable_hybrid_overlay () {
     
     # wait for the ovnKubernetesConfig to update
     start_time=$(date +%s)
-    while [ -z "$(oc get network.operator.openshift.io -o jsonpath="{.items[0].spec.defaultNetwork.ovnKubernetesConfig}")" ]; do
+    while [ -z "$(oc get network.operator.openshift.io -o jsonpath="{.items[0].spec.defaultNetwork.ovnKubernetesConfig.hybridOverlayConfig}")" ]; do
         if [ $(($(date +%s) - $start_time)) -gt 300 ]; then
             echo "Timeout waiting for the ovnKubernetesConfig to update"
             exit 1
