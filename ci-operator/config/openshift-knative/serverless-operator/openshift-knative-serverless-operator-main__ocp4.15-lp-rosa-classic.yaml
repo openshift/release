@@ -172,6 +172,28 @@ tests:
       OPENSHIFT_VERSION: "4.15"
     test:
     - ref: cucushift-installer-check-cluster-health
+    - as: knative-eventing-kafka-broker-e2e
+      commands: make test-upstream-e2e-kafka-no-upgrade
+      dependencies:
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - as: operator-e2e
       commands: make test-e2e-with-kafka
       dependencies:
@@ -191,8 +213,6 @@ tests:
         name: serverless-metadata-webhook
       from: serverless-source-image
       resources:
-        limits:
-          memory: 8Gi
         requests:
           cpu: 100m
           memory: 200Mi
@@ -215,35 +235,9 @@ tests:
         name: serverless-metadata-webhook
       from: serverless-source-image
       resources:
-        limits:
-          memory: 8Gi
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: knative-eventing-kafka-broker-e2e
-      commands: make test-upstream-e2e-kafka-no-upgrade
-      dependencies:
-      - env: SERVERLESS_KNATIVE_OPERATOR
-        name: serverless-knative-operator
-      - env: SERVERLESS_BUNDLE
-        name: serverless-bundle
-      - env: SERVERLESS_INDEX
-        name: serverless-index
-      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
-        name: serverless-openshift-knative-operator
-      - env: SERVERLESS_SOURCE_IMAGE
-        name: serverless-source-image
-      - env: SERVERLESS_INGRESS
-        name: serverless-ingress
-      - env: SERVERLESS_METADATA_WEBHOOK
-        name: serverless-metadata-webhook
-      from: serverless-source-image
-      resources:
-        limits:
-          memory: 12Gi
-        requests:
-          cpu: 100m
-          memory: 6Gi
     workflow: firewatch-rosa-aws-sts
   timeout: 8h0m0s
 zz_generated_metadata:
