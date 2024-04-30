@@ -9,8 +9,6 @@ set -x
 echo $SHARED_DIR
 
 env | grep SHARED_DIR
-cat $SHARED_DIR/krkn_start.txt
-
 sleep 1000
 
 
