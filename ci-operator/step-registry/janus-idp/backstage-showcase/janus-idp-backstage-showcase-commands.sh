@@ -18,7 +18,7 @@ cd backstage-showcase || exit
 GIT_PR_NUMBER=1216
 git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
 git checkout PR"${GIT_PR_NUMBER}"
-git merge origin/main --no-edit
+git rebase origin/main
 PR_CHANGESET=$(git diff --name-only main)
 echo "Changeset: $PR_CHANGESET"
 
