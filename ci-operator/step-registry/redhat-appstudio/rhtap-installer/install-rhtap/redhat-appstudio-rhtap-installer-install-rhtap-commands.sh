@@ -11,7 +11,7 @@ export ACS__API_TOKEN \
   GITHUB__APP__ID \
   GITHUB__APP__CLIENT__ID \
   GITHUB__APP__CLIENT__SECRET \
-  GITHUB__APP__WEBHOOK_SECRET \
+  GITHUB__APP__WEBHOOK__SECRET \
   GITHUB__APP__PRIVATE_KEY \
   GITOPS__GIT_TOKEN \
   QUAY__DOCKERCONFIGJSON \
@@ -55,7 +55,7 @@ DEVELOPER_HUB__CATALOG__URL=https://github.com/redhat-appstudio/tssc-sample-temp
 GITHUB__APP__ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-app-id)
 GITHUB__APP__CLIENT__ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-id)
 GITHUB__APP__CLIENT__SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-secret)
-GITHUB__APP__WEBHOOK_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-webhook-secret)
+GITHUB__APP__WEBHOOK__SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-webhook-secret)
 GITHUB__APP__PRIVATE_KEY=$(base64 -d < /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-private-key)
 GITOPS__GIT_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
 QUAY__DOCKERCONFIGJSON=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhtap_quay_ci_token)
