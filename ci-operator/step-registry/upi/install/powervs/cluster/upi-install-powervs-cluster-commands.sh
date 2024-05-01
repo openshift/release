@@ -446,7 +446,7 @@ function create_transit_gateway() {
   TGW_NAME="${workspace_name}"-tg
 
   ##Create the Transit Gateway
-  ic tg gateway-create --name "${TGW_NAME}" --location "${VPC_REGION}" --routing global --resource-group-id "${RESOURCE_GROUP_ID}" --output json | tee /tmp/tgw.id
+  ic tg gateway-create --name "${TGW_NAME}" --location "${VPC_REGION}" --routing local --resource-group-id "${RESOURCE_GROUP_ID}" --output json | tee /tmp/tgw.id
   TGW_ID=$(cat /tmp/tgw.id | grep id | awk -F'"' '/"id":/{print $4; exit}')
   export TGW_ID
   echo "${TGW_ID}" > "${SHARED_DIR}"/TGW_ID
