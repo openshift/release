@@ -196,6 +196,7 @@ function create_upi_powervs_cluster() {
   echo "Done with retrieval"
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/kubeconfig "${SHARED_DIR}"/kubeconfig
   echo "Done copying the kubeconfig"
+  exit 0
 }
 
 function ic() {
