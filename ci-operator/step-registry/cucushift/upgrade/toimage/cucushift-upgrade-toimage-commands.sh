@@ -531,6 +531,11 @@ if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
 
+#support HyperShift upgrade
+if [[ -f "${SHARED_DIR}/mgmt_kubeconfig" ]]; then
+    export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+fi
+
 # Setup proxy if it's present in the shared dir
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     # shellcheck disable=SC1091
