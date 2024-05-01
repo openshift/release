@@ -23,7 +23,7 @@ export KUBECONFIG=/tmp/config
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export NAMESPACE=$TARGET_NAMESPACE 
 
-while [ $(oc get ns | grep -c "start-kraken") -lt 1 ]; do
+while [ "$(oc get ns | grep -c 'start-kraken')" -lt 1 ]; do
   echo "start kraken not found yet, waiting"
   sleep 10
 done
