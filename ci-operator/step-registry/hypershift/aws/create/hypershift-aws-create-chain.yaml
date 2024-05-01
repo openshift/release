@@ -38,7 +38,7 @@ chain:
       default: "SingleReplica"
       documentation: "Availability policy for hosted cluster components. Supported options: SingleReplica, HighlyAvailable, default SingleReplica"
     - name: HYPERSHIFT_INFRA_AVAILABILITY_POLICY
-      default: "SingleReplica"
+      default: "HighlyAvailable"
       documentation: "Availability policy for infrastructure services in guest cluster. Supported options: SingleReplica, HighlyAvailable, default SingleReplica"
     - name: HYPERSHIFT_INSTANCE_TYPE
       default: "m5.xlarge"
@@ -50,14 +50,14 @@ chain:
       set -exuo pipefail
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
-      
+
       if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
         AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
         DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
       fi
       DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
       RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
-      
+
       ICSP_COMMAND=""
       if [[ $ENABLE_ICSP == "true" ]]; then
         ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml")
