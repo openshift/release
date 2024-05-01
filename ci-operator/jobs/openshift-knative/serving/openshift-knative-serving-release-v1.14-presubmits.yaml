@@ -3,9 +3,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-v1\.12$
-    - ^release-v1\.12-
-    cluster: build05
+    - ^release-v1\.14$
+    - ^release-v1\.14-
+    cluster: build03
     context: ci/prow/412-images
     decorate: true
     decoration_config:
@@ -14,7 +14,7 @@ presubmits:
       ci-operator.openshift.io/variant: "412"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-v1.12-412-images
+    name: pull-ci-openshift-knative-serving-release-v1.14-412-images
     rerun_command: /test 412-images
     spec:
       containers:
@@ -61,8 +61,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-v1\.12$
-    - ^release-v1\.12-
+    - ^release-v1\.14$
+    - ^release-v1\.14-
     cluster: build05
     context: ci/prow/412-perf-tests-aws-412
     decorate: true
@@ -74,7 +74,7 @@ presubmits:
       ci-operator.openshift.io/variant: "412"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-v1.12-412-perf-tests-aws-412
+    name: pull-ci-openshift-knative-serving-release-v1.14-412-perf-tests-aws-412
     rerun_command: /test 412-perf-tests-aws-412
     spec:
       containers:
@@ -143,8 +143,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-v1\.12$
-    - ^release-v1\.12-
+    - ^release-v1\.14$
+    - ^release-v1\.14-
     cluster: build05
     context: ci/prow/412-test-e2e-aws-412
     decorate: true
@@ -156,7 +156,7 @@ presubmits:
       ci-operator.openshift.io/variant: "412"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-v1.12-412-test-e2e-aws-412
+    name: pull-ci-openshift-knative-serving-release-v1.14-412-test-e2e-aws-412
     rerun_command: /test 412-test-e2e-aws-412
     spec:
       containers:
@@ -223,11 +223,93 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )412-test-e2e-aws-412,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-v1\.14$
+    - ^release-v1\.14-
+    cluster: build05
+    context: ci/prow/412-test-e2e-tls-aws-412
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
+      ci-operator.openshift.io/variant: "412"
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serving-release-v1.14-412-test-e2e-tls-aws-412
+    rerun_command: /test 412-test-e2e-tls-aws-412
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/test-e2e-tls-aws-412-cluster-profile
+        - --target=test-e2e-tls-aws-412
+        - --variant=412
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/test-e2e-tls-aws-412-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-serverless
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )412-test-e2e-tls-aws-412,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
-    - ^release-v1\.12$
-    - ^release-v1\.12-
-    cluster: build05
+    - ^release-v1\.14$
+    - ^release-v1\.14-
+    cluster: build03
     context: ci/prow/415-images
     decorate: true
     decoration_config:
@@ -236,7 +318,7 @@ presubmits:
       ci-operator.openshift.io/variant: "415"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-v1.12-415-images
+    name: pull-ci-openshift-knative-serving-release-v1.14-415-images
     rerun_command: /test 415-images
     spec:
       containers:
@@ -283,9 +365,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-v1\.12$
-    - ^release-v1\.12-
-    cluster: build05
+    - ^release-v1\.14$
+    - ^release-v1\.14-
+    cluster: build03
     context: ci/prow/415-perf-tests-aws-415
     decorate: true
     decoration_config:
@@ -294,7 +376,7 @@ presubmits:
       ci-operator.openshift.io/variant: "415"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-v1.12-415-perf-tests-aws-415
+    name: pull-ci-openshift-knative-serving-release-v1.14-415-perf-tests-aws-415
     rerun_command: /test 415-perf-tests-aws-415
     spec:
       containers:
@@ -354,9 +436,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-v1\.12$
-    - ^release-v1\.12-
-    cluster: build05
+    - ^release-v1\.14$
+    - ^release-v1\.14-
+    cluster: build03
     context: ci/prow/415-test-e2e-aws-415
     decorate: true
     decoration_config:
@@ -365,7 +447,7 @@ presubmits:
       ci-operator.openshift.io/variant: "415"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-v1.12-415-test-e2e-aws-415
+    name: pull-ci-openshift-knative-serving-release-v1.14-415-test-e2e-aws-415
     rerun_command: /test 415-test-e2e-aws-415
     spec:
       containers:
@@ -423,11 +505,82 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )415-test-e2e-aws-415,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-v1\.14$
+    - ^release-v1\.14-
+    cluster: build03
+    context: ci/prow/415-test-e2e-tls-aws-415
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "415"
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serving-release-v1.14-415-test-e2e-tls-aws-415
+    rerun_command: /test 415-test-e2e-tls-aws-415
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=test-e2e-tls-aws-415
+        - --variant=415
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )415-test-e2e-tls-aws-415,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
-    - ^release-v1\.12$
-    - ^release-v1\.12-
-    cluster: build05
+    - ^release-v1\.14$
+    - ^release-v1\.14-
+    cluster: build03
     context: ci/prow/416-images
     decorate: true
     decoration_config:
@@ -437,7 +590,7 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.16"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-v1.12-416-images
+    name: pull-ci-openshift-knative-serving-release-v1.14-416-images
     rerun_command: /test 416-images
     spec:
       containers:
@@ -483,8 +636,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-v1\.12$
-    - ^release-v1\.12-
+    - ^release-v1\.14$
+    - ^release-v1\.14-
     cluster: build05
     context: ci/prow/416-perf-tests-aws-416
     decorate: true
@@ -497,7 +650,7 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.16"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-v1.12-416-perf-tests-aws-416
+    name: pull-ci-openshift-knative-serving-release-v1.14-416-perf-tests-aws-416
     rerun_command: /test 416-perf-tests-aws-416
     spec:
       containers:
@@ -566,8 +719,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-v1\.12$
-    - ^release-v1\.12-
+    - ^release-v1\.14$
+    - ^release-v1\.14-
     cluster: build05
     context: ci/prow/416-test-e2e-aws-416
     decorate: true
@@ -580,7 +733,7 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.16"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-v1.12-416-test-e2e-aws-416
+    name: pull-ci-openshift-knative-serving-release-v1.14-416-test-e2e-aws-416
     rerun_command: /test 416-test-e2e-aws-416
     spec:
       containers:
@@ -646,3 +799,86 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )416-test-e2e-aws-416,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-v1\.14$
+    - ^release-v1\.14-
+    cluster: build05
+    context: ci/prow/416-test-e2e-tls-aws-416
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
+      ci-operator.openshift.io/variant: "416"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.16"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serving-release-v1.14-416-test-e2e-tls-aws-416
+    rerun_command: /test 416-test-e2e-tls-aws-416
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/test-e2e-tls-aws-416-cluster-profile
+        - --target=test-e2e-tls-aws-416
+        - --variant=416
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/test-e2e-tls-aws-416-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-serverless
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )416-test-e2e-tls-aws-416,?($|\s.*)
