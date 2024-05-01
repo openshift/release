@@ -1,0 +1,86 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  ocs-ci-tests:
+    name: ocs-ci-container
+    namespace: ci
+    tag: stable
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: odf-interop-aws
+  cron: 0 6 25 10 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: aws-cspi-qe
+      FIREWATCH_CONFIG: |
+        {
+        "failure_rules":
+        [
+          {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+          {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+          {"step": "odf-prepare-cluster", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default"]},
+          {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default"]},
+          {"step": "odf-apply-storage-cluster", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default"]},
+          {"step": "interop-tests-ocs-tests", "failure_type": "pod_failure", "classification": "Test Execution",  "group": {"name": "lp-tests", "priority": 4}, "jira_additional_labels": ["!default","interop-tests"]},
+          {"step": "interop-tests-ocs-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "OCSQE", "group": {"name": "lp-tests", "priority": 4},"jira_additional_labels": ["!default","interop-tests"]}
+            ],
+          "success_rules":
+            [
+              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
+            ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.14-lp","rosa-hypershift-lp","odf-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OCM_LOGIN_ENV: staging
+      ODF_VERSION_MAJOR_MINOR: "4.14"
+      OPERATORS: |
+        [
+            {"name": "odf-operator", "install_namespace": "openshift-storage", "target_namespaces": "!install", "operator_group": "openshift-storage-operator-group"}
+        ]
+      REGION: us-west-2
+      ZONES_COUNT: "3"
+    test:
+    - ref: odf-prepare-cluster
+    - ref: install-operators
+    - ref: cucushift-hypershift-extended-health-check
+    - ref: odf-apply-storage-cluster
+    - ref: interop-tests-ocs-tests
+    workflow: firewatch-rosa-aws-sts-hypershift
+zz_generated_metadata:
+  branch: master
+  org: red-hat-storage
+  repo: ocs-ci
+  variant: odf-ocp4.14-lp-rosa-hypershift

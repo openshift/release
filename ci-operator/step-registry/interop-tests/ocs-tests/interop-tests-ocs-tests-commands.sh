@@ -32,8 +32,37 @@ mkdir -p "${LOGS_FOLDER}"
 mkdir -p "${CLUSTER_PATH}/auth"
 mkdir -p "${CLUSTER_PATH}/data"
 
-cp -v "${KUBECONFIG}"              "${CLUSTER_PATH}/auth/kubeconfig"
-cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
+CONSOLE_URL=$(cat $SHARED_DIR/console.url)
+API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
+export CONSOLE_URL
+export API_URL
+export KUBECONFIG=$SHARED_DIR/kubeconfig
+
+# login for interop testings
+if test -f ${SHARED_DIR}/kubeadmin-password
+then
+  OCP_CRED_USR="kubeadmin"
+  export OCP_CRED_USR
+  OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
+  export OCP_CRED_PSW
+  oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
+else #login for ROSA & Hypershift platforms
+  eval "$(cat "${SHARED_DIR}/api.login")"
+fi
+
+cp -v "${KUBECONFIG}" "${CLUSTER_PATH}/auth/kubeconfig"
+
+if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
+    cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
+elif [[ -s "${SHARED_DIR}/kubeadmin-password" ]]; then
+    # Recommendation from hypershift qe team in slack channel..
+    echo "Hypershift recommend"
+    cp -v "${SHARED_DIR}/kubeadmin-password" "${CLUSTER_PATH}/auth/kubeadmin-password"
+else
+    echo "Hypershift recommend..."
+    cmd=$(cat "${SHARED_DIR}/api.login")
+    echo $cmd | cut -d ' ' -f 1- | grep -o '\bHTP\w*' > "${CLUSTER_PATH}/auth/kubeadmin-password"
+fi
 
 # Create ocs-tests config overwrite file
 cat > "${LOGS_CONFIG}" << __EOF__
