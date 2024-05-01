@@ -66,6 +66,11 @@ until oc get multiclusterengines multiclusterengine-sample -ojsonpath="{.status.
   sleep 10
 done
 oc wait --timeout=20m pod -n multicluster-engine --all --for=condition=Ready
+echo "multiclusterengine upgrade successfully"
+until [[ $(oc get deployment -n hypershift operator -o jsonpath='{.status.updatedReplicas}') == $(oc get deployment -n hypershift operator -o jsonpath='{.status.replicas}') ]]; do
+    echo "Waiting for updated replicas to match replicas..."
+    sleep 10
+done
 oc wait --timeout=5m --for=condition=Available -n local-cluster ManagedClusterAddOn/hypershift-addon
 oc wait --timeout=5m --for=condition=Degraded=False -n local-cluster ManagedClusterAddOn/hypershift-addon
-echo "multiclusterengine upgrade successfully"
+echo "HyperShift operator upgrade successfully"
