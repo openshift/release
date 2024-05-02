@@ -160,17 +160,24 @@ grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${
 
 ### TODO check if we can support the following
 ### Create manifests
-#echo "Creating manifests..."
-#oinst agent create cluster-manifests
+echo "Creating manifests..."
+oinst agent create cluster-manifests
+
+mkdir -p "${ARTIFACT_DIR}/cluster-manifests/"
+mkdir -p "${INSTALL_DIR}/openshift/"
+
+cp -rT "${INSTALL_DIR}/cluster-manifests/" "${ARTIFACT_DIR}/cluster-manifests/"
+cp -rT "${INSTALL_DIR}/cluster-manifests/" "${INSTALL_DIR}/openshift/"
 
 ### Inject customized manifests
-#echo -e "\nThe following manifests will be included at installation time:"
-#find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
-#while IFS= read -r -d '' item
-#do
-#  manifest="$(basename "${item}")"
-#  cp "${item}" "${INSTALL_DIR}/cluster-manifests/${manifest##manifest_}"
-#done < <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
+# echo -e "\nThe following manifests will be included at installation time:"
+# find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
+# while IFS= read -r -d '' item
+# do
+#   manifest="$(basename "${item}")"
+#   cp "${item}" "${INSTALL_DIR}/cluster-manifests/${manifest##manifest_}"
+#   cp "${item}" "${ARTIFACT_DIR}/cluster-manifests/${manifest##manifest_}"
+# done < <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
 gnu_arch=$(echo "$architecture" | sed 's/arm64/aarch64/;s/amd64/x86_64/;')
 case "${BOOT_MODE}" in
 "iso")
