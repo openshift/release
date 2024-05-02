@@ -38,6 +38,7 @@ tests:
         set +e
         set -x
         currentCSV=$(oc get packagemanifests servicemeshoperator -o jsonpath="{range .status.channels[*]}Channel: {.name} currentCSV: {.currentCSV}{'\n'}{end}")
+        currentCSV=$(grep stable <<<"${currentCSV}" | grep -o '[^:]*$')
         catalogSource=$(oc get packagemanifests servicemeshoperator -o jsonpath={.status.catalogSource})
         catalogSourceNamespace=$(oc get packagemanifests servicemeshoperator -o jsonpath={.status.catalogSourceNamespace})
         echo "apiVersion: operators.coreos.com/v1alpha1
@@ -52,7 +53,7 @@ tests:
             source: ${catalogSource}
             sourceNamespace: ${catalogSourceNamespace}
             startingCSV: ${currentCSV}
-        " | sed -e 's/^          //' | tee >(cat 1>&2) | oc apply -f -
+        " | oc apply -f -
       from: stable:cli
       resources:
         requests:
@@ -60,6 +61,8 @@ tests:
           memory: 200Mi
     - as: central
       commands: |
+        echo "delete any existing stackrox-db"
+        kubectl -n stackrox delete persistentvolumeclaims stackrox-db || true
         curl https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common/central-cr.yaml \
           | kubectl apply -n stackrox -f -
         kubectl -n stackrox exec deploy/central -- \
