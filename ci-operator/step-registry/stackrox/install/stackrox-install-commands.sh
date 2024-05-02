@@ -135,11 +135,11 @@ function install_central() {
 
   curl -o new.central-cr.yaml "${central_cr_url}"
   curl_returncode=$?
-  if [[ $curl_returncode -eq 0 ]] && [[ $(diff central-cr.yaml new.central-cr.yaml >&2; echo $?) -eq 1 ]]; then
+  if [[ $curl_returncode -eq 0 ]] && [[ $(diff stackrox-install-central-cr.yaml new.central-cr.yaml >&2; echo $?) -eq 1 ]]; then
     echo "WARN: Change in upstream example central [${central_cr_url}]."
   fi
 
-  oc apply -f central-cr.yaml \
+  oc apply -f stackrox-install-central-cr.yaml \
     || create_example_kind central
 }
 
@@ -166,14 +166,14 @@ function install_secured_cluster() {
   echo "Create Secured-cluster resource"
   curl -o new.secured-cluster-cr.yaml "${secured_cluster_cr_url}"
   curl_returncode=$?
-  if [[ $curl_returncode -eq 0 ]] && [[ $(diff secured-cluster-cr.yaml new.secured-cluster-cr.yaml >&2; echo $?) -eq 1 ]]; then
+  if [[ $curl_returncode -eq 0 ]] && [[ $(diff stackrox-install-secured-cluster-cr.yaml new.secured-cluster-cr.yaml >&2; echo $?) -eq 1 ]]; then
     echo "WARN: Change in upstream example secured cluster [${secured_cluster_cr_url}]."
   fi
   #curl https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common/secured-cluster-cr.yaml \
   #  | oc apply -n stackrox -f -
   oc get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json \
     || {
-      oc apply -f secured-cluster-cr.yaml \
+      oc apply -f stackrox-install-secured-cluster-cr.yaml \
         || create_example_kind SecuredCluster;
     }
   for I in {1..10}; do
