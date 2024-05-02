@@ -26,70 +26,6 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: list
-      commands: oc get packagemanifests | grep security
-      from: stable:cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: install
-      commands: |
-        set +e
-        set -x
-        currentCSV=$(oc get packagemanifests servicemeshoperator -o jsonpath="{range .status.channels[*]}Channel: {.name} currentCSV: {.currentCSV}{'\n'}{end}")
-        currentCSV=$(grep stable <<<"${currentCSV}" | grep -o '[^:]*$')
-        catalogSource=$(oc get packagemanifests servicemeshoperator -o jsonpath={.status.catalogSource})
-        catalogSourceNamespace=$(oc get packagemanifests servicemeshoperator -o jsonpath={.status.catalogSourceNamespace})
-        echo "apiVersion: operators.coreos.com/v1alpha1
-          kind: Subscription
-          metadata:
-            name: advanced-cluster-security
-            namespace: stackrox
-          spec:
-            channel: stable
-            installPlanApproval: Automatic
-            name: stackrox
-            source: ${catalogSource}
-            sourceNamespace: ${catalogSourceNamespace}
-            startingCSV: ${currentCSV}
-        " | oc apply -f -
-      from: stable:cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: central
-      commands: |
-        echo "delete any existing stackrox-db"
-        kubectl -n stackrox delete persistentvolumeclaims stackrox-db || true
-        curl https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common/central-cr.yaml \
-          | kubectl apply -n stackrox -f -
-        kubectl -n stackrox exec deploy/central -- \
-          roxctl central init-bundles generate my-test-bundle --insecure-skip-tls-verify --password letmein --output-secrets - \
-          | kubectl -n stackrox apply -f -
-        kubectl -n stackrox rollout status deploy/central --timeout=10m
-        kubectl get -n stackrox centrals.platform.stackrox.io
-        kubectl get -n stackrox centrals.platform.stackrox.io stackrox-central-services --output=json
-      from: stable:cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: securedcluster
-      commands: |
-        curl https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common/secured-cluster-cr.yaml \
-          | kubectl apply -n stackrox -f -
-        for I in {1..10} do
-          kubectl get -n stackrox securedclusters.platform.stackrox.io || true
-          sleep 30
-        done
-        kubectl get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json
-      from: stable:cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
     - as: getpodstatus
       commands: oc get pods -n "stackrox"
       from: stable:cli
@@ -97,6 +33,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - ref: stackrox-install
     workflow: generic-claim
 zz_generated_metadata:
   branch: master
