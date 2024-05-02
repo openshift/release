@@ -117,7 +117,7 @@ function create_example_kind() {
 
   for (( try = 20; try > 0; try-- )); do
     oc get "$(oc get "${CSV}" -o json | jq -r '[.spec.customresourcedefinitions.owned[]|.name]|join(",")')"
-    kubectl -n stackrox rollout status deploy/"${kind,,}" --timeout=2m && break
+    oc -n stackrox rollout status deploy/"${kind,,}" --timeout=2m && break
     echo "retry, sleep ${try}"
     sleep "${try}"
   done
@@ -131,7 +131,7 @@ function install_central() {
   oc new-project stackrox
   
   echo "Delete any existing stackrox-db"
-  kubectl -n stackrox delete persistentvolumeclaims stackrox-db >/dev/null 2>&1 || true
+  oc -n stackrox delete persistentvolumeclaims stackrox-db >/dev/null 2>&1 || true
 
   curl -o new.central-cr.yaml "${central_cr_url}"
   curl_returncode=$?
@@ -150,16 +150,16 @@ function set_admin_password() {
   oc -n stackrox get secret admin-pass -o json \
     | jq --arg password "${centralAdminPasswordBase64}" \
       '.data["password"]=$password' \
-    | kubectl apply -f - ) >&2
+    | oc apply -f - ) >&2
 }
 
 function get_init_bundle() {
   echo ">>> Get init-bundle and save as a cluster secret"
   admin_password=$(oc -n stackrox get secret admin-pass -o json | jq -er '.data["password"] | @base64d')
-  kubectl -n stackrox exec deploy/central -- \
+  oc -n stackrox exec deploy/central -- \
     roxctl central init-bundles generate my-test-bundle --insecure-skip-tls-verify --password "${admin_password}" --output-secrets - \
     | tee init-bundle.yml \
-    | kubectl -n stackrox apply -f -
+    | oc -n stackrox apply -f -
 }
 
 function install_secured_cluster() {
@@ -170,55 +170,57 @@ function install_secured_cluster() {
     echo "WARN: Change in upstream example secured cluster [${secured_cluster_cr_url}]."
   fi
   #curl https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common/secured-cluster-cr.yaml \
-  #  | kubectl apply -n stackrox -f -
-  kubectl get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json \
+  #  | oc apply -n stackrox -f -
+  oc get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json \
     || {
       oc apply -f secured-cluster-cr.yaml \
         || create_example_kind SecuredCluster;
     }
   for I in {1..10}; do
-    kubectl get -n stackrox securedclusters.platform.stackrox.io && break
+    oc get -n stackrox securedclusters.platform.stackrox.io && break
     sleep 30
   done
-  kubectl get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json
+  oc get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json
 }
 
 oc delete project stackrox || true
-kubectl -n stackrox delete persistentvolumeclaims stackrox-db >/dev/null 2>&1 || true
+oc -n stackrox delete persistentvolumeclaims stackrox-db >/dev/null 2>&1 || true
 oc delete subscription -n openshift-operators --field-selector="metadata.name==rhacs-operator" || true
 #exit
 
-kubectl get crd -n openshift-operators centrals.platform.stackrox.io \
+oc get crd -n openshift-operators centrals.platform.stackrox.io \
   || install_operator
 #oc get subs -n openshift-operators
-#kubectl get crd -n openshift-operators centrals.platform.stackrox.io
+#oc get crd -n openshift-operators centrals.platform.stackrox.io
 
-kubectl -n stackrox rollout status deploy/central --timeout=30s \
+oc -n stackrox rollout status deploy/central --timeout=30s \
   || install_central
 
 for (( i = 0; i < 5; i++ )); do
-  kubectl -n stackrox get deploy/central -o json \
+  oc -n stackrox get deploy/central -o json \
     | jq -er '.status|(.replicas == .readyReplicas)' && break
   echo "retry:${i} (sleep 30s)"
   sleep 30
 done
 oc get deployments -n stackrox
 
-set_admin_password
+#set_admin_password
 
 get_init_bundle
 
 oc -n stackrox get routes central || true
-while ! oc -n stackrox get routes central -o json | jq -r '.spec.host'; do
-  echo no route?
-  sleep 10
-done
+#for I in {1..10}; do
+#  oc -n stackrox get routes central -o json \
+#    | jq -er '.spec.host' && break
+#  echo "no route? [try ${I}/10]"
+#  sleep 10
+#done
 
 oc get pods -n "stackrox"
 
 oc logs -n stackrox --selector="app==central" --pod-running-timeout=20s --tail=10000
 
-kubectl events -n stackrox --types=Warning
+oc events -n stackrox --types=Warning
 
 #sleep 300
 oc get pods -n "stackrox"
