@@ -42,8 +42,6 @@ else
   echo "Cannot login! You need to specify the offline token OCM_TOKEN!"
   exit 1
 fi
-AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
-AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
 # Variables
 if [[ -z "$TEST_PROFILE" ]]; then
@@ -61,10 +59,9 @@ junit_xml="${TEST_PROFILE}-$(date +%m%d%s).xml"
 rosatest --ginkgo.v --ginkgo.no-color \
   --ginkgo.timeout ${TEST_TIMEOUT} \
   --ginkgo.junit-report "${ARTIFACT_DIR}/$junit_xml" \
-  ${LABEL_FILTER_SWITCH} \
-  | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" || true
+  ${LABEL_FILTER_SWITCH}
 
-echo "$junit_xml" > "${SHARED_DIR}/junit-report-list"
+# echo "$junit_xml" > "${SHARED_DIR}/junit-report-list"
 
-log "INFO: Generate report portal report ..."
-rosatest --ginkgo.v --ginkgo.no-color --ginkgo.timeout "10m" --ginkgo.label-filter "e2e-report"
+# log "INFO: Generate report portal report ..."
+# rosatest --ginkgo.v --ginkgo.no-color --ginkgo.timeout "10m" --ginkgo.label-filter "e2e-report"
