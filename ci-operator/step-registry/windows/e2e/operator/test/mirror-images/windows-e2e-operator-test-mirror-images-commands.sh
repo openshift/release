@@ -30,7 +30,35 @@ echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
 # unset KUBECONFIG to ensure this step always interact with the build farm.
 #unset KUBECONFIG
 
-# Create list of images required to run the Windows e2e test suite
+registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
+
+jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
+
+# ---------------------------------------------------------------------------------------------
+# Mirror operator image from CI namespace in build farm to emphemeral test cluster
+wmco_image_src="registry.apps.build02.vmc.ci.openshift.org/${NAMESPACE}/pipeline"
+wmco_image_dst="${MIRROR_REGISTRY_HOST}/pipeline"
+
+oc image mirror "${wmco_image_src}" "${wmco_image_dst}" -a "${new_pull_secret}" \
+ --skip-verification=true --keep-manifest-list=true --filter-by-os='.*'
+
+idms_content="apiVersion: config.openshift.io/v1\n"
+idms_content+="kind: ImageDigestMirrorSet\n"
+idms_content+="metadata:\n"
+idms_content+="  name: wmco-e2e-digestmirrorset\n"
+idms_content+="spec:\n"
+idms_content+="  imageDigestMirrors:\n"
+idms_content+="  - mirrors:\n"
+idms_content+="    - ${wmco_image_dst}\n"
+idms_content+="    source: ${wmco_image_src}\n"
+
+echo -e "$idms_content" > "/tmp/image-digest-mirror-set.yaml"
+run_command "cat /tmp/image-digest-mirror-set.yaml"
+
+run_command "oc create -f /tmp/image-digest-mirror-set.yaml"
+
+# ---------------------------------------------------------------------------------------------
+# Create list of source/mirror destination pairs for all images required to run the Windows e2e test suite
 cat <<EOF > "/tmp/mirror-images-list.yaml"
 mcr.microsoft.com/oss/kubernetes/pause:3.9=MIRROR_REGISTRY_PLACEHOLDER/oss/kubernetes/pause:3.9
 mcr.microsoft.com/powershell:lts-nanoserver-1809=MIRROR_REGISTRY_PLACEHOLDER/powershell:lts-nanoserver-1809
@@ -38,16 +66,12 @@ mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022=MIRROR_REGISTRY_PLACEHOLDER
 quay.io/operator-framework/upstream-registry-builder:v1.16.0=MIRROR_REGISTRY_PLACEHOLDER/operator-framework/upstream-registry-builder:v1.16.0
 EOF
 
-registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
-
-jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
-
 sed -i "s/MIRROR_REGISTRY_PLACEHOLDER/${MIRROR_REGISTRY_HOST}/g" "/tmp/mirror-images-list.yaml"
 
 itms_content="apiVersion: config.openshift.io/v1\n"
 itms_content+="kind: ImageTagMirrorSet\n"
 itms_content+="metadata:\n"
-itms_content+="  name: wmco-e2e-mirrorset\n"
+itms_content+="  name: wmco-e2e-tagmirrorset\n"
 itms_content+="spec:\n"
 itms_content+="  imageTagMirrors:\n"
 
