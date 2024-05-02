@@ -107,10 +107,10 @@ export OPENSHIFT_VERSION
 
 RHCOS_BUILD_VERSION=$(cat ocpversion.json | jq -r '.displayVersions."machine-os".Version')
 export RHCOS_BUILD_VERSION
-echo $RHCOS_BUILD_VERSION
+echo "Using RHCOS Build Version $RHCOS_BUILD_VERSION"
 
 RHCOS_VERSION=$(echo $RHCOS_BUILD_VERSION | awk -F '.' '{printf "%d.%d-%d.%d\n", substr($1,1,1), substr($1,2), substr($2,1,1), substr($2,2)}')
-echo $RHCOS_VERSION
+echo "Using RHCOS Version $RHCOS_VERSION"
 
 export ISO_URL="https://rhcos.mirror.openshift.com/art/storage/prod/streams/${RHCOS_VERSION}/builds/${RHCOS_BUILD_VERSION}/s390x/rhcos-${RHCOS_BUILD_VERSION}-live.s390x.iso"
 export ROOT_FS_URL="https://rhcos.mirror.openshift.com/art/storage/prod/streams/${RHCOS_VERSION}/builds/${RHCOS_BUILD_VERSION}/s390x/rhcos-${RHCOS_BUILD_VERSION}-live-rootfs.s390x.img"
@@ -138,8 +138,8 @@ spec:
       requests:
         storage: 10Gi
   osImages:
-    - openshiftVersion: "${OCP_VERSION}"
-      version: "${OCP_RELEASE_VERSION}"
+    - openshiftVersion: "${OPENSHIFT_VERSION}"
+      version: "${RHCOS_BUILD_VERSION}"
       url: "${ISO_URL}"
       rootFSUrl: "${ROOT_FS_URL}"
       cpuArchitecture: s390x
