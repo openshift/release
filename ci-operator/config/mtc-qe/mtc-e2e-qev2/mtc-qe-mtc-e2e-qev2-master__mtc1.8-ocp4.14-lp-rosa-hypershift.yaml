@@ -15,6 +15,10 @@ base_images:
     name: openshift-cli-installer
     namespace: ci
     tag: latest
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
@@ -54,8 +58,8 @@ tests:
   steps:
     cluster_profile: aws-cspi-qe
     env:
-      CLUSTER1_CONFIG: name-prefix=mtc-source;platform=rosa;region=us-east-2;version=4.14;channel-group=stable;compute-machine-type=m5.xlarge;timeout=2h;replicas=2
-      CLUSTER2_CONFIG: name-prefix=mtc-target;platform=rosa;region=us-east-2;version=4.15;channel-group=stable;compute-machine-type=m5.xlarge;timeout=2h;replicas=2
+      CLUSTER1_CONFIG: name-prefix=mtc-source;platform=hypershift;region=us-west-2;version=4.14;channel-group=stable;compute-machine-type=m5.xlarge;timeout=2h;replicas=2
+      CLUSTER2_CONFIG: name-prefix=mtc-target;platform=hypershift;region=us-west-2;version=4.15;channel-group=stable;compute-machine-type=m5.xlarge;timeout=2h;replicas=2
       FIREWATCH_CONFIG: |
         {
         "failure_rules":
@@ -72,21 +76,21 @@ tests:
           {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
         ]
         }
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.14-lp","rosa-lp","mtc-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.14-lp","rosa-hypershift-lp","mtc-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       MTC_VERSION: "1.8"
       PULL_SECRET_NAME: pull-secret
       S3_BUCKET_NAME: openshift-cli-installer-cspi-interop
       S3_BUCKET_PATH: openshift-ci
-      TEST_PLATFORM: rosa
+      TEST_PLATFORM: hypershift
     test:
     - ref: mtc-prepare-clusters
-    - ref: cucushift-installer-check-cluster-health
+    - ref: cucushift-hypershift-extended-health-check
     - ref: mtc-execute-tests
     workflow: firewatch-cluster
 zz_generated_metadata:
   branch: master
   org: mtc-qe
   repo: mtc-e2e-qev2
-  variant: mtc1.8-ocp4.14-lp-rosa-classic
+  variant: mtc1.8-ocp4.14-lp-rosa-hypershift
