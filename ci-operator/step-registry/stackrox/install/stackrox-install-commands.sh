@@ -179,6 +179,7 @@ function install_secured_cluster() {
   for I in {1..10}; do
     oc get -n stackrox securedclusters.platform.stackrox.io && break
     sleep 30
+    echo "retry ${I}"
   done
   oc get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json
 }
