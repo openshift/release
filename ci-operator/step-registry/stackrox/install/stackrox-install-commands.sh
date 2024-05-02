@@ -14,6 +14,9 @@ Install ACS into a single cluster.
 EOF
 
 set -vx
+echo "${SHARED_DIR:-}"
+pwd
+ls -la
 
 example_cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
 central_cr_url=${example_cr_url}/central-cr.yaml 
@@ -72,6 +75,101 @@ oc login "${url}" -u "${user}" -p "${password}"
 oc get clusteroperators || true
 oc get csr -o name
 
+cat <<EOF | tee central-cr.yaml
+apiVersion: platform.stackrox.io/v1alpha1
+kind: Central
+metadata:
+  name: stackrox-central-services
+spec:
+  imagePullSecrets:
+  - name: e2e-test-pull-secret
+  # Resource settings should be in sync with /deploy/common/local-dev-values.yaml
+  central:
+    adminPasswordSecret:
+      name: admin-pass
+    resources:
+      requests:
+        memory: 1Gi
+        cpu: 500m
+      limits:
+        memory: 4Gi
+        cpu: 1
+    db:
+      resources:
+        requests:
+          memory: 1Gi
+          cpu: 500m
+        limits:
+          memory: 4Gi
+          cpu: 1
+    telemetry:
+      enabled: false
+  scanner:
+    analyzer:
+      scaling:
+        autoScaling: Disabled
+        replicas: 1
+      resources:
+        requests:
+          memory: 500Mi
+          cpu: 500m
+        limits:
+          memory: 2500Mi
+          cpu: 2000m
+    db:
+      resources:
+        requests:
+          cpu: 400m
+          memory: 512Mi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-pass
+data:
+  # letmein
+  password: bGV0bWVpbg==
+EOF
+
+cat <<EOF | tee secured-cluster-cr.yaml
+apiVersion: platform.stackrox.io/v1alpha1
+kind: SecuredCluster
+metadata:
+  name: stackrox-secured-cluster-services
+spec:
+  clusterName: testing-cluster
+  imagePullSecrets:
+  - name: e2e-test-pull-secret
+  admissionControl:
+    resources:
+      requests:
+        memory: 100Mi
+        cpu: 100m
+  sensor:
+    resources:
+      requests:
+        memory: 100Mi
+        cpu: 100m
+  perNode:
+    collector:
+      resources:
+        requests:
+          memory: 100Mi
+          cpu: 100m
+    compliance:
+      resources:
+        requests:
+          memory: 100Mi
+          cpu: 100m
+    nodeInventory:
+      resources:
+        requests:
+          memory: 100Mi
+          cpu: 100m
+EOF
 
 function install_operator() {
   echo ">>> Install rhacs-operator"
@@ -135,11 +233,11 @@ function install_central() {
 
   curl -o new.central-cr.yaml "${central_cr_url}"
   curl_returncode=$?
-  if [[ $curl_returncode -eq 0 ]] && [[ $(diff stackrox-install-central-cr.yaml new.central-cr.yaml >&2; echo $?) -eq 1 ]]; then
+  if [[ $curl_returncode -eq 0 ]] && [[ $(diff central-cr.yaml new.central-cr.yaml >&2; echo $?) -eq 1 ]]; then
     echo "WARN: Change in upstream example central [${central_cr_url}]."
   fi
 
-  oc apply -f stackrox-install-central-cr.yaml \
+  oc apply -f central-cr.yaml \
     || create_example_kind central
 }
 
@@ -166,14 +264,14 @@ function install_secured_cluster() {
   echo "Create Secured-cluster resource"
   curl -o new.secured-cluster-cr.yaml "${secured_cluster_cr_url}"
   curl_returncode=$?
-  if [[ $curl_returncode -eq 0 ]] && [[ $(diff stackrox-install-secured-cluster-cr.yaml new.secured-cluster-cr.yaml >&2; echo $?) -eq 1 ]]; then
+  if [[ $curl_returncode -eq 0 ]] && [[ $(diff secured-cluster-cr.yaml new.secured-cluster-cr.yaml >&2; echo $?) -eq 1 ]]; then
     echo "WARN: Change in upstream example secured cluster [${secured_cluster_cr_url}]."
   fi
   #curl https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common/secured-cluster-cr.yaml \
   #  | oc apply -n stackrox -f -
   oc get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json \
     || {
-      oc apply -f stackrox-install-secured-cluster-cr.yaml \
+      oc apply -f secured-cluster-cr.yaml \
         || create_example_kind SecuredCluster;
     }
   for I in {1..10}; do
@@ -183,6 +281,7 @@ function install_secured_cluster() {
   done
   oc get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json
 }
+
 
 oc delete project stackrox || true
 oc -n stackrox delete persistentvolumeclaims stackrox-db >/dev/null 2>&1 || true
@@ -225,3 +324,5 @@ oc events -n stackrox --types=Warning
 
 #sleep 300
 oc get pods -n "stackrox"
+
+
