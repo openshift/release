@@ -70,7 +70,7 @@ Parameters:
     ConstraintDescription: Machinename
     Description: Machinename
     Type: String
-    Default: topolvm-host-testbed-ec2-instance
+    Default: topolvm-ec2-instance
   HostInstanceType:
     Default: t2.medium
     Type: String
