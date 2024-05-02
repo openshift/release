@@ -8,10 +8,10 @@ DEBUG_OUTPUT=/tmp/log.txt
 export ACS__API_TOKEN \
   ACS__CENTRAL_ENDPOINT \
   DEVELOPER_HUB__CATALOG__URL \
-  GITHUB__APP__APP_ID GITHUB__APP__CLIENT_ID \
-  GITHUB__APP__CLIENT_SECRET \
-  GITHUB__APP__WEBHOOK_SECRET \
-  GITHUB__APP__WEBHOOK_URL \
+  GITHUB__APP__ID \
+  GITHUB__APP__CLIENT__ID \
+  GITHUB__APP__CLIENT__SECRET \
+  GITHUB__APP__WEBHOOK__SECRET \
   GITHUB__APP__PRIVATE_KEY \
   GITOPS__GIT_TOKEN \
   QUAY__DOCKERCONFIGJSON \
@@ -39,7 +39,9 @@ export ACS__API_TOKEN \
   RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES \
   RHTAP_ENABLE_TPA \
   RED_HAT_DEVELOPER_HUB_URL \
-  GITHUB_TOKEN \
+  GITHUB__TOKEN \
+  GITLAB__APP__CLIENT__ID \
+  GITLAB__APP__CLIENT__SECRET \
   GITHUB_ORGANIZATION QUAY_IMAGE_ORG \
   APPLICATION_ROOT_NAMESPACE \
   NODE_TLS_REJECT_UNAUTHORIZED
@@ -58,10 +60,10 @@ env | grep '^RHTAP_ENABLE'
 ACS__API_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-api-token)
 ACS__CENTRAL_ENDPOINT=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-central-endpoint)
 DEVELOPER_HUB__CATALOG__URL=https://github.com/redhat-appstudio/tssc-sample-templates/blob/main/all.yaml
-GITHUB__APP__APP_ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-app-id)
-GITHUB__APP__CLIENT_ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-id)
-GITHUB__APP__CLIENT_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-secret)
-GITHUB__APP__WEBHOOK_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-webhook-secret)
+GITHUB__APP__ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-app-id)
+GITHUB__APP__CLIENT__ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-id)
+GITHUB__APP__CLIENT__SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-secret)
+GITHUB__APP__WEBHOOK__SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-webhook-secret)
 GITHUB__APP__PRIVATE_KEY=$(base64 -d < /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-private-key)
 GITOPS__GIT_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
 QUAY__DOCKERCONFIGJSON=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhtap_quay_ci_token)
@@ -182,7 +184,7 @@ e2e_test(){
   APPLICATION_ROOT_NAMESPACE="rhtap-app"
   QUAY_IMAGE_ORG="rhtap_qe"
   GITHUB_ORGANIZATION="rhtap-rhdh-qe"
-  GITHUB_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
+  GITHUB__TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
   RED_HAT_DEVELOPER_HUB_URL=https://"$(oc get route redhat-developer-hub -n $NAMESPACE -o jsonpath='{.spec.host}')"
 
   cd "$(mktemp -d)"
