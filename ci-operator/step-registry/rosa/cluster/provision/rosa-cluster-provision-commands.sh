@@ -325,7 +325,7 @@ if [[ "$HOSTED_CP" == "true" ]]; then
         exit 1
       fi
     fi
-    PROVISION_SHARD_ID=$(echo "$psList" | head -n 1)
+    PROVISION_SHARD_ID="3224f848-07de-11ef-a7c1-0a580a8204cc"
 
     HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
     record_cluster "properties" "provision_shard_id" ${PROVISION_SHARD_ID}
