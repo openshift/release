@@ -14,7 +14,7 @@ Install ACS into a single cluster.
 EOF
 
 set -vx
-echo "${SHARED_DIR:-}"
+cd "${SHARED_DIR:-}"
 pwd
 ls -la
 
@@ -27,7 +27,7 @@ export SHARED_DIR=${SHARED_DIR:-}
 export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 
 if [[ ! -f "${KUBECONFIG}" ]] || ! oc api-versions >/dev/null 2>&1; then
-  cluster_name=${1:-$(tail -1 /tmp/testing_cluster.txt)}
+  cluster_name=${1:-$(tail -1 /tmp/testing_cluster.txt || true)}
   SHARED_DIR=/tmp/${cluster_name}
   export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
@@ -57,21 +57,23 @@ if [[ ! -f "${KUBECONFIG}" ]] || ! oc api-versions >/dev/null 2>&1; then
       sleep "${i}"
     done
   fi
+  if [[ -f "${SHARED_DIR}"/dotenv ]]; then
+    (
+    set +e
+    source "${SHARED_DIR}"/dotenv
+    url=${API_ENDPOINT} #$(cat "${SHARED_DIR}/cluster-console-url")
+    echo $url
+    user=${CONSOLE_USER} #$(cat "${SHARED_DIR}/cluster-console-username")
+    echo $user
+    password=${CONSOLE_PASSWORD} #$(cat "${SHARED_DIR}/cluster-console-password")
+    echo $password
+    oc login "${url}" -u "${user}" -p "${password}"
+    )
+  fi
   
   echo "${cluster_name}" | tee /tmp/testing_cluster.txt
 fi
 ls -la "${SHARED_DIR}"
-(
-set +e
-source "${SHARED_DIR}"/dotenv
-url=${API_ENDPOINT} #$(cat "${SHARED_DIR}/cluster-console-url")
-echo $url
-user=${CONSOLE_USER} #$(cat "${SHARED_DIR}/cluster-console-username")
-echo $user
-password=${CONSOLE_PASSWORD} #$(cat "${SHARED_DIR}/cluster-console-password")
-echo $password
-oc login "${url}" -u "${user}" -p "${password}"
-)
 oc get clusteroperators || true
 oc get csr -o name
 
