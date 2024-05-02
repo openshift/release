@@ -316,7 +316,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
-        Ingress
       BASE_DOMAIN: qe.devcluster.openshift.com
       BASELINE_CAPABILITY_SET: None
       COMPUTE_NODE_TYPE: m6g.xlarge
@@ -339,7 +338,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
-        Ingress
       BASE_DOMAIN: qe.devcluster.openshift.com
       BASELINE_CAPABILITY_SET: None
       E2E_RUN_TAGS: '@disconnected'
@@ -571,6 +569,22 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-efs
+- as: aws-ipi-ovn-efs-fips-amd-f14-destructive-ui
+  cron: 45 19 8,22 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.16
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FEATURE_GATES: '[InstallAlternateInfrastructureAWS=true]'
+      FEATURE_SET: CustomNoUpgrade
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-e2e-test-qe-ui-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-efs
 - as: aws-ipi-ovn-ipsec-amd-mixarch-f9-destructive
   cron: 18 5 1,10,22 * *
   steps:
@@ -749,7 +763,7 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager Ingress
+      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager
       BASE_DOMAIN: qe.devcluster.openshift.com
       BASELINE_CAPABILITY_SET: None
       PERSISTENT_MONITORING: "false"
@@ -763,7 +777,7 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager Ingress
+      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager
       BASE_DOMAIN: qe.devcluster.openshift.com
       BASELINE_CAPABILITY_SET: None
       BOOTSTRAP_INSTANCE_TYPE: m6g.large
@@ -859,7 +873,7 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager Ingress
+      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       PERSISTENT_MONITORING: "false"
     test:
@@ -872,7 +886,7 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager Ingress
+      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
@@ -1540,7 +1554,7 @@ tests:
       MULTI_RELEASE_IMAGE: release:multi-latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: baremetal MachineAPI Ingress
+      ADDITIONAL_ENABLED_CAPABILITIES: baremetal MachineAPI
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       BASELINE_CAPABILITY_SET: None
       DISCONNECTED: "false"

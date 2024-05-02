@@ -1,16 +1,4 @@
 base_images:
-  ocp_4.16_etcd:
-    name: "4.16"
-    namespace: ocp
-    tag: etcd
-  ocp_4.16_hyperkube:
-    name: "4.16"
-    namespace: ocp
-    tag: hyperkube
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
@@ -29,41 +17,38 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.21-openshift-4.16
 images:
-- context_dir: images/installer-altinfra
-  dockerfile_path: Dockerfile.ci
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/baremetal/Dockerfile.ci
   from: origin_scos-4.16_base-stream8
   inputs:
-    ocp_4.16_etcd:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:etcd
-    ocp_4.16_hyperkube:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:hyperkube
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: installer-altinfra
-- context_dir: images/installer-artifacts
-  dockerfile_path: Dockerfile.rhel
+  to: baremetal-installer
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: origin_scos-4.16_base-stream8
   inputs:
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
     origin_scos-4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
   to: installer-artifacts
-- context_dir: images/installer
-  dockerfile_path: Dockerfile.ci
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/installer/Dockerfile.ci
   from: origin_scos-4.16_base-stream8
   inputs:
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
     origin_scos-4.16_installer-terraform-providers:
       as:
       - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
