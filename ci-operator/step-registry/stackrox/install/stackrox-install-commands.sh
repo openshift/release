@@ -242,7 +242,7 @@ function install_central() {
 
   curl -o new.central-cr.yaml "${central_cr_url}"
   curl_returncode=$?
-  if [[ ${curl_returncode} -eq 0 ]] && [[ $(diff central-cr.yaml new.central-cr.yaml >&2; echo $?) -eq 1 ]]; then
+  if [[ ${curl_returncode} -eq 0 ]] && [[ $(diff central-cr.yaml new.central-cr.yaml | grep -v password >&2; echo $?) -eq 1 ]]; then
     echo "WARN: Change in upstream example central [${central_cr_url}]."
   fi
 
