@@ -301,10 +301,9 @@ sshKey: |
   $(<"${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key")
 EOF
 
-# Fetching the installer binary
-echo "Fetching openshift-install binary"
-wget -q -O $HOME/openshift-install.tar.gz https://mirror.openshift.com/pub/openshift-v4/s390x/clients/ocp/latest/openshift-install-linux-amd64.tar.gz
-tar -xzf $HOME/openshift-install.tar.gz -C $HOME/$CLUSTER_NAME/
+# Extracting the installer binary
+echo "Extracting the openshift-install binary"
+oc adm release extract -a $HOME/abi-pull-secret-compact --command openshift-install $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE --to=$HOME/$CLUSTER_NAME/
 
 # Generate PXE artifacts
 echo "Generating pxe-boot artifacts for SNO cluster"
