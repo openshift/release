@@ -321,15 +321,15 @@ function install_secured_cluster() {
   oc get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json
 }
 
+oc get crd -n openshift-operators centrals.platform.stackrox.io \
+  || install_operator
+
 echo "Wait for ACS operator controller"
 for (( i = 0; i < 5; i++ )); do
   oc get pods -A -lapp==rhacs-operator,control-plane=controller-manager && break || true
   echo "retry:${i} (sleep 10s)"
   sleep 10
 done
-
-oc get crd -n openshift-operators centrals.platform.stackrox.io \
-  || install_operator
 
 function oc_wait_for_condition_created() {
   for (( i = 0; i < 5; i++ )); do
