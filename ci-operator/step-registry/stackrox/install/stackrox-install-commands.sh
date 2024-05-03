@@ -96,7 +96,7 @@ function uninstall_acs() {
   oc -n stackrox delete persistentvolumeclaims stackrox-db --wait >/dev/null 2>&1 || true
   oc delete subscription -n openshift-operators --field-selector="metadata.name==rhacs-operator" --wait || true
 }
-#uninstall_acs
+uninstall_acs
 
 ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
@@ -381,8 +381,9 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   echo ">>> Wait for replicas"
   oc get deployments -n stackrox
   wait_deploy_replicas central-db
-  wait_deploy_replicas sensor
   wait_deploy_replicas scanner
+  wait_deploy_replicas scanner-db
+  wait_deploy_replicas sensor
   wait_deploy_replicas admission-control
   
   oc -n stackrox get routes central && echo "Warning: routes found" || true
