@@ -96,7 +96,7 @@ function uninstall_acs() {
   oc -n stackrox delete persistentvolumeclaims stackrox-db --wait >/dev/null 2>&1 || true
   oc delete subscription -n openshift-operators --field-selector="metadata.name==rhacs-operator" --wait || true
 }
-uninstall_acs
+#uninstall_acs
 
 ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
@@ -351,7 +351,7 @@ function wait_deploy_replicas() {
 }
 
 
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   oc get crd -n openshift-operators centrals.platform.stackrox.io \
     || install_operator
   
