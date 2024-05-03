@@ -247,6 +247,13 @@ function install_central() {
   echo "Delete any existing stackrox-db"
   oc -n stackrox delete persistentvolumeclaims stackrox-db >/dev/null 2>&1 || true
 
+  echo "Wait for pods in stackrox namespace"
+  for (( try = 20; try > 0; try-- )); do
+    oc get pods -n "stackrox" && break || true
+    echo "retry, sleep ${try}"
+    sleep "${try}"
+  done
+
   curl -o new.central-cr.yaml "${central_cr_url}"
   curl_returncode=$?
   if [[ ${curl_returncode} -eq 0 ]] && [[ $(diff central-cr.yaml new.central-cr.yaml | grep -v password >&2; echo $?) -eq 1 ]]; then
