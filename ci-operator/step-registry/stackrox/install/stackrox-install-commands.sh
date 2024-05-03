@@ -3,7 +3,7 @@
 set -eou pipefail
 
 cat <<EOF
-Install ACS into a single cluster.
+Install ACS into a single cluster [$(date -u)].
 * Subscribe to rhacs-operator
 * In new namespace "stackrox",
   * Create central custom resource
@@ -13,18 +13,24 @@ Install ACS into a single cluster.
   * Wait for all services minimal running state.
 EOF
 
-set -vx
-cd "${SHARED_DIR:-}"
-pwd
-ls -la
-
 example_cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
 central_cr_url=${example_cr_url}/central-cr.yaml 
 secured_cluster_cr_url=${example_cr_url}/secured-cluster-cr.yaml 
-admin_password=letmein
 
 export SHARED_DIR=${SHARED_DIR:-}
 export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
+
+function exit_handler() {
+  echo ">>> End ACS install [$(date -u)]"
+  echo "KUBECONFIG=${KUBECONFIG}"
+  set -x
+  oc logs -n stackrox --selector="app==central" --pod-running-timeout=1s --tail=20
+  oc events -n stackrox --types=Warning
+  oc get pods -n "stackrox"
+}
+trap 'exit_handler' EXIT
+trap 'test ${BASH_COMMAND:0:2} == "oc" && echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
+
 
 if [[ ! -f "${KUBECONFIG}" ]] || ! oc api-versions >/dev/null 2>&1; then
   cluster_name=${1:-$(tail -1 /tmp/testing_cluster.txt || true)}
@@ -37,12 +43,11 @@ if [[ ! -f "${KUBECONFIG}" ]] || ! oc api-versions >/dev/null 2>&1; then
       cluster_name=${cluster_names%% *}
     else
       select cluster_name in ${cluster_names}; do
-        echo "you picked ${cluster_name}"
         break;
       done
     fi
     SHARED_DIR=/tmp/${cluster_name}
-    export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
+    export KUBECONFIG=${SHARED_DIR}/kubeconfig
   fi
   
   if [[ ! -f "${KUBECONFIG}" ]]; then
@@ -57,27 +62,30 @@ if [[ ! -f "${KUBECONFIG}" ]] || ! oc api-versions >/dev/null 2>&1; then
       sleep "${i}"
     done
   fi
-  if [[ -f "${SHARED_DIR}"/dotenv ]]; then
-    (
-    set +e
-    source "${SHARED_DIR}"/dotenv
-    url=${API_ENDPOINT} #$(cat "${SHARED_DIR}/cluster-console-url")
-    echo $url
-    user=${CONSOLE_USER} #$(cat "${SHARED_DIR}/cluster-console-username")
-    echo $user
-    password=${CONSOLE_PASSWORD} #$(cat "${SHARED_DIR}/cluster-console-password")
-    echo $password
-    oc login "${url}" -u "${user}" -p "${password}"
-    )
-  fi
+  ( source "${SHARED_DIR}"/dotenv || true
+    if [[ -n "${API_ENDPOINT:-}" ]]; then
+      oc login "${API_ENDPOINT}" -u "${CONSOLE_USER:-admin}" -p "${CONSOLE_PASSWORD:-letmein}" || true
+    fi
+  )
   
   echo "${cluster_name}" | tee /tmp/testing_cluster.txt
 fi
+cd "${SHARED_DIR:-}"
+pwd
 ls -la "${SHARED_DIR}"
 oc get clusteroperators || true
 oc get csr -o name
 
-cat <<EOF | tee central-cr.yaml
+function uninstall_acs() {
+  oc delete project stackrox || true
+  oc -n stackrox delete persistentvolumeclaims stackrox-db >/dev/null 2>&1 || true
+  oc delete subscription -n openshift-operators --field-selector="metadata.name==rhacs-operator" || true
+}
+uninstall_acs
+
+ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
+centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
+cat <<EOF > central-cr.yaml
 apiVersion: platform.stackrox.io/v1alpha1
 kind: Central
 metadata:
@@ -132,11 +140,10 @@ kind: Secret
 metadata:
   name: admin-pass
 data:
-  # letmein
-  password: bGV0bWVpbg==
+  password: ${centralAdminPasswordBase64}
 EOF
 
-cat <<EOF | tee secured-cluster-cr.yaml
+cat <<EOF > secured-cluster-cr.yaml
 apiVersion: platform.stackrox.io/v1alpha1
 kind: SecuredCluster
 metadata:
@@ -235,7 +242,7 @@ function install_central() {
 
   curl -o new.central-cr.yaml "${central_cr_url}"
   curl_returncode=$?
-  if [[ $curl_returncode -eq 0 ]] && [[ $(diff central-cr.yaml new.central-cr.yaml >&2; echo $?) -eq 1 ]]; then
+  if [[ ${curl_returncode} -eq 0 ]] && [[ $(diff central-cr.yaml new.central-cr.yaml >&2; echo $?) -eq 1 ]]; then
     echo "WARN: Change in upstream example central [${central_cr_url}]."
   fi
 
@@ -244,33 +251,36 @@ function install_central() {
 }
 
 function set_admin_password() {
-  ( set +vx
   ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
-  centralAdminPasswordBase64="$(echo "$ROX_PASSWORD" | base64)"
+  centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
   oc -n stackrox get secret admin-pass -o json \
     | jq --arg password "${centralAdminPasswordBase64}" \
       '.data["password"]=$password' \
-    | oc apply -f - ) >&2
+    | oc apply -f -
 }
 
 function get_init_bundle() {
+  # global ROX_PASSWORD
   echo ">>> Get init-bundle and save as a cluster secret"
-  admin_password=$(oc -n stackrox get secret admin-pass -o json | jq -er '.data["password"] | @base64d')
-  oc -n stackrox exec deploy/central -- \
-    roxctl central init-bundles generate my-test-bundle --insecure-skip-tls-verify --password "${admin_password}" --output-secrets - \
-    | tee init-bundle.yml \
-    | oc -n stackrox apply -f -
+  ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json | jq -er '.data["password"] | @base64d')
+  oc -n stackrox get secret collector-tls && return
+  for (( i = 0; i < 5; i++ )); do
+    oc -n stackrox exec deploy/central -- \
+      roxctl central init-bundles generate my-test-bundle --insecure-skip-tls-verify --password "${ROX_PASSWORD}" --output-secrets - \
+      | tee init-bundle.yml \
+      | oc -n stackrox apply -f - && break
+    echo "retry:${i} (sleep 10s)"
+    sleep 10
+  done
 }
 
 function install_secured_cluster() {
   echo "Create Secured-cluster resource"
   curl -o new.secured-cluster-cr.yaml "${secured_cluster_cr_url}"
   curl_returncode=$?
-  if [[ $curl_returncode -eq 0 ]] && [[ $(diff secured-cluster-cr.yaml new.secured-cluster-cr.yaml >&2; echo $?) -eq 1 ]]; then
+  if [[ ${curl_returncode} -eq 0 ]] && [[ $(diff secured-cluster-cr.yaml new.secured-cluster-cr.yaml >&2; echo $?) -eq 1 ]]; then
     echo "WARN: Change in upstream example secured cluster [${secured_cluster_cr_url}]."
   fi
-  #curl https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common/secured-cluster-cr.yaml \
-  #  | oc apply -n stackrox -f -
   oc get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json \
     || {
       oc apply -f secured-cluster-cr.yaml \
@@ -284,17 +294,20 @@ function install_secured_cluster() {
   oc get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json
 }
 
-
-oc delete project stackrox || true
-oc -n stackrox delete persistentvolumeclaims stackrox-db >/dev/null 2>&1 || true
-oc delete subscription -n openshift-operators --field-selector="metadata.name==rhacs-operator" || true
-#exit
-
 oc get crd -n openshift-operators centrals.platform.stackrox.io \
   || install_operator
-#oc get subs -n openshift-operators
-#oc get crd -n openshift-operators centrals.platform.stackrox.io
 
+function oc_wait_for_condition_created() {
+  for (( i = 0; i < 5; i++ )); do
+    oc wait --for condition=established --timeout=120s "${@}" \
+      && break
+    echo "retry:${i} (sleep 30s)"
+    sleep 30
+  done
+}
+oc_wait_for_condition_created crd centrals.platform.stackrox.io
+oc get crd -n openshift-operators \
+  | grep 'platform.stackrox.io'
 oc -n stackrox rollout status deploy/central --timeout=30s \
   || install_central
 
@@ -302,13 +315,19 @@ for (( i = 0; i < 5; i++ )); do
   oc -n stackrox get deploy/central -o json \
     | jq -er '.status|(.replicas == .readyReplicas)' && break
   echo "retry:${i} (sleep 30s)"
+  if [[ $i -eq 5 ]]; then
+    echo "Central bad state."
+  fi
   sleep 30
 done
 oc get deployments -n stackrox
 
 #set_admin_password
-
 get_init_bundle
+
+oc_wait_for_condition_created crd secured-clusters.platform.stackrox.io
+oc -n stackrox rollout status deploy/secured-cluster --timeout=30s \
+  || install_secured_cluster
 
 oc -n stackrox get routes central || true
 #for I in {1..10}; do
@@ -317,14 +336,3 @@ oc -n stackrox get routes central || true
 #  echo "no route? [try ${I}/10]"
 #  sleep 10
 #done
-
-oc get pods -n "stackrox"
-
-oc logs -n stackrox --selector="app==central" --pod-running-timeout=20s --tail=10000
-
-oc events -n stackrox --types=Warning
-
-#sleep 300
-oc get pods -n "stackrox"
-
-
