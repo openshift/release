@@ -214,6 +214,7 @@ function install_operator() {
       startingCSV: ${currentCSV## }
   " | sed -e 's/^    //' | tee >(cat 1>&2) \
     | oc apply -f -
+
 }
 
 function create_example_kind() {
@@ -310,6 +311,13 @@ function install_secured_cluster() {
   done
   oc get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json
 }
+
+echo "Wait for ACS operator controller"
+for (( i = 0; i < 5; i++ )); do
+  oc get pods -A -lapp==rhacs-operator,control-plane=controller-manager && break || true
+  echo "retry:${i} (sleep 10s)"
+  sleep 10
+done
 
 oc get crd -n openshift-operators centrals.platform.stackrox.io \
   || install_operator
