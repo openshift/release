@@ -38,6 +38,11 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: dpu-daemon
+- dockerfile_literal: |
+    FROM base
+    RUN dnf install -y python3-pip && pip3 install yq && dnf install -y podman
+  from: src
+  to: custom-src
 promotion:
   to:
   - name: 4.17-priv
@@ -63,7 +68,7 @@ tests:
 - as: unit
   commands: HOME=/tmp make test
   container:
-    from: src
+    from: custom-src
 - as: e2e-dpu-operator-tests
   cluster: build05
   steps:
