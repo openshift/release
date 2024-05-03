@@ -31,6 +31,7 @@ function exit_handler() {
 }
 trap 'exit_handler' EXIT
 trap 'test ${BASH_COMMAND:0:2} == "oc" && echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
+trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
 
 
 if [[ ! -f "${KUBECONFIG}" ]] || ! oc api-versions >/dev/null 2>&1; then
@@ -341,12 +342,12 @@ function wait_deploy_replicas() {
         && break
     if [[ ${i} -eq $(( retry - 1 )) ]]; then
       echo "WARN: ${app^} replicas are too low."
-      oc -n stackrox get deploy/"${app}" -o json \
-        | jq -er '.status' || break
     fi
     echo "retry:${i} (sleep ${sleeptime}s)"
     sleep "${sleeptime}"
   done
+  oc -n stackrox get deploy/"${app}" -o json \
+    | jq -er '.status' || break
 }
 
 
@@ -378,6 +379,7 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     || install_secured_cluster
   
   echo ">>> Wait for replicas"
+  oc get deployments -n stackrox
   wait_deploy_replicas central-db
   wait_deploy_replicas sensor
   wait_deploy_replicas scanner
