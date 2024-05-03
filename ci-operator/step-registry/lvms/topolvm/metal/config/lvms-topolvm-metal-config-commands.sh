@@ -39,7 +39,7 @@ tar -C ${remote_workdir} -xzf ${GO_VERSION}.tar.gz
 rm ${GO_VERSION}.tar.gz
 echo 'export PATH=$PATH:${remote_workdir}/go/bin' >> ~/.profile && source ~/.profile
 
-apt install \
+sudo apt-get install \
     docker.io \
     lvm2 \
     util-linux \
