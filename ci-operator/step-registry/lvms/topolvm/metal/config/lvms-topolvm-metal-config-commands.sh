@@ -64,10 +64,6 @@ sudo groupadd docker
 sudo usermod -aG docker ubuntu
 newgrp docker
 
-
-
-
-
 git clone github.com/topolvm/topolvm@${PULL_PULL_SHA} topolvm
 
 EOF
