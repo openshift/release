@@ -39,7 +39,7 @@ jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '
 wmco_image_src="registry.apps.build02.vmc.ci.openshift.org/${NAMESPACE}/pipeline"
 wmco_image_dst="${MIRROR_REGISTRY_HOST}/pipeline"
 
-oc image mirror "${wmco_image_src}" "${wmco_image_dst}" -a "${new_pull_secret}" \
+oc image mirror "${wmco_image_src}" "${wmco_image_dst}" --insecure=true -a "${new_pull_secret}" \
  --skip-verification=true --keep-manifest-list=true --filter-by-os='.*'
 
 idms_content="apiVersion: config.openshift.io/v1\n"
@@ -77,8 +77,8 @@ itms_content+="  imageTagMirrors:\n"
 
 for image in $(cat /tmp/mirror-images-list.yaml)
 do
-   oc image mirror $image  --insecure=true -a "${new_pull_secret}" \
- -skip-verification=true --keep-manifest-list=true --filter-by-os='.*'
+   oc image mirror $image --insecure=true -a "${new_pull_secret}" \
+ --skip-verification=true --keep-manifest-list=true --filter-by-os='.*'
 
     source_image=$(echo "$image" | cut -d'=' -f1)
     mirror_registry=$(echo "$image" | cut -d'=' -f2)
