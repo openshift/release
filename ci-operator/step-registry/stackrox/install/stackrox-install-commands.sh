@@ -321,16 +321,6 @@ function install_secured_cluster() {
   oc get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json
 }
 
-oc get crd -n openshift-operators centrals.platform.stackrox.io \
-  || install_operator
-
-echo "Wait for ACS operator controller"
-for (( i = 0; i < 5; i++ )); do
-  oc get pods -A -lapp==rhacs-operator,control-plane=controller-manager && break || true
-  echo "retry:${i} (sleep 10s)"
-  sleep 10
-done
-
 function oc_wait_for_condition_created() {
   for (( i = 0; i < 5; i++ )); do
     oc wait --for condition=established --timeout=120s "${@}" \
@@ -339,11 +329,6 @@ function oc_wait_for_condition_created() {
     sleep 30
   done
 }
-oc_wait_for_condition_created crd centrals.platform.stackrox.io
-oc get crd -n openshift-operators \
-  | grep 'platform.stackrox.io'
-oc -n stackrox rollout status deploy/central --timeout=30s \
-  || install_central
 
 function wait_deploy_replicas() {
   local app retry sleeptime
@@ -352,37 +337,51 @@ function wait_deploy_replicas() {
   sleeptime=${3:-30}
   for (( i = 0; i < retry; i++ )); do
     oc -n stackrox get deploy/"${app}" -o json \
-      | jq -er '.status|(.replicas == .readyReplicas)' && break
+      | jq -er '.status|(.replicas == .readyReplicas)' >/dev/null 2>&1 \
+        && break
     if [[ ${i} -eq $(( retry - 1 )) ]]; then
       echo "WARN: ${app^} replicas are too low."
       oc -n stackrox get deploy/"${app}" -o json \
-        | jq -er '.status'
+        | jq -er '.status' || break
     fi
-    echo "retry:${i} (sleep "${sleeptime}"s)"
+    echo "retry:${i} (sleep ${sleeptime}s)"
     sleep "${sleeptime}"
   done
 }
-wait_deploy_replicas central
-oc get deployments -n stackrox
 
-#set_admin_password
-get_init_bundle
 
-oc_wait_for_condition_created crd securedclusters.platform.stackrox.io
-oc -n stackrox rollout status deploy/secured-cluster --timeout=30s \
-  || install_secured_cluster
-
-echo ">>> Wait for replicas"
-wait_deploy_replicas central-db
-wait_deploy_replicas sensor
-wait_deploy_replicas collector
-wait_deploy_replicas scanner
-wait_deploy_replicas admission-control
-
-oc -n stackrox get routes central && echo "Warning: routes found" || true
-#for I in {1..10}; do
-#  oc -n stackrox get routes central -o json \
-#    | jq -er '.spec.host' && break
-#  echo "no route? [try ${I}/10]"
-#  sleep 10
-#done
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  oc get crd -n openshift-operators centrals.platform.stackrox.io \
+    || install_operator
+  
+  echo "Wait for ACS operator controller"
+  for (( i = 0; i < 5; i++ )); do
+    oc get pods -A -lapp==rhacs-operator,control-plane=controller-manager && break
+    echo "retry:${i} (sleep 10s)"
+    sleep 10
+  done
+  
+  oc_wait_for_condition_created crd centrals.platform.stackrox.io
+  oc get crd -n openshift-operators \
+    | grep 'platform.stackrox.io'
+  oc -n stackrox rollout status deploy/central --timeout=30s \
+    || install_central
+  
+  wait_deploy_replicas central
+  oc get deployments -n stackrox
+  
+  #set_admin_password
+  get_init_bundle
+  
+  oc_wait_for_condition_created crd securedclusters.platform.stackrox.io
+  oc -n stackrox rollout status deploy/secured-cluster --timeout=30s \
+    || install_secured_cluster
+  
+  echo ">>> Wait for replicas"
+  wait_deploy_replicas central-db
+  wait_deploy_replicas sensor
+  wait_deploy_replicas scanner
+  wait_deploy_replicas admission-control
+  
+  oc -n stackrox get routes central && echo "Warning: routes found" || true
+fi
