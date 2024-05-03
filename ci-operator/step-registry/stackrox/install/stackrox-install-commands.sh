@@ -13,6 +13,7 @@ Install ACS into a single cluster [$(date -u)].
   * Wait for all services minimal running state.
 EOF
 
+echo ">>> Prepare script environment"
 example_cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
 central_cr_url=${example_cr_url}/central-cr.yaml 
 secured_cluster_cr_url=${example_cr_url}/secured-cluster-cr.yaml 
@@ -80,7 +81,10 @@ oc get clusteroperators || true
 oc get csr -o name
 
 function get_jq() {
-  curl -o ./jq https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
+  local url
+  url=https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
+  echo "Downloading jq binary from ${url}"
+  curl -Ls -o ./jq "${url}"
   chmod u+x ./jq
   export PATH=${PATH}:${PWD}
 }
@@ -91,7 +95,7 @@ function uninstall_acs() {
   oc -n stackrox delete persistentvolumeclaims stackrox-db --wait >/dev/null 2>&1 || true
   oc delete subscription -n openshift-operators --field-selector="metadata.name==rhacs-operator" --wait || true
 }
-uninstall_acs
+#uninstall_acs
 
 ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
@@ -342,12 +346,14 @@ oc -n stackrox rollout status deploy/central --timeout=30s \
   || install_central
 
 function wait_deploy_replicas() {
-  local app
+  local app retry
   app=${1:-central}
-  for (( i = 0; i < 6; i++ )); do
+  retry=${2:-6}
+  sleeptime=${3:-30}
+  for (( i = 0; i < retry; i++ )); do
     oc -n stackrox get deploy/"${app}" -o json \
       | jq -er '.status|(.replicas == .readyReplicas)' && break
-    if [[ $i -eq 5 ]]; then
+    if [[ ${i} -eq $(( retry - 1 )) ]]; then
       echo "${app^} replicas are too low."
       oc -n stackrox get deploy/"${app}" -o json \
         | jq -er '.status'
@@ -367,7 +373,12 @@ oc_wait_for_condition_created crd securedclusters.platform.stackrox.io
 oc -n stackrox rollout status deploy/secured-cluster --timeout=30s \
   || install_secured_cluster
 
-oc -n stackrox get routes central || true
+wait_deploy_replicas sensor
+wait_deploy_replicas collector
+wait_deploy_replicas scanner
+wait_deploy_replicas admission-control
+
+oc -n stackrox get routes central && echo "Warning: routes found" || true
 #for I in {1..10}; do
 #  oc -n stackrox get routes central -o json \
 #    | jq -er '.spec.host' && break
