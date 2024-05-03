@@ -9,7 +9,7 @@ function waitForReady() {
     set +x
     local retries=0
     local attempts=140
-    while [[ $(oc get nodes --no-headers -l node-role.kubernetes.io/worker,node-role.kubernetes.io/infra!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].status}" | tr ' ' '\n' | grep -c "True") != "$1" ]]; do
+    while [[ $(oc get nodes --no-headers -l node-role.kubernetes.io/worker,node-role.kubernetes.io/infra!=,node.openshift.io/os_id=rhcos --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].status}" | tr ' ' '\n' | grep -c "True") != "$1" ]]; do
         log "Following nodes are currently present, waiting for desired count $1 to be met."
         log "Machinesets:"
         oc get machinesets -A
@@ -35,7 +35,7 @@ function waitForReady() {
 }
 
 function scaleMachineSets(){
-    worker_machine_sets=$(oc get --no-headers machinesets -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-role!=infra,machine.openshift.io/cluster-api-machine-role!=workload -o name )
+    worker_machine_sets=$(oc get --no-headers machinesets -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-role!=infra,machine.openshift.io/cluster-api-machine-role!=workload -o name | grep -v rhel)
     scale_num=$(echo $worker_machine_sets | wc -w | xargs)
     scale_size=$(($1/$scale_num))
     first_machine=""
@@ -58,7 +58,7 @@ function scaleDownMachines() {
     num_to_decrease=$(($1-$2))
     echo "num to decrease $num_to_decrease"
 
-    for machineset in $(oc get --no-headers machinesets -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-role!=infra,machine.openshift.io/cluster-api-machine-role!=workload -o name); do
+    for machineset in $(oc get --no-headers machinesets -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-role!=infra,machine.openshift.io/cluster-api-machine-role!=workload -o name | grep -v rhel); do
         echo "machine set to edit $machineset"
         machine_set_num=$(oc get $machineset -n openshift-machine-api -o jsonpath="{.spec.replicas}")
         echo "machine set scale num currently: $machine_set_num"
@@ -77,7 +77,7 @@ function scaleDownMachines() {
         fi
     done
 }
-current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
+current_worker_count=$(oc get nodes --no-headers -l "node-role.kubernetes.io/worker,node.openshift.io/os_id=rhcos" --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 echo "current worker count $current_worker_count"
 echo "worker scale count $WORKER_REPLICA_COUNT"
 
