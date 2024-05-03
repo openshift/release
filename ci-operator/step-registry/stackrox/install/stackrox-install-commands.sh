@@ -76,6 +76,13 @@ ls -la "${SHARED_DIR}"
 oc get clusteroperators || true
 oc get csr -o name
 
+function get_jq() {
+  curl -o ./jq https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
+  chmod u+x ./jq
+  export PATH=${PATH}:${PWD}
+}
+jq --version || get_jq
+
 function uninstall_acs() {
   oc delete project stackrox || true
   oc -n stackrox delete persistentvolumeclaims stackrox-db >/dev/null 2>&1 || true
