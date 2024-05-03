@@ -56,6 +56,12 @@ cp "${SHARED_DIR}/kubeadmin-password" "${KUBECONFIG_DIR}/"
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
 
+cp "${SHARED_DIR}/.openshift_install.log" "${INSTALL_DIR}/"
+cp "${SHARED_DIR}/.openshift_install_state.json" "${INSTALL_DIR}/"
+
+cp "${SHARED_DIR}/.openshift_install.log" "${ARTIFACT_DIR}/"
+cp "${SHARED_DIR}/.openshift_install_state.json" "${ARTIFACT_DIR}/"
+
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 echo "Launching 'wait-for bootstrap-complete' installation step....."
