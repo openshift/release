@@ -273,9 +273,9 @@ chmod 700 $HOME/setup_pxeboot.sh
 # Booting up zVSIs as agents
 for fip in "${zvsi_fip_list[@]}"; do
   echo "Transferring the setup script to zVSI $fip"
-  scp "${ssh_options[@]}" $HOME/setup_pxeboot.sh root@$fip:/root/setup_pxeboot.sh
+  scp "${ssh_options[@]}" $HOME/setup_pxeboot.sh core@$fip:/var/home/core/setup_pxeboot.sh
   echo "Triggering the script in the zVSI $fip"
-  ssh "${ssh_options[@]}" root@$fip "/root/setup_pxeboot.sh" &
+  ssh "${ssh_options[@]}" core@$fip "/var/home/core/setup_pxeboot.sh" &
   sleep 60
   echo "Successfully booted the zVSI $fip as agent"
 done
