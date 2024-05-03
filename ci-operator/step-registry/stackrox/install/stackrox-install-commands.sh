@@ -337,7 +337,7 @@ function wait_deploy_replicas() {
   retry=${2:-6}
   sleeptime=${3:-30}
   for (( i = 0; i < retry; i++ )); do
-    oc -n stackrox get deploy/"${app}" -o json \
+    { oc -n stackrox get deploy/"${app}" -o json || true; } \
       | jq -er '.status|(.replicas == .readyReplicas)' >/dev/null 2>&1 \
         && break
     if [[ ${i} -eq $(( retry - 1 )) ]]; then
@@ -347,7 +347,7 @@ function wait_deploy_replicas() {
     sleep "${sleeptime}"
   done
   oc -n stackrox get deploy/"${app}" -o json \
-    | jq -er '.status' || break
+    | jq -er '.status' || true
 }
 
 
