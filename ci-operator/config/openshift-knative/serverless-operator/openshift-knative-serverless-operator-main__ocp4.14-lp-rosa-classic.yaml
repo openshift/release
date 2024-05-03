@@ -113,8 +113,6 @@ releases:
       version: "4.14"
 resources:
   '*':
-    limits:
-      memory: 6Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -157,8 +155,9 @@ tests:
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.14"
     test:
-    - as: operator-e2e
-      commands: make test-e2e-with-kafka
+    - ref: cucushift-installer-check-cluster-health
+    - as: knative-eventing-kafka-broker-e2e
+      commands: make test-upstream-e2e-kafka-no-upgrade
       dependencies:
       - env: KNATIVE_OPENSHIFT_INGRESS
         name: knative-openshift-ingress
@@ -168,8 +167,20 @@ tests:
         name: openshift-knative-operator
       from: serverless-operator-src
       resources:
-        limits:
-          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-e2e
+      commands: DELETE_CRD_ON_TEARDOWN=false make teardown test-e2e-with-kafka
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
         requests:
           cpu: 100m
           memory: 200Mi
@@ -184,27 +195,9 @@ tests:
         name: openshift-knative-operator
       from: serverless-operator-src
       resources:
-        limits:
-          memory: 6Gi
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: knative-eventing-kafka-broker-e2e
-      commands: make test-upstream-e2e-kafka-no-upgrade
-      dependencies:
-      - env: KNATIVE_OPENSHIFT_INGRESS
-        name: knative-openshift-ingress
-      - env: KNATIVE_OPERATOR
-        name: knative-operator
-      - env: OPENSHIFT_KNATIVE_OPERATOR
-        name: openshift-knative-operator
-      from: serverless-operator-src
-      resources:
-        limits:
-          memory: 12Gi
-        requests:
-          cpu: 100m
-          memory: 6Gi
     workflow: firewatch-rosa-aws-sts
   timeout: 8h0m0s
 zz_generated_metadata:
