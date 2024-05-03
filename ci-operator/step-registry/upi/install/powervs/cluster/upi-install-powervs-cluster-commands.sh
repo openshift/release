@@ -191,8 +191,12 @@ function create_upi_powervs_cluster() {
   echo "BASTION_PRIVATE_IP:- $BASTION_PRIVATE_IP"
 
   export BASTION_PUBLIC_IP
+  echo "Retrieving the SSH key"
   scp -i "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/id_rsa root@"${BASTION_PUBLIC_IP}":~/openstack-upi/auth/kubeconfig  "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/
+  echo "Done with retrieval"
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/kubeconfig "${SHARED_DIR}"/kubeconfig
+  echo "Done copying the kubeconfig"
+  exit 0
 }
 
 function ic() {
@@ -443,7 +447,7 @@ function create_transit_gateway() {
   TGW_NAME="${workspace_name}"-tg
 
   ##Create the Transit Gateway
-  ic tg gateway-create --name "${TGW_NAME}" --location "${VPC_REGION}" --routing global --resource-group-id "${RESOURCE_GROUP_ID}" --output json | tee /tmp/tgw.id
+  ic tg gateway-create --name "${TGW_NAME}" --location "${VPC_REGION}" --routing local --resource-group-id "${RESOURCE_GROUP_ID}" --output json | tee /tmp/tgw.id
   TGW_ID=$(cat /tmp/tgw.id | grep id | awk -F'"' '/"id":/{print $4; exit}')
   export TGW_ID
   echo "${TGW_ID}" > "${SHARED_DIR}"/TGW_ID
@@ -595,7 +599,7 @@ case "$CLUSTER_TYPE" in
 
   # Generates a workspace name like rdr-mac-upi-4-14-au-syd-n1
   # this keeps the workspace unique
-  CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
+  CLEAN_VERSION=$(echo "${OCP_VERSION}" | sed 's/\([0-9]*\.[0-9]*\).*/\1/')
   WORKSPACE_NAME=rdr-mac-p2-"${CLEAN_VERSION}"-"${POWERVS_ZONE}"
   VPC_NAME="${WORKSPACE_NAME}"-vpc
   echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
@@ -621,6 +625,7 @@ case "$CLUSTER_TYPE" in
   create_upi_tf_varfile "${WORKSPACE_NAME}"
   fix_user_permissions
   create_upi_powervs_cluster
+  exit 0
 ;;
 *)
   echo "Creating UPI based PowerVS cluster using ${CLUSTER_TYPE} is not implemented yet..."
