@@ -346,7 +346,7 @@ oc -n stackrox rollout status deploy/central --timeout=30s \
   || install_central
 
 function wait_deploy_replicas() {
-  local app retry
+  local app retry sleeptime
   app=${1:-central}
   retry=${2:-6}
   sleeptime=${3:-30}
@@ -354,16 +354,15 @@ function wait_deploy_replicas() {
     oc -n stackrox get deploy/"${app}" -o json \
       | jq -er '.status|(.replicas == .readyReplicas)' && break
     if [[ ${i} -eq $(( retry - 1 )) ]]; then
-      echo "${app^} replicas are too low."
+      echo "WARN: ${app^} replicas are too low."
       oc -n stackrox get deploy/"${app}" -o json \
         | jq -er '.status'
     fi
-    echo "retry:${i} (sleep 30s)"
-    sleep 30
+    echo "retry:${i} (sleep "${sleeptime}"s)"
+    sleep "${sleeptime}"
   done
 }
 wait_deploy_replicas central
-wait_deploy_replicas central-db
 oc get deployments -n stackrox
 
 #set_admin_password
@@ -373,6 +372,8 @@ oc_wait_for_condition_created crd securedclusters.platform.stackrox.io
 oc -n stackrox rollout status deploy/secured-cluster --timeout=30s \
   || install_secured_cluster
 
+echo ">>> Wait for replicas"
+wait_deploy_replicas central-db
 wait_deploy_replicas sensor
 wait_deploy_replicas collector
 wait_deploy_replicas scanner
