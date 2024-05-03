@@ -87,9 +87,9 @@ function get_jq() {
 jq --version || get_jq
 
 function uninstall_acs() {
-  oc delete project stackrox || true
-  oc -n stackrox delete persistentvolumeclaims stackrox-db >/dev/null 2>&1 || true
-  oc delete subscription -n openshift-operators --field-selector="metadata.name==rhacs-operator" || true
+  oc delete project stackrox --wait || true
+  oc -n stackrox delete persistentvolumeclaims stackrox-db --wait >/dev/null 2>&1 || true
+  oc delete subscription -n openshift-operators --field-selector="metadata.name==rhacs-operator" --wait || true
 }
 uninstall_acs
 
@@ -114,6 +114,11 @@ spec:
       limits:
         memory: 4Gi
         cpu: 1
+    exposure:
+      loadBalancer:
+        enabled: false
+      route:
+        enabled: false
     db:
       resources:
         requests:
@@ -336,15 +341,23 @@ oc get crd -n openshift-operators \
 oc -n stackrox rollout status deploy/central --timeout=30s \
   || install_central
 
-for (( i = 0; i < 5; i++ )); do
-  oc -n stackrox get deploy/central -o json \
-    | jq -er '.status|(.replicas == .readyReplicas)' && break
-  echo "retry:${i} (sleep 30s)"
-  if [[ $i -eq 5 ]]; then
-    echo "Central bad state."
-  fi
-  sleep 30
-done
+function wait_deploy_replicas() {
+  local app
+  app=${1:-central}
+  for (( i = 0; i < 6; i++ )); do
+    oc -n stackrox get deploy/"${app}" -o json \
+      | jq -er '.status|(.replicas == .readyReplicas)' && break
+    if [[ $i -eq 5 ]]; then
+      echo "${app^} replicas are too low."
+      oc -n stackrox get deploy/"${app}" -o json \
+        | jq -er '.status'
+    fi
+    echo "retry:${i} (sleep 30s)"
+    sleep 30
+  done
+}
+wait_deploy_replicas central
+wait_deploy_replicas central-db
 oc get deployments -n stackrox
 
 #set_admin_password
