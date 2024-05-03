@@ -26,7 +26,7 @@ function save_stack_events_to_shared()
   set -o errexit
 }
 
-echo "ec2-user" > "${SHARED_DIR}/ssh_user"
+echo "ubuntu" > "${SHARED_DIR}/ssh_user"
 
 echo -e "AMI ID: $ami_id"
 
@@ -265,7 +265,7 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
           echo "====== Authorizing public key ======" | tee -a /tmp/init_output.txt
-          echo "\${PublicKeyString}" >> /home/ec2-user/.ssh/authorized_keys
+          echo "\${PublicKeyString}" >> /home/ubuntu/.ssh/authorized_keys
           # Use the same defaults as OCP to avoid failing requests to apiserver, such as
           # requesting logs.
           echo "====== Updating inotify =====" | tee -a /tmp/init_output.txt
