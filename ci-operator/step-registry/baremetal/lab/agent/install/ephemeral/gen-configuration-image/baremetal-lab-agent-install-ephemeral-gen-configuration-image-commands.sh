@@ -53,8 +53,6 @@ cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/.openshift_install.log" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/.openshift_install_state.json" "${SHARED_DIR}/"
 
-sleep 600
-
 ### Copy the agent configuration image to the auxiliary host
 echo -e "\nCopying the agent configuration image into the bastion host..."
 scp "${SSHOPTS[@]}" "${INSTALL_DIR}/${AGENT_CONFIGURATION_IMAGE_NAME}" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/${AGENT_CONFIGURATION_IMAGE_NAME}"
