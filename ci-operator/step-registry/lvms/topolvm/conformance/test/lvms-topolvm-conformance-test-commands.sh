@@ -31,10 +31,7 @@ cat <<EOF > ${SHARED_DIR}/run-conformance.sh
 #!/bin/bash
 set -euo pipefail
 
-cd ${remote_workdir}
-
-git clone github.com/topolvm/topolvm@${PULL_PULL_SHA} topolvm
-cd topolvm
+cd ${remote_workdir}/topolvm
 
 make -C test/e2e incluster-lvmd/create-vg
 make -C test/e2e incluster-lvmd/setup-minikube

@@ -34,10 +34,10 @@ set -euo pipefail
 cd ${remote_workdir}
 
 curl -LO https://go.dev/dl/${GO_VERSION}.tar.gz
-rm -rf /usr/local/go
-tar -C /usr/local -xzf ${GO_VERSION}.tar.gz
+rm -rf ${remote_workdir}/go
+tar -C ${remote_workdir} -xzf ${GO_VERSION}.tar.gz
 rm ${GO_VERSION}.tar.gz
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.profile && source ~/.profile
+echo 'export PATH=$PATH:${remote_workdir}/go/bin' >> ~/.profile && source ~/.profile
 
 apt install \
     docker.io \
@@ -47,7 +47,7 @@ apt install \
 
 
 
-git clone https://github.com/topolvm/topolvm.git
+git clone github.com/topolvm/topolvm@${PULL_PULL_SHA} topolvm
 
 EOF
 
