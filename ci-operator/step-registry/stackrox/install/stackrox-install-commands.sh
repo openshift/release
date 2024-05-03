@@ -53,7 +53,10 @@ if [[ ! -f "${KUBECONFIG}" ]] || ! oc api-versions >/dev/null 2>&1; then
   if [[ ! -f "${KUBECONFIG}" ]]; then
     mkdir -p "${SHARED_DIR}"
     for (( i = 20; i > 0; i-- )); do
-      infractl artifacts "${cluster_name}" -d "${SHARED_DIR}"
+      infractl artifacts "${cluster_name}" -d "${SHARED_DIR}" || true
+      unzip "${SHARED_DIR}"/data -l || true
+      unzip "${SHARED_DIR}"/data -d "${SHARED_DIR}"/ || true
+      ls -la "${SHARED_DIR}"
       if [[ -f "${KUBECONFIG}" ]]; then
         break
       else
@@ -339,7 +342,7 @@ oc get deployments -n stackrox
 #set_admin_password
 get_init_bundle
 
-oc_wait_for_condition_created crd secured-clusters.platform.stackrox.io
+oc_wait_for_condition_created crd securedclusters.platform.stackrox.io
 oc -n stackrox rollout status deploy/secured-cluster --timeout=30s \
   || install_secured_cluster
 
