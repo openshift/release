@@ -39,11 +39,32 @@ tar -C ${remote_workdir} -xzf ${GO_VERSION}.tar.gz
 rm ${GO_VERSION}.tar.gz
 echo 'export PATH=$PATH:${remote_workdir}/go/bin' >> ~/.profile && source ~/.profile
 
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+
 sudo apt-get install \
-    docker.io \
+    docker-ce \
+    docker-ce-cli \
+    containerd.io \
+    docker-buildx-plugin \
+    docker-compose-plugin \
+    ca-certificates \
+    curl \
     lvm2 \
     util-linux \
     -y
+
+sudo groupadd docker
+sudo usermod -aG docker ubuntu
+newgrp docker
+
+
 
 
 
