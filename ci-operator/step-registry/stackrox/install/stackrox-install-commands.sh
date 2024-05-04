@@ -226,12 +226,9 @@ function install_operator() {
 }
 
 function clean_stackrox() {
-  echo "(re)Create stackrox namespace"
-  oc project stackrox > /dev/null 2>&1 \
-    && { oc delete project stackrox || true; }
-  oc new-project stackrox
-  echo "Delete any existing stackrox-db"
-  oc -n stackrox delete persistentvolumeclaims stackrox-db >/dev/null 2>&1 || true
+  echo "Create stackrox namespace"
+  oc project stackrox >/dev/null 2>&1 \
+    || oc new-project stackrox --v=0
 }
 
 function create_cr() {
@@ -296,17 +293,14 @@ if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   
   oc_wait_for_condition_created crd centrals.platform.stackrox.io
 
-  clean_stackrox
-  oc -n stackrox rollout status deploy/central --timeout=30s \
-    || create_cr central
+  oc new-project stackrox --v=0
+  create_cr central
   wait_deploy central
   
   get_init_bundle
   
   oc_wait_for_condition_created crd securedclusters.platform.stackrox.io
-  oc -n stackrox rollout status deploy/secured-cluster --timeout=30s \
-    || create_cr secured-cluster
-  wait_deploy secured-cluster
+  create_cr secured-cluster
   
   echo ">>> Wait for deployments"
   oc get deployments -n stackrox
