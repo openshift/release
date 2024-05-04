@@ -19,7 +19,7 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 echo "SHARED_DIR=${SHARED_DIR}"
 echo "KUBECONFIG=${KUBECONFIG}"
 
-cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
+cr_url=https://raw.githubusercontentbad.com/stackrox/stackrox/master/operator/tests/common
 
 SCRATCH=$(mktemp -d)
 cd "${SCRATCH}"
@@ -28,7 +28,6 @@ function exit_handler() {
   echo ">>> End ACS install [$(date -u)]"
   rm -rf "${SCRATCH}"
   set -x
-  oc get clusteroperators || true
   oc get crd -n openshift-operators \
     | grep 'platform.stackrox.io'
   oc get deployments -A
@@ -202,7 +201,6 @@ EOF
 
 function install_operator() {
   echo ">>> Install rhacs-operator"
-  echo "Find channels"
   oc get packagemanifests rhacs-operator -o jsonpath="{range .status.channels[*]}Channel: {.name} currentCSV: {.currentCSV} installMode: {.currentCSV.installModes}{'\n'}{end}"
   currentCSV=$(oc get packagemanifests rhacs-operator -o jsonpath="{.status.channels[?(.name=='stable')].currentCSV}")
   echo "${currentCSV}"
@@ -222,9 +220,9 @@ function install_operator() {
       source: ${catalogSource}
       sourceNamespace: ${catalogSourceNamespace}
       startingCSV: ${currentCSV## }
-  " | sed -e 's/^    //' | tee >(cat 1>&2) \
+  " | sed -e 's/^    //' \
+    | tee >(cat 1>&2) \
     | oc apply -f -
-
 }
 
 function clean_stackrox() {
@@ -260,20 +258,19 @@ function get_init_bundle() {
   done
 }
 
-function oc_wait_for_condition_created() {
+function retry() {
   for (( i = 0; i < 10; i++ )); do
-    oc wait --for condition=established --timeout=120s "${@}" \
-      && break
+    "$@" && break
     sleep 30
   done
 }
 
+function oc_wait_for_condition_created() {
+  retry oc wait --for condition=established --timeout=120s "${@}"
+}
+
 function wait_deploy() {
-  for (( i = 0; i < 5; i++ )); do
-    oc -n stackrox rollout status deploy/"$1" --timeout=300s \
-      && break
-    sleep 30
-  done
+  retry oc -n stackrox rollout status deploy/"$1" --timeout=300s
 }
 
 wait_pods_running() {
