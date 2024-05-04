@@ -92,7 +92,7 @@ function get_jq() {
 jq --version || get_jq
 
 function uninstall_acs() {
-  oc delete project stackrox --wait || true
+  oc delete project stackrox || true
   oc -n stackrox delete persistentvolumeclaims stackrox-db --wait >/dev/null 2>&1 || true
   oc delete subscription -n openshift-operators --field-selector="metadata.name==rhacs-operator" --wait || true
 }
@@ -225,12 +225,6 @@ function install_operator() {
     | oc apply -f -
 }
 
-function clean_stackrox() {
-  echo "Create stackrox namespace"
-  oc project stackrox >/dev/null 2>&1 \
-    || oc new-project stackrox --v=0
-}
-
 function create_cr() {
   app=${1:-central}
   echo ">>> Install ${app^}"
@@ -262,7 +256,7 @@ function retry() {
   done
 }
 
-function oc_wait_for_condition_created() {
+function oc_wait_created() {
   retry oc wait --for condition=established --timeout=120s "${@}"
 }
 
@@ -285,21 +279,16 @@ wait_pods_running() {
 if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   uninstall_acs
 
-  oc get crd -n openshift-operators centrals.platform.stackrox.io >/dev/null 2>&1 \
-    || install_operator
-  
-  echo "Wait for ACS operator controller"
+  install_operator
   wait_pods_running -A -lapp==rhacs-operator,control-plane=controller-manager
-  
-  oc_wait_for_condition_created crd centrals.platform.stackrox.io
+  oc_wait_created crd centrals.platform.stackrox.io
 
-  oc new-project stackrox --v=0
+  oc new-project stackrox >/dev/null 2>&1
   create_cr central
   wait_deploy central
   
   get_init_bundle
-  
-  oc_wait_for_condition_created crd securedclusters.platform.stackrox.io
+  oc_wait_created crd securedclusters.platform.stackrox.io
   create_cr secured-cluster
   
   echo ">>> Wait for deployments"
@@ -309,6 +298,4 @@ if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   wait_deploy scanner-db
   wait_deploy sensor
   wait_deploy admission-control
-  
-  oc -n stackrox get routes central && echo "Warning: routes found" || true
 fi
