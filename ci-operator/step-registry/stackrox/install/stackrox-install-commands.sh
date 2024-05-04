@@ -39,48 +39,6 @@ trap 'exit_handler' EXIT
 trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
 
 
-if [[ ! -f "${KUBECONFIG}" ]] || ! oc api-versions >/dev/null 2>&1; then
-  cluster_name=${1:-$(tail -1 /tmp/testing_cluster.txt || true)}
-  SHARED_DIR=/tmp/${cluster_name}
-  export KUBECONFIG=${SHARED_DIR}/kubeconfig
-
-  if [[ ! -f "${KUBECONFIG}" ]] || ! oc api-versions >/dev/null 2>&1; then
-    cluster_names=$(infractl list | tee >(cat >&2) | grep '^dh.*')
-    if [[ $(echo "${cluster_names}" | wc -l) -eq 1 ]]; then
-      cluster_name=${cluster_names%% *}
-    else
-      select cluster_name in ${cluster_names}; do
-        break;
-      done
-    fi
-    SHARED_DIR=/tmp/${cluster_name}
-    export KUBECONFIG=${SHARED_DIR}/kubeconfig
-  fi
-  
-  if [[ ! -f "${KUBECONFIG}" ]]; then
-    mkdir -p "${SHARED_DIR}"
-    for (( i = 20; i > 0; i-- )); do
-      infractl artifacts "${cluster_name}" -d "${SHARED_DIR}" || true
-      unzip "${SHARED_DIR}"/data -l || true
-      unzip "${SHARED_DIR}"/data -d "${SHARED_DIR}"/ || true
-      ls -la "${SHARED_DIR}"
-      if [[ -f "${KUBECONFIG}" ]]; then
-        break
-      else
-        printf "."
-      fi
-      sleep "${i}"
-    done
-  fi
-  ( source "${SHARED_DIR}"/dotenv || true
-    if [[ -n "${API_ENDPOINT:-}" ]]; then
-      oc login "${API_ENDPOINT}" -u "${CONSOLE_USER:-admin}" -p "${CONSOLE_PASSWORD:-letmein}" || true
-    fi
-  )
-  
-  echo "${cluster_name}" | tee /tmp/testing_cluster.txt
-fi
-
 function get_jq() {
   local url
   url=https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
