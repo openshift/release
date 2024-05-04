@@ -350,16 +350,20 @@ function wait_deploy_replicas() {
     | jq -er '.status' || true
 }
 
-
 if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   oc get crd -n openshift-operators centrals.platform.stackrox.io \
     || install_operator
   
   echo "Wait for ACS operator controller"
-  for (( i = 0; i < 5; i++ )); do
-    oc get pods -A -lapp==rhacs-operator,control-plane=controller-manager && break
-    echo "retry:${i} (sleep 10s)"
-    sleep 10
+  for (( i = 0; i < 10; i++ )); do
+    oc get pods -A -lapp==rhacs-operator,control-plane=controller-manager
+    pods_running=$(oc get pods -A -lapp==rhacs-operator,control-plane=controller-manager \
+      --field-selector="status.phase==Running" --no-headers | wc -l)
+    if [[ "${pods_running}" -gt 0 ]]; then
+      break
+    fi
+    echo "retry:${i} (sleep 30s)"
+    sleep 30
   done
   
   oc_wait_for_condition_created crd centrals.platform.stackrox.io
