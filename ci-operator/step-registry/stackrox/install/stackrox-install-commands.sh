@@ -29,6 +29,8 @@ function exit_handler() {
   rm -rf "${SCRATCH}"
   set -x
   oc get clusteroperators || true
+  oc get crd -n openshift-operators \
+    | grep 'platform.stackrox.io'
   oc get deployments -A
   oc logs -n stackrox --selector="app==central" --pod-running-timeout=1s --tail=20
   oc events -n stackrox --types=Warning
@@ -237,7 +239,7 @@ function clean_stackrox() {
 function create_cr() {
   app=${1:-central}
   echo ">>> Install ${app^}"
-  if curl -o "new.${app}-cr.yaml" "${cr_url}/${app}-cr.yaml" \
+  if curl -Ls -o "new.${app}-cr.yaml" "${cr_url}/${app}-cr.yaml" \
     && [[ $(diff "${app}-cr.yaml" "new.${app}-cr.yaml" | grep -v password >&2; echo $?) -eq 1 ]]; then
     echo "WARN: Change in upstream example ${app}. (${cr_url}/${app}-cr.yaml)"
   fi
@@ -247,7 +249,8 @@ function create_cr() {
 function get_init_bundle() {
   echo ">>> Get init-bundle and save as a cluster secret"
   ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json | jq -er '.data["password"] | @base64d')
-  oc -n stackrox get secret collector-tls && return  # init-bundle exists
+  oc -n stackrox get secret collector-tls >/dev/null 2>&1 \
+    && return # init-bundle exists
   for (( i = 0; i < 5; i++ )); do
     oc -n stackrox exec deploy/central -- \
       roxctl central init-bundles generate my-test-bundle --insecure-skip-tls-verify --password "${ROX_PASSWORD}" --output-secrets - \
@@ -288,21 +291,17 @@ wait_pods_running() {
 if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   uninstall_acs
 
-  oc get crd -n openshift-operators centrals.platform.stackrox.io \
+  oc get crd -n openshift-operators centrals.platform.stackrox.io >/dev/null 2>&1 \
     || install_operator
   
-  oc get deployments -n openshift-operators || true
   echo "Wait for ACS operator controller"
   wait_pods_running -A -lapp==rhacs-operator,control-plane=controller-manager
   
   oc_wait_for_condition_created crd centrals.platform.stackrox.io
-  oc get crd -n openshift-operators \
-    | grep 'platform.stackrox.io'
 
   clean_stackrox
   oc -n stackrox rollout status deploy/central --timeout=30s \
     || create_cr central
-  
   wait_deploy central
   
   get_init_bundle
@@ -310,8 +309,9 @@ if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   oc_wait_for_condition_created crd securedclusters.platform.stackrox.io
   oc -n stackrox rollout status deploy/secured-cluster --timeout=30s \
     || create_cr secured-cluster
+  wait_deploy secured-cluster
   
-  echo ">>> Wait for replicas"
+  echo ">>> Wait for deployments"
   oc get deployments -n stackrox
   wait_deploy central-db
   wait_deploy scanner
