@@ -314,7 +314,7 @@ function install_secured_cluster() {
 }
 
 function oc_wait_for_condition_created() {
-  for (( i = 0; i < 5; i++ )); do
+  for (( i = 0; i < 15; i++ )); do
     oc wait --for condition=established --timeout=120s "${@}" \
       && break
     echo "retry:${i} (sleep 30s)"
