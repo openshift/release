@@ -354,6 +354,7 @@ if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   oc get crd -n openshift-operators centrals.platform.stackrox.io \
     || install_operator
   
+  oc get deployments -n openshift-operators || true
   echo "Wait for ACS operator controller"
   for (( i = 0; i < 10; i++ )); do
     oc get pods -A -lapp==rhacs-operator,control-plane=controller-manager
