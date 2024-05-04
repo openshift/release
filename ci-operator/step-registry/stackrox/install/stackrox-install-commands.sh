@@ -14,14 +14,17 @@ Install ACS into a single cluster [$(date -u)].
 EOF
 
 echo ">>> Prepare script environment"
+export SHARED_DIR=${SHARED_DIR:-}
+export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
+echo "SHARED_DIR=${SHARED_DIR}"
+echo "KUBECONFIG=${KUBECONFIG}"
+
 example_cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
 central_cr_url=${example_cr_url}/central-cr.yaml 
 secured_cluster_cr_url=${example_cr_url}/secured-cluster-cr.yaml 
 
-export SHARED_DIR=${SHARED_DIR:-}
-export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
-
-delete_on_exit=""
+SCRATCH=$(mktemp -d)
+cd "${SCRATCH}"
 function exit_handler() {
   echo ">>> End ACS install [$(date -u)]"
   echo "KUBECONFIG=${KUBECONFIG}"
@@ -29,12 +32,9 @@ function exit_handler() {
   oc logs -n stackrox --selector="app==central" --pod-running-timeout=1s --tail=20
   oc events -n stackrox --types=Warning
   oc get pods -n "stackrox"
-  for file in ${delete_on_exit//:/ }; do
-    rm -f "${file}" || true
-  done
+  rm -rf "${SCRATCH}"
 }
 trap 'exit_handler' EXIT
-trap 'test ${BASH_COMMAND:0:2} == "oc" && echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
 trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
 
 
@@ -79,11 +79,6 @@ if [[ ! -f "${KUBECONFIG}" ]] || ! oc api-versions >/dev/null 2>&1; then
   
   echo "${cluster_name}" | tee /tmp/testing_cluster.txt
 fi
-cd "${SHARED_DIR:-}"
-pwd
-ls -la "${SHARED_DIR}"
-oc get clusteroperators || true
-oc get csr -o name
 
 function get_jq() {
   local url
@@ -91,7 +86,6 @@ function get_jq() {
   echo "Downloading jq binary from ${url}"
   curl -Ls -o ./jq "${url}"
   chmod u+x ./jq
-  delete_on_exit=${delete_on_exit}:${PWD}/jq
   export PATH=${PATH}:${PWD}
 }
 jq --version || get_jq
@@ -267,7 +261,6 @@ function install_central() {
   oc -n stackrox delete persistentvolumeclaims stackrox-db >/dev/null 2>&1 || true
 
   curl -o new.central-cr.yaml "${central_cr_url}"
-  delete_on_exit=${delete_on_exit}:${PWD}/new.central-cr.yaml
   curl_returncode=$?
   if [[ ${curl_returncode} -eq 0 ]] && [[ $(diff central-cr.yaml new.central-cr.yaml | grep -v password >&2; echo $?) -eq 1 ]]; then
     echo "WARN: Change in upstream example central [${central_cr_url}]."
@@ -280,7 +273,6 @@ function install_central() {
 function install_secured_cluster() {
   echo "Create Secured-cluster resource"
   curl -o new.secured-cluster-cr.yaml "${secured_cluster_cr_url}"
-  delete_on_exit=${delete_on_exit}:${PWD}/new.secured-cluster-cr.yaml
   curl_returncode=$?
   if [[ ${curl_returncode} -eq 0 ]] && [[ $(diff secured-cluster-cr.yaml new.secured-cluster-cr.yaml >&2; echo $?) -eq 1 ]]; then
     echo "WARN: Change in upstream example secured cluster [${secured_cluster_cr_url}]."
@@ -342,8 +334,8 @@ function wait_deploy_replicas() {
 
 wait_pods_running() {
   for (( i = 0; i < 10; i++ )); do
-    oc get pods ${@}
-    pods_running=$(oc get pods ${@}\
+    oc get pods "${@}"
+    pods_running=$(oc get pods "${@}" \
       --field-selector="status.phase==Running" --no-headers | wc -l)
     if [[ "${pods_running}" -gt 0 ]]; then
       break
@@ -354,6 +346,9 @@ wait_pods_running() {
 }
 
 if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  oc get clusteroperators || true
+  oc get csr -o name
+
   oc get crd -n openshift-operators centrals.platform.stackrox.io \
     || install_operator
   
