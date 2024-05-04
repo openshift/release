@@ -278,15 +278,6 @@ function install_central() {
     || create_example_kind central
 }
 
-function set_admin_password() {
-  ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
-  centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
-  oc -n stackrox get secret admin-pass -o json \
-    | jq --arg password "${centralAdminPasswordBase64}" \
-      '.data["password"]=$password' \
-    | oc apply -f -
-}
-
 function get_init_bundle() {
   # global ROX_PASSWORD
   echo ">>> Get init-bundle and save as a cluster secret"
@@ -376,7 +367,6 @@ if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   wait_deploy_replicas central
   oc get deployments -n stackrox
   
-  #set_admin_password
   get_init_bundle
   
   oc_wait_for_condition_created crd securedclusters.platform.stackrox.io
