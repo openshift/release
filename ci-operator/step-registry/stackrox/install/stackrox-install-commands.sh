@@ -28,6 +28,9 @@ function exit_handler() {
   oc logs -n stackrox --selector="app==central" --pod-running-timeout=1s --tail=20
   oc events -n stackrox --types=Warning
   oc get pods -n "stackrox"
+  IFS=: for file in ${delete_on_exit}; do
+    rm -f "${file}" || true
+  fi
 }
 trap 'exit_handler' EXIT
 trap 'test ${BASH_COMMAND:0:2} == "oc" && echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
@@ -87,6 +90,7 @@ function get_jq() {
   echo "Downloading jq binary from ${url}"
   curl -Ls -o ./jq "${url}"
   chmod u+x ./jq
+  delete_on_exit=${delete_on_exit}:${PWD}/jq
   export PATH=${PATH}:${PWD}
 }
 jq --version || get_jq
@@ -261,14 +265,8 @@ function install_central() {
   echo "Delete any existing stackrox-db"
   oc -n stackrox delete persistentvolumeclaims stackrox-db >/dev/null 2>&1 || true
 
-  echo "Wait for pods in stackrox namespace"
-  for (( try = 20; try > 0; try-- )); do
-    oc get pods -n "stackrox" && break || true
-    echo "retry, sleep ${try}"
-    sleep "${try}"
-  done
-
   curl -o new.central-cr.yaml "${central_cr_url}"
+  delete_on_exit=${delete_on_exit}:${PWD}/new.central-cr.yaml
   curl_returncode=$?
   if [[ ${curl_returncode} -eq 0 ]] && [[ $(diff central-cr.yaml new.central-cr.yaml | grep -v password >&2; echo $?) -eq 1 ]]; then
     echo "WARN: Change in upstream example central [${central_cr_url}]."
@@ -278,24 +276,10 @@ function install_central() {
     || create_example_kind central
 }
 
-function get_init_bundle() {
-  # global ROX_PASSWORD
-  echo ">>> Get init-bundle and save as a cluster secret"
-  ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json | jq -er '.data["password"] | @base64d')
-  oc -n stackrox get secret collector-tls && return
-  for (( i = 0; i < 5; i++ )); do
-    oc -n stackrox exec deploy/central -- \
-      roxctl central init-bundles generate my-test-bundle --insecure-skip-tls-verify --password "${ROX_PASSWORD}" --output-secrets - \
-      | tee init-bundle.yml \
-      | oc -n stackrox apply -f - && break
-    echo "retry:${i} (sleep 10s)"
-    sleep 10
-  done
-}
-
 function install_secured_cluster() {
   echo "Create Secured-cluster resource"
   curl -o new.secured-cluster-cr.yaml "${secured_cluster_cr_url}"
+  delete_on_exit=${delete_on_exit}:${PWD}/new.secured-cluster-cr.yaml
   curl_returncode=$?
   if [[ ${curl_returncode} -eq 0 ]] && [[ $(diff secured-cluster-cr.yaml new.secured-cluster-cr.yaml >&2; echo $?) -eq 1 ]]; then
     echo "WARN: Change in upstream example secured cluster [${secured_cluster_cr_url}]."
@@ -313,8 +297,22 @@ function install_secured_cluster() {
   oc get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json
 }
 
+function get_init_bundle() {
+  # global ROX_PASSWORD
+  echo ">>> Get init-bundle and save as a cluster secret"
+  ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json | jq -er '.data["password"] | @base64d')
+  oc -n stackrox get secret collector-tls && return
+  for (( i = 0; i < 5; i++ )); do
+    oc -n stackrox exec deploy/central -- \
+      roxctl central init-bundles generate my-test-bundle --insecure-skip-tls-verify --password "${ROX_PASSWORD}" --output-secrets - \
+      | oc -n stackrox apply -f - && break
+    echo "retry:${i} (sleep 10s)"
+    sleep 10
+  done
+}
+
 function oc_wait_for_condition_created() {
-  for (( i = 0; i < 15; i++ )); do
+  for (( i = 0; i < 10; i++ )); do
     oc wait --for condition=established --timeout=120s "${@}" \
       && break
     echo "retry:${i} (sleep 30s)"
@@ -341,15 +339,10 @@ function wait_deploy_replicas() {
     | jq -er '.status' || true
 }
 
-if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  oc get crd -n openshift-operators centrals.platform.stackrox.io \
-    || install_operator
-  
-  oc get deployments -n openshift-operators || true
-  echo "Wait for ACS operator controller"
+wait_pods_running() {
   for (( i = 0; i < 10; i++ )); do
-    oc get pods -A -lapp==rhacs-operator,control-plane=controller-manager
-    pods_running=$(oc get pods -A -lapp==rhacs-operator,control-plane=controller-manager \
+    oc get pods ${@}
+    pods_running=$(oc get pods ${@}\
       --field-selector="status.phase==Running" --no-headers | wc -l)
     if [[ "${pods_running}" -gt 0 ]]; then
       break
@@ -357,6 +350,15 @@ if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     echo "retry:${i} (sleep 30s)"
     sleep 30
   done
+}
+
+if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  oc get crd -n openshift-operators centrals.platform.stackrox.io \
+    || install_operator
+  
+  oc get deployments -n openshift-operators || true
+  echo "Wait for ACS operator controller"
+  wait_pods_running -A -lapp==rhacs-operator,control-plane=controller-manager
   
   oc_wait_for_condition_created crd centrals.platform.stackrox.io
   oc get crd -n openshift-operators \
