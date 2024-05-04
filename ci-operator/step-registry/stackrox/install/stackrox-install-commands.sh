@@ -21,6 +21,7 @@ secured_cluster_cr_url=${example_cr_url}/secured-cluster-cr.yaml
 export SHARED_DIR=${SHARED_DIR:-}
 export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 
+delete_on_exit=""
 function exit_handler() {
   echo ">>> End ACS install [$(date -u)]"
   echo "KUBECONFIG=${KUBECONFIG}"
@@ -28,7 +29,7 @@ function exit_handler() {
   oc logs -n stackrox --selector="app==central" --pod-running-timeout=1s --tail=20
   oc events -n stackrox --types=Warning
   oc get pods -n "stackrox"
-  IFS=: for file in ${delete_on_exit}; do
+  for file in ${delete_on_exit//:/ }; do
     rm -f "${file}" || true
   done
 }
