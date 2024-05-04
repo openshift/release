@@ -19,20 +19,20 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 echo "SHARED_DIR=${SHARED_DIR}"
 echo "KUBECONFIG=${KUBECONFIG}"
 
-example_cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
-central_cr_url=${example_cr_url}/central-cr.yaml 
-secured_cluster_cr_url=${example_cr_url}/secured-cluster-cr.yaml 
+cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
 
 SCRATCH=$(mktemp -d)
 cd "${SCRATCH}"
 function exit_handler() {
+  set +e
   echo ">>> End ACS install [$(date -u)]"
-  echo "KUBECONFIG=${KUBECONFIG}"
+  rm -rf "${SCRATCH}"
   set -x
+  oc get clusteroperators || true
+  oc get deployments -A
   oc logs -n stackrox --selector="app==central" --pod-running-timeout=1s --tail=20
   oc events -n stackrox --types=Warning
   oc get pods -n "stackrox"
-  rm -rf "${SCRATCH}"
 }
 trap 'exit_handler' EXIT
 trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
@@ -95,7 +95,6 @@ function uninstall_acs() {
   oc -n stackrox delete persistentvolumeclaims stackrox-db --wait >/dev/null 2>&1 || true
   oc delete subscription -n openshift-operators --field-selector="metadata.name==rhacs-operator" --wait || true
 }
-#uninstall_acs
 
 ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
@@ -226,75 +225,29 @@ function install_operator() {
 
 }
 
-function create_example_kind() {
-  local kind
-  kind=${1:-central}
-  CSV=$(oc get csv -o name -n openshift-operators | grep /rhacs-operator.)
-  sleep 5
-  for (( i = 0; i < 5; i++ )); do
-    echo "Apply rhacs-operator's first example for kind==${kind^}."
-    oc get "${CSV}" -o json \
-      | jq -r 'first(.metadata.annotations["alm-examples"] | fromjson | .[] | select(.kind == "'"${kind^}"'"))' \
-      | tee >(cat >&2) \
-      | oc apply -f - \
-      && break
-    echo "retry:${i} (sleep 30s)"
-    sleep 30
-  done
-
-  for (( try = 20; try > 0; try-- )); do
-    oc get "$(oc get "${CSV}" -o json | jq -r '[.spec.customresourcedefinitions.owned[]|.name]|join(",")')"
-    oc -n stackrox rollout status deploy/"${kind,,}" --timeout=2m && break
-    echo "retry, sleep ${try}"
-    sleep "${try}"
-  done
-}
-
-function install_central() {
-  echo ">>> Install Central"
-
-  oc project stackrox >/dev/null 2>&1 \
+function clean_stackrox() {
+  echo "(re)Create stackrox namespace"
+  oc project stackrox > /dev/null 2>&1 \
     && { oc delete project stackrox || true; }
   oc new-project stackrox
-  
   echo "Delete any existing stackrox-db"
   oc -n stackrox delete persistentvolumeclaims stackrox-db >/dev/null 2>&1 || true
-
-  curl -o new.central-cr.yaml "${central_cr_url}"
-  curl_returncode=$?
-  if [[ ${curl_returncode} -eq 0 ]] && [[ $(diff central-cr.yaml new.central-cr.yaml | grep -v password >&2; echo $?) -eq 1 ]]; then
-    echo "WARN: Change in upstream example central [${central_cr_url}]."
-  fi
-
-  oc apply -f central-cr.yaml \
-    || create_example_kind central
 }
 
-function install_secured_cluster() {
-  echo "Create Secured-cluster resource"
-  curl -o new.secured-cluster-cr.yaml "${secured_cluster_cr_url}"
-  curl_returncode=$?
-  if [[ ${curl_returncode} -eq 0 ]] && [[ $(diff secured-cluster-cr.yaml new.secured-cluster-cr.yaml >&2; echo $?) -eq 1 ]]; then
-    echo "WARN: Change in upstream example secured cluster [${secured_cluster_cr_url}]."
+function create_cr() {
+  app=${1:-central}
+  echo ">>> Install ${app^}"
+  if curl -o "new.${app}-cr.yaml" "${cr_url}/${app}-cr.yaml" \
+    && [[ $(diff "${app}-cr.yaml" "new.${app}-cr.yaml" | grep -v password >&2; echo $?) -eq 1 ]]; then
+    echo "WARN: Change in upstream example ${app}. (${cr_url}/${app}-cr.yaml)"
   fi
-  oc get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json \
-    || {
-      oc apply -f secured-cluster-cr.yaml \
-        || create_example_kind SecuredCluster;
-    }
-  for I in {1..10}; do
-    oc get -n stackrox securedclusters.platform.stackrox.io && break
-    sleep 30
-    echo "retry ${I}"
-  done
-  oc get -n stackrox securedclusters.platform.stackrox.io stackrox-secured-cluster-services --output=json
+  oc apply -f "${app}-cr.yaml"
 }
 
 function get_init_bundle() {
-  # global ROX_PASSWORD
   echo ">>> Get init-bundle and save as a cluster secret"
   ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json | jq -er '.data["password"] | @base64d')
-  oc -n stackrox get secret collector-tls && return
+  oc -n stackrox get secret collector-tls && return  # init-bundle exists
   for (( i = 0; i < 5; i++ )); do
     oc -n stackrox exec deploy/central -- \
       roxctl central init-bundles generate my-test-bundle --insecure-skip-tls-verify --password "${ROX_PASSWORD}" --output-secrets - \
@@ -308,46 +261,32 @@ function oc_wait_for_condition_created() {
   for (( i = 0; i < 10; i++ )); do
     oc wait --for condition=established --timeout=120s "${@}" \
       && break
-    echo "retry:${i} (sleep 30s)"
     sleep 30
   done
 }
 
-function wait_deploy_replicas() {
-  local app retry sleeptime
-  app=${1:-central}
-  retry=${2:-6}
-  sleeptime=${3:-30}
-  for (( i = 0; i < retry; i++ )); do
-    { oc -n stackrox get deploy/"${app}" -o json || true; } \
-      | jq -er '.status|(.replicas == .readyReplicas)' >/dev/null 2>&1 \
-        && break
-    if [[ ${i} -eq $(( retry - 1 )) ]]; then
-      echo "WARN: ${app^} replicas are too low."
-    fi
-    echo "retry:${i} (sleep ${sleeptime}s)"
-    sleep "${sleeptime}"
+function wait_deploy() {
+  for (( i = 0; i < 5; i++ )); do
+    oc -n stackrox rollout status deploy/"$1" --timeout=300s \
+      && break
+    sleep 30
   done
-  oc -n stackrox get deploy/"${app}" -o json \
-    | jq -er '.status' || true
 }
 
 wait_pods_running() {
   for (( i = 0; i < 10; i++ )); do
-    oc get pods "${@}"
     pods_running=$(oc get pods "${@}" \
       --field-selector="status.phase==Running" --no-headers | wc -l)
     if [[ "${pods_running}" -gt 0 ]]; then
       break
     fi
-    echo "retry:${i} (sleep 30s)"
     sleep 30
   done
+  oc get pods "${@}"
 }
 
 if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  oc get clusteroperators || true
-  oc get csr -o name
+  uninstall_acs
 
   oc get crd -n openshift-operators centrals.platform.stackrox.io \
     || install_operator
@@ -359,25 +298,26 @@ if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   oc_wait_for_condition_created crd centrals.platform.stackrox.io
   oc get crd -n openshift-operators \
     | grep 'platform.stackrox.io'
+
+  clean_stackrox
   oc -n stackrox rollout status deploy/central --timeout=30s \
-    || install_central
+    || create_cr central
   
-  wait_deploy_replicas central
-  oc get deployments -n stackrox
+  wait_deploy central
   
   get_init_bundle
   
   oc_wait_for_condition_created crd securedclusters.platform.stackrox.io
   oc -n stackrox rollout status deploy/secured-cluster --timeout=30s \
-    || install_secured_cluster
+    || create_cr secured-cluster
   
   echo ">>> Wait for replicas"
   oc get deployments -n stackrox
-  wait_deploy_replicas central-db
-  wait_deploy_replicas scanner
-  wait_deploy_replicas scanner-db
-  wait_deploy_replicas sensor
-  wait_deploy_replicas admission-control
+  wait_deploy central-db
+  wait_deploy scanner
+  wait_deploy scanner-db
+  wait_deploy sensor
+  wait_deploy admission-control
   
   oc -n stackrox get routes central && echo "Warning: routes found" || true
 fi
