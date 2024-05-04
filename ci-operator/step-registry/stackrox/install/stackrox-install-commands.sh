@@ -30,7 +30,7 @@ function exit_handler() {
   oc get pods -n "stackrox"
   IFS=: for file in ${delete_on_exit}; do
     rm -f "${file}" || true
-  fi
+  done
 }
 trap 'exit_handler' EXIT
 trap 'test ${BASH_COMMAND:0:2} == "oc" && echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
