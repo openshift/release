@@ -41,6 +41,28 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
+- as: nvidia-gpu-operator-e2e-master
+  cron: 0 19 * * *
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: single-node-conf-aws
+    - ref: single-node-conf-e2e
+    - chain: ipi-install
+    test:
+    - as: gpu-operator-e2e
+      commands: NVIDIAGPU_DEPLOY_FROM_BUNDLE=true TEST_FEATURES="nvidiagpu" NVIDIAGPU_GPU_MACHINESET_INSTANCE_TYPE="g4dn.xlarge"
+        make run-tests
+      from: nvidia-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
 - as: nvidia-gpu-operator-e2e-23-6-x
   cron: 0 21 * * 1-5
   steps:
