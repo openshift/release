@@ -131,7 +131,8 @@ chmod 0600 ${SSH_PRIVATE}
 SSH_OPTIONS=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'ServerAliveInterval=60' -o 'ServerAliveCountMax=60' -o 'UserKnownHostsFile=/dev/null' -i "${SSH_PRIVATE}")
 # Save private-key, pull-secret and offline-token to bastion
 ssh "${SSH_OPTIONS[@]}" root@${BASTION} "mkdir -p ~/.sno"
-scp "${SSH_OPTIONS[@]}" /etc/sno-power-credentials/{ssh-publickey,pull-secret,offline-token} root@${BASTION}:~/.sno/.
+scp "${SSH_OPTIONS[@]}" /etc/sno-power-credentials/{ssh-publickey,pull-secret,pull-secret-ci,offline-token} root@${BASTION}:~/.sno/.
+scp "${SSH_OPTIONS[@]}" ${SSH_PRIVATE} root@${BASTION}:~/.sno/.
 # set the default INSTALL_TYPE to sno
 INSTALL_TYPE=${INSTALL_TYPE:-sno}
 
@@ -182,7 +183,7 @@ set +e
 API_URL="https://api.openshift.com/api/assisted-install/v2"
 OFFLINE_TOKEN_FILE="\${OFFLINE_TOKEN_FILE:-/root/.sno/offline-token}"
 PULL_SECRET_FILE="\${PULL_SECRET_FILE:-/root/.sno/pull-secret}"
-SSH_PUB_KEY_FILE="\${PUBLIC_KEY_FILE:-/root/.sno/id_rsa.pub}"
+SSH_PUB_KEY_FILE="\${PUBLIC_KEY_FILE:-/root/.sno/ssh-publickey}"
 OFFLINE_TOKEN=\$(cat \${OFFLINE_TOKEN_FILE})
 PULL_SECRET=\$(cat \${PULL_SECRET_FILE} | tr -d '\n' | jq -R .)
 SSH_PUB_KEY=\$(cat \${SSH_PUB_KEY_FILE})
@@ -462,7 +463,7 @@ export POWERVS_VSI_NAME="\${CLUSTER_NAME}-worker"
 set +x
 export PULL_SECRET_FILE=/root/.sno/pull-secret
 export PULL_SECRET="\$(cat \$PULL_SECRET_FILE)"
-SSH_PUB_KEY_FILE=/root/.sno/id_rsa.pub
+SSH_PUB_KEY_FILE=/root/.sno/ssh-publickey
 export SSH_PUB_KEY="\$(cat \$SSH_PUB_KEY_FILE)"
 export OFFLINE_TOKEN_FILE=/root/.sno/offline-token
 
@@ -599,7 +600,7 @@ set +e
 IP_ADDRESS=\$1
 INSTALLATION_DISK=\$2
 
-SSH_OPTIONS=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i /root/.sno/id_rsa)
+SSH_OPTIONS=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i /root/.sno/ssh-privatekey)
 
 for _ in {1..20}; do
     echo "Set boot dev to disk in worker"
