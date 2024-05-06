@@ -93,7 +93,7 @@ function setup_upi_workspace(){
   cd "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir || true
   curl -sL https://raw.githubusercontent.com/ocp-power-automation/openshift-install-power/"${UPI_AUTOMATION_VERSION}"/openshift-install-powervs -o ./openshift-install-powervs
   chmod +x ./openshift-install-powervs
-  ./openshift-install-powervs setup
+  ./openshift-install-powervs setup -ignore-os-checks
 }
 
 function create_upi_tf_varfile(){
@@ -162,7 +162,7 @@ function create_upi_powervs_cluster() {
   # Dev Note: https://github.com/ocp-power-automation/openshift-install-power/blob/devel/openshift-install-powervs#L767C1-L767C145
   # May trigger the redaction
   OUTPUT="yes"
-  ./openshift-install-powervs create -var-file var-mac-upi.tfvars -verbose | sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d; /Login to the console with user/d' | \
+  ./openshift-install-powervs create -ignore-os-checks -var-file var-mac-upi.tfvars -verbose | sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d; /Login to the console with user/d' | \
     while read LINE
     do
         if [[ "${LINE}" == *"BEGIN RSA PRIVATE KEY"* ]]
@@ -179,11 +179,11 @@ function create_upi_powervs_cluster() {
         fi
     done || true
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate "${SHARED_DIR}"/terraform-mac-upi.tfstate
-  ./openshift-install-powervs output > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
-  ./openshift-install-powervs access-info > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
+  ./openshift-install-powervs output -ignore-os-checks > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
+  ./openshift-install-powervs access-info -ignore-os-checks > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
   # Dev Note: the following two lines may be causing the redaction routine to remove the log
-  ./openshift-install-powervs output bastion_private_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
-  ./openshift-install-powervs output bastion_public_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
+  ./openshift-install-powervs output -ignore-os-checks bastion_private_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
+  ./openshift-install-powervs output -ignore-os-checks bastion_public_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
 
   BASTION_PUBLIC_IP=$(<"${SHARED_DIR}/BASTION_PUBLIC_IP")
   echo "BASTION_PUBLIC_IP:- $BASTION_PUBLIC_IP"
