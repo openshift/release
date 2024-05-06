@@ -214,12 +214,12 @@ function get_init_bundle() {
   ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json | jq -er '.data["password"] | @base64d')
   oc -n stackrox get secret collector-tls >/dev/null 2>&1 \
     && return # init-bundle exists
-  function deploy() {
+  function init_bundle() {
     oc -n stackrox exec deploy/central -- \
       roxctl central init-bundles generate my-test-bundle --insecure-skip-tls-verify --password "${ROX_PASSWORD}" --output-secrets - \
       | oc -n stackrox apply -f -
   }
-  retry deploy
+  retry init_bundle
 }
 
 function wait_created() {
