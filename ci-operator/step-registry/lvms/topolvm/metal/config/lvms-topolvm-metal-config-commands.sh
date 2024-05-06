@@ -63,7 +63,23 @@ sudo apt-get install \
 sudo usermod -aG docker ubuntu
 newgrp docker
 
-git clone github.com/topolvm/topolvm@${PULL_PULL_SHA} topolvm
+PULL_NUMBER=${PULL_NUMBER:-}
+
+# Check if PULL_NUMBER environment variable is set and not empty
+if [ -z "\${PULL_NUMBER}" ]; then
+    echo "PULL_NUMBER is not set. Defaulting to the 'main' branch."
+
+    # Clone the repository and checkout the 'main' branch
+    git clone -b main --single-branch https://github.com/openshift/${REPO_NAME}
+else
+    echo "PULL_NUMBER is set to '\${PULL_NUMBER}'. Checking out the pull request."
+
+    # Clone the repository and fetch the pull request branch
+    git clone https://github.com/${REPO_OWNER}/${REPO_NAME}
+    pushd ${REPO_NAME}
+    git pull origin pull/\${PULL_NUMBER}/head:\${PULL_NUMBER}
+    git switch \${PULL_NUMBER}
+fi
 
 EOF
 
