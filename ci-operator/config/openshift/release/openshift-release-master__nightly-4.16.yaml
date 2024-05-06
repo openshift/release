@@ -879,14 +879,30 @@ tests:
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-graceful-shutdown
-- as: e2e-aws-ovn-shared-vpc-phz-techpreview
+- as: e2e-openstack-ovn-techpreview
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: openstack-vexxhost
     env:
-      BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
       FEATURE_SET: TechPreviewNoUpgrade
-    workflow: openshift-e2e-aws-shared-vpc-phz
+      TEST_SUITE: experimental/reliability/minimal
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-nutanix-ovn-techpreview
+  cluster: build01
+  interval: 168h
+  steps:
+    cluster_profile: nutanix
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-nutanix
 - as: e2e-agent-compact-ipv4-conformance
   cluster: build05
   cron: 0 */12 * * *
