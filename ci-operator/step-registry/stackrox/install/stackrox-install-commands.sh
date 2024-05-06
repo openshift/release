@@ -49,12 +49,6 @@ function get_jq() {
 }
 jq --version || get_jq
 
-function uninstall_acs() {
-  oc delete project stackrox || true
-  oc -n stackrox delete persistentvolumeclaims stackrox-db --wait >/dev/null 2>&1 || true
-  oc delete subscription -n openshift-operators --field-selector="metadata.name==rhacs-operator" --wait || true
-}
-
 ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
 cat <<EOF > central-cr.yaml
@@ -214,7 +208,7 @@ function retry() {
   done
 }
 
-function oc_wait_created() {
+function wait_created() {
   retry oc wait --for condition=established --timeout=120s "${@}"
 }
 
@@ -222,31 +216,23 @@ function wait_deploy() {
   retry oc -n stackrox rollout status deploy/"$1" --timeout=300s
 }
 
-wait_pods_running() {
-  for (( i = 0; i < 10; i++ )); do
-    pods_running=$(oc get pods "${@}" \
-      --field-selector="status.phase==Running" --no-headers | wc -l)
-    if [[ "${pods_running}" -gt 0 ]]; then
-      break
-    fi
-    sleep 30
-  done
+function wait_pods_running() {
+  retry oc get pods "${@}" --field-selector="status.phase==Running" \
+    -o jsonpath="{.items[0].metadata.name}" >/dev/null 2>&1
   oc get pods "${@}"
 }
 
 if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  uninstall_acs
-
   install_operator
   wait_pods_running -A -lapp==rhacs-operator,control-plane=controller-manager
-  oc_wait_created crd centrals.platform.stackrox.io
+  wait_created crd centrals.platform.stackrox.io
 
   oc new-project stackrox >/dev/null 2>&1
   create_cr central
   wait_deploy central
   
   get_init_bundle
-  oc_wait_created crd securedclusters.platform.stackrox.io
+  wait_created crd securedclusters.platform.stackrox.io
   create_cr secured-cluster
   
   echo ">>> Wait for deployments"
