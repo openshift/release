@@ -35,6 +35,7 @@ scp "${SSHOPTS[@]}" "${SHARED_DIR}/test-list" "root@${IP}:/tmp/test-list"
 
 echo "### Running tests"
 timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF"
+    set -x
     # prepending each printed line with a timestamp
     exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }') 2>&1
 

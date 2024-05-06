@@ -31,6 +31,42 @@ function gcloud_auth() {
   gcloud config set project "${service_project_id}"
 }
 
+function wait_for_dns() {
+  local -r zone_name=$1; shift
+  local -r expected_num_priv_ip=$1; shift
+  local real_num_priv_ip
+  local tmp_output
+  local cmd
+  local attempt=0
+  local max_attempts=10
+
+  tmp_output=$(mktemp)
+  cmd="gcloud dns record-sets list --zone ${zone_name} --filter=\"(type=A OR type=SRV) AND NOT name~rh-api\" 2>/dev/null | tee ${tmp_output}"  
+  while true; do
+    logger "INFO" "Running Command '${cmd}'"
+    eval "${cmd}"
+    set +o errexit
+    real_num_priv_ip=$(grep -P "\s+10\.[0-9\.]+$" "${tmp_output}" | wc -l)
+    set -o errexit
+
+    logger "INFO" "There are ${real_num_priv_ip} dns record-sets in zone '${zone_name}' with private IP addresses."
+    if [[ ${real_num_priv_ip} -eq ${expected_num_priv_ip} ]]; then
+      logger "INFO" "Found the expected ${real_num_priv_ip} dns record-sets in zone '${zone_name}' with private IP addresses."
+      return 0
+    fi
+
+    attempt=$(( attempt + 1 ))
+    if [[ $attempt -ge $max_attempts ]]; then
+      break
+    fi
+    echo "Checking dns record-sets failed, retrying in $(( 2 ** attempt )) seconds"
+    sleep $(( 2 ** attempt ))
+  done
+
+  logger "ERROR" "Expecting ${expected_num_priv_ip} dns record-sets in zone '${zone_name}' with private IP addresses, but found only ${real_num_priv_ip}."
+  return 1
+}
+
 # Post installation check for private cluster
 function check_private() {
   local api_lisening
@@ -38,9 +74,6 @@ function check_private() {
   local priv_zone_dns
   local pub_zone_name
   local pub_zone_dns
-  local tmp_output
-  local cmd
-  local num_priv_ip
 
   # 1. check API Listening
   api_lisening=$(ocm get cluster "${CLUSTER_ID}" | jq -r .api.listening)
@@ -52,7 +85,7 @@ function check_private() {
   fi
 
   # 2. check on GCP the DNS record-sets
-  tmp_output=$(mktemp)
+  ret=0
   gcloud_auth
 
   # find out the private DNS zone name and public DNS zone name
@@ -63,34 +96,15 @@ function check_private() {
   logger "INFO" "The DNS private zone: ${priv_zone_name} (${priv_zone_dns})"
   logger "INFO" "The DNS public zone: ${pub_zone_name} (${pub_zone_dns})"
 
-  # list DNS record-sets
-  cmd="gcloud dns record-sets list --zone ${pub_zone_name} --filter=\"(type=A OR type=SRV) AND NOT name~rh-api\" 2>/dev/null | tee ${tmp_output}"
-  logger "INFO" "Running Command '${cmd}'"
-  eval "${cmd}"
-  set +o errexit
-  num_priv_ip=$(grep -P "\s+10\.[0-9\.]+$" "${tmp_output}" | wc -l)
-  set -o errexit
-  logger "INFO" "There are ${num_priv_ip} dns record-sets in public zone '${pub_zone_name}' with private IP addresses."
-  # Expecting both api and *.apps dns record-sets in public zone are with private IP addresses
-  if [ ${num_priv_ip} -lt 2 ]; then
-    logger "ERROR" "One or more api/*.apps dns record-sets in zone '${pub_zone_name}' are with non-private IP address."
-    return 1
-  fi
-  cmd="gcloud dns record-sets list --zone ${priv_zone_name} --filter=\"(type=A OR type=SRV) AND NOT name~rh-api\" 2>/dev/null | tee ${tmp_output}"
-  logger "INFO" "Running Command '${cmd}'"
-  eval "${cmd}"
-  set +o errexit
-  num_priv_ip=$(grep -P "\s+10\.[0-9\.]+$" "${tmp_output}" | wc -l)
-  set -o errexit
-  logger "INFO" "There are ${num_priv_ip} dns record-sets in zone '${priv_zone_name}' with private IP addresses."
-  # Expecting all api, api-int and *.apps dns record-sets in private zone are with private IP addresses
-  if [ ${num_priv_ip} -lt 3 ]; then
-    logger "ERROR" "One or more api/api-int/*.apps dns record-sets in private zone '${priv_zone_name}' are with non-private IP address."
-    return 1
-  fi
+  wait_for_dns "${pub_zone_name}" 2 || ret=$(( ret | 1 ))
+  wait_for_dns "${priv_zone_name}" 3 || ret=$(( ret | 2 ))
 
-  logger "INFO" "check_private: Cluster DNS record-sets check passed"
-  return 0
+  if [ $ret -eq 0 ]; then
+    logger "INFO" "check_private: Cluster DNS record-sets check passed"
+  else
+    logger "INFO" "check_private: Cluster DNS record-sets check failed"
+  fi
+  return $ret
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM

@@ -61,7 +61,7 @@ function version_check() {
 }
 
 echo "$(date -u --rfc-3339=seconds) - Configuring gcloud..."
-if version_check "4.12"; then
+if version_check "4.11"; then
   GCLOUD_SDK_VERSION="447"
 else
   GCLOUD_SDK_VERSION="256"
@@ -76,6 +76,7 @@ if ! gcloud --version; then
   export PATH=${HOME}/google-cloud-sdk/bin:${PATH}
   popd
 fi
+gcloud version
 
 if [[ -s "${SHARED_DIR}/xpn.json" ]] && [[ -f "${CLUSTER_PROFILE_DIR}/xpn_creds.json" ]]; then
   echo "Activating XPN service-account..."
