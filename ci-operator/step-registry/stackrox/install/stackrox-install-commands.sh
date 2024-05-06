@@ -2,6 +2,9 @@
 
 set -eou pipefail
 
+OPERATOR_VERSION=${OPERATOR_VERSION:-}
+OPERATOR_CHANNEL=${OPERATOR_CHANNEL:-stable}
+
 cat <<EOF
 Install ACS into a single cluster [$(date -u)].
 * Subscribe to rhacs-operator
@@ -18,7 +21,6 @@ export SHARED_DIR=${SHARED_DIR:-}
 export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 echo "SHARED_DIR=${SHARED_DIR}"
 echo "KUBECONFIG=${KUBECONFIG}"
-OPERATOR_VERSION=${OPERATOR_VERSION:-}
 
 cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
 
@@ -167,7 +169,7 @@ function install_operator() {
   local currentCSV catalogSource catalogSourceNamespace
   echo ">>> Install rhacs-operator"
   oc get packagemanifests rhacs-operator -o jsonpath="{range .status.channels[*]}Channel: {.name} currentCSV: {.currentCSV}{'\n'}{end}"
-  currentCSV=$(oc get packagemanifests rhacs-operator -o jsonpath="{.status.channels[?(.name=='stable')].currentCSV}")
+  currentCSV=$(oc get packagemanifests rhacs-operator -o jsonpath="{.status.channels[?(.name=='${OPERATOR_CHANNEL}')].currentCSV}")
   currentCSV=${OPERATOR_VERSION:-${currentCSV}}
   echo "${currentCSV}"
   catalogSource=$(oc get packagemanifests rhacs-operator -o jsonpath="{.status.catalogSource}")
@@ -179,7 +181,7 @@ function install_operator() {
       name: rhacs-operator
       namespace: openshift-operators
     spec:
-      channel: stable
+      channel: ${OPERATOR_CHANNEL}
       installPlanApproval: Automatic
       name: rhacs-operator
       source: ${catalogSource}
