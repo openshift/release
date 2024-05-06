@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -xeuo pipefail
 
 function retry() {
     local check_func=$1
@@ -70,6 +70,41 @@ function rosa_login() {
 
     #create secret based on rosa token
     oc create secret -n default generic rosa-creds-secret --from-literal=ocmToken="${ROSA_TOKEN}" --from-literal=ocmApiUrl="${ocm_api_url}"
+}
+
+function set_eternal_azure_oidc() {
+  ISSUER_URL="$(cat /var/run/hypershift-ext-oidc-app-cli/issuer-url)"
+  CLI_CLIENT_ID="$(cat /var/run/hypershift-ext-oidc-app-cli/client-id)"
+  CONSOLE_CLIENT_ID="$(cat /var/run/hypershift-ext-oidc-app-console/client-id)"
+  CONSOLE_CLIENT_SECRET="$(cat /var/run/hypershift-ext-oidc-app-console/client-secret)"
+  CONSOLE_CLIENT_SECRET_NAME=console-secret
+
+  oc -n default create secret generic ${CONSOLE_CLIENT_SECRET_NAME} --from-literal=clientSecret="${CONSOLE_CLIENT_SECRET}"
+
+  export EXTERNAL_AUTH_PROVIDERS="  externalAuthProviders:
+    - name: entra-id
+      issuer:
+        issuerURL: ${ISSUER_URL}
+        audiences:
+          - ${CONSOLE_CLIENT_ID}
+          - ${CLI_CLIENT_ID}
+      oidcClients:
+        - componentName: cli
+          componentNamespace: openshift-console
+          clientID: ${CLI_CLIENT_ID}
+        - componentName: console
+          componentNamespace: openshift-console
+          clientID: ${CONSOLE_CLIENT_ID}
+          clientSecret:
+            name: ${CONSOLE_CLIENT_SECRET_NAME}
+      claimMappings:
+        username:
+          claim: email
+          prefixPolicy:
+          prefix: \"oidc-user-test:\"
+        groups:
+          claim: groups
+          prefix: \"oidc-groups-test:\""
 }
 
 function export_envs() {
@@ -208,10 +243,9 @@ ${ADDITIONAL_SECURITY_GROUPS_YAML}"
 
     export NODEPOOL_NAME="nodepool-0"
 
-#    # some other optional spec of rosacontrolplane
-#    export MACHINE_CIDR=${MACHINE_CIDR}
-#    export NETWORK_TYPE=${NETWORK_TYPE}
-#    export ENDPOINT_ACCESS=${ENDPOINT_ACCESS}
+    if [[ "${ENABLE_EXTERNAL_OIDC}" == "true" ]]; then
+      set_eternal_azure_oidc
+    fi
 }
 
 # main
@@ -260,6 +294,7 @@ kind: ROSAControlPlane
 metadata:
   name: "${CLUSTER_NAME}-control-plane"
 spec:
+${EXTERNAL_AUTH_PROVIDERS}
   rosaClusterName: ${CLUSTER_NAME:0:54}
   version: "${OPENSHIFT_VERSION}"
   region: "${AWS_REGION}"
