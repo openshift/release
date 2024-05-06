@@ -47,9 +47,7 @@ sudo subscription-manager repos \
 cd ${remote_workdir}
 
 sudo dnf -y copr enable nmstate/nmstate-git
-sudo dnf -y clean all
-sudo dnf -y update
-sudo dnf -y install nmstate virt-install virt-manager libvirt-nss openshift-clients cockpit-machines golang jq sos
+sudo dnf -y install nmstate virt-install virt-manager libvirt-nss openshift-clients cockpit-machines golang jq sos podman
 
 sudo systemctl start libvirtd
 sudo systemctl enable libvirtd

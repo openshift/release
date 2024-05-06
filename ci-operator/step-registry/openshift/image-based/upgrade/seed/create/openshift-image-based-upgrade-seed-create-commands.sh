@@ -29,8 +29,8 @@ release_base_info=""
 
 case $OCP_IMAGE_SOURCE in
   "ci")
-  seed_base_info="$(curl -s "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep ${OCP_BASE_VERSION} | tail -n1)"
-  release_base_info="$(curl -s "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep ${OCP_BASE_VERSION} | tail -n2 | head -1)"
+  seed_base_info="$(curl -s "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep -F ${OCP_BASE_VERSION} | tail -n1)"
+  release_base_info="$(curl -s "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep -F ${OCP_BASE_VERSION} | tail -n2 | head -1)"
   ;;
   "release")
   seed_base_info="$(curl -s "https://api.openshift.com/api/upgrades_info/graph?arch=amd64&channel=stable-${OCP_BASE_VERSION}" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | tail -n1)"
@@ -62,6 +62,9 @@ case $SEED_IMAGE_TAG_FORMAT in
     ;;
   "nightly")
     SEED_IMAGE_TAG="nightly-${SEED_VERSION}-$(date +%F)"
+    ;;
+  "e2e")
+    SEED_IMAGE_TAG="e2e-${SEED_VERSION}-$(date +%F)"
     ;;
   "presubmit")
     SEED_IMAGE_TAG="pre-${PULL_PULL_SHA}"

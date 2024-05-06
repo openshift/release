@@ -7,6 +7,7 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
+HCP_CLI=""
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4, use HyperShift command"
   arch=$(arch)
@@ -14,6 +15,7 @@ if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
     downURL=$(oc get ConsoleCLIDownload hypershift-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/hypershift.tar.gz ${downURL}
     cd /tmp && tar -xvf /tmp/hypershift.tar.gz
     chmod +x /tmp/hypershift
+    HCP_CLI="/tmp/hypershift"
     cd -
   fi
 else
@@ -25,6 +27,7 @@ else
   echo '{}' | jq --arg auth "$brew_registry_auth" '.auths += {"brew.registry.redhat.io": {"auth": $auth}}' > /tmp/brew_configjson
   oc image extract "brew.${HO_IMAGE}" --path /usr/bin/hypershift-no-cgo:/tmp/hs-cli --registry-config=/tmp/brew_configjson
   chmod +x /tmp/hs-cli/hypershift-no-cgo
+  HCP_CLI="/tmp/hs-cli/hypershift-no-cgo"
 fi
 
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
@@ -34,7 +37,7 @@ if [[ "${PLATFORM_TYPE}" == "Agent" ]]; then
   EXTRA_ARGS="${EXTRA_ARGS} --agent-namespace local-cluster-${CLUSTER_NAME}"
 fi
 
-/tmp/hs-cli/hypershift-no-cgo dump cluster ${EXTRA_ARGS} \
+"${HCP_CLI}" dump cluster ${EXTRA_ARGS} \
 --artifact-dir=$ARTIFACT_DIR \
 --namespace local-cluster \
 --dump-guest-cluster=true \
