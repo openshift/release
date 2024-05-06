@@ -77,8 +77,8 @@ else
     # Clone the repository and fetch the pull request branch
     git clone https://github.com/${REPO_OWNER}/${REPO_NAME}
     pushd ${REPO_NAME}
-    git pull origin pull/\${PULL_NUMBER}/head:\${PULL_NUMBER}
-    git switch \${PULL_NUMBER}
+    git fetch origin pull/\${PULL_NUMBER}/head:\${PULL_NUMBER}
+    git checkout \${PULL_NUMBER}
 fi
 
 EOF
