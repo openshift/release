@@ -164,10 +164,8 @@ echo "Creating manifests..."
 oinst agent create cluster-manifests
 
 mkdir -p "${ARTIFACT_DIR}/cluster-manifests/"
-mkdir -p "${INSTALL_DIR}/openshift/"
 
 cp -rT "${INSTALL_DIR}/cluster-manifests/" "${ARTIFACT_DIR}/cluster-manifests/"
-cp -rT "${INSTALL_DIR}/cluster-manifests/" "${INSTALL_DIR}/openshift/"
 
 ### Inject customized manifests
 # echo -e "\nThe following manifests will be included at installation time:"
