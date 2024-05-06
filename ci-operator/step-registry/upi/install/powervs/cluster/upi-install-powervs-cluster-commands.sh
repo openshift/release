@@ -599,7 +599,7 @@ case "$CLUSTER_TYPE" in
 
   # Generates a workspace name like rdr-mac-upi-4-14-au-syd-n1
   # this keeps the workspace unique
-  CLEAN_VERSION=$(echo "${OCP_VERSION}" | sed 's/\([0-9]*\.[0-9]*\).*/\1/')
+  CLEAN_VERSION=$(echo "${OCP_VERSION}" | sed 's/\([0-9]*\.[0-9]*\).*/\1/' | tr '.' '-')
   WORKSPACE_NAME=rdr-mac-p2-"${CLEAN_VERSION}"-"${POWERVS_ZONE}"
   VPC_NAME="${WORKSPACE_NAME}"-vpc
   echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
