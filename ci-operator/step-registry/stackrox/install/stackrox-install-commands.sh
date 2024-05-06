@@ -18,15 +18,13 @@ export SHARED_DIR=${SHARED_DIR:-}
 export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 echo "SHARED_DIR=${SHARED_DIR}"
 echo "KUBECONFIG=${KUBECONFIG}"
+OPERATOR_VERSION=${OPERATOR_VERSION:-}
 
 cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
 
 SCRATCH=$(mktemp -d)
 cd "${SCRATCH}"
-function exit_handler() {
-  set +e
-  echo ">>> End ACS install [$(date -u)]"
-  rm -rf "${SCRATCH}"
+function debug_print() {
   set -x
   oc get crd -n openshift-operators \
     | grep 'platform.stackrox.io'
@@ -34,6 +32,20 @@ function exit_handler() {
   oc logs -n stackrox --selector="app==central" --pod-running-timeout=1s --tail=20
   oc events -n stackrox --types=Warning
   oc get pods -n "stackrox"
+}
+function exit_handler() {
+  exitcode=$?
+  set +e
+  echo ">>> End ACS install"
+  echo "[$(date -u)]"
+  echo "exitcode:${exitcode}"
+  rm -rf "${SCRATCH}"
+  if [[ ${exitcode} -ne 0 ]]; then
+    debug_print
+    echo "Failed install with ${OPERATOR_VERSION}"
+  else
+    echo "Successfully installed with ${OPERATOR_VERSION}"
+  fi
 }
 trap 'exit_handler' EXIT
 trap 'echo "$(date +%H:%M:%S)# ${BASH_COMMAND}"' DEBUG
@@ -154,8 +166,9 @@ EOF
 function install_operator() {
   local currentCSV catalogSource catalogSourceNamespace
   echo ">>> Install rhacs-operator"
-  oc get packagemanifests rhacs-operator -o jsonpath="{range .status.channels[*]}Channel: {.name} currentCSV: {.currentCSV} installMode: {.currentCSV.installModes}{'\n'}{end}"
+  oc get packagemanifests rhacs-operator -o jsonpath="{range .status.channels[*]}Channel: {.name} currentCSV: {.currentCSV}{'\n'}{end}"
   currentCSV=$(oc get packagemanifests rhacs-operator -o jsonpath="{.status.channels[?(.name=='stable')].currentCSV}")
+  currentCSV=${OPERATOR_VERSION:-${currentCSV}}
   echo "${currentCSV}"
   catalogSource=$(oc get packagemanifests rhacs-operator -o jsonpath="{.status.catalogSource}")
   catalogSourceNamespace=$(oc get packagemanifests rhacs-operator -o jsonpath="{.status.catalogSourceNamespace}")
@@ -175,6 +188,7 @@ function install_operator() {
   " | sed -e 's/^    //' \
     | tee >(cat 1>&2) \
     | oc apply -f -
+  OPERATOR_VERSION=$currentCSV
 }
 
 function create_cr() {
