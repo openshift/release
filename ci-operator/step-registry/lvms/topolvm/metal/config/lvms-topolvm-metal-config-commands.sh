@@ -65,7 +65,6 @@ newgrp docker
 
 PULL_NUMBER=${PULL_NUMBER:-}
 
-rm -rf ${REPO_NAME}
 
 # Check if PULL_NUMBER environment variable is set and not empty
 # if the repo is openshift/release, we have a PR during testing but it will be for openshift/release,
@@ -74,11 +73,13 @@ if [ -z "\${PULL_NUMBER}" ] || [ "${REPO_OWNER}/${REPO_NAME}" == "openshift/rele
     echo "PULL_NUMBER is not set or pj-rehearse detected. Defaulting to the 'main' branch of 'openshift/topolvm'."
 
     # Clone the repository and checkout the 'main' branch
+    rm -rf topolvm
     git clone -b main --single-branch https://github.com/openshift/topolvm
 else
     echo "PULL_NUMBER is set to '\${PULL_NUMBER}'. Checking out the pull request."
 
     # Clone the repository and fetch the pull request branch
+    rm -rf ${REPO_NAME}
     git clone https://github.com/${REPO_OWNER}/${REPO_NAME}
     pushd ${REPO_NAME}
     git fetch origin pull/\${PULL_NUMBER}/head:\${PULL_NUMBER}
