@@ -8,14 +8,18 @@ function download_oc() {
     which oc
     oc version --client
 }
+# Default oc on OCP 4.16 not support OpenSSL 1.x
 function extract_oc() {
     mkdir -p /tmp/client
     export OC_DIR="/tmp/client"
     export PATH=${OC_DIR}:$PATH
     echo -e "Extracting oc\n"
-    local retry=5 tmp_oc="/tmp/client-2"
+    local retry=5 tmp_oc="/tmp/client-2" binary='oc'
     mkdir -p ${tmp_oc}
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${RELEASE_IMAGE_TARGET}); do
+    if (( $1 > 15 )) && (openssl version | grep -q "OpenSSL 1") ; then
+        binary='oc.rhel8'
+    fi
+    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=${binary} --to=${tmp_oc} ${RELEASE_IMAGE_TARGET}); do
         echo >&2 "Failed to extract oc binary, retry..."
         ((retry -= 1))
         if ((retry < 0)); then return 1; fi
@@ -35,7 +39,7 @@ if [[ -n "$minor_version" && "$minor_version" -lt 10 ]]; then
     echo "Y version is less than 10, using oc 4.10 directly"
     download_oc
 else
-    extract_oc
+    extract_oc $minor_version
 fi
 start_date=$(date +"%Y-%m-%dT%H:%M:%S%:z")
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
