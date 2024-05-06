@@ -60,7 +60,6 @@ sudo apt-get install \
     util-linux \
     -y
 
-sudo groupadd docker
 sudo usermod -aG docker ubuntu
 newgrp docker
 
