@@ -18,19 +18,22 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 if [[ -n ${MCE} ]] ; then
-  HYPERSHIFT_NAME=hcp
-  if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-    echo "MCE version is less than 2.4, use hypershift command"
-    HYPERSHIFT_NAME=hypershift
-  fi
-
   arch=$(arch)
   if [ "$arch" == "x86_64" ]; then
-    downURL=$(oc get ConsoleCLIDownload hcp-cli-download -o=jsonpath='{.spec.links[?(@.text=="Download hcp CLI for Linux for x86_64")].href}') && curl -k --output "/tmp/${HYPERSHIFT_NAME}.tar.gz" "${downURL}"
-    cd /tmp && tar -xvf "/tmp/${HYPERSHIFT_NAME}.tar.gz"
-    chmod +x "/tmp/${HYPERSHIFT_NAME}"
-    HCP_CLI="/tmp/${HYPERSHIFT_NAME}"
-    cd -
+    if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
+      echo "MCE version is less than 2.4, use hypershift command"
+      downURL=$(oc get ConsoleCLIDownload hypershift-cli-download -o=jsonpath='{.spec.links[?(@.text=="Download hypershift CLI for Linux for x86_64")].href}') && curl -k --output "/tmp/hypershift.tar.gz" "${downURL}"
+      cd /tmp && tar -xvf "/tmp/hypershift.tar.gz"
+      chmod +x "/tmp/hypershift"
+      HCP_CLI="/tmp/hypershift"
+      cd -
+    else
+      downURL=$(oc get ConsoleCLIDownload hcp-cli-download -o=jsonpath='{.spec.links[?(@.text=="Download hcp CLI for Linux for x86_64")].href}') && curl -k --output "/tmp/hcp.tar.gz" "${downURL}"
+      cd /tmp && tar -xvf "/tmp/hcp.tar.gz"
+      chmod +x "/tmp/hcp"
+      HCP_CLI="/tmp/hcp"
+      cd -
+    fi
   fi
 fi
 
