@@ -303,7 +303,7 @@ EOF
 
 # Extracting the installer binary
 echo "Extracting the openshift-install binary"
-oc adm release extract -a $HOME/abi-pull-secret-compact --command openshift-install $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE --to=$HOME/$CLUSTER_NAME/
+oc adm release extract -a $HOME/abi-pull-secret-compact --command openshift-install $OCP_RELEASE_IMAGE --to=$HOME/$CLUSTER_NAME/
 
 # Generate PXE artifacts
 echo "Generating pxe-boot artifacts for SNO cluster"
