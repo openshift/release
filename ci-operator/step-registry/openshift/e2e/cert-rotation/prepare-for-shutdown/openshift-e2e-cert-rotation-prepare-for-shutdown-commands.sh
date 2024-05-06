@@ -164,6 +164,8 @@ prepull-tools-image-for-gather-step
 HOST_TZ=$(date +"%Z %z" | cut -d' ' -f1)
 run-on-all-nodes "timedatectl set-timezone ${HOST_TZ}"
 
+oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=30m
+
 oc -n openshift-machine-config-operator create serviceaccount kubelet-bootstrap-cred-manager
 oc -n openshift-machine-config-operator adm policy add-cluster-role-to-user cluster-admin -z kubelet-bootstrap-cred-manager
 cat << 'EOZ' > /tmp/kubelet-bootstrap-cred-manager-ds.yaml
