@@ -71,10 +71,10 @@ rm -rf ${REPO_NAME}
 # if the repo is openshift/release, we have a PR during testing but it will be for openshift/release,
 # so also fallback to main branch in that case.
 if [ -z "\${PULL_NUMBER}" ] || [ "${REPO_OWNER}/${REPO_NAME}" == "openshift/release" ]; then
-    echo "PULL_NUMBER is not set. Defaulting to the 'main' branch."
+    echo "PULL_NUMBER is not set or pj-rehearse detected. Defaulting to the 'main' branch of 'openshift/topolvm'."
 
     # Clone the repository and checkout the 'main' branch
-    git clone -b main --single-branch https://github.com/openshift/${REPO_NAME}
+    git clone -b main --single-branch https://github.com/openshift/topolvm
 else
     echo "PULL_NUMBER is set to '\${PULL_NUMBER}'. Checking out the pull request."
 
