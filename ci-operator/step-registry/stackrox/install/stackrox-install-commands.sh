@@ -189,25 +189,24 @@ function create_cr() {
   oc apply -f "${app}-cr.yaml"
 }
 
-function get_init_bundle() {
-  echo ">>> Get init-bundle and save as a cluster secret"
-  ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json | jq -er '.data["password"] | @base64d')
-  oc -n stackrox get secret collector-tls >/dev/null 2>&1 \
-    && return # init-bundle exists
-  for (( i = 0; i < 5; i++ )); do
-    oc -n stackrox exec deploy/central -- \
-      roxctl central init-bundles generate my-test-bundle --insecure-skip-tls-verify --password "${ROX_PASSWORD}" --output-secrets - \
-      | oc -n stackrox apply -f - && break
-    echo "retry:${i} (sleep 10s)"
-    sleep 10
-  done
-}
-
 function retry() {
   for (( i = 0; i < 10; i++ )); do
     "$@" && break
     sleep 30
   done
+}
+
+function get_init_bundle() {
+  echo ">>> Get init-bundle and save as a cluster secret"
+  ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json | jq -er '.data["password"] | @base64d')
+  oc -n stackrox get secret collector-tls >/dev/null 2>&1 \
+    && return # init-bundle exists
+  function deploy() {
+    oc -n stackrox exec deploy/central -- \
+      roxctl central init-bundles generate my-test-bundle --insecure-skip-tls-verify --password "${ROX_PASSWORD}" --output-secrets - \
+      | oc -n stackrox apply -f -
+  }
+  retry deploy
 }
 
 function wait_created() {
