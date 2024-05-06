@@ -252,10 +252,10 @@ if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   create_cr secured-cluster
 
   echo ">>> Wait for deployments"
-  oc get deployments -n stackrox
   wait_deploy central-db
   wait_deploy scanner
   wait_deploy scanner-db
   wait_deploy sensor
   wait_deploy admission-control
+  oc get deployments -n stackrox
 fi
