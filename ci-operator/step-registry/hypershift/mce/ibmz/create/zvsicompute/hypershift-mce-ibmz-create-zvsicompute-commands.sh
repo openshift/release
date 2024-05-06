@@ -260,7 +260,7 @@ curl -k -L --output $HOME/rootfs.img "$rootfs_url"
 scp "${ssh_options[@]}" $HOME/rootfs.img root@$httpd_vsi_ip:/var/www/html/rootfs.img 
 ssh "${ssh_options[@]}" root@$httpd_vsi_ip "chmod 644 /var/www/html/rootfs.img"
 echo "Downloading the setup script for pxeboot of agents"
-curl -k -L --output $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot.sh"
+curl -k -L --output $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot_hcp.sh"
 minitrd_url="${initrd_url//&/\\&}"                                 # Escaping & while replacing the URL
 export minitrd_url
 mkernel_url="${kernel_url//&/\\&}"                                 # Escaping & while replacing the URL
@@ -282,7 +282,6 @@ done
 
 # Deleting the resources downloaded in the pod
 rm -f $HOME/setup_pxeboot.sh  $HOME/rootfs.img
-
 # Wait for agents to join (max: 20 min)
 for ((i=50; i>=1; i--)); do
   agents_count=$(oc get agents -n $hcp_ns --no-headers | wc -l)
