@@ -83,6 +83,35 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
+- as: aws-ipi-f9-longduration-apiserver
+  cron: 4 14 9,21,30 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      OCP_ARCH: arm64
+      TEST_SCENARIOS: API_Server
+      TEST_TIMEOUT: "600"
+    test:
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-f9-longduration-hive-remaining
+  cron: 12 5 7,16,25 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FILTERS_ADDITIONAL: ~CPaasrunOnly&;~HiveSDRosa&;~HiveSpec&
+      OCP_ARCH: arm64
+      TEST_SCENARIOS: Cluster_Operator
+      TEST_TIMEOUT: "90"
+    test:
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-f9-longduration-part1-3
   cron: 23 1 6,15,27 * *
   steps:
