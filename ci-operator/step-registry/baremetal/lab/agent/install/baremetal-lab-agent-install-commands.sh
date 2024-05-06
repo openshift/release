@@ -67,8 +67,19 @@ INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
 mkdir -p "${INSTALL_DIR}"
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
-   --command=openshift-install --to=/tmp
+
+
+
+if [ "${FIPS_ENABLED}" == "true" ]; then
+  oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+  --command=openshift-install-fips --to=/tmp
+  mv /tmp/openshift-install-fips /tmp/openshift-install
+else
+  oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+  --command=openshift-install --to=/tmp
+fi
+
+
 
 # We change the payload image to the one in the mirror registry only when the mirroring happens.
 # For example, in the case of clusters using cluster-wide proxy, the mirroring is not required.
