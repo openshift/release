@@ -159,7 +159,6 @@ function install_operator() {
   echo "${currentCSV}"
   catalogSource=$(oc get packagemanifests rhacs-operator -o jsonpath="{.status.catalogSource}")
   catalogSourceNamespace=$(oc get packagemanifests rhacs-operator -o jsonpath="{.status.catalogSourceNamespace}")
-  
   echo "Add subscription"
   echo "apiVersion: operators.coreos.com/v1alpha1
     kind: Subscription
@@ -231,11 +230,11 @@ if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   oc new-project stackrox >/dev/null 2>&1
   create_cr central
   wait_deploy central
-  
+
   get_init_bundle
   wait_created crd securedclusters.platform.stackrox.io
   create_cr secured-cluster
-  
+
   echo ">>> Wait for deployments"
   oc get deployments -n stackrox
   wait_deploy central-db
