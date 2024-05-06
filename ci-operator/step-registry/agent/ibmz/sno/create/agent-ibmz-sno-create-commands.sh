@@ -308,31 +308,32 @@ oc adm release extract -a $HOME/abi-pull-secret-compact --command openshift-inst
 # Generate PXE artifacts
 echo "Generating pxe-boot artifacts for SNO cluster"
 $HOME/$CLUSTER_NAME/openshift-install agent create pxe-files --dir $HOME/$CLUSTER_NAME/ --log-level debug
+cp $HOME/$CLUSTER_NAME/boot-artifacts/ $HOME/$CLUSTER_NAME/boot-artifacts-$PROW_JOB_ID/ 
 
 # Generating script for agent boot execution on zVSI
 echo "Uploading the pxe-boot artifacts to HTTPD server"
-scp -r "${ssh_options[@]}" $HOME/$CLUSTER_NAME/boot-artifacts/ root@$httpd_vsi_ip:/var/www/html/
-ssh "${ssh_options[@]}" root@$httpd_vsi_ip "mv /var/www/html/boot-artifacts/* /var/www/html/; chmod 644 /var/www/html/*; rm -rf /var/www/html/boot-artifacts/"
+scp -r "${ssh_options[@]}" $HOME/$CLUSTER_NAME/boot-artifacts-$PROW_JOB_ID/ root@$httpd_vsi_ip:/var/www/html/
+ssh "${ssh_options[@]}" root@$httpd_vsi_ip "chmod -R 644 /var/www/html/boot-artifacts-$PROW_JOB_ID/"
 echo "Downloading the setup script for pxeboot of SNO"
-curl -k -L --output $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot.sh"
-initrd_url="http://$httpd_vsi_ip:80/agent.s390x-initrd.img"
-kernel_url="http://$httpd_vsi_ip:80/agent.s390x-kernel.img"
-sed -i "s|INITRD_URL|${initrd_url}|" $HOME/setup_pxeboot.sh 
-sed -i "s|KERNEL_URL|${kernel_url}|" $HOME/setup_pxeboot.sh 
-sed -i "s|HTTPD_VSI_IP|${httpd_vsi_ip}|" $HOME/setup_pxeboot.sh 
-sed -i "s|rootfs.img|agent.s390x-rootfs.img|" $HOME/setup_pxeboot.sh 
-chmod 700 $HOME/setup_pxeboot.sh
+curl -k -L --output $HOME/trigger_pxeboot.sh "http://$httpd_vsi_ip:80/trigger_pxeboot.sh"
+initrd_url="http://$httpd_vsi_ip:80/boot-artifacts-$PROW_JOB_ID/agent.s390x-initrd.img"
+kernel_url="http://$httpd_vsi_ip:80/boot-artifacts-$PROW_JOB_ID/agent.s390x-kernel.img"
+rootfs_url="http://$httpd_vsi_ip:80/boot-artifacts-$PROW_JOB_ID/agent.s390x-rootfs.img"
+sed -i "s|INITRD_URL|${initrd_url}|" $HOME/trigger_pxeboot.sh 
+sed -i "s|KERNEL_URL|${kernel_url}|" $HOME/trigger_pxeboot.sh 
+sed -i "s|ROOTFS_URL|${rootfs_url}|" $HOME/trigger_pxeboot.sh 
+chmod 700 $HOME/trigger_pxeboot.sh
 
 # Booting up zVSI as SNO cluster
 echo "Transferring the setup script to zVSI $zvsi_fip"
-scp "${ssh_options[@]}" $HOME/setup_pxeboot.sh core@$zvsi_fip:/var/home/core/setup_pxeboot.sh
+scp "${ssh_options[@]}" $HOME/trigger_pxeboot.sh core@$zvsi_fip:/var/home/core/trigger_pxeboot.sh
 echo "Triggering the script in the zVSI $zvsi_fip"
-ssh "${ssh_options[@]}" core@$zvsi_fip "/var/home/core/setup_pxeboot.sh" &
+ssh "${ssh_options[@]}" core@$zvsi_fip "/var/home/core/trigger_pxeboot.sh" &
 sleep 60
 echo "Successfully booted the zVSI $zvsi_fip with the setup script"
 
-# Deleting the resources in the pod
-rm -f $HOME/setup_pxeboot.sh
+# Deleting the additional resources in the pod
+rm -rf $HOME/trigger_pxeboot.sh $HOME/$CLUSTER_NAME/boot-artifacts-$PROW_JOB_ID/
 
 # Wait for installation to complete --> monitoring in bastion node
 echo "Uploading the cluster artifacts directory to bastion node for monitoring"
