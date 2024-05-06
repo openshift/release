@@ -66,7 +66,9 @@ newgrp docker
 PULL_NUMBER=${PULL_NUMBER:-}
 
 # Check if PULL_NUMBER environment variable is set and not empty
-if [ -z "\${PULL_NUMBER}" ]; then
+# if the repo is openshift/release, we have a PR during testing but it will be for openshift/release,
+# so also fallback to main branch in that case.
+if [ -z "\${PULL_NUMBER}" ] || [ "${REPO_OWNER}/${REPO_NAME}" != "openshift/release" ]; then
     echo "PULL_NUMBER is not set. Defaulting to the 'main' branch."
 
     # Clone the repository and checkout the 'main' branch
