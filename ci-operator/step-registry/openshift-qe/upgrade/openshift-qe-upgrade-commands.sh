@@ -36,7 +36,7 @@ else
       TARGET_RELEASES="$(oc adm release info "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" --output=json | jq -r '.metadata.version')"
 fi
 echo  "-------------------------------------------------------------------------------------------"
-echo  Loaded Upgrade from [ $CURRENT_VERSION ] to [ $TARGET_RELEASES ]
+echo  Upgrade from [ $CURRENT_VERSION ] to [ $TARGET_RELEASES ]
 echo  "-------------------------------------------------------------------------------------------"
 
 if [ -d ocp-qe-perfscale-ci ];then
