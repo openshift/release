@@ -19,7 +19,7 @@ export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 echo "SHARED_DIR=${SHARED_DIR}"
 echo "KUBECONFIG=${KUBECONFIG}"
 
-cr_url=https://raw.githubusercontentbad.com/stackrox/stackrox/master/operator/tests/common
+cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests/common
 
 SCRATCH=$(mktemp -d)
 cd "${SCRATCH}"
@@ -152,6 +152,7 @@ spec:
 EOF
 
 function install_operator() {
+  local currentCSV catalogSource catalogSourceNamespace
   echo ">>> Install rhacs-operator"
   oc get packagemanifests rhacs-operator -o jsonpath="{range .status.channels[*]}Channel: {.name} currentCSV: {.currentCSV} installMode: {.currentCSV.installModes}{'\n'}{end}"
   currentCSV=$(oc get packagemanifests rhacs-operator -o jsonpath="{.status.channels[?(.name=='stable')].currentCSV}")
@@ -178,6 +179,7 @@ function install_operator() {
 }
 
 function create_cr() {
+  local app
   app=${1:-central}
   echo ">>> Install ${app^}"
   if curl -Ls -o "new.${app}-cr.yaml" "${cr_url}/${app}-cr.yaml" \
