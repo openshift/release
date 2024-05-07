@@ -265,7 +265,7 @@ sleep 5
 create_icsp_connected
 check_olm_capability
 check_marketplace
-sleep 14400
+#sleep 14400
 create_catalog_sources
 
 #support hypershift config guest cluster's icsp
