@@ -58,6 +58,7 @@ sudo apt-get install \
     curl \
     lvm2 \
     util-linux \
+    make \
     -y
 
 sudo usermod -aG docker ubuntu
