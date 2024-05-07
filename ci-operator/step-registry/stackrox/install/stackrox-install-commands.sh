@@ -30,7 +30,7 @@ function exit_handler() {
   exitcode=$?
   set +e
   echo ">>> End ACS install"
-  echo "[$(date -u)]"
+  echo "[$(date -u)] SECONDS=${SECONDS}"
   rm -rf "${SCRATCH}"
   if [[ ${exitcode} -ne 0 ]]; then
     echo "Failed install with ${OPERATOR_VERSION}"
