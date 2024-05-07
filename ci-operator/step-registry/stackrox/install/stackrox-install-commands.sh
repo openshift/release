@@ -52,7 +52,7 @@ function get_jq() {
 }
 jq --version || get_jq
 
-ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json | jq -er '.data["password"] | @base64d' 2>/dev/null) \
+ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json 2>/dev/null | jq -er '.data["password"] | @base64d') \
   || ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
 cat <<EOF > central-cr.yaml
@@ -232,7 +232,7 @@ function wait_deploy() {
 function wait_pods_running() {
   retry oc get pods "${@}" --field-selector="status.phase==Running" \
     -o jsonpath="{.items[0].metadata.name}" >/dev/null 2>&1 \
-    || { oc get pods "${@}"; exit 1; }
+    || { oc get pods "${@}"; return 1; }
 }
 
 if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
