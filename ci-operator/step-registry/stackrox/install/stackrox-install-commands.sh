@@ -33,7 +33,6 @@ function exit_handler() {
   echo "[$(date -u)]"
   rm -rf "${SCRATCH}"
   if [[ ${exitcode} -ne 0 ]]; then
-    echo "Error at LINENO=${LINENO}: \`${BASH_COMMAND}\`"
     echo "Failed install with ${OPERATOR_VERSION}"
   else
     echo "Successfully installed with ${OPERATOR_VERSION}"
