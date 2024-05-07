@@ -1,11 +1,11 @@
 #!/bin/bash
 set -xeuo pipefail
 
-DRY_RUN=""
-if [[ "$JOB_NAME" == rehearse* ]]; then
-    echo "INFO: \$JOB_NAME starts with rehearse - running in DRY RUN mode"
-    DRY_RUN="-n"
-fi
+# DRY_RUN=""
+# if [[ "$JOB_NAME" == rehearse* ]]; then
+#     echo "INFO: \$JOB_NAME starts with rehearse - running in DRY RUN mode"
+#     DRY_RUN="-n"
+# fi
 
 export PATH="${HOME}/.local/bin:${PATH}"
 
