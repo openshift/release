@@ -31,21 +31,19 @@ cat <<EOF > ${SHARED_DIR}/run-conformance.sh
 #!/bin/bash
 set -euo pipefail
 
-cd ${remote_workdir}/topolvm
+TEST_SCHEDULER_EXTENDER_TYPE=none
+TEST_LVMD_TYPE=embedded
+KUBERNETES_VERSION=v1.28.0
 
-make -C test/e2e incluster-lvmd/create-vg
-make -C test/e2e incluster-lvmd/setup-minikube
-make -C test/e2e incluster-lvmd/launch-minikube
-
-export TEST_SCHEDULER_EXTENDER_TYPE=none
-export TEST_LVMD_TYPE=embedded
-export KUBERNETES_VERSION=v1.28.0
-
-make -C test/e2e incluster-lvmd/test
+make -C ${remote_workdir}/topolvm/test/e2e \
+    incluster-lvmd/create-vg \
+    incluster-lvmd/test \
+    incluster-lvmd/setup-minikube \
+    incluster-lvmd/launch-minikube
 
 EOF
 
-chmod +x ${SHARED_DIR}/install.sh
-scp "${SSHOPTS[@]}" ${SHARED_DIR}/install.sh $ssh_host_ip:$remote_workdir
+chmod +x ${SHARED_DIR}/run-conformance.sh
+scp "${SSHOPTS[@]}" ${SHARED_DIR}/run-conformance.sh $ssh_host_ip:$remote_workdir
 
-ssh "${SSHOPTS[@]}" $ssh_host_ip "${remote_workdir}/install.sh"
+ssh "${SSHOPTS[@]}" $ssh_host_ip "${remote_workdir}/run-conformance.sh"
