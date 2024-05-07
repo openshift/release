@@ -46,30 +46,36 @@ resources:
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: build
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   commands: |
     true
   container:
     from: bin
 - as: verify
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   commands: |
     make verify -k --warn-undefined-variables
   container:
     from: bin
 - as: verify-deps
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   commands: |
     make verify-deps -k --warn-undefined-variables
   container:
     from: bin
 - as: unit
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   commands: |
     make test --warn-undefined-variables
   container:
     from: test-bin
 - as: integration
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   commands: make test-integration
   container:
     from: test-bin
 - as: e2e
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     dependencies:
       COMPONENT_IMAGE_REF: multicloud-manager
@@ -108,6 +114,7 @@ tests:
           cpu: 100m
     workflow: ocm-e2e-clusterpool
 - as: sonar-pre-submit
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -126,6 +133,7 @@ tests:
         requests:
           cpu: 100m
 - as: sonar-post-submit
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   postsubmit: true
   steps:
     test:

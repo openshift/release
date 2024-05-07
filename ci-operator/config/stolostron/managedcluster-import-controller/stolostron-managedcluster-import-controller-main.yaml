@@ -45,6 +45,7 @@ resources:
       memory: 200Mi
 tests:
 - as: sonar-pre-submit
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   commands: |
     export XDG_CACHE_HOME="/tmp"
     export SELF="make -f /opt/build-harness/Makefile.prow"
@@ -55,6 +56,7 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 - as: sonar-post-submit
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   commands: |
     export SONAR_GO_TEST_ARGS="./..."
     export XDG_CACHE_HOME="/tmp"
@@ -67,14 +69,17 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 - as: check
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   commands: make check
   container:
     from: src
 - as: unit
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   commands: make test
   container:
     from: src
 - as: e2e
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     dependencies:
       COMPONENT_IMAGE_REF: managedcluster-import-controller
