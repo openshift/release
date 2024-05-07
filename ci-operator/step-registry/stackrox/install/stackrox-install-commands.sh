@@ -7,12 +7,12 @@ OPERATOR_CHANNEL=${OPERATOR_CHANNEL:-stable}
 
 cat <<EOF
 Install ACS into a single cluster [$(date -u)].
-* Subscribe to rhacs-operator
-* In new namespace "stackrox",
-  * Create central custom resource
-  * Wait for Central to start
-  * Request init-bundle from Central
-  * Create secured-cluster custom resource with init-bundle
+* Subscribe to rhacs-operator.
+* In new namespace "stackrox":
+  * Create central custom resource.
+  * Wait for Central to start.
+  * Request init-bundle from Central.
+  * Create secured-cluster custom resource with init-bundle.
   * Wait for all services minimal running state.
 EOF
 
@@ -26,24 +26,14 @@ cr_url=https://raw.githubusercontent.com/stackrox/stackrox/master/operator/tests
 
 SCRATCH=$(mktemp -d)
 cd "${SCRATCH}"
-function debug_print() {
-  set -x
-  oc get crd -n openshift-operators \
-    | grep 'platform.stackrox.io'
-  oc get deployments -A
-  oc logs -n stackrox --selector="app==central" --pod-running-timeout=1s --tail=20
-  oc events -n stackrox --types=Warning
-  oc get pods -n "stackrox"
-}
 function exit_handler() {
   exitcode=$?
   set +e
   echo ">>> End ACS install"
   echo "[$(date -u)]"
-  echo "exitcode:${exitcode}"
   rm -rf "${SCRATCH}"
   if [[ ${exitcode} -ne 0 ]]; then
-    debug_print
+    echo "Error at LINENO=${LINENO}: \`${BASH_COMMAND}\`"
     echo "Failed install with ${OPERATOR_VERSION}"
   else
     echo "Successfully installed with ${OPERATOR_VERSION}"
@@ -63,7 +53,8 @@ function get_jq() {
 }
 jq --version || get_jq
 
-ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
+ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json | jq -er '.data["password"] | @base64d') \
+  || ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
 cat <<EOF > central-cr.yaml
 apiVersion: platform.stackrox.io/v1alpha1
@@ -191,7 +182,7 @@ function install_operator() {
   " | sed -e 's/^    //' \
     | tee >(cat 1>&2) \
     | oc apply -f -
-  OPERATOR_VERSION=$currentCSV
+  OPERATOR_VERSION="${currentCSV}"
 }
 
 function create_cr() {
@@ -200,26 +191,27 @@ function create_cr() {
   echo ">>> Install ${app^}"
   if curl -Ls -o "new.${app}-cr.yaml" "${cr_url}/${app}-cr.yaml" \
     && [[ $(diff "${app}-cr.yaml" "new.${app}-cr.yaml" | grep -v password >&2; echo $?) -eq 1 ]]; then
-    echo "WARN: Change in upstream example ${app}. (${cr_url}/${app}-cr.yaml)"
+    echo "INFO: Diff in upstream example ${app}. (${cr_url}/${app}-cr.yaml)"
   fi
   oc apply -f "${app}-cr.yaml"
 }
 
 function retry() {
   for (( i = 0; i < 10; i++ )); do
-    "$@" && break
-    sleep 30
+    "$@" && return 0
+    sleep 1
   done
+  return 1
 }
 
 function get_init_bundle() {
   echo ">>> Get init-bundle and save as a cluster secret"
-  ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json | jq -er '.data["password"] | @base64d')
   oc -n stackrox get secret collector-tls >/dev/null 2>&1 \
     && return # init-bundle exists
   function init_bundle() {
     oc -n stackrox exec deploy/central -- \
-      roxctl central init-bundles generate my-test-bundle --insecure-skip-tls-verify --password "${ROX_PASSWORD}" --output-secrets - \
+      roxctl central init-bundles generate my-test-bundle \
+        --insecure-skip-tls-verify --password "${ROX_PASSWORD}" --output-secrets - \
       | oc -n stackrox apply -f -
   }
   retry init_bundle
@@ -230,13 +222,17 @@ function wait_created() {
 }
 
 function wait_deploy() {
-  retry oc -n stackrox rollout status deploy/"$1" --timeout=300s
+  retry oc -n stackrox rollout status deploy/"$1"le --timeout=300s \
+    || {
+      echo "oc logs -n stackrox --selector=app==$1 --pod-running-timeout=30s --tail=20"
+      oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=20
+      exit 1
+    }
 }
 
 function wait_pods_running() {
   retry oc get pods "${@}" --field-selector="status.phase==Running" \
     -o jsonpath="{.items[0].metadata.name}" >/dev/null 2>&1
-  oc get pods "${@}"
 }
 
 if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
@@ -244,7 +240,7 @@ if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   wait_pods_running -A -lapp==rhacs-operator,control-plane=controller-manager
   wait_created crd centrals.platform.stackrox.io
 
-  oc new-project stackrox >/dev/null
+  oc new-project stackrox >/dev/null || true
   create_cr central
   wait_deploy central
 
