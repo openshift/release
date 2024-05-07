@@ -308,7 +308,7 @@ oc adm release extract -a $HOME/abi-pull-secret-compact --command openshift-inst
 # Generate PXE artifacts
 echo "Generating pxe-boot artifacts for SNO cluster"
 $HOME/$CLUSTER_NAME/openshift-install agent create pxe-files --dir $HOME/$CLUSTER_NAME/ --log-level debug
-cp $HOME/$CLUSTER_NAME/boot-artifacts/ $HOME/$CLUSTER_NAME/boot-artifacts-$PROW_JOB_ID/ 
+cp -r $HOME/$CLUSTER_NAME/boot-artifacts/ $HOME/$CLUSTER_NAME/boot-artifacts-$PROW_JOB_ID/ 
 
 # Generating script for agent boot execution on zVSI
 echo "Uploading the pxe-boot artifacts to HTTPD server"
