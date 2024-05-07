@@ -5,13 +5,13 @@ build_root:
     tag: golang-1.18
 images:
 - dockerfile_path: Containerfile
-  to: ci-tools-nvidia-gpu-operator
+  to: nvidia-ci
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -20,7 +20,7 @@ resources:
       cpu: 2000m
       memory: 2Gi
 tests:
-- as: nvidia-gpu-operator-e2e
+- as: nvidia-gpu-operator-e2e-latest
   steps:
     cluster_profile: aws-edge-infra
     env:
@@ -30,25 +30,18 @@ tests:
     pre:
     - chain: ipi-conf-aws
     - ref: single-node-conf-aws
-    - ref: single-node-conf-e2e
     - chain: ipi-install
     test:
-    - as: scale-gpu-nodes
-      commands: make scale_aws_gpu_nodes
-      from: ci-tools-nvidia-gpu-operator
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
     - as: gpu-operator-e2e
-      commands: make e2e_gpu_test CHANNEL=v23.9
-      from: ci-tools-nvidia-gpu-operator
+      commands: NVIDIAGPU_CLEANUP=false TEST_FEATURES="nvidiagpu" NVIDIAGPU_GPU_MACHINESET_INSTANCE_TYPE="g4dn.xlarge"
+        make run-tests
+      from: nvidia-ci
       resources:
         requests:
           cpu: 2000m
           memory: 2Gi
 - as: nvidia-gpu-operator-e2e-master
-  cron: 0 01 * * 3
+  cron: 0 01 * * *
   steps:
     cluster_profile: aws-edge-infra
     env:
@@ -58,25 +51,18 @@ tests:
     pre:
     - chain: ipi-conf-aws
     - ref: single-node-conf-aws
-    - ref: single-node-conf-e2e
     - chain: ipi-install
     test:
-    - as: scale-gpu-nodes
-      commands: make scale_aws_gpu_nodes
-      from: ci-tools-nvidia-gpu-operator
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
     - as: gpu-operator-e2e
-      commands: make master_e2e_gpu_test
-      from: ci-tools-nvidia-gpu-operator
+      commands: NVIDIAGPU_CLEANUP=false NVIDIAGPU_DEPLOY_FROM_BUNDLE=true TEST_FEATURES="nvidiagpu"
+        NVIDIAGPU_GPU_MACHINESET_INSTANCE_TYPE="g4dn.xlarge" make run-tests
+      from: nvidia-ci
       resources:
         requests:
           cpu: 2000m
           memory: 2Gi
 - as: nvidia-gpu-operator-e2e-23-6-x
-  cron: 0 03 * * 3
+  cron: 0 03 * * *
   steps:
     cluster_profile: aws-edge-infra
     env:
@@ -86,25 +72,18 @@ tests:
     pre:
     - chain: ipi-conf-aws
     - ref: single-node-conf-aws
-    - ref: single-node-conf-e2e
     - chain: ipi-install
     test:
-    - as: scale-gpu-nodes
-      commands: make scale_aws_gpu_nodes
-      from: ci-tools-nvidia-gpu-operator
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
     - as: gpu-operator-e2e
-      commands: make e2e_gpu_test CHANNEL=v23.6
-      from: ci-tools-nvidia-gpu-operator
+      commands: NVIDIAGPU_CLEANUP=false NVIDIAGPU_SUBSCRIPTION_CHANNEL="v23.6" TEST_FEATURES="nvidiagpu"
+        NVIDIAGPU_GPU_MACHINESET_INSTANCE_TYPE="g4dn.xlarge" make run-tests
+      from: nvidia-ci
       resources:
         requests:
           cpu: 2000m
           memory: 2Gi
 - as: nvidia-gpu-operator-e2e-23-9-x
-  cron: 0 05 * * 3
+  cron: 0 05 * * *
   steps:
     cluster_profile: aws-edge-infra
     env:
@@ -114,19 +93,12 @@ tests:
     pre:
     - chain: ipi-conf-aws
     - ref: single-node-conf-aws
-    - ref: single-node-conf-e2e
     - chain: ipi-install
     test:
-    - as: scale-gpu-nodes
-      commands: make scale_aws_gpu_nodes
-      from: ci-tools-nvidia-gpu-operator
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
     - as: gpu-operator-e2e
-      commands: make e2e_gpu_test CHANNEL=v23.9
-      from: ci-tools-nvidia-gpu-operator
+      commands: NVIDIAGPU_CLEANUP=false NVIDIAGPU_SUBSCRIPTION_CHANNEL="v23.9" TEST_FEATURES="nvidiagpu"
+        NVIDIAGPU_GPU_MACHINESET_INSTANCE_TYPE="g4dn.xlarge" make run-tests
+      from: nvidia-ci
       resources:
         requests:
           cpu: 2000m
@@ -134,5 +106,5 @@ tests:
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
-  repo: ci-tools-nvidia-gpu-operator
-  variant: "4.13"
+  repo: nvidia-ci
+  variant: "4.15"
