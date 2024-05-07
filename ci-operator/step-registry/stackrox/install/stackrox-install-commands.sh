@@ -198,7 +198,7 @@ function create_cr() {
 function retry() {
   for (( i = 0; i < 10; i++ )); do
     "$@" && return 0
-    sleep 1
+    sleep 30
   done
   return 1
 }
