@@ -53,7 +53,7 @@ function get_jq() {
 }
 jq --version || get_jq
 
-ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json | jq -er '.data["password"] | @base64d') \
+ROX_PASSWORD=$(oc -n stackrox get secret admin-pass -o json | jq -er '.data["password"] | @base64d' 2>/dev/null) \
   || ROX_PASSWORD="$(LC_ALL=C tr -dc _A-Z-a-z-0-9 < /dev/urandom | head -c12 || true)"
 centralAdminPasswordBase64="$(echo "${ROX_PASSWORD}" | base64)"
 cat <<EOF > central-cr.yaml
@@ -222,7 +222,7 @@ function wait_created() {
 }
 
 function wait_deploy() {
-  retry oc -n stackrox rollout status deploy/"$1"le --timeout=300s \
+  retry oc -n stackrox rollout status deploy/"$1" --timeout=300s \
     || {
       echo "oc logs -n stackrox --selector=app==$1 --pod-running-timeout=30s --tail=20"
       oc logs -n stackrox --selector="app==$1" --pod-running-timeout=30s --tail=20
