@@ -56,11 +56,12 @@ function rosa_login() {
      ocm_api_url="https://api.integration.openshift.com"
     fi
 
-    ROSA_VERSION=$(rosa version)
+    # there is a bug for rosa version that would cause panic
+    # ROSA_VERSION=$(rosa version)
     ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 
     if [[ ! -z "${ROSA_TOKEN}" ]]; then
-      echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+      # echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
       rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
       ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
     else
