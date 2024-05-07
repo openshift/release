@@ -175,18 +175,19 @@ function install_operator() {
   catalogSource=$(oc get packagemanifests rhacs-operator -o jsonpath="{.status.catalogSource}")
   catalogSourceNamespace=$(oc get packagemanifests rhacs-operator -o jsonpath="{.status.catalogSourceNamespace}")
   echo "Add subscription"
-  echo "apiVersion: operators.coreos.com/v1alpha1
-    kind: Subscription
-    metadata:
-      name: rhacs-operator
-      namespace: openshift-operators
-    spec:
-      channel: ${OPERATOR_CHANNEL}
-      installPlanApproval: Automatic
-      name: rhacs-operator
-      source: ${catalogSource}
-      sourceNamespace: ${catalogSourceNamespace}
-      startingCSV: ${currentCSV## }
+  echo "
+      apiVersion: operators.coreos.com/v1alpha1
+      kind: Subscription
+      metadata:
+        name: rhacs-operator
+        namespace: openshift-operators
+      spec:
+        channel: ${OPERATOR_CHANNEL}
+        installPlanApproval: Automatic
+        name: rhacs-operator
+        source: ${catalogSource}
+        sourceNamespace: ${catalogSourceNamespace}
+        startingCSV: ${currentCSV## }
   " | sed -e 's/^    //' \
     | tee >(cat 1>&2) \
     | oc apply -f -
@@ -243,7 +244,7 @@ if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   wait_pods_running -A -lapp==rhacs-operator,control-plane=controller-manager
   wait_created crd centrals.platform.stackrox.io
 
-  oc new-project stackrox >/dev/null 2>&1
+  oc new-project stackrox >/dev/null
   create_cr central
   wait_deploy central
 
