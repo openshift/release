@@ -234,7 +234,7 @@ ${ssh_key_string}
 EOF
 chmod 0600 ${tmp_ssh_key}
 ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "$tmp_ssh_key")
-zvsi_mac=$(ssh "${ssh_options[@]}" core@$zvsi_fip "ip link show | awk '/ether/ {print \$2}'")
+zvsi_mac=$(ssh "${ssh_options[@]}" root@$zvsi_fip "ip link show | awk '/ether/ {print \$2}'")
 
 echo "Creating agent-config and install-config files"
 mkdir $HOME/$CLUSTER_NAME
@@ -326,9 +326,9 @@ chmod 700 $HOME/trigger_pxeboot.sh
 
 # Booting up zVSI as SNO cluster
 echo "Transferring the setup script to zVSI $zvsi_fip"
-scp "${ssh_options[@]}" $HOME/trigger_pxeboot.sh core@$zvsi_fip:/var/home/core/trigger_pxeboot.sh
+scp "${ssh_options[@]}" $HOME/trigger_pxeboot.sh root@$zvsi_fip:/root/trigger_pxeboot.sh
 echo "Triggering the script in the zVSI $zvsi_fip"
-ssh "${ssh_options[@]}" core@$zvsi_fip "/var/home/core/trigger_pxeboot.sh" &
+ssh "${ssh_options[@]}" root@$zvsi_fip "/root/trigger_pxeboot.sh" &
 sleep 60
 echo "Successfully booted the zVSI $zvsi_fip with the setup script"
 
