@@ -36,6 +36,11 @@ cd ${remote_workdir}/topolvm
 make -C test/e2e incluster-lvmd/create-vg
 make -C test/e2e incluster-lvmd/setup-minikube
 make -C test/e2e incluster-lvmd/launch-minikube
+
+export TEST_SCHEDULER_EXTENDER_TYPE=none
+export TEST_LVMD_TYPE=embedded
+export KUBERNETES_VERSION=v1.28.0
+
 make -C test/e2e incluster-lvmd/test
 
 EOF

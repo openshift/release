@@ -79,9 +79,9 @@ else
     echo "PULL_NUMBER is set to '\${PULL_NUMBER}'. Checking out the pull request."
 
     # Clone the repository and fetch the pull request branch
-    rm -rf ${REPO_NAME}
-    git clone https://github.com/${REPO_OWNER}/${REPO_NAME}
-    pushd ${REPO_NAME}
+    rm -rf topolvm
+    git clone https://github.com/${REPO_OWNER}/${REPO_NAME} topolvm
+    pushd topolvm
     git fetch origin pull/\${PULL_NUMBER}/head:\${PULL_NUMBER}
     git checkout \${PULL_NUMBER}
 fi
