@@ -20,6 +20,10 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: image-based-install-operator
+promotion:
+  to:
+  - name: "2.5"
+    namespace: stolostron
 resources:
   '*':
     requests:
@@ -38,31 +42,21 @@ tests:
   commands: HOME=/tmp make test
   container:
     from: src
-- as: integration
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
+- as: publish
+  postsubmit: true
   steps:
-    allow_best_effort_post_steps: true
-    test:
-    - as: integration-deploy-and-run
-      cli: latest
-      commands: |
-        make run-integration-test
-      dependencies:
-      - env: IMG
-        name: image-based-install-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: generic-claim
+    dependencies:
+      SOURCE_IMAGE_REF: image-based-install-operator
+    env:
+      IMAGE_REPO: image-based-install-operator
+      OSCI_ENV_CONFIG: |
+        OSCI_PUBLISH_DELAY=0
+        OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        OSCI_PIPELINE_REPO=backplane-pipeline
+        OSCI_RELEASE_BRANCH=backplane-2.5
+      RELEASE_REF: backplane-2.5
+    workflow: ocm-ci-manifest-update
 zz_generated_metadata:
-  branch: main
+  branch: backplane-2.5
   org: openshift
   repo: image-based-install-operator
