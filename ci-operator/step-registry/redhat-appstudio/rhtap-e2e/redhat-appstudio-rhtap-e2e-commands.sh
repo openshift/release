@@ -29,7 +29,7 @@ RED_HAT_DEVELOPER_HUB_URL=https://"$(oc get route redhat-developer-hub -n rhtap 
 
 cd "$(mktemp -d)"
 
-git clone https://github.com/redhat-appstudio/rhtap-e2e.git .
+#git clone https://github.com/redhat-appstudio/rhtap-e2e.git .
 
 NODE_TLS_REJECT_UNAUTHORIZED=0
 yarn && yarn test
