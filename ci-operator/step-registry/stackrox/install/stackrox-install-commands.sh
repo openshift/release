@@ -231,7 +231,8 @@ function wait_deploy() {
 
 function wait_pods_running() {
   retry oc get pods "${@}" --field-selector="status.phase==Running" \
-    -o jsonpath="{.items[0].metadata.name}" >/dev/null 2>&1
+    -o jsonpath="{.items[0].metadata.name}" >/dev/null 2>&1 \
+    || { oc get pods "${@}"; exit 1; }
 }
 
 if [[ -z "${BASH_SOURCE:-}" ]] || [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
