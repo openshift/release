@@ -14,5 +14,9 @@ APP_ID="$(cat /secrets/pr-creds/app_id)"
 export APP_ID
 export CLIENT_KEY=/secrets/pr-creds/key.pem
 
-cd /go/src/github.com/openshift/microshift/
+cd /go/src/github.com/openshift/
+rm -rf ./microshift
+git clone --branch ushift-3139/create-tag-before-referencing-it https://github.com/pmtk/microshift.git
+
+cd ./microshift
 ./scripts/release-notes/gen_ec_release_notes.sh ${DRY_RUN}
