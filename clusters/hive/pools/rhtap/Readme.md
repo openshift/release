@@ -6,8 +6,8 @@ This folder contains the manifests for RHTAP cluster pools created by Hive. [Hiv
 
 In RHTAP we have two different templates which install Openshift in different AWS regions:
 
-* [Higher Tests Load - us-east-2](rhtap-aws-us-east-2.yaml): Mostly used for [Infra Deployments](https://github.com/redhat-appstudio/infra-deployments) and [E2E Tests](https://github.com/redhat-appstudio/e2e-tests) repos where we the tests load have a big impact.
-* [Normal Tests Load - us-west-2](rhtap-aws-us-west-2.yaml): Recommended for RHTAP components like Application Service, SPI... etc due a lowest load impact of tests.
+- [Higher Tests Load - us-east-2](rhtap-aws-us-east-2.yaml): Mostly used for [Infra Deployments](https://github.com/redhat-appstudio/infra-deployments) and [E2E Tests](https://github.com/redhat-appstudio/e2e-tests) repos where we the tests load have a big impact.
+- [Normal Tests Load - us-west-2](rhtap-aws-us-west-2.yaml): Recommended for RHTAP components like Application Service, SPI... etc due a lowest load impact of tests.
 
 ## How to use RHTAP Cluster Pools in your tests?
 
@@ -32,7 +32,7 @@ In case you choose the template with **Higher Tests Load - us-west-2** add the c
     .
 ```
 
-In case you choose the template with **Normal Tests Load - us-west-2** add the claim to your configuration following [application service config](/ci-operator/config/redhat-appstudio/application-service/redhat-appstudio-application-service-main.yaml) example:
+In case you choose the template with **Normal Tests Load - us-west-2** add the claim to your configuration following [application service config](/ci-operator/config/konflux-ci/application-service/redhat-appstudio-application-service-main.yaml) example:
 
 ```yaml
 - as: application-service-e2e
