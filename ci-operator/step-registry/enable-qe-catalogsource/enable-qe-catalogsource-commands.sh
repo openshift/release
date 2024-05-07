@@ -262,9 +262,9 @@ run_command "oc whoami"
 run_command "oc version -o yaml"
 update_global_auth
 sleep 5
-create_icsp_connected
-check_olm_capability
-check_marketplace
+#create_icsp_connected
+#check_olm_capability
+#check_marketplace
 #sleep 14400
 #create_catalog_sources
 
