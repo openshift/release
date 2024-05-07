@@ -183,7 +183,9 @@ echo $bvsi_fip >> ${SHARED_DIR}/bastion-vsi-ip  # Storing to access in further s
 
 # Creating DNS service
 echo "Triggering the DNS Service creation on IBM Cloud in the resource group $infra_name-rg"
-dns_state=$(ibmcloud dns instance-create $infra_name-dns standard-dns -g $infra_name-rg --output JSON | jq -r '.state')
+ibmcloud dns instance-create $infra_name-dns standard-dns -g $infra_name-rg
+sleep 30
+dns_state=$(ibmcloud dns instance $infra_name-dns --output JSON | jq -r '.state')
 if [ "$dns_state" == "active" ]; then
   echo "$infra_name-dns DNS instance is created successfully and in active state."
 else 
