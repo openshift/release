@@ -34,12 +34,13 @@ set -euo pipefail
 TEST_SCHEDULER_EXTENDER_TYPE=none
 TEST_LVMD_TYPE=embedded
 KUBERNETES_VERSION=v1.28.0
+PATH=$PATH:${remote_workdir}/go/bin
 
 make -C ${remote_workdir}/topolvm/test/e2e \
     incluster-lvmd/create-vg \
-    incluster-lvmd/test \
     incluster-lvmd/setup-minikube \
-    incluster-lvmd/launch-minikube
+    incluster-lvmd/launch-minikube \
+    incluster-lvmd/test
 
 EOF
 
