@@ -17,7 +17,7 @@ Install ACS into a single cluster [$(date -u)].
 EOF
 
 echo ">>> Prepare script environment"
-export SHARED_DIR=${SHARED_DIR:-}
+export SHARED_DIR=${SHARED_DIR:-/tmp}
 export KUBECONFIG=${KUBECONFIG:-${SHARED_DIR}/kubeconfig}
 echo "SHARED_DIR=${SHARED_DIR}"
 echo "KUBECONFIG=${KUBECONFIG}"
