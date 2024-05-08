@@ -15,10 +15,10 @@ export AWS_PAGER=""
 # download clusterctl and clusterawsadm
 mkdir -p /tmp/bin
 export PATH=/tmp/bin:$PATH
-curl -L https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.6.2/clusterctl-linux-amd64 -o /tmp/bin/clusterctl && \
+curl -L https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.7.1/clusterctl-linux-amd64 -o /tmp/bin/clusterctl && \
     chmod +x /tmp/bin/clusterctl
 
-curl -L https://github.com/kubernetes-sigs/cluster-api-provider-aws/releases/download/v2.4.1/clusterawsadm-linux-amd64 -o /tmp/bin/clusterawsadm && \
+curl -L https://github.com/kubernetes-sigs/cluster-api-provider-aws/releases/download/v2.5.0/clusterawsadm-linux-amd64 -o /tmp/bin/clusterawsadm && \
     chmod +x /tmp/bin/clusterawsadm
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"

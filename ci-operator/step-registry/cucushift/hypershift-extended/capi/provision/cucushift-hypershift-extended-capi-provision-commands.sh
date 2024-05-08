@@ -101,7 +101,7 @@ function set_eternal_azure_oidc() {
       claimMappings:
         username:
           claim: email
-          prefixPolicy:
+          prefixPolicy: Prefix
           prefix: \"oidc-user-test:\"
         groups:
           claim: groups
