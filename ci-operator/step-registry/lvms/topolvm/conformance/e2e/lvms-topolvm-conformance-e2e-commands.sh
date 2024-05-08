@@ -34,9 +34,9 @@ set -euo pipefail
 PATH=$PATH:${remote_workdir}/go/bin
 
 make -C ${remote_workdir}/topolvm/test/e2e \
-    TEST_LVMD_TYPE=embedded \
-    KUBERNETES_VERSION=1.28.0 \
-    TEST_SCHEDULER_EXTENDER_TYPE=none \
+    TEST_SCHEDULER_EXTENDER_TYPE=${TEST_SCHEDULER_EXTENDER_TYPE} \
+    TEST_LVMD_TYPE=${TEST_LVMD_TYPE} \
+    KUBERNETES_VERSION=${KUBERNETES_VERSION} \
     incluster-lvmd/create-vg \
     incluster-lvmd/setup-minikube \
     incluster-lvmd/launch-minikube \
