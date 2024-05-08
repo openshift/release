@@ -40,7 +40,8 @@ export ACS__API_TOKEN \
   RHTAP_ENABLE_TPA \
   GITLAB__APP__CLIENT__ID \
   GITLAB__APP__CLIENT__SECRET \
-  GITLAB__TOKEN
+  GITLAB__TOKEN \
+  QUAY__API_TOKEN
 
 RHTAP_ENABLE_GITHUB=${RHTAP_ENABLE_GITHUB:-'true'}
 RHTAP_ENABLE_GITLAB=${RHTAP_ENABLE_GITLAB:-'true'}
@@ -64,6 +65,7 @@ SPRAYPROXY_SERVER_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-serve
 GITLAB__APP__CLIENT__ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_oauth_client_id)
 GITLAB__APP__CLIENT__SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_oauth_client_secret)
 GITLAB__TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_token)
+QUAY__API_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/quay_api_token)
 
 TPA__GUAC__PASSWORD="guac1234" # notsecret
 TPA__KEYCLOAK__ADMIN_PASSWORD="admin123456" # notsecret
