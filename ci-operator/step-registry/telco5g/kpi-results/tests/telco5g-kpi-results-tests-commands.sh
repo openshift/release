@@ -124,7 +124,7 @@ function did_specified_test_pass() {
 
     # get the test results from the file
     local results
-    results=($(${JQ_FILE_PATH} "${jq_filter}" "${KPI_RESULTS_FILE_PATH}" | sed 's/"//g'))
+    mapfile -t results < <(${JQ_FILE_PATH} "${jq_filter}" "${KPI_RESULTS_FILE_PATH}" | sed 's/"//g')
 
     # Print what we are checking
     print_message "Checking status of result for test '${test_name}'"
@@ -229,7 +229,7 @@ function main() {
     fi
 
     print_message "Resolving digests using graph: '${OCP_UPGRADE_GRAPH_URL}'"
-    print_message "Fetching version for diges:  '${RELEASE_IMAGE_LATEST}'"
+    print_message "Fetching version for digest:  '${RELEASE_IMAGE_LATEST}'"
 
     # Get the ocp release from environment
     # These are passed automatically from the ci-operator
