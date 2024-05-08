@@ -3,7 +3,8 @@
 set -x
 
 # session variables
-infra_name="$CLUSTER_NAME-$(echo -n $PROW_JOB_ID|cut -c-8)"
+job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
+infra_name="$CLUSTER_NAME-$job_id"
 plugins_list=("vpc-infrastructure" "cloud-dns-services")
 IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
@@ -168,5 +169,5 @@ ${ssh_key_string}
 -----END OPENSSH PRIVATE KEY-----
 EOF
 chmod 0600 ${tmp_ssh_key}
-ssh -o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "$tmp_ssh_key" root@$httpd_vsi_ip "rm -rf /var/www/html/boot-artifacts-$PROW_JOB_ID/"
+ssh -o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "$tmp_ssh_key" root@$httpd_vsi_ip "rm -rf /var/www/html/boot-artifacts-$job_id/"
 echo "$(date) Successfully completed the e2e deletion chain"
