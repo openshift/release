@@ -39,10 +39,22 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: hypershift-tests
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.16
   upi-installer:
     name: "4.16"
     namespace: ocp
     tag: upi-installer
+images:
+- dockerfile_literal: |
+    FROM redhat-operator-index
+    USER root
+    RUN curl -L "https://github.com/operator-framework/operator-registry/releases/latest/download/linux-$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')-opm" -o /tmp/opm && chmod +x /tmp/opm && mv /tmp/opm /usr/bin/opm && opm version
+    USER 1001
+  from: redhat-operator-index
+  to: redhat-operator-index-staticl-opm
 releases:
   initial:
     candidate:
@@ -143,6 +155,8 @@ tests:
   cron: 0 8 * * *
   steps:
     cluster_profile: equinix-ocp-metal
+    dependencies:
+      MIRROR_OLM_REMOTE_INDEX: redhat-operator-index-staticl-opm
     env:
       CCS_OPERATOR_CHANNELS: stable-4.14,stable-4.14,stable-4.14,stable-4.14
       CCS_OPERATOR_PACKAGES: odf-operator,ocs-operator,mcg-operator,odf-csi-addons-operator
