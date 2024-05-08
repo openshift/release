@@ -1,0 +1,35 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+releases:
+  latest:
+    release:
+      product: ocp
+      channel: candidate
+      version: "4.15"
+resources:
+  '*':
+    limits:
+      memory: 500Mi
+    requests:
+      cpu: 100m
+      memory: 100Mi
+tests:
+- as: kpi-results-415-candidate
+  cluster: build05
+  # The upstream KPI job runs on an internal jenkins
+  # The job takes about 12 hours and starts at around 0900UTC on Saturdays
+  # Therefore we will set the cron here to run around 2200UTC the same day
+  cron: "0 22 * * 6"
+  steps:
+    env:
+      KPI_DESCRIPTION: "RAN RDS SPR-EE"
+    workflow: telco5g-kpi-results
+# The branches below don't exist but the ci-tooling requires them to be unique
+# This is fine because we aren't checking out any repo for this job anyway
+zz_generated_metadata:
+  branch: master-415
+  org: ran-telco5g
+  repo: kpi-results
