@@ -116,7 +116,7 @@ sn_cidr=$(ibmcloud is subnet $infra_name-sn --vpc $infra_name-vpc --output JSON 
 set -e
 zvsi_rip=""
 echo "Triggering the $infra_name-sno zVSI creation on IBM Cloud in the VPC $infra_name-vpc"
-ibmcloud is instance-create $infra_name-sno $infra_name-vpc $IC_REGION-2 $ZVSI_PROFILE $infra_name-sn --image $ZVSI_IMAGE --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg
+ibmcloud is instance-create $infra_name-sno $infra_name-vpc $IC_REGION-2 $ZVSI_PROFILE $infra_name-sn --image $ZVSI_IMAGE --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg --boot-volume '{"name": "agent-sno-volume", "volume": {"name": "agent-sno-boot-vol", "capacity": 100, "profile": {"name": "general-purpose"}}}'
 sleep 60
 set +e
 zvsi_state=$(ibmcloud is instance $infra_name-sno | awk '/Status/{print $2}')
