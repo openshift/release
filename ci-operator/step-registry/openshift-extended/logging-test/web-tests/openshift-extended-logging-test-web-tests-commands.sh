@@ -32,7 +32,7 @@ fi
 
 if [[ $E2E_RUN_TAGS =~ @level0 ]]; then
     echo "only run level0 scenarios"
-    ./${run_shell} ./tests/logging/ --tags @level0 || true
+    ./${run_shell} --spec ./tests/logging/ --tags @level0 || true
 else
     ./${run_shell} --spec ./tests/logging/ || true
 fi
