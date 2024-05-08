@@ -57,7 +57,7 @@ PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
 mkdir -p "${INSTALL_DIR}"
 
-curl https://github.com/openshift/installer/blob/master/docs/user/agent/add-node/node-joiner.sh $INSTALL_DIR
+curl https://github.com/openshift/installer/blob/master/docs/user/agent/add-node/node-joiner.sh --output "${INSTALL_DIR}/node-joiner.sh"
 
 cat > "${INSTALL_DIR}/nodes-config.yaml" <<EOF
 hosts: []
