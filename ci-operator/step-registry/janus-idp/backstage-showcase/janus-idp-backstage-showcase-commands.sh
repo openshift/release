@@ -4,12 +4,11 @@ HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
-export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME NAME_SPACE TAG_NAME
+export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
 echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
 GITHUB_ORG_NAME="janus-idp"
 GITHUB_REPOSITORY_NAME="backstage-showcase"
-NAME_SPACE=showcase-ci
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
@@ -64,7 +63,7 @@ else
         tag_count=$(echo $response | jq '.tags | length')
 
         if [ "$tag_count" -gt "0" ]; then
-            echo "Docker image $IMAGE_NAME is now available."
+            echo "Docker image $IMAGE_NAME is now available. Time elapsed: $(($ELAPSED_TIME / 60)) minute(s)."
             break
         fi
 
@@ -76,7 +75,7 @@ else
 
         # If the elapsed time exceeds the timeout, exit with an error
         if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
-            echo "Timed out waiting for Docker image $IMAGE_NAME."
+            echo "Timed out waiting for Docker image $IMAGE_NAME. Time elapsed: $(($ELAPSED_TIME / 60)) minute(s)."
             exit 1
         fi
     done
