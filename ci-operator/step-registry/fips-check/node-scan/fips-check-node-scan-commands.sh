@@ -77,7 +77,7 @@ fi
 
 # generate report
 echo "Generating the Junit for fips check node scan"
-filename="fips-check-node-scan"
+filename="junit_fips-check-node-scan"
 testsuite="fips-check-node-scan"
 subteam="Security_and_Compliance"
 if $pass; then
