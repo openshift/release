@@ -51,24 +51,27 @@ function copy-file-from-first-master {
 
 cat << 'EOZ' > /tmp/approve-csrs-with-timeout.sh
   export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost-recovery.kubeconfig
-  echo -n "Approving CSRs"
-  attempts=0
-  max_attempts=5
-  while true; do
-    echo -n '.'
-    mapfile -d ' ' -t csrs < <(oc get csr --field-selector=spec.signerName='kubernetes.io/kube-apiserver-client-kubelet' --no-headers | grep Pending | cut -f1 -d" ")
-    if [[ ${#csrs[@]} -gt 0 ]]; then
-      echo ""
-      oc adm certificate approve ${csrs} && attempts=0
-    else
-      (( attempts++ ))
-    fi
-    if (( attempts > max_attempts )); then
-      echo ""
-      echo "Timeout waiting for new CSRs"
-      break
-    fi
-    sleep 5s
+  fields=( kubernetes.io/kube-apiserver-client-kubelet kubernetes.io/kubelet-serving )
+  for field in ${fields[@]}; do
+    echo "Approving ${field} CSRs at $(date)"
+    (( required_csrs=${#control_nodes[@]} + ${#compute_nodes[@]} ))
+    approved_csrs=0
+    attempts=0
+    max_attempts=30
+    while (( required_csrs >= approved_csrs )); do
+      echo -n '.'
+      mapfile -d ' ' -t csrs < <(oc get csr --field-selector=spec.signerName=${field} --no-headers | grep Pending | cut -f1 -d" ")
+      if [[ ${#csrs[@]} -gt 0 ]]; then
+        echo ""
+        oc adm certificate approve ${csrs} && attempts=0 && (( approved_csrs=approved_csrs+${#csrs[@]} ))
+      else
+        (( attempts++ ))
+      fi
+      if (( attempts > max_attempts )); then
+        break
+      fi
+      sleep 10s
+    done
   done
   echo "Done"
 EOZ
@@ -160,6 +163,8 @@ prepull-tools-image-for-gather-step
 # Sync host and node timezones to avoid possible errors when skewing time
 HOST_TZ=$(date +"%Z %z" | cut -d' ' -f1)
 run-on-all-nodes "timedatectl set-timezone ${HOST_TZ}"
+
+oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=30m
 
 oc -n openshift-machine-config-operator create serviceaccount kubelet-bootstrap-cred-manager
 oc -n openshift-machine-config-operator adm policy add-cluster-role-to-user cluster-admin -z kubelet-bootstrap-cred-manager

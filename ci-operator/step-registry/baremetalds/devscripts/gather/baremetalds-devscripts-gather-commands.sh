@@ -46,48 +46,6 @@ tar -czC "/var/log/libvirt/qemu" -f "/tmp/artifacts/libvirt-logs.tar.gz" --trans
 . network.sh
 . utils.sh
 
-# Pass master and workers IPs to installer-gather script to collect info from nodes which didn't join the cluster
-NODE_NAMES=()
-for (( n=0; n<\$NUM_MASTERS; n++ ))
-do
-  NODE_NAMES+=(\$(printf \$MASTER_HOSTNAME_FORMAT \$n))
-done
-for (( n=0; n<\$NUM_WORKERS; n++ ))
-do
-  NODE_NAMES+=(\$(printf \$WORKER_HOSTNAME_FORMAT \$n))
-done
-for (( n=0; n<\$NUM_EXTRA_WORKERS; n++ ))
-do
-  NODE_NAMES+=("extraworker-%d")
-done
-
-NODE_IPS=()
-for node_name in "${NODE_NAMES[@]}"
-do
-  node_ip=\$(sudo virsh net-dumpxml \$BAREMETAL_NETWORK_NAME | xmllint --xpath "string(//dns[*]/host/hostname[. = '\$node_name']/../@ip)" -)
-    NODE_IPS+=("\$node_ip")
-done
-
-INTERNAL_SSH_OPTS=(-o 'ConnectTimeout=5'
-  -o 'StrictHostKeyChecking=no'
-  -o 'UserKnownHostsFile=/dev/null'
-  -o 'ServerAliveInterval=90'
-)
-
-# Collect sos report from each known node
-for NODE_IP in \${NODE_IPS[@]}; do
-  echo "Fetching SOS report from \${NODE_IP}"
-  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} sudo mkdir /run/artifacts &&
-  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} \
-    sudo podman run -it --name toolbox --authfile /var/lib/kubelet/config.json --privileged --ipc=host --net=host --pid=host -e HOST=/host -e NAME=toolbox- -e IMAGE=registry.redhat.io/rhel8/support-tools:latest -v /run:/run -v /var/log:/var/log -v /etc/machine-id:/etc/machine-id -v /etc/localtime:/etc/localtime -v /:/host registry.redhat.io/rhel8/support-tools:latest \
-        sos report --batch \
-          -o container_log,filesys,logs,networkmanager,podman,processor,sar \
-          -k podman.all -k podman.logs \
-          --tmp-dir /run/artifacts && \
-  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} sudo chown -R core:core /run/artifacts
-  scp "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP}:/run/artifacts/*.tar* /tmp/artifacts/ || true
-done
-
 echo "Get the bootstrap logs if it is around and we didn't already collect them..."
 if ! compgen -G "/root/dev-scripts/ocp/ostest/log-bundle*.tar.gz" > /dev/null 2>&1
 then
@@ -104,6 +62,50 @@ then
   podman cp external-squid:/var/log/squid/cache.log /tmp/squid-logs-$NAMESPACE || true
   tar -czC "/tmp" -f "/tmp/artifacts/squid-logs-$NAMESPACE.tar.gz" squid-logs-$NAMESPACE/
 fi
+
+# Exit if we have access to the API, the other gather steps will get logs
+if [ "\$(cat logs/installer-status.txt)" == "0" ] ; then exit 0 ; fi
+
+# Pass master and workers IPs to installer-gather script to collect info from nodes which didn't join the cluster
+NODE_NAMES=()
+for (( n=0; n<\$NUM_MASTERS; n++ ))
+do
+  NODE_NAMES+=(\$(printf \$MASTER_HOSTNAME_FORMAT \$n))
+done
+for (( n=0; n<\$NUM_WORKERS; n++ ))
+do
+  NODE_NAMES+=(\$(printf \$WORKER_HOSTNAME_FORMAT \$n))
+done
+for (( n=0; n<\$NUM_EXTRA_WORKERS; n++ ))
+do
+  NODE_NAMES+=("extraworker-%d" \$n)
+done
+
+NODE_IPS=()
+for node_name in "\${NODE_NAMES[@]}"
+do
+  node_ip=\$(sudo virsh net-dumpxml \$BAREMETAL_NETWORK_NAME | xmllint --xpath "string(//host[@name='\$node_name']/@ip)" -)
+    NODE_IPS+=("\$node_ip")
+done
+
+INTERNAL_SSH_OPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+)
+
+# Collect sos report from each known node
+for NODE_IP in \${NODE_IPS[@]}; do
+  echo "Fetching SOS report from \${NODE_IP}"
+  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} sudo mkdir /run/artifacts &&
+  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} \
+    sudo journalctl \| sudo dd of=/var/log/journal.log || true
+  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} \
+    sudo tar -czf /run/artifacts/journal_\${NODE_IP//:/_}.tar.gz --exclude='var/log/journal' /var/log || true
+  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} sudo chown -R core:core /run/artifacts
+  scp "\${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \${NODE_IP}):/run/artifacts/*.tar* /tmp/artifacts/ || true
+done
+
 EOF
 
 echo "### Fetching must-gather image information..."

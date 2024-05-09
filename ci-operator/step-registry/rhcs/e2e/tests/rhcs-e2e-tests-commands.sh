@@ -50,11 +50,11 @@ if [ ! -d $MANIFESTS_FOLDER ];then
 fi
 export RHCS_OUTPUT=${SHARED_DIR} # this is the sensitive information sharing folder between steps
 
-export GATEWAY_URL=$GATEWAY_URL
-
 export CLUSTER_PROFILE=${CLUSTER_PROFILE}
 export CHANNEL_GROUP=${CHANNEL_GROUP}
 export RHCS_ENV=${RHCS_ENV}
+export RHCS_URL=${RHCS_URL}
+export GATEWAY_URL=${GATEWAY_URL}
 export VERSION=${VERSION}
 export REGION=${REGION}
 if [ ! -z "$RHCS_SOURCE" ];then
