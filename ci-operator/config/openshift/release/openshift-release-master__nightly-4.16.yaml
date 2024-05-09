@@ -1262,6 +1262,284 @@ tests:
     - ref: baremetalds-sno-rename
     - ref: baremetalds-sno-test
     workflow: baremetalds-sno
+- as: e2e-aws-ovn-capi
+  interval: 8h
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstallAWS=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- as: e2e-aws-ovn-shared-vpc-capi
+  interval: 8h
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_GATES: '["ClusterAPIInstallAWS=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
+    workflow: openshift-e2e-aws-sharednetwork
+  timeout: 6h0m0s
+- as: e2e-powervs-capi-ovn-capi
+  cluster: build01
+  interval: 24h
+  steps:
+    cluster_profile: powervs-5
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.16"
+      CLUSTER_NAME_MODIFIER: capi-416
+      FEATURE_GATES: '["ClusterAPIInstallPowerVS=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      INSTALLER: powervs
+      TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-powervs-ipi
+  timeout: 6h0m0s
+- as: e2e-openstack-fips-capi
+  minimum_interval: 56h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+      FIPS_ENABLED: "true"
+      TEST_SUITE: experimental/reliability/minimal
+    pre:
+    - chain: ipi-openstack-pre
+    - ref: fips-check
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-proxy-capi
+  minimum_interval: 144h
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    env:
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-openstack-proxy
+- as: e2e-openstack-externallb-capi
+  minimum_interval: 168h
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    env:
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-openstack-external-lb
+- as: e2e-openstack-nfv-intel-capi
+  minimum_interval: 144h
+  steps:
+    cluster_profile: openstack-nfv
+    env:
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-openstack-nfv-cgroupsv1
+- as: e2e-openstack-nfv-mellanox-capi
+  minimum_interval: 144h
+  steps:
+    cluster_profile: openstack-nfv
+    env:
+      ADDITIONAL_WORKERS_NETWORKS: mellanox-dpdk
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+      OPENSTACK_DPDK_NETWORK: mellanox-dpdk
+      OPENSTACK_SRIOV_NETWORK: mellanox-sriov
+    workflow: openshift-e2e-openstack-nfv-cgroupsv1
+- as: e2e-openstack-additional-ipv6-network-capi
+  minimum_interval: 144h
+  steps:
+    cluster_profile: openstack-hwoffload
+    env:
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-openstack-ipv6
+- as: e2e-openstack-csi-manila-capi
+  minimum_interval: 144h
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    env:
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-openstack-csi-manila
+- as: e2e-openstack-csi-cinder-capi
+  minimum_interval: 144h
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    env:
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+      TEST_SKIPS: should concurrently access the volume and restored snapshot from
+        pods on the same node
+    workflow: openshift-e2e-openstack-csi-cinder
+- as: e2e-openstack-ovn-parallel-capi
+  minimum_interval: 48h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+      ROTATE_CLOUD_CREDENTIALS: "true"
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-ovn-serial-capi
+  minimum_interval: 48h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+      ROTATE_CLOUD_CREDENTIALS: "true"
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-nfv-hwoffload-capi
+  minimum_interval: 96h
+  steps:
+    cluster_profile: openstack-hwoffload
+    env:
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-openstack-hwoffload-cgroupsv1
+- as: e2e-openstack-dualstack-upi-capi
+  minimum_interval: 240h
+  steps:
+    cluster_profile: openstack-hwoffload
+    env:
+      CONFIG_TYPE: dual-stack-upi
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+      OPENSTACK_COMPUTE_FLAVOR: m1.xlarge
+      OPENSTACK_TEST_SKIPS: The OpenStack platform creates Worker nodes in a server
+        group\|The OpenStack platform creates Control plane nodes in a server group
+      TEST_SKIPS: Services Secondary IP Family \[LinuxOnly\] should function for service
+        endpoints using hostNetwork
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-upi
+- as: e2e-openstack-ovn-password-capi
+  minimum_interval: 48h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-ovn-etcd-scaling-capi
+  minimum_interval: 168h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-openstack-etcd-scaling
+- as: e2e-openstack-dualstack-capi
+  minimum_interval: 96h
+  steps:
+    cluster_profile: openstack-hwoffload
+    env:
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-openstack-dualstack
+- as: e2e-openstack-dualstack-v6primary-capi
+  minimum_interval: 96h
+  steps:
+    cluster_profile: openstack-hwoffload
+    env:
+      CONFIG_TYPE: dualstack-v6primary
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+      TEST_SKIPS: when FIPS is disabled the HAProxy router should serve routes when
+        configured with a 1024-bit RSA key\|should redirect on blob pull
+    workflow: openshift-e2e-openstack-dualstack
+- as: e2e-openstack-ccpmso-capi
+  minimum_interval: 240h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+      TEST_SUITE: experimental/reliability/minimal
+    test:
+    - as: openstack-test-cpms
+      commands: |
+        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch release-4.16 --depth=1 $dir
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        cd $dir
+        make e2e-periodic
+      from: stolostron
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack
+    workflow: openshift-e2e-openstack-ipi
+  timeout: 7h0m0s
+- as: e2e-openstack-ccpmso-zone-capi
+  minimum_interval: 240h
+  steps:
+    cluster_profile: openstack-vh-mecha-az0
+    env:
+      ETCD_ON_LOCAL_DISK: "true"
+      FEATURE_GATES: ClusterAPIInstallOpenStack=true
+      FEATURE_SET: CustomNoUpgrade
+      TEST_SUITE: experimental/reliability/minimal
+      USE_RAMFS: "false"
+    test:
+    - as: openstack-test-cpms
+      commands: |
+        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch release-4.16 --depth=1 $dir
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        cd $dir
+        test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
+        make e2e-periodic
+      from: stolostron
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack
+    workflow: openshift-e2e-openstack-ipi
+  timeout: 7h0m0s
+- as: e2e-nutanix-ovn-capi
+  cluster: build01
+  interval: 8h
+  steps:
+    cluster_profile: nutanix
+    env:
+      FEATURE_GATES: '["ClusterAPIInstallNutanix=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-nutanix-ovn
+  timeout: 6h0m0s
+- as: e2e-powervs-ovn-capi
+  cluster: build01
+  interval: 12h
+  steps:
+    cluster_profile: powervs-5
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.16"
+      FEATURE_GATES: '["ClusterAPIInstallPowerVS=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      INSTALLER: powervs
+      TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-powervs-ipi
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift
