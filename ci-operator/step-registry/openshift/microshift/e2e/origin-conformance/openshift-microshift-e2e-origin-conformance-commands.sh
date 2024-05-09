@@ -15,9 +15,19 @@ mkdir "${STATIC_CONFIG_MANIFEST_DIR}"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 
+# The base image for this step is incapable of ssh-ing to MicroShift's VM because
+# of user configuration. Since this image comes from promotion of origin we would
+# like to leave it untouched. The skip list is within MicroShift's code, which is
+# inside the VM that we need to ssh. Use the previous step (openshift-microshift-infra-conformance-setup)
+# to put the list in the $SHARED_DIR so its available for any other step that may
+# need it.
 if [ -f "${SHARED_DIR}/conformance-skip.txt" ]; then
     cp ${SHARED_DIR}/conformance-skip.txt "${CONFORMANCE_SKIP}"
 fi
+
+# Remove skipped tests from current complete test list. This will automatically take new
+# tests in and we shall see whether they fail in the very first run in which they are included.
+# The test list belongs to MicroShift repo to control this by release.
 while read -r test; do
     grep -F "$test" "${CONFORMANCE_SKIP}" > /dev/null || echo "$test" >> "${CONFORMANCE_TEST_LIST}"
 done < <(openshift-tests run openshift/conformance --dry-run --provider none 2>/dev/null | egrep '^"\[')
