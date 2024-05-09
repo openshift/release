@@ -5,7 +5,11 @@ set -o nounset
 set -o pipefail
 set -x
 
-ls 
+if [[ ! ${RUN_CERBERUS} ]]; then
+  exit 0
+fi
+
+ls
 
 export CERBERUS_KUBECONFIG=$KUBECONFIG
 
