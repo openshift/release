@@ -387,6 +387,9 @@ CONFIG = {
     },
     'aws-ip-pools-us-east-1': {
         'default': 256,
+    },
+    'observability-aws-quota-slice': {
+        'default': 50,
     }
 }
 
