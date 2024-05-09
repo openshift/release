@@ -74,7 +74,7 @@ rosa create idp -c ${CLUSTER_ID} \
 echo "oc login ${API_URL} -u ${IDP_USER} -p ${IDP_PASSWD} --insecure-skip-tls-verify=true" > "${SHARED_DIR}/api.login"
 
 # Grant cluster-admin access to the cluster
-rosa grant user cluster-admin --user=${IDP_USER} --cluster=${CLUSTER_ID}
+rosa grant user dedicated-admin --user=${IDP_USER} --cluster=${CLUSTER_ID}
 
 echo "Waiting for idp ready..."
 set_proxy
