@@ -9,7 +9,8 @@ if [[ -n "${GITHUB_TOKEN_PATH:-}" ]]; then
 	arg="--github-token-path /secrets/$( basename "${GITHUB_TOKEN_PATH}" )"
 fi
 
-CONTAINER_ENGINE=${CONTAINER_ENGINE:-docker}
+DEFAULT_CONTAINER_ENGINE=$(command -v podman 2>&1 >/dev/null && echo podman || echo docker)
+CONTAINER_ENGINE=${CONTAINER_ENGINE:-$DEFAULT_CONTAINER_ENGINE}
 if [ -z ${VOLUME_MOUNT_FLAGS+x} ]; then VOLUME_MOUNT_FLAGS=':z'; else echo "VOLUME_MOUNT_FLAGS is set to '$VOLUME_MOUNT_FLAGS'"; fi
 
 

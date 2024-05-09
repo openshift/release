@@ -3,7 +3,8 @@
 # This script refresh bugzilla PRs
 # Required in branch cutting
 TMPDIR="${TMPDIR:-/tmp}"
-CONTAINER_ENGINE="${CONTAINER_ENGINE:-docker}"
+DEFAULT_CONTAINER_ENGINE=$(command -v podman 2>&1 >/dev/null && echo podman || echo docker)
+CONTAINER_ENGINE=${CONTAINER_ENGINE:-$DEFAULT_CONTAINER_ENGINE}
 BRANCHES=(main master)
 
 echo Fetching oauth token...
