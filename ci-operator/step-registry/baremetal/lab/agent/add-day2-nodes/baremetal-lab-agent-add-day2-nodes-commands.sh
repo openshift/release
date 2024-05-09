@@ -137,6 +137,8 @@ sh "${INSTALL_DIR}/node-joiner.sh"
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
 
+sleep 3600
+
 gnu_arch=$(echo "$architecture" | sed 's/arm64/aarch64/;s/amd64/x86_64/;')
 case "${BOOT_MODE}" in
 "iso")
