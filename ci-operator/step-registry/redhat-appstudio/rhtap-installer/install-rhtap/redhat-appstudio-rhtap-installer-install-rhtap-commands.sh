@@ -149,9 +149,9 @@ EOF
   wait_for_pipeline "pipelineruns/$pipeline_name" "$NAMESPACE"
   tkn -n "$NAMESPACE" pipelinerun logs "$pipeline_name" -f >"$DEBUG_OUTPUT"
 
-  homepage_url=$(grep "homepage-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
-  callback_url=$(grep "callback-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
-  webhook_url=$(grep "webhook-url" < "$DEBUG_OUTPUT"  | sed 's/.*: //g') 
+  homepage_url=$(grep --max-count 1 "homepage-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
+  callback_url=$(grep --max-count 1 "callback-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
+  webhook_url=$(grep --max-count 1 "webhook-url" < "$DEBUG_OUTPUT"  | head -1 | sed 's/.*: //g') 
 
   echo "$homepage_url" | tee "${SHARED_DIR}/homepage_url"
   echo "$callback_url" | tee "${SHARED_DIR}/callback_url"
