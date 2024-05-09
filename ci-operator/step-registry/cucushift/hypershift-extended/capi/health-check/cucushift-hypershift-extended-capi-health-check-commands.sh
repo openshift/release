@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -xeuo pipefail
+set -euo pipefail
 
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then

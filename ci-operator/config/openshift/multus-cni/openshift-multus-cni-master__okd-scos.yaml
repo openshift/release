@@ -7,8 +7,8 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
-  origin_scos-4.15_base-stream9:
-    name: scos-4.15
+  origin_scos-4.16_base-stream9:
+    name: scos-4.16
     namespace: origin
     tag: base-stream9
 build_root:
@@ -17,24 +17,40 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.21-openshift-4.16
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: origin_scos-4.15_base-stream9
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile.openshift
+  from: origin_scos-4.16_base-stream9
   inputs:
     ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
+      - rhel8
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
+      - rhel9
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: multus-cni
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile.microshift
+  from: origin_scos-4.16_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - rhel9
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: multus-cni-microshift
 promotion:
   to:
-  - name: scos-4.15
+  - name: scos-4.16
     namespace: origin
 releases:
   latest:
     integration:
-      name: scos-4.15
+      name: scos-4.16
       namespace: origin
 resources:
   '*':

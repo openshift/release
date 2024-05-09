@@ -19,6 +19,7 @@ function ibmcloud_login {
   "${IBMCLOUD_CLI}" config --check-version=false
   echo "Try to login..."
   "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+  "${IBMCLOUD_CLI}" plugin list
 }
 
 function check_vpc() {
@@ -93,14 +94,17 @@ run_command "${IBMCLOUD_CLI} is instance ${bastion_name} --output JSON > ${insFi
 echo "INFO" "Created bastion instance ${bastion_name} status: $(jq -r '.status' ${insFile})"
 bastion_private_ip="$(jq -r '.network_interfaces[0].primary_ip.address' ${insFile})"
 
-nic=$(jq -r '.network_interfaces[0].id' ${insFile})
+nac=$(jq -r '.network_attachments[0].id' ${insFile})
+nic=$(${IBMCLOUD_CLI} is instance-network-attachment ${bastion_name} ${nac} --output JSON | jq -r ".virtual_network_interface.id")
 fip="${cluster_name}-fip"
-bastion_public_ip=$(${IBMCLOUD_CLI} is floating-ip-reserve ${fip} --nic-id $nic --output JSON | jq -r .address)
-
+${IBMCLOUD_CLI} is floating-ip-reserve ${fip} --nic-id $nic --output JSON > "${workdir}/${bastion_name}_ip.json"
+bastion_public_ip=$(jq -r '.address' "${workdir}/${bastion_name}_ip.json")
+echo "bastion_public_ip: $bastion_public_ip"
 if [ X"${bastion_public_ip}" == X"" ] || [ X"${bastion_private_ip}" == X"" ] ; then
     echo "ERROR" "Failed to find bastion's public and private IP!"
     exit 1
 fi
+
 # always save bastion info to ensure deprovision works
 cat > "${bastion_info_yaml}" << EOF
 publicIpAddress: ${bastion_public_ip}
@@ -109,12 +113,9 @@ bastionHost: ${bastion_name}
 vpcName: ${vpcName}
 EOF
 
-run_command "${IBMCLOUD_CLI} is instance-network-interface-floating-ip-add ${bastion_name} ${nic} ${fip}"
-
 #dump the info 
-run_command "${IBMCLOUD_CLI} is instance-network-interface-floating-ips ${bastion_name} $nic"
-run_command "${IBMCLOUD_CLI} is sg-rules $sg --vpc ${vpcName}"
-
+run_command "${IBMCLOUD_CLI} is instance-network-interface-floating-ips ${bastion_name} $nac"
+run_command "${IBMCLOUD_CLI} is sg $sg"
 #####################################
 ####Register mirror registry DNS#####
 #####################################

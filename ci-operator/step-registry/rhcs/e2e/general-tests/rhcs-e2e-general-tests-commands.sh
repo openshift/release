@@ -6,7 +6,6 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-
 ls ${SHARED_DIR}
 
 cp -r /root/terraform-provider-rhcs ~/
@@ -23,7 +22,7 @@ export CLUSTER_PROFILE=${CLUSTER_PROFILE}
 export QE_USAGE=${QE_USAGE}
 export WAIT_OPERATORS=${WAIT_OPERATORS}
 export CHANNEL_GROUP=${CHANNEL_GROUP}
-export RHCS_ENV=${RHCS_ENV}
+export RHCS_URL=${RHCS_URL}
 export VERSION=${VERSION}
 export REGION=${REGION}
 

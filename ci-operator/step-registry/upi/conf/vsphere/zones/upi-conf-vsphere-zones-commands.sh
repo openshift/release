@@ -363,6 +363,8 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$vm_template = "${vm_template}"
 \$vcenter = "${vsphere_url}"
 \$vcentercredpath = "secrets/vcenter-creds.xml"
+\$storagepolicy = ""
+\$secureboot = \$false
 
 \$ipam = "ipam.vmc.ci.openshift.org"
 

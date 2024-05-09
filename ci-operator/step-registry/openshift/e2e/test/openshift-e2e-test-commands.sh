@@ -25,6 +25,14 @@ if [[ "${CLUSTER_TYPE}" == "hypershift" ]]; then
     echo "Overriding 'hypershift' cluster type to be 'aws'"
 fi
 
+# OpenShift clusters intalled with platform type External is handled as 'None'
+# by the e2e framework, even through it was installed in an infrastructure (CLUSTER_TYPE)
+# integrated by OpenShift (like AWS).
+STATUS_PLATFORM_NAME="$(oc get Infrastructure cluster -o jsonpath='{.status.platform}' || true)"
+if [[ "${STATUS_PLATFORM_NAME-}" == "External" ]]; then
+    export CLUSTER_TYPE="external"
+fi
+
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
@@ -172,6 +180,7 @@ powervs*)
     export IBMCLOUD_API_KEY
     ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
+external) export TEST_PROVIDER='' ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
@@ -180,8 +189,8 @@ cd /tmp/output
 
 if [[ "${CLUSTER_TYPE}" == "gcp" || "${CLUSTER_TYPE}" == "gcp-arm64"  ]]; then
     pushd /tmp
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
-    tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
+    tar -xzf google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
     export PATH=$PATH:/tmp/google-cloud-sdk/bin
     mkdir gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig

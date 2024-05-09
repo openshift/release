@@ -18,19 +18,22 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 if [[ -n ${MCE} ]] ; then
-  HYPERSHIFT_NAME=hcp
-  if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-    echo "MCE version is less than 2.4, use hypershift command"
-    HYPERSHIFT_NAME=hypershift
-  fi
-
   arch=$(arch)
   if [ "$arch" == "x86_64" ]; then
-    downURL=$(oc get ConsoleCLIDownload hcp-cli-download -o=jsonpath='{.spec.links[?(@.text=="Download hcp CLI for Linux for x86_64")].href}') && curl -k --output "/tmp/${HYPERSHIFT_NAME}.tar.gz" "${downURL}"
-    cd /tmp && tar -xvf "/tmp/${HYPERSHIFT_NAME}.tar.gz"
-    chmod +x "/tmp/${HYPERSHIFT_NAME}"
-    HCP_CLI="/tmp/${HYPERSHIFT_NAME}"
-    cd -
+    if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
+      echo "MCE version is less than 2.4, use hypershift command"
+      downURL=$(oc get ConsoleCLIDownload hypershift-cli-download -o=jsonpath='{.spec.links[?(@.text=="Download hypershift CLI for Linux for x86_64")].href}') && curl -k --output "/tmp/hypershift.tar.gz" "${downURL}"
+      cd /tmp && tar -xvf "/tmp/hypershift.tar.gz"
+      chmod +x "/tmp/hypershift"
+      HCP_CLI="/tmp/hypershift"
+      cd -
+    else
+      downURL=$(oc get ConsoleCLIDownload hcp-cli-download -o=jsonpath='{.spec.links[?(@.text=="Download hcp CLI for Linux for x86_64")].href}') && curl -k --output "/tmp/hcp.tar.gz" "${downURL}"
+      cd /tmp && tar -xvf "/tmp/hcp.tar.gz"
+      chmod +x "/tmp/hcp"
+      HCP_CLI="/tmp/hcp"
+      cd -
+    fi
   fi
 fi
 
@@ -75,11 +78,57 @@ if [[ $ENABLE_ICSP == "true" ]]; then
   echo "extract secret/pull-secret"
   oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
   PULL_SECRET_PATH="/tmp/.dockerconfigjson"
+  if [ ! -f /tmp/yq-v4 ]; then
+    curl -L "https://github.com/mikefarah/yq/releases/download/v4.30.5/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+    -o /tmp/yq-v4 && chmod +x /tmp/yq-v4
+  fi
+  oc get imagecontentsourcepolicy -oyaml | /tmp/yq-v4 '.items[] | .spec.repositoryDigestMirrors' > "${SHARED_DIR}/mgmt_icsp.yaml"
 fi
 
 # Enable wildcard routes on the management cluster
 oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p \
   '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
+
+
+RELEASE_IMAGE="${RELEASE_IMAGE_LATEST}"
+
+if [[ "${DISCONNECTED}" == "true" ]];
+then
+  mirror_registry=$(oc get imagecontentsourcepolicy cnv-repo -o=jsonpath='{.spec.repositoryDigestMirrors[0].mirrors[0]}')
+  mirror_registry=${mirror_registry%%/*}
+  if [[ $mirror_registry == "" ]] ; then
+      echo "Warning: Can not find the mirror registry, abort !!!"
+      exit 1
+  fi
+  echo "mirror registry is ${mirror_registry}"
+
+  mirrored_index=${mirror_registry}/olm-index/redhat-operator-index
+  OLM_CATALOGS_R_OVERRIDES=registry.redhat.io/redhat/certified-operator-index=${mirrored_index},registry.redhat.io/redhat/community-operator-index=${mirrored_index},registry.redhat.io/redhat/redhat-marketplace-index=${mirrored_index},registry.redhat.io/redhat/redhat-operator-index=${mirrored_index}
+
+  PAYLOADIMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
+  RELEASE_IMAGE="${PAYLOADIMAGE}"
+
+  if [ ! -f "${SHARED_DIR}/ho_operator_image" ] ; then
+      echo "Warning: Can not find ho_operator_image, abort !!!"
+      exit 1
+  fi
+  HO_OPERATOR_IMAGE=$(cat "${SHARED_DIR}/ho_operator_image")
+
+  EXTRA_ARGS="${EXTRA_ARGS} --additional-trust-bundle=${SHARED_DIR}/registry.2.crt --network-type=OVNKubernetes --annotations=hypershift.openshift.io/control-plane-operator-image=${HO_OPERATOR_IMAGE} --annotations=hypershift.openshift.io/olm-catalogs-is-registry-overrides=${OLM_CATALOGS_R_OVERRIDES}"
+
+  ### workaround for https://issues.redhat.com/browse/OCPBUGS-32770
+  if [[ -z ${MCE} ]] ; then
+    if [ ! -f "${SHARED_DIR}/capi_provider_kubevirt_image" ] ; then
+        echo "Warning: Can not find capi_provider_kubevirt_image, abort !!!"
+        exit 1
+    fi
+    CAPI_PROVIDER_KUBEVIRT_IMAGE=$(cat "${SHARED_DIR}/capi_provider_kubevirt_image")
+
+    EXTRA_ARGS="${EXTRA_ARGS} --annotations=hypershift.openshift.io/capi-provider-kubevirt-image=${CAPI_PROVIDER_KUBEVIRT_IMAGE}"
+  fi
+  ###
+
+fi
 
 
 echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
@@ -91,7 +140,7 @@ echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
   --memory "${HYPERSHIFT_NODE_MEMORY}Gi" \
   --cores "${HYPERSHIFT_NODE_CPU_CORES}" \
   --root-volume-size 64 \
-  --release-image "${RELEASE_IMAGE_LATEST}" \
+  --release-image "${RELEASE_IMAGE}" \
   --pull-secret "${PULL_SECRET_PATH}" \
   --generate-ssh
 

@@ -297,6 +297,8 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$datacenter = "${vsphere_datacenter}"
 \$cluster = "${vsphere_cluster}"
 \$vcentercredpath = "secrets/vcenter-creds.xml"
+\$storagepolicy = ""
+\$secureboot = \$false
 
 \$ipam = "ipam.vmc.ci.openshift.org"
 
@@ -340,6 +342,10 @@ cp -t "${dir}" \
   "${SHARED_DIR}/install-config.yaml"
 
 echo "$(date +%s)" >"${SHARED_DIR}/TEST_TIME_INSTALL_START"
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 ### Create manifests
 echo "Creating manifests..."
