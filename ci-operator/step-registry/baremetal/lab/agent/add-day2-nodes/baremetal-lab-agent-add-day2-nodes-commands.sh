@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -o errtrace
-set -o errexit
 set -o pipefail
 set -o nounset
 
@@ -57,7 +56,6 @@ PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
 mkdir -p "${INSTALL_DIR}"
 
-curl https://github.com/openshift/installer/blob/master/docs/user/agent/add-node/node-joiner.sh --output "${INSTALL_DIR}/node-joiner.sh"
 
 cat > "${INSTALL_DIR}/nodes-config.yaml" <<EOF
 hosts: []
@@ -127,6 +125,8 @@ done
 cp "${INSTALL_DIR}/nodes-config.yaml" "${INSTALL_DIR}/"
 
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
+
+curl https://github.com/openshift/installer/blob/master/docs/user/agent/add-node/node-joiner.sh --output "${INSTALL_DIR}/node-joiner.sh"
 
 chmod +x "${INSTALL_DIR}/node-joiner.sh"
 sh "${INSTALL_DIR}/node-joiner.sh"
@@ -200,6 +200,8 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   fi
 done
 
+sleep 3600
+
 # wait for certs to be provisioned
 WAIT="true"
 while [ $WAIT == "true" ]; do
@@ -211,6 +213,8 @@ while [ $WAIT == "true" ]; do
           fi
     done
 done
+
+sleep 3600
 
 oc get csr -o json | jq -r '.items[] | select(.status == {} ) | .metadata.name' | xargs oc adm certificate approve
 
