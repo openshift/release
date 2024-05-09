@@ -6,11 +6,8 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_REGION=${REGION}
 export AWS_PAGER=""
 
-#todo debug only
-
-# aws s3 cp s3://heli-test/kubeconfig  ${SHARED_DIR}/kubeconfig
-# cp ${SHARED_DIR}/kubeconfig ${SHARED_DIR}/mgmt_kubeconfig
-
+git_cmd=$(which git)
+echo "$git_cmd"
 
 # download clusterctl and clusterawsadm
 mkdir -p /tmp/bin
@@ -18,7 +15,7 @@ export PATH=/tmp/bin:$PATH
 curl -L https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.7.1/clusterctl-linux-amd64 -o /tmp/bin/clusterctl && \
     chmod +x /tmp/bin/clusterctl
 
-curl -L https://github.com/kubernetes-sigs/cluster-api-provider-aws/releases/download/v2.5.0/clusterawsadm-linux-amd64 -o /tmp/bin/clusterawsadm && \
+curl -L https://github.com/kubernetes-sigs/cluster-api-provider-aws/releases/download/v2.5.0/clusterawsadm_v2.5.0_linux_amd64 -o /tmp/bin/clusterawsadm && \
     chmod +x /tmp/bin/clusterawsadm
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
