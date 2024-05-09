@@ -20,7 +20,7 @@ CLUSTER_NAME=$(KUBECONFIG="$KUBECONFIG_FILE" ./kubectl config view --minify -o j
 
 SSH_KEY_PATH="/tmp/id_rsa"
 SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null"
-SSH_CMD="ocp.sh release --name ${CLUSTER_NAME}"
+SSH_CMD="ocp-dt.sh release --name ${CLUSTER_NAME}"
 
 # setup ssh key
 cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
