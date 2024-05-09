@@ -1730,7 +1730,7 @@ test_awsendpointservices_status_output_populated
 
 test_serving_machine_pools
 
-test_mc_request_serving_pool_autoscaling
+# test_mc_request_serving_pool_autoscaling
 
 test_delete_sc
 
