@@ -157,6 +157,43 @@ oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patc
 oc patch OperatorHub cluster --type json \
     -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 
+# Generate custom ingress certificate valid for 10 years
+tenYears=3650
+baseDomain=$(oc get dns.config cluster -o=jsonpath='{.spec.baseDomain}')
+temp_dir=$(mktemp -d)
+openssl req -newkey rsa:4096 -nodes -sha256 -keyout "${temp_dir}/ca.key" -x509 -days ${tenYears} -subj "/CN=$baseDomain" -out "${temp_dir}/ca.crt"
+
+openssl genrsa -out "${temp_dir}/ca.key" 4096
+openssl req -x509 -sha256 -key "${temp_dir}/ca.key" -nodes -new -days ${tenYears} -out "${temp_dir}/ca.crt" -subj "/CN=${baseDomain}" -set_serial 1
+
+oc create configmap custom-ca \
+     --from-file=ca-bundle.crt="${temp_dir}/ca.crt" \
+     -n openshift-config
+
+oc patch proxy/cluster \
+     --type=merge \
+     --patch='{"spec":{"trustedCA":{"name":"custom-ca"}}}'
+
+defaultIngressDomain=$(oc get ingresscontroller default -o=jsonpath='{.status.domain}' -n openshift-ingress-operator)
+cat <<EOZ > "${temp_dir}/tmp.conf"
+[cus]
+subjectAltName = DNS:*.${defaultIngressDomain}
+EOZ
+openssl genrsa -out "${temp_dir}/server.key" 4096
+openssl req -new -key "${temp_dir}/server.key" -subj "/CN=${defaultIngressDomain}" -addext "subjectAltName = DNS:*.${defaultIngressDomain}" -out "${temp_dir}/server.csr"
+openssl x509 -req -days ${tenYears} -CA "${temp_dir}/ca.crt" -CAkey "${temp_dir}/ca.key" -CAserial caproxy.srl -CAcreateserial -extfile "${temp_dir}/tmp.conf" -extensions cus -in "${temp_dir}/server.csr" -out "${temp_dir}/server.crt"
+
+oc create secret tls custom-cert \
+     --cert="${temp_dir}/server.crt" \
+     --key="${temp_dir}/server.key" \
+     -n openshift-ingress
+
+oc patch ingresscontroller.operator default \
+     --type=merge -p \
+     '{"spec":{"defaultCertificate": {"name": "custom-cert"}}}' \
+     -n openshift-ingress-operator
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=30m
+
 source /usr/local/share/cert-rotation-functions.sh
 prepull-tools-image-for-gather-step
 
