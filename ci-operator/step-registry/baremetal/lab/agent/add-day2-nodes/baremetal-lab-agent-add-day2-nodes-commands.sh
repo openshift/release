@@ -122,7 +122,9 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   fi
 done
 
-cp "${INSTALL_DIR}/nodes-config.yaml" "${INSTALL_DIR}/"
+sleep 3600
+
+cp "${INSTALL_DIR}/nodes-config.yaml" "${ARTIFACT_DIR}/"
 
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
 
