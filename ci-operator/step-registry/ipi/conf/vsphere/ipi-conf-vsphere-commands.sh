@@ -114,7 +114,7 @@ fi
 
 if [ ${Z_VERSION} -gt 9 ]; then
   echo "$(date -u --rfc-3339=seconds) - 4.x installation is later than 4.9, will install with resource pool"
-  RESOURCE_POOL_DEF="resourcePool: /${vsphere_datacenter}/host/${vsphere_cluster}/Resources/ipi-ci-clusters"
+  RESOURCE_POOL_DEF="resourcePool: ${vsphere_cluster}/Resources/ipi-ci-clusters"
 fi
 if [ ${Z_VERSION} -lt 11 ]; then
   MACHINE_POOL_OVERRIDES="controlPlane:
@@ -180,25 +180,7 @@ baseDomain: $base_domain
 $MACHINE_POOL_OVERRIDES
 platform:
   vsphere:
-    vcenters:
-    - datacenters:
-       - ${vsphere_datacenter}
-      password: ${GOVC_PASSWORD}
-      port: 443
-      server: ${vsphere_url}
-      user: ${GOVC_USERNAME}
-    failureDomains:
-    - name: generated-failure-domain
-      region: generated-region
-      server: ${vsphere_url}
-      topology:
-        computeCluster: /${vsphere_datacenter}/host/${vsphere_cluster}
-        datacenter: ${vsphere_datacenter}
-        datastore: /${vsphere_datacenter}/datastore/${vsphere_datastore}
-        networks:
-        - ${vsphere_portgroup}
-        ${RESOURCE_POOL_DEF}
-      zone: generated-zone
+$(cat $SHARED_DIR/platform.yaml)
 EOF
 fi
 
