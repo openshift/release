@@ -343,4 +343,4 @@ echo "$(date) Waiting for the installation to complete"
 ssh "${ssh_options[@]}" root@$bvsi_fip "/root/$CLUSTER_NAME/openshift-install wait-for install-complete --dir /root/$CLUSTER_NAME/ --log-level debug 2>&1 | grep --line-buffered -v password &"
 
 # Password for the cluster gets leaked in the installer logs and hence removing them.
-sed -i 's/password: .*/password: REDACTED"/g' /root/$CLUSTER_NAME/.openshift_install.log
+sed -i 's/password: .*/password: REDACTED"/g' $HOME/$CLUSTER_NAME/.openshift_install.log
