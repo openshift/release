@@ -82,7 +82,8 @@ function set_eternal_azure_oidc() {
 
   oc -n default create secret generic ${CONSOLE_CLIENT_SECRET_NAME} --from-literal=clientSecret="${CONSOLE_CLIENT_SECRET}"
 
-  export EXTERNAL_AUTH_PROVIDERS="  externalAuthProviders:
+  export EXTERNAL_AUTH_PROVIDERS="  enableExternalAuthProviders: true
+  externalAuthProviders:
     - name: entra-id
       issuer:
         issuerURL: ${ISSUER_URL}
