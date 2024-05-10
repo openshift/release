@@ -6,12 +6,8 @@ set -x
 job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
 infra_name="$CLUSTER_NAME-$job_id"
 plugins_list=("vpc-infrastructure" "cloud-dns-services")
-IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
-export IC_API_KEY
 httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
-httpd_vsi_pub_key=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key")
-export httpd_vsi_pub_key
 
 # Installing CLI tools
 set -e
@@ -57,7 +53,7 @@ fi
 # Login to the IBM Cloud
 echo "Logging into IBM Cloud by targetting the $IC_REGION region"
 ibmcloud config --check-version=false                               # To avoid manual prompt for updating CLI version
-ibmcloud login --apikey $IC_API_KEY -r $IC_REGION -q > /dev/null
+ibmcloud login --apikey @${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey -r $IC_REGION -q > /dev/null
 set +e
 echo "Installing the required ibmcloud plugins if not present."
 for plugin in "${plugins_list[@]}"; do  
