@@ -57,7 +57,7 @@ fi
 # Login to the IBM Cloud
 echo "Logging into IBM Cloud by targetting the $IC_REGION region"
 ibmcloud config --check-version=false                               # To avoid manual prompt for updating CLI version
-ibmcloud login --apikey $IC_API_KEY -r $IC_REGION
+ibmcloud login --apikey $IC_API_KEY -r $IC_REGION -q > /dev/null
 set +e
 echo "Installing the required ibmcloud plugins if not present."
 for plugin in "${plugins_list[@]}"; do  
@@ -344,4 +344,7 @@ echo "Uploading the cluster artifacts directory to bastion node for monitoring"
 cp /tmp/bin/oc $HOME/$CLUSTER_NAME/
 scp -r "${ssh_options[@]}" $HOME/$CLUSTER_NAME/ root@$bvsi_fip:/root/
 echo "$(date) Waiting for the installation to complete"
-ssh "${ssh_options[@]}" root@$bvsi_fip "/root/$CLUSTER_NAME/openshift-install wait-for install-complete --dir /root/$CLUSTER_NAME/ --log-level debug"
+ssh "${ssh_options[@]}" root@$bvsi_fip "/root/$CLUSTER_NAME/openshift-install wait-for install-complete --dir /root/$CLUSTER_NAME/ --log-level debug 2>&1 | grep --line-buffered -v password &"
+
+# Password for the cluster gets leaked in the installer logs and hence removing them.
+sed -i 's/password: .*/password: REDACTED"/g' /root/$CLUSTER_NAME/.openshift_install.log
