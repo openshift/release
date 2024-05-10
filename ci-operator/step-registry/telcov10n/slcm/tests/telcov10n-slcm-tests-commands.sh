@@ -3,11 +3,12 @@
 set -e
 set -o pipefail
 
-CI_PROJECT_ID=`cat /var/run/stage-01/ci-project-id`
-DCI_REMOTE_CI=`cat /var/run/stage-01/dci-remote-ci`
-ECO_VALIDATION_CONTAINER=`cat /var/run/stage-01/eco-validation-container`
-GITLAB_TOKEN=`cat /var/run/stage-01/gitlab-token`
-GITLAB_URL=`cat /var/run/stage-01/gitlab-url`
+CREDENTIALS_PATH=/var/run/stage-01
+CI_PROJECT_ID=`cat $CREDENTIALS_PATH/ci-project-id/CI_PROJECT_ID`
+DCI_REMOTE_CI=`cat $CREDENTIALS_PATH/dci-remote-ci/DCI_REMOTE_CI`
+ECO_VALIDATION_CONTAINER=`cat $CREDENTIALS_PATH/eco-validation-container/ECO_VALIDATION_CONTAINER`
+GITLAB_TOKEN=`cat $CREDENTIALS_PATH/gitlab-token/GITLAB_TOKEN`
+GITLAB_URL=`cat $CREDENTIALS_PATH/gitlab-url/GITLAB_URL`
 
 echo "Start"
 echo "SITE_NAME $SITE_NAME"
