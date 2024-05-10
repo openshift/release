@@ -77,6 +77,24 @@ vc_info='{"vcenters":[]}'
 for vcenter in $vsphere_urls; do
   vsphere_url="${vcenter}"
   source /var/run/vault/vsphere-ibmcloud-config/load-vsphere-env-config.sh
+  # source /var/run/vault/vsphere-config/load-vsphere-env-config.sh
+echo "apiVersion: vspherecapacitymanager.splat.io/v1
+kind: Lease
+metadata:
+  generateName: "${LEASED_RESOURCE}-"
+  namespace: "vsphere-infra-helpers"
+  labels:
+    boskos-lease-id: "${LEASED_RESOURCE}"
+    job-name: "${JOB_NAME_SAFE}"
+spec:
+  vcpus: 24
+  memory: 96
+  networks: 1" | oc create --kubeconfig /var/run/vault/vsphere-config/vsphere-capacity-manager-kubeconfig -f -
+
+declare vcenter_usernames
+declare vcenter_passwords
+# shellcheck source=/dev/null
+source "${VCENTER_AUTH_PATH}"
 
   declare vcenter_usernames
   declare vcenter_passwords
