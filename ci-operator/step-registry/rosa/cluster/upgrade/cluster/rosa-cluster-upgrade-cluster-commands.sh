@@ -92,7 +92,7 @@ function upgrade_cluster_to () {
       exit 1
     fi
 
-    rosa upgrade cluster -y -m auto --version $recommended_version -c $cluster_id ${HCP_SWITCH} 1>"/tmp/update_info.txt" 2>&1
+    rosa upgrade cluster -y -m auto --version $recommended_version -c $cluster_id ${HCP_SWITCH} 1>"/tmp/update_info.txt" 2>&1 || true
     upgrade_info=$(cat "/tmp/update_info.txt")
     if [[ "$upgrade_info" == *"There is already"* ]]; then
       log "Waiting for the previous upgrade schedule to be removed."
@@ -105,9 +105,11 @@ function upgrade_cluster_to () {
 
   # Speed up the upgrading process
   set_proxy
-  log "Force restarting the MUO pod to speed up the upgrading process."
-  muo_pod=$(oc get pod -n openshift-managed-upgrade-operator | grep 'managed-upgrade-operator' | grep -v 'catalog' | cut -d ' ' -f1)
-  oc delete pod $muo_pod -n openshift-managed-upgrade-operator
+  if [[ "$HOSTED_CP" == "false" ]]; then
+    log "Force restarting the MUO pod to speed up the upgrading process."
+    muo_pod=$(oc get pod -n openshift-managed-upgrade-operator | grep 'managed-upgrade-operator' | grep -v 'catalog' | cut -d ' ' -f1)
+    oc delete pod $muo_pod -n openshift-managed-upgrade-operator
+  fi
   unset_proxy
 
   # Upgrade cluster
