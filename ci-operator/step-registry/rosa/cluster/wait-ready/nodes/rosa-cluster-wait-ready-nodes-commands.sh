@@ -166,8 +166,18 @@ function waitForReady() {
 # Determine count of desired compute node count
 function getDesiredComputeCount {
   desired_compute_count=0
-  for compute_count in $(rosa list machinepool -c "$CLUSTER_ID" | grep -v ID | awk '{print $3}' | cut -d'/' -f2 | cut -d'-' -f1); do
-    desired_compute_count=$(expr $desired_compute_count + $compute_count)
+  for MP_NAME in $(rosa list machinepool -c "$CLUSTER_ID" -o json | jq -r '.[].id'); do
+    mp_compute_count=$(rosa describe machinepool --machinepool ${MP_NAME}  -c "$CLUSTER_ID"  -o json  |jq -r '.replicas')
+    if [[ "$mp_compute_count" = "null" ]]; then
+      echo "Machinepool $MP_NAME --auto-scaling enabled, retrieving min_replica count desired"
+      if [[ $HOSTED_CP = "true" ]];then
+        mp_compute_count=$(rosa describe machinepool --machinepool ${MP_NAME} -c "$CLUSTER_ID" -o json  | jq -r '.autoscaling.min_replica')
+      else
+        mp_compute_count=$(rosa describe machinepool --machinepool ${MP_NAME} -c "$CLUSTER_ID" -o json  | jq -r '.autoscaling.min_replicas')
+      fi
+    fi
+    echo "Machinepool $MP_NAME desired compute node count is $mp_compute_count"
+    desired_compute_count=$(expr $desired_compute_count + $mp_compute_count)
   done
  
   export desired_compute_count
