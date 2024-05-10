@@ -6,9 +6,6 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_REGION=${REGION}
 export AWS_PAGER=""
 
-git_cmd=$(which git)
-echo "$git_cmd"
-
 # download clusterctl and clusterawsadm
 mkdir -p /tmp/bin
 export PATH=/tmp/bin:$PATH
