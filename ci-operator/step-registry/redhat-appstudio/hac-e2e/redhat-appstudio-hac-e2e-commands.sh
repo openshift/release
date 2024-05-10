@@ -21,7 +21,7 @@ export  OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD QONTRACT_BASE_URL \
 QONTRACT_PASSWORD=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qontract_password)
 QONTRACT_USERNAME=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qontract_username)
 QONTRACT_BASE_URL="https://app-interface.devshift.net/graphql"
-CYPRESS_PASSWORD=$(cat /usr/local/konflux-ci-secrets/redhat-appstudio-qe/cypress_password)
+CYPRESS_PASSWORD=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/cypress_password)
 export CYPRESS_USERNAME=user1
 export CYPRESS_PERIODIC_RUN=true
 CYPRESS_GH_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github-token)
