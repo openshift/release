@@ -57,7 +57,7 @@ cat << 'EOZ' > /tmp/approve-csrs-with-timeout.sh
     (( required_csrs=${#control_nodes[@]} + ${#compute_nodes[@]} ))
     approved_csrs=0
     attempts=0
-    max_attempts=30
+    max_attempts=40
     while (( required_csrs >= approved_csrs )); do
       echo -n '.'
       mapfile -d ' ' -t csrs < <(oc get csr --field-selector=spec.signerName=${field} --no-headers | grep Pending | cut -f1 -d" ")
@@ -72,8 +72,9 @@ cat << 'EOZ' > /tmp/approve-csrs-with-timeout.sh
       fi
       sleep 10s
     done
+    echo ""
   done
-  echo "Done"
+  echo "Finished CSR approval at $(date)"
 EOZ
 chmod a+x /tmp/approve-csrs-with-timeout.sh
 timeout ${COMMAND_TIMEOUT} ${SCP} /tmp/approve-csrs-with-timeout.sh "core@${control_nodes[0]}:/tmp/approve-csrs-with-timeout.sh"
