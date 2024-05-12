@@ -32,6 +32,7 @@ function is_hcp_started() {
     if [[ -n "${cluster_res}" ]] ; then
       return 0
     fi
+    rosa logs install -c ${CLUSTER_NAME}
     return 1
 }
 
