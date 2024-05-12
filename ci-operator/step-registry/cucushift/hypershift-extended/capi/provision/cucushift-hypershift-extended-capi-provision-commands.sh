@@ -22,7 +22,7 @@ function retry() {
         fi
     done
 
-    echo "Failed to run check function $1 after $max_retries attempts."
+    echo "Failed to run check function $check_func after $max_retries attempts."
     return 1
 }
 
