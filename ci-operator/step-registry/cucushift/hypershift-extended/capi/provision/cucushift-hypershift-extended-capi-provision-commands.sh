@@ -439,6 +439,16 @@ if [[ "${INFRA_ID}" == "null" ]]; then
 fi
 echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"
 
+set +x
+if [[ "${ENDPOINT_ACCESS}" == "Public" ]]; then
+  secret=$(oc get secret -n default ${CLUSTER_NAME}-kubeconfig --ignore-not-found -ojsonpath='{.data.value}')
+  if [[ -n "$secret" ]]; then
+    echo "hosted cluster kubeconfig found"
+   echo "${secret}" | base64 -d > "${SHARED_DIR}/kubeconfig"
+  else
+    echo "hosted cluster kubeconfig not found"
+  fi
+fi
 # do not check worker node here
 # wait for cluster machinepool ready
 # retry is_machine_pool_ready "${NODEPOOL_NAME}"
