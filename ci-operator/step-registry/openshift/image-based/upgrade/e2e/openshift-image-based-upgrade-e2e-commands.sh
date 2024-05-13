@@ -19,15 +19,15 @@ ssh_host_ip="$host@$instance_ip"
 PULL_SECRET_FILE="/var/run/pull-secret/.dockerconfigjson"
 PULL_SECRET=$(cat ${PULL_SECRET_FILE})
 
-RECIPIENT_VM_NAME=$(cat ${SHARED_DIR}/recipient_vm_name)
-recipient_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${RECIPIENT_VM_NAME}/auth/kubeconfig
+TARGET_VM_NAME=$(cat ${SHARED_DIR}/target_vm_name)
+target_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TARGET_VM_NAME}/auth/kubeconfig
 remote_artifacts_dir=${remote_workdir}/artifacts
 
 cat <<EOF > ${SHARED_DIR}/e2e_test.sh
 #!/bin/bash
 set -xeuo pipefail
 
-export KUBECONFIG='${recipient_kubeconfig}'
+export KUBECONFIG='${target_kubeconfig}'
 export PULL_SECRET='${PULL_SECRET}'
 export TESTS_PULL_REF='${TESTS_PULL_REF}'
 
