@@ -58,6 +58,18 @@ mcr.microsoft.com/oss/kubernetes/pause:3.9=MIRROR_REGISTRY_PLACEHOLDER/oss/kuber
 mcr.microsoft.com/powershell:lts-nanoserver-1809=MIRROR_REGISTRY_PLACEHOLDER/powershell:lts-nanoserver-1809
 mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022=MIRROR_REGISTRY_PLACEHOLDER/powershell:lts-nanoserver-ltsc2022
 quay.io/operator-framework/upstream-registry-builder:v1.16.0=MIRROR_REGISTRY_PLACEHOLDER/operator-framework/upstream-registry-builder:v1.16.0
+registry.access.redhat.com/ubi8/ubi-minimal:latest=MIRROR_REGISTRY_PLACEHOLDER/ubi8/ubi-minimal:latest
+registry.access.redhat.com/ubi9/ubi-minimal:latest=MIRROR_REGISTRY_PLACEHOLDER/ubi9/ubi-minimal:latest
+registry.access.redhat.com/ubi8/httpd-24:1-299=MIRROR_REGISTRY_PLACEHOLDER/ubi8/httpd-24:1-299
+registry.k8s.io/sig-storage/csi-provisioner:v3.3.0=MIRROR_REGISTRY_PLACEHOLDER/sig-storage/csi-provisioner:v3.3.0
+registry.k8s.io/sig-storage/livenessprobe:v2.8.0=MIRROR_REGISTRY_PLACEHOLDER/sig-storage/livenessprobe:v2.8.0
+k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.7.0=MIRROR_REGISTRY_PLACEHOLDER/sig-storage/csi-node-driver-registrar:v2.7.0
+registry.k8s.io/sig-storage/smbplugin:v1.10.0=MIRROR_REGISTRY_PLACEHOLDER/sig-storage/smbplugin:v1.10.0
+gcr.io/cloud-provider-vsphere/csi/release/driver:v3.0.0=MIRROR_REGISTRY_PLACEHOLDER/cloud-provider-vsphere/csi/release/driver:v3.0.0
+mcr.microsoft.com/k8s/csi/azurefile-csi:latest=MIRROR_REGISTRY_PLACEHOLDER/k8s/csi/azurefile-csi:latest
+mcr.microsoft.com/oss/kubernetes-csi/csi-node-driver-registrar:v2.8.0=MIRROR_REGISTRY_PLACEHOLDER/oss/kubernetes-csi/csi-node-driver-registrar:v2.8.0
+registry.redhat.io/rhel8/support-tools:latest=MIRROR_REGISTRY_PLACEHOLDER/rhel8/support-tools:latest
+registry.redhat.io/rhel9/support-tools:latest=MIRROR_REGISTRY_PLACEHOLDER/rhel9/support-tools:latest
 EOF
 
 sed -i "s/MIRROR_REGISTRY_PLACEHOLDER/${MIRROR_REGISTRY_HOST}/g" "/tmp/mirror-images-list.yaml"

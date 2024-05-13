@@ -708,8 +708,10 @@ esac
 
 #Create infra and workload machineconfigpool
 create_machineconfigpool infra
-create_machineconfigpool workload
 
+if [[ $IF_CREATE_WORKLOAD_NODE == "true" ]];then
+  create_machineconfigpool workload
+fi
 #Set default value to none if no specified value, using cpu and ram of worker nodes to create machineset
 #This also used for some property don't exist in a certain cloud provider, but need to pass correct parameter for create_machineset
 OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=${OPENSHIFT_INFRA_NODE_INSTANCE_TYPE:-none}
