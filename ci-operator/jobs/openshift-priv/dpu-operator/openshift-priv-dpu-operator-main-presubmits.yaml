@@ -140,20 +140,22 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build04
-    context: ci/prow/unit
+    cluster: build05
+    context: ci/prow/make-test
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 1h0m0s
     hidden: true
     labels:
+      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-dpu-operator-main-unit
+    name: pull-ci-openshift-priv-dpu-operator-main-make-test
     path_alias: github.com/openshift/dpu-operator
-    rerun_command: /test unit
+    rerun_command: /test make-test
     spec:
       containers:
       - args:
@@ -161,7 +163,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=make-test
         command:
         - ci-operator
         image: ci-operator:latest
@@ -171,6 +174,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -188,6 +194,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -197,4 +206,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )make-test,?($|\s.*)

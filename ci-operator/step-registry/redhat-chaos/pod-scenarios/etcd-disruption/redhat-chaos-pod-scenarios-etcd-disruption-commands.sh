@@ -10,12 +10,13 @@ oc config view
 oc projects
 python3 --version
 
-ES_PASSWORD=$(cat "/secret/es/password")
-ES_USERNAME=$(cat "/secret/es/username")
+ES_PASSWORD=$(cat "/secret/es/password" || "")
+ES_USERNAME=$(cat "/secret/es/username" || "")
 
-
-export ELASTIC_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-export ELASTIC_INDEX=krkn_chaos_ci
+if [[ -n $ES_PASSWORD ]]; then
+    export ELASTIC_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+    export ELASTIC_INDEX=krkn_chaos_ci
+fi
 
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
@@ -24,7 +25,7 @@ export KUBECONFIG=/tmp/config
 
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export NAMESPACE=$TARGET_NAMESPACE 
-telemetry_password=$(cat "/secret/telemetry/telemetry_password")
+telemetry_password=$(cat "/secret/telemetry/telemetry_password"  || "")
 export TELEMETRY_PASSWORD=$telemetry_password
 
 oc get nodes --kubeconfig $KRKN_KUBE_CONFIG

@@ -151,6 +151,8 @@ if [[ ${ADDITIONAL_WORKERS_NETWORKS:-} != "" ]]; then
 fi
 
 if [ "${FIPS_ENABLED:-}" = "true" ]; then
+	# Since CI does not run with FIPS mode enabled, disable checking for it in openshift-install
+	export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 	echo "Adding 'fips: true' to install-config.yaml"
 	yq --yaml-output --in-place ".
 		| .fips = true
