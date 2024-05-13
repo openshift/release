@@ -16,10 +16,11 @@ function set_proxy () {
 function retry() {
     local check_func=$1
     shift
-    local max_retries=20
+    local max_retries=30
     local retry_delay=60
     local retries=0
 
+    echo "retry $check_func"
     while (( retries < max_retries )); do
         if $check_func "$@"; then
             return 0
@@ -33,6 +34,8 @@ function retry() {
     done
 
     echo "retry timeout after $max_retries attempts."
+    # debug only
+    oc -n default get rosacontrolplane ${CLUSTER_NAME}-control-plane -oyaml
     return 1
 }
 
@@ -51,6 +54,7 @@ function check_kubeconfig_secret() {
     local res
     res=$(oc get secret -A | grep ${CLUSTER_NAME}-kubeconfig)
     if [[ -z "$res" ]]; then
+      echo "could not find ${CLUSTER_NAME} kubeconfig"
       return 1
     fi
     return 0
@@ -128,6 +132,7 @@ if [[ -n "${namespace}" ]] ; then
   cluster_id=$(cat "${SHARED_DIR}/cluster-id")
   dft_security_group_id=$(aws ec2 describe-security-groups --region ${REGION} --filters "Name=vpc-id,Values=${hc_vpc_id}" "Name=group-name,Values=${cluster_id}-default-sg" --query 'SecurityGroups[].GroupId' --output text)
   aws ec2 authorize-security-group-ingress --region ${REGION} --group-id ${dft_security_group_id} --protocol tcp --port 443 --cidr ${mgmt_vpc_cidr}
+  set -x
   retry check_kubeconfig_secret
 
   set +x
