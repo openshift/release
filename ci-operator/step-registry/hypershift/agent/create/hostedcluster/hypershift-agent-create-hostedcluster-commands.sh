@@ -2,8 +2,6 @@
 
 set -exuo pipefail
 
-oc annotate sc assisted-service storageclass.kubernetes.io/is-default-class=true
-
 ICSP_COMMAND=""
 if [[ $ENABLE_ICSP == "true" ]]; then
   ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml")
