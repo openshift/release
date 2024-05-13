@@ -40,7 +40,8 @@ export ACS__API_TOKEN \
   RHTAP_ENABLE_TPA \
   GITLAB__APP__CLIENT__ID \
   GITLAB__APP__CLIENT__SECRET \
-  GITLAB__TOKEN
+  GITLAB__TOKEN \
+  QUAY__API_TOKEN
 
 RHTAP_ENABLE_GITHUB=${RHTAP_ENABLE_GITHUB:-'true'}
 RHTAP_ENABLE_GITLAB=${RHTAP_ENABLE_GITLAB:-'true'}
@@ -64,6 +65,7 @@ SPRAYPROXY_SERVER_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-serve
 GITLAB__APP__CLIENT__ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_oauth_client_id)
 GITLAB__APP__CLIENT__SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_oauth_client_secret)
 GITLAB__TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_token)
+QUAY__API_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/quay_api_token)
 
 TPA__GUAC__PASSWORD="guac1234" # notsecret
 TPA__KEYCLOAK__ADMIN_PASSWORD="admin123456" # notsecret
@@ -147,9 +149,9 @@ EOF
   wait_for_pipeline "pipelineruns/$pipeline_name" "$NAMESPACE"
   tkn -n "$NAMESPACE" pipelinerun logs "$pipeline_name" -f >"$DEBUG_OUTPUT"
 
-  homepage_url=$(grep "homepage-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
-  callback_url=$(grep "callback-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
-  webhook_url=$(grep "webhook-url" < "$DEBUG_OUTPUT"  | sed 's/.*: //g') 
+  homepage_url=$(grep --max-count 1 "homepage-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
+  callback_url=$(grep --max-count 1 "callback-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
+  webhook_url=$(grep --max-count 1 "webhook-url" < "$DEBUG_OUTPUT"  | head -1 | sed 's/.*: //g') 
 
   echo "$homepage_url" | tee "${SHARED_DIR}/homepage_url"
   echo "$callback_url" | tee "${SHARED_DIR}/callback_url"
