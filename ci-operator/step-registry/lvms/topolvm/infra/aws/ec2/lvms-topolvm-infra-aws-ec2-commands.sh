@@ -11,7 +11,7 @@ trap 'save_stack_events_to_shared' EXIT TERM INT
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-REGION="${EC2_REGION:-$LEASED_RESOURCE}"
+REGION="${REGION:-$LEASED_RESOURCE}"
 JOB_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 stack_name="${JOB_NAME}"
 cf_tpl_file="${SHARED_DIR}/${JOB_NAME}-cf-tpl.yaml"
