@@ -83,6 +83,39 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
+- as: aws-ipi-f2-longduration-workload
+  cron: 45 15 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      TEST_SCENARIOS: Workloads
+      TEST_TIMEOUT: "600"
+    test:
+    - ref: idp-htpasswd
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-f9-longduration-apiserver
+  cron: 25 4 2,11,20 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      TEST_SCENARIOS: API_Server
+      TEST_TIMEOUT: "600"
+    test:
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-f9-longduration-part1-3
   cron: 23 1 6,15,27 * *
   steps:
@@ -369,6 +402,21 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi
+- as: gcp-ipi-proxy-private-f28-disasterrecovery
+  cron: 27 19 13 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
+      TEST_SCENARIOS: DR_Testing
+    test:
+    - ref: idp-htpasswd
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
 - as: gcp-ipi-to-multiarch-f14
   cron: 49 18 5,19 * *
   steps:
