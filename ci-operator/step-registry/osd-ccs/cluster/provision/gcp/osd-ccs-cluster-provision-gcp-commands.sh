@@ -29,6 +29,27 @@ function backoff() {
   return $failed
 }
 
+# Authenticate to Google Cloud
+function gcloud_auth() {
+  local service_project_id
+
+  if ! which gcloud; then
+    GCLOUD_TAR="google-cloud-sdk-468.0.0-linux-x86_64.tar.gz"
+    GCLOUD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$GCLOUD_TAR"
+    logger "INFO" "gcloud not installed, installing from $GCLOUD_URL"
+    pushd ${HOME}
+    curl -O "$GCLOUD_URL"
+    tar -xzf "$GCLOUD_TAR"
+    export PATH=${HOME}/google-cloud-sdk/bin:${PATH}
+    popd
+  fi
+
+  # login to the service project
+  service_project_id="$(jq -r -c .project_id "${GCP_CREDENTIALS_FILE}")"
+  gcloud auth activate-service-account --key-file="${GCP_CREDENTIALS_FILE}"
+  gcloud config set project "${service_project_id}"
+}
+
 # add IAM policy bindings for the ephemeral service account, in the host project
 # parameters:
 #   $1 - the email of the ephemeral service account
@@ -37,6 +58,32 @@ function add_iam_policy_binding()
 {
   local -r sa_email=$1;  shift
   local -r vpc_project_id=$1;  shift
+  local service_project_id
+
+  # login to the service project
+  gcloud_auth
+
+  local interested_roles=("roles/compute.networkAdmin" "roles/compute.securityAdmin" "roles/dns.admin")
+  local cmd
+  for role in "${interested_roles[@]}"; do
+    cmd="gcloud projects add-iam-policy-binding ${vpc_project_id} --member \"serviceAccount:${sa_email}\" --role ${role} 1>/dev/null"
+    backoff "${cmd}"
+  done
+
+  service_project_id="$(jq -r -c .project_id "${GCP_CREDENTIALS_FILE}")"
+  for project in "${service_project_id}" "${vpc_project_id}"; do
+    cmd="gcloud projects get-iam-policy ${project} --flatten='bindings[].members' --format='table(bindings.role)' --filter='bindings.members:${sa_email}'"
+    logger "INFO" "Running Command '${cmd}'"
+    eval "${cmd}"
+  done
+}
+
+CLUSTER_MACHINES_CREATED=false
+function wait_for_bootstrap() {
+  if ${CLUSTER_MACHINES_CREATED}; then
+    # There are already compute instances of the cluster on GCP.
+    return 0
+  fi
 
   if ! which gcloud; then
     GCLOUD_TAR="google-cloud-sdk-468.0.0-linux-x86_64.tar.gz"
@@ -54,18 +101,16 @@ function add_iam_policy_binding()
   gcloud auth activate-service-account --key-file="${GCP_CREDENTIALS_FILE}"
   gcloud config set project "${service_project_id}"
 
-  local interested_roles=("roles/compute.networkAdmin" "roles/compute.securityAdmin" "roles/dns.admin")
-  local cmd
-  for role in "${interested_roles[@]}"; do
-    cmd="gcloud projects add-iam-policy-binding ${vpc_project_id} --member \"serviceAccount:${sa_email}\" --role ${role} 1>/dev/null"
-    backoff "${cmd}"
-  done
+  cmd="gcloud compute instances list --filter='name~${CLUSTER_NAME}' | grep ${CLUSTER_NAME}"
+  logger "INFO" "Running Command '${cmd}'"
+  eval "${cmd}"
+  if [ $? -ne 0 ]; then
+    logger "ERROR" "Failed to find cluster machines on GCP"
+    return 1
+  fi
 
-  for project in "${service_project_id}" "${vpc_project_id}"; do
-    cmd="gcloud projects get-iam-policy ${project} --flatten='bindings[].members' --format='table(bindings.role)' --filter='bindings.members:${sa_email}'"
-    logger "INFO" "Running Command '${cmd}'"
-    eval "${cmd}"
-  done
+  CLUSTER_MACHINES_CREATED=true
+  return 0
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -86,6 +131,7 @@ DISABLE_WORKLOAD_MONITORING=${DISABLE_WORKLOAD_MONITORING:-false}
 SUBSCRIPTION_TYPE=${SUBSCRIPTION_TYPE:-"standard"}
 REGION=${REGION:-"${LEASED_RESOURCE}"}
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
+BOOTSTRAP_TIMEOUT=${BOOTSTRAP_TIMEOUT}
 
 if [ "${ENABLE_SHARED_VPC}" == "yes" ]; then
   logger "INFO" "Extracting the Shared VPC configurations..."
@@ -115,7 +161,8 @@ fi
 GCP_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json"
 
 versionList=$(ocm list versions --channel-group ${CHANNEL_GROUP})
-logger "INFO" "Available cluster versions:\n${versionList}"
+logger "INFO" "Available cluster versions:"
+echo "${versionList}"
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
   OPENSHIFT_VERSION=$(echo "$versionList" | tail -1)
 elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
@@ -137,7 +184,7 @@ COMPUTE_NODES=${COMPUTE_NODES:-$default_compute_nodes}
 
 # Switches
 MARKETPLACE_GCP_TERMS_SWITCH=""
-if [[ ! -z "$SUBSCRIPTION_TYPE" ]]; then
+if [[ "$SUBSCRIPTION_TYPE" == "marketplace-gcp" ]]; then
   MARKETPLACE_GCP_TERMS_SWITCH="--marketplace-gcp-terms"
 fi
 
@@ -156,6 +203,11 @@ if [[ "$SECURE_BOOT_FOR_SHIELDED_VMS" == "true" ]]; then
   SECURE_BOOT_FOR_SHIELDED_VMS_SWITCH="--secure-boot-for-shielded-vms"
 fi
 
+PRIVATE_SWITCH=""
+if [[ "${PRIVATE}" == "yes" ]]; then
+  PRIVATE_SWITCH="--private"
+fi
+
 # Cluster parameters
 logger "INFO" "Parameters for cluster request:"
 echo "  Cluster name: ${CLUSTER_NAME}"
@@ -170,6 +222,7 @@ echo "  Etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Subscription type: ${SUBSCRIPTION_TYPE}"
 echo "  Secure boot for shielded VMs: ${SECURE_BOOT_FOR_SHIELDED_VMS}"
+echo "  Private: ${PRIVATE}"
 if [ "${ENABLE_SHARED_VPC}" == "yes" ]; then
   echo "  VPC project id: ${VPC_PROJECT_ID}"
   echo "  VPC name: ${VPC_NAME}"
@@ -190,6 +243,7 @@ ${MARKETPLACE_GCP_TERMS_SWITCH} \
 ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
 ${ETCD_ENCRYPTION_SWITCH} \
 ${SECURE_BOOT_FOR_SHIELDED_VMS_SWITCH} \
+${PRIVATE_SWITCH} \
 ${SHARED_VPC_SWITCH:-}"
 
 # Create GCP cluster
@@ -208,7 +262,7 @@ start_time=$(date +"%s")
 while true; do
   sleep 60
   CLUSTER_STATE=$(ocm get cluster "${CLUSTER_ID}" | jq -r '.status.state')
-  echo "Cluster state: ${CLUSTER_STATE}"
+  logger "INFO" "Cluster state: ${CLUSTER_STATE}"
   if [[ "${ENABLE_SHARED_VPC}" == "yes" ]] && [[ "${CLUSTER_STATE}" == "waiting" ]]; then
     logger "INFO" "Granting the required permissions in the host project..."
     ephemeral_sa_email=$(ocm describe cluster "${CLUSTER_ID}" | grep -Po "osd-managed-admin-[^\s\t]+")
@@ -216,16 +270,20 @@ while true; do
     continue
   fi
   if [[ "${CLUSTER_STATE}" == "ready" ]]; then
-    echo "Cluster ${CLUSTER_ID} is reported as ready"
+    logger "INFO" "Cluster ${CLUSTER_ID} is reported as ready"
     break
   fi
-  if (( $(date +"%s") - $start_time >= $CLUSTER_TIMEOUT )); then
-    echo "error: Timed out while waiting for cluster to be ready"
+  if (( $(date +"%s") - $start_time >= $BOOTSTRAP_TIMEOUT )) && ! wait_for_bootstrap; then
+    logger "ERROR" "Timed out while waiting for cluster bootstrap completion (in $BOOTSTRAP_TIMEOUT seconds)"
     exit 1
   fi
-  if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" ]]; then
+  if (( $(date +"%s") - $start_time >= $CLUSTER_TIMEOUT )); then
+    logger "ERROR" "Timed out while waiting for cluster to be ready"
+    exit 1
+  fi
+  if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending"  && "${CLUSTER_STATE}" != "validating" ]]; then
     ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/logs/install" > "${ARTIFACT_DIR}/.cluster_install.log" || echo "error: Unable to pull installation log."
-    echo "error: Cluster reported invalid state: ${CLUSTER_STATE}"
+    logger "ERROR" "Cluster reported invalid state: ${CLUSTER_STATE}"
     exit 1
   fi
 done

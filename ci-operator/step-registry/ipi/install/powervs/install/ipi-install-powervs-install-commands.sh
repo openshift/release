@@ -700,6 +700,21 @@ function dump_resources() {
   echo "8<--------8<--------8<--------8<-------- Running jobs 8<--------8<--------8<--------8<--------"
   ibmcloud pi job list --json | jq -r '.jobs[] | select (.status.state|test("running"))'
 
+  echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud 8<-------8<--------8<--------"
+  (
+    if [ ! -f "${dir}/auth/envtest.kubeconfig" ]
+    then
+      exit 0
+    fi
+    export KUBECONFIG=${dir}/auth/envtest.kubeconfig
+    echo "8<--------8<--------8<-------- ibmpowervscluster 8<--------8<--------8<--------"
+    oc --request-timeout=5s get ibmpowervscluster -n openshift-cluster-api-guests -o yaml
+    echo "8<--------8<--------8<-------- ibmpowervsimage 8<--------8<--------8<--------"
+    oc --request-timeout=5s get ibmpowervsimage -n openshift-cluster-api-guests -o yaml
+    echo "8<--------8<--------8<-------- ibmpowervsmachines 8<--------8<--------8<--------"
+    oc --request-timeout=5s get ibmpowervsmachines -n openshift-cluster-api-guests -o yaml
+  )
+
   echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
 
   # Restore any debugging if saved

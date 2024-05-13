@@ -1,6 +1,6 @@
 base_images:
   tests-base:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: tests
 binary_build_commands: |
@@ -9,8 +9,6 @@ binary_build_commands: |
   # ensured the tools are searcheable.
   export GOPATH=/go
   export PATH="${GOPATH}/bin:/usr/local/go/bin/:$PATH"
-  source ci/lib.sh
-  clone_tests_repo
 build_root:
   project_image:
     dockerfile_path: ci/openshift-ci/images/Dockerfile.buildroot
@@ -31,12 +29,12 @@ images:
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
 resources:
   '*':
@@ -81,20 +79,17 @@ tests:
         # which causes openshift-tests to fail.
         export AZURE_AUTH_LOCATION=${SHARED_DIR}/metadata.json
 
-        KATA_WORKDIR=/go/src/github.com/kata-containers/tests
-        cd $KATA_WORKDIR
-
         # The installer is instructed to configure kata containers to use
         # QEMU from the RHCOS extension and host's kernel.
         export KATA_WITH_SYSTEM_QEMU="yes"
         export KATA_WITH_HOST_KERNEL="yes"
         export KATA_RUNTIME="kata-qemu"
         # Install Kata Containers and run a smoke test.
-        .ci/openshift-ci/test.sh
+        ci/openshift-ci/test.sh
 
         # Deploy the kata-webhook so that the tests ran on next step of the
         # workflow will use the kata runtime.
-        .ci/openshift-ci/cluster/deploy_webhook.sh
+        ci/openshift-ci/cluster/deploy_webhook.sh
       from: with-deps
       resources:
         requests:

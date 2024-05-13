@@ -27,14 +27,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: quay-e2e-tests-quay310-ocp416-lp-interop
+- as: quay-e2e-tests-quay311-ocp416-lp-interop
   cron: 0 6 11 2 *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      CSO_CHANNEL: stable-3.10
+      CSO_CHANNEL: stable-3.11
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -54,13 +54,14 @@ tests:
         }
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","quay-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      QBO_CHANNEL: stable-3.10
-      QUAY_OPERATOR_CHANNEL: stable-3.10
+      ODF_OPERATOR_CHANNEL: stable-4.15
+      QBO_CHANNEL: stable-3.11
+      QUAY_OPERATOR_CHANNEL: stable-3.11
+      RE_TRIGGER_ON_FAILURE: "true"
       USER_TAGS: |
         scenario quay
     test:
-    - ref: quay-tests-deploy-quay-aws-s3
-    - ref: quay-tests-test-quay-e2e
+    - chain: quay-tests-quay-e2e-test
     - ref: quay-tests-qbo-qe-test
     - ref: quay-tests-cso-qe-test
     workflow: firewatch-cucushift-installer-rehearse-aws-ipi
@@ -72,30 +73,82 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       CSO_CHANNEL: stable-3.9
+      ODF_OPERATOR_CHANNEL: stable-4.15
       QBO_CHANNEL: stable-3.9
       QUAY_OPERATOR_CHANNEL: stable-3.9
     test:
-    - ref: quay-tests-deploy-quay-aws-s3
-    - ref: quay-tests-test-quay-e2e
+    - chain: quay-tests-quay-e2e-test
     - ref: quay-tests-qbo-qe-test
     - ref: quay-tests-cso-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: quay-e2e-tests-quay38-ocp416
+- as: quay-e2e-tests-quay310-ocp416
   cron: 0 12 * * 2
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      CSO_CHANNEL: stable-3.8
-      QBO_CHANNEL: stable-3.8
-      QUAY_OPERATOR_CHANNEL: stable-3.8
+      CSO_CHANNEL: stable-3.10
+      ODF_OPERATOR_CHANNEL: stable-4.15
+      QBO_CHANNEL: stable-3.10
+      QUAY_OPERATOR_CHANNEL: stable-3.10
     test:
-    - ref: quay-tests-deploy-quay-aws-s3
-    - ref: quay-tests-test-quay-e2e
+    - chain: quay-tests-quay-e2e-test
     - ref: quay-tests-qbo-qe-test
     - ref: quay-tests-cso-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay311-aws-s3-rds-postgresql16-ocp416
+  cron: 0 12 * * 3
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      POSTGRESQL_VERSION: "16"
+      QUAY_OPERATOR_CHANNEL: stable-3.11
+    test:
+    - ref: quay-tests-deploy-quay-aws-rds-postgresql
+    - ref: quay-tests-test-quay-e2e
+    workflow: quay-tests-cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay311-aws-s3-rds-postgresql15-ocp416
+  cron: 0 12 * * 4
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      POSTGRESQL_VERSION: "15"
+      QUAY_OPERATOR_CHANNEL: stable-3.11
+    test:
+    - ref: quay-tests-deploy-quay-aws-rds-postgresql
+    - ref: quay-tests-test-quay-e2e
+    workflow: quay-tests-cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay311-aws-s3-rds-postgresql14-ocp416
+  cron: 0 12 * * 2
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      POSTGRESQL_VERSION: "14"
+      QUAY_OPERATOR_CHANNEL: stable-3.11
+    test:
+    - ref: quay-tests-deploy-quay-aws-rds-postgresql
+    - ref: quay-tests-test-quay-e2e
+    workflow: quay-tests-cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay311-aws-s3-rds-postgresql13-ocp416
+  cron: 0 12 * * 1
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      POSTGRESQL_VERSION: "13"
+      QUAY_OPERATOR_CHANNEL: stable-3.11
+    test:
+    - ref: quay-tests-deploy-quay-aws-rds-postgresql
+    - ref: quay-tests-test-quay-e2e
+    workflow: quay-tests-cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay

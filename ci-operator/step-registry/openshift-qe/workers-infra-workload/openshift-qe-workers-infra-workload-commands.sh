@@ -182,7 +182,7 @@ function create_machineset() {
 
     #Set default value for key VARIABLE
     #Use the first machineset name by default if no REF_MACHINESET_NAME specified
-    ref_machineset_name=$(oc -n openshift-machine-api get -o 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' machinesets | grep worker | head -n1)
+    ref_machineset_name=$(oc -n openshift-machine-api get -o 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' machinesets | grep worker | grep -v rhel | head -n1)
     REF_MACHINESET_NAME=${REF_MACHINESET_NAME:-$ref_machineset_name}
 
     get_ref_machineset_info $REF_MACHINESET_NAME
@@ -581,8 +581,8 @@ platform_type=$(oc get infrastructure cluster -ojsonpath='{.status.platformStatu
 platform_type=$(echo $platform_type | tr -s 'A-Z' 'a-z')
 node_arch=$(echo $node_arch | tr -s " " "\n"| sort -u)
 all_machinesets=$(oc -n openshift-machine-api get machineset -ojsonpath='{.items[*].metadata.name}{"\n"}')
-machineset_list=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win"| head -n3)
-machineset_count=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win"| head -n3 |wc -l)
+machineset_list=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win|rhel"| head -n3)
+machineset_count=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win|rhel"| head -n3 |wc -l)
 total_worker_nodes=$(oc get nodes -l node-role.kubernetes.io/worker= -oname|wc -l)
 
 scale_type=""
@@ -602,7 +602,7 @@ SET_ENV_BY_PLATFORM=${SET_ENV_BY_PLATFORM:=$platform_type}
 echo SET_ENV_BY_PLATFORM is $SET_ENV_BY_PLATFORM
 case ${SET_ENV_BY_PLATFORM} in
 	aws)
-           #ARM64 Architecture:
+     #ARM64 Architecture:
 	   if [[ $node_arch == "arm64" ]];then
 	      if [[ ${scale_type} == "medium" ]];then
                 OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=m6g.12xlarge
@@ -666,13 +666,20 @@ case ${SET_ENV_BY_PLATFORM} in
              ;;
 
 	azure)
-	   #Azure use VM_SIZE as instance type, to unify variable, define all to INSTANCE_TYPE
-           OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=Standard_D16s_v3
-           OPENSHIFT_INFRA_NODE_VOLUME_TYPE=Premium_LRS
-           OPENSHIFT_INFRA_NODE_VOLUME_SIZE=128
-           OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=Standard_D32s_v3
-           OPENSHIFT_WORKLOAD_NODE_VOLUME_TYPE=Premium_LRS
-           OPENSHIFT_WORKLOAD_NODE_VOLUME_SIZE=500
+      #Azure use VM_SIZE as instance type, to unify variable, define all to INSTANCE_TYPE
+      #ARM64 Architecture:
+      if [[ $node_arch == "arm64" ]];then
+          OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=Standard_D16ps_v5
+          OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=Standard_D32ps_v5
+      else 
+          OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=Standard_D16s_v3
+          OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=Standard_D32s_v3
+      fi
+            
+        OPENSHIFT_INFRA_NODE_VOLUME_TYPE=Premium_LRS
+        OPENSHIFT_INFRA_NODE_VOLUME_SIZE=128
+        OPENSHIFT_WORKLOAD_NODE_VOLUME_TYPE=Premium_LRS
+        OPENSHIFT_WORKLOAD_NODE_VOLUME_SIZE=500
              ;;
 	vsphere)
 	   OPENSHIFT_INFRA_NODE_VOLUME_SIZE=120
@@ -701,8 +708,10 @@ esac
 
 #Create infra and workload machineconfigpool
 create_machineconfigpool infra
-create_machineconfigpool workload
 
+if [[ $IF_CREATE_WORKLOAD_NODE == "true" ]];then
+  create_machineconfigpool workload
+fi
 #Set default value to none if no specified value, using cpu and ram of worker nodes to create machineset
 #This also used for some property don't exist in a certain cloud provider, but need to pass correct parameter for create_machineset
 OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=${OPENSHIFT_INFRA_NODE_INSTANCE_TYPE:-none}

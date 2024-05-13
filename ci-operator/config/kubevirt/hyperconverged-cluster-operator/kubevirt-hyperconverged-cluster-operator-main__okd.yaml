@@ -14,17 +14,17 @@ base_images:
   hco-bundle-reg:
     name: hyperconverged-cluster-bundle
     namespace: ci
-    tag: 1.12.0-unstable
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    tag: 1.13.0-unstable
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
 binary_build_commands: make install
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
 - dockerfile_path: build/Dockerfile.okd
   from: base
@@ -47,9 +47,9 @@ images:
   to: virt-artifacts-server
 - dockerfile_path: build/Dockerfile.functest.ci
   inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: hyperconverged-cluster-functest
 - dockerfile_literal: |
     FROM src
@@ -111,8 +111,9 @@ resources:
       cpu: 500m
       memory: 1Gi
 tests:
-- as: hco-e2e-operator-sdk-gcp
-  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+- always_run: false
+  as: hco-e2e-operator-sdk-gcp
+  optional: true
   steps:
     cluster_profile: gcp-virtualization
     dependencies:
@@ -131,7 +132,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
+        GINKGO_LABELS='!SINGLE_NODE_ONLY' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
@@ -143,8 +144,9 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-gcp
-- as: hco-e2e-operator-sdk-aws
-  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+- always_run: false
+  as: hco-e2e-operator-sdk-aws
+  optional: true
   steps:
     cluster_profile: aws-virtualization
     dependencies:
@@ -163,7 +165,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
+        GINKGO_LABELS='!SINGLE_NODE_ONLY' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
@@ -175,15 +177,16 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-aws
-- as: hco-e2e-upgrade-operator-sdk-aws
-  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+- always_run: false
+  as: hco-e2e-upgrade-operator-sdk-aws
+  optional: true
   steps:
     cluster_profile: aws-virtualization
     dependencies:
       OO_BUNDLE: hco-bundle-reg
     env:
       BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
-      INITIAL_VERSION: 1.12.0
+      INITIAL_VERSION: 1.13.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
     test:
     - as: deploy-cr
@@ -218,7 +221,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
+        GINKGO_LABELS='!SINGLE_NODE_ONLY' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
@@ -228,15 +231,16 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-aws
-- as: hco-e2e-upgrade-operator-sdk-gcp
-  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+- always_run: false
+  as: hco-e2e-upgrade-operator-sdk-gcp
+  optional: true
   steps:
     cluster_profile: gcp-virtualization
     dependencies:
       OO_BUNDLE: hco-bundle-reg
     env:
       COMPUTE_NODE_TYPE: n2-standard-4
-      INITIAL_VERSION: 1.12.0
+      INITIAL_VERSION: 1.13.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
     test:
     - as: deploy-cr
@@ -271,7 +275,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
+        GINKGO_LABELS='!SINGLE_NODE_ONLY' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest

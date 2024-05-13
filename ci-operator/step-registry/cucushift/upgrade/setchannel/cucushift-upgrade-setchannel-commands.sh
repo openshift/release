@@ -15,11 +15,15 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 KUBECONFIG="" oc --loglevel=8 registry login
 
 # Extract oc binary which is supposed to be identical with target release
+# Default oc on OCP 4.16 not support OpenSSL 1.x
 function extract_oc(){
     echo -e "Extracting oc\n"
-    local retry=5 tmp_oc="/tmp/client-2"
+    local retry=5 tmp_oc="/tmp/client-2" binary='oc'
     mkdir -p ${tmp_oc}
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${DUMMY_TARGET});
+    if (( y_ver > 15 )) && (openssl version | grep -q "OpenSSL 1") ; then
+        binary='oc.rhel8'
+    fi
+    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=${binary} --to=${tmp_oc} ${DUMMY_TARGET});
     do
         echo >&2 "Failed to extract oc binary, retry..."
         (( retry -= 1 ))
@@ -27,6 +31,7 @@ function extract_oc(){
         sleep 60
     done
     mv ${tmp_oc}/oc ${OC_DIR} -f
+    export PATH="$PATH"
     which oc
     oc version --client
     return 0
@@ -62,10 +67,10 @@ export DUMMY_TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
 # we need this DUMMY_TARGET_VERSION from ci config to download oc
 DUMMY_TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${DUMMY_TARGET}" --output=json | jq -r '.metadata.version')"
 echo "Target version of ci config is: ${DUMMY_TARGET_VERSION}"
-extract_oc
-
 x_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f1 -d. )
 y_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f2 -d. )
+export y_ver
+extract_oc
 ver="${x_ver}.${y_ver}"
 target_channel="${UPGRADE_CHANNEL}-${ver}"
 if ! oc adm upgrade channel ${target_channel}; then

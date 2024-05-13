@@ -20,8 +20,8 @@ fi
 ret=0
 
 # save for debugging
-oc get machinesets -n openshift-machine-api -o json > ${ARTIFACT_DIR}/machinesets.json
-oc get machine -n openshift-machine-api -o json > ${ARTIFACT_DIR}/machine.json
+oc get machineset.machine.openshift.io -n openshift-machine-api -o json > ${ARTIFACT_DIR}/machinesets.json
+oc get machines.machine.openshift.io -n openshift-machine-api -o json > ${ARTIFACT_DIR}/machine.json
 oc get nodes -o json > ${ARTIFACT_DIR}/nodes.json
 
 # --------------------------------
@@ -45,12 +45,12 @@ fi
 # --------------------------------
 edge_node_day2_machineset_name=$(head -n 1 ${SHARED_DIR}/edge_node_day2_machineset_name)
 
-MACHINES=$(oc get machine -n openshift-machine-api -ojson | jq -r --arg n "$edge_node_day2_machineset_name" '.items[] | select(.metadata.labels."machine.openshift.io/cluster-api-machineset"==$n) | .metadata.name')
+MACHINES=$(oc get machines.machine.openshift.io -n openshift-machine-api -ojson | jq -r --arg n "$edge_node_day2_machineset_name" '.items[] | select(.metadata.labels."machine.openshift.io/cluster-api-machineset"==$n) | .metadata.name')
 for machine in $MACHINES;
 do
-  instance_id=$(oc get machines -n openshift-machine-api ${machine} -o json | jq -r '.status.providerStatus.instanceId')
-  external_dns=$(oc get machine -n openshift-machine-api ${machine} -o json | jq -r '.status.addresses[] | select(.type=="ExternalDNS") | .address')
-  internal_dns=$(oc get machine -n openshift-machine-api ${machine} -o json | jq -r '.status.addresses[] | select(.type=="InternalDNS") | .address')
+  instance_id=$(oc get machines.machine.openshift.io -n openshift-machine-api ${machine} -o json | jq -r '.status.providerStatus.instanceId')
+  external_dns=$(oc get machines.machine.openshift.io -n openshift-machine-api ${machine} -o json | jq -r '.status.addresses[] | select(.type=="ExternalDNS") | .address')
+  internal_dns=$(oc get machines.machine.openshift.io -n openshift-machine-api ${machine} -o json | jq -r '.status.addresses[] | select(.type=="InternalDNS") | .address')
 
   machine_info="instance_id:[${instance_id}], external_dns:[${external_dns}], internal_dns:[${internal_dns}]"
 

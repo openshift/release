@@ -7,7 +7,7 @@ def _add_osd_rc_bootstrap(gendoc):
     gendoc.add_comments("""
     Bootstrap the environment for the amd64 tests image.  The caches require an amd64 "tests" image to execute on
     the cluster.  This imagestream is used as a commandline parameter to the release-controller...
-         --tools-image-stream-tag=release-controller-bootstrap:tests
+         --tools-image-stream-tag=release-controller-bootstrap:tools
         """)
     gendoc.append({
         'apiVersion': 'image.openshift.io/v1',
@@ -24,12 +24,12 @@ def _add_osd_rc_bootstrap(gendoc):
                 {
                     'from': {
                         'kind': 'DockerImage',
-                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.16:tests'
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.16:tools'
                     },
                     'importPolicy': {
                         'scheduled': True
                     },
-                    'name': 'tests',
+                    'name': 'tools',
                     'referencePolicy': {
                         'type': 'Source'
                     }
@@ -321,7 +321,7 @@ def _add_osd_rc_deployment(gendoc):
                                         '--listen=' + ('127.0.0.1:8080' if context.private else ':8080'),
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
                                         f'--job-namespace={context.jobs_namespace}',
-                                        '--tools-image-stream-tag=release-controller-bootstrap:tests',
+                                        '--tools-image-stream-tag=release-controller-bootstrap:tools',
                                         f'--release-architecture={context.get_supported_architecture_name()}',
                                         '-v=6',
                                         '--github-token-path=/etc/github/oauth',
@@ -403,7 +403,7 @@ def _add_osd_rc_deployment(gendoc):
                                         f'--artifacts={context.fc_app_url}',
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
                                         f'--job-namespace={context.jobs_namespace}',
-                                        '--tools-image-stream-tag=release-controller-bootstrap:tests',
+                                        '--tools-image-stream-tag=release-controller-bootstrap:tools',
                                         f'--release-architecture={context.get_supported_architecture_name()}',
                                         '-v=6',
                                         '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.',

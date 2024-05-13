@@ -1,7 +1,7 @@
 presubmits:
   openshift-knative/serverless-operator:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -806,7 +806,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )412-upstream-e2e-kafka-aws-412,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -863,7 +863,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )415-aws-ovn-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -920,7 +920,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )415-azure-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -977,7 +977,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )415-gcp-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -1452,7 +1452,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )415-operator-e2e-aws-415,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -1509,7 +1509,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )415-osd-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -1854,7 +1854,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )415-upstream-e2e-kafka-aws-415,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -1911,7 +1911,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )415-vsphere-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -2725,7 +2725,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )416-upstream-e2e-kafka-aws-416,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -2788,6 +2788,64 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
+    context: ci/prow/ocp4.14-lp-rosa-classic-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: ocp4.14-lp-rosa-classic
+      ci.openshift.io/generator: prowgen
+      job-release: "4.14"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-main-ocp4.14-lp-rosa-classic-images
+    rerun_command: /test ocp4.14-lp-rosa-classic-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=ocp4.14-lp-rosa-classic
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ocp4.14-lp-rosa-classic-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
     context: ci/prow/ocp4.15-lp-interop-images
     decorate: true
     decoration_config:
@@ -2842,6 +2900,64 @@ presubmits:
     trigger: (?m)^/test( | .* )ocp4.15-lp-interop-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/ocp4.15-lp-rosa-classic-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: ocp4.15-lp-rosa-classic
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-main-ocp4.15-lp-rosa-classic-images
+    rerun_command: /test ocp4.15-lp-rosa-classic-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=ocp4.15-lp-rosa-classic
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ocp4.15-lp-rosa-classic-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
     branches:
     - ^main$
     - ^main-

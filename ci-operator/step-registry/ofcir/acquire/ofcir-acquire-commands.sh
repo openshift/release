@@ -70,6 +70,8 @@ cat > "${SHARED_DIR}/packet-conf.sh" <<-EOF
         ssh "\${SSHOPTS[@]}" "root@\${IP}" hostname && break
         # Ironic hosts
         ssh "\${SSHOPTS[@]}" "centos@\${IP}" sudo dd if=/home/centos/.ssh/authorized_keys of=/root/.ssh/authorized_keys && break
+        # Ironic hosts CS9
+        ssh "\${SSHOPTS[@]}" "cloud-user@\${IP}" sudo dd if=/home/cloud-user/.ssh/authorized_keys of=/root/.ssh/authorized_keys && break
         sleep 10
     done
 EOF
@@ -118,8 +120,12 @@ function getCIR(){
     fi
 }
 
-#CLUSTERTYPE can be one of "virt", "virt-arm64" or "baremetal"
-CIRTYPE=host
+# Most virt based jobs run on all of the CI hosts, but the diask space available
+# in ESI isn't enough for upgrade jobs
+CIRTYPE=host,host_esi
+[[ "$JOB_NAME" =~ -upgrade- ]] && CIRTYPE=host
+
+#CLUSTERTYPE can be one of "virt", "virt-arm64", "baremetal" or "baremetal-moc"
 [ "$CLUSTERTYPE" == "baremetal" ] && CIRTYPE=cluster
 [ "$CLUSTERTYPE" == "baremetal-moc" ] && CIRTYPE=cluster_moc
 [ "$CLUSTERTYPE" == "virt-arm64" ] && CIRTYPE=host_arm

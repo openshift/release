@@ -11,10 +11,10 @@ base_images:
     name: 4.17-priv
     namespace: ocp-private
     tag: must-gather
-  ocp_4.16_base:
+  ocp_4.16_base-rhel9:
     name: 4.17-priv
     namespace: ocp-private
-    tag: base
+    tag: base-rhel9
   ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
@@ -34,18 +34,21 @@ canonical_go_repository: github.com/openshift/oc
 images:
 - dockerfile_path: images/cli/Dockerfile.rhel
   inputs:
-    ocp_4.16_base:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cli
-- context_dir: images/tools
-  from: cli
+- dockerfile_path: images/tools/Dockerfile
+  inputs:
+    ocp_4.16_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: tools
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: tests-base
@@ -53,13 +56,16 @@ images:
     ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: tests
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: must-gather-base
   inputs:
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: must-gather
 - context_dir: images/deployer
   dockerfile_path: Dockerfile.rhel

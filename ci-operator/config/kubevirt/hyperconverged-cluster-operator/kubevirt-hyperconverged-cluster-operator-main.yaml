@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: "9"
   cli:
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
     tag: cli
   cli-operator-sdk:
@@ -14,21 +14,21 @@ base_images:
   hco-bundle-reg:
     name: hyperconverged-cluster-bundle
     namespace: ci
-    tag: 1.12.0-unstable
+    tag: 1.13.0-unstable
   hco-bundle-reg-prev:
     name: hyperconverged-cluster-bundle
     namespace: ci
-    tag: 1.11.0-unstable
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    tag: 1.12.0-unstable
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
 binary_build_commands: make install
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
 - dockerfile_path: build/Dockerfile.okd
   from: base
@@ -51,9 +51,9 @@ images:
   to: virt-artifacts-server
 - dockerfile_path: build/Dockerfile.functest.ci
   inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: hyperconverged-cluster-functest
 - dockerfile_literal: |
     FROM src
@@ -114,12 +114,12 @@ operator:
 releases:
   initial:
     integration:
-      name: "4.16"
+      name: "4.17"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
+      name: "4.17"
       namespace: ocp
 resources:
   '*':
@@ -148,7 +148,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
+        GINKGO_LABELS='!SINGLE_NODE_ONLY' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
@@ -180,7 +180,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
+        GINKGO_LABELS='!HIGHLY_AVAILABLE_CLUSTER' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
@@ -197,6 +197,61 @@ tests:
     cluster_profile: azure-virtualization
     dependencies:
       OO_BUNDLE: hco-bundle-reg
+    env:
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
+      INITIAL_VERSION: 1.13.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_INSTALL_TIMEOUT_MINUTES: "15"
+    test:
+    - as: deploy-cr
+      commands: |
+        export OUTPUT_DIR=${SHARED_DIR}
+        export CMD=oc
+        source ./hack/compare_scc.sh
+        dump_sccs_before
+        # compressing the SCC files into one tar file, as the CI does not support sub-directories in the  SHARED_DIR
+        tar -C "${SHARED_DIR}" -czvf "${SHARED_DIR}/scc.tar.gz" scc/
+        make deploy_cr
+      from: hco-oc-bin-operator-sdk-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: upgrade-bundle
+      commands: |
+        # un-compressing to get all the original SCC files from the previous phase
+        tar -C "${SHARED_DIR}" -xzvf "${SHARED_DIR}/scc.tar.gz"
+        OUTPUT_DIR=${SHARED_DIR} make upgrade-test-operator-sdk
+      dependencies:
+      - env: OO_NEXT_BUNDLE
+        name: hco-upgrade-operator-sdk-bundle
+      env:
+      - name: INITIAL_VERSION
+      from: hco-oc-bin-operator-sdk-image
+      grace_period: 45m0s
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: e2e-test
+      commands: |
+        GINKGO_LABELS='!HIGHLY_AVAILABLE_CLUSTER' make functest
+      dependencies:
+      - env: FUNCTEST_IMAGE
+        name: hyperconverged-cluster-functest
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-operator-sdk-azure-sno
+- as: hco-e2e-upgrade-prev-operator-sdk-sno-azure
+  optional: true
+  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+  steps:
+    cluster_profile: azure-virtualization
+    dependencies:
+      OO_BUNDLE: hco-bundle-reg-prev
     env:
       BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
       INITIAL_VERSION: 1.12.0
@@ -235,62 +290,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
-      dependencies:
-      - env: FUNCTEST_IMAGE
-        name: hyperconverged-cluster-functest
-      from: hco-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    workflow: optional-operators-ci-operator-sdk-azure-sno
-- as: hco-e2e-upgrade-prev-operator-sdk-sno-azure
-  optional: true
-  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
-  steps:
-    cluster_profile: azure-virtualization
-    dependencies:
-      OO_BUNDLE: hco-bundle-reg-prev
-    env:
-      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
-      INITIAL_VERSION: 1.11.0
-      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
-      OO_INSTALL_TIMEOUT_MINUTES: "15"
-    test:
-    - as: deploy-cr
-      commands: |
-        export OUTPUT_DIR=${SHARED_DIR}
-        export CMD=oc
-        source ./hack/compare_scc.sh
-        dump_sccs_before
-        # compressing the SCC files into one tar file, as the CI does not support sub-directories in the  SHARED_DIR
-        tar -C "${SHARED_DIR}" -czvf "${SHARED_DIR}/scc.tar.gz" scc/
-        make deploy_cr
-      from: hco-oc-bin-operator-sdk-image
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: upgrade-bundle
-      commands: |
-        # un-compressing to get all the original SCC files from the previous phase
-        tar -C "${SHARED_DIR}" -xzvf "${SHARED_DIR}/scc.tar.gz"
-        OUTPUT_DIR=${SHARED_DIR} make upgrade-test-operator-sdk
-      dependencies:
-      - env: OO_NEXT_BUNDLE
-        name: hco-upgrade-operator-sdk-bundle
-      env:
-      - name: INITIAL_VERSION
-      from: hco-oc-bin-operator-sdk-image
-      grace_period: 45m0s
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: e2e-test
-      commands: |
-        make functest
+        GINKGO_LABELS='!HIGHLY_AVAILABLE_CLUSTER' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
@@ -322,7 +322,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
+        GINKGO_LABELS='!HIGHLY_AVAILABLE_CLUSTER' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
@@ -339,6 +339,61 @@ tests:
     cluster_profile: aws-virtualization
     dependencies:
       OO_BUNDLE: hco-bundle-reg
+    env:
+      BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
+      INITIAL_VERSION: 1.13.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_INSTALL_TIMEOUT_MINUTES: "15"
+    test:
+    - as: deploy-cr
+      commands: |
+        export OUTPUT_DIR=${SHARED_DIR}
+        export CMD=oc
+        source ./hack/compare_scc.sh
+        dump_sccs_before
+        # compressing the SCC files into one tar file, as the CI does not support sub-directories in the  SHARED_DIR
+        tar -C "${SHARED_DIR}" -czvf "${SHARED_DIR}/scc.tar.gz" scc/
+        KVM_EMULATION=true make deploy_cr
+      from: hco-oc-bin-operator-sdk-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: upgrade-bundle
+      commands: |
+        # un-compressing to get all the original SCC files from the previous phase
+        tar -C "${SHARED_DIR}" -xzvf "${SHARED_DIR}/scc.tar.gz"
+        OUTPUT_DIR=${SHARED_DIR} make upgrade-test-operator-sdk
+      dependencies:
+      - env: OO_NEXT_BUNDLE
+        name: hco-upgrade-operator-sdk-bundle
+      env:
+      - name: INITIAL_VERSION
+      from: hco-oc-bin-operator-sdk-image
+      grace_period: 45m0s
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: e2e-test
+      commands: |
+        GINKGO_LABELS='!HIGHLY_AVAILABLE_CLUSTER' make functest
+      dependencies:
+      - env: FUNCTEST_IMAGE
+        name: hyperconverged-cluster-functest
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-operator-sdk-aws-sno
+- as: hco-e2e-upgrade-prev-operator-sdk-sno-aws
+  optional: true
+  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+  steps:
+    cluster_profile: aws-virtualization
+    dependencies:
+      OO_BUNDLE: hco-bundle-reg-prev
     env:
       BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
       INITIAL_VERSION: 1.12.0
@@ -377,62 +432,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
-      dependencies:
-      - env: FUNCTEST_IMAGE
-        name: hyperconverged-cluster-functest
-      from: hco-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    workflow: optional-operators-ci-operator-sdk-aws-sno
-- as: hco-e2e-upgrade-prev-operator-sdk-sno-aws
-  optional: true
-  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
-  steps:
-    cluster_profile: aws-virtualization
-    dependencies:
-      OO_BUNDLE: hco-bundle-reg-prev
-    env:
-      BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
-      INITIAL_VERSION: 1.11.0
-      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
-      OO_INSTALL_TIMEOUT_MINUTES: "15"
-    test:
-    - as: deploy-cr
-      commands: |
-        export OUTPUT_DIR=${SHARED_DIR}
-        export CMD=oc
-        source ./hack/compare_scc.sh
-        dump_sccs_before
-        # compressing the SCC files into one tar file, as the CI does not support sub-directories in the  SHARED_DIR
-        tar -C "${SHARED_DIR}" -czvf "${SHARED_DIR}/scc.tar.gz" scc/
-        KVM_EMULATION=true make deploy_cr
-      from: hco-oc-bin-operator-sdk-image
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: upgrade-bundle
-      commands: |
-        # un-compressing to get all the original SCC files from the previous phase
-        tar -C "${SHARED_DIR}" -xzvf "${SHARED_DIR}/scc.tar.gz"
-        OUTPUT_DIR=${SHARED_DIR} make upgrade-test-operator-sdk
-      dependencies:
-      - env: OO_NEXT_BUNDLE
-        name: hco-upgrade-operator-sdk-bundle
-      env:
-      - name: INITIAL_VERSION
-      from: hco-oc-bin-operator-sdk-image
-      grace_period: 45m0s
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: e2e-test
-      commands: |
-        make functest
+        GINKGO_LABELS='!HIGHLY_AVAILABLE_CLUSTER' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
@@ -485,7 +485,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
+        GINKGO_LABELS='!SINGLE_NODE_ONLY' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
@@ -516,7 +516,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
+        GINKGO_LABELS='!SINGLE_NODE_ONLY' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
@@ -555,7 +555,7 @@ tests:
       OO_BUNDLE: hco-bundle-reg
     env:
       BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
-      INITIAL_VERSION: 1.12.0
+      INITIAL_VERSION: 1.13.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_INSTALL_TIMEOUT_MINUTES: "15"
       SPOT_INSTANCES: "true"
@@ -592,7 +592,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
+        GINKGO_LABELS='!SINGLE_NODE_ONLY' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
@@ -610,7 +610,7 @@ tests:
       OO_BUNDLE: hco-bundle-reg
     env:
       BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
-      INITIAL_VERSION: 1.12.0
+      INITIAL_VERSION: 1.13.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_INSTALL_TIMEOUT_MINUTES: "15"
     test:
@@ -646,7 +646,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
+        GINKGO_LABELS='!SINGLE_NODE_ONLY' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
@@ -664,7 +664,7 @@ tests:
       OO_BUNDLE: hco-bundle-reg-prev
     env:
       BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
-      INITIAL_VERSION: 1.11.0
+      INITIAL_VERSION: 1.12.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_INSTALL_TIMEOUT_MINUTES: "15"
       SPOT_INSTANCES: "true"
@@ -701,7 +701,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
+        GINKGO_LABELS='!SINGLE_NODE_ONLY' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
@@ -719,7 +719,7 @@ tests:
       OO_BUNDLE: hco-bundle-reg-prev
     env:
       BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
-      INITIAL_VERSION: 1.11.0
+      INITIAL_VERSION: 1.12.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_INSTALL_TIMEOUT_MINUTES: "15"
     test:
@@ -755,7 +755,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
+        GINKGO_LABELS='!SINGLE_NODE_ONLY' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
@@ -773,7 +773,7 @@ tests:
       OO_BUNDLE: hco-bundle-reg-prev
     env:
       BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
-      INITIAL_VERSION: 1.11.0
+      INITIAL_VERSION: 1.12.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
     test:
     - as: deploy-cr
@@ -810,7 +810,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
+        GINKGO_LABELS='!SINGLE_NODE_ONLY' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
@@ -828,7 +828,7 @@ tests:
       OO_BUNDLE: hco-bundle-reg-prev
     env:
       BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
-      INITIAL_VERSION: 1.11.0
+      INITIAL_VERSION: 1.12.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_INSTALL_TIMEOUT_MINUTES: "15"
     test:
@@ -866,7 +866,7 @@ tests:
           memory: 1Gi
     - as: e2e-test
       commands: |
-        make functest
+        GINKGO_LABELS='!SINGLE_NODE_ONLY' make functest
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
