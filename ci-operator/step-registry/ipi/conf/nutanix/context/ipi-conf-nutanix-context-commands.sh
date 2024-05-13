@@ -75,30 +75,40 @@ fi
 subnet_ip=$(echo "${subnets_json}" | jq ".entities[] | select(.spec.name==\"${subnet_name}\") | .spec.resources.ip_config.subnet_ip")
 
 if [[ -z "${API_VIP}" ]]; then
+  echo "Setting API_VIP"
   if [[ -z "${subnet_ip}" ]]; then
     echo "$(date -u --rfc-3399=seconds) - Cannot get VIP for API"
     exit 1
   fi
   RANDOM_API_VIP_BLOCK=$(( RANDOM % 254 ))
   API_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -v random=${RANDOM_API_VIP_BLOCK} -F. '{printf "%d.%d.%d.%d", $1, $2, $3, random}')
+  echo "Set API_VIP 2 to ${API_VIP}"
 
   if [[ ! -z  "${awk_ip_program}" ]]; then
     API_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -F. -v num=${slice_number} -v type="api" "${awk_ip_program}")
+    echo "Set API_VIP 2 ${API_VIP}"
   fi
 fi
 
 if [[ -z "${INGRESS_VIP}" ]]; then
+  echo "Setting INGRESS_VIP"
   if [[ -z "${subnet_ip}" ]]; then
     echo "$(date -u --rfc-3399=seconds) - Cannot get VIP for Ingress"
     exit 1
   fi
   RANDOM_INGRESS_VIP_BLOCK=$(( RANDOM % 254 ))
   INGRESS_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -v random=${RANDOM_INGRESS_VIP_BLOCK} -F. '{printf "%d.%d.%d.%d", $1, $2, $3, random}')
+  echo "Set INGRESS_VIP 1 ${INGRESS_VIP}"
 
   if [[ ! -z  "${awk_ip_program}" ]]; then
     INGRESS_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -F. -v num=${slice_number} -v type="ingress" "${awk_ip_program}")
+    echo "Set INGRESS_VIP 2 ${INGRESS_VIP}"
+
   fi
 fi
+
+echo "INGRESS_VIP = $INGRESS_VIP"
+echo "API_VIP = API_VIP"
 
 echo "$(date -u --rfc-3339=seconds) - Creating nutanix_context.sh file..."
 cat > "${SHARED_DIR}/nutanix_context.sh" << EOF
