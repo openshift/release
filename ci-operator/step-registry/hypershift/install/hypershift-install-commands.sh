@@ -21,13 +21,7 @@ if [ "${ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --cert-rotation-scale=20m"
 fi
 
-if [ "${CLOUD_PROVIDER}" == "Azure" ]; then
-  bin/hypershift install --hypershift-image="${OPERATOR_IMAGE}" \
-  --platform-monitoring=All \
-  --enable-ci-debug-output \
-  --wait-until-available \
-  ${EXTRA_ARGS}
-else
+if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
   bin/hypershift install --hypershift-image="${OPERATOR_IMAGE}" \
   --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
   --oidc-storage-provider-s3-bucket-name=hypershift-ci-oidc \
@@ -40,6 +34,12 @@ else
   --external-dns-provider=aws \
   --external-dns-credentials=/etc/hypershift-pool-aws-credentials/credentials \
   --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com \
+  --wait-until-available \
+  ${EXTRA_ARGS}
+else
+  bin/hypershift install --hypershift-image="${OPERATOR_IMAGE}" \
+  --platform-monitoring=All \
+  --enable-ci-debug-output \
   --wait-until-available \
   ${EXTRA_ARGS}
 fi
