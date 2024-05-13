@@ -55,7 +55,7 @@ __EOF__
 set -x
 START_TIME=$(date "+%s")
 
-run-ci --color=yes tests/ -m 'acceptance and not ui' -k '' \
+run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   --ocsci-conf "${LOGS_CONFIG}" \
   --collect-logs \
   --ocs-version "${OCS_VERSION}" \
