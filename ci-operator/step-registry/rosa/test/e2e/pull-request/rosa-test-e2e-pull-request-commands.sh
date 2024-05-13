@@ -51,4 +51,5 @@ if [[ ! -z "$TEST_LABEL_FILTERS" ]]; then
 fi
 
 log "INFO: Start pull reqeust testing ..."
-rosatest --ginkgo.v --ginkgo.no-color ${FOCUS_SWITCH} ${LABEL_FILTER_SWITCH}
+junit_xml="${ARTIFACT_DIR}/pull-request.xml"
+rosatest --ginkgo.v --ginkgo.no-color --ginkgo.junit-report "$junit_xml" ${FOCUS_SWITCH} ${LABEL_FILTER_SWITCH}
