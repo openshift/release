@@ -18,6 +18,9 @@ fi
 
 openshift_install_path="/var/lib/openshift-install"
 
+
+echo "Helloooo from upi"
+
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 # shellcheck source=/dev/null
 declare vsphere_datacenter
