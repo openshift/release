@@ -37,7 +37,7 @@ folder_name=$(ls -t -d /tmp/*/ | head -1)
 jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
 
 metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
-cp -r "${metrics_folder_name}" "${ARTIFACTS_DIR}/"
+cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
 
 WEBHOOK_USER=$(cat "/horreum-secret/horreum-webhook-user")
 
