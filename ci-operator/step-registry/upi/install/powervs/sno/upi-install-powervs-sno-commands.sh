@@ -415,7 +415,7 @@ EOF
 
 cat > ${BASTION_CI_SCRIPTS_DIR}/grub-menu.template << EOF
     if [ \${GRUB_MAC_CONFIG} = "\${MAC_ADDRESS}" ]; then
-        linux \${KERNEL_PATH} ignition.firstboot ignition.platform.id=metal 'coreos.live.rootfs_url=\${ROOTFS_URL}' 'ignition.config.url=\${IGNITION_URL}'
+        linux \${KERNEL_PATH} ignition.firstboot ignition.platform.id=metal 'coreos.live.rootfs_url=http://192.168.140.2/\${ROOTFS_FILE}' 'ignition.config.url=http://192.168.140.2/\${IGNITION_FILE}'
         initrd \${INITRAMFS_PATH}
     fi
 EOF
@@ -551,8 +551,8 @@ else
 fi
 
 export GRUB_MAC_CONFIG="\\\${net_default_mac}"
-export ROOTFS_URL=\${BASTION_HTTP_URL}/\${CLUSTER_NAME}/rootfs.img
-export IGNITION_URL=\${BASTION_HTTP_URL}/\${CLUSTER_NAME}/bootstrap.ign
+export ROOTFS_FILE=\${CLUSTER_NAME}/rootfs.img
+export IGNITION_FILE=\${CLUSTER_NAME}/bootstrap.ign
 export KERNEL_PATH="images/\${CLUSTER_NAME}/kernel"
 export INITRAMFS_PATH="images/\${CLUSTER_NAME}/initramfs.img"
 
@@ -769,13 +769,13 @@ scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeadmin
 scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeconfig "${SHARED_DIR}/"
 echo "Create proxy-conf.sh file"
 cat << EOF > "${SHARED_DIR}/proxy-conf.sh"
-echo "Setup proxy to ${BASTION}:2005"
-export HTTP_PROXY=http://${BASTION}:2005/
-export HTTPS_PROXY=http://${BASTION}:2005/
+echo "Setup proxy to ${BASTION_IP}:2005"
+export HTTP_PROXY=http://${BASTION_IP}:2005/
+export HTTPS_PROXY=http://${BASTION_IP}:2005/
 export NO_PROXY="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 
-export http_proxy=http://${BASTION}:2005/
-export https_proxy=http://${BASTION}:2005/
+export http_proxy=http://${BASTION_IP}:2005/
+export https_proxy=http://${BASTION_IP}:2005/
 export no_proxy="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 EOF
 echo "Finished prepare_next_steps"
