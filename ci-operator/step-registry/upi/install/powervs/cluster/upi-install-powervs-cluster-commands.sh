@@ -133,7 +133,7 @@ rhel_image_name     = "CentOS-Stream-9"
 rhcos_import_image              = true
 rhcos_import_image_filename     = "${COREOS_NAME}"
 rhcos_import_image_storage_type = "tier1"
-system_type         = "s922"
+system_type         = "s1022"
 cluster_domain      = "${CLUSTER_DOMAIN}"
 cluster_id_prefix   = "rh-ci"
 bastion   = { memory = "16", processors = "1", "count" = 1 }
@@ -599,7 +599,7 @@ case "$CLUSTER_TYPE" in
 
   # Generates a workspace name like rdr-mac-upi-4-14-au-syd-n1
   # this keeps the workspace unique
-  CLEAN_VERSION=$(echo "${OCP_VERSION}" | sed 's/\([0-9]*\.[0-9]*\).*/\1/')
+  CLEAN_VERSION=$(echo "${OCP_VERSION}" | sed 's/\([0-9]*\.[0-9]*\).*/\1/' | tr '.' '-')
   WORKSPACE_NAME=rdr-mac-p2-"${CLEAN_VERSION}"-"${POWERVS_ZONE}"
   VPC_NAME="${WORKSPACE_NAME}"-vpc
   echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME

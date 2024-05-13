@@ -31,15 +31,16 @@ else
 fi
 
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -ojsonpath='{.items[0].metadata.namespace}')
 EXTRA_ARGS=""
-PLATFORM_TYPE=$(oc get hostedclusters -n local-cluster ${CLUSTER_NAME} -ojsonpath="{.spec.platform.type}")
+PLATFORM_TYPE=$(oc get hostedclusters -n ${HOSTED_CLUSTER_NS} ${CLUSTER_NAME} -ojsonpath="{.spec.platform.type}")
 if [[ "${PLATFORM_TYPE}" == "Agent" ]]; then
   EXTRA_ARGS="${EXTRA_ARGS} --agent-namespace local-cluster-${CLUSTER_NAME}"
 fi
 
 "${HCP_CLI}" dump cluster ${EXTRA_ARGS} \
 --artifact-dir=$ARTIFACT_DIR \
---namespace local-cluster \
+--namespace ${HOSTED_CLUSTER_NS} \
 --dump-guest-cluster=true \
 --name="${CLUSTER_NAME}"
 

@@ -249,6 +249,34 @@ oc wait nodes --all --for=condition=Ready=true --timeout=15m
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
 oc get clusterversion version -o yaml || true
 
+function remove_kubeadmin_user() {
+    if [[ "$KUBEADMIN_REMOVED" == "true" ]]; then
+        ret_delete_admin=0
+
+        ## it is hosted cluster only for workflow cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+        ## it means you only see hosted cluster in testing
+        if test -f "${SHARED_DIR}/nested_kubeconfig" && diff -q "${SHARED_DIR}/nested_kubeconfig" "${SHARED_DIR}/kubeconfig" >/dev/null; then
+            return
+        fi
+
+        echo "KUBEADMIN_REMOVED is set to 'true' and it is not hosted cluster. Deleting kubeadmin secret..."
+        oc --kubeconfig="${SHARED_DIR}/kubeconfig" delete secrets kubeadmin -n kube-system || ret_delete_admin=$?
+        if [ "W${ret_delete_admin}W" != "W0W" ]; then
+            echo "fail to delete kubeadmin-password in mgmt clusger or non-hypershift cluster"
+            if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
+                echo "do not force success exit"
+                exit 1
+            fi
+            echo "force success exit"
+            exit 0
+        fi
+        echo "Kubeadmin secret deleted successfully for mgmt cluster or non-hypershift cluster."
+
+    else
+        echo '$KUBEADMIN_REMOVED not set to "true". Skipping deletion.'
+    fi
+}
+
 # execute the cases
 function run {
     test_scenarios=""
@@ -339,6 +367,7 @@ function run {
     touch "${ARTIFACT_DIR}/skip_overall_if_fail"
     ret_value=0
     set -x
+    remove_kubeadmin_user
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
         extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         -o "${ARTIFACT_DIR}/extended.log" \

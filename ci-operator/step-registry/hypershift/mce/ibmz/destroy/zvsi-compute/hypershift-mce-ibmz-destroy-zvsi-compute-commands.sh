@@ -198,5 +198,5 @@ ${ssh_key_string}
 -----END OPENSSH PRIVATE KEY-----
 EOF
 chmod 0600 ${tmp_ssh_key}
-ssh -o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "${tmp_ssh_key}" root@$httpd_vsi_ip "rm -rf /var/www/html/rootfs.img"
+ssh -o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "${tmp_ssh_key}" root@$httpd_vsi_ip "rm -rf /var/www/html/rootfs-$PROW_JOB_ID.img"
 echo "$(date) Successfully completed the e2e deletion chain"
