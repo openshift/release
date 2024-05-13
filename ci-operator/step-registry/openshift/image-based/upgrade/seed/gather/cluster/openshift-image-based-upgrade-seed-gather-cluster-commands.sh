@@ -35,7 +35,7 @@ echo "Transfering upgrade script..."
 echo ${SHARED_DIR}
 scp "${SSHOPTS[@]}" ${SHARED_DIR}/gather_seed_cluster.sh $ssh_host_ip:$remote_workdir
 
-echo "Upgrading recipient cluster..."
+echo "Upgrading target cluster..."
 ssh "${SSHOPTS[@]}" $ssh_host_ip "${remote_workdir}/gather_seed_cluster.sh"
 
 echo "Pulling must gather data from the host..."
