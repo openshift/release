@@ -3,8 +3,15 @@
 set -x
 
 # session variables
-infra_name="$HC_NAME-$(echo -n $PROW_JOB_ID|cut -c-8)"
+HC_NAME="$(printf $PROW_JOB_ID|sha256sum|cut -c-20)"
+export HC_NAME
+job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
+export job_id
 plugins_list=("vpc-infrastructure" "cloud-dns-services")
+infra_name="hcp-ci-$job_id"
+export infra_name
+hcp_domain="$job_id-$HYPERSHIFT_BASEDOMAIN"
+export hcp_domain
 IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
 httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
@@ -50,7 +57,7 @@ done
 
 # Deleting the DNS Service
 echo "Triggering the $infra_name-dns DNS instance deletion in the resource group $infra_name-rg."
-dns_zone_id=$(ibmcloud dns zones -i $infra_name-dns | grep $HC_NAME.$HYPERSHIFT_BASEDOMAIN | awk '{print $1}')
+dns_zone_id=$(ibmcloud dns zones -i $infra_name-dns | grep $HC_NAME.$hcp_domain | awk '{print $1}')
 glb_id=$(ibmcloud dns glbs $dns_zone_id -i $infra_name-dns --output json | jq -r '.[]|.id')
 glb_pool_id=$(ibmcloud dns glb-pools -i $infra_name-dns --output json | jq -r '.[]|.id')
 network_id=$(ibmcloud is vpc $infra_name-vpc --output JSON | jq -r '.id')
@@ -89,7 +96,38 @@ for status in "${fip_delete_status[@]}"; do
     fi
 done
 
-sleep 60
+# Deleting the bastion VSI
+echo "Triggering the $infra_name-bastion instance deletion in the $infra_name-vpc VPC."
+bvsi_delete_status=$(ibmcloud is instance-delete $infra_name-bastion --output JSON -f | jq -r '.[]|.result')
+if [ "$bvsi_delete_status" = 'false' ]; then
+    echo "Deletion of $infra_name-bastion instance is not successful."
+    exit 1
+else 
+    echo "Successfully deleted the $infra_name-bastion instance in the $infra_name-vpc VPC."
+fi
+
+# Clearing proxy setup as we deleted bastion ( proxy server )
+
+rm -rf "${SHARED_DIR}/proxy-conf.sh"
+unset http_proxy
+unset https_proxy
+unset HTTP_PROXY
+unset HTTPS_PROXY
+unset NO_PROXY
+unset no_proxy
+
+# Deleting the bastion VSI Floating IP
+echo "Triggering the $infra_name-bastion-ip Floating IP in the $infra_name-rg resource group."
+bfip_delete_status=$(ibmcloud is ipd $infra_name-bastion-ip --output JSON -f | jq -r '.[]|.result')
+if [ "$bfip_delete_status" = 'false' ]; then
+    echo "Deletion of $infra_name-bastion-ip floating IP is not successful."
+    exit 1
+else 
+    echo "Successfully deleted the $infra_name-bastion-ip floating IP in the $infra_name-rg resource group."
+fi
+
+sleep 60   # Allowing all the subnet resources to get deleted
+
 
 # Deleting the subnet
 echo "Triggering the $infra_name-sn subnet deletion in the $infra_name-vpc VPC."
@@ -111,24 +149,15 @@ else
     exit 1
 fi
 
-# Deleting the SSH key
-echo "Triggering the $infra_name-key SSH key deletion in the resource group $infra_name-rg resource group."
-ssh_key_delete_status=$(ibmcloud is key-delete $infra_name-key --output JSON -f | jq -r '.[]|.result')
-if [ $ssh_key_delete_status == "true" ]; then
-    echo "Successfully deleted the SSH key $infra_name-key in the $infra_name-rg resource group."
-else 
-    echo "Error: Failed to delete the $infra_name-key SSH key in the $infra_name-rg resource group."
-    exit 1
-fi
-
 echo "Waiting for resources to get deleted completely before deleting the resource group"
 sleep 60
 
 # Deleting the resource group
 set -e
-echo "Verifying if any resource reclamations are present in the $infra_name-rg resource group"
 rg_id=$(ibmcloud resource groups -q | awk -v rg="$infra_name-rg" '$1 == rg {print $2}')
 echo "Resource Group ID: $rg_id"
+
+echo "Verifying if any resource reclamations are present in the $infra_name-rg resource group"
 instance_ids=$(ibmcloud resource reclamations --output json | jq -r --arg rid "$rg_id" '.[]|select(.resource_group_id == $rid)|.id' | tr '\n' ' ')
 IFS=' ' read -ra instance_id_list <<< "$instance_ids"
 if [ ${#instance_id_list[@]} -gt 0 ]; then
@@ -138,12 +167,25 @@ if [ ${#instance_id_list[@]} -gt 0 ]; then
         ibmcloud resource reclamation-delete $instance_id -f 
     done
 else
-    echo "No resource reclamations present in $infra_name-rg"
+    echo "No resource reclamations are present in $infra_name-rg"
+fi
+
+echo "Verifying if any service instances are present in the $infra_name-rg resource group"
+si_names=$(ibmcloud resource service-instances --type all -g $infra_name-rg --output JSON | jq -r '.[]|.name' | tr '\n' ' ')
+IFS=' ' read -ra si_list <<< "$si_names"
+if [ ${#si_list[@]} -gt 0 ]; then
+    echo "Service Instance Names :" "${si_list[@]}"
+    for si in "${si_list[@]}"; do
+        echo "Deleting the service instance $si"
+        ibmcloud resource service-instance-delete $si -g $infra_name-rg --recursive -f
+    done
+else
+    echo "No service instances are present in $infra_name-rg"
 fi
 
 echo "Triggering the $infra_name-rg resource group deletion in the $IC_REGION region."
 ibmcloud resource group-delete $infra_name-rg -f
-echo "Successfully completed the destruction of all the resources that are created during the CI."
+echo "Successfully completed the deletion of all the resources that are created during the CI."
 
 # Deleting the rootfs image from the HTTPD server
 ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
@@ -156,6 +198,5 @@ ${ssh_key_string}
 -----END OPENSSH PRIVATE KEY-----
 EOF
 chmod 0600 ${tmp_ssh_key}
-ssh -o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "${tmp_ssh_key}" root@$httpd_vsi_ip "rm -rf /var/www/html/rootfs.img"
+ssh -o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "${tmp_ssh_key}" root@$httpd_vsi_ip "rm -rf /var/www/html/rootfs-$PROW_JOB_ID.img"
 echo "$(date) Successfully completed the e2e deletion chain"
-set +e

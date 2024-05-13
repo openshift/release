@@ -5,12 +5,14 @@ presubmits:
     branches:
     - ^maistra-2\.2$
     - ^maistra-2\.2-
-    cluster: build04
+    cluster: build03
     context: ci/prow/build-containers-2-2
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-maistra-header-append-filter-maistra-2.2-build-containers-2-2
@@ -19,10 +21,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/build-containers-2-2-cluster-profile
         - --target=build-containers-2-2
         command:
         - ci-operator
@@ -33,14 +36,16 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/build-containers-2-2-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -53,12 +58,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: hive-hive-credentials
+      - name: cluster-profile
         secret:
-          secretName: hive-hive-credentials
+          secretName: cluster-secrets-ossm-aws
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -74,7 +85,7 @@ presubmits:
     branches:
     - ^maistra-2\.2$
     - ^maistra-2\.2-
-    cluster: build04
+    cluster: build03
     context: ci/prow/lint-2-2
     decorate: true
     decoration_config:
@@ -129,7 +140,7 @@ presubmits:
     branches:
     - ^maistra-2\.2$
     - ^maistra-2\.2-
-    cluster: build04
+    cluster: build03
     context: ci/prow/test-2-2
     decorate: true
     decoration_config:

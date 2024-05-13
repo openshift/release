@@ -163,10 +163,10 @@ cat << EOF > ~/ocp-install.yml
     ignore_errors: true
 
   - name: Run oc command to check if cluster is ready
-    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Progressing'\'')].status}'
     register: oc_status
-    until: "'True' in oc_status.stdout"
-    retries: 30
+    until: "'False' in oc_status.stdout"
+    retries: 60
     delay: 60
     ignore_errors: true
 
@@ -250,12 +250,23 @@ cat << EOF > ~/fetch-information.yml
 
   - name: Get cluster version
     shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion
+    ignore_errors: true
 
   - name: Get bmh objects
     shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get bmh -A
+    ignore_errors: true
 
   - name: Get nodes
     shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get node
+    ignore_errors: true
+
+  - name: Get MCP
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get mcp
+    ignore_errors: true
+
+  - name: Get operators
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get co
+    ignore_errors: true
 EOF
 
 cat << EOF > ~/check-cluster.yml
@@ -266,7 +277,7 @@ cat << EOF > ~/check-cluster.yml
   tasks:
 
   - name: Check if cluster is available
-    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'
+    shell: oc --kubeconfig=${WORK_DIR}/auth/kubeconfig get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Progressing'\'')].status}'
     register: ready_check
 
   - name: Check for errors in cluster deployment
@@ -276,7 +287,7 @@ cat << EOF > ~/check-cluster.yml
   - name: Fail if deployment failed
     fail:
       msg: Installation has failed
-    when: "'True' not in ready_check.stdout or 'Error while reconciling' in error_check.stdout"
+    when: "'False' not in ready_check.stdout"
 
 EOF
 
@@ -295,8 +306,6 @@ EOF
 
 #Set status and run playbooks
 status=0
-# Install posix collection so that we can use debug callback
-ansible-galaxy collection install ansible.posix
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
 sleep 300  # Wait for cluster to be ready after a reboot

@@ -47,10 +47,12 @@ images:
   to: ubi9-minimal-entitled
 - dockerfile_literal: |
     FROM src
-    RUN wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && \
-      chmod +x /usr/bin/yq
+    RUN wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq && \
+      chmod +x /usr/local/bin/yq
+    RUN wget https://github.com/operator-framework/operator-sdk/releases/download/v1.34.1/operator-sdk_linux_amd64 -O /usr/local/bin/operator-sdk && \
+      chmod +x /usr/local/bin/operator-sdk
   from: src
-  to: e2e-hub-yq
+  to: e2e-hub-tools
 - dockerfile_literal: |
     FROM src
     RUN curl -LO https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_x86_64.tar.gz && \
@@ -82,8 +84,8 @@ operator:
 promotion:
   to:
   - excluded_images:
+    - e2e-hub-tools
     - ubi9-minimal-entitled
-    - e2e-hub-yq
     - src-grpcurl
     namespace: edge-infrastructure
     tag: latest
@@ -92,7 +94,7 @@ releases:
   latest:
     release:
       channel: fast
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -217,13 +219,17 @@ tests:
         oc project default
         ./ci/prow/e2e-hub-spoke-incluster-build
       dependencies:
+      - env: OO_BUNDLE
+        name: operator-bundle
+      - env: OO_HUB_BUNDLE
+        name: hub-operator-bundle
       - env: IMG
         name: kernel-module-management-operator
       - env: HUB_IMG
         name: kernel-module-management-operator-hub
       - env: WEBHOOK_IMG
         name: kernel-module-management-webhook-server
-      from: e2e-hub-yq
+      from: e2e-hub-tools
       resources:
         requests:
           cpu: 1000m

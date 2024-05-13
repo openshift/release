@@ -1,16 +1,20 @@
 base_images:
   base:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: base-rhel9
+  loki-tag:
+    name: v2.9.8
+    namespace: logging
+    tag: loki
   lokistack-gateway:
     name: mirror-5.y
     namespace: logging
     tag: lokistack-gateway
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.21-builder-multi-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
   opa-openshift:
     name: mirror-5.y
     namespace: logging
@@ -19,29 +23,25 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
 images:
 - dockerfile_path: Dockerfile.ocp
   from: base
   inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-builder-multi-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: loki
 - dockerfile_path: Dockerfile.promtail.ocp
   from: base
   inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-builder-multi-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: promtail
 - context_dir: operator
   dockerfile_path: Dockerfile
   from: base
-  inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - golang:1.21.7
   to: loki-operator
 operator:
   bundles:
@@ -51,8 +51,8 @@ operator:
   substitutions:
   - pullspec: quay.io/openshift-logging/loki-operator:0.1.0
     with: pipeline:loki-operator
-  - pullspec: quay.io/openshift-logging/loki:v2.9.4
-    with: pipeline:loki
+  - pullspec: quay.io/openshift-logging/loki:v2.9.8
+    with: pipeline:loki-tag
   - pullspec: quay.io/observatorium/api:latest
     with: pipeline:lokistack-gateway
   - pullspec: quay.io/observatorium/opa-openshift:latest
@@ -65,10 +65,9 @@ promotion:
     namespace: logging
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.14"
+    release:
+      channel: stable
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -133,7 +132,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.15"
   steps:
     dependencies:
       OO_INDEX: ci-index-loki-operator-bundle

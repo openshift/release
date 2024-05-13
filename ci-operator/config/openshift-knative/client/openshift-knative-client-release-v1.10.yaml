@@ -83,6 +83,11 @@ promotion:
   to:
   - name: knative-v1.10.0
     namespace: openshift
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -90,15 +95,11 @@ resources:
 test_binary_build_commands: make test-install
 tests:
 - as: e2e-aws-ocp-412
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.12"
   steps:
     allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
     test:
     - as: test
       cli: latest
@@ -117,7 +118,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: generic-claim
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-v1.10
   org: openshift-knative

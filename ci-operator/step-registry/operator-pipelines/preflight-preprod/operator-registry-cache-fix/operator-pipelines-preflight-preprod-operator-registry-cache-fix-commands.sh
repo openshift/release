@@ -7,6 +7,8 @@ echo "Check if catalog sources are healthy"
 echo "Writing pods and statuses to disk"
 oc get pods -n openshift-marketplace -o "jsonpath={range .items[*]}{.metadata.name}{' '}{.status.phase}{'\n'}{end}" > /tmp/catalog-sources-status
 
+cat /tmp/catalog-sources-status
+
 echo "Read pods and statuses from disk; if any pod has status CrashLoopBackoff delete pod"
 while IFS=' ' read -r podName status
 do

@@ -125,6 +125,28 @@ retry_installplan_creation () {
     done
 }
 
+# Enables hybrid overlay feature on a running cluster
+enable_hybrid_overlay () {
+    VXLAN_PORT=4789
+    
+    oc patch Network.operator.openshift.io cluster --type='merge' --patch '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"hybridOverlayConfig":{"hybridOverlayVXLANPort":'"${VXLAN_PORT}"',"hybridClusterNetwork":[{"cidr": "10.132.0.0/14","hostPrefix": 23}]}}}}}'
+    
+    # wait for the ovnKubernetesConfig to update
+    start_time=$(date +%s)
+    while [ -z "$(oc get network.operator.openshift.io -o jsonpath="{.items[0].spec.defaultNetwork.ovnKubernetesConfig.hybridOverlayConfig}")" ]; do
+        if [ $(($(date +%s) - $start_time)) -gt 300 ]; then
+            echo "Timeout waiting for the ovnKubernetesConfig to update"
+            exit 1
+        fi
+    done
+}
+
+# Enable hybrid overlay
+if [[ "${ENABLE_HYBRID_OVERLAY}" == "true" ]]; then
+    echo "Enabling hybrid overlay feature on a running cluster"
+    enable_hybrid_overlay
+fi
+
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
@@ -159,6 +181,7 @@ echo "OO_TARGET_NAMESPACES: $OO_TARGET_NAMESPACES"
 echo "OO_CONFIG_ENVVARS:    $OO_CONFIG_ENVVARS"
 echo "TEST_MODE:            $TEST_MODE"
 echo "EVAL_CONFIG_ENVVARS:  $EVAL_CONFIG_ENVVARS"
+echo "ENABLE_HYBRID_OVERLAY:$ENABLE_HYBRID_OVERLAY"
 
 if [[ -f "${SHARED_DIR}/operator-install-namespace.txt" ]]; then
     OO_INSTALL_NAMESPACE=$(cat "$SHARED_DIR"/operator-install-namespace.txt)

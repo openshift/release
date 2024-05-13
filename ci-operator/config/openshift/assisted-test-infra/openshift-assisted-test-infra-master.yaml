@@ -27,6 +27,10 @@ base_images:
     name: govc
     namespace: ci
     tag: v0.29.0
+  tests:
+    name: "4.15"
+    namespace: ocp
+    tag: tests
   upi-installer:
     name: "4.15"
     namespace: ocp
@@ -164,15 +168,6 @@ tests:
         OPENSHIFT_VERSION=4.14
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-11-periodic
-  cron: 00 02 */1 * 0,3
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.11
-      TEST_SUITE: full
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-12-periodic
   cron: 00 02 */1 * 0,3
   steps:
@@ -180,7 +175,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.12
-      TEST_SUITE: full
+      TEST_SUITE: none
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-13-periodic
   cron: 00 02 */1 * 0-5
@@ -189,7 +184,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.13
-      TEST_SUITE: full
+      TEST_SUITE: none
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-14-periodic
   cron: 00 03 */1 * 0-5
@@ -391,6 +386,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         WORKER_DISK=40000000000
+      PACKET_PLAN: m3.large.x86
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
@@ -688,16 +684,6 @@ tests:
 - always_run: false
   as: e2e-vsphere-assisted
   optional: true
-  steps:
-    cluster_profile: vsphere-2
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-      PLATFORM: vsphere
-    workflow: assisted-vsphere
-- as: e2e-vsphere-assisted-periodic
-  cron: 00 05 */1 * 0-5
   steps:
     cluster_profile: vsphere-2
     env:

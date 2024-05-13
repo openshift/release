@@ -1,8 +1,3 @@
-base_images:
-  test-runtime:
-    name: test-runtime
-    namespace: microshift
-    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -85,29 +80,29 @@ tests:
     cluster_profile: aws
     env:
       EC2_INSTANCE_TYPE: c5n.metal
-      MICROSHIFT_OS: rhel-9.3
+      MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-tests
 - as: microshift-metal-tests-arm
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-0addfb94c944af1cc
       EC2_INSTANCE_TYPE: c6g.metal
+      MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-tests
 - as: microshift-metal-cache
   run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
   steps:
     cluster_profile: aws
     env:
-      MICROSHIFT_OS: rhel-9.3
+      MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-cache
 - as: microshift-metal-cache-nightly
   cron: 0 0 * * *
   steps:
     cluster_profile: aws
     env:
-      MICROSHIFT_OS: rhel-9.3
+      MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-cache
 - as: microshift-metal-cache-arm
   run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
@@ -115,7 +110,7 @@ tests:
     cluster_profile: aws
     env:
       EC2_INSTANCE_TYPE: t4g.2xlarge
-      MICROSHIFT_OS: rhel-9.3
+      MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-cache
 - as: microshift-metal-cache-nightly-arm
   cron: 0 0 * * *
@@ -123,7 +118,7 @@ tests:
     cluster_profile: aws
     env:
       EC2_INSTANCE_TYPE: t4g.2xlarge
-      MICROSHIFT_OS: rhel-9.3
+      MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-cache
 - as: rebase-on-nightlies
   cron: 0 5 * * 1-5
@@ -139,15 +134,47 @@ tests:
     cluster_profile: aws
     env:
       EC2_INSTANCE_TYPE: c5n.metal
-      MICROSHIFT_OS: rhel-9.3
+      MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-tests
 - as: metal-periodic-test-arm
   run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*)$
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-0addfb94c944af1cc
       EC2_INSTANCE_TYPE: c6g.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: metal-bootc-test
+  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: metal-bootc-test-nightly
+  cron: 0 1 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c5n.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: metal-bootc-test-arm
+  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c6g.metal
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-tests
+- as: metal-bootc-test-nightly-arm
+  cron: 0 1 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c6g.metal
+      MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly
   cron: 0 1,13 * * *
@@ -155,7 +182,7 @@ tests:
     cluster_profile: aws
     env:
       EC2_INSTANCE_TYPE: c5n.metal
-      MICROSHIFT_OS: rhel-9.3
+      MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly-arm
   cron: 0 1,13 * * *
@@ -163,18 +190,21 @@ tests:
     cluster_profile: aws
     env:
       EC2_INSTANCE_TYPE: c6g.metal
-      MICROSHIFT_OS: rhel-9.3
+      MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-conformance-rhel-eus-nightly
   cron: 0 1,13 * * *
   steps:
     cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-conformance-with-optional-rpms-rhel-eus-nightly
   cron: 0 1,13 * * *
   steps:
     cluster_profile: aws
     env:
+      MICROSHIFT_OS: rhel-9.4
       OPTIONAL_RPMS: "true"
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-conformance-rhel-eus-nightly-arm
@@ -183,6 +213,7 @@ tests:
     cluster_profile: aws
     env:
       EC2_INSTANCE_TYPE: t4g.2xlarge
+      MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-conformance-with-optional-rpms-rhel-eus-nightly-arm
   cron: 0 1,13 * * *
@@ -190,34 +221,38 @@ tests:
     cluster_profile: aws
     env:
       EC2_INSTANCE_TYPE: t4g.2xlarge
+      MICROSHIFT_OS: rhel-9.4
       OPTIONAL_RPMS: "true"
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-conformance-rhel-eus
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|origin/.*|vendor/.*|Makefile.*|scripts/.*)$
+  run_if_changed: ^(assets/.*|etcd/.*|vendor/.*)$
   steps:
     cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-conformance-rhel-eus-arm
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|origin/.*|vendor/.*|Makefile.*|scripts/.*)$
+  run_if_changed: ^(assets/.*|etcd/.*|vendor/.*)$
   steps:
     cluster_profile: aws
     env:
       EC2_INSTANCE_TYPE: t4g.2xlarge
+      MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
-- as: ocp-conformance-full-rhel-eus-weekly
-  cron: 0 2 * * 1
+- as: e2e-aws-ovn-ocp-conformance
+  cron: 0 1,13 * * *
   steps:
     cluster_profile: aws
     env:
-      RESTRICTED: "false"
-    workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-origin-conformance
 - as: clusterbot
   cron: 0 1 * * *
   steps:
     cluster_profile: aws
     env:
       MICROSHIFT_ARCH: arm64
-      MICROSHIFT_OS: rhel-9.3
+      MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-clusterbot
 zz_generated_metadata:
   branch: main

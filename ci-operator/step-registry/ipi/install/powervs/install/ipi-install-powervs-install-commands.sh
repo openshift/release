@@ -483,7 +483,7 @@ function destroy_resources() {
   #
   mkdir /tmp/ocp-test
   cat > "/tmp/ocp-test/metadata.json" << EOF
-{"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
+{"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceGUID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
 EOF
 
   #
@@ -699,6 +699,21 @@ function dump_resources() {
 
   echo "8<--------8<--------8<--------8<-------- Running jobs 8<--------8<--------8<--------8<--------"
   ibmcloud pi job list --json | jq -r '.jobs[] | select (.status.state|test("running"))'
+
+  echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud 8<-------8<--------8<--------"
+  (
+    if [ ! -f "${dir}/auth/envtest.kubeconfig" ]
+    then
+      exit 0
+    fi
+    export KUBECONFIG=${dir}/auth/envtest.kubeconfig
+    echo "8<--------8<--------8<-------- ibmpowervscluster 8<--------8<--------8<--------"
+    oc --request-timeout=5s get ibmpowervscluster -n openshift-cluster-api-guests -o yaml
+    echo "8<--------8<--------8<-------- ibmpowervsimage 8<--------8<--------8<--------"
+    oc --request-timeout=5s get ibmpowervsimage -n openshift-cluster-api-guests -o yaml
+    echo "8<--------8<--------8<-------- ibmpowervsmachines 8<--------8<--------8<--------"
+    oc --request-timeout=5s get ibmpowervsmachines -n openshift-cluster-api-guests -o yaml
+  )
 
   echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
 
