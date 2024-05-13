@@ -83,6 +83,9 @@ function set_eternal_azure_oidc() {
 
   oc -n default create secret generic ${CONSOLE_CLIENT_SECRET_NAME} --from-literal=clientSecret="${CONSOLE_CLIENT_SECRET}"
 
+  #      - componentName: cli
+  #        componentNamespace: openshift-console
+  #        clientID: ${CLI_CLIENT_ID}
   export EXTERNAL_AUTH_PROVIDERS="  enableExternalAuthProviders: true
   externalAuthProviders:
     - name: entra-id
@@ -92,9 +95,6 @@ function set_eternal_azure_oidc() {
           - ${CONSOLE_CLIENT_ID}
           - ${CLI_CLIENT_ID}
       oidcClients:
-        - componentName: cli
-          componentNamespace: openshift-console
-          clientID: ${CLI_CLIENT_ID}
         - componentName: console
           componentNamespace: openshift-console
           clientID: ${CONSOLE_CLIENT_ID}

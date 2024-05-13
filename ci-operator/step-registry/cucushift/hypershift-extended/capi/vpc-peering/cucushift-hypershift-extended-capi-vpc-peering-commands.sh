@@ -133,7 +133,6 @@ if [[ -n "${namespace}" ]] ; then
   dft_security_group_id=$(aws ec2 describe-security-groups --region ${REGION} --filters "Name=vpc-id,Values=${hc_vpc_id}" "Name=group-name,Values=${cluster_id}-default-sg" --query 'SecurityGroups[].GroupId' --output text)
   aws ec2 authorize-security-group-ingress --region ${REGION} --group-id ${dft_security_group_id} --protocol tcp --port 443 --cidr ${mgmt_vpc_cidr}
 
-  sleep 1h
   set -x
   retry check_kubeconfig_secret
 
