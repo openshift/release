@@ -45,7 +45,7 @@ fi
 set -e
 echo "Logging into IBM Cloud by targetting the $IC_REGION region"
 ibmcloud config --check-version=false                               # To avoid manual prompt for updating CLI version
-ibmcloud login --apikey $IC_API_KEY -r $IC_REGION
+ibmcloud login --apikey $IC_API_KEY -r $IC_REGION > /dev/null
 set +e
 echo "Installing the required ibmcloud plugins if not present."
 for plugin in "${plugins_list[@]}"; do  
