@@ -281,7 +281,7 @@ while true; do
     logger "ERROR" "Timed out while waiting for cluster to be ready"
     exit 1
   fi
-  if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" ]]; then
+  if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending"  && "${CLUSTER_STATE}" != "validating" ]]; then
     ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/logs/install" > "${ARTIFACT_DIR}/.cluster_install.log" || echo "error: Unable to pull installation log."
     logger "ERROR" "Cluster reported invalid state: ${CLUSTER_STATE}"
     exit 1

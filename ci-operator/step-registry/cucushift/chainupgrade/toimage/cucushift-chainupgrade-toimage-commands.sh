@@ -19,7 +19,10 @@ KUBECONFIG="" oc --loglevel=8 registry login
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
     if (( FRC != 0 )); then
-        echo -e "\n# oc adm upgrade status\n$(env OC_ENABLE_CMD_UPGRADE_STATUS='true' oc adm upgrade status)"
+        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+            echo -e "\n# oc adm upgrade status\n"
+            env OC_ENABLE_CMD_UPGRADE_STATUS='true' oc adm upgrade status --details=all || true 
+        fi
         echo -e "\n# oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
         echo -e "\n# oc get machineconfig\n$(oc get machineconfig)"
         echo -e "\n# Describing abnormal nodes...\n"
@@ -277,11 +280,15 @@ function rhel_upgrade(){
 }
 
 # Extract oc binary which is supposed to be identical with target release
+# Default oc on OCP 4.16 not support OpenSSL 1.x
 function extract_oc(){
     echo -e "Extracting oc\n"
-    local retry=5 tmp_oc="/tmp/client-2"
+    local retry=5 tmp_oc="/tmp/client-2" binary='oc'
     mkdir -p ${tmp_oc}
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
+    if (( TARGET_MINOR_VERSION > 15 )) && (openssl version | grep -q "OpenSSL 1") ; then
+        binary='oc.rhel8'
+    fi
+    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=${binary} --to=${tmp_oc} ${TARGET});
     do
         echo >&2 "Failed to extract oc binary, retry..."
         (( retry -= 1 ))
@@ -648,9 +655,10 @@ function upgrade() {
 function dump_status_if_unexpected() {
     # expecting oc to equal TARGET_MINOR_VERSION, skip if less than .16
         if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
-            local out; out="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status)"
+            local out; out="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 || true)"
             # if upgrading, and not progressing well, dump status to log
-            if ! grep -qE 'The cluster version is not updating|Upgrade is proceeding well' <<< "${out}" ; then
+            # "resource name may not be empty" is a known issue, remove once OCPBUGS-32682 is fixed
+            if ! grep -qE 'The cluster version is not updating|Upgrade is proceeding well|resource name may not be empty' <<< "${out}" ; then
                 echo "${out}"
             fi
         fi
@@ -946,6 +954,9 @@ do
     (( index += 1 ))
     export TARGET="${target}"
     TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
+    TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
+    export TARGET_VERSION
+    export TARGET_MINOR_VERSION
     extract_oc
 
     SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
@@ -954,9 +965,6 @@ do
     export SOURCE_MINOR_VERSION
     echo -e "Source release version is: ${SOURCE_VERSION}\nSource minor version is: ${SOURCE_MINOR_VERSION}"
 
-    TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
-    export TARGET_VERSION
-    export TARGET_MINOR_VERSION
     echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
 
     export FORCE_UPDATE="false"

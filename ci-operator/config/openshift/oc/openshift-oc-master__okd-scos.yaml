@@ -1,47 +1,63 @@
 base_images:
-  ocp_builder_rhel-8-golang-1.20-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.16
   ocp_builder_rhel-8-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.21-openshift-4.16
-  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.16
-  origin_scos-4.16_base-stream8:
+    tag: rhel-9-golang-1.21-openshift-4.16
+  origin_scos-4.16_base-stream9:
     name: scos-4.16
     namespace: origin
-    tag: base-stream8
+    tag: base-stream9
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.21-openshift-4.16
 images:
-- context_dir: images/cli
-  dockerfile_path: Dockerfile.rhel
-  from: origin_scos-4.16_base-stream8
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/cli/Dockerfile.rhel
+  from: origin_scos-4.16_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: cli
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/tools/Dockerfile
+  from: origin_scos-4.16_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: tools
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/deployer/Dockerfile.rhel
+  from: cli
+  to: deployer
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/cli-artifacts/Dockerfile.rhel
+  from: cli
   inputs:
     ocp_builder_rhel-8-golang-1.21-openshift-4.16:
       as:
+      - builder
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-  to: cli
-- context_dir: images/deployer
-  dockerfile_path: Dockerfile.rhel
-  from: cli
-  to: deployer
-- context_dir: images/cli-artifacts
-  dockerfile_path: Dockerfile.rhel
-  from: cli
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
-      as:
+      - builder-rhel-9
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cli-artifacts
 promotion:
