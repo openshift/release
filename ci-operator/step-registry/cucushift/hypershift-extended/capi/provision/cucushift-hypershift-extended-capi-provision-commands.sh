@@ -373,6 +373,9 @@ oc -n default get rosacontrolplane ${CLUSTER_NAME}-control-plane -oyaml > "/tmp/
 mv "/tmp/${CLUSTER_NAME}-pool-0.yaml" ${ARTIFACT_DIR}/
 mv "/tmp/${CLUSTER_NAME}-control-plane.yaml" ${ARTIFACT_DIR}/
 
+# debug only
+sleep 1h
+
 # wait for cluster control plane ready
 retry is_hcp_started || exit 1
 CLUSTER_ID=$(rosa describe cluster -c ${CLUSTER_NAME} -o json | jq '.id' | cut -d'"' -f2 | tr -d '\n')
