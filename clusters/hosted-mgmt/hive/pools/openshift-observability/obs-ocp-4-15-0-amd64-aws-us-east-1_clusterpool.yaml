@@ -1,33 +1,38 @@
 apiVersion: hive.openshift.io/v1
 kind: ClusterPool
 metadata:
-  name: obs-ocp-4-15-amd64-aws-us-east-1 # name is not relevant but of course must be unique
-  namespace: openshift-observability-cluster-pool
-  labels: # architecture, cloud, owner, product, version are used to filter out a pool when a job claims a cluster
+  creationTimestamp: null
+  labels:
     architecture: amd64
     cloud: aws
     owner: openshift-observability
     product: ocp
     region: us-east-1
     version: "4.15"
+  name: obs-ocp-4-15-amd64-aws-us-east-1
+  namespace: openshift-observability-cluster-pool
 spec:
   baseDomain: devobscluster.devcluster.openshift.com
   hibernationConfig:
     resumeTimeout: 20m0s
   imageSetRef:
-    # the name of the imageSet which determines the image to install the cluster; will be automatically updated if `version_*` labels are set
-    # See https://github.com/openshift/release/tree/master/clusters/hive/pools
     name: ocp-release-4.15.12-x86-64-for-4.15.0-0-to-4.16.0-0
   installAttemptsLimit: 1
   installConfigSecretTemplateRef:
-    name: install-config-aws-us-east-1 # the name of the secret with an installation config for the installer
-  skipMachinePools: true
+    name: install-config-aws-us-east-1
+  labels:
+    tp.openshift.io/owner: openshift-observability
+  maxSize: 10
   platform:
     aws:
       credentialsSecretRef:
-        name: aws-installer-credentials # the name of the secret with the credentials of the cloud account
+        name: aws-installer-credentials
       region: us-east-1
   pullSecretRef:
     name: pull-secret
-  size: 1 # the number of clusters that Hive should keep provisioned and waiting for use.
-  maxSize: 10 # the maximum number of clusters that can exist at the same time.
+  size: 1
+  skipMachinePools: true
+status:
+  ready: 0
+  size: 0
+  standby: 0
