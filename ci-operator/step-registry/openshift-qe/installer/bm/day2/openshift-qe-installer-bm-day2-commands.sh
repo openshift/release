@@ -22,7 +22,7 @@ oc projects
 
 # Label the nodes
 if [ ${LABEL} ]; then
-  oc label node $(oc get node -oname -l node-role.kubernetes.io/worker | head -n${$LABEL_NUM_NODES} | grep -oP "^node/\K.*") ${LABEL}="" --overwrite
+  oc label node "$(oc get node -oname -l node-role.kubernetes.io/worker | head -n ${LABEL_NUM_NODES} | grep -oP "^node/\K.*")" ${LABEL}="" --overwrite
 fi
 
 # Install the SRIOV operator
@@ -61,7 +61,7 @@ spec:
 EOF
 
 # Wait for the operator to be ready
-  until [ $(kubectl get csv -n openshift-sriov-network-operator | grep sriov-network-operator > /dev/null; echo $?) == 0 ];
+  until [ "$(kubectl get csv -n openshift-sriov-network-operator | grep sriov-network-operator > /dev/null; echo $?)" == 0 ];
     do echo "Waiting for SRIOV operator"
     sleep 5
   done
