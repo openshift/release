@@ -694,6 +694,17 @@ function dump_resources() {
     oc --request-timeout=5s get pods -A -o=wide | sed -e '/\(Running\|Completed\)/d'
   )
 
+  echo "8<--------8<--------8<--------8<-------- oc get pods -n openshift-machine-api 8<--------8<--------8<--------8<--------"
+  (
+    oc --request-timeout=5s get pods -n openshift-machine-api
+    echo "8<--------8<-------- oc get machines.machine.openshift.io -n openshift-machine-api 8<--------8<--------"
+    oc --request-timeout=5s get machines.machine.openshift.io -n openshift-machine-api
+    echo "8<--------8<-------- oc get machineset.machine.openshift.io -n openshift-machine-api 8<--------8<--------"
+    oc --request-timeout=5s get machineset.machine.openshift.io -n openshift-machine-api
+    echo "8<--------8<-------- oc logs -l k8s-app=controller -c machine-controller -n openshift-machine-api 8<--------8<--------"
+    oc --request-timeout=5s logs -l k8s-app=controller -c machine-controller -n openshift-machine-api
+  )
+
   echo "8<--------8<--------8<--------8<-------- Instance names, health 8<--------8<--------8<--------8<--------"
   ibmcloud pi instance list --json | jq -r '.pvmInstances[] | select(.name|test("'${CLUSTER_NAME}'")) | " \(.name) - \(.status) - health reason: \(.health.reason) - health status: \(.health.status)"'
 
