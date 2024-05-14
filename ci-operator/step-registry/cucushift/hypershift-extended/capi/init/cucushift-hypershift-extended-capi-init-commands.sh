@@ -8,7 +8,6 @@ export AWS_PAGER=""
 
 # debug only
 aws s3 cp s3://heli-test-05/kubeconfig  ${SHARED_DIR}/kubeconfig
-cp ${SHARED_DIR}/kubeconfig ${SHARED_DIR}/mgmt_kubeconfig
 
 # download clusterctl and clusterawsadm
 mkdir -p /tmp/bin
