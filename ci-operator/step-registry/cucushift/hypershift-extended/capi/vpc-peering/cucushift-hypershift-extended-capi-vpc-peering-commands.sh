@@ -52,7 +52,7 @@ function check_vpc_peering_connection() {
 
 function check_kubeconfig_secret() {
     local res
-    res=$(oc get secret -A | grep ${CLUSTER_NAME}-kubeconfig)
+    res=$(oc get secret -A | grep -E "${CLUSTER_NAME}-*kubeconfig")
     if [[ -z "$res" ]]; then
       echo "could not find ${CLUSTER_NAME} kubeconfig"
       return 1
@@ -135,9 +135,6 @@ if [[ -n "${namespace}" ]] ; then
 
   set -x
   retry check_kubeconfig_secret
-
-  set +x
-  oc get secret -n ${namespace} ${CLUSTER_NAME}-kubeconfig --ignore-not-found -ojsonpath='{.data.value}' | base64 -d > "${SHARED_DIR}/kubeconfig"
 fi
 
 echo "${dft_security_group_id}" > ${SHARED_DIR}/capi_hcp_default_security_group

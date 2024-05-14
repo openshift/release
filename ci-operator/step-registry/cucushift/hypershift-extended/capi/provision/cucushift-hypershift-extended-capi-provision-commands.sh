@@ -373,9 +373,6 @@ oc -n default get rosacontrolplane ${CLUSTER_NAME}-control-plane -oyaml > "/tmp/
 mv "/tmp/${CLUSTER_NAME}-pool-0.yaml" ${ARTIFACT_DIR}/
 mv "/tmp/${CLUSTER_NAME}-control-plane.yaml" ${ARTIFACT_DIR}/
 
-# debug only
-sleep 1h
-
 # wait for cluster control plane ready
 retry is_hcp_started || exit 1
 CLUSTER_ID=$(rosa describe cluster -c ${CLUSTER_NAME} -o json | jq '.id' | cut -d'"' -f2 | tr -d '\n')
@@ -442,16 +439,6 @@ if [[ "${INFRA_ID}" == "null" ]]; then
 fi
 echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"
 
-set +x
-if [[ "${ENDPOINT_ACCESS}" == "Public" ]]; then
-  secret=$(oc get secret -n default ${CLUSTER_NAME}-kubeconfig --ignore-not-found -ojsonpath='{.data.value}')
-  if [[ -n "$secret" ]]; then
-    echo "hosted cluster kubeconfig found"
-   echo "${secret}" | base64 -d > "${SHARED_DIR}/kubeconfig"
-  else
-    echo "hosted cluster kubeconfig not found"
-  fi
-fi
 # do not check worker node here
 # wait for cluster machinepool ready
 # retry is_machine_pool_ready "${NODEPOOL_NAME}"
