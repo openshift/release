@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 11 19 22 * *
   decorate: true
   decoration_config:
@@ -12,11 +12,11 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure-qe
-    ci-operator.openshift.io/variant: amd64-nightly-4.15-upgrade-from-aro
+    ci-operator.openshift.io/variant: amd64-nightly-4.15-upgrade-from-aro-4.14
     ci.openshift.io/generator: prowgen
-    job-release: "4.10"
+    job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.15-amd64-nightly-4.15-upgrade-from-aro-aro-f30
+  name: periodic-ci-openshift-openshift-tests-private-release-4.15-amd64-nightly-4.15-upgrade-from-aro-4.14-aro-f30
   spec:
     containers:
     - args:
@@ -28,7 +28,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/aro-f30-cluster-profile
       - --target=aro-f30
-      - --variant=amd64-nightly-4.15-upgrade-from-aro
+      - --variant=amd64-nightly-4.15-upgrade-from-aro-4.14
       command:
       - ci-operator
       image: ci-operator:latest
@@ -88,7 +88,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 20 13 13,27 * *
   decorate: true
   decoration_config:
@@ -1328,7 +1328,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 24 13 4 * *
   decorate: true
   decoration_config:
@@ -1415,7 +1415,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 49 0 15 * *
   decorate: true
   decoration_config:
@@ -1502,7 +1502,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 31 16 12,28 * *
   decorate: true
   decoration_config:
@@ -1589,7 +1589,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 23 21 10 * *
   decorate: true
   decoration_config:
@@ -1676,7 +1676,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 15 0 5 * *
   decorate: true
   decoration_config:
@@ -1763,7 +1763,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 15 3 7,21 * *
   decorate: true
   decoration_config:
@@ -1925,6 +1925,94 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-azurestack-qe
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 46 17 5,14,21,28 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.15
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: equinix-ocp-metal
+    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
+    ci-operator.openshift.io/cluster: build05
+    ci-operator.openshift.io/variant: amd64-nightly-4.15-upgrade-from-stable-4.14
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.15-amd64-nightly-4.15-upgrade-from-stable-4.14-baremetalds-agent-hypershift-mce-compact-full-inplace-f7
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/baremetalds-agent-hypershift-mce-compact-full-inplace-f7-cluster-profile
+      - --target=baremetalds-agent-hypershift-mce-compact-full-inplace-f7
+      - --variant=amd64-nightly-4.15-upgrade-from-stable-4.14
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/baremetalds-agent-hypershift-mce-compact-full-inplace-f7-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-equinix-ocp-metal-qe
     - name: github-credentials-openshift-ci-robot-private-git-cloner
       secret:
         secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -2397,7 +2485,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 18 23 12,26 * *
   decorate: true
   decoration_config:
@@ -2484,7 +2572,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 18 23 2,18 * *
   decorate: true
   decoration_config:
@@ -4336,7 +4424,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 40 17 13,27 * *
   decorate: true
   decoration_config:
@@ -4696,7 +4784,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 31 15 27 * *
   decorate: true
   decoration_config:
@@ -4958,7 +5046,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 12 15 30 * *
   decorate: true
   decoration_config:
@@ -5046,7 +5134,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 22 23 13 * *
   decorate: true
   decoration_config:
@@ -5134,7 +5222,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 43 3 22 * *
   decorate: true
   decoration_config:
@@ -5222,7 +5310,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 47 4 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -5310,7 +5398,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 24 16 9,21,30 * *
   decorate: true
   decoration_config:
@@ -8654,6 +8742,204 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
+  cron: 6 20 2,11,18,25 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.15
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: amd64-nightly
+    ci.openshift.io/generator: prowgen
+    job-release: "4.15"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.15-amd64-nightly-aws-ipi-ovn-hypershift-mce-ibmz-guest-critical-f7
+  reporter_config:
+    slack:
+      channel: '#forum-prow-hypershift-qe-ci'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/aws-ipi-ovn-hypershift-mce-ibmz-guest-critical-f7-cluster-profile
+      - --target=aws-ipi-ovn-hypershift-mce-ibmz-guest-critical-f7
+      - --variant=amd64-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/aws-ipi-ovn-hypershift-mce-ibmz-guest-critical-f7-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-qe
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 14 19 1,8,15,24 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.15
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: amd64-nightly
+    ci.openshift.io/generator: prowgen
+    job-release: "4.15"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.15-amd64-nightly-aws-ipi-ovn-hypershift-mce-ibmz-mgmt-critical-f7
+  reporter_config:
+    slack:
+      channel: '#forum-prow-hypershift-qe-ci'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/aws-ipi-ovn-hypershift-mce-ibmz-mgmt-critical-f7-cluster-profile
+      - --target=aws-ipi-ovn-hypershift-mce-ibmz-mgmt-critical-f7
+      - --variant=amd64-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/aws-ipi-ovn-hypershift-mce-ibmz-mgmt-critical-f7-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-qe
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
   cron: 11 6 5,12,19,28 * *
   decorate: true
   decoration_config:
@@ -8709,6 +8995,204 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/aws-ipi-ovn-hypershift-mce-mgmt-f7-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-qe
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 17 20 7,14,23,30 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.15
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: amd64-nightly
+    ci.openshift.io/generator: prowgen
+    job-release: "4.15"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.15-amd64-nightly-aws-ipi-ovn-hypershift-mce-power-guest-critical-f7
+  reporter_config:
+    slack:
+      channel: '#forum-prow-hypershift-qe-ci'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/aws-ipi-ovn-hypershift-mce-power-guest-critical-f7-cluster-profile
+      - --target=aws-ipi-ovn-hypershift-mce-power-guest-critical-f7
+      - --variant=amd64-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/aws-ipi-ovn-hypershift-mce-power-guest-critical-f7-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-qe
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 14 7 8,15,22,29 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.15
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: amd64-nightly
+    ci.openshift.io/generator: prowgen
+    job-release: "4.15"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.15-amd64-nightly-aws-ipi-ovn-hypershift-mce-power-mgmt-critical-f7
+  reporter_config:
+    slack:
+      channel: '#forum-prow-hypershift-qe-ci'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/aws-ipi-ovn-hypershift-mce-power-mgmt-critical-f7-cluster-profile
+      - --target=aws-ipi-ovn-hypershift-mce-power-mgmt-critical-f7
+      - --variant=amd64-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/aws-ipi-ovn-hypershift-mce-power-mgmt-critical-f7-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -12941,7 +13425,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 53 3 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -13029,7 +13513,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 21 0 6,15,24 * *
   decorate: true
   decoration_config:
@@ -13117,7 +13601,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 35 8 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
   decorate: true
   decoration_config:
@@ -13205,7 +13689,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 10 22 4,13,25 * *
   decorate: true
   decoration_config:
@@ -13293,7 +13777,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 4 15 3,8,13,18,23,28 * *
   decorate: true
   decoration_config:
@@ -13381,7 +13865,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 51 18 3,12,21 * *
   decorate: true
   decoration_config:
@@ -13469,7 +13953,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 53 14 4,9,14,19,24,29 * *
   decorate: true
   decoration_config:
@@ -13557,7 +14041,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 17 17 6,15,27 * *
   decorate: true
   decoration_config:
@@ -13645,7 +14129,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 40 20 1,13,22 * *
   decorate: true
   decoration_config:
@@ -13744,7 +14228,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 25 14 1,6,11,16,21,26 * *
   decorate: true
   decoration_config:
@@ -13832,7 +14316,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 12 14 8,20,29 * *
   decorate: true
   decoration_config:
@@ -13920,7 +14404,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 43 16 5,10,15,20,25,30 * *
   decorate: true
   decoration_config:
@@ -14008,7 +14492,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 32 5 9,21,30 * *
   decorate: true
   decoration_config:
@@ -14096,7 +14580,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 59 5 4,9,14,19,24,29 * *
   decorate: true
   decoration_config:
@@ -14184,7 +14668,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 19 4 2,11,23 * *
   decorate: true
   decoration_config:
@@ -14272,7 +14756,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 6 14 7,16,25 * *
   decorate: true
   decoration_config:
@@ -14371,7 +14855,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 36 7 2,7,12,17,22,27 * *
   decorate: true
   decoration_config:
@@ -14459,7 +14943,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 55 17 4,13,22 * *
   decorate: true
   decoration_config:
@@ -14547,7 +15031,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 35 19 25 * *
   decorate: true
   decoration_config:
@@ -14635,7 +15119,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 54 13 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
   decorate: true
   decoration_config:
@@ -14723,7 +15207,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 54 11 3,8,13,18,23,28 * *
   decorate: true
   decoration_config:
@@ -14811,7 +15295,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 9 4 10,19,28 * *
   decorate: true
   decoration_config:
@@ -14899,7 +15383,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 16 11 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -14987,7 +15471,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 51 7 5,10,15,20,25,30 * *
   decorate: true
   decoration_config:
@@ -15075,7 +15559,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 53 11 1,10,19 * *
   decorate: true
   decoration_config:
@@ -15163,7 +15647,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 28 5 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -15251,7 +15735,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 39 20 2,11,23 * *
   decorate: true
   decoration_config:
@@ -15339,7 +15823,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 26 8 12,21,30 * *
   decorate: true
   decoration_config:
@@ -15438,7 +15922,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 30 12 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -15526,7 +16010,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 55 13 1,10,22 * *
   decorate: true
   decoration_config:
@@ -15614,7 +16098,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 54 19 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -15702,7 +16186,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 30 1 4,16,25 * *
   decorate: true
   decoration_config:
@@ -20553,7 +21037,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 36 1 7 * *
   decorate: true
   decoration_config:
@@ -20641,7 +21125,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 26 4 6 * *
   decorate: true
   decoration_config:
@@ -20729,7 +21213,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 4 11 25 * *
   decorate: true
   decoration_config:
@@ -20817,7 +21301,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 7 0 27 * *
   decorate: true
   decoration_config:
@@ -20905,7 +21389,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 8 7 26 * *
   decorate: true
   decoration_config:
@@ -20993,7 +21477,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 11 4 25 * *
   decorate: true
   decoration_config:
@@ -21081,7 +21565,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 34 23 24 * *
   decorate: true
   decoration_config:
@@ -21169,7 +21653,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 41 4 8 * *
   decorate: true
   decoration_config:
@@ -21257,7 +21741,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 35 18 3 * *
   decorate: true
   decoration_config:
@@ -21345,7 +21829,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 54 14 1 * *
   decorate: true
   decoration_config:
@@ -21433,7 +21917,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 36 6 1 * *
   decorate: true
   decoration_config:
@@ -21521,7 +22005,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 14 15 14 * *
   decorate: true
   decoration_config:
@@ -21609,7 +22093,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 47 19 6 * *
   decorate: true
   decoration_config:
@@ -21697,7 +22181,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 19 17 12 * *
   decorate: true
   decoration_config:
@@ -21785,7 +22269,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 28 12 4 * *
   decorate: true
   decoration_config:
@@ -21873,7 +22357,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 23 3 10,24 * *
   decorate: true
   decoration_config:
@@ -21961,7 +22445,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 3 1 26 * *
   decorate: true
   decoration_config:
@@ -22049,7 +22533,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 15 19 24 * *
   decorate: true
   decoration_config:
@@ -22137,7 +22621,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 59 21 24 * *
   decorate: true
   decoration_config:
@@ -22225,7 +22709,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 22 23 13,27 * *
   decorate: true
   decoration_config:
@@ -22313,7 +22797,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 34 5 4 * *
   decorate: true
   decoration_config:
@@ -23746,7 +24230,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 45 21 2,9,16,23 * *
   decorate: true
   decoration_config:
@@ -29233,7 +29717,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 8 7 6 8 *
   decorate: true
   decoration_config:
@@ -29495,7 +29979,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 41 22 27 7 *
   decorate: true
   decoration_config:
@@ -29598,7 +30082,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-rollback-nightly
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.15-amd64-rollback-nightly-nutanix-ipi-f360
+  name: periodic-ci-openshift-openshift-tests-private-release-4.15-amd64-rollback-nightly-nutanix-ipi-boot-categories-project-f360
   spec:
     containers:
     - args:
@@ -29608,8 +30092,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/nutanix-ipi-f360-cluster-profile
-      - --target=nutanix-ipi-f360
+      - --secret-dir=/usr/local/nutanix-ipi-boot-categories-project-f360-cluster-profile
+      - --target=nutanix-ipi-boot-categories-project-f360
       - --variant=amd64-rollback-nightly
       command:
       - ci-operator
@@ -29626,7 +30110,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/nutanix-ipi-f360-cluster-profile
+      - mountPath: /usr/local/nutanix-ipi-boot-categories-project-f360-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -29844,7 +30328,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 42 2 8,24 * *
   decorate: true
   decoration_config:
@@ -30192,7 +30676,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 24 10 24 * *
   decorate: true
   decoration_config:
@@ -30279,7 +30763,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 6 15 1 * *
   decorate: true
   decoration_config:
@@ -30366,7 +30850,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 4 13 4 * *
   decorate: true
   decoration_config:
@@ -30627,7 +31111,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 55 18 7,21 * *
   decorate: true
   decoration_config:
@@ -31151,7 +31635,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 17 12 4 * *
   decorate: true
   decoration_config:
@@ -31238,7 +31722,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 43 21 5,19 * *
   decorate: true
   decoration_config:
@@ -31413,7 +31897,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 31 18 16,30 * *
   decorate: true
   decoration_config:
@@ -33763,7 +34247,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 44 17 13,29 * *
   decorate: true
   decoration_config:
@@ -33850,7 +34334,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 47 10 6,20 * *
   decorate: true
   decoration_config:
@@ -33937,7 +34421,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 52 1 4,20 * *
   decorate: true
   decoration_config:
@@ -34024,7 +34508,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 46 20 9,23 * *
   decorate: true
   decoration_config:
@@ -34111,7 +34595,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 6 22 14,28 * *
   decorate: true
   decoration_config:
@@ -35246,7 +35730,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 12 5 2,16 * *
   decorate: true
   decoration_config:
@@ -35333,7 +35817,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 12 5 2,16 * *
   decorate: true
   decoration_config:
@@ -36380,7 +36864,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 32 4 9,24 * *
   decorate: true
   decoration_config:
@@ -36907,7 +37391,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 35 19 22 * *
   decorate: true
   decoration_config:
@@ -36995,7 +37479,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 5 15 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -38322,7 +38806,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 20 3 12 * *
   decorate: true
   decoration_config:
@@ -38409,7 +38893,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 24 5 16 * *
   decorate: true
   decoration_config:
@@ -38844,7 +39328,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 12 21 11,27 * *
   decorate: true
   decoration_config:
@@ -38931,7 +39415,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 41 8 16,30 * *
   decorate: true
   decoration_config:
@@ -40610,7 +41094,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 7 6 6 * *
   decorate: true
   decoration_config:
@@ -40697,7 +41181,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 33 4 14 * *
   decorate: true
   decoration_config:
@@ -40784,7 +41268,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 24 15 27 * *
   decorate: true
   decoration_config:
@@ -40871,7 +41355,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 14 4 3,19 * *
   decorate: true
   decoration_config:
@@ -40958,7 +41442,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 52 11 12 * *
   decorate: true
   decoration_config:
@@ -41045,7 +41529,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 13 12 14 * *
   decorate: true
   decoration_config:
@@ -41132,7 +41616,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 29 2 14 * *
   decorate: true
   decoration_config:
@@ -41219,7 +41703,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 48 10 24 * *
   decorate: true
   decoration_config:
@@ -42089,7 +42573,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 15 8 30 * *
   decorate: true
   decoration_config:
@@ -46232,7 +46716,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 23 12 2,14,23 * *
   decorate: true
   decoration_config:
@@ -46320,7 +46804,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 58 17 3,15,24 * *
   decorate: true
   decoration_config:
@@ -46408,7 +46892,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 51 10 3,8,13,18,23,28 * *
   decorate: true
   decoration_config:
@@ -46496,7 +46980,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 23 5 12,21,30 * *
   decorate: true
   decoration_config:
@@ -46584,7 +47068,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 26 7 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
   decorate: true
   decoration_config:
@@ -46672,7 +47156,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 16 7 1,10,19 * *
   decorate: true
   decoration_config:
@@ -46760,7 +47244,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 54 18 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -46848,7 +47332,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 33 2 7 * *
   decorate: true
   decoration_config:
@@ -46936,7 +47420,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 38 22 8 * *
   decorate: true
   decoration_config:
@@ -47024,7 +47508,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 4 15 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
   decorate: true
   decoration_config:
@@ -47112,7 +47596,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 42 13 4,13,25 * *
   decorate: true
   decoration_config:
@@ -47200,7 +47684,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 22 14 8,17,26 * *
   decorate: true
   decoration_config:
@@ -47288,7 +47772,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 28 11 5,17,26 * *
   decorate: true
   decoration_config:
@@ -47386,7 +47870,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 0 14 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -47474,7 +47958,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 5 22 5,17,26 * *
   decorate: true
   decoration_config:
@@ -47562,7 +48046,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 50 20 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -47650,7 +48134,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 42 23 1,10,22 * *
   decorate: true
   decoration_config:
@@ -47738,7 +48222,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 59 4 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -47826,7 +48310,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 3 13 2,14,23 * *
   decorate: true
   decoration_config:
@@ -47914,7 +48398,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 51 1 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -48002,7 +48486,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 21 22 7,16,28 * *
   decorate: true
   decoration_config:
@@ -48090,7 +48574,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 6 21 3,8,13,18,23,28 * *
   decorate: true
   decoration_config:
@@ -48178,7 +48662,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 34 9 1,6,11,16,21,26 * *
   decorate: true
   decoration_config:
@@ -48266,7 +48750,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 16 5 1,10,19 * *
   decorate: true
   decoration_config:
@@ -48354,7 +48838,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 28 21 1,10,19 * *
   decorate: true
   decoration_config:
@@ -48442,7 +48926,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 36 13 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
   decorate: true
   decoration_config:
@@ -48530,7 +49014,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 4 8 3,12,21 * *
   decorate: true
   decoration_config:
@@ -48618,7 +49102,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 24 0 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
   decorate: true
   decoration_config:
@@ -48706,7 +49190,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 17 19 3,15,24 * *
   decorate: true
   decoration_config:
@@ -48794,7 +49278,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 6 12 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
   decorate: true
   decoration_config:
@@ -48882,7 +49366,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 3 15 6,15,27 * *
   decorate: true
   decoration_config:
@@ -48970,7 +49454,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 56 15 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -49058,7 +49542,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 54 19 6,15,27 * *
   decorate: true
   decoration_config:
@@ -49146,7 +49630,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 23 21 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
   decorate: true
   decoration_config:
@@ -49234,7 +49718,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 2 23 3,12,24 * *
   decorate: true
   decoration_config:
@@ -49322,7 +49806,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 34 12 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -49410,7 +49894,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 55 19 4,13,25 * *
   decorate: true
   decoration_config:
@@ -49498,7 +49982,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 11 14 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -49586,7 +50070,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 45 6 6,15,24 * *
   decorate: true
   decoration_config:
@@ -49674,7 +50158,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 2 23 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -49762,7 +50246,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 27 13 13 * *
   decorate: true
   decoration_config:
@@ -49850,7 +50334,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 27 22 4,16,25 * *
   decorate: true
   decoration_config:
@@ -49938,7 +50422,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 42 1 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
   decorate: true
   decoration_config:
@@ -50026,7 +50510,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 26 13 20 * *
   decorate: true
   decoration_config:
@@ -50114,7 +50598,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 45 23 5 * *
   decorate: true
   decoration_config:
@@ -50202,7 +50686,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 17 4 5,19 * *
   decorate: true
   decoration_config:
@@ -50290,7 +50774,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 6 3 10 * *
   decorate: true
   decoration_config:
@@ -50378,7 +50862,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 23 17 2,11,20 * *
   decorate: true
   decoration_config:
@@ -50466,7 +50950,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 52 1 2,7,12,17,22,27 * *
   decorate: true
   decoration_config:
@@ -50554,7 +51038,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 49 23 3,15,24 * *
   decorate: true
   decoration_config:
@@ -50642,7 +51126,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 54 15 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
   decorate: true
   decoration_config:
@@ -54086,7 +54570,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 23 12 4,11,18,27 * *
   decorate: true
   decoration_config:
@@ -54534,7 +55018,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 7 18 10 * *
   decorate: true
   decoration_config:
@@ -54882,7 +55366,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 11 1 8,24 * *
   decorate: true
   decoration_config:

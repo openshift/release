@@ -15,6 +15,12 @@ releases:
       product: ocp
       stream: ci
       version: "4.16"
+  ppc64le-latest:
+    candidate:
+      architecture: ppc64le
+      product: ocp
+      stream: nightly
+      version: "4.16"
 resources:
   '*':
     requests:
@@ -377,6 +383,44 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-serial
+- as: e2e-openstack-ovn-techpreview
+  interval: 168h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: experimental/reliability/minimal
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-nutanix-ovn-techpreview
+  cluster: build01
+  interval: 168h
+  steps:
+    cluster_profile: nutanix
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-nutanix
+- as: e2e-powervs-ovn-techpreview
+  cluster: build01
+  interval: 168h
+  steps:
+    cluster_profile: powervs-5
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.16"
+      FEATURE_SET: TechPreviewNoUpgrade
+      INSTALLER: powervs
+      TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-powervs-ipi
 - as: e2e-gcp-sdn-upgrade
   cluster: build02
   interval: 168h

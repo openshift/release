@@ -54,13 +54,25 @@ else
   exit 1
 fi
 
+read_profile_file() {
+  local file="${1}"
+  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/${file}"
+  fi
+}
+
 # Log in
-ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli"
+SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+ROSA_TOKEN=$(read_profile_file "ocm-token")
+if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
+  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+elif [[ -n "${ROSA_TOKEN}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token"
   rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
 else
-  echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
+  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
   exit 1
 fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
@@ -140,19 +152,19 @@ cluster_info_json=$(mktemp)
 start_time=$(date +"%s")
 dyn_start_time=${start_time}
 CLUSTER_PREVIOUS_STATE="claim"
-record_cluster "timers.install" "status" "claim"
+record_cluster "timers" "status" "claim"
 while true; do
   rosa describe cluster -c "${CLUSTER_ID}" -o json > ${cluster_info_json}
   CLUSTER_STATE=$(cat ${cluster_info_json} | jq -r '.state')
   log "Cluster state: ${CLUSTER_STATE}"
   current_time=$(date +"%s")
   if [[ "${CLUSTER_STATE}" == "error" ]] || (( "${current_time}" - "${start_time}" >= "${CLUSTER_TIMEOUT}" )); then
-    record_cluster "timers.install" "status" "${CLUSTER_STATE}"
+    record_cluster "timers" "status" "${CLUSTER_STATE}"
     FAILED_INSTALL="yes"
     break
   fi
   if [[ "${CLUSTER_STATE}" != "${CLUSTER_PREVIOUS_STATE}" ]] ; then
-    record_cluster "timers.install" "status" "${CLUSTER_STATE}"
+    record_cluster "timers" "status" "${CLUSTER_STATE}"
     record_cluster "timers.install" "${CLUSTER_PREVIOUS_STATE}" $(( "${current_time}" - "${dyn_start_time}" ))
     dyn_start_time=${current_time}
     CLUSTER_PREVIOUS_STATE=${CLUSTER_STATE}

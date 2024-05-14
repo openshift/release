@@ -297,6 +297,8 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$datacenter = "${vsphere_datacenter}"
 \$cluster = "${vsphere_cluster}"
 \$vcentercredpath = "secrets/vcenter-creds.xml"
+\$storagepolicy = ""
+\$secureboot = \$false
 
 \$ipam = "ipam.vmc.ci.openshift.org"
 

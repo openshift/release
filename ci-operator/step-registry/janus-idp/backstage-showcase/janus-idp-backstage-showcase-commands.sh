@@ -4,16 +4,18 @@ HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
-export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME NAME_SPACE TAG_NAME
+export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
 echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
 GITHUB_ORG_NAME="janus-idp"
 GITHUB_REPOSITORY_NAME="backstage-showcase"
-NAME_SPACE=showcase-ci
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd backstage-showcase || exit
+
+git config --global user.name "rhdh-qe"
+git config --global user.email "rhdh-qe@redhat.com"
 
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     # if this is executed as PR check of https://github.com/janus-idp/backstage-showcase.git repo, switch to PR branch.
@@ -43,7 +45,7 @@ for change in $PR_CHANGESET; do
     fi
 done
 
-if [ $ONLY_IN_DIRS ] || [[ "$JOB_NAME" == rehearse-* ]]; then
+if $ONLY_IN_DIRS || [[ "$JOB_NAME" == rehearse-* ]]; then
     echo "Skipping wait for new PR image and proceeding with image tag : next"
     echo "updated image tag : next"
     TAG_NAME="next"
@@ -61,7 +63,7 @@ else
         tag_count=$(echo $response | jq '.tags | length')
 
         if [ "$tag_count" -gt "0" ]; then
-            echo "Docker image $IMAGE_NAME is now available."
+            echo "Docker image $IMAGE_NAME is now available. Time elapsed: $(($ELAPSED_TIME / 60)) minute(s)."
             break
         fi
 
@@ -73,7 +75,7 @@ else
 
         # If the elapsed time exceeds the timeout, exit with an error
         if [ $ELAPSED_TIME -ge $TIMEOUT ]; then
-            echo "Timed out waiting for Docker image $IMAGE_NAME."
+            echo "Timed out waiting for Docker image $IMAGE_NAME. Time elapsed: $(($ELAPSED_TIME / 60)) minute(s)."
             exit 1
         fi
     done
