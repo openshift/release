@@ -52,7 +52,6 @@ DUMMY_TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${DUM
 echo "Target version of ci config is: ${DUMMY_TARGET_VERSION}"
 x_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f1 -d. )
 y_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f2 -d. )
-export y_ver
 ver="${x_ver}.${y_ver}"
 target_channel="${UPGRADE_CHANNEL}-${ver}"
 if ! oc adm upgrade channel ${target_channel}; then

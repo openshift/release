@@ -401,7 +401,6 @@ run_command "oc version --client"
 export DUMMY_TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
 # we need this DUMMY_TARGET_VERSION from ci config to download oc and do some pre-check
 DUMMY_TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${DUMMY_TARGET}" --output=json | jq -r '.metadata.version')"
-export DUMMY_TARGET_VERSION
 echo "Target version of ci config is: ${DUMMY_TARGET_VERSION}"
 
 SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
