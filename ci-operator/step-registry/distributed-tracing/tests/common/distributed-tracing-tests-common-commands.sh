@@ -39,6 +39,7 @@ else
   --report-path "$ARTIFACT_DIR" \
   --report-format "XML" \
   --test-dir \
-  tests/e2e-acceptance
+  tests/e2e-acceptance \
+  tests/e2e-otel
 
 fi
