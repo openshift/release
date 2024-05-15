@@ -26,31 +26,31 @@ if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
 fi
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
 
-registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
+#registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
 
-jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
+#jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
 
 # Mirror operator image from CI namespace in build farm to emphemeral test cluster
-wmco_image_src="registry.apps.build02.vmc.ci.openshift.org/${NAMESPACE}/pipeline"
-wmco_image_dst="${MIRROR_REGISTRY_HOST}/pipeline"
+#wmco_image_src="registry.apps.build02.vmc.ci.openshift.org/${NAMESPACE}/pipeline"
+#wmco_image_dst="${MIRROR_REGISTRY_HOST}/pipeline"
 
-oc image mirror "${wmco_image_src}" "${wmco_image_dst}" --insecure=true -a "${new_pull_secret}" \
- --skip-verification=true --keep-manifest-list=true --filter-by-os='.*'
+#oc image mirror "${wmco_image_src}" "${wmco_image_dst}" --insecure=true -a "${new_pull_secret}" \
+# --skip-verification=true --keep-manifest-list=true --filter-by-os='.*'
 
-idms_content="apiVersion: config.openshift.io/v1\n"
-idms_content+="kind: ImageDigestMirrorSet\n"
-idms_content+="metadata:\n"
-idms_content+="  name: wmco-e2e-digestmirrorset\n"
-idms_content+="spec:\n"
-idms_content+="  imageDigestMirrors:\n"
-idms_content+="  - mirrors:\n"
-idms_content+="    - ${wmco_image_dst}\n"
-idms_content+="    source: ${wmco_image_src}\n"
+#idms_content="apiVersion: config.openshift.io/v1\n"
+#idms_content+="kind: ImageDigestMirrorSet\n"
+#idms_content+="metadata:\n"
+#idms_content+="  name: wmco-e2e-digestmirrorset\n"
+#idms_content+="spec:\n"
+#idms_content+="  imageDigestMirrors:\n"
+#idms_content+="  - mirrors:\n"
+#idms_content+="    - ${wmco_image_dst}\n"
+#idms_content+="    source: ${wmco_image_src}\n"
 
-echo -e "$idms_content" > "/tmp/image-digest-mirror-set.yaml"
-run_command "cat /tmp/image-digest-mirror-set.yaml"
+#echo -e "$idms_content" > "/tmp/image-digest-mirror-set.yaml"
+#run_command "cat /tmp/image-digest-mirror-set.yaml"
 
-run_command "oc create -f /tmp/image-digest-mirror-set.yaml"
+#run_command "oc create -f /tmp/image-digest-mirror-set.yaml"
 
 # Create list of source/mirror destination pairs for all images required to run the Windows e2e test suite
 cat <<EOF > "/tmp/mirror-images-list.yaml"
