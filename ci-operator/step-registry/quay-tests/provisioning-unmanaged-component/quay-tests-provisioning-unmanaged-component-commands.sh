@@ -30,7 +30,7 @@ QUAY_AWS_RDS_POSTGRESQL_VERSION="16.3"
 #Create new directory to create terraform resources
 mkdir -p terraform_aws_rds && cd terraform_aws_rds
 touch quaybuilder quaybuilder.pub
-cp /var/run/quay-qe-omr-secret/quaybuilder > quaybuilder && cp /var/run/quay-qe-omr-secret/quaybuilder.pub > quaybuilder.pub
+cp /var/run/quay-qe-omr-secret/quaybuilder quaybuilder && cp /var/run/quay-qe-omr-secret/quaybuilder.pub quaybuilder.pub
 chmod 600 ./quaybuilder && chmod 600 ./quaybuilder.pub && echo "" >> quaybuilder
 echo "cp secret"
 ls -l
