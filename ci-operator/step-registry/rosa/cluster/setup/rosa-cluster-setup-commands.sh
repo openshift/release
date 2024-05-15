@@ -15,7 +15,7 @@ export AVAILABLE_UPGRADE=${AVAILABLE_UPGRADE:-"no"}
 CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
 
 log(){
-    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
+    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}"
 }
 
 # Configure aws
