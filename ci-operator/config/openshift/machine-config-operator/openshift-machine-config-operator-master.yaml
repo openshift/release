@@ -78,10 +78,14 @@ images:
         ostree container commit
   from: ocp_os
   to: custom-os-image
+- dockerfile_literal: |
+    FROM quay.io/zzlotnik/toolbox:mco-fedora-40
+  to: zacks-toolbox
 promotion:
   to:
   - excluded_images:
     - custom-os-image
+    - zacks-toolbox
     name: "4.17"
     namespace: ocp
 releases:
@@ -442,6 +446,54 @@ tests:
     env:
       PROJECT_NAME: machine-config-operator
     workflow: openshift-ci-security
+- as: e2e-aws-ovn-upgrade-ocb
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: get-prelayering-rpmostree-status
+      commands: |-
+        #!/usr/bin/env bash
+        set -xeuo pipefail
+        run-on-all-nodes 'rpm-ostree status'
+      from: zacks-toolbox
+      resources:
+        requests:
+          cpu: 100m
+    - as: enable-layering
+      commands: |-
+        #!/usr/bin/env bash
+
+        set -xeuo pipefail
+        onclustertesting setup ci --inject-yum-repos --containerfile-path <(curl -s 'https://raw.githubusercontent.com/openshift/machine-config-operator/master/test/e2e-techpreview/Containerfile.okd-fcos')
+      from: zacks-toolbox
+      resources:
+        requests:
+          cpu: 100m
+    - as: get-postlayering-rpmostree-status
+      commands: |-
+        #!/usr/bin/env bash
+        set -xeuo pipefail
+        run-on-all-nodes 'rpm-ostree status'
+        run-on-all-nodes 'cowsay "Moo"'
+      from: zacks-toolbox
+      resources:
+        requests:
+          cpu: 100m
+    - ref: openshift-e2e-test
+    - as: get-posttest-rpmostree-status
+      commands: |-
+        #!/usr/bin/env bash
+        set -xeuo pipefail
+        run-on-all-nodes 'rpm-ostree status'
+        run-on-all-nodes 'cowsay "Moo"'
+      from: zacks-toolbox
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: master
   org: openshift
