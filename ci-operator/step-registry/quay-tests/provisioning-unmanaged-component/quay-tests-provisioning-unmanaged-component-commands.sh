@@ -14,10 +14,10 @@ id
 user=`whoami`
 echo $user
 
-#Create AWS EC2 instance, S3 Storage Bucket, and AWS RDS Postgreql 16
-QUAY_AWS_S3_BUCKET="quayprowcis3$RANDOM"
-QUAY_SUBNET_GROUP="quayprowcisubnetgroup$RANDOM"
-QUAY_SECURITY_GROUP="quayprowcisecuritygroup$RANDOM"
+#Create AWS EC2 instance for redis, S3 Storage Bucket, and AWS RDS Postgreql with default 16
+QUAY_AWS_S3_BUCKET="quayoperatorcis3$RANDOM"
+QUAY_SUBNET_GROUP="quayoperatorcisubnetgroup$RANDOM"
+QUAY_SECURITY_GROUP="quayoperatorcisecuritygroup$RANDOM"
 
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
@@ -65,7 +65,7 @@ resource "aws_vpc" "quayoperatorci" {
   enable_dns_hostnames = true
 
   tags = {
-    Name = "quayoperatorcitest"
+    Name = "quayoperatorcitest$RANDOM"
   }
 }
 resource "aws_internet_gateway" "quayoperatorigw" {
@@ -170,7 +170,7 @@ resource "aws_db_instance" "quaydb" {
   skip_final_snapshot  = true
   db_subnet_group_name = aws_db_subnet_group.quayoperatorci.id
   vpc_security_group_ids = [aws_security_group.quayoperatorsecg.id]
-  identifier = "quay-operator-ci-postgres"
+  identifier = "quay-operator-ci-postgres$RANDOM"
 }
 
 output "quaydb_address" {
@@ -213,10 +213,18 @@ terraform init
 terraform apply -auto-approve 
 
 QUAY_AWS_RDS_POSTGRESQL_ADDRESS=$(terraform output quaydb_address | tr -d '""' | tr -d '\n')
+QUAY_REDIS_IP_ADDRESS=$(terraform output instance_public_ip | tr -d '""' | tr -d '\n')
 
 echo "${QUAY_AWS_S3_BUCKET}" >${SHARED_DIR}/QUAY_AWS_S3_BUCKET
 echo "${QUAY_SUBNET_GROUP}" >${SHARED_DIR}/QUAY_SUBNET_GROUP
 echo "${QUAY_SECURITY_GROUP}" >${SHARED_DIR}/QUAY_SECURITY_GROUP
+
+echo "${QUAY_REDIS_IP_ADDRESS}" >${ARTIFACT_DIR}/QUAY_REDIS_IP_ADDRESS
+echo "${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}" >${ARTIFACT_DIR}/QUAY_AWS_RDS_POSTGRESQL_ADDRESS
+
+#Share the Terraform Var and Terraform Directory
+tar -cvzf terraform.tgz --exclude=".terraform" *
+cp terraform.tgz ${SHARED_DIR}
 
 cd .. && mkdir -p terraform_install_extension && cd terraform_install_extension
 
@@ -273,5 +281,5 @@ pwd
 echo "copyyyy..."
 ls -l 
 ls -l ${ARTIFACT_DIR}
-tar -cvzf terraform.tgz --exclude="terraform.*" --exclude="quaybuilder*" terraform_aws_rds terraform_install_extension || true
-cp terraform.tgz ${ARTIFACT_DIR} || true
+# find . -name '*.tf' -print0 | tar -cvzf terraform.tgz --null --files-from - || true
+# cp terraform.tgz ${ARTIFACT_DIR} || true
