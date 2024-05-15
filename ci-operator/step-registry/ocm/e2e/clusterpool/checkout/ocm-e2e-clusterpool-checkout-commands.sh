@@ -5,11 +5,16 @@ log() {
 }
 
 checkoutCluster() {
-    cluster_claim=""
-    cluster_type=${1}
-    cluster_idx=${2}
-    tmp_claim="${cluster_type}-${cluster_idx}-$suffix"
-    for pool in $pools; do
+    local cluster_type="${1}"
+    local cluster_idx="${2}"
+    local pool_filter="${3}"
+
+    local cluster_claim=""
+    local tmp_claim="${cluster_type}-${cluster_idx}-$suffix"
+    local filtered_pools=""
+    filtered_pools="$(echo "${pools}" | grep -e "${pool_filter}")"
+
+    for pool in ${filtered_pools}; do
         log "Provisioning claim ${tmp_claim} from ClusterPool ${pool} ..."
         make clusterpool/checkout \
             CLUSTERPOOL_NAME=${pool} \
@@ -27,7 +32,7 @@ checkoutCluster() {
 
     if [[ -z "${cluster_claim}" ]]; then
         log "No cluster was checked out for ${cluster_type} ${cluster_idx}. Tried these cluster pools:"
-        echo "${pools}"
+        echo "${filtered_pools}"
         return 1
     fi
 
@@ -58,18 +63,24 @@ suffix=$(cat /dev/urandom | tr -dc "a-z0-9" | head -c 5)
 
 # Checkout hub clusters
 log "Provisioning ${CLUSTERPOOL_HUB_COUNT} hub clusters ..."
+if [[ -n "${CLUSTERPOOL_HUB_FILTER}" ]]; then
+    log "Filtering ClusterPool list using filter: '${CLUSTERPOOL_HUB_FILTER}' ..."
+fi
 
 for ((i = 1; i <= CLUSTERPOOL_HUB_COUNT; i++)); do
-    checkoutCluster hub $i &
+    checkoutCluster hub ${i} "${CLUSTERPOOL_HUB_FILTER}" &
     pids+=($!)
     sleep 60
 done
 
 # Checkout managed clusters
 log "Provisioning ${CLUSTERPOOL_MANAGED_COUNT} managed clusters ..."
+if [[ -n "${CLUSTERPOOL_MANAGED_FILTER}" ]]; then
+    log "Filtering ClusterPool list using filter: '${CLUSTERPOOL_MANAGED_FILTER}' ..."
+fi
 
 for ((i = 1; i <= CLUSTERPOOL_MANAGED_COUNT; i++)); do
-    checkoutCluster managed $i &
+    checkoutCluster managed ${i} "${CLUSTERPOOL_MANAGED_FILTER}" &
     pids+=($!)
     sleep 60
 done
