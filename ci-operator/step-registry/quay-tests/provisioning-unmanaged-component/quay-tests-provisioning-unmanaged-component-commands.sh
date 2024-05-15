@@ -4,16 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "omr secret"
-ls -l /var/run/quay-qe-omr-secret/
-
-echo "create pub file"
-pwd
-ls -l .
-id
-user=`whoami`
-echo $user
-
 #Create AWS EC2 instance for redis, S3 Storage Bucket, and AWS RDS Postgreql with default 16
 QUAY_AWS_S3_BUCKET="quayoperatorcis3$RANDOM"
 QUAY_SUBNET_GROUP="quayoperatorcisubnetgroup$RANDOM"
@@ -27,13 +17,10 @@ QUAY_AWS_RDS_POSTGRESQL_PASSWORD=$(cat /var/run/quay-qe-aws-rds-postgresql-secre
 
 QUAY_AWS_RDS_POSTGRESQL_VERSION="$POSTGRESQL_VERSION"
 
-#Create new directory to create terraform resources
-mkdir -p terraform_aws_rds && cd terraform_aws_rds
-touch quaybuilder quaybuilder.pub
+#Create new directory for terraform resources
+mkdir -p terraform_aws_rds && cd terraform_aws_rds && touch quaybuilder quaybuilder.pub
 cp /var/run/quay-qe-omr-secret/quaybuilder quaybuilder && cp /var/run/quay-qe-omr-secret/quaybuilder.pub quaybuilder.pub
 chmod 600 ./quaybuilder && chmod 600 ./quaybuilder.pub && echo "" >> quaybuilder
-echo "cp secret"
-ls -l
 
 cat >>variables.tf <<EOF
 variable "region" {
@@ -120,11 +107,12 @@ resource "aws_instance" "quayoperatorci" {
     volume_size = 200
   }
 
+#Launch redis with docker container
   provisioner "remote-exec" {
     inline = [
       "sudo yum install podman -y",
       "mkdir -p ~/redis-quay",
-      "sudo podman run -d  --name redis -p 6379:6379 -e REDIS_PASSWORD=redispw -v ~/redis-quay:/var/lib/redis/data:Z quay.io/clair-load-test/redis:5.1"
+      "sudo podman run -d  --name redis -p 6379:6379 -e REDIS_PASSWORD="$QUAY_AWS_RDS_POSTGRESQL_PASSWORD" -v ~/redis-quay:/var/lib/redis/data:Z quay.io/clair-load-test/redis:5.1"
     ]
   }
 
@@ -144,7 +132,7 @@ output "instance_public_ip" {
 }
 
 
-## DB ##
+## Postgres DB Instance ##
 resource "aws_subnet" "quayoperatorci2" {
   vpc_id            = aws_vpc.quayoperatorci.id
   cidr_block        = "10.0.2.0/24"
@@ -186,7 +174,7 @@ output "quaydb_username" {
     value = aws_db_instance.quaydb.username
 }
 
-## Bucket ##
+## S3 Bucket ##
 resource "aws_s3_bucket" "quayaws" {
   bucket = var.aws_bucket
   force_destroy = true
@@ -202,7 +190,6 @@ resource "aws_s3_bucket_acl" "quayaws_bucket_acl" {
   bucket = aws_s3_bucket.quayaws.id
   acl    = "private"
 }
-
 EOF
 
 export TF_VAR_aws_bucket="${QUAY_AWS_S3_BUCKET}"
@@ -251,7 +238,7 @@ provider "postgresql" {
   connect_timeout = 15
 }
 
-## Provision db for clair
+## Provision db for clairpostgres 
 resource "postgresql_database" "clairdb" {
   name              = "clair"
   connection_limit  = -1
@@ -272,14 +259,7 @@ export TF_VAR_quay_db_host="${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}"
 terraform init 
 terraform apply -auto-approve 
 
-#Share the Terraform Var and Terraform Directory
-pwd
-cd ..
-pwd
-# tar -cvzf terraform.tgz --exclude=".terraform" *
-# cp terraform.tgz ${ARTIFACT_DIR}
-echo "copyyyy..."
-ls -l 
-ls -l ${ARTIFACT_DIR}
+#Log the Terraform tf files
 # find . -name '*.tf' -print0 | tar -cvzf terraform.tgz --null --files-from - || true
 # cp terraform.tgz ${ARTIFACT_DIR} || true
+#ls -l ${ARTIFACT_DIR}
