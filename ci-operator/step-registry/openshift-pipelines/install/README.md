@@ -1,24 +1,22 @@
-# openshift-pipelines-install-and-tests-ref<!-- omit from toc -->
+# openshift-pipelines-install<!-- omit from toc -->
 
 ## Table of Contents<!-- omit from toc -->
 - [Purpose](#purpose)
 - [Process](#process)
-- [Prerequisite(s)](#prerequisite--s-)
+- [Prerequisite(s)](#prerequisites)
   - [Infrastructure](#infrastructure)
   - [Environment Variables](#environment-variables)
 - [Custom Images](#custom-images)
 
 ## Purpose
 
-To execute Openshift Pipelines interop tests. All XML results will be saved into "$ARTIFACT_DIR".
+To install OpenShift Pipelines in preparation of interop tests.
 
 ## Process
 
 This script does the following to run Openshift Pipelines interop tests
 1. Login to the test cluster as a kubeadmin.
 2. Run gauge command for olm.spec to install openshift pipelines operator.
-3. Run other gauge specs for interop tests.
-4. Move xmls to `${ARTIFACT_DIR}/junit_*.xml`.
 
 ## Prerequisite(s)
 
