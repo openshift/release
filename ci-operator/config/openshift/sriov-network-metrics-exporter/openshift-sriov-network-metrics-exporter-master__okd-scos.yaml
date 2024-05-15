@@ -3,8 +3,8 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
-  origin_scos-4.15_base-stream9:
-    name: scos-4.15
+  origin_scos-4.16_base-stream9:
+    name: scos-4.16
     namespace: origin
     tag: base-stream9
 binary_build_commands: make build
@@ -16,7 +16,7 @@ build_root:
 canonical_go_repository: github.com/k8snetworkplumbingwg/sriov-network-metrics-exporter
 images:
 - dockerfile_path: Dockerfile.rhel
-  from: origin_scos-4.15_base-stream9
+  from: origin_scos-4.16_base-stream9
   inputs:
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
@@ -24,18 +24,14 @@ images:
   to: sriov-network-metrics-exporter
 promotion:
   to:
-  - name: "4.16"
-    namespace: ocp
+  - name: sriov-4.16
+    namespace: origin
 releases:
-  initial:
-    integration:
-      name: "4.16"
-      namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
-      namespace: ocp
+      name: scos-4.16
+      namespace: origin
 resources:
   '*':
     limits:
@@ -43,19 +39,8 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tests:
-- as: unit
-  commands: make test
-  container:
-    from: src
-- as: security
-  optional: true
-  steps:
-    env:
-      PROJECT_NAME: sriov-network-metrics-exporter
-      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
-    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift
   repo: sriov-network-metrics-exporter
+  variant: okd-scos
