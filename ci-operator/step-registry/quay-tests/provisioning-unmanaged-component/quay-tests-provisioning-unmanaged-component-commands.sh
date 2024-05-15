@@ -6,21 +6,13 @@ set -o pipefail
 
 echo "omr secret"
 ls -l /var/run/quay-qe-omr-secret/
-touch quaybuilder quaybuilder.pub
+
 echo "create pub file"
 pwd
 ls -l .
 id
 user=`whoami`
 echo $user
-cat /var/run/quay-qe-omr-secret/quaybuilder > quaybuilder && cat /var/run/quay-qe-omr-secret/quaybuilder.pub > quaybuilder.pub
-chown 
-chmod 600 ./quaybuilder && chmod 600 ./quaybuilder.pub && echo "" >> quaybuilder
-echo "copy omr secret"
-ls -l
-sudo chown $user quaybuilder quaybuilder.pub
-echo "chown secret"
-ls -l
 
 #Create AWS EC2 instance, S3 Storage Bucket, and AWS RDS Postgreql 16
 QUAY_AWS_S3_BUCKET="quayprowcis3$RANDOM"
@@ -37,6 +29,11 @@ QUAY_AWS_RDS_POSTGRESQL_VERSION="16.3"
 
 #Create new directory to create terraform resources
 mkdir -p terraform_aws_rds && cd terraform_aws_rds
+touch quaybuilder quaybuilder.pub
+cp /var/run/quay-qe-omr-secret/quaybuilder > quaybuilder && cp /var/run/quay-qe-omr-secret/quaybuilder.pub > quaybuilder.pub
+chmod 600 ./quaybuilder && chmod 600 ./quaybuilder.pub && echo "" >> quaybuilder
+echo "cp secret"
+ls -l
 
 cat >>variables.tf <<EOF
 variable "region" {
@@ -219,6 +216,10 @@ QUAY_AWS_RDS_POSTGRESQL_ADDRESS=$(terraform output quaydb_address | tr -d '""' |
 #Share the Terraform Var and Terraform Directory
 tar -cvzf terraform.tgz --exclude=".terraform" *
 cp terraform.tgz ${SHARED_DIR}
+echo "copyyyy..."
+ls -l 
+ls -l ${SHARED_DIR}
+
 echo "${QUAY_AWS_S3_BUCKET}" >${SHARED_DIR}/QUAY_AWS_S3_BUCKET
 echo "${QUAY_SUBNET_GROUP}" >${SHARED_DIR}/QUAY_SUBNET_GROUP
 echo "${QUAY_SECURITY_GROUP}" >${SHARED_DIR}/QUAY_SECURITY_GROUP
