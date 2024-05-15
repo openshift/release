@@ -23,22 +23,24 @@ images:
   to: cnv-ci
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.14"
+      version_bounds:
+        lower: 4.14.0-0
+        stream: 4-stable
+        upper: 4.15.0-0
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: cnv-odf-tests-aws-upi-ocp414
+- as: cnv-odf-tests-ibmcloud-upi-ocp414
   cron: 0 6 25 10 *
   steps:
-    cluster_profile: aws-cspi-qe
+    cluster_profile: ibmcloud-cspi-qe
     env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
       COMPUTE_NODE_TYPE: c5n.metal
       FIREWATCH_CONFIG: |
         {
@@ -66,15 +68,12 @@ tests:
       OCP_VERSION: "4.14"
       ODF_OPERATOR_CHANNEL: stable-4.14
       ODF_VERSION_MAJOR_MINOR: "4.14"
-      RE_TRIGGER_ON_FAILURE: "false"
-      USER_TAGS: |
-        scenario cnv
     test:
     - chain: cucushift-installer-check-cluster-health
     - ref: interop-tests-deploy-odf
     - ref: interop-tests-ocs-tests
     - ref: interop-tests-cnv-tests-e2e-deploy
-    workflow: firewatch-ipi-aws
+    workflow: firewatch-ipi-ibmcloud
 zz_generated_metadata:
   branch: cnv-4.14
   org: RedHatQE
