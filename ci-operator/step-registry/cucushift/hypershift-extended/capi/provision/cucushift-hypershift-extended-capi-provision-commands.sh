@@ -81,6 +81,10 @@ function set_eternal_azure_oidc() {
   CONSOLE_CLIENT_SECRET="$(cat /var/run/hypershift-ext-oidc-app-console/client-secret)"
   CONSOLE_CLIENT_SECRET_NAME=console-secret
 
+  exist=$(oc -n default get secret ${CONSOLE_CLIENT_SECRET_NAME} --ignore-not-found)
+  if [[ -n "${exist}" ]] ; then
+    oc delete -n default secret ${CONSOLE_CLIENT_SECRET_NAME}
+  fi
   oc -n default create secret generic ${CONSOLE_CLIENT_SECRET_NAME} --from-literal=clientSecret="${CONSOLE_CLIENT_SECRET}"
 
   #      - componentName: cli
