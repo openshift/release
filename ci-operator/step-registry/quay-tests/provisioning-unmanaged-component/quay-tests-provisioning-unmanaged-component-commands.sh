@@ -25,7 +25,7 @@ QUAY_AWS_RDS_POSTGRESQL_DBNAME=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/
 QUAY_AWS_RDS_POSTGRESQL_USERNAME=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/username)
 QUAY_AWS_RDS_POSTGRESQL_PASSWORD=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/password)
 
-QUAY_AWS_RDS_POSTGRESQL_VERSION="16.3"
+QUAY_AWS_RDS_POSTGRESQL_VERSION="$POSTGRESQL_VERSION"
 
 #Create new directory to create terraform resources
 mkdir -p terraform_aws_rds && cd terraform_aws_rds
@@ -124,7 +124,7 @@ resource "aws_instance" "quayoperatorci" {
     inline = [
       "sudo yum install podman -y",
       "mkdir -p ~/redis-quay",
-      "sudo podman run -d  --name redis -p 6379:6379 -e REDIS_PASSWORD=redispw -v ~/redis-quay:/var/lib/redis/data:Z quay.io/quay-qetest/redis:latest"
+      "sudo podman run -d  --name redis -p 6379:6379 -e REDIS_PASSWORD=redispw -v ~/redis-quay:/var/lib/redis/data:Z quay.io/clair-load-test/redis:5.1"
     ]
   }
 
@@ -170,6 +170,7 @@ resource "aws_db_instance" "quaydb" {
   skip_final_snapshot  = true
   db_subnet_group_name = aws_db_subnet_group.quayoperatorci.id
   vpc_security_group_ids = [aws_security_group.quayoperatorsecg.id]
+  identifier = "quay-operator-ci-postgres"
 }
 
 output "quaydb_address" {
@@ -212,13 +213,6 @@ terraform init
 terraform apply -auto-approve 
 
 QUAY_AWS_RDS_POSTGRESQL_ADDRESS=$(terraform output quaydb_address | tr -d '""' | tr -d '\n')
-
-#Share the Terraform Var and Terraform Directory
-tar -cvzf terraform.tgz --exclude=".terraform" *
-cp terraform.tgz ${ARTIFACT_DIR}
-echo "copyyyy..."
-ls -l 
-ls -l ${ARTIFACT_DIR}
 
 echo "${QUAY_AWS_S3_BUCKET}" >${SHARED_DIR}/QUAY_AWS_S3_BUCKET
 echo "${QUAY_SUBNET_GROUP}" >${SHARED_DIR}/QUAY_SUBNET_GROUP
@@ -270,5 +264,14 @@ export TF_VAR_quay_db_host="${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}"
 terraform init 
 terraform apply -auto-approve 
 
-tar -cvzf rdsterraform.tgz --exclude="terraform.*" terraform_aws_rds terraform_install_extension
-cp rdsterraform.tgz ${ARTIFACT_DIR}
+#Share the Terraform Var and Terraform Directory
+pwd
+cd ..
+pwd
+# tar -cvzf terraform.tgz --exclude=".terraform" *
+# cp terraform.tgz ${ARTIFACT_DIR}
+echo "copyyyy..."
+ls -l 
+ls -l ${ARTIFACT_DIR}
+tar -cvzf terraform.tgz --exclude="terraform.*" --exclude="quaybuilder*" terraform_aws_rds terraform_install_extension || true
+cp terraform.tgz ${ARTIFACT_DIR} || true
