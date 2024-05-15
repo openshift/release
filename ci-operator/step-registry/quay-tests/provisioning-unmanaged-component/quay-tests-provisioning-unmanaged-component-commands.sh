@@ -7,11 +7,20 @@ set -o pipefail
 echo "omr secret"
 ls -l /var/run/quay-qe-omr-secret/
 touch quaybuilder quaybuilder.pub
+echo "create pub file"
+pwd
+ls -l .
+id
+user=`whoami`
+echo $user
 cat /var/run/quay-qe-omr-secret/quaybuilder > quaybuilder && cat /var/run/quay-qe-omr-secret/quaybuilder.pub > quaybuilder.pub
+chown 
 chmod 600 ./quaybuilder && chmod 600 ./quaybuilder.pub && echo "" >> quaybuilder
 echo "copy omr secret"
 ls -l
-cat quaybuilder
+sudo chown $user quaybuilder quaybuilder.pub
+echo "chown secret"
+ls -l
 
 #Create AWS EC2 instance, S3 Storage Bucket, and AWS RDS Postgreql 16
 QUAY_AWS_S3_BUCKET="quayprowcis3$RANDOM"
