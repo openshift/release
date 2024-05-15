@@ -19,19 +19,21 @@ echo "Using the flattened version of kubeconfig"
 oc config view --flatten > /tmp/config
 
 export KUBECONFIG=/tmp/config
-export DURATION=$DURATION
-export NODE_NAME=$NODE_NAME
-export LABEL_SELECTOR=$LABEL_SELECTOR
-export INSTANCE_COUNT=$INSTANCE_COUNT
-export INTERFACES=$INTERFACES
-export EXECUTION=$EXECUTION
-export EGRESS=$EGRESS
+
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
-export NETWORK_PARAMS=$NETWORK_PARAMS
-export WAIT_DURATION=$WAIT_DURATION
+
+
+platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}') 
+if [ "$platform" = "AWS" ]; then
+    export INTERFACES="['ens5']"
+elif [ "$platform" = "GCP" ]; then
+    export INTERFACES="['ens4']"
+elif [ "$platform" = "Azure" ]; then
+    export INTERFACES="['ens0']"
+fi
 
 ./network-chaos/prow_run.sh
 rc=$?
