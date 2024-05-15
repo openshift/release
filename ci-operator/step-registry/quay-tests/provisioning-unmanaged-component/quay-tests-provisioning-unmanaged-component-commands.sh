@@ -113,7 +113,7 @@ resource "aws_instance" "quayoperatorci" {
 
   associate_public_ip_address = true
   vpc_security_group_ids = [aws_security_group.quayoperatorsecg.id]
-  subnet_id = aws_subnet.quayoperatorcisub.id
+  subnet_id = aws_subnet.quayoperatorci.id
   
   ebs_block_device {
     device_name = "/dev/sda1"
@@ -215,10 +215,10 @@ QUAY_AWS_RDS_POSTGRESQL_ADDRESS=$(terraform output quaydb_address | tr -d '""' |
 
 #Share the Terraform Var and Terraform Directory
 tar -cvzf terraform.tgz --exclude=".terraform" *
-cp terraform.tgz ${SHARED_DIR}
+cp terraform.tgz ${ARTIFACT_DIR}
 echo "copyyyy..."
 ls -l 
-ls -l ${SHARED_DIR}
+ls -l ${ARTIFACT_DIR}
 
 echo "${QUAY_AWS_S3_BUCKET}" >${SHARED_DIR}/QUAY_AWS_S3_BUCKET
 echo "${QUAY_SUBNET_GROUP}" >${SHARED_DIR}/QUAY_SUBNET_GROUP
@@ -269,3 +269,6 @@ EOF
 export TF_VAR_quay_db_host="${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}"
 terraform init 
 terraform apply -auto-approve 
+
+tar -cvzf rdsterraform.tgz --exclude="terraform.*" terraform_aws_rds terraform_install_extension
+cp rdsterraform.tgz ${ARTIFACT_DIR}
