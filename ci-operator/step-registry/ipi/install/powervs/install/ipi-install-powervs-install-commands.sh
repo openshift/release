@@ -696,6 +696,7 @@ function dump_resources() {
 
   echo "8<--------8<--------8<--------8<-------- oc get pods -n openshift-machine-api 8<--------8<--------8<--------8<--------"
   (
+    export KUBECONFIG=${dir}/auth/kubeconfig
     oc --request-timeout=5s get pods -n openshift-machine-api
     echo "8<--------8<-------- oc get machines.machine.openshift.io -n openshift-machine-api 8<--------8<--------"
     oc --request-timeout=5s get machines.machine.openshift.io -n openshift-machine-api
