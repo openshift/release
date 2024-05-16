@@ -22,6 +22,14 @@ JOB_NAME="${JOB_NAME:-default}"
 # The official graph contains the mappings for all hashes to version strings
 OCP_UPGRADE_GRAPH_URL="${OCP_UPGRADE_GRAPH_URL:-https://amd64.ocp.releases.ci.openshift.org/graph}"
 
+# Supported Openshift versions
+# 4-stable runs against all 4.x releases
+# We need to fast exit successfully for all runs that are not what we support
+SUPPORTED_VERSIONS=(
+    "4.15"
+    "4.14"
+)
+
 function get_date_stamp() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')]"
 }
@@ -249,6 +257,12 @@ function main() {
     fi
 
     print_message "Got version string '${OCP_RELEASE_VERSION}' for digest"
+
+    # check if this is a supported version
+    if grep -F -x -z -- "${OCP_RELEASE_VERSION}" <<< "${SUPPORTED_VERSIONS[@]}"; then
+        # If the version is not supported then we must exit cleanly
+        exit 0
+    fi
 
     # download the report
     download_kpi_results_report "${OCP_RELEASE_VERSION}" "${KPI_DESCRIPTION}"
