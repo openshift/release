@@ -14,6 +14,8 @@ if ! source "${SHARED_DIR}/ci-machine-config.sh"; then
   export SSH_KEY_FILE="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
 fi
 
+sleep 3600
+
 mkdir -p build/ansible
 cd build/ansible
 
