@@ -10,6 +10,7 @@ function populate_artifact_dir() {
     echo "Copying log bundle..."
     cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
   fi
+
   echo "Removing REDACTED info from log..."
   sed '
     s/password: .*/password: REDACTED/;
@@ -21,6 +22,7 @@ function populate_artifact_dir() {
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${SHARED_DIR}/installation_stats.log" > "${ARTIFACT_DIR}/installation_stats.log"
+
   case "${CLUSTER_TYPE}" in
     powervs*)
       # We don't want debugging in this section
@@ -37,6 +39,12 @@ function populate_artifact_dir() {
       >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
       ;;
   esac
+
+  if [ -d "${dir}/.clusterapi_output" ]
+  then
+    echo "Copying CAPI output to artifact dir"
+    cp -r "${dir}/.clusterapi_output/" "${ARTIFACT_DIR}/clusterapi_output/"
+  fi
 }
 
 function prepare_next_steps() {
@@ -946,6 +954,21 @@ openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v '
 ret=${PIPESTATUS[0]}
 echo "ret=${ret}"
 echo "8<--------8<--------8<--------8<-------- END: create cluster 8<--------8<--------8<--------8<--------"
+
+# If we need to try again, then does the CAPI cluster status yaml file exist?
+if [ ${ret} -gt 0 ]; then
+  SFILE="/tmp/installer/.clusterapi_output/IBMPowerVSCluster-openshift-cluster-api-guests*yaml"
+  ls -l ${SFILE} || true
+  if [ -f ${SFILE} ]; then
+    # How many statuses are False?
+    SLINES=$(/tmp/yq eval .status.conditions ${SFILE} -o json | /tmp/jq -r '.[] | select(.status|test("False")) | .type' | wc -l)
+    echo "Skip? SLINES=${SLINES}"
+    if [ ${SLINES} -gt 0 ]; then
+      echo "Skipping wait-for install-complete since detected CAPI problem"
+      ret=0
+    fi
+  fi
+fi
 
 if [ ${ret} -gt 0 ]; then
   echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"
