@@ -3,6 +3,9 @@
 set -euo pipefail
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+if [[ -f "${SHARED_DIR}/mgmt_kubeconfig" ]]; then
+  export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+fi
 
 # get cluster namesapce
 CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
@@ -28,7 +31,10 @@ if [[ -z "$secret" ]]; then
   exit 1
 fi
 
-mv $KUBECONFIG "${SHARED_DIR}/mgmt_kubeconfig"
+if [[ !  -f "${SHARED_DIR}/mgmt_kubeconfig" ]] ; then
+  mv $KUBECONFIG "${SHARED_DIR}/mgmt_kubeconfig"
+fi
+
 echo "${secret}" | base64 -d > "${SHARED_DIR}/kubeconfig"
 echo "hosted cluster kubeconfig is switched"
 oc whoami
