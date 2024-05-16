@@ -115,7 +115,7 @@ resource "aws_instance" "quayoperatorci" {
     volume_size = 200
   }
 
-#Launch redis with docker container
+#Launch redis instance with docker container
   provisioner "remote-exec" {
     inline = [
       "sudo yum install podman -y",
