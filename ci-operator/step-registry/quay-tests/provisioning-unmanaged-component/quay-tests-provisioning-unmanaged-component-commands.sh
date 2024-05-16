@@ -8,6 +8,8 @@ set -o pipefail
 QUAY_AWS_S3_BUCKET="quayoperatorcis3$RANDOM"
 QUAY_SUBNET_GROUP="quayoperatorcisubnetgroup$RANDOM"
 QUAY_SECURITY_GROUP="quayoperatorcisecuritygroup$RANDOM"
+QUAY_OPERATOR_KEY="quayoperatorkey$RANDOM"
+QUAY_EC2_INSTANCE="quayoperatorciints$RANDOM"
 
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
@@ -27,16 +29,19 @@ variable "region" {
   default = "us-east-2"
 }
 variable "quay_subnet_group" {
+  # default = "$QUAY_SUBNET_GROUP"
 }
 variable "quay_security_group" {
+  # default = "$QUAY_SECURITY_GROUP"
 }
 variable "aws_bucket" {
+  # default = "$QUAY_AWS_S3_BUCKET"
 }
 variable "quay_operator_key" {
-  default = "quayprow_operator_key$RANDOM"
+  default = "$QUAY_OPERATOR_KEY"
 }
 variable "quay_ec2_instance" {
-  default = ""quayoperatorcitest$RANDOM"
+  default = "$QUAY_EC2_INSTANCE"
 }
 EOF
 
@@ -209,8 +214,8 @@ echo "${QUAY_AWS_S3_BUCKET}" >${SHARED_DIR}/QUAY_AWS_S3_BUCKET
 echo "${QUAY_SUBNET_GROUP}" >${SHARED_DIR}/QUAY_SUBNET_GROUP
 echo "${QUAY_SECURITY_GROUP}" >${SHARED_DIR}/QUAY_SECURITY_GROUP
 
-echo "${QUAY_REDIS_IP_ADDRESS}" >${ARTIFACT_DIR}/QUAY_REDIS_IP_ADDRESS
-echo "${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}" >${ARTIFACT_DIR}/QUAY_AWS_RDS_POSTGRESQL_ADDRESS
+echo "${QUAY_REDIS_IP_ADDRESS}" >${SHARED_DIR}/QUAY_REDIS_IP_ADDRESS
+echo "${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}" >${SHARED_DIR}/QUAY_AWS_RDS_POSTGRESQL_ADDRESS
 
 #Share the Terraform Var and Terraform Directory
 tar -cvzf terraform.tgz --exclude=".terraform" *
