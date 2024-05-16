@@ -38,7 +38,7 @@ function log() {
 }
 
 log "add jq plugin for converting json to yaml"
-
+# this snippet enables jq to convert json to yaml
 cat > ~/.jq <<EOF
 def yamlify2:
     (objects | to_entries | (map(.key | length) | max + 2) as \$w |
@@ -57,6 +57,14 @@ def yamlify2:
     // .
     ;
 EOF
+
+if [[ ${JOB_NAME_SAFE} =~ "-upi" ]]; then
+   IPI=0
+   log "determined this is a UPI job"
+else
+   IPI=1
+   log "determined this is an IPI job"
+fi
 
 # notes: jcallen: split the LEASED_RESOURCE e.g. bcr01a.dal10.1153
 # into: primary router hostname, datacenter and vlan id
@@ -138,6 +146,7 @@ for LEASE in $LEASES; do
   VCENTER=$(cat /tmp/lease.json | jq -r '.status.server')
   NETWORK_PATH=$(cat /tmp/lease.json | jq -r '.status.topology.networks[0]')
   vcenter_portgroups[$VCENTER]=$(echo $NETWORK_PATH | cut -d '/' -f 4)
+  cp /tmp/lease.json ${SHARED_DIR}/LEASE_$LEASE.json
   log "discovered portgroup ${vcenter_portgroups[$VCENTER]}"
 done
 
@@ -151,10 +160,24 @@ declare -A vsphere_datacenters
 
 platformSpec='{"vcenters": [],"failureDomains": []}'
 
-log "building local variables and platform spec"
+log "building local variables and failure domains"
 
-# gather auth details for each pool
 for RESOURCE_POOL in ${RESOURCE_POOLS}; do
+  # check to see if this pool is in use by a lease
+  FOUND=0
+  for _leaseJSON in $(ls -d $SHARED_DIR/LEASE*); do 
+    _VCENTER=$(cat ${_leaseJSON} | jq -r .status.name)
+    if [ ${_VCENTER} = ${RESOURCE_POOL} ]; then
+      FOUND=1
+      break
+    fi
+  done
+
+  if [ ${FOUND} -eq 0 ]; then
+    log "resource pool ${RESOURCE_POOL} isn't in use. excluding from failure domains"
+    continue    
+  fi
+
   log "building local variables and platform spec for pool ${RESOURCE_POOL}"
   oc get pools.vspherecapacitymanager.splat.io --kubeconfig ${SA_KUBECONFIG} -n vsphere-infra-helpers ${RESOURCE_POOL} -o json > /tmp/pool.json
   VCENTER_AUTH_PATH=$(cat /tmp/pool.json | jq -r '.metadata.annotations["ci-auth-path"]')  
@@ -175,7 +198,12 @@ for RESOURCE_POOL in ${RESOURCE_POOLS}; do
   datacenter=$(cat /tmp/pool.json | jq -r '.spec.topology.datacenter')
   datastore=$(cat /tmp/pool.json | jq -r '.spec.topology.datastore')
   network="${vcenter_portgroups[${server}]}"
-  platformSpec=$(echo ${platformSpec} | jq -r '.failureDomains += [{"server": "'${server}'", "name": "'${name}'", "zone": "'${zone}'", "region": "'${region}'", "server": "'${server}'", "topology": {"computeCluster": "'${cluster}'", "datacenter": "'${datacenter}'", "datastore": "'$datastore'", "networks": ["'${network}'"]}}]')
+  if [ $IPI -eq 0 ]; then
+    resource_pool=${cluster}/Resources/${NAMESPACE}-${UNIQUE_HASH}
+  else
+    resource_pool=${cluster}/Resources/ipi-ci-clusters
+  fi
+  platformSpec=$(echo ${platformSpec} | jq -r '.failureDomains += [{"server": "'${server}'", "name": "'${name}'", "zone": "'${zone}'", "region": "'${region}'", "server": "'${server}'", "topology": {"resourcePool": "'${resource_pool}'", "computeCluster": "'${cluster}'", "datacenter": "'${datacenter}'", "datastore": "'$datastore'", "networks": ["'${network}'"]}}]')
 
   cp /tmp/pool.json ${SHARED_DIR}/POOL_${RESOURCE_POOL}.json
 done
