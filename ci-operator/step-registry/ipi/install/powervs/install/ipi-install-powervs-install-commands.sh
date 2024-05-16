@@ -483,7 +483,7 @@ function destroy_resources() {
   #
   mkdir /tmp/ocp-test
   cat > "/tmp/ocp-test/metadata.json" << EOF
-{"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
+{"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceGUID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
 EOF
 
   #
@@ -692,6 +692,18 @@ function dump_resources() {
   (
     export KUBECONFIG=${dir}/auth/kubeconfig
     oc --request-timeout=5s get pods -A -o=wide | sed -e '/\(Running\|Completed\)/d'
+  )
+
+  echo "8<--------8<--------8<--------8<-------- oc get pods -n openshift-machine-api 8<--------8<--------8<--------8<--------"
+  (
+    export KUBECONFIG=${dir}/auth/kubeconfig
+    oc --request-timeout=5s get pods -n openshift-machine-api
+    echo "8<--------8<-------- oc get machines.machine.openshift.io -n openshift-machine-api 8<--------8<--------"
+    oc --request-timeout=5s get machines.machine.openshift.io -n openshift-machine-api
+    echo "8<--------8<-------- oc get machineset.machine.openshift.io -n openshift-machine-api 8<--------8<--------"
+    oc --request-timeout=5s get machineset.machine.openshift.io -n openshift-machine-api
+    echo "8<--------8<-------- oc logs -l k8s-app=controller -c machine-controller -n openshift-machine-api 8<--------8<--------"
+    oc --request-timeout=5s logs -l k8s-app=controller -c machine-controller -n openshift-machine-api
   )
 
   echo "8<--------8<--------8<--------8<-------- Instance names, health 8<--------8<--------8<--------8<--------"
