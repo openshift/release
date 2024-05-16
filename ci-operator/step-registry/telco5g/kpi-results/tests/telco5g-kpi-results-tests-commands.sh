@@ -16,6 +16,9 @@ JQ_FILE_PATH="/tmp/jq"
 # Default value for description
 KPI_DESCRIPTION="${KPI_DESCRIPTION:-KPI}"
 
+# Default value for job name
+JOB_NAME="${JOB_NAME:-default}"
+
 # The official graph contains the mappings for all hashes to version strings
 OCP_UPGRADE_GRAPH_URL="${OCP_UPGRADE_GRAPH_URL:-https://amd64.ocp.releases.ci.openshift.org/graph}"
 
