@@ -283,6 +283,15 @@ function main() {
         exit 0
     fi
 
+    # check for rehearsal
+    print_message "Checking job name: '${JOB_NAME}'"
+    if [[ "${JOB_NAME}" == rehearse* ]]; then
+        # We just want to make sure the script runs in the rehearsal to this point.
+        # Whether the performance was pass or fail does not matter for rehearsal.
+        print_message "Rehearsal detected; exiting successful regardless of performance"
+        exit 0
+    fi
+
     # download the report
     download_kpi_results_report "${ocp_release_version}" "${KPI_DESCRIPTION}"
 
@@ -293,15 +302,6 @@ function main() {
 
     if [[ "${test_data}" -eq 0 ]]; then
         print_message "Cyclictest and Oslat both passed criteria"
-    fi
-
-    # check for rehearsal
-    print_message "Checking job name: '${JOB_NAME}'"
-    if [[ "${JOB_NAME}" == rehearse* ]]; then
-        # We just want to make sure the script runs in the rehearsal to this point.
-        # Whether the performance was pass or fail does not matter for rehearsal.
-        print_message "Rehearsal detected; exiting successful regardless of performance"
-        exit 0
     fi
 
     # exit using the provided status code
