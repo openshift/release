@@ -468,6 +468,7 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       EXTRA_ARGS: --fips
       FIPS_ENABLED: "true"
+      TEST_ADDITIONAL: Network_Observability
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
       TEST_TIMEOUT: "30"
     test:
@@ -1519,6 +1520,19 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
+- as: azure-stack-ipi-proxy-f14-disasterrecovery
+  cluster: build01
+  cron: 12 23 14,28 * *
+  steps:
+    cluster_profile: azurestack-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
+      TEST_SCENARIOS: DR_Testing
+    test:
+    - ref: idp-htpasswd
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
 - as: azure-stack-upi-f5
   cluster: build01
   cron: 55 11 4,9,14,19,24,29 * *
@@ -2116,8 +2130,6 @@ tests:
     cluster_profile: nutanix-qe
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       RT_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe
@@ -2140,8 +2152,6 @@ tests:
     cluster_profile: nutanix-qe
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       SIZE_VARIANT: compact
     test:
     - chain: openshift-e2e-test-qe
@@ -2165,8 +2175,6 @@ tests:
     env:
       E2E_RUN_TAGS: '@disconnected'
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       RT_ENABLED: "true"
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
@@ -2192,20 +2200,8 @@ tests:
     cluster_profile: nutanix-qe
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-nutanix-ipi-image-registry-s3
-- as: nutanix-ipi-image-registry-s3-f28-destructive
-  cluster: build01
-  cron: 15 17 16 * *
-  steps:
-    cluster_profile: nutanix-qe
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-    test:
-    - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-nutanix-ipi-image-registry-s3
 - as: nutanix-ipi-proxy-fips-mini-perm-f28
   cluster: build01
@@ -2214,8 +2210,6 @@ tests:
     cluster_profile: nutanix-qe-dis
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe
@@ -2238,8 +2232,6 @@ tests:
     cluster_profile: nutanix-qe-dis
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe-ui
@@ -2274,8 +2266,6 @@ tests:
     env:
       BASTION_SUBNET_UUID: 512c1d6f-c6e7-4746-8ae2-9c3e1db2aba6
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
       LB_TYPE: UserManaged
     test:
     - chain: openshift-e2e-test-qe
@@ -2299,8 +2289,6 @@ tests:
     cluster_profile: nutanix-qe-zone
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '[ClusterAPIInstall=true]'
-      FEATURE_SET: CustomNoUpgrade
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones
@@ -2510,6 +2498,8 @@ tests:
   cron: 34 2 25 * *
   steps:
     cluster_profile: vsphere-2
+    env:
+      TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
