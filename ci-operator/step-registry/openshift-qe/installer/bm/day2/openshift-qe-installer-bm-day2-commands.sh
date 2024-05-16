@@ -27,7 +27,7 @@ fi
 
 # Install the SRIOV operator
 if [ ${SRIOV} == "true" ]; then
-  cat << EOF| oc create -f -
+  cat << EOF| oc apply -f -
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -36,7 +36,7 @@ metadata:
     workload.openshift.io/allowed: management
 EOF
 
-  cat << EOF| oc create -f -
+  cat << EOF| oc apply -f -
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -47,7 +47,7 @@ spec:
   - openshift-sriov-network-operator
 EOF
 
-  cat << EOF| oc create -f -
+  cat << EOF| oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -68,7 +68,7 @@ EOF
   kubectl wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n openshift-sriov-network-operator "$(kubectl get csv -n openshift-sriov-network-operator -oname)"
 
 # Create the SRIOV network policy
-  cat << EOF| oc create -f -
+  cat << EOF| oc apply -f -
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkNodePolicy
 metadata:
