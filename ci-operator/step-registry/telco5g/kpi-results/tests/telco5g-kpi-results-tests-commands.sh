@@ -259,6 +259,13 @@ function main() {
         print_message "Cyclictest and Oslat both passed criteria"
     fi
 
+    # check for rehearsal
+    if [[ "${JOB_NAME}" == rehearse* ]]; then
+        # We just want to make sure the script runs in the rehearsal to this point.
+        # Whether the performance was pass or fail does not matter for rehearsal.
+        exit 0
+    fi
+
     # exit using the provided status code
     exit "${test_data}"
 }
