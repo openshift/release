@@ -33,7 +33,10 @@ variable "quay_security_group" {
 variable "aws_bucket" {
 }
 variable "quay_operator_key" {
-  default = "quayprow_operator_key"
+  default = "quayprow_operator_key$RANDOM"
+}
+variable "quay_ec2_instance" {
+  default = ""quayoperatorcitest$RANDOM"
 }
 EOF
 
@@ -123,7 +126,7 @@ resource "aws_instance" "quayoperatorci" {
     private_key = file("./quaybuilder")
   }
   tags = {
-    Name = "quayoperatorcitest"
+    Name = var.quay_ec2_instance
   }
 }
 
@@ -211,10 +214,10 @@ echo "${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}" >${ARTIFACT_DIR}/QUAY_AWS_RDS_POSTGRES
 
 #Share the Terraform Var and Terraform Directory
 tar -cvzf terraform.tgz --exclude=".terraform" *
+echo "Copy terraform tf files"
 cp terraform.tgz ${SHARED_DIR}
 
 cd .. && mkdir -p terraform_install_extension && cd terraform_install_extension
-
 cat >>variables.tf <<EOF
 variable "quay_db_host" {
 }
@@ -238,7 +241,7 @@ provider "postgresql" {
   connect_timeout = 15
 }
 
-## Provision db for clairpostgres 
+## Provision db with name "clair" for clairpostgres 
 resource "postgresql_database" "clairdb" {
   name              = "clair"
   connection_limit  = -1

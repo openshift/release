@@ -13,6 +13,7 @@ QUAY_SUBNET_GROUP=$(cat ${SHARED_DIR}/QUAY_SUBNET_GROUP)
 QUAY_SECURITY_GROUP=$(cat ${SHARED_DIR}/QUAY_SECURITY_GROUP)
 echo "Start to destroy quay aws rds postgresql and s3 buckets ..."
 
+sleep 600
 #Destroy Quay Security Testing Host
 export TF_VAR_aws_bucket="${QUAY_AWS_S3_BUCKET}"
 export TF_VAR_quay_subnet_group="${QUAY_SUBNET_GROUP}"
