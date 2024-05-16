@@ -50,10 +50,10 @@ task_id=$BUILD_ID
 
 if [[ "${JOB_TYPE}" == "presubmit" ]]; then
     build_url="${prow_pr_base_url}/${PULL_NUMBER}/${job_id}/${task_id}"
-    artifacts_url="${artifacts_pr_base_url}/${PULL_NUMBER}/${job_id}/"
+    artifacts_url="${artifacts_pr_base_url}/${PULL_NUMBER}/${job_id}/${task_id}/artifacts"
 else
     build_url="${prow_base_url}/${job_id}/${task_id}"
-    artifacts_url="${artifacts_base_url}/${job_id}/${task_id}"
+    artifacts_url="${artifacts_base_url}/${job_id}/${task_id}/artifacts"
 fi
 
 
