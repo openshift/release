@@ -120,7 +120,7 @@ resource "aws_instance" "quayoperatorci" {
     inline = [
       "sudo yum install podman -y",
       "mkdir -p ~/redis-quay",
-      "sudo podman run -d  --name redis -p 6379:6379 -e REDIS_PASSWORD=$QUAY_AWS_RDS_POSTGRESQL_PASSWORD -v ~/redis-quay:/var/lib/redis/data:Z quay.io/clair-load-test/redis:5.1"
+      "sudo podman run -d  --name redis -p 6379:6379 -e REDIS_PASSWORD=$QUAY_AWS_RDS_POSTGRESQL_PASSWORD -v ~/redis-quay:/var/lib/redis/data:Z quay.io/clair-load-test/redis:6.2.7"
     ]
   }
 
