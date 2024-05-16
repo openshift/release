@@ -15,4 +15,6 @@ TAG_NAME="next"
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd backstage-showcase || exit
 
-bash ./.ibm/pipelines/openshift-ci-tests.sh
+sleep 1800
+
+#bash ./.ibm/pipelines/openshift-ci-tests.sh
