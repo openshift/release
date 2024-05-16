@@ -263,6 +263,7 @@ function main() {
     if [[ "${JOB_NAME}" == rehearse* ]]; then
         # We just want to make sure the script runs in the rehearsal to this point.
         # Whether the performance was pass or fail does not matter for rehearsal.
+        print_message "Rehearsal detected; exiting successful regardless of performance"
         exit 0
     fi
 
