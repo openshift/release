@@ -213,10 +213,15 @@ function test_render_mixed_type() {
 #>>>>>"
 
     zone_type="local-zone"
-    jq -r ".AvailabilityZones[] | select(.ZoneType==\"$zone_type\").ZoneName" "${ARTIFACT_DIR}/edge-zones_${region}.json" | shuf |head -n1 > $result_file
-    
+    jq -r ".AvailabilityZones[] | select(.ZoneType==\"$zone_type\").ZoneName" "${ARTIFACT_DIR}/edge-zones_${region}.json" | shuf | head -n1 > "$result_file"
+
     zone_type="wavelength-zone"
-    jq -r ".AvailabilityZones[] | select(.ZoneType==\"$zone_type\").ZoneName" "${ARTIFACT_DIR}/edge-zones_${region}.json" | shuf |head -n1 >> $result_file
+    jq -r ".AvailabilityZones[] | select(.ZoneType==\"$zone_type\").ZoneName" "${ARTIFACT_DIR}/edge-zones_${region}.json" | shuf | head -n1 >> "$result_file"
+
+    if [[ $(wc -l < "$result_file") -eq 1 ]]; then
+        echo "Skipping mixed test in region ${region} as it has only one edge subnet. 'test_render_all' will perform the required validations."
+        return
+    fi
 
     create_install_patch "$test_name" "$region" "$result_file"
     test_render_validations "$test_name" "$region" "$result_file"
