@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -o nounset
-set -o pipefail
 
 # Constants for the server used to save reports
 KPI_RESULTS_SERVER="https://10.0.12.113"
