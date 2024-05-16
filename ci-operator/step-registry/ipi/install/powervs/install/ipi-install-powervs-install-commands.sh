@@ -711,20 +711,20 @@ function dump_resources() {
 
   echo "8<--------8<--------8<--------8<-------- Running jobs 8<--------8<--------8<--------8<--------"
   ibmcloud pi job list --json | jq -r '.jobs[] | select (.status.state|test("running"))'
-
-  echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud 8<-------8<--------8<--------"
+ 
+  echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud Cluster 8<-------8<--------8<--------"
   (
-    if [ ! -f "${dir}/auth/envtest.kubeconfig" ]
-    then
-      exit 0
+    if [ -d "${dir}/.clusterapi_output" ]; then
+      /tmp/yq eval .status.conditions ${dir}/.clusterapi_output/IBMPowerVSCluster-openshift-cluster-api-guests-*yaml
+
+      echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud Cluster 8<-------8<--------8<--------"
+      for FILE in ${dir}/.clusterapi_output/IBMPowerVSMachine-openshift-cluster-api-guests-*.yaml
+      do
+	echo ${FILE}
+        /tmp/yq eval .status.conditions ${FILE}
+	echo
+      done
     fi
-    export KUBECONFIG=${dir}/auth/envtest.kubeconfig
-    echo "8<--------8<--------8<-------- ibmpowervscluster 8<--------8<--------8<--------"
-    oc --request-timeout=5s get ibmpowervscluster -n openshift-cluster-api-guests -o yaml
-    echo "8<--------8<--------8<-------- ibmpowervsimage 8<--------8<--------8<--------"
-    oc --request-timeout=5s get ibmpowervsimage -n openshift-cluster-api-guests -o yaml
-    echo "8<--------8<--------8<-------- ibmpowervsmachines 8<--------8<--------8<--------"
-    oc --request-timeout=5s get ibmpowervsmachines -n openshift-cluster-api-guests -o yaml
   )
 
   echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
