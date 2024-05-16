@@ -1,0 +1,36 @@
+ref:
+  as: lvms-topolvm-conformance-e2e
+  grace_period: 10m
+  commands: lvms-topolvm-conformance-e2e-commands.sh
+  from_image:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.16
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: TEST_SCHEDULER_EXTENDER_TYPE
+      default: none
+      documentation: |-
+        The scheduler extender type to test (TopoLVMs own scheduler extension or the native CSI Storage Capacity Tracking). 
+        This defaults to none, meaning Storage Capacity tracking.
+    - name: TEST_LVMD_TYPE
+      default: embedded
+      documentation: |-
+        The lvmd type to test (embedded or daemonset). This defaults to embedded.
+        The embedded mode runs the lvm2 daemon of TopoLVM in the same binary as the CSI driver daemonset.
+        If daemonset, a separate daemonset is deployed to run the lvm2 daemon and communication is done via gRPC.
+    - name: KUBERNETES_VERSION
+      default: 1.28.0
+      documentation: |-
+        The version of Kubernetes in Minikube to test against. This defaults to v1.28.0.
+        This will result in a different version of the Kubernetes cluster being used in the test.
+        TopoLVM always supports a matrix of 3 versions of Kubernetes. It should always be within this matrix.
+        See https://github.com/topolvm/topolvm?tab=readme-ov-file#topolvm for details.
+  documentation: |-
+    This step runs the topolvm conformance tests. These conformance tests are run on minikube
+    and expect debian-like tooling so they must be run on a debian derivative machine instead of RHEL.
+    This test suite is nevertheless important to keep midstream openshift/topolvm support consistent with
+    upstream.

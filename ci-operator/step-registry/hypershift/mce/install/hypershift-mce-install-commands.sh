@@ -135,6 +135,8 @@ spec: {}
 EOF
 sleep 5
 
+oc patch mce multiclusterengine-sample --type=merge -p '{"spec":{"overrides":{"components":[{"name":"hive","enabled": false}]}}}'
+echo "Disable HIVE component in MCE"
 oc patch mce multiclusterengine-sample --type=merge -p '{"spec":{"overrides":{"components":[{"name":"hypershift-preview","enabled": true}]}}}'
 echo "wait for mce to Available"
 oc wait --timeout=20m --for=condition=Available MultiClusterEngine/multiclusterengine-sample
