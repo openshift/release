@@ -19,6 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: release
   ubi:
     name: ubi
     namespace: ocp
@@ -78,7 +82,7 @@ tests:
     make test --warn-undefined-variables
   container:
     from: src
-- as: e2e-operator
+- as: aws-ocp-e2e-operator
   steps:
     cluster_profile: aws
     dependencies:
@@ -104,6 +108,30 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-aws
+- as: rosa-hcp-e2e-operator
+  steps:
+    cluster_profile: quay-aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      BYO_OIDC: "true"
+      CHANNEL_GROUP: stable
+      OCM_LOGIN_ENV: integration
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+      OPENSHIFT_VERSION: "4.15"
+      REGION: us-east-2
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: rosa-aws-sts-hcp
 zz_generated_metadata:
   branch: master
   org: openshift
