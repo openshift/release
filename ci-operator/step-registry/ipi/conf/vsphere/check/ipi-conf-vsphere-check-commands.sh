@@ -164,11 +164,13 @@ platformSpec='{"vcenters": [],"failureDomains": []}'
 log "building local variables and failure domains"
 
 for RESOURCE_POOL in ${RESOURCE_POOLS}; do
+  log "checking to see if ${RESOURCE_POOL} is in use"
   # check to see if this pool is in use by a lease
   FOUND=0
   for _leaseJSON in $(ls -d $SHARED_DIR/LEASE*); do 
     _VCENTER=$(cat ${_leaseJSON} | jq -r .status.name)
-    if [ ${_VCENTER} = ${RESOURCE_POOL} ]; then
+    log "checking if ${_VCENTER} == ${RESOURCE_POOL}"
+    if [ ${_VCENTER,,} = ${RESOURCE_POOL,,} ]; then
       FOUND=1
       break
     fi
@@ -288,6 +290,7 @@ for LEASE in $LEASES; do
 
   export GOVC_USERNAME="${pool_usernames[$vsphere_url]}"
   export GOVC_PASSWORD="${pool_passwords[$vsphere_url]}"    
+  export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 
   echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${vsphere_portgroup} in DC ${vsphere_datacenter} and destroy"
   govc ls -json "${vsphere_portgroup}" |
