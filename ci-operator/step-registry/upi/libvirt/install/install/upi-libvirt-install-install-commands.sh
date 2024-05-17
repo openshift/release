@@ -17,8 +17,6 @@ CLUSTER_DOMAIN="libvirt-s390x-amd64-0-0.ci"
 LIBVIRT_DOMAIN_NAME_SUFFIX="libvirt-s390x-amd64-0-0-ci"
 
 mkdir /tmp/bin
-curl -o /tmp/bin/yq -L "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_amd64" && chmod u+x /tmp/bin/yq
-curl -o /tmp/bin/jq -L "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-amd64" && chmod u+x /tmp/bin/jq
 
 if [ -n "${OPENSHIFT_CLIENT_VERSION_OVERRIDE}" ]; then
   echo "Downloading openshift client ${OPENSHIFT_CLIENT_VERSION_OVERRIDE}"
@@ -51,7 +49,9 @@ function approve_csrs() {
   while true; do
     if [[ ! -f /tmp/install-complete ]]; then
       # even if oc get csr fails continue
-      oc get csr -ojson | jq -r '.items[] | select(.status == {} ) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve || true
+      echo "Checking for unapproved certs..."
+      oc get csr | grep "Pending" || true
+      oc get csr -ojson | yq-v4 -oy '.items[] | select(.status | length == 0) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve || true
       sleep 15 & wait
       continue
     else
@@ -108,12 +108,14 @@ function upload_to_pool {
 
   # to get correct rights, we create the volume via an XML file instead of
   # `virsh vol-create-as`
+  echo "Creating volume from XML:"
   volume_xml_path=$(mktemp --tmpdir "$filename".xml.XXXXX)
-  <<<"$VOLUME_TEMPLATE_XML" yq -p=xml -o=xml \
+  <<<"$VOLUME_TEMPLATE_XML" yq-v4 -p=xml -o=xml \
     ".volume.name=\"$filename\" | \
      .volume.capacity=\"$(stat -c %s "$filepath")\" | \
      .volume.target.path=\"$targetPath\"" \
     > "$volume_xml_path"
+  cat "$volume_xml_path"
 
   mock-nss.sh virsh vol-create --pool "$pool" --file "$volume_xml_path"
   mock-nss.sh virsh vol-upload --pool "$pool" --vol "$filename" --file "$filepath"
@@ -176,7 +178,8 @@ echo "Creating manifests."
 $OCPINSTALL create manifests --dir "${INSTALL_DIR}"
 
 echo "Setting mastersSchedulable to false in manifests/cluster-scheduler-02-config.yml"
-yq -i '.spec.mastersSchedulable = false' "${INSTALL_DIR}"/manifests/cluster-scheduler-02-config.yml
+yq-v4 -i '.spec.mastersSchedulable = false' "${INSTALL_DIR}"/manifests/cluster-scheduler-02-config.yml
+cat "${INSTALL_DIR}"/manifests/cluster-scheduler-02-config.yml
 
 cp "${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml" "${INSTALL_DIR}/manifests/manifest_etcd-on-ramfs-mc.yml"
 
@@ -201,9 +204,10 @@ upload_to_pool httpd "${INSTALL_DIR}/worker.ign" "/var/www/html/worker.ign"
 #
 # virt-install then downloads the initramfs and kernel and uploads them
 # as temporary boot artifacts via libvirt for each machine that is booted.
-KERNEL_URL=$($OCPINSTALL coreos print-stream-json | jq -r ".architectures.$ARCH.artifacts.metal.formats.pxe.kernel.location")
-INITRAMFS_URL=$($OCPINSTALL coreos print-stream-json | jq -r ".architectures.$ARCH.artifacts.metal.formats.pxe.initramfs.location")
-ROOTFS_URL=$($OCPINSTALL coreos print-stream-json | jq -r ".architectures.$ARCH.artifacts.metal.formats.pxe.rootfs.location")
+KERNEL_URL=$($OCPINSTALL coreos print-stream-json | yq-v4 -oy ".architectures.$ARCH.artifacts.metal.formats.pxe.kernel.location")
+INITRAMFS_URL=$($OCPINSTALL coreos print-stream-json | yq-v4 -oy ".architectures.$ARCH.artifacts.metal.formats.pxe.initramfs.location")
+ROOTFS_URL=$($OCPINSTALL coreos print-stream-json | yq-v4 -oy ".architectures.$ARCH.artifacts.metal.formats.pxe.rootfs.location")
+echo "Found kernel=${KERNEL_URL}, initrd=${INITRAMFS_URL}, and rootfs=${ROOTFS_URL}"
 
 KERNEL_FILENAME=$(basename "$KERNEL_URL")
 INITRAMFS_FILENAME=$(basename "$INITRAMFS_URL")
@@ -293,13 +297,13 @@ EOF
 )
 
 # iterate over nodes and boot each of them
-for c in $(seq "$(<<<"$NODE_DEFINITIONS" yq 'length')"); do
-  node_definition=$(<<<"$NODE_DEFINITIONS" yq ".[$((c-1))]")
-  node_name=$(<<<"$node_definition" yq .name)
-  node_mac=$(<<<"$node_definition" yq .mac)
+for c in $(seq "$(<<<"$NODE_DEFINITIONS" yq-v4 'length')"); do
+  node_definition=$(<<<"$NODE_DEFINITIONS" yq-v4 ".[$((c-1))]")
+  node_name=$(<<<"$node_definition" yq-v4 .name)
+  node_mac=$(<<<"$node_definition" yq-v4 .mac)
 
   domain_cmdline="rd.neednet=1 coreos.inst.install_dev=/dev/vda coreos.live.rootfs_url=$HTTPD_BASE_URL/$ROOTFS_FILENAME "
-  domain_cmdline+=$(<<<"$node_definition" yq '.extra-args | join(" ")')
+  domain_cmdline+=$(<<<"$node_definition" yq-v4 '.extra-args | join(" ")')
 
   echo "Creating .qcow2 image for ${node_name}"
   delete_from_pool_if_exists images "${node_name}".qcow2
@@ -312,7 +316,7 @@ for c in $(seq "$(<<<"$NODE_DEFINITIONS" yq 'length')"); do
 
   echo "Preparing XML for ${node_name}"
   domain_xml_path=$(mktemp --tmpdir domain-"${node_name}".xml.XXXXX)
-  <<<"$DOMAIN_TEMPLATE_XML" yq -p=xml -o=xml \
+  <<<"$DOMAIN_TEMPLATE_XML" yq-v4 -p=xml -o=xml \
     ".domain.name=\"${node_name}\" |
     .domain.memory=\"${DOMAIN_MEMORY}\" |
     .domain.vcpu=\"${DOMAIN_VCPUS}\" |
@@ -325,17 +329,18 @@ for c in $(seq "$(<<<"$NODE_DEFINITIONS" yq 'length')"); do
     > "$domain_xml_path"
 
 
-  echo "Creating domain"
+  echo "Creating domain from xml:"
+  cat "$domain_xml_path"
   mock-nss.sh virsh create "$domain_xml_path" --validate
 done
 
-for c in $(seq "$(<<<"$NODE_DEFINITIONS" yq 'length')"); do
-  node_definition=$(<<<"$NODE_DEFINITIONS" yq ".[$((c-1))]")
-  node_name=$(<<<"$node_definition" yq .name)
-  node_mac=$(<<<"$node_definition" yq .mac)
+for c in $(seq "$(<<<"$NODE_DEFINITIONS" yq-v4 'length')"); do
+  node_definition=$(<<<"$NODE_DEFINITIONS" yq-v4 ".[$((c-1))]")
+  node_name=$(<<<"$node_definition" yq-v4 .name)
+  node_mac=$(<<<"$node_definition" yq-v4 .mac)
 
   domain_cmdline="rd.neednet=1 coreos.inst.install_dev=/dev/vda coreos.live.rootfs_url=$HTTPD_BASE_URL/$ROOTFS_FILENAME "
-  domain_cmdline+=$(<<<"$node_definition" yq '.extra-args | join(" ")')
+  domain_cmdline+=$(<<<"$node_definition" yq-v4 '.extra-args | join(" ")')
 
   domain_qcow2_image_host_path=/var/lib/libvirt/images/${node_name}.qcow2
 
@@ -343,7 +348,7 @@ for c in $(seq "$(<<<"$NODE_DEFINITIONS" yq 'length')"); do
 
   echo "Domain was deleted, creating new domain ${node_name} that boots from disk"
   domain_xml_path=$(mktemp --tmpdir domain-"${node_name}".xml.XXXXX)
-  <<<"$DOMAIN_TEMPLATE_XML" yq -p=xml -o=xml \
+  <<<"$DOMAIN_TEMPLATE_XML" yq-v4 -p=xml -o=xml \
     ".domain.name=\"${node_name}\" |
     .domain.memory=\"${DOMAIN_MEMORY}\" |
     .domain.vcpu=\"${DOMAIN_VCPUS}\" |
@@ -352,7 +357,8 @@ for c in $(seq "$(<<<"$NODE_DEFINITIONS" yq 'length')"); do
     .domain.devices.interface.mac.+@address=\"${node_mac}\"" \
     > "$domain_xml_path"
 
-  echo "Creating domain"
+  echo "Creating domain from xml:"
+  cat "$domain_xml_path"
   mock-nss.sh virsh define "$domain_xml_path" --validate
   mock-nss.sh virsh start "$node_name"
 done

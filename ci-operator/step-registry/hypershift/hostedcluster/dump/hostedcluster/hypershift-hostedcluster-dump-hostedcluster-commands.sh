@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "Set KUBECONFIG to Hive cluster"
+echo "Set KUBECONFIG to management cluster"
 export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
 
 HOSTED_CLUSTER_FILE="$SHARED_DIR/hosted_cluster.txt"

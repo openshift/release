@@ -1,0 +1,31 @@
+binary_build_commands: GOFLAGS="-mod=readonly" make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.16
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  ./hack/markdownlint-install.sh
+tests:
+- always_run: false
+  as: markdownlint
+  commands: |
+    hack/markdownlint.sh
+  container:
+    from: test-bin
+  run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^.markdown.*)$
+- as: unit
+  commands: GOFLAGS="-mod=readonly" make test
+  container:
+    from: bin
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: kube-compare

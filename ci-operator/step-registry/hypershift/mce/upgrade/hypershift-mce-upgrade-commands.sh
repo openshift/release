@@ -62,8 +62,15 @@ for ((i=1; i<=60; i++)); do
   sleep 10
 done
 oc wait --timeout=20m csv -n multicluster-engine --all --for=jsonpath='{.status.phase}'=Succeeded
-oc wait --timeout=20m pod -n multicluster-engine --all --for=condition=Ready
 until oc get multiclusterengines multiclusterengine-sample -ojsonpath="{.status.currentVersion}" | grep -q "$MCE_TARGET_VERSION"; do
   sleep 10
 done
+oc wait --timeout=20m pod -n multicluster-engine --all --for=condition=Ready
 echo "multiclusterengine upgrade successfully"
+until [[ $(oc get deployment -n hypershift operator -o jsonpath='{.status.updatedReplicas}') == $(oc get deployment -n hypershift operator -o jsonpath='{.status.replicas}') ]]; do
+    echo "Waiting for updated replicas to match replicas..."
+    sleep 10
+done
+oc wait --timeout=5m --for=condition=Available -n local-cluster ManagedClusterAddOn/hypershift-addon
+oc wait --timeout=5m --for=condition=Degraded=False -n local-cluster ManagedClusterAddOn/hypershift-addon
+echo "HyperShift operator upgrade successfully"

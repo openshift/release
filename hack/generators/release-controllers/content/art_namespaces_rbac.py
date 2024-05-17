@@ -1,4 +1,4 @@
-arch_in_hostname = {'arm64': 'arm64', 'ppc64le': 'ppc64le', 'multi': 'multi', 'x86_64': 'amd64', 's390x': 's390x'}
+arch_in_hostname = {'arm64': 'arm64', 'ppc64le': 'ppc64le', 'multi': 'multi', 'x86_64': 'amd64', 's390x': 's390x', 'multi-2': 'multi-2'}
 
 
 def add_imagestream_namespace_rbac(gendoc):

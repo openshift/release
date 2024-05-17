@@ -1,6 +1,6 @@
-## Alerts on the hive cluster
+## Alerts on the hosted-mgmt cluster
 
-### hive-blocked-deprovision
+### hosted-mgmt-blocked-deprovision
 
 #### Runbook
 
@@ -8,7 +8,7 @@
 or labels of the metrics.
 
 ```console
-oc --context hive get clusterdeployment -n ci-ocp-4-10-amd64-aws-us-east-1-jfrb6 ci-ocp-4-10-amd64-aws-us-east-1-jfrb6 -o json | jq '.spec.clusterPoolRef'
+oc --context hosted-mgmt get clusterdeployment -n ci-ocp-4-10-amd64-aws-us-east-1-jfrb6 ci-ocp-4-10-amd64-aws-us-east-1-jfrb6 -o json | jq '.spec.clusterPoolRef'
 {
   "claimName": "a79fb333-70b5-11ed-901d-0a580a8270f1",
   "claimedTimestamp": "2022-11-30T14:07:05Z",
@@ -26,7 +26,7 @@ The deprovision could be blocked by any of the following reasons:
 * (optional) The job that claimed the cluster is stored in the label of the `clusterclaim`:
 
 ```console
-oc --context hive get clusterclaims -n ci-cluster-pool a79fb333-70b5-11ed-901d-0a580a8270f1 --show-labels
+oc --context hosted-mgmt get clusterclaims -n ci-cluster-pool a79fb333-70b5-11ed-901d-0a580a8270f1 --show-labels
 NAME                                   POOL                              PENDING          CLUSTERNAMESPACE                        CLUSTERRUNNING   AGE   LABELS
 a79fb333-70b5-11ed-901d-0a580a8270f1   ci-ocp-4-10-amd64-aws-us-east-1   ClusterClaimed   ci-ocp-4-10-amd64-aws-us-east-1-jfrb6   Running          91d   prow.k8s.io/build-id=1597950746676957184,prow.k8s.io/job=pull-ci-openshift-assisted-service-master-edge-subsystem-kubxxx
 ```
@@ -34,7 +34,7 @@ a79fb333-70b5-11ed-901d-0a580a8270f1   ci-ocp-4-10-amd64-aws-us-east-1   Cluster
 * Due to [HIVE-2191](https://issues.redhat.com/browse/HIVE-2191), the alert might be active on cluster deployments that are no longer exist on the cluster. In that case, restarting the hive-controller pod should do the job.
 
 ```console
-oc --context hive get pod -n hive -l control-plane=controller-manager
+oc --context hosted-mgmt get pod -n hive -l control-plane=controller-manager
 NAME                                READY   STATUS    RESTARTS   AGE
 hive-controllers-759f94989b-xxhh7   1/1     Running   0          74m
 ```

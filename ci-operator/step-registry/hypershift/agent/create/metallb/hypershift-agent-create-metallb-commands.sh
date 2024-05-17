@@ -92,7 +92,6 @@ metadata:
   name: ingress-public-ip
   namespace: metallb-system
 spec:
-  protocol: layer2
   autoAssign: false
   addresses:
   - 192.168.111.30-192.168.111.30
@@ -105,10 +104,22 @@ metadata:
   name: ingress-public-ip
   namespace: metallb-system
 spec:
-  protocol: layer2
   autoAssign: false
   addresses:
   - 192.168.111.30-192.168.111.30
+  - fd2e:6f44:5dd8:c956::1e-fd2e:6f44:5dd8:c956::1e
+EOF
+elif [[ $IP_STACK == "v6" ]]; then
+  oc create -f - <<EOF
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: ingress-public-ip
+  namespace: metallb-system
+spec:
+  protocol: layer2
+  autoAssign: false
+  addresses:
   - fd2e:6f44:5dd8:c956::1e-fd2e:6f44:5dd8:c956::1e
 EOF
 else
@@ -118,13 +129,13 @@ fi
 
 oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1
-kind: BGPAdvertisement
+kind: L2Advertisement
 metadata:
   name: ingress-public-ip
   namespace: metallb-system
 spec:
-  aggregationLength: 32
-  aggregationLengthV6: 128
+  ipAddressPools:
+  - ingress-public-ip
 EOF
 
 oc create -f - <<EOF

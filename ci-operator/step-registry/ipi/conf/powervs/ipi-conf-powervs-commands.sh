@@ -6,6 +6,7 @@ set -o pipefail
 
 echo "ARCH=${ARCH}"
 echo "BRANCH=${BRANCH}"
+echo "LEASED_RESOURCE=${LEASED_RESOURCE}"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
@@ -57,7 +58,23 @@ POWERVS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.powervscred"
 if [[ -n "${CLUSTER_NAME_MODIFIER}" ]]; then
   # Hopefully the entire hostname (including the BASE_DOMAIN) is less than 255 bytes.
   # Also, the CLUSTER_NAME seems to be truncated at 21 characters long.
-  CLUSTER_NAME="p-${LEASED_RESOURCE}-${CLUSTER_NAME_MODIFIER}"
+  case "${LEASED_RESOURCE}" in
+    "mad02-powervs-5-quota-slice-0")
+      CLUSTER_NAME="p-mad02-0-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "mad02-powervs-5-quota-slice-1")
+      CLUSTER_NAME="p-mad02-1-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "mad02-powervs-5-quota-slice-2")
+      CLUSTER_NAME="p-mad02-2-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "mad02-powervs-5-quota-slice-3")
+      CLUSTER_NAME="p-mad02-3-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    *)
+      CLUSTER_NAME="p-${LEASED_RESOURCE}-${CLUSTER_NAME_MODIFIER}"
+    ;;
+  esac
 else
   CLUSTER_NAME="p-${LEASED_RESOURCE}"
 fi
@@ -82,6 +99,30 @@ case "${LEASED_RESOURCE}" in
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON04")
       POWERVS_REGION=lon
       VPCREGION=eu-gb
+   ;;
+   "mad02-powervs-5-quota-slice-0")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MAD02-0")
+      POWERVS_REGION=mad
+      POWERVS_ZONE=mad02
+      VPCREGION=eu-es
+   ;;
+   "mad02-powervs-5-quota-slice-1")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MAD02-1")
+      POWERVS_REGION=mad
+      POWERVS_ZONE=mad02
+      VPCREGION=eu-es
+   ;;
+   "mad02-powervs-5-quota-slice-2")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MAD02-2")
+      POWERVS_REGION=mad
+      POWERVS_ZONE=mad02
+      VPCREGION=eu-es
+   ;;
+   "mad02-powervs-5-quota-slice-3")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MAD02-3")
+      POWERVS_REGION=mad
+      POWERVS_ZONE=mad02
+      VPCREGION=eu-es
    ;;
    "mon01")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MON01")
@@ -132,6 +173,11 @@ case "${LEASED_RESOURCE}" in
       VPCREGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/VPCREGION")
    ;;
 esac
+
+echo "POWERVS_SERVICE_INSTANCE_ID=${POWERVS_SERVICE_INSTANCE_ID}"
+echo "POWERVS_REGION=${POWERVS_REGION}"
+echo "POWERVS_ZONE=${POWERVS_ZONE}"
+echo "VPCREGION=${VPCREGION}"
 
 echo "CONTROL_PLANE_REPLICAS=${CONTROL_PLANE_REPLICAS}"
 echo "WORKER_REPLICAS=${WORKER_REPLICAS}"
@@ -256,3 +302,20 @@ for PARAMETER in "${PARAMETERS[@]}"; do
   echo "Removing ${PARAMETER}"
   sed -i '/'${PARAMETER}':/d' "${CONFIG}"
 done
+
+if [ -n "${FEATURE_SET}" ]; then
+  echo "Adding 'featureSet: ...' to install-config.yaml"
+  cat >> "${CONFIG}" << EOF
+featureSet: ${FEATURE_SET}
+EOF
+fi
+
+# FeatureGates must be a valid yaml list.
+# E.g. ['Feature1=true', 'Feature2=false']
+# Only supported in 4.14+.
+if [ -n "${FEATURE_GATES}" ]; then
+  echo "Adding 'featureGates: ...' to install-config.yaml"
+  cat >> "${CONFIG}" << EOF
+featureGates: ${FEATURE_GATES}
+EOF
+fi

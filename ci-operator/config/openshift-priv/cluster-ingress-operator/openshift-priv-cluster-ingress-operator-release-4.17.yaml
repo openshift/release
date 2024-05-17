@@ -29,7 +29,8 @@ images:
   to: cluster-ingress-operator
 promotion:
   to:
-  - name: 4.17-priv
+  - disabled: true
+    name: 4.17-priv
     namespace: ocp-private
 releases:
   initial:
@@ -128,6 +129,22 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
+- as: e2e-aws-gatewayapi
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_GATES: '[GatewayAPIEnabled=true]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: make TEST=TestGatewayAPI test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.17
   org: openshift-priv

@@ -142,6 +142,7 @@ tar -Jcf "${SHARED_DIR}/s3_cloudfront_terraform_state.tar.xz" terraform.tfstate
 
 # create secert using private key for cloudfront
 CLOUDFRONT_PRIVATE_KEY="${CLUSTER_PROFILE_DIR}/cloudfront-key"
+CLOUDFRONT_KEYPAIR_ID="${CLUSTER_PROFILE_DIR}/cloudfront-keypair-id"
 if [[ -f "${CLOUDFRONT_PRIVATE_KEY}" ]]; then
   oc create secret generic cloudfront-secret --from-file=${CLOUDFRONT_PRIVATE_KEY} -n openshift-image-registry
 else
@@ -150,7 +151,7 @@ else
 fi
 
 # configure image registry to use cloudfront
-oc patch configs.imageregistry.operator.openshift.io/cluster --type merge -p '{"spec":{"storage":{"managementState":"Unmanaged","s3":{"bucket":"'"${NEW_BUCKET}"'","region":"'"${AWS_REGION}"'","cloudFront":{"baseURL":"https://'"${CLOUDFRONT_DOMAIN_NAME}"'","duration": "300s","keypairID":"K3FZYAKDQYAWWP","privateKey":{"key":"cloudfront-key","name":"cloudfront-secret"}}}}}}'
+oc patch configs.imageregistry.operator.openshift.io/cluster --type merge -p '{"spec":{"storage":{"managementState":"Unmanaged","s3":{"bucket":"'"${NEW_BUCKET}"'","region":"'"${AWS_REGION}"'","cloudFront":{"baseURL":"https://'"${CLOUDFRONT_DOMAIN_NAME}"'","duration": "300s","keypairID":"'"${CLOUDFRONT_KEYPAIR_ID}"'","privateKey":{"key":"cloudfront-key","name":"cloudfront-secret"}}}}}}'
 
 # wait image registry to redeploy with cloudfront
 check_imageregistry_back_ready(){

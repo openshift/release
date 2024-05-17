@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-if [ "${RE_TRIGGER_ON_FAILURE}" = "true" ]; then
+if [ "${RE_TRIGGER_ON_FAILURE}" = "true" ] && [[ $JOB_NAME != *"rehearse"* ]]; then
 
   SERVER_URL=$(cat "${CLUSTER_PROFILE_DIR}/openshift-ci-job-trigger-server-url")
   TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/openshift-ci-api-token")

@@ -3,22 +3,10 @@
 set -o nounset
 set -o pipefail
 
-function extract_oc(){
-    echo -e "Extracting oc\n"
-    local retry=5 
-    tmp_oc="/tmp/client"
-    mkdir -p ${tmp_oc}
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE});
-    do
-        echo >&2 "Failed to extract oc binary, retry..."
-        (( retry -= 1 ))
-        if (( retry < 0 )); then return 1; fi
-        sleep 60
-    done
-    mv ${tmp_oc}/oc /tmp -f
-    export PATH="$PATH"
-    which oc
-    oc version --client
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
 }
 
 function get_tp_operator(){
@@ -300,8 +288,9 @@ if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
 fi
 
 report_file="${ARTIFACT_DIR}/ota-test-result.txt"
-export PATH=/tmp:${PATH}
-extract_oc
+# oc cli is injected from release:target
+run_command "which oc"
+run_command "oc version --client"
 
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig

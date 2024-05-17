@@ -23,17 +23,25 @@ else
   exit 1
 fi
 
+read_profile_file() {
+  local file="${1}"
+  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/${file}"
+  fi
+}
+
 # Log in
-ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-if [[ ! -z "${ROSA_TOKEN}" ]]; then
+SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+ROSA_TOKEN=$(read_profile_file "ocm-token")
+if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
+  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+elif [[ -n "${ROSA_TOKEN}" ]]; then
   echo "Logging into ${OCM_LOGIN_ENV} with offline token"
   rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
-  if [ $? -ne 0 ]; then
-    echo "Login failed"
-    exit 1
-  fi
 else
-  echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
+  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
   exit 1
 fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
@@ -81,6 +89,32 @@ rosa create account-roles -y --mode auto \
                           | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
 
 # Store the account-role-prefix for the next pre steps and the account roles deletion
-echo "Store the account-role-prefix and the account-roles-arn ..."
+echo "Store the account-role-prefix and the account-roles-arns ..."
 echo -n "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-prefix"
-rosa list account-roles -o json | jq -r '.[].RoleARN' | grep "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-arns"
+ret=0
+rosa list account-roles -o json | jq -r '.[].RoleARN' | grep "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-arns" || ret=$?
+if [[ "$ret" != 0 ]]; then
+    rosa list account-roles -o json | jq -r '.[].RoleARN' | grep "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-arns"
+fi
+echo "Storing successfully"
+
+# Workaround for missing 'ec2:DisassociateAddress' policy for 4.16
+account_intaller_role_name=$(cat "${SHARED_DIR}/account-roles-arns" | grep "Installer-Role" | awk -F '/' '{print $NF}')
+policy_name=$account_intaller_role_name"-Policy-Inline"
+
+inline_policy=$(mktemp)
+cat > $inline_policy <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "ec2:DisassociateAddress"
+      ],
+      "Effect": "Allow",
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+aws iam put-role-policy --role-name $account_intaller_role_name --policy-name $policy_name  --policy-document file://${inline_policy}

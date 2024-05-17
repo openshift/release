@@ -64,6 +64,8 @@ if [[ "$HOSTED_CP" == "true" ]]; then
 fi
 
 # Define cluster name
+CLUSTER_NAME=""
+DOMAIN_PREFIX_SWITCH=""
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]] && [[ -e "${SHARED_DIR}/cluster-name" ]]; then
   # For Shared VPC cluster, cluster name is determined in step aws-provision-route53-private-hosted-zone
   #   as Private Hosted Zone needs to be ready before installing Shared VPC cluster
@@ -77,8 +79,27 @@ else
   fi
   subfix=$(openssl rand -hex 2)
   CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
-  echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+  # For long cluster name enabled, append a "long_name_prefix_len" chars long random string to cluster name
+  # Max possible prefix length is 9, max possible subfix length is 4, hyppen is used 2 times, random string of length "long_name_prefix_len"
+  # (9 + 4 + 2 + "long_name_prefix_len" = 54 )
+  MAX_CLUSTER_NAME_LENGTH=54
+  if [[ "$LONG_CLUSTER_NAME_ENABLED" == "true" ]]; then
+    long_name_prefix_len=$(( MAX_CLUSTER_NAME_LENGTH - $(echo -n "$CLUSTER_NAME" | wc -c) - 1 ))
+    long_name_prefix=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c $long_name_prefix_len)
+    CLUSTER_NAME="$prefix-$subfix-$long_name_prefix"
+  fi
+  
+  #set the domain prefix of length (<=15)
+  MAX_DOMAIN_PREFIX_LENGTH=15
+  if [[ "$SPECIFY_DOMAIN_PREFIX" == "true" ]]; then
+    first_char=$(head /dev/urandom | tr -dc 'a-z' | head -c 1)
+    remaining_chars=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c $((MAX_DOMAIN_PREFIX_LENGTH - 1)))
+    DOMAIN_PREFIX="$first_char$remaining_chars"
+    DOMAIN_PREFIX_SWITCH="--domain-prefix $DOMAIN_PREFIX"
+  fi
+  #else the domain prefix will be auto generated.
 fi
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
 # Configure aws
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
@@ -95,15 +116,27 @@ else
   exit 1
 fi
 
+read_profile_file() {
+  local file="${1}"
+  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/${file}"
+  fi
+}
+
 # Log in
-ROSA_VERSION=$(rosa version)
-ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+ROSA_TOKEN=$(read_profile_file "ocm-token")
+if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
+  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+  ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+elif [[ -n "${ROSA_TOKEN}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token"
   rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
   ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
 else
-  echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
+  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
   exit 1
 fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
@@ -184,7 +217,8 @@ cat > ${cluster_config_file} << EOF
   "region": "${CLOUD_PROVIDER_REGION}",
   "version": {
     "channel_group": "${CHANNEL_GROUP}",
-    "raw_id": "${OPENSHIFT_VERSION}"
+    "raw_id": "${OPENSHIFT_VERSION}",
+    "major_version": "$(echo ${OPENSHIFT_VERSION} | awk -F. '{print $1"."$2}')"
   },
   "tags": "${TAGS}",
   "multi_az": ${MULTI_AZ},
@@ -260,7 +294,7 @@ if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   if [[ ${MIN_REPLICAS} -ge 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
     MIN_REPLICAS=3
   fi
-  COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"  
+  COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"
   record_cluster "nodes" "min_replicas" ${MIN_REPLICAS}
   record_cluster "nodes" "max_replicas" ${MAX_REPLICAS}
 else
@@ -352,7 +386,7 @@ if [[ "$ENABLE_PROXY" == "true" ]]; then
   record_cluster "proxy" "enabled" ${ENABLE_PROXY}
   record_cluster "proxy" "http" $proxy_private_url
   record_cluster "proxy" "https" $proxy_private_url
-  record_cluster "proxy" "trust_bundle_file" $trust_bundle_file  
+  record_cluster "proxy" "trust_bundle_file" $trust_bundle_file
 fi
 
 SUBNET_ID_SWITCH=""
@@ -363,7 +397,7 @@ if [[ "$ENABLE_BYOVPC" == "true" ]]; then
     echo -e "The private_subnet_ids are mandatory."
     exit 1
   fi
-  
+
   if [[ "${PRIVATE_SUBNET_ONLY}" == "true" ]] ; then
     SUBNET_ID_SWITCH="--subnet-ids ${PRIVATE_SUBNET_IDs}"
     record_cluster "subnets" "private_subnet_ids" ${PRIVATE_SUBNET_IDs}
@@ -403,7 +437,7 @@ if [[ "$STS" == "true" ]]; then
   if [[ -z "${account_intaller_role_arn}" ]] || [[ -z "${account_support_role_arn}" ]] || [[ -z "${account_worker_role_arn}" ]]; then
     echo -e "One or more account roles with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
     exit 1
-  fi  
+  fi
   ACCOUNT_ROLES_SWITCH="--role-arn ${account_intaller_role_arn} --support-role-arn ${account_support_role_arn} --worker-iam-role ${account_worker_role_arn}"
   record_cluster "aws.sts" "role_arn" $account_intaller_role_arn
   record_cluster "aws.sts" "support_role_arn" $account_support_role_arn
@@ -414,7 +448,7 @@ if [[ "$STS" == "true" ]]; then
     if [[ -z "${account_control_plane_role_arn}" ]]; then
       echo -e "The control plane account role with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
       exit 1
-    fi      
+    fi
     ACCOUNT_ROLES_SWITCH="${ACCOUNT_ROLES_SWITCH} --controlplane-iam-role ${account_control_plane_role_arn}"
     record_cluster "aws.sts" "control_plane_role_arn" $account_control_plane_role_arn
   fi
@@ -480,9 +514,9 @@ echo "  Enable audit log: ${ENABLE_AUDIT_LOG}"
 echo "  Cluster Tags: ${TAGS}"
 echo "  Additional Security groups: ${ADDITIONAL_SECURITY_GROUP}"
 echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
-if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then 
+if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Min replicas: ${MIN_REPLICAS}"
-  echo "  Max replicas: ${MAX_REPLICAS}"  
+  echo "  Max replicas: ${MAX_REPLICAS}"
 else
   echo "  Replicas: ${REPLICAS}"
 fi
@@ -505,6 +539,7 @@ ${HYPERSHIFT_SWITCH} \
 --channel-group ${CHANNEL_GROUP} \
 --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
 --tags ${TAGS} \
+${DOMAIN_PREFIX_SWITCH} \
 ${ACCOUNT_ROLES_SWITCH} \
 ${EC2_METADATA_HTTP_TOKENS_SWITCH} \
 ${MULTI_AZ_SWITCH} \
@@ -528,11 +563,15 @@ ${SECURITY_GROUP_ID_SWITCH} \
 ${NO_CNI_SWITCH} \
 ${CONFIGURE_CLUSTER_AUTOSCALER_SWITCH} \
 ${DRY_RUN_SWITCH}
-" 
+"
 echo "$cmd"| sed -E 's/\s{2,}/ /g' > "${SHARED_DIR}/create_cluster.sh"
 
 log "Running command:"
-cat "${SHARED_DIR}/create_cluster.sh" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" | sed "s/$SHARED_VPC_AWS_ACCOUNT_ID/$SHARED_VPC_AWS_ACCOUNT_ID_MASK/g"
+cmdout=$(cat "${SHARED_DIR}/create_cluster.sh" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g")
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+  cmdout=$(echo $cmdout | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g")
+fi
+echo "$cmdout"
 CLUSTER_INFO_WITHOUT_MASK="$(mktemp)"
 eval "${cmd}" > "${CLUSTER_INFO_WITHOUT_MASK}"
 

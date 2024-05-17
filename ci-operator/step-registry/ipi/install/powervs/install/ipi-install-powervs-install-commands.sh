@@ -10,6 +10,7 @@ function populate_artifact_dir() {
     echo "Copying log bundle..."
     cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
   fi
+
   echo "Removing REDACTED info from log..."
   sed '
     s/password: .*/password: REDACTED/;
@@ -21,6 +22,7 @@ function populate_artifact_dir() {
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${SHARED_DIR}/installation_stats.log" > "${ARTIFACT_DIR}/installation_stats.log"
+
   case "${CLUSTER_TYPE}" in
     powervs*)
       # We don't want debugging in this section
@@ -37,6 +39,12 @@ function populate_artifact_dir() {
       >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
       ;;
   esac
+
+  if [ -d "${dir}/.clusterapi_output" ]
+  then
+    echo "Copying CAPI output to artifact dir"
+    cp -r "${dir}/.clusterapi_output/" "${ARTIFACT_DIR}/clusterapi_output/"
+  fi
 }
 
 function prepare_next_steps() {
@@ -483,7 +491,7 @@ function destroy_resources() {
   #
   mkdir /tmp/ocp-test
   cat > "/tmp/ocp-test/metadata.json" << EOF
-{"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
+{"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceGUID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
 EOF
 
   #
@@ -694,11 +702,38 @@ function dump_resources() {
     oc --request-timeout=5s get pods -A -o=wide | sed -e '/\(Running\|Completed\)/d'
   )
 
+  echo "8<--------8<--------8<--------8<-------- oc get pods -n openshift-machine-api 8<--------8<--------8<--------8<--------"
+  (
+    export KUBECONFIG=${dir}/auth/kubeconfig
+    oc --request-timeout=5s get pods -n openshift-machine-api
+    echo "8<--------8<-------- oc get machines.machine.openshift.io -n openshift-machine-api 8<--------8<--------"
+    oc --request-timeout=5s get machines.machine.openshift.io -n openshift-machine-api
+    echo "8<--------8<-------- oc get machineset.machine.openshift.io -n openshift-machine-api 8<--------8<--------"
+    oc --request-timeout=5s get machineset.machine.openshift.io -n openshift-machine-api
+    echo "8<--------8<-------- oc logs -l k8s-app=controller -c machine-controller -n openshift-machine-api 8<--------8<--------"
+    oc --request-timeout=5s logs -l k8s-app=controller -c machine-controller -n openshift-machine-api
+  )
+
   echo "8<--------8<--------8<--------8<-------- Instance names, health 8<--------8<--------8<--------8<--------"
   ibmcloud pi instance list --json | jq -r '.pvmInstances[] | select(.name|test("'${CLUSTER_NAME}'")) | " \(.name) - \(.status) - health reason: \(.health.reason) - health status: \(.health.status)"'
 
   echo "8<--------8<--------8<--------8<-------- Running jobs 8<--------8<--------8<--------8<--------"
   ibmcloud pi job list --json | jq -r '.jobs[] | select (.status.state|test("running"))'
+ 
+  echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud Cluster 8<-------8<--------8<--------"
+  (
+    if [ -d "${dir}/.clusterapi_output" ]; then
+      /tmp/yq eval .status.conditions ${dir}/.clusterapi_output/IBMPowerVSCluster-openshift-cluster-api-guests-*yaml
+
+      echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud Cluster 8<-------8<--------8<--------"
+      for FILE in ${dir}/.clusterapi_output/IBMPowerVSMachine-openshift-cluster-api-guests-*.yaml
+      do
+	echo ${FILE}
+        /tmp/yq eval .status.conditions ${FILE}
+	echo
+      done
+    fi
+  )
 
   echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
 
@@ -919,6 +954,21 @@ openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v '
 ret=${PIPESTATUS[0]}
 echo "ret=${ret}"
 echo "8<--------8<--------8<--------8<-------- END: create cluster 8<--------8<--------8<--------8<--------"
+
+# If we need to try again, then does the CAPI cluster status yaml file exist?
+if [ ${ret} -gt 0 ]; then
+  SFILE="/tmp/installer/.clusterapi_output/IBMPowerVSCluster-openshift-cluster-api-guests*yaml"
+  ls -l ${SFILE} || true
+  if [ -f ${SFILE} ]; then
+    # How many statuses are False?
+    SLINES=$(/tmp/yq eval .status.conditions ${SFILE} -o json | /tmp/jq -r '.[] | select(.status|test("False")) | .type' | wc -l)
+    echo "Skip? SLINES=${SLINES}"
+    if [ ${SLINES} -gt 0 ]; then
+      echo "Skipping wait-for install-complete since detected CAPI problem"
+      ret=0
+    fi
+  fi
+fi
 
 if [ ${ret} -gt 0 ]; then
   echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"

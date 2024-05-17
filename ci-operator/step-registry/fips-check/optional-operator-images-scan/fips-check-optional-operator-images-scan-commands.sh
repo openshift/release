@@ -173,7 +173,7 @@ time_used="$(( ($(date +%s) - $timestamp_start)/60 ))"
 echo "Tests took ${time_used} minutes"
 
 echo "Generating the Junit for fips check optional operators scan"
-filename="fips-check-soptional_operators-images-scan"
+filename="junit_fips-check-soptional_operators-images-scan"
 testsuite="fips-check-soptional_operators-images-scan"
 subteam="Security_and_Compliance"
 if $pass; then

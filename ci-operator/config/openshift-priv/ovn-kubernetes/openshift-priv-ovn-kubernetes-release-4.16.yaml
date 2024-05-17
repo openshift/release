@@ -23,7 +23,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.21
 canonical_go_repository: github.com/openshift/ovn-kubernetes
 images:
 - dockerfile_path: Dockerfile.base
@@ -51,8 +51,7 @@ images:
   to: ovn-kubernetes-microshift
 promotion:
   to:
-  - disabled: true
-    name: 4.16-priv
+  - name: 4.16-priv
     namespace: ocp-private
 releases:
   initial:
@@ -189,6 +188,20 @@ tests:
     env:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+- as: e2e-metal-ipi-ovn-dualstack-local-gateway
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        OVN_LOCAL_GATEWAY_MODE=true
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e
 - as: e2e-aws-ovn-hypershift
   steps:
     cluster_profile: hypershift

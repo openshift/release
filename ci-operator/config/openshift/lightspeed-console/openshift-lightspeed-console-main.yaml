@@ -4,10 +4,14 @@ base_images:
     namespace: openshift
     tag: 1.20-ubi9
 build_root:
-  image_stream_tag:
-    name: nodejs-16
-    namespace: openshift
-    tag: latest
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi8/nodejs-18:latest
+      USER root
+      RUN yum -y install git
+      RUN mkdir /go && chmod 777 /go
+      RUN npm install --global yarn
+      USER 1001
 images:
 - dockerfile_path: Dockerfile
   from: ubi-9-nginx-120
@@ -32,6 +36,17 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: lint
+  steps:
+    test:
+    - as: lint
+      commands: yarn install && yarn run lint
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -12,6 +12,16 @@ cluster_groups:
   - build09
   - build10
   - vsphere02
+  managed_clusters:
+  - app.ci
+  - build01
+  - build02
+  - build03
+  - build04
+  - build05
+  - build09
+  - build10
+  - hosted-mgmt
   non_app_ci:
   - build01
   - build02
@@ -187,14 +197,6 @@ secret_configs:
     name: bugzilla-credentials-openshift-bugzilla-robot
     namespace: ci
 - from:
-    password:
-      field: password
-      item: kata-jenkins-ci.westus2.cloudapp.azure.com
-  to:
-  - cluster: app.ci
-    name: jenkins-credentials-kata-jenkins-ci.westus2.cloudapp.azure.com
-    namespace: ci
-- from:
     oauth:
       field: github-oauth-token
       item: openshift-bot
@@ -259,9 +261,6 @@ secret_configs:
   - cluster: app.ci
     name: ci-slack-api-url
     namespace: ci
-  - cluster: hive
-    name: ci-slack-api-url
-    namespace: hive
 - from:
     integration_key:
       field: integration_key
@@ -273,14 +272,6 @@ secret_configs:
   - cluster: app.ci
     name: pagerduty
     namespace: ci
-- from:
-    integration_key:
-      field: integration_key
-      item: pagerduty
-  to:
-  - cluster: hive
-    name: pagerduty
-    namespace: hive
 - from:
     config.json:
       field: client-configuration
@@ -387,14 +378,6 @@ secret_configs:
   to:
   - cluster: app.ci
     name: gce-sa-credentials-gcs-crier-publisher
-    namespace: ci
-- from:
-    config.json:
-      field: push-credentials
-      item: quay.io
-  to:
-  - cluster: app.ci
-    name: registry-push-credentials-quay.io
     namespace: ci
 - from:
     config.json:
@@ -879,10 +862,6 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-aws-terraform-qe
-    namespace: ci
-  - cluster_groups:
-    - non_app_ci
-    name: cluster-secrets-aws-perf-qe
     namespace: ci
   - cluster_groups:
     - non_app_ci
@@ -2363,10 +2342,10 @@ secret_configs:
     namespace: ci
 - from:
     kubeconfig:
-      field: sa.hive.hive.config
+      field: sa.hive.hosted-mgmt.config
       item: build_farm
-    sa.hive.hive.token.txt:
-      field: sa.hive.hive.token.txt
+    sa.hive.hosted-mgmt.token.txt:
+      field: sa.hive.hosted-mgmt.token.txt
       item: build_farm
   to:
   - cluster_groups:
@@ -2379,10 +2358,10 @@ secret_configs:
     namespace: test-credentials
 - from:
     kubeconfig:
-      field: sa.hypershift-workload.hive.config
+      field: sa.hypershift-workload.hosted-mgmt.config
       item: build_farm
-    sa.hypershift-workload.hive.token.txt:
-      field: sa.hypershift-workload.hive.token.txt
+    sa.hypershift-workload.hosted-mgmt.token.txt:
+      field: sa.hypershift-workload.hosted-mgmt.token.txt
       item: build_farm
   to:
   - cluster_groups:
@@ -2393,20 +2372,6 @@ secret_configs:
     - build_farm
     name: hypershift-workload-credentials
     namespace: ci
-- from:
-    bucket:
-      field: bucket
-      item: hypershift-operator-oidc-provider-s3-credentials
-    credentials:
-      field: credentials
-      item: hypershift-operator-oidc-provider-s3-credentials
-    region:
-      field: region
-      item: hypershift-operator-oidc-provider-s3-credentials
-  to:
-  - cluster: hive
-    name: hypershift-operator-oidc-provider-s3-credentials
-    namespace: hypershift
 - from:
     ci.htpasswd:
       field: ci.htpasswd
@@ -2452,15 +2417,6 @@ secret_configs:
   - cluster: build02
     name: aws-ci-infra-ci-build02-audit-logs-uploader-credentials
     namespace: api-audit-log
-- from:
-    .awscred:
-      field: .awscred
-      item: AWS ci-longlivedcluster-bot
-  to:
-  - cluster_groups:
-    - build_farm
-    name: aws-openshift-llc-account-credentials
-    namespace: ci
 - from:
     .git-credentials:
       field: git_url_with_credentials
@@ -2670,8 +2626,8 @@ secret_configs:
     sa.config-updater.build10.config:
       field: sa.config-updater.build10.config
       item: config-updater
-    sa.config-updater.hive.config:
-      field: sa.config-updater.hive.config
+    sa.config-updater.hosted-mgmt.config:
+      field: sa.config-updater.hosted-mgmt.config
       item: config-updater
     sa.config-updater.vsphere02.config:
       field: sa.config-updater.vsphere02.config
@@ -3163,11 +3119,11 @@ secret_configs:
     sa.ci-chat-bot.vsphere02.token.txt:
       field: sa.ci-chat-bot.vsphere02.token.txt
       item: ci-chat-bot
-    sa.hypershift-workload.hive.config:
-      field: sa.hypershift-workload.hive.config
+    sa.hypershift-workload.hosted-mgmt.config:
+      field: sa.hypershift-workload.hosted-mgmt.config
       item: build_farm
-    sa.hypershift-workload.hive.token.txt:
-      field: sa.hypershift-workload.hive.token.txt
+    sa.hypershift-workload.hosted-mgmt.token.txt:
+      field: sa.hypershift-workload.hosted-mgmt.token.txt
       item: build_farm
   to:
   - cluster: app.ci
@@ -3216,11 +3172,11 @@ secret_configs:
     sa.github-ldap-user-group-creator.build10.token.txt:
       field: sa.github-ldap-user-group-creator.build10.token.txt
       item: build_farm
-    sa.github-ldap-user-group-creator.hive.config:
-      field: sa.github-ldap-user-group-creator.hive.config
+    sa.github-ldap-user-group-creator.hosted-mgmt.config:
+      field: sa.github-ldap-user-group-creator.hosted-mgmt.config
       item: build_farm
-    sa.github-ldap-user-group-creator.hive.token.txt:
-      field: sa.github-ldap-user-group-creator.hive.token.txt
+    sa.github-ldap-user-group-creator.hosted-mgmt.token.txt:
+      field: sa.github-ldap-user-group-creator.hosted-mgmt.token.txt
       item: build_farm
     sa.github-ldap-user-group-creator.vsphere02.config:
       field: sa.github-ldap-user-group-creator.vsphere02.config
@@ -3388,14 +3344,6 @@ secret_configs:
     name: slack-credentials-dptp-bot-alpha
     namespace: ci
 - from:
-    password:
-      field: password
-      item: jira-credentials-dptp-bot
-  to:
-  - cluster: app.ci
-    name: jira-credentials-dptp-bot
-    namespace: ci
-- from:
     token:
       field: token
       item: jira-token-dptp-bot
@@ -3436,20 +3384,6 @@ secret_configs:
   to:
   - cluster: app.ci
     name: registry-push-credentials-ci-images-mirror
-    namespace: ci
-    type: kubernetes.io/dockerconfigjson
-- from:
-    .dockerconfigjson:
-      dockerconfigJSON:
-      - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
-        item: build_farm
-        registry_url: registry.ci.openshift.org
-      - auth_field: auth
-        item: brew.registry.redhat.io-pull-secret
-        registry_url: brew.registry.redhat.io
-  to:
-  - cluster: app.ci
-    name: mirror-brew-redhat-io-to-ci-central-registry-credentials
     namespace: ci
     type: kubernetes.io/dockerconfigjson
 - from:
@@ -3838,16 +3772,19 @@ secret_configs:
     name: dpcr-secret
     namespace: dex
 - from:
-    hive-id:
-      field: hive-id
+    hosted-mgmt-id:
+      field: hosted-mgmt-id
       item: dex
-    hive-secret:
-      field: hive-secret
+    hosted-mgmt-secret:
+      field: hosted-mgmt-secret
       item: dex
   to:
   - cluster: app.ci
-    name: hive-secret
+    name: hosted-mgmt-secret
     namespace: dex
+  - cluster: app.ci
+    name: hosted-mgmt-dex-oidc
+    namespace: ci
 - from:
     art-id:
       field: art-id
@@ -3892,6 +3829,14 @@ secret_configs:
       item: dex
   to:
   - cluster: build10
+    name: dex-rh-sso
+    namespace: openshift-config
+- from:
+    clientSecret:
+      field: hosted-mgmt-secret
+      item: dex
+  to:
+  - cluster: hosted-mgmt
     name: dex-rh-sso
     namespace: openshift-config
 - from:
@@ -4001,7 +3946,7 @@ secret_configs:
         item: registry.redhat.io-pull-secret
         registry_url: registry.redhat.io
   to:
-  - cluster: hive
+  - cluster: hosted-mgmt
     name: pull-secret
     namespace: ci-cluster-pool
     type: kubernetes.io/dockerconfigjson
@@ -4013,10 +3958,10 @@ secret_configs:
       field: aws_secret_access_key
       item: openshift-ci-pools-hive
   to:
-  - cluster: hive
+  - cluster: hosted-mgmt
     name: hive-aws-credentials
     namespace: ci-cluster-pool
-  - cluster: hive
+  - cluster: hosted-mgmt
     name: hive-aws-credentials
     namespace: fake-cluster-pool
 - from:
@@ -4146,11 +4091,11 @@ secret_configs:
     sa.cluster-display.build10.token.txt:
       field: sa.cluster-display.build10.token.txt
       item: build_farm
-    sa.cluster-display.hive.config:
-      field: sa.cluster-display.hive.config
+    sa.cluster-display.hosted-mgmt.config:
+      field: sa.cluster-display.hosted-mgmt.config
       item: build_farm
-    sa.cluster-display.hive.token.txt:
-      field: sa.cluster-display.hive.token.txt
+    sa.cluster-display.hosted-mgmt.token.txt:
+      field: sa.cluster-display.hosted-mgmt.token.txt
       item: build_farm
     sa.cluster-display.vsphere02.config:
       field: sa.cluster-display.vsphere02.config
@@ -4419,6 +4364,45 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-powervs-4
+    namespace: ci
+- from:
+    insights-live.yaml:
+      field: insights-live.yaml
+      item: insights-ci-account
+    ops-mirror.pem:
+      field: cert-key.pem
+      item: mirror.openshift.com
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+    ssh-privatekey:
+      field: ssh-privatekey
+      item: jenkins-ci-iam
+    ssh-publickey:
+      field: ssh-publickey
+      item: jenkins-ci-iam
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-powervs-5
     namespace: ci
 - from:
     pull-secret:
@@ -4868,8 +4852,8 @@ secret_configs:
     OPENSHIFT_MONITORING_CI_TOKEN:
       field: sa.ci-monitoring.app.ci.token.txt
       item: openshift-monitoring-credentials
-    OPENSHIFT_MONITORING_CI_TOKEN_ON_HIVE:
-      field: sa.ci-monitoring.hive.token.txt
+    OPENSHIFT_MONITORING_CI_TOKEN_ON_HOSTED_MGMT:
+      field: sa.ci-monitoring.hosted-mgmt.token.txt
       item: openshift-monitoring-credentials
     PROMETHEUS_USER_WORKLOAD_TOKEN:
       field: sa.prometheus-user-workload.app.ci.token.txt
@@ -5442,6 +5426,80 @@ secret_configs:
   - cluster: app.ci
     name: qci-pull-through-cache-credentials
     namespace: ci
+- from:
+    bucket:
+      field: bucket
+      item: hypershift-oidc
+    credentials:
+      field: credentials
+      item: hypershift-oidc
+    region:
+      field: region
+      item: hypershift-oidc
+  to:
+  - cluster: hosted-mgmt
+    name: hypershift-operator-oidc-provider-s3-credentials
+    namespace: hypershift
+- from:
+    .dockerconfigjson:
+      field: .dockerconfigjson
+      item: hive-global-pull-secret
+  to:
+  - cluster: hosted-mgmt
+    name: global-pull-secret
+    namespace: hive
+- from:
+    aws_access_key_id:
+      field: aws_access_key_id
+      item: openshift-ci-audit-credentials
+    aws_secret_access_key:
+      field: aws_secret_access_key
+      item: openshift-ci-audit-credentials
+  to:
+  - cluster_groups:
+    - managed_clusters
+    name: cloudwatch-receiver-token
+    namespace: rh-corp-logging
+- from:
+    access_key_id:
+      field: access_key_id
+      item: net-observ-loki-build10-credentials
+    access_key_secret:
+      field: access_key_secret
+      item: net-observ-loki-build10-credentials
+    bucketnames:
+      field: bucketnames
+      item: net-observ-loki-build10-credentials
+    endpoint:
+      field: endpoint
+      item: net-observ-loki-build10-credentials
+    region:
+      field: region
+      item: net-observ-loki-build10-credentials
+  to:
+  - cluster: build10
+    name: loki-s3
+    namespace: netobserv
+- from:
+    access_key_id:
+      field: access_key_id
+      item: net-observ-loki-build01-credentials
+    access_key_secret:
+      field: access_key_secret
+      item: net-observ-loki-build01-credentials
+    bucketnames:
+      field: bucketnames
+      item: net-observ-loki-build01-credentials
+    endpoint:
+      field: endpoint
+      item: net-observ-loki-build01-credentials
+    region:
+      field: region
+      item: net-observ-loki-build01-credentials
+  to:
+  - cluster: build01
+    name: loki-s3
+    namespace: netobserv
 user_secrets_target_clusters:
 - app.ci
 - build01
@@ -5451,6 +5509,6 @@ user_secrets_target_clusters:
 - build05
 - build09
 - build10
-- hive
+- hosted-mgmt
 - vsphere02
 vault_dptp_prefix: dptp

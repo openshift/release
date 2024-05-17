@@ -18,6 +18,27 @@ log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
 }
 
+# Record Cluster Configurations
+cluster_config_file="${SHARED_DIR}/cluster-config"
+function record_cluster() {
+  if [ $# -eq 2 ]; then
+    location="."
+    key=$1
+    value=$2
+  else
+    location=".$1"
+    key=$2
+    value=$3
+  fi
+
+  payload=$(cat $cluster_config_file)
+  if [[ "$value" == "true" ]] || [[ "$value" == "false" ]]; then
+    echo $payload | jq "$location += {\"$key\":$value}" > $cluster_config_file
+  else
+    echo $payload | jq "$location += {\"$key\":\"$value\"}" > $cluster_config_file
+  fi
+}
+
 # Configure aws
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 if [[ "$HOSTED_CP" == "true" ]] && [[ ! -z "$REGION" ]]; then
@@ -33,14 +54,25 @@ else
   exit 1
 fi
 
+read_profile_file() {
+  local file="${1}"
+  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/${file}"
+  fi
+}
+
 # Log in
-ROSA_VERSION=$(rosa version)
-ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+ROSA_TOKEN=$(read_profile_file "ocm-token")
+if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
+  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+elif [[ -n "${ROSA_TOKEN}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token"
   rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
 else
-  echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
+  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
   exit 1
 fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
@@ -118,31 +150,41 @@ log "Waiting for cluster ready..."
 FAILED_INSTALL="no"
 cluster_info_json=$(mktemp)
 start_time=$(date +"%s")
+dyn_start_time=${start_time}
+CLUSTER_PREVIOUS_STATE="claim"
+record_cluster "timers" "status" "claim"
 while true; do
-  sleep 60
   rosa describe cluster -c "${CLUSTER_ID}" -o json > ${cluster_info_json}
   CLUSTER_STATE=$(cat ${cluster_info_json} | jq -r '.state')
-  echo "Cluster state: ${CLUSTER_STATE}"
-  if [[ "${CLUSTER_STATE}" == "ready" ]]; then
-    log "Cluster is reported as ready"
-    break
-  fi
-  if (( $(date +"%s") - $start_time >= $CLUSTER_TIMEOUT )); then
-    log "error: Timed out while waiting for cluster to be ready"
-    exit 1
-  fi
-
-  # Adding ingress role to trust policy
-  if [[ "${ENABLE_SHARED_VPC}" == "yes" ]] && [[ "${BYO_OIDC}" == "false" ]] && [[ "${CLUSTER_STATE}" == "waiting" ]]; then
-    post_shared_vpc_auto ${cluster_info_json}
-  fi
-
-  if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" && "${CLUSTER_STATE}" != "waiting" && "${CLUSTER_STATE}" != "validating" ]]; then  
-    log "error: Cluster reported invalid state: ${CLUSTER_STATE}"
+  log "Cluster state: ${CLUSTER_STATE}"
+  current_time=$(date +"%s")
+  if [[ "${CLUSTER_STATE}" == "error" ]] || (( "${current_time}" - "${start_time}" >= "${CLUSTER_TIMEOUT}" )); then
+    record_cluster "timers" "status" "${CLUSTER_STATE}"
     FAILED_INSTALL="yes"
     break
   fi
+  if [[ "${CLUSTER_STATE}" != "${CLUSTER_PREVIOUS_STATE}" ]] ; then
+    record_cluster "timers" "status" "${CLUSTER_STATE}"
+    record_cluster "timers.install" "${CLUSTER_PREVIOUS_STATE}" $(( "${current_time}" - "${dyn_start_time}" ))
+    dyn_start_time=${current_time}
+    CLUSTER_PREVIOUS_STATE=${CLUSTER_STATE}
+    if [[ "${CLUSTER_STATE}" == "ready" ]]; then
+      break
+    fi
+  else
+      if [[ ${CLUSTER_STATE} == "installing" ]]; then
+      	sleep 60
+      else
+        sleep 1
+      fi
+  fi
+  if [[ "${CLUSTER_STATE}" == "waiting" ]] && [[ "${ENABLE_SHARED_VPC}" == "yes" ]] && [[ "${BYO_OIDC}" == "false" ]]; then
+    # Adding ingress role to trust policy
+    post_shared_vpc_auto ${cluster_info_json}
+  fi
 done
+cat $cluster_config_file | jq -r '.timers'
+
 if [[ "$FAILED_INSTALL" == "yes" ]]; then
   rosa logs install -c ${CLUSTER_ID} > "${ARTIFACT_DIR}/.install.log"
   exit 1

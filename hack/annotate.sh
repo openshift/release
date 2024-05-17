@@ -88,6 +88,7 @@ for release in ${releases[@]}; do
 	annotate "ocp-ppc64le" "${release}-art-latest-ppc64le" "ocp-${release}-ppc64le.json"
 	annotate "ocp-arm64" "${release}-art-latest-arm64" "ocp-${release}-arm64.json"
 	annotate "ocp-multi" "${release}-art-latest-multi" "ocp-${release}-multi.json"
+	annotate "ocp-multi-2" "${release}-art-latest-multi-2" "ocp-${release}-multi-2.json"
 	annotate "ocp-priv" "${release}-art-latest-priv" "ocp-${release}.json" "private"
 	annotate "ocp-s390x-priv" "${release}-art-latest-s390x-priv" "ocp-${release}-s390x.json" "private"
 	annotate "ocp-ppc64le-priv" "${release}-art-latest-ppc64le-priv" "ocp-${release}-ppc64le.json" "private"
@@ -103,6 +104,7 @@ annotate "ocp-s390x" "release-s390x" "ocp-4.y-stable-s390x.json"
 annotate "ocp-ppc64le" "release-ppc64le" "ocp-4.y-stable-ppc64le.json"
 annotate "ocp-arm64" "release-arm64" "ocp-4.y-stable-arm64.json"
 annotate "ocp-multi" "release-multi" "ocp-4.y-stable-multi.json"
+annotate "ocp-multi-2" "release-multi-2" "ocp-4.y-stable-multi-2.json"
 
 # 4-dev-preview release streams
 annotate "ocp" "4-dev-preview" "ocp-4-dev-preview.json"

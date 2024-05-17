@@ -379,16 +379,22 @@ postsubmits:
     labels:
       ci.openshift.io/role: infra
     max_concurrency: 1
-    name: branch-ci-openshift-release-master-hive-apply
+    name: branch-ci-openshift-release-master-hosted-mgmt-apply
     spec:
       containers:
       - args:
-        - --config-dir=clusters/hive
+        - --config-dir=clusters/hosted-mgmt
         - --confirm=true
         - --as=
         - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
+        env:
+        - name: hosted_mgmt_id
+          valueFrom:
+            secretKeyRef:
+              key: hosted-mgmt-id
+              name: hosted-mgmt-dex-oidc
         image: registry.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""
@@ -404,7 +410,7 @@ postsubmits:
       - name: build-farm-credentials
         secret:
           items:
-          - key: sa.config-updater.hive.config
+          - key: sa.config-updater.hosted-mgmt.config
             path: kubeconfig
           secretName: config-updater
   - agent: kubernetes
@@ -431,7 +437,7 @@ postsubmits:
         - --debug
         command:
         - /ko-app/label_sync
-        image: gcr.io/k8s-prow/label_sync:v20240327-a58d781f5a
+        image: gcr.io/k8s-prow/label_sync:v20240513-a9bd71bf01
         imagePullPolicy: Always
         name: ""
         resources:

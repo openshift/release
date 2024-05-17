@@ -4,6 +4,25 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function wait_for_sriov_network_node_state() {
+    # Wait up to 5 minutes for SriovNetworkNodeState to be succeeded
+    for _ in $(seq 1 10); do
+        NODES_READY=$(oc get SriovNetworkNodeState --no-headers -n openshift-sriov-network-operator -o jsonpath='{.items[*].status.syncStatus}' | grep Succeeded | wc -l || true)
+        if [ "${NODES_READY}" == "1" ]; then
+            FOUND_NODE=1
+            break
+        fi
+        echo "Waiting for SriovNetworkNodeState to be succeeded"
+        sleep 30
+    done
+
+    if [ ! -n "${FOUND_NODE:-}" ] ; then
+        echo "SriovNetworkNodeState is not succeeded after 5 minutes"
+        oc get SriovNetworkNodeState -n openshift-sriov-network-operator -o yaml
+        exit 1
+    fi
+}
+
 wait_for_sriov_pods() {
     # Wait up to 15 minutes for SNO to be installed
     for _ in $(seq 1 15); do
@@ -146,6 +165,8 @@ else
     SRIOV_DEVICE_TYPE="vfio-pci"
     IS_RDMA="false"
 fi
+
+wait_for_sriov_network_node_state
 
 echo "Print SriovNetworkNodeState before creating SriovNetworkNodePolicy"
 oc get SriovNetworkNodeState -n openshift-sriov-network-operator -o yaml
