@@ -135,8 +135,6 @@ spec: {}
 EOF
 sleep 5
 
-oc patch mce multiclusterengine-sample --type=merge -p '{"spec":{"overrides":{"components":[{"name":"hive","enabled": false}]}}}'
-echo "Disable HIVE component in MCE"
 oc patch mce multiclusterengine-sample --type=merge -p '{"spec":{"overrides":{"components":[{"name":"hypershift-preview","enabled": true}]}}}'
 echo "wait for mce to Available"
 oc wait --timeout=20m --for=condition=Available MultiClusterEngine/multiclusterengine-sample
@@ -216,3 +214,5 @@ oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_icsp.yaml && yq-go r /tmp/mgm
 echo "wait for addon to Available"
 oc wait --timeout=5m --for=condition=Available -n local-cluster ManagedClusterAddOn/hypershift-addon
 oc wait --timeout=5m --for=condition=Degraded=False -n local-cluster ManagedClusterAddOn/hypershift-addon
+echo "Disable HIVE component in MCE"
+oc patch mce multiclusterengine-sample --type=merge -p '{"spec":{"overrides":{"components":[{"name":"hive","enabled": false}]}}}'
