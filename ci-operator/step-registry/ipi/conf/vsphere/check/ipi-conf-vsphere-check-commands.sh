@@ -111,11 +111,12 @@ else
 fi
 
 # create a lease for each pool
-for POOL in $pools; do
+for POOL in ${pools[@]}; do
   log "creating lease for pool ${POOL}"
   requiredPool=""
   if [ $POOL != "unspecified" ]; then 
-    requiredPool="  required-pool: $POOL"
+    requiredPool="required-pool: $POOL"
+    log "setting required pool ${requiredPool}"
   fi
   echo "apiVersion: vspherecapacitymanager.splat.io/v1
 kind: Lease
