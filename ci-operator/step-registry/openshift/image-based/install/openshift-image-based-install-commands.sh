@@ -45,7 +45,8 @@ export IBI_VM_NAME="${TARGET_VM_NAME}"
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
-export PULL_SECRET=\$(<${remote_workdir}/.pull_secret.json)
+export REGISTRY_AUTH_FILE='${remote_workdir}/.pull_secret.json'
+export PULL_SECRET=\$(<\$REGISTRY_AUTH_FILE)
 export BACKUP_SECRET=\$(<${remote_workdir}/.backup_secret.json)
 
 sudo dnf -y install runc
