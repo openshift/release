@@ -6,7 +6,7 @@ cd /tmp || exit
 
 export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME NAME_SPACE TAG_NAME
 
-GITHUB_ORG_NAME="janus-idp"
+GITHUB_ORG_NAME="ascerra"
 GITHUB_REPOSITORY_NAME="backstage-showcase"
 NAME_SPACE="showcase-ci-nightly"
 TAG_NAME="next"
@@ -15,6 +15,8 @@ TAG_NAME="next"
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd backstage-showcase || exit
 
-sleep 1800
+bash ./.ibm/pipelines/openshift-ci-tests.sh
 
-#bash ./.ibm/pipelines/openshift-ci-tests.sh
+echo "done with install now sleeping"
+
+sleep 1800
