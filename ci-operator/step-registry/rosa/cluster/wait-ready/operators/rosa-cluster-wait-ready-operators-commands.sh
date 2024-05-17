@@ -43,4 +43,4 @@ else
   echo "All cluster operators are done progressing."
 fi
 
-sleep 28800
+sleep 30000
