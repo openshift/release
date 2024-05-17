@@ -1,0 +1,21 @@
+workflow:
+  as: hypershift-mce-aws-heterogeneous-conformance
+  documentation: |-
+    The HyperShift mce aws heterogeneous conformance workflow executes tests against a new ephemeral
+  steps:
+    env:
+      ZONES_COUNT: "3"
+      TEST_SKIPS: etcd leader changes are not excessive
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "1"
+    post:
+    - ref: wait
+    - ref: hypershift-mce-dump
+    - chain: hypershift-mce-aws-destroy
+    - chain: ipi-aws-post
+    test:
+    - chain: hypershift-conformance
+    pre:
+    - chain: ipi-aws-pre
+    - ref: ipi-install-heterogeneous
+    - ref: hypershift-mce-install

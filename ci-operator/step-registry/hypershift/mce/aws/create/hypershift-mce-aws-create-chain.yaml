@@ -14,11 +14,14 @@ chain:
           default: "origin-ci-int-aws.dev.rhcloud.com"
           documentation: "The cluster's FQDN will be a subdomain of the base domain."
         - name: HYPERSHIFT_AWS_REGION
-          default: "us-east-1"
+          default: ""
           documentation: "The AWS region of the cluster."
         - name: ENABLE_ICSP
           default: "false"
           documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
+        - name: EXTRA_ARGS
+          default: ""
+          documentation: "Extra args to pass to the create cluster aws command"
       commands: |-
         set -exuo pipefail
 
@@ -48,13 +51,15 @@ chain:
           oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
           PULL_SECRET_PATH="/tmp/.dockerconfigjson"
         fi
+        
+        REGION=${HYPERSHIFT_AWS_REGION:-$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')}        
       
         /tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} \
-        --name ${CLUSTER_NAME} \
+        ${EXTRA_ARGS} --name ${CLUSTER_NAME} \
         --infra-id ${CLUSTER_NAME} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
         --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
-        --region ${HYPERSHIFT_AWS_REGION} \
+        --region ${REGION} \
         --pull-secret ${PULL_SECRET_PATH} \
         --aws-creds ${CLUSTER_PROFILE_DIR}/.awscred \
         --namespace local-cluster \
