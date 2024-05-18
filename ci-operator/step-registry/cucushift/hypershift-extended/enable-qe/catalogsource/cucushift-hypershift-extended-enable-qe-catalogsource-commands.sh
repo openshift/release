@@ -46,6 +46,13 @@ function create_catalog_sources() {
     ocp_version=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
     index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
 
+    if [ "${DISCONNECTED}" = "true" ]; then
+        MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
+        # the proxy registry port 6001 for quay.io
+        MIRROR_PROXY_REGISTRY_QUAY=`echo "${MIRROR_REGISTRY_HOST}" | sed 's/5000/6001/g' `
+        index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
+    fi
+
     echo "create QE catalogsource: qe-app-registry"
     cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1

@@ -62,10 +62,14 @@ build_root:
     tag: golang-1.18
 releases:
   latest:
-    release:
+    prerelease:
       architecture: amd64
-      channel: candidate
-      version: 4.16.0-ec.0
+      product: ocp
+      relative: 1
+      version_bounds:
+        lower: 4.16.0-0
+        stream: 4-dev-preview
+        upper: 4.17.0-0
   target:
     prerelease:
       architecture: amd64
@@ -89,19 +93,7 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
     test:
-    - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_TARGET},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/upgrade-edge
-      dependencies:
-      - env: RELEASE_IMAGE_TARGET
-        name: release:target
-      - env: RELEASE_IMAGE_LATEST
-        name: release:latest
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-sanity-rollback
     workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
 zz_generated_metadata:
   branch: release-4.16

@@ -102,8 +102,10 @@ data:
 EOF
 
 # Creating AgentServiceConfig
+CLUSTER_VERSION=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
+OS_IMAGES=$(jq --arg CLUSTER_VERSION "${CLUSTER_VERSION}" '[.[] | select(.openshift_version == $CLUSTER_VERSION)]' "${SHARED_DIR}/default_os_images.json")
 echo "$(date) Creating AgentServiceConfig"
-envsubst <<"EOF" | oc apply -f -
+cat <<EOF | oc apply -f -
 apiVersion: agent-install.openshift.io/v1beta1
 kind: AgentServiceConfig
 metadata:
@@ -124,10 +126,9 @@ spec:
       requests:
         storage: 10Gi
   osImages:
-    - openshiftVersion: "${OCP_VERSION}"
-      version: "${OCP_RELEASE_VERSION}"
-      url: "${ISO_URL}"
-      rootFSUrl: "${ROOT_FS_URL}"
+    - openshiftVersion: "${CLUSTER_VERSION}"
+      version: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "s390x").version')
+      url: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "s390x").url')
       cpuArchitecture: s390x
 EOF
 

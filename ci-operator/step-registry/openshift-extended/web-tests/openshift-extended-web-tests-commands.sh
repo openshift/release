@@ -41,6 +41,9 @@ else
     # WRS specific testing
     echo 'WRS testing'
     ./console-test-frontend.sh --tags @wrs || true
+  elif [[ $E2E_TEST_TYPE == 'ui_destructive' ]]; then
+    echo 'Running destructive tests'
+    ./console-test-frontend.sh --tags @destructive || true
   else
     echo "only run smoke scenarios"
     ./console-test-frontend.sh --tags @smoke || true

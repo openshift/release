@@ -4,6 +4,23 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function save_oidc_tokens {
+    echo "Saving oidc tokens back to SHARED_DIR"
+    cp "$token_cache_dir"/* "$SHARED_DIR"/oc-oidc-token
+    ls "$token_cache_dir" > "$SHARED_DIR"/oc-oidc-token-filename
+}
+
+function exit_trap {
+    echo "Exit trap triggered"
+    date '+%s' > "${SHARED_DIR}/TEST_TIME_TEST_END" || :
+    if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
+        save_oidc_tokens
+    fi
+}
+
+trap 'exit_trap' EXIT
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
@@ -18,12 +35,21 @@ then
     export GUEST_KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 fi
 
+# restore external oidc cache dir for oc
+if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
+    echo "Restoring external OIDC cache dir for oc"
+    export KUBECACHEDIR
+    KUBECACHEDIR="/tmp/output/oc-oidc"
+    token_cache_dir="$KUBECACHEDIR/oc"
+    mkdir -p "$token_cache_dir"
+    cat "$SHARED_DIR/oc-oidc-token" > "$token_cache_dir/$(cat "$SHARED_DIR/oc-oidc-token-filename")"
+    oc whoami
+fi
+
 # although we set this env var, but it does not exist if the CLUSTER_TYPE is not gcp.
 # so, currently some cases need to access gcp service whether the cluster_type is gcp or not
 # and they will fail, like some cvo cases, because /var/run/secrets/ci.openshift.io/cluster-profile/gce.json does not exist.
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
-
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 # prepare for the future usage on the kubeconfig generation of different workflow
 test -n "${KUBECONFIG:-}" && echo "${KUBECONFIG}" || echo "no KUBECONFIG is defined"
@@ -98,7 +124,7 @@ then
     export CLUSTER_ID
 fi
 
-# configure enviroment for different cluster
+# configure environment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
 gcp)
@@ -188,8 +214,8 @@ cd /tmp/output
 
 if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     pushd /tmp
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
-    tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
+    tar -xzf google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
     export PATH=$PATH:/tmp/google-cloud-sdk/bin
     mkdir -p gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig
@@ -199,7 +225,6 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
 fi
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
-trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
 # check if the cluster is ready
 oc version --client

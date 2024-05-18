@@ -80,7 +80,7 @@ function setup_upi_workspace(){
   cd "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir || true
   curl -sL https://raw.githubusercontent.com/ocp-power-automation/openshift-install-power/"${UPI_AUTOMATION_VERSION}"/openshift-install-powervs -o ./openshift-install-powervs
   chmod +x ./openshift-install-powervs
-  ./openshift-install-powervs setup
+  ./openshift-install-powervs setup -ignore-os-checks
 }
 
 function clone_upi_artifacts(){
@@ -118,7 +118,7 @@ function clone_upi_artifacts(){
 
 function destroy_upi_powervs_cluster() {
   cd "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/ || true
-  ./openshift-install-powervs destroy -var-file var-mac-upi.tfvars -force-destroy || true
+  ./openshift-install-powervs destroy -ignore-os-checks -var-file var-mac-upi.tfvars -force-destroy || true
 }
 
 function cleanup_ibmcloud_powervs() {

@@ -65,6 +65,7 @@ fi
 
 # Define cluster name
 CLUSTER_NAME=""
+DOMAIN_PREFIX_SWITCH=""
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]] && [[ -e "${SHARED_DIR}/cluster-name" ]]; then
   # For Shared VPC cluster, cluster name is determined in step aws-provision-route53-private-hosted-zone
   #   as Private Hosted Zone needs to be ready before installing Shared VPC cluster
@@ -78,6 +79,25 @@ else
   fi
   subfix=$(openssl rand -hex 2)
   CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
+  # For long cluster name enabled, append a "long_name_prefix_len" chars long random string to cluster name
+  # Max possible prefix length is 9, max possible subfix length is 4, hyppen is used 2 times, random string of length "long_name_prefix_len"
+  # (9 + 4 + 2 + "long_name_prefix_len" = 54 )
+  MAX_CLUSTER_NAME_LENGTH=54
+  if [[ "$LONG_CLUSTER_NAME_ENABLED" == "true" ]]; then
+    long_name_prefix_len=$(( MAX_CLUSTER_NAME_LENGTH - $(echo -n "$CLUSTER_NAME" | wc -c) - 1 ))
+    long_name_prefix=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c $long_name_prefix_len)
+    CLUSTER_NAME="$prefix-$subfix-$long_name_prefix"
+  fi
+  
+  #set the domain prefix of length (<=15)
+  MAX_DOMAIN_PREFIX_LENGTH=15
+  if [[ "$SPECIFY_DOMAIN_PREFIX" == "true" ]]; then
+    first_char=$(head /dev/urandom | tr -dc 'a-z' | head -c 1)
+    remaining_chars=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c $((MAX_DOMAIN_PREFIX_LENGTH - 1)))
+    DOMAIN_PREFIX="$first_char$remaining_chars"
+    DOMAIN_PREFIX_SWITCH="--domain-prefix $DOMAIN_PREFIX"
+  fi
+  #else the domain prefix will be auto generated.
 fi
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
@@ -96,14 +116,27 @@ else
   exit 1
 fi
 
+read_profile_file() {
+  local file="${1}"
+  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/${file}"
+  fi
+}
+
 # Log in
-ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli"
+SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+ROSA_TOKEN=$(read_profile_file "ocm-token")
+if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
+  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+  ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+elif [[ -n "${ROSA_TOKEN}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token"
   rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
   ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
 else
-  echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
+  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
   exit 1
 fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
@@ -506,6 +539,7 @@ ${HYPERSHIFT_SWITCH} \
 --channel-group ${CHANNEL_GROUP} \
 --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
 --tags ${TAGS} \
+${DOMAIN_PREFIX_SWITCH} \
 ${ACCOUNT_ROLES_SWITCH} \
 ${EC2_METADATA_HTTP_TOKENS_SWITCH} \
 ${MULTI_AZ_SWITCH} \
