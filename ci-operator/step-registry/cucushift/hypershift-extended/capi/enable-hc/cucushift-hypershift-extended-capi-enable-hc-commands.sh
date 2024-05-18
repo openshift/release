@@ -25,11 +25,27 @@ if [[ "${ENABLE_EXTERNAL_OIDC}" == "true" ]]; then
   secret_name="${CLUSTER_NAME}-bootstrap-kubeconfig"
 fi
 
-secret=$(oc get secret -n ${namespace} ${secret_name} --ignore-not-found -ojsonpath='{.data.value}')
-if [[ -z "$secret" ]]; then
-  echo "capi kubeconfig not found, exit"
-  exit 1
-fi
+max_retries=10
+retry_delay=30
+retries=0
+secret=""
+while (( retries < max_retries )); do
+  secret=$(oc get secret -n ${namespace} ${secret_name} --ignore-not-found -ojsonpath='{.data.value}')
+  if [[ ! -z "$secret" ]]; then
+    echo "find the secret ${secret_name} in ${namespace}"
+    break
+  fi
+
+  retries=$(( retries + 1 ))
+  if (( retries < max_retries )); then
+    echo "Retrying in $retry_delay seconds..."
+    sleep $retry_delay
+  else
+    oc get secret -n ${namespace}
+    echo "capi kubeconfig not found, exit"
+    exit 1
+  fi
+done
 
 if [[ !  -f "${SHARED_DIR}/mgmt_kubeconfig" ]] ; then
   mv $KUBECONFIG "${SHARED_DIR}/mgmt_kubeconfig"

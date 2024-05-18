@@ -7,7 +7,7 @@ export AWS_REGION=${REGION}
 export AWS_PAGER=""
 
 # debug only
-aws s3 cp s3://heli-test-05/kubeconfig  ${SHARED_DIR}/kubeconfig
+aws s3 cp s3://heli-test/kubeconfig  ${SHARED_DIR}/kubeconfig
 
 # download clusterctl and clusterawsadm
 mkdir -p /tmp/bin
