@@ -220,11 +220,11 @@ ${ADDITIONAL_SECURITY_GROUPS_YAML}"
     fi
 
     if [[ -n "${CLUSTER_SECTOR}" ]]; then
-      psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('ready')" | jq -r '.items[].provision_shard_reference.id')
+      psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${REGION}' and status in ('ready')" | jq -r '.items[].provision_shard_reference.id')
       if [[ -z "$psList" ]]; then
         echo "no ready provision shard found, trying to find maintenance status provision shard"
         # try to find maintenance mode SC, currently osdfm api doesn't support status in ('ready', 'maintenance') query.
-        psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('maintenance')" | jq -r '.items[].provision_shard_reference.id')
+        psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${REGION}' and status in ('maintenance')" | jq -r '.items[].provision_shard_reference.id')
         if [[ -z "$psList" ]]; then
           echo "No available provision shard!"
           exit 1
@@ -442,6 +442,29 @@ if [[ "${INFRA_ID}" == "null" ]]; then
   INFRA_ID=$CLUSTER_NAME
 fi
 echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"
+
+# now the rosa steps are bound to this config file in the SHARED_DIR, generate it to reuse those steps
+cluster_config_file="${SHARED_DIR}/cluster-config"
+cat > ${cluster_config_file} << EOF
+{
+  "name": "${CLUSTER_NAME}",
+  "sts": "true",
+  "hypershift": "true",
+  "region": "${REGION}",
+  "version": {
+    "channel_group": "stable",
+    "raw_id": "${OPENSHIFT_VERSION}",
+    "major_version": "$(echo ${OPENSHIFT_VERSION} | awk -F. '{print $1"."$2}')"
+  },
+  "tags": "${TAGS}",
+  "disable_scp_checks": "true",
+  "disable_workload_monitoring": "false",
+  "etcd_encryption": ${ETCD_ENCRYPTION},
+  "enable_customer_managed_key": "false",
+  "fips": "false",
+  "private": "${ENDPOINT_ACCESS}"
+}
+EOF
 
 # do not check worker node here
 # wait for cluster machinepool ready
