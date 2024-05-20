@@ -9,6 +9,25 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+function log() {
+  echo "$(date -u --rfc-3339=seconds) - ${1}"
+}
+
+# getNetworkParamters sets variables associated with the network at the provided path
+function getNetworkParamters() {  
+  log "getting network parameters for $1"
+
+  mask=$(cat $1 | jq -r .spec.netmask)
+  gateway=$(cat $1 | jq -r .spec.gateway)
+  machine_network_cidr=$(cat $1 | jq -r .spec.machineNetworkCidr)
+  dns_server=${gateway}
+  octet1=$(echo "${gateway}" | cut -d. -f1)
+  octet2=$(echo "${gateway}" | cut -d. -f2)
+  octet3=$(echo "${gateway}" | cut -d. -f3)
+  octet4=$(echo "${gateway}" | cut -d. -f4)
+  ip_address_count=$(cat $1 | jq -r .spec.ipAddressCount)
+}
+
 # notes: jcallen: we need vlanid and primaryrouterhostname
 declare vlanid
 declare primaryrouterhostname
@@ -17,30 +36,23 @@ declare vsphere_portgroup
 declare dns_server
 declare vsphere_datastore
 declare vsphere_resource_pool
+declare NETWORK_PATH
 source "${SHARED_DIR}/vsphere_context.sh"
-
 
 cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
-echo "$(date -u --rfc-3339=seconds) - Setting up external load balancer"
+log "Setting up external load balancer"
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
-if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
-  exit 1
-fi
+# derive load balancer host network details and VIP
+getNetworkParamters ${NETWORK_PATH}
 
-# ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
-
-gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
-mask=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].mask' "${SUBNETS_CONFIG}")
-external_lb_ip_address=$(jq -r --argjson N 2 --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
-dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
-
-jq -r --argjson N 2 --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/vips.txt
-jq -r --argjson N 2 --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/vips.txt
-jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}" >>"${SHARED_DIR}"/machinecidr.txt
-
+lb_mask=${mask}
+lb_gateway=${gateway}
+lb_dns=${gateway}
+vip=${octet1}.${octet2}.${octet3}.$(($octet4+1))
+echo ${vip} > "${SHARED_DIR}"/vips.txt
+echo ${vip} >> "${SHARED_DIR}"/vips.txt
+echo ${machine_network_cidr} > "${SHARED_DIR}"/machinecidr.txt
 
 echo "Reserved the following IP addresses..."
 cat "${SHARED_DIR}"/vips.txt
@@ -58,9 +70,9 @@ ssh_pub_key=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 vm_template="${OVA_URL##*/}"
 
 # Troubleshooting UPI OVA import issue
-echo "$(date -u --rfc-3339=seconds) - vm_template: ${vm_template}"
+log "vm_template: ${vm_template}"
 
-echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
+log "Configuring govc exports..."
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 
@@ -77,10 +89,10 @@ cat >/tmp/rhcos.json <<EOF
 EOF
 
 
-echo "$(date -u --rfc-3339=seconds) - Checking if RHCOS OVA needs to be downloaded from ${OVA_URL}..."
+log "Checking if RHCOS OVA needs to be downloaded from ${OVA_URL}..."
 
 if [[ "$(govc vm.info "${vm_template}" | wc -c)" -eq 0 ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Creating a template for the VMs from ${OVA_URL}..."
+  log "Creating a template for the VMs from ${OVA_URL}..."
   curl -L -o /tmp/rhcos.ova "${OVA_URL}"
   govc import.ova -options=/tmp/rhcos.json /tmp/rhcos.ova &
   wait "$!"
@@ -119,6 +131,7 @@ frontend router-https
   default_backend router-https
 EOF
 
+# configure endpoints for any network associated with the job
 EP_NAMES=("api-server" "machine-config-server" "router-http" "router-https")
 EP_PORTS=("6443" "22623" "80" "443")
 
@@ -132,19 +145,21 @@ backend ${EP_NAMES[$i]}
   default-server verify none inter 10s downinter 5s rise 2 fall 3 slowstart 60s maxconn 250 maxqueue 256 weight 100
 EOF
 
-  for ip in {10..127}; do
-    ipaddress=$(jq -r --argjson N "$ip" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
-    echo "   "server ${EP_NAMES[$i]}-${ip} ${ipaddress}:${EP_PORTS[$i]} check check-ssl >>$HAPROXY_PATH
-    if [[ -n "${VSPHERE_EXTRA_LEASED_RESOURCE:-}" ]]; then
-      for extra_leased_resource in ${VSPHERE_EXTRA_LEASED_RESOURCE}; do
-          extra_router=$(awk -F. '{print $1}' <(echo "${extra_leased_resource}"))
-	  extra_phydc=$(awk -F. '{print $2}' <(echo "${extra_leased_resource}"))
-	  extra_vlanid=$(awk -F. '{print $3}' <(echo "${extra_leased_resource}"))
-	  extra_primaryrouterhostname="${extra_router}.${extra_phydc}"
-	  ipaddress=$(jq -r --argjson N "$ip" --arg PRH "$extra_primaryrouterhostname" --arg VLANID "$extra_vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
-	  echo "   "server ${EP_NAMES[$i]}${extra_vlanid}-${ip} ${ipaddress}:${EP_PORTS[$i]} check check-ssl >>$HAPROXY_PATH
-      done 
+  # read shared network configuration
+  for _networkJSON in $(ls -d $SHARED_DIR/NETWORK*); do
+    if [[ _networkJSON =~ "single" ]]; then
+      continue
     fi
+
+    getNetworkParamters ${_networkJSON}
+
+    log "creating endpoints for haproxy for network ${_networkJSON}"
+    endCount=$((${ip_address_count}-2))
+    for (( i=2; i < $endCount; i++ )) do
+      ip="${octet1}.${octet2}.${octet3}.$(( ${octet4} + ${i} ))"
+      log "server ${EP_NAMES[$i]}-${ip} ${ip}:${EP_PORTS[$i]} check check-ssl"
+      echo "   "server ${EP_NAMES[$i]}-${ip} ${ip}:${EP_PORTS[$i]} check check-ssl >>$HAPROXY_PATH
+    done
   done
 done
 
@@ -200,16 +215,23 @@ curl -sSL "https://mirror2.openshift.com/pub/openshift-v4/clients/butane/latest/
 
 LB_VMNAME="${cluster_name}-lb"
 export GOVC_NETWORK="${vsphere_portgroup}"
+export GOVC_RESOURCE_POOL="${vsphere_resource_pool}"
   vsphere_portgroup_path=$(govc ls /${vsphere_datacenter}/network | grep "${vlanid}")
+  log "cloning load balancer VM"
   govc vm.clone -on=false -dc=/${vsphere_datacenter} -ds /${vsphere_datacenter}/datastore/${vsphere_datastore} -pool=${vsphere_resource_pool} -vm="${vm_template}" "${LB_VMNAME}"
+
+  log "updating network to portgroup ${GOVC_NETWORK}"
   govc vm.network.change -dc=/${vsphere_datacenter} -vm "${LB_VMNAME}" -net "${vsphere_portgroup_path}" ethernet-0
 IGN=$(cat $BUTANE_CFG | /tmp/butane -r -d /tmp | gzip | base64 -w0)
 
-IPCFG="ip=${external_lb_ip_address}::${gateway}:${mask}:lb::none nameserver=${dns_server}"
+IPCFG="ip=${vip}::${gateway}:${mask}:lb::none nameserver=${dns_server}"
 
+log "initializing extra config"
 govc vm.change -vm "${LB_VMNAME}" -e "guestinfo.afterburn.initrd.network-kargs=${IPCFG}"
 govc vm.change -vm "${LB_VMNAME}" -e guestinfo.ignition.config.data=$IGN
 govc vm.change -vm "${LB_VMNAME}" -e guestinfo.ignition.config.data.encoding=gzip+base64
+
+log "powering on load balancer VM"
 govc vm.power -on "${LB_VMNAME}"
 
 touch $SHARED_DIR/external_lb

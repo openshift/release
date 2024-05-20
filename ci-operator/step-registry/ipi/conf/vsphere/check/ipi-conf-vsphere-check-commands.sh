@@ -29,8 +29,6 @@ declare primaryrouterhostname
 declare vsphere_portgroup
 declare -a portgroup_list
 declare multizone
-
-# SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
 declare vsphere_url
 
 function log() {
@@ -107,6 +105,7 @@ metadata:
 spec:
   vcpus: 0
   memory: 0
+  requiresPool: \"${VSPHERE_BASTION_LEASED_RESOURCE}\"
   networks: 1" | oc create --kubeconfig ${SA_KUBECONFIG} -f -
 fi
 
@@ -162,11 +161,19 @@ for LEASE in $LEASES; do
   oc get leases.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig ${SA_KUBECONFIG} ${LEASE} -o json > /tmp/lease.json
   VCENTER=$(cat /tmp/lease.json | jq -r '.status.server')
   NETWORK_PATH=$(cat /tmp/lease.json | jq -r '.status.topology.networks[0]')
-  portgroup_name=$(echo $NETWORK_PATH | cut -d '/' -f 4)
-  
+  NETWORK_RESOURCE=$(cat /tmp/lease.json | jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name')
+
+  portgroup_name=$(echo $NETWORK_PATH | cut -d '/' -f 4)  
 
   bastion_leased_resource=$(cat /tmp/lease.json | jq .metadata.labels.VSPHERE_BASTION_LEASED_RESOURCE)
   extra_leased_resource=$(cat /tmp/lease.json | jq .metadata.labels.VSPHERE_EXTRA_LEASED_RESOURCE)
+
+  NETWORK_CACHE_PATH="${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json"
+  
+  if [ ! -f $NETWORK_CACHE_PATH ]; then
+    log caching network resource ${NETWORK_RESOURCE}
+    oc get networks.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig ${SA_KUBECONFIG} ${NETWORK_RESOURCE} -o json > ${NETWORK_CACHE_PATH}
+  fi
 
   if [ ${bastion_leased_resource} != "null" ]; then
     log "setting bastion portgroup ${portgroup_name} in vsphere_context.sh"  
@@ -175,7 +182,7 @@ export vsphere_bastion_portgroup="${portgroup_name}"
 EOF
 
   elif [ ${extra_leased_resource} != "null" ]; then
-    log "setting extra leased networrk ${portgroup_name} in vsphere_context.sh"  
+    log "setting extra leased network ${portgroup_name} in vsphere_context.sh"  
     cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
 export vsphere_extra_portgroup_${extra_leased_resource}="${portgroup_name}"
 EOF
@@ -270,36 +277,32 @@ done
 # # For most CI jobs, a single lease and single pool will be used. We'll initialize govc.sh and
 # # vsphere_context.sh with the first lease we find. multi-zone and multi-vcenter will need to
 # # parse topology, credentials, etc from $SHARED_DIR.
-# oc get leases.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig ${SA_KUBECONFIG} ${LEASES[0]} -o json > /tmp/lease.json
+
+cp /tmp/lease.json $SHARED_DIR/LEASE_single.json
+NETWORK_RESOURCE=$(cat /tmp/lease.json | jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name')
+cp "${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json" $SHARED_DIR/NETWORK_single.json
 
 cat /tmp/lease.json | jq -r '.status.envVars' > /tmp/envvars
 source /tmp/envvars
 
+if [ $IPI -eq 0 ]; then
+  resource_pool=${vsphere_cluster}/Resources/${NAMESPACE}-${UNIQUE_HASH}
+else
+  resource_pool=${vsphere_cluster}/Resources/ipi-ci-clusters
+fi
+
 log "Creating govc.sh file..."
 cat >>"${SHARED_DIR}/govc.sh" <<EOF
-export GOVC_URL="${vsphere_url}"
-export GOVC_USERNAME="${vsphere_user}"
-export GOVC_PASSWORD="${vsphere_password}"
+$(cat /tmp/envvars)
+export LEASE_PATH=${SHARED_DIR}/LEASE_single.json
+export NETWORK_PATH=${SHARED_DIR}/NETWORK_single.json
 export GOVC_INSECURE=1
-export GOVC_DATACENTER="${vsphere_datacenter}"
-export GOVC_DATASTORE="${vsphere_datastore}"
-export GOVC_RESOURCE_POOL=${vsphere_resource_pool}
+export vsphere_resource_pool=${resource_pool}
+export GOVC_RESOURCE_POOL=${resource_pool}
 EOF
 
 log "Creating vsphere_context.sh file..."
-cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
-export vsphere_url="${vsphere_url}"
-export vsphere_cluster="${vsphere_cluster}"
-export vsphere_resource_pool="${vsphere_resource_pool}"
-export dns_server="${gateway}"
-export cloud_where_run="IBM"
-export vsphere_datacenter="${vsphere_datacenter}"
-export vsphere_datastore="${vsphere_datastore}"
-export vsphere_portgroup="${vsphere_portgroup}"
-export vlanid="${vlanid:-unset}"
-export phydc="${phydc:-unset}"
-export primaryrouterhostname="${primaryrouterhostname:-unset}"
-EOF
+cp "${SHARED_DIR}/govc.sh" "${SHARED_DIR}/vsphere_context.sh"
 
 # 1. Get the OpaqueNetwork (NSX-T port group) which is listed in LEASED_RESOURCE.
 # 2. Select the virtual machines attached to network
@@ -311,23 +314,23 @@ EOF
 # randomly delete may fail, this shouldn't cause an immediate issue
 # but should eventually be cleaned up.
 
-set +e
-for LEASE in $LEASES; do
-  cat $SHARED_DIR/LEASE_$LEASE.json | jq -r '.status.envVars' > /tmp/envvars
-  source /tmp/envvars
+# set +e
+# for LEASE in $LEASES; do
+#   cat $SHARED_DIR/LEASE_$LEASE.json | jq -r '.status.envVars' > /tmp/envvars
+#   source /tmp/envvars
 
-  export GOVC_USERNAME="${pool_usernames[$vsphere_url]}"
-  export GOVC_PASSWORD="${pool_passwords[$vsphere_url]}"
-  export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
+#   export GOVC_USERNAME="${pool_usernames[$vsphere_url]}"
+#   export GOVC_PASSWORD="${pool_passwords[$vsphere_url]}"
+#   export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 
-  echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${vsphere_portgroup} in DC ${vsphere_datacenter} and destroy"
-  govc ls -json "${vsphere_portgroup}" |
-  jq '.elements[]?.Object.Vm[]?.Value' |
-  xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |
-  jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |
-  xargs -I {} --no-run-if-empty govc vm.destroy {}
-done
-set -e
+#   echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${vsphere_portgroup} in DC ${vsphere_datacenter} and destroy"
+#   govc ls -json "${vsphere_portgroup}" |
+#   jq '.elements[]?.Object.Vm[]?.Value' |
+#   xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |
+#   jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |
+#   xargs -I {} --no-run-if-empty govc vm.destroy {}
+# done
+# set -e
 
 log "writing the platform spec"
 echo $platformSpec | jq -r yamlify2 | sed --expression='s/^/    /g' > $SHARED_DIR/platform.yaml
