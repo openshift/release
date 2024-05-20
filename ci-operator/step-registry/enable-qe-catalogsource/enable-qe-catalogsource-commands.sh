@@ -53,7 +53,8 @@ function update_global_auth () {
 
   # replace all global auth with the QE's
   # new_dockerconfig="/var/run/vault/image-registry/qe_dockerconfigjson"
-
+  oc adm catalog mirror quay.io/openshift-qe-optional-operators/aosqe-index:v4.16 brew.registry.redhat.io --manifests-only  -a /tmp/new-dockerconfigjson
+  
   # add quay.io/openshift-qe-optional-operators and quay.io/openshifttest auth to the global auth
   new_dockerconfig="/tmp/new-dockerconfigjson"
   # qe_registry_auth=$(cat "/var/run/vault/mirror-registry/qe_optional.json" | jq -r '.auths."quay.io/openshift-qe-optional-operators".auth')
@@ -262,10 +263,10 @@ run_command "oc whoami"
 run_command "oc version -o yaml"
 update_global_auth
 sleep 5
-create_icsp_connected
-check_olm_capability
-check_marketplace
-create_catalog_sources
+#create_icsp_connected
+#check_olm_capability
+#check_marketplace
+#create_catalog_sources
 
 #support hypershift config guest cluster's icsp
-oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_icsp.yaml && yq-go r /tmp/mgmt_icsp.yaml 'items[*].spec.repositoryDigestMirrors' -  | sed  '/---*/d' > ${SHARED_DIR}/mgmt_icsp.yaml
+#oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_icsp.yaml && yq-go r /tmp/mgmt_icsp.yaml 'items[*].spec.repositoryDigestMirrors' -  | sed  '/---*/d' > ${SHARED_DIR}/mgmt_icsp.yaml
