@@ -8,12 +8,9 @@ SA_NAME="kv-external-infra-sa"
 oc create ns ${EXTERNAL_INFRA_NS}
 oc create serviceaccount ${SA_NAME} -n ${EXTERNAL_INFRA_NS}
 
-TOKEN_SA_SECRET=$(oc get secrets -n ${EXTERNAL_INFRA_NS} -o json | jq -r --arg SA_NAME "$SA_NAME" \
-  '.items[] | select(.metadata.annotations."kubernetes.io/service-account.name"==$SA_NAME and .type=="kubernetes.io/service-account-token").metadata.name')
+TOKEN=$(oc create token ${SA_NAME} -n ${EXTERNAL_INFRA_NS} --duration 4h)
 
-TOKEN=$(oc get secret ${TOKEN_SA_SECRET} -n ${EXTERNAL_INFRA_NS} -o jsonpath='{.data.token}' | base64 -d)
-
-oc get secret ${TOKEN_SA_SECRET} -n ${EXTERNAL_INFRA_NS} -o jsonpath='{.data.ca\.crt}' | base64 -d > /tmp/ca.crt
+oc get configmap kube-root-ca.crt -n ${EXTERNAL_INFRA_NS} -o "jsonpath={.data['ca\.crt']}" > /tmp/ca.crt
 
 CURRENT_CONTEXT_NAME=$(oc config current-context)
 INFRA_CLUSTER_NAME=$(oc config view -o json | jq -r --arg CURRENT_CONTEXT_NAME "$CURRENT_CONTEXT_NAME" '.contexts[] | select(.name==$CURRENT_CONTEXT_NAME).context.cluster')
