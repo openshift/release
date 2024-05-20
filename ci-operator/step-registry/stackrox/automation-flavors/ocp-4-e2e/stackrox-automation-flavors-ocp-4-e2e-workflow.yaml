@@ -7,7 +7,14 @@ workflow:
       commands: |
         echo "Running openshift-4 ${OCP_VERSION} automation"
         mkdir -p ~/.gcp/
-        cp "/tmp/vault/stackrox-automation-flavors/OCP_4_GCP_SA" ~/.gcp/osServiceAccount.json
+        GOOGLE_CREDENTIALS=$(cat /tmp/vault/stackrox-automation-flavors/OCP_4_GCP_SA)
+        if [[ "${GOOGLE_CREDENTIALS:0:1}" != "{" ]]; then
+          echo "base64 decoding credentials [${GOOGLE_CREDENTIALS:1:10}...]"
+          GOOGLE_CREDENTIALS=$(base64 -d <<<"${GOOGLE_CREDENTIALS}")
+          export GOOGLE_CREDENTIALS
+        fi
+        echo "${GOOGLE_CREDENTIALS}" > ~/.gcp/osServiceAccount.json
+        oc create clusterrolebinding system:openshift:scc:restricted --clusterrole=system:openshift:scc:restricted --group=system:authenticated || true
         /usr/bin/openshift-ci.sh create openshift-4 "${OCP_VERSION}"
       credentials:
       - mount_path: /tmp/vault/stackrox-automation-flavors
