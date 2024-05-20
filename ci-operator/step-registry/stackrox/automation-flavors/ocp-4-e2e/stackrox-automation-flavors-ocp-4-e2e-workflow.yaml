@@ -6,8 +6,9 @@ workflow:
     - as: ocp-4-create
       commands: |
         echo "Running openshift-4 ${OCP_VERSION} automation"
-        mkdir -p ~/.gcp/; echo "${GOOGLE_CREDENTIALS}" > ~/.gcp/osServiceAccount.json
+        echo "${GOOGLE_CREDENTIALS}" > ~/.gcp/osServiceAccount.json
         /usr/bin/openshift-ci.sh create openshift-4 "${OCP_VERSION}"
+        oc create clusterrolebinding system:openshift:scc:restricted --clusterrole=system:openshift:scc:restricted --group=system:authenticated || true
       credentials:
       - mount_path: /tmp/vault/stackrox-automation-flavors
         name: stackrox-automation-flavors
