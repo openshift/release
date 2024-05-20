@@ -46,7 +46,7 @@ variable "quay_ec2_instance" {
 }
 EOF
 
-cat >>create_redis_aws_s3_postgresql.tf <<EOF
+cat >>create_aws_redis_s3_postgresql.tf <<EOF
 
 ## EC2 instance for redis ##
 provider "aws" {
