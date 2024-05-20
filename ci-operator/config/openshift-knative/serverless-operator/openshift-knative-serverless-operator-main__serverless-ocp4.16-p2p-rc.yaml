@@ -112,10 +112,9 @@ images:
   to: serverless-metadata-webhook
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.15"
+    release:
+      channel: candidate
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -129,6 +128,7 @@ tests:
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
+      ADDONS_OPERATORS_RUN_IN_PARALLEL: "false"
       CHANNEL_GROUP: candidate
       FIREWATCH_CONFIG: |
         {
@@ -153,9 +153,11 @@ tests:
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       OCM_LOGIN_ENV: staging
-      OPENSHIFT_VERSION: "4.15"
+      OPENSHIFT_VERSION: "4.16"
+      OPERATOR1_CONFIG: name=serverless-operator;namespace=openshift-serverless
+      OPERATOR2_CONFIG: name=servicemeshoperator
     test:
-    - ref: ipi-install-rbac
+    - ref: operator-install
     - as: mesh-e2e
       cli: latest
       commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make mesh-e2e
@@ -202,10 +204,10 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: firewatch-rosa-aws-sts
+    workflow: firewatch-rosa-aws-sts-hypershift
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: serverless-ocp4.15-lp-p2p
+  variant: serverless-ocp4.16-p2p-rc
