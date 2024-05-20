@@ -66,34 +66,50 @@ else
    log "determined this is an IPI job"
 fi
 
-# notes: jcallen: split the LEASED_RESOURCE e.g. bcr01a.dal10.1153
-# into: primary router hostname, datacenter and vlan id
+if [[ -n "${VSPHERE_EXTRA_LEASED_RESOURCE:-}" ]]; then
+  log "creating extra lease resources"
 
-# router=$(awk -F. '{print $1}' <(echo "${LEASED_RESOURCE}"))
-# phydc=$(awk -F. '{print $2}' <(echo "${LEASED_RESOURCE}"))
-# vlanid=$(awk -F. '{print $3}' <(echo "${LEASED_RESOURCE}"))
-# primaryrouterhostname="${router}.${phydc}"
+  i=1  
+  for extra_leased_resource in ${VSPHERE_EXTRA_LEASED_RESOURCE}; do
+    log "creating extra leased resource ${extra_leased_resource}"
+    echo "apiVersion: vspherecapacitymanager.splat.io/v1
+kind: Lease
+metadata:
+  generateName: "${LEASED_RESOURCE}-"
+  namespace: "vsphere-infra-helpers"
+  annotations: {}
+  labels:
+    boskos-lease-id: "${LEASED_RESOURCE}"
+    job-name: "${JOB_NAME_SAFE}"
+    VSPHERE_EXTRA_LEASED_RESOURCE: \"${i}\"
+spec:
+  vcpus: 0
+  memory: 0
+  networks: 1" | oc create --kubeconfig ${SA_KUBECONFIG} -f -
 
-# # notes: jcallen: all new subnets resides on port groups named: ci-vlan-#### where #### is the vlan id.
-# vsphere_portgroup="ci-vlan-${vlanid}"
-# portgroup_list+=("${vsphere_portgroup}")
-# if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-#   echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
-#   exit 1
-# fi
+  i=$((i + 1))
+  done
+fi
 
-# if [[ -n "${VSPHERE_EXTRA_LEASED_RESOURCE:-}" ]]; then
-#   i=0
-#   for extra_leased_resource in ${VSPHERE_EXTRA_LEASED_RESOURCE}; do
-#     extra_vlanid=$(awk -F. '{print $3}' <(echo "${extra_leased_resource}"))
-#     extra_portgroup="ci-vlan-${extra_vlanid}"
-#     i=$((i + 1))
-#     portgroup_list+=("${extra_portgroup}")
-#     cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
-# export vsphere_extra_portgroup_${i}="${extra_portgroup}"
-# EOF
-#   done
-# fi
+
+if [[ -n "${VSPHERE_BASTION_LEASED_RESOURCE:-}" ]]; then  
+  log "creating bastion lease resource ${VSPHERE_BASTION_LEASED_RESOURCE}"
+  echo "apiVersion: vspherecapacitymanager.splat.io/v1
+kind: Lease
+metadata:
+  generateName: "${LEASED_RESOURCE}-"
+  namespace: "vsphere-infra-helpers"
+  annotations: {}
+  labels:
+    boskos-lease-id: "${LEASED_RESOURCE}"
+    job-name: "${JOB_NAME_SAFE}"
+    VSPHERE_BASTION_LEASED_RESOURCE: \"${VSPHERE_BASTION_LEASED_RESOURCE}\"
+spec:
+  vcpus: 0
+  memory: 0
+  networks: 1" | oc create --kubeconfig ${SA_KUBECONFIG} -f -
+fi
+
 
 POOLS=${POOLS:-}
 declare -a pools=($POOLS)
@@ -132,25 +148,45 @@ spec:
   memory: ${OPENSHIFT_REQUIRED_MEMORY}
   ${requiredPool}
   networks: 1" | oc create --kubeconfig ${SA_KUBECONFIG} -f -
-
-  log "waiting for lease to be fulfilled..."
-  oc wait leases.vspherecapacitymanager.splat.io --kubeconfig ${SA_KUBECONFIG} --timeout=30m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}"
 done
+
+log "waiting for lease to be fulfilled..."
+oc wait leases.vspherecapacitymanager.splat.io --kubeconfig ${SA_KUBECONFIG} --timeout=30m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}"
 
 declare -A vcenter_portgroups
 
-# store leases to SHARED_DIR to be used in later steps
+# reconcile leases
 log "Extracting portgroups from leases..."
 LEASES=$(oc get leases.vspherecapacitymanager.splat.io --kubeconfig ${SA_KUBECONFIG} -l boskos-lease-id="${LEASED_RESOURCE}" -n vsphere-infra-helpers -o=jsonpath='{.items[*].metadata.name}')
 for LEASE in $LEASES; do
   oc get leases.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig ${SA_KUBECONFIG} ${LEASE} -o json > /tmp/lease.json
   VCENTER=$(cat /tmp/lease.json | jq -r '.status.server')
   NETWORK_PATH=$(cat /tmp/lease.json | jq -r '.status.topology.networks[0]')
-  vcenter_portgroups[$VCENTER]=$(echo $NETWORK_PATH | cut -d '/' -f 4)
+  portgroup_name=$(echo $NETWORK_PATH | cut -d '/' -f 4)
+  
+
+  bastion_leased_resource=$(cat /tmp/lease.json | jq .metadata.labels.VSPHERE_BASTION_LEASED_RESOURCE)
+  extra_leased_resource=$(cat /tmp/lease.json | jq .metadata.labels.VSPHERE_EXTRA_LEASED_RESOURCE)
+
+  if [ ${bastion_leased_resource} != "null" ]; then
+    log "setting bastion portgroup ${portgroup_name} in vsphere_context.sh"  
+    cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF    
+export vsphere_bastion_portgroup="${portgroup_name}"
+EOF
+
+  elif [ ${extra_leased_resource} != "null" ]; then
+    log "setting extra leased networrk ${portgroup_name} in vsphere_context.sh"  
+    cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
+export vsphere_extra_portgroup_${extra_leased_resource}="${portgroup_name}"
+EOF
+
+  else
+    vcenter_portgroups[$VCENTER]=${portgroup_name}
+  fi
+
   cp /tmp/lease.json ${SHARED_DIR}/LEASE_$LEASE.json
   log "discovered portgroup ${vcenter_portgroups[$VCENTER]}"
 done
-
 
 # retrieving resource pools 
 RESOURCE_POOLS=$(oc get pools.vspherecapacitymanager.splat.io --kubeconfig ${SA_KUBECONFIG} -n vsphere-infra-helpers -o=jsonpath='{.items[*].metadata.name}')
@@ -264,15 +300,6 @@ export vlanid="${vlanid:-unset}"
 export phydc="${phydc:-unset}"
 export primaryrouterhostname="${primaryrouterhostname:-unset}"
 EOF
-
-if [[ -n "${VSPHERE_BASTION_LEASED_RESOURCE:-}" ]]; then
-  vlanid_2=$(awk -F. '{print $3}' <(echo "${VSPHERE_BASTION_LEASED_RESOURCE}"))
-  vsphere_bastion_portgroup="ci-vlan-${vlanid_2}"
-  cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
-export vsphere_bastion_portgroup="${vsphere_bastion_portgroup}"
-EOF
-  portgroup_list+=("${vsphere_bastion_portgroup}")
-fi
 
 # 1. Get the OpaqueNetwork (NSX-T port group) which is listed in LEASED_RESOURCE.
 # 2. Select the virtual machines attached to network
