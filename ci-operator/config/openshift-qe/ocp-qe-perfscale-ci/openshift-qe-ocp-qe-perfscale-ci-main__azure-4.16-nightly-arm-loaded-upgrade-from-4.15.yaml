@@ -1,0 +1,66 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: prow/Dockerfile
+  to: ocp-qe-perfscale-ci-azure-416-arm
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.16"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: perfscale-azure-24nodes-loaded-upgrade-415to416
+  cron: 0 12 * * 1
+  steps:
+    cluster_profile: azure-arm64-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D16ps_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8ps_v5
+      CUSTOM_AZURE_REGION: centralus
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      MAX_UNAVAILABLE: "3"
+      WORKER_REPLICA_COUNT: "24"
+    post:
+    - chain: ipi-deprovision
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-custom-region
+    - ref: ovn-conf 
+    - ref: ovn-conf-ipsec-manifest
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: workers-scale
+    - chain: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-upgrade
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: azure-4.16-nightly-arm
