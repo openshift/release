@@ -1,6 +1,6 @@
 base_images:
   upi-installer:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -10,7 +10,7 @@ build_root:
     tag: latest
 images:
 - dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-vsphere-415
+  to: ocp-qe-perfscale-ci-vsphere-416
 promotion:
   to:
   - namespace: ci
@@ -21,12 +21,12 @@ releases:
       product: ocp
       relative: 1
       stream: nightly
-      version: "4.15"
+      version: "4.16"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.16"
 resources:
   '*':
     requests:
@@ -72,18 +72,6 @@ tests:
     workflow: openshift-qe-installer-vsphere-ipi-ovn
   timeout: 5h0m0s
 - always_run: false
-  as: control-plane-24nodes
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: vsphere-8-vpn
-    env:
-      WORKER_REPLICA_COUNT: "24"
-    test:
-    - chain: workers-scale
-    - chain: openshift-qe-control-plane
-    workflow: openshift-qe-installer-vsphere-ipi-ovn
-  timeout: 5h0m0s
-- always_run: false
   as: control-plane-10nodes
   steps:
     allow_skip_on_success: true
@@ -93,6 +81,18 @@ tests:
     test:
     - chain: workers-scale
     - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-vsphere-ipi-ovn
+  timeout: 5h0m0s
+- always_run: false
+  as: node-density-heavy-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-8-vpn
+    env:
+      WORKER_REPLICA_COUNT: "24"
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-vsphere-ipi-ovn
   timeout: 5h0m0s
 - always_run: false
@@ -108,4 +108,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-qe
   repo: ocp-qe-perfscale-ci
-  variant: vsphere-4.15-nightly-x86
+  variant: vsphere-4.16-nightly-x86
