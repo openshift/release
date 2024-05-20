@@ -227,7 +227,8 @@ for VCENTER in ${!pool_usernames[@]}; do
   done
   printf -v joined '"%s",' "${_datacenters[@]}"
   log "found datacenters ${joined%,}"
-  platformSpec=$(echo $platformSpec | jq -r '.vcenters += [{"server": "'$VCENTER'", "user": "'$vsphere_user'", "password": "'$vsphere_password'", "datacenters": ['$(echo "${joined%,}")']}]')
+
+  platformSpec=$(echo $platformSpec | jq -r '.vcenters += [{"server": "'$VCENTER'", "user": "'${pool_usernames[$VCENTER]}'", "password": "'${pool_passwords[$VCENTER]}'", "datacenters": ['$(echo "${joined%,}")']}]')
 done
 
 # # For most CI jobs, a single lease and single pool will be used. We'll initialize govc.sh and
@@ -289,7 +290,7 @@ for LEASE in $LEASES; do
   source /tmp/envvars
 
   export GOVC_USERNAME="${pool_usernames[$vsphere_url]}"
-  export GOVC_PASSWORD="${pool_passwords[$vsphere_url]}"    
+  export GOVC_PASSWORD="${pool_passwords[$vsphere_url]}"
   export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 
   echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${vsphere_portgroup} in DC ${vsphere_datacenter} and destroy"
