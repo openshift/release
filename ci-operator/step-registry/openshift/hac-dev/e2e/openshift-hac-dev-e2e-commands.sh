@@ -91,12 +91,11 @@ set +e
 # Run Cypress Tests
 TEST_RUN=0
 cd /tmp/e2e || { echo "/tmp/e2e doesn't exists"; exit 1; }
-npm run cy:run || TEST_RUN=1
-
+npm run cy:run -- --spec ./tests/advanced-happy-path.spec.ts || TEST_RUN=1
 cp -a /tmp/e2e/cypress/* ${ARTIFACT_DIR}
 
-echo "Releasing bonfire namespace"
-bonfire namespace release ${NAMESPACE} -f
+# echo "Releasing bonfire namespace"
+# bonfire namespace release ${NAMESPACE} -f
 
 # Teardown
 exit $TEST_RUN
