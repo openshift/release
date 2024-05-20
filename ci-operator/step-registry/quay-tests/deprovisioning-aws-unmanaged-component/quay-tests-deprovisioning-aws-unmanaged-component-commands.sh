@@ -11,8 +11,6 @@ mkdir -p terraform_quay_aws_unmanaged && cd terraform_quay_aws_unmanaged
 cp ${SHARED_DIR}/$QUAY_UNMANAGED_AWS_TERRAFORM_PACKAGE .
 tar -xzvf $QUAY_UNMANAGED_AWS_TERRAFORM_PACKAGE && ls
 
-echo "Sleep 10m..."
-sleep 600
 #Destroy Quay Security Testing Host
 echo "Start to destroy quay aws rds postgresql, redis ec2 instance ands3 buckets ..."
 terraform --version
