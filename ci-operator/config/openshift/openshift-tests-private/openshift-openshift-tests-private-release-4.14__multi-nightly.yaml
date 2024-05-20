@@ -53,7 +53,19 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: aws-ipi-arm-f7-netobserv
+- as: aws-ipi-amd-f7-netobserv
+  cron: 27 15 2,9,16,23 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6i.2xlarge
+    test:
+    - chain: openshift-e2e-test-netobserv-qe
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-arm-f28-netobserv
   cron: 27 15 2 * *
   steps:
     cluster_profile: aws-qe
@@ -61,7 +73,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
+      COMPUTE_NODE_TYPE: m6gd.2xlarge
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-netobserv-qe
