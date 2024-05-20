@@ -384,16 +384,15 @@ function check_history() {
     fi
 }
 
+# for OCP-23799 OTA-455 - only minor upgrade to-latest, 4.16+
 function check_rollback_denied() {
     if [[ "${UPGRADE_TO_VERSION}" == "latest" ]] && [[ ${TARGET_MINOR_VERSION} -ge "16" ]] && [[  ${TARGET_MINOR_VERSION} -gt ${SOURCE_MINOR_VERSION} ]]; then
-        # for OCP-23799 OTA-455 - only minor upgrade to 4.16+ to-latest
         out="$(oc adm upgrade rollback 2>&1 || true)" # expecting an error, capture and don't fail
         expected="error: ${SOURCE_VERSION} is less than the current target ${TARGET_VERSION} and matches the cluster's previous version, but rollbacks that change major or minor versions are not recommended."
-        echo "debug: UPGRADE_TO_VERSION \"${UPGRADE_TO_VERSION}\" expected \"${expected}\" out \"${out}\""
         if [[ ${out} != "${expected}" ]]; then
-            echo "to-latest rollback reject step failed. expecting: ${expected} received ${out}"
-            # return 1
-            else
+            echo -e "to-latest rollback reject step failed. \nexpecting: \"${expected}\" \nreceived: \"${out}\""
+            return 1
+        else
             echo "to-latest rollback reject step passed."
         fi
     fi
