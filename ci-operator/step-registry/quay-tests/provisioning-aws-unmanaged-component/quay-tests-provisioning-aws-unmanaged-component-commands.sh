@@ -201,9 +201,6 @@ resource "aws_s3_bucket_acl" "quayaws_bucket_acl" {
 }
 EOF
 
-# export TF_VAR_aws_bucket="${QUAY_AWS_S3_BUCKET}"
-# export TF_VAR_quay_subnet_group="${QUAY_SUBNET_GROUP}"
-# export TF_VAR_quay_security_group="${QUAY_SECURITY_GROUP}"
 terraform --version
 terraform init 
 terraform apply -auto-approve 
@@ -211,10 +208,7 @@ terraform apply -auto-approve
 QUAY_AWS_RDS_POSTGRESQL_ADDRESS=$(terraform output quaydb_address | tr -d '""' | tr -d '\n')
 QUAY_REDIS_IP_ADDRESS=$(terraform output instance_public_ip | tr -d '""' | tr -d '\n')
 
-# echo "${QUAY_AWS_S3_BUCKET}" >${SHARED_DIR}/QUAY_AWS_S3_BUCKET
-# echo "${QUAY_SUBNET_GROUP}" >${SHARED_DIR}/QUAY_SUBNET_GROUP
-# echo "${QUAY_SECURITY_GROUP}" >${SHARED_DIR}/QUAY_SECURITY_GROUP
-
+#Save for next step
 echo "${QUAY_REDIS_IP_ADDRESS}" >${SHARED_DIR}/QUAY_REDIS_IP_ADDRESS
 echo "${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}" >${SHARED_DIR}/QUAY_AWS_RDS_POSTGRESQL_ADDRESS
 
