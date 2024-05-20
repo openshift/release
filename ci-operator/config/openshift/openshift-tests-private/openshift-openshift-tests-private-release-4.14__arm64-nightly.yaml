@@ -83,6 +83,39 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
+- as: aws-ipi-f28-longduration-workload
+  cron: 33 20 16 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      TEST_SCENARIOS: Workloads
+      TEST_TIMEOUT: "600"
+    test:
+    - ref: idp-htpasswd
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-f28-longduration-apiserver
+  cron: 6 15 16 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      TEST_SCENARIOS: API_Server
+      TEST_TIMEOUT: "600"
+    test:
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-byo-iam-role-regen-cert-f14
   cron: 52 12 9,24 * *
   steps:
@@ -255,6 +288,22 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
+- as: azure-ipi-private-f28-disasterrecovery
+  cron: 34 11 26 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
+      TEST_SCENARIOS: DR_Testing
+    test:
+    - ref: idp-htpasswd
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-azure-ipi-private
 - as: azure-ipi-to-multiarch-f14
   cron: 24 0 1,16 * *
   steps:
@@ -489,6 +538,20 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-upi-f28-ui
+  cron: 8 1 24 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BOOTSTRAP_NODE_TYPE: t2a-standard-4
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      CONTROL_PLANE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe-ui
+    workflow: cucushift-installer-rehearse-gcp-upi
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

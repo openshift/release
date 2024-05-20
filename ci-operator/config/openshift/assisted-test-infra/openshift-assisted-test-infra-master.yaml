@@ -27,10 +27,6 @@ base_images:
     name: govc
     namespace: ci
     tag: v0.29.0
-  tests:
-    name: "4.15"
-    namespace: ocp
-    tag: tests
   upi-installer:
     name: "4.15"
     namespace: ocp
@@ -684,6 +680,16 @@ tests:
 - always_run: false
   as: e2e-vsphere-assisted
   optional: true
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-periodic
+  cron: 00 05 */1 * 0-5
   steps:
     cluster_profile: vsphere-2
     env:

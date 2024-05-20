@@ -129,9 +129,9 @@ function enable_zones() {
 
     while read -r zone_name; do
         local zone_type
-        zone_type=$(jq -r ".AvailabilityZones[] | select(.ZoneName==\"${zoneName}\").ZoneType" "${ARTIFACT_DIR}/edge-zones_${region}.json")
+        zone_type=$(jq -r ".AvailabilityZones[] | select(.ZoneName==\"${zone_name}\").ZoneType" "${ARTIFACT_DIR}/edge-zones_${region}.json")
         local zone_group
-        zone_group=$(jq -r ".AvailabilityZones[] | select(.ZoneName==\"${zoneName}\").GroupName" "${ARTIFACT_DIR}/edge-zones_${region}.json")
+        zone_group=$(jq -r ".AvailabilityZones[] | select(.ZoneName==\"${zone_name}\").GroupName" "${ARTIFACT_DIR}/edge-zones_${region}.json")
 
         echo "Trying to enable zone group ${zone_group} (${zone_type})"
         opt_in_zone_group "${region_name}" "${zone_type}" "${zone_name}" "${zone_group}"
@@ -213,10 +213,15 @@ function test_render_mixed_type() {
 #>>>>>"
 
     zone_type="local-zone"
-    jq -r ".AvailabilityZones[] | select(.ZoneType==\"$zone_type\").ZoneName" "${ARTIFACT_DIR}/edge-zones_${region}.json" | shuf |head -n1 > $result_file
-    
+    jq -r ".AvailabilityZones[] | select(.ZoneType==\"$zone_type\").ZoneName" "${ARTIFACT_DIR}/edge-zones_${region}.json" | shuf | head -n1 > "$result_file"
+
     zone_type="wavelength-zone"
-    jq -r ".AvailabilityZones[] | select(.ZoneType==\"$zone_type\").ZoneName" "${ARTIFACT_DIR}/edge-zones_${region}.json" | shuf |head -n1 >> $result_file
+    jq -r ".AvailabilityZones[] | select(.ZoneType==\"$zone_type\").ZoneName" "${ARTIFACT_DIR}/edge-zones_${region}.json" | shuf | head -n1 >> "$result_file"
+
+    if [[ $(wc -l < "$result_file") -eq 1 ]]; then
+        echo "Skipping mixed test in region ${region} as it has only one edge subnet. 'test_render_all' will perform the required validations."
+        return
+    fi
 
     create_install_patch "$test_name" "$region" "$result_file"
     test_render_validations "$test_name" "$region" "$result_file"
@@ -421,9 +426,10 @@ do
     if [[ -f "${ARTIFACT_DIR}/edge-zones-disabled_${region_name}.txt" ]] ; then
         echo "Detected one or more disabled edge zones, trying to enable it..."
         enable_zones "${region_name}"
+
         if [[ -f "${ARTIFACT_DIR}/edge-zones-disabled_${region_name}_failed-to-enable.txt" ]] ; then
-            echo "One or more zones in the region ${region_name} were not enabled and/or failed to opt-in. Ask the job OWNER to enable the below edge zones manually in EC2 Console." | tee -a "$JUNIT_BUFFER_FILE_MSG"
-            cat "${ARTIFACT_DIR}/edge-zones-disabled_${region_name}_failed-to-enable.txt" | tee -a "$JUNIT_BUFFER_FILE_MSG"
+            echo "One or more zones in the region ${region_name} was not enabled and/or failed to opt-in. Ask the job OWNER to enable the below edge zones manually in AWS EC2 Console." | tee -a "$JUNIT_BUFFER_FILE_MSG"
+            tee -a "$JUNIT_BUFFER_FILE_MSG" < "${ARTIFACT_DIR}/edge-zones-disabled_${region_name}_failed-to-enable.txt"
             test_result="failed"
         fi
     fi

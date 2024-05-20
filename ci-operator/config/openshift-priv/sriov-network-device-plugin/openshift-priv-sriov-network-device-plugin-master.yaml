@@ -1,6 +1,6 @@
 base_images:
   ocp_4.16_base-rhel9:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
@@ -22,17 +22,17 @@ images:
   to: sriov-network-device-plugin
 promotion:
   to:
-  - name: 4.16-priv
+  - name: 4.17-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.16-priv
+      name: 4.17-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.16-priv
+      name: 4.17-priv
       namespace: ocp-private
 resources:
   '*':
@@ -44,6 +44,17 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: unit-test
+  commands: make test-race
+  container:
+    from: src
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: sriov-network-device-plugin
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift-priv
