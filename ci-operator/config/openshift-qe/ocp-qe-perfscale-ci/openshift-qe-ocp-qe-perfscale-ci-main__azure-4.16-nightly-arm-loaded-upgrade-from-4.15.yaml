@@ -5,20 +5,22 @@ build_root:
     tag: latest
 images:
 - dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-azure-416-arm
+  to: ocp-qe-perfscale-ci-azure-416-arm-ipsec
 promotion:
   to:
   - namespace: ci
     tag: latest
 releases:
-  arm64-latest:
-    candidate:
+  initial:
+    prerelease:
       architecture: arm64
       product: ocp
-      stream: nightly
-      version: "4.16"
+      version_bounds:
+        lower: 4.15.0-0
+        upper: 4.16.0-0
   latest:
     candidate:
+      architecture: arm64
       product: ocp
       stream: nightly
       version: "4.16"
@@ -37,10 +39,10 @@ tests:
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CHURN: "false"
       COMPUTE_NODE_TYPE: Standard_D16ps_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D8ps_v5
       CUSTOM_AZURE_REGION: centralus
-      CHURN: "false"
       ENABLE_FORCE: "true"
       GC: "false"
       MAX_UNAVAILABLE: "3"
@@ -50,7 +52,7 @@ tests:
     pre:
     - chain: ipi-conf-azure
     - ref: ipi-conf-azure-custom-region
-    - ref: ovn-conf 
+    - ref: ovn-conf
     - ref: ovn-conf-ipsec-manifest
     - chain: ipi-install
     - ref: ipi-azure-rbac
@@ -63,4 +65,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-qe
   repo: ocp-qe-perfscale-ci
-  variant: azure-4.16-nightly-arm
+  variant: azure-4.16-nightly-arm-loaded-upgrade-from-4.15
