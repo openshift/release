@@ -49,6 +49,8 @@ RUN:
 REPORTING:
   default_ocs_must_gather_image: "quay.io/rhceph-dev/ocs-must-gather"
   default_ocs_must_gather_latest_tag: "latest-${ODF_VERSION_MAJOR_MINOR}"
+DEPLOYMENT:
+  skip_download_client: True
 __EOF__
 
 
