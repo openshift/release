@@ -6,6 +6,13 @@ workflow:
     - as: ocp-4-create
       commands: |
         echo "Running openshift-4 ${OCP_VERSION} automation"
+        mkdir -p ~/.gcp/
+        GOOGLE_CREDENTIALS=$(cat /tmp/vault/stackrox-automation-flavors/OCP_4_GCP_SA)
+        if [[ "${GOOGLE_CREDENTIALS:0:1}" != "{" ]]; then
+          echo "base64 decoding credentials [${GOOGLE_CREDENTIALS:1:10}...]"
+          GOOGLE_CREDENTIALS=$(base64 -d <<<"${GOOGLE_CREDENTIALS}")
+          export GOOGLE_CREDENTIALS
+        fi
         echo "${GOOGLE_CREDENTIALS}" > ~/.gcp/osServiceAccount.json
         /usr/bin/openshift-ci.sh create openshift-4 "${OCP_VERSION}"
         oc create clusterrolebinding system:openshift:scc:restricted --clusterrole=system:openshift:scc:restricted --group=system:authenticated || true
