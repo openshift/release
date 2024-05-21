@@ -577,7 +577,7 @@ alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.i
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
 vsphere*)
     export VSPHERE_PERSIST_SESSION=true
-    export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
+    export SSL_CERT_FILE=/var/run/vsphere-ibmcloud-ci/vcenter-certificate
     ;;
 openstack-osuosl) ;;
 openstack-ppc64le) ;;
