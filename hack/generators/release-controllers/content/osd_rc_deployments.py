@@ -218,7 +218,7 @@ def get_oc_env_vars():
         },
         {
             "name": "XDG_RUNTIME_DIR",
-            "value": "$HOME/run"
+            "value": "/tmp/home/run"
         }
     ]
 
