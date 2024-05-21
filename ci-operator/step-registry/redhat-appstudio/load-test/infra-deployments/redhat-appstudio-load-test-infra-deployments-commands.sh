@@ -91,8 +91,6 @@ echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" >"${GIT_CREDS_PATH}"
 cd "$(mktemp -d)"
 
 git clone --origin upstream --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
-# TODO this change is needed only for backwards compatibility, remove after https://github.com/redhat-appstudio/e2e-tests is merged
-git remote add origin https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git
 
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     # if this is executed as PR check of github.com/redhat-appstudio/infra-deployments.git repo, switch to PR branch.
