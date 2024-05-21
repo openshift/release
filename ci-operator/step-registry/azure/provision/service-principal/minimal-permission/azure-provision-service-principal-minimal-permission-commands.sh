@@ -191,6 +191,12 @@ required_permissions="""
 \"Microsoft.Storage/storageAccounts/listKeys/action\"
 """
 
+# optional permission to gather bootstrap bundle log
+required_permissions="""
+\"Microsoft.Compute/virtualMachines/retrieveBootDiagnosticsData/action\",
+${required_permissions}
+"""
+
 if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "IPI" ]]; then
     required_permissions="""
 \"Microsoft.Compute/availabilitySets/write\",

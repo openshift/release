@@ -51,27 +51,20 @@ else
     pass=false
 fi
 # check whether it is disconnected cluster
-oc label namespace "$project" security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite=true || true
-cluster_http_proxy=$(oc get proxy cluster -o=jsonpath='{.spec.httpProxy}')
-cluster_https_proxy=$(oc get proxy cluster -o=jsonpath='{.spec.httpProxy}')
-attempt=0
-while true; do
-    out=$(oc --request-timeout=60s -n "$project" debug node/"$master_node_0" -- chroot /host bash -c "export http_proxy=$cluster_http_proxy; export https_proxy=$cluster_https_proxy; curl -sSI ifconfig.me --connect-timeout 5" 2> /dev/null || true)
-    if [[ $out == *"Via: 1.1"* ]]; then
-        echo "This is not a disconnected cluster"
-        break
-    fi
-    attempt=$(( attempt + 1 ))
-    if [[ $attempt -gt 3 ]]; then
-        echo "This is a disconnected cluster, skip testing"
-        oc delete ns "$project"
+run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
+if [[ $ret -eq 0 ]]; then
+    auths=`cat /tmp/.dockerconfigjson`
+    if [[ $auths =~ "5000" ]]; then
+        echo "This is a disconnected env, skip it."
         exit 0
     fi
-    sleep 5
-done
+fi
 
 # run node scan and check the result
 report="/tmp/fips-check-node-scan.log"
+oc label namespace "$project" security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite=true || true
+cluster_http_proxy=$(oc get proxy cluster -o=jsonpath='{.spec.httpProxy}')
+cluster_https_proxy=$(oc get proxy cluster -o=jsonpath='{.spec.httpProxy}')
 oc --request-timeout=300s -n "$project" debug node/"$master_node_0" -- chroot /host bash -c "export http_proxy=$cluster_http_proxy; export https_proxy=$cluster_https_proxy; podman run --authfile /var/lib/kubelet/config.json --privileged -i -v /:/myroot registry.ci.openshift.org/ci/check-payload:latest scan node --root  /myroot &> $report" || true
 out=$(oc --request-timeout=300s -n "$project" debug node/"$master_node_0" -- chroot /host bash -c "cat /$report" || true)
 echo "The report is: $out"
@@ -84,7 +77,7 @@ fi
 
 # generate report
 echo "Generating the Junit for fips check node scan"
-filename="fips-check-node-scan"
+filename="junit_fips-check-node-scan"
 testsuite="fips-check-node-scan"
 subteam="Security_and_Compliance"
 if $pass; then

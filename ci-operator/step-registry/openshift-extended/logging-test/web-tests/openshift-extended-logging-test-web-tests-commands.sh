@@ -17,8 +17,25 @@ fi
 ## set extra env vars for logging test
 export CYPRESS_EXTRA_PARAM="{\"openshift-logging\": {\"cluster-logging\": {\"channel\": \"${CLO_SUB_CHANNEL}\", \"source\": \"${CLO_SUB_SOURCE}\"}, \"elasticsearch-operator\": {\"channel\": \"${EO_SUB_CHANNEL}\", \"source\": \"${EO_SUB_SOURCE}\"}, \"loki-operator\": {\"channel\": \"${LO_SUB_CHANNEL}\", \"source\": \"${LO_SUB_SOURCE}\"}}}"
 
-echo "Start to test logging cases"
-./console-test-frontend.sh --spec ./tests/logging/ || exit 0
+echo "Start to test logging web cases"
+export E2E_RUN_TAGS="${E2E_RUN_TAGS}"
+echo "E2E_RUN_TAGS is: ${E2E_RUN_TAGS}"
+
+run_shell="console-test-frontend.sh"
+if [[ $E2E_RUN_TAGS =~ @osd_ccs|@rosa ]] ; then
+    run_shell="console-test-managed-service.sh"
+fi
+## determine if it is hypershift guest cluster or not
+if ! (oc get node --kubeconfig=${KUBECONFIG} | grep master) ; then
+    run_shell="console-test-frontend-hypershift.sh"
+fi
+
+if [[ $E2E_RUN_TAGS =~ @level0 ]]; then
+    echo "only run level0 scenarios"
+    ./${run_shell} --spec ./tests/logging/ --tags @level0 || true
+else
+    ./${run_shell} --spec ./tests/logging/ || true
+fi
 
 # summarize test results
 echo "Summarizing test results..."

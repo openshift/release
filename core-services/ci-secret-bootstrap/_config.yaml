@@ -12,6 +12,16 @@ cluster_groups:
   - build09
   - build10
   - vsphere02
+  managed_clusters:
+  - app.ci
+  - build01
+  - build02
+  - build03
+  - build04
+  - build05
+  - build09
+  - build10
+  - hosted-mgmt
   non_app_ci:
   - build01
   - build02
@@ -185,14 +195,6 @@ secret_configs:
   - cluster_groups:
     - build_farm
     name: bugzilla-credentials-openshift-bugzilla-robot
-    namespace: ci
-- from:
-    password:
-      field: password
-      item: kata-jenkins-ci.westus2.cloudapp.azure.com
-  to:
-  - cluster: app.ci
-    name: jenkins-credentials-kata-jenkins-ci.westus2.cloudapp.azure.com
     namespace: ci
 - from:
     oauth:
@@ -376,14 +378,6 @@ secret_configs:
   to:
   - cluster: app.ci
     name: gce-sa-credentials-gcs-crier-publisher
-    namespace: ci
-- from:
-    config.json:
-      field: push-credentials
-      item: quay.io
-  to:
-  - cluster: app.ci
-    name: registry-push-credentials-quay.io
     namespace: ci
 - from:
     config.json:
@@ -2424,15 +2418,6 @@ secret_configs:
     name: aws-ci-infra-ci-build02-audit-logs-uploader-credentials
     namespace: api-audit-log
 - from:
-    .awscred:
-      field: .awscred
-      item: AWS ci-longlivedcluster-bot
-  to:
-  - cluster_groups:
-    - build_farm
-    name: aws-openshift-llc-account-credentials
-    namespace: ci
-- from:
     .git-credentials:
       field: git_url_with_credentials
       item: openshift-bot
@@ -3285,6 +3270,9 @@ secret_configs:
   - cluster: build01
     name: cert-issuer
     namespace: cert-manager
+  - cluster: build09
+    name: cert-issuer
+    namespace: cert-manager
 - from:
     service-account.json:
       field: service-account.json
@@ -3357,14 +3345,6 @@ secret_configs:
   to:
   - cluster: app.ci
     name: slack-credentials-dptp-bot-alpha
-    namespace: ci
-- from:
-    password:
-      field: password
-      item: jira-credentials-dptp-bot
-  to:
-  - cluster: app.ci
-    name: jira-credentials-dptp-bot
     namespace: ci
 - from:
     token:
@@ -5471,6 +5451,58 @@ secret_configs:
   - cluster: hosted-mgmt
     name: global-pull-secret
     namespace: hive
+- from:
+    aws_access_key_id:
+      field: aws_access_key_id
+      item: openshift-ci-audit-credentials
+    aws_secret_access_key:
+      field: aws_secret_access_key
+      item: openshift-ci-audit-credentials
+  to:
+  - cluster_groups:
+    - managed_clusters
+    name: cloudwatch-receiver-token
+    namespace: rh-corp-logging
+- from:
+    access_key_id:
+      field: access_key_id
+      item: net-observ-loki-build10-credentials
+    access_key_secret:
+      field: access_key_secret
+      item: net-observ-loki-build10-credentials
+    bucketnames:
+      field: bucketnames
+      item: net-observ-loki-build10-credentials
+    endpoint:
+      field: endpoint
+      item: net-observ-loki-build10-credentials
+    region:
+      field: region
+      item: net-observ-loki-build10-credentials
+  to:
+  - cluster: build10
+    name: loki-s3
+    namespace: netobserv
+- from:
+    access_key_id:
+      field: access_key_id
+      item: net-observ-loki-build01-credentials
+    access_key_secret:
+      field: access_key_secret
+      item: net-observ-loki-build01-credentials
+    bucketnames:
+      field: bucketnames
+      item: net-observ-loki-build01-credentials
+    endpoint:
+      field: endpoint
+      item: net-observ-loki-build01-credentials
+    region:
+      field: region
+      item: net-observ-loki-build01-credentials
+  to:
+  - cluster: build01
+    name: loki-s3
+    namespace: netobserv
 user_secrets_target_clusters:
 - app.ci
 - build01

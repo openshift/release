@@ -86,7 +86,7 @@ tests:
     - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
 - as: azure-upi-f14
-  cron: 14 11 11,27 * *
+  cron: 14 11 13,27 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -106,8 +106,35 @@ tests:
           memory: 200Mi
     - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-azure-upi
+- as: baremetal-ipi-ovn-ipv4-f14
+  cluster: build05
+  cron: 0 17 11,25 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_TARGET},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    workflow: baremetal-lab-ipi
 - as: gcp-ipi-ovn-ipsec-f14
-  cron: 33 20 14,28 * *
+  cron: 33 20 9,23 * *
   steps:
     cluster_profile: gcp-qe
     test:
@@ -126,7 +153,7 @@ tests:
     - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
 - as: ibmcloud-ipi-f14
-  cron: 24 21 13,27 * *
+  cron: 24 21 7,21 * *
   steps:
     cluster_profile: ibmcloud-qe
     test:
@@ -146,7 +173,7 @@ tests:
     workflow: cucushift-installer-rehearse-ibmcloud-ipi
 - as: nutanix-ipi-f14
   cluster: build01
-  cron: 31 6 9,23 * *
+  cron: 31 6 5,19 * *
   steps:
     cluster_profile: nutanix-qe
     test:
@@ -164,7 +191,7 @@ tests:
           memory: 200Mi
     - ref: nutanix-upgrade-pre-config
     - ref: cucushift-chainupgrade-toimage
-    workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
+    workflow: cucushift-installer-rehearse-nutanix-ipi
 - as: vsphere-upi-f14
   cron: 56 14 3,17 * *
   steps:

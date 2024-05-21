@@ -66,6 +66,10 @@ EOF
 # apply patch to install-config
 yq-go m -x -i "install-config.yaml" "${PATCH}"
 
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
+
 openshift-install create manifests
 
 # we don't want to create any machine* objects
