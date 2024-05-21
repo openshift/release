@@ -147,7 +147,7 @@ EOF
 
   # read shared network configuration
   for _networkJSON in $(ls -d $SHARED_DIR/NETWORK*); do
-    if [[ _networkJSON =~ "single" ]]; then
+    if [[ ${_networkJSON} =~ "single" ]]; then
       continue
     fi
 
