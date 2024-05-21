@@ -215,13 +215,12 @@ curl -sSL "https://mirror2.openshift.com/pub/openshift-v4/clients/butane/latest/
 
 LB_VMNAME="${cluster_name}-lb"
 export GOVC_NETWORK="${vsphere_portgroup}"
-export GOVC_RESOURCE_POOL="${vsphere_resource_pool}"
-  vsphere_portgroup_path=$(govc ls /${vsphere_datacenter}/network | grep "${vlanid}")
+export GOVC_RESOURCE_POOL="${vsphere_resource_pool}"  
   log "cloning load balancer VM"
   govc vm.clone -on=false -dc=/${vsphere_datacenter} -ds /${vsphere_datacenter}/datastore/${vsphere_datastore} -pool=${vsphere_resource_pool} -vm="${vm_template}" "${LB_VMNAME}"
 
   log "updating network to portgroup ${GOVC_NETWORK}"
-  govc vm.network.change -dc=/${vsphere_datacenter} -vm "${LB_VMNAME}" -net "${vsphere_portgroup_path}" ethernet-0
+  govc vm.network.change -dc=/${vsphere_datacenter} -vm "${LB_VMNAME}" -net "${GOVC_NETWORK}" ethernet-0
 IGN=$(cat $BUTANE_CFG | /tmp/butane -r -d /tmp | gzip | base64 -w0)
 
 IPCFG="ip=${vip}::${gateway}:${mask}:lb::none nameserver=${dns_server}"
