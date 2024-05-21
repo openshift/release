@@ -7,6 +7,10 @@ base_images:
     name: cli-ocm
     namespace: ci
     tag: latest
+  ocp-addons-operators-cli:
+    name: ocp-addons-operators-cli
+    namespace: ci
+    tag: latest
   ocp_4.15_cli:
     name: "4.15"
     namespace: ocp
@@ -156,11 +160,19 @@ tests:
       OPENSHIFT_VERSION: "4.16"
       OPERATOR1_CONFIG: name=serverless-operator;namespace=openshift-serverless
       OPERATOR2_CONFIG: name=servicemeshoperator
+      REGION: us-west-2
     test:
     - ref: operator-install
-    - as: mesh-e2e
+    - as: install-for-mesh-e2e
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make mesh-e2e
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make install-for-mesh-e2e
+      from: serverless-source-image
+      resources:
+        requests:
+          cpu: 100m
+    - as: mesh-e2e-tests
+      cli: latest
+      commands: make test-upstream-e2e-mesh-testonly
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
