@@ -387,6 +387,7 @@ function check_history() {
 # for OCP-23799 OTA-455 - only minor upgrade to-latest, 4.16+
 function check_rollback_denied() {
     if [[ "${UPGRADE_TO_VERSION}" == "latest" ]] && [[ ${TARGET_MINOR_VERSION} -ge "16" ]] && [[  ${TARGET_MINOR_VERSION} -gt ${SOURCE_MINOR_VERSION} ]]; then
+        export OC_ENABLE_CMD_UPGRADE_ROLLBACK=true #OCPBUGS-33905, rollback is protected by env feature gate now
         out="$(oc adm upgrade rollback 2>&1 || true)" # expecting an error, capture and don't fail
         expected="error: ${SOURCE_VERSION} is less than the current target ${TARGET_VERSION} and matches the cluster's previous version, but rollbacks that change major or minor versions are not recommended."
         if [[ ${out} != "${expected}" ]]; then
