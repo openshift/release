@@ -3,7 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-sleep 7200
+
 # Set the cluster proxy configuration, if its present.
 if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
     echo "setting the proxy"
