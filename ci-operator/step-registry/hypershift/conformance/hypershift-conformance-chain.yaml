@@ -6,6 +6,14 @@ chain:
     commands: |-
       set -x
 
+      function cleanup() {
+        for child in $( jobs -p ); do
+          kill "${child}"
+        done
+        wait
+      }
+      trap cleanup EXIT
+
       function patch_image_streams() {
         # workaround for https://issues.redhat.com/browse/OCPBUGS-31446
         # imagestreams on the hosted cluster are ignoring
@@ -190,6 +198,7 @@ chain:
       name: hypershift-pool-aws-credentials
       namespace: test-credentials
     timeout: 14400s
+    grace_period: 30m0s
     env:
     - name: TEST_ARGS
       default: ""
