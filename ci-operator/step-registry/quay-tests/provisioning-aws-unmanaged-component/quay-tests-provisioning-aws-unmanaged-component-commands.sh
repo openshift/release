@@ -18,7 +18,7 @@ QUAY_AWS_RDS_POSTGRESQL_USERNAME=$(cat /var/run/quay-qe-aws-rds-postgresql-secre
 QUAY_AWS_RDS_POSTGRESQL_PASSWORD=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/password)
 
 QUAY_AWS_RDS_POSTGRESQL_VERSION="$POSTGRESQL_VERSION"
-QUAY_UNMANAGED_AWS_TERRAFORM_PACKAGE="quay_unmanaged_aws_terraform.tgz"
+QUAY_UNMANAGED_AWS_TERRAFORM_PACKAGE="QUAY_UNMANAGED_AWS_TERRAFORM.tgz"
 
 #Create new directory for terraform resources
 mkdir -p terraform_quay_aws_unmanaged && cd terraform_quay_aws_unmanaged && touch quaybuilder quaybuilder.pub
@@ -48,7 +48,7 @@ EOF
 
 cat >>create_aws_redis_s3_postgresql.tf <<EOF
 
-## EC2 instance for redis ##
+## EC2 instance for redis server ##
 provider "aws" {
   region = "us-east-2"
   access_key = "${QUAY_AWS_ACCESS_KEY}"
