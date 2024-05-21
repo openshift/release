@@ -16,7 +16,7 @@ echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..
 declare -a vips
 mapfile -t vips <"${SHARED_DIR}/vips.txt"
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
