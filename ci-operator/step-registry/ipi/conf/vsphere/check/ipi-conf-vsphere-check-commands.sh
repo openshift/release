@@ -113,7 +113,7 @@ fi
 POOLS=${POOLS:-}
 declare -a pools=($POOLS)
 
-SA_KUBECONFIG=${SA_KUBECONFIG:-/var/run/vault/vsphere-config/vsphere-capacity-manager-kubeconfig}
+SA_KUBECONFIG=${SA_KUBECONFIG:-/var/run/vsphere-ibmcloud-ci/vsphere-capacity-manager-kubeconfig}
 OPENSHIFT_REQUIRED_CORES=${OPENSHIFT_REQUIRED_CORES:-24}
 OPENSHIFT_REQUIRED_MEMORY=${OPENSHIFT_REQUIRED_MEMORY:-96}
 
@@ -274,15 +274,15 @@ for VCENTER in ${!pool_usernames[@]}; do
   platformSpec=$(echo $platformSpec | jq -r '.vcenters += [{"server": "'$VCENTER'", "user": "'${pool_usernames[$VCENTER]}'", "password": "'${pool_passwords[$VCENTER]}'", "datacenters": ['$(echo "${joined%,}")']}]')
 done
 
-# # For most CI jobs, a single lease and single pool will be used. We'll initialize govc.sh and
-# # vsphere_context.sh with the first lease we find. multi-zone and multi-vcenter will need to
-# # parse topology, credentials, etc from $SHARED_DIR.
+# For most CI jobs, a single lease and single pool will be used. We'll initialize govc.sh and
+# vsphere_context.sh with the first lease we find. multi-zone and multi-vcenter will need to
+# parse topology, credentials, etc from $SHARED_DIR.
 
 cp /tmp/lease.json $SHARED_DIR/LEASE_single.json
 NETWORK_RESOURCE=$(cat /tmp/lease.json | jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name')
 cp "${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json" $SHARED_DIR/NETWORK_single.json
 
-cat /tmp/lease.json | jq -r '.status.envVars' > /tmp/envvars
+cat ${SHARED_DIR}/LEASE_single.json | jq -r '.status.envVars' > /tmp/envvars
 source /tmp/envvars
 
 if [ $IPI -eq 0 ]; then
@@ -299,6 +299,10 @@ export NETWORK_PATH=${SHARED_DIR}/NETWORK_single.json
 export GOVC_INSECURE=1
 export vsphere_resource_pool=${resource_pool}
 export GOVC_RESOURCE_POOL=${resource_pool}
+export cloud_where_run=IBM
+export GOVC_USERNAME="${pool_usernames[${GOVC_URL}]}"
+export GOVC_PASSWORD="${pool_passwords[${GOVC_URL}]}"
+export GOVC_TLS_CA_CERTS=/var/run/vsphere-ibmcloud-ci/vcenter-certificate
 EOF
 
 log "Creating vsphere_context.sh file..."
