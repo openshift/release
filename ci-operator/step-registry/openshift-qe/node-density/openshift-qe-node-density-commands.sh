@@ -53,7 +53,7 @@ else
 fi
 
 WEBHOOK_URL="https://snake-curious-easily.ngrok-free.app"
-JSON_DATA='{"jobName":"kube-burner-poc","parameters":{"ARTIFACT_URL":"'"$artifacts_url"'", "BUCKET_NAME":"test-platform-results", "TYPE":"report"}}'
+JSON_DATA='{"jobName":"kube-burner-poc","parameters":{"ARTIFACTS_URL":"'"$artifacts_url"'", "BUCKET_NAME":"test-platform-results", "TYPE":"report"}}'
 
 curl -X POST \
      -u "user:$WEBHOOK_USER"  \
