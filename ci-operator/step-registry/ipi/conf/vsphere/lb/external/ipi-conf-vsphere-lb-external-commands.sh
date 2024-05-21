@@ -155,8 +155,8 @@ EOF
 
     log "creating endpoints for haproxy for network ${_networkJSON}"
     endCount=$((${ip_address_count}-2))
-    for (( i=2; i < $endCount; i++ )) do
-      ip="${octet1}.${octet2}.${octet3}.$(( ${octet4} + ${i} ))"
+    for (( ipindex=2; ipindex < $endCount; ipindex++ )) do
+      ip="${octet1}.${octet2}.${octet3}.$(( ${octet4} + ${ipindex} ))"
       log "server ${EP_NAMES[$i]}-${ip} ${ip}:${EP_PORTS[$i]} check check-ssl"
       echo "   "server ${EP_NAMES[$i]}-${ip} ${ip}:${EP_PORTS[$i]} check check-ssl >>$HAPROXY_PATH
     done
