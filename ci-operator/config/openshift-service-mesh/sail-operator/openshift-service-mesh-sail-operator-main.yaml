@@ -70,20 +70,19 @@ tests:
     export XDG_CACHE_HOME="/tmp/cache"
     export GOCACHE="/tmp/cache"
     export GOMODCACHE="/tmp/cache"
+    export GITHUB_TOKEN_PATH=/creds-github/token
     ./tools/automator-main.sh \
     --org=openshift-service-mesh \
     --repo=sail-operator \
     --branch=main \
     --token-path=/creds-github/token \
     '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
-    "--labels=tide/merge-method-merge,auto-merge" \
+    "--labels=auto-merge,tide/merge-method-merge" \
     --modifier=merge_upstream_main \
-    --merge-repository=https://github.com/istio-ecosystem/sail-operator \
-    --merge-branch=main \
-    --merge-strategy=merge
+    --cmd=./ossm/merge_upstream.sh
   container:
     from: src
-  cron: 00 05 * * 1-5
+  cron: 00 0,3,6,9,12,15,18,21 * * 1-5
   secrets:
   - mount_path: /creds-github
     name: ossm-github-simple-job
@@ -387,6 +386,7 @@ tests:
            git config --global user.name 'Jonh Wendell'; \
            cd /work && \
            export BUILD_WITH_CONTAINER="0" && \
+           rm Makefile.vendor.mk bundle/**/*.yaml && \
            make -e GITHUB_TOKEN=${GITHUB_TOKEN} -e NIGHTLY=true docker-buildx bundle-publish-nightly"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:

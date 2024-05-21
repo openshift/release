@@ -131,11 +131,11 @@ enable_hybrid_overlay () {
     
     oc patch Network.operator.openshift.io cluster --type='merge' --patch '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"hybridOverlayConfig":{"hybridOverlayVXLANPort":'"${VXLAN_PORT}"',"hybridClusterNetwork":[{"cidr": "10.132.0.0/14","hostPrefix": 23}]}}}}}'
     
-    # wait for the ovnkube config map to reflect the change
+    # wait for the ovnKubernetesConfig to update
     start_time=$(date +%s)
-    while [ -z "$(oc get configmap -n openshift-ovn-kubernetes ovnkube-config -o yaml | grep hybridoverlay)" ]; do
+    while [ -z "$(oc get network.operator.openshift.io -o jsonpath="{.items[0].spec.defaultNetwork.ovnKubernetesConfig.hybridOverlayConfig}")" ]; do
         if [ $(($(date +%s) - $start_time)) -gt 300 ]; then
-            echo "Timeout waiting for the ovn-kubernetes config map to update"
+            echo "Timeout waiting for the ovnKubernetesConfig to update"
             exit 1
         fi
     done

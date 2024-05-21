@@ -83,13 +83,14 @@ for dev in "${devices[@]}"; do
     /sbin/dhclient -v \
     -pf "/var/run/dhclient.$interface.pid" \
     -lf "/var/lib/dhcp/dhclient.$interface.lease" "$interface"
-
-  # nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-$CLUSTER_NAME")" \
-  #   /sbin/dhclient -v -N \
-  #   -pf "/var/run/dhclient.$interface.v6.pid" \
-  #   -lf "/var/lib/dhcp/dhclient.$interface.v6.lease" "$interface"
+  
+  if [ "$bridge" = "br-int" ]; then
+    nsenter -m -u -n -i -p -t "$(podman inspect -f '{{ .State.Pid }}' "haproxy-$CLUSTER_NAME")" \
+      /sbin/dhclient -6 -v \
+      -pf "/var/run/dhclient.$interface.v6.pid" \
+      -lf "/var/lib/dhcp/dhclient.$interface.v6.lease" "$interface"
+  fi
 done
-
 
 echo "Sending HUP to HAProxy to trigger the configuration reload..."
 podman kill --signal HUP "haproxy-$CLUSTER_NAME"

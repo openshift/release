@@ -4,16 +4,17 @@ set -o nounset
 set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+REGION=${HYPERSHIFT_AWS_REGION:-$LEASED_RESOURCE}
 
 BUCKET_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-echo "create bucket name: $BUCKET_NAME ,region $HYPERSHIFT_AWS_REGION"
-if [ "$HYPERSHIFT_AWS_REGION" == "us-east-1" ]; then
+echo "create bucket name: $BUCKET_NAME, region $REGION"
+if [ "$REGION" == "us-east-1" ]; then
     aws s3api create-bucket --bucket "$BUCKET_NAME" \
         --region us-east-1
 else
     aws s3api create-bucket --bucket "$BUCKET_NAME" \
-        --create-bucket-configuration LocationConstraint="$HYPERSHIFT_AWS_REGION" \
-        --region "$HYPERSHIFT_AWS_REGION"
+        --create-bucket-configuration LocationConstraint="$REGION" \
+        --region "$REGION"
 fi
 aws s3api delete-public-access-block --bucket "$BUCKET_NAME"
 export BUCKET_NAME=$BUCKET_NAME

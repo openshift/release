@@ -1,0 +1,70 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- build_args:
+  - name: DOCKER_BUILDKIT
+    value: "1"
+  - name: BUILDKIT_PROGRESS
+    value: plain
+  - name: max_jobs
+    value: "10"
+  - name: nvcc_threads
+    value: "18"
+  context_dir: .
+  dockerfile_path: Dockerfile
+  to: vllm-build-main-cuda
+promotion:
+  to:
+  - namespace: opendatahub-io
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+  vllm-build-main-cuda:
+    limits:
+      cpu: "16"
+      memory: 24Gi
+    requests:
+      cpu: "16"
+      memory: 24Gi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-build-main-cuda
+    env:
+      IMAGE_REPO: vllm
+    workflow: opendatahub-io-ci-image-mirror
+- as: fast-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-build-main-cuda
+    env:
+      IMAGE_REPO: vllm
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- as: nightly-image-mirror
+  cron: 0 0 * * *
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: vllm-build-main-cuda
+    env:
+      IMAGE_REPO: vllm
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: vllm

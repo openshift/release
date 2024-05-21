@@ -30,18 +30,25 @@ else
   exit 1
 fi
 
-# Log in
-ROSA_VERSION=$(rosa version)
-ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
-  rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
-  if [ $? -ne 0 ]; then
-    echo "Login failed"
-    exit 1
+read_profile_file() {
+  local file="${1}"
+  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/${file}"
   fi
+}
+
+# Log in
+SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+ROSA_TOKEN=$(read_profile_file "ocm-token")
+if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
+  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+elif [[ -n "${ROSA_TOKEN}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli"
+  rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
 else
-  echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
+  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
   exit 1
 fi
 
@@ -170,7 +177,7 @@ rosa create machinepool -y \
                         ${AUTO_REPAIR_SWITCH} \
                         ${MP_SECURITY_GROUP_ID_SWITCH}
 # echo the machinepool name to a file
-echo $MP_NAME > $SHARED_DIR/mp_name
+echo $MP_NAME >> $SHARED_DIR/mp_name
 } 
 
 if [[ ! -z "$MP_ZONE" ]]; then

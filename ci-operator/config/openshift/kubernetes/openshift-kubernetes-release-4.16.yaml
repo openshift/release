@@ -35,10 +35,6 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: oc-rpms
-  ocp_4.16_base:
-    name: "4.16"
-    namespace: ocp
-    tag: base
   ocp_4.16_base-rhel9:
     name: "4.16"
     namespace: ocp
@@ -47,10 +43,6 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: tools
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
@@ -82,9 +74,9 @@ images:
     ocp_4.16_tools:
       as:
       - registry.ci.openshift.org/ocp/4.16:tools
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: kubernetes-tests
 - dockerfile_literal: |
     # We want to test the PR using the code from it. Now, this repo ships RPMs
@@ -124,9 +116,6 @@ images:
   to: pod
 - dockerfile_path: openshift-hack/images/installer-kube-apiserver-artifacts/Dockerfile.rhel
   inputs:
-    ocp_4.16_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
@@ -138,7 +127,6 @@ promotion:
   to:
   - additional_images:
       artifacts: artifacts
-    disabled: true
     excluded_images:
     - rhel-coreos
     name: "4.16"
@@ -267,7 +255,8 @@ tests:
     memory_backed_volume:
       size: 6Gi
 - as: verify
-  commands: ARTIFACTS="${ARTIFACT_DIR}" TMPDIR=/tmp/volume openshift-hack/verify.sh
+  commands: |
+    KUBE_VERIFY_GIT_BRANCH="${PULL_BASE_REF:-master}" ARTIFACTS="${ARTIFACT_DIR}" TMPDIR=/tmp/volume openshift-hack/verify.sh
   container:
     from: src
 - as: verify-commits
@@ -378,6 +367,19 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-vsphere
 - as: k8s-e2e-conformance-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: openshift-hack/conformance-k8s.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: k8s-conformance
+  interval: 48h
   steps:
     cluster_profile: aws
     test:

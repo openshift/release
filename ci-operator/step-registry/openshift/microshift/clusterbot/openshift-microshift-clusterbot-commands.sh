@@ -16,9 +16,17 @@ declare -A instance_types=(
 	[arm64]=t4g.large
 )
 
+allowed_os=(
+	"rhel-9.2"
+	"rhel-9.3"
+	"rhel-9.4"
+)
+
 # shellcheck disable=SC2153  # possible misspelling
-if [[ "${MICROSHIFT_OS}" != "rhel-9.2" ]] && [[ "${MICROSHIFT_OS}" != "rhel-9.3" ]]; then
-	echo "MICROSHIFT_OS must have value: rhel-9.2 or rhel-9.3"
+if [[ " ${allowed_os[*]} " =~ [[:space:]]${MICROSHIFT_OS}[[:space:]] ]]; then
+	: ok
+else
+	echo "MICROSHIFT_OS must have value one of: ${allowed_os[*]}"
 	exit 1
 fi
 

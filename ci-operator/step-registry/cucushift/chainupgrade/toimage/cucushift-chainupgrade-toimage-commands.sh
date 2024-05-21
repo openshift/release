@@ -19,20 +19,24 @@ KUBECONFIG="" oc --loglevel=8 registry login
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
     if (( FRC != 0 )); then
-        echo -e "oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
-        echo -e "oc get machineconfig\n$(oc get machineconfig)"
-        echo -e "Describing abnormal nodes...\n"
+        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+            echo -e "\n# oc adm upgrade status\n"
+            env OC_ENABLE_CMD_UPGRADE_STATUS='true' oc adm upgrade status --details=all || true 
+        fi
+        echo -e "\n# oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
+        echo -e "\n# oc get machineconfig\n$(oc get machineconfig)"
+        echo -e "\n# Describing abnormal nodes...\n"
         oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
-        echo -e "Describing abnormal operators...\n"
+        echo -e "\n# Describing abnormal operators...\n"
         oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
-        echo -e "Describing abnormal mcp...\n"
+        echo -e "\n# Describing abnormal mcp...\n"
         oc get mcp --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
     fi
 }
 
 # Generate the Junit for upgrade
 function createUpgradeJunit() {
-    echo "Generating the Junit for upgrade"
+    echo -e "\n# Generating the Junit for upgrade"
     if (( FRC == 0 )); then
       cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -276,11 +280,15 @@ function rhel_upgrade(){
 }
 
 # Extract oc binary which is supposed to be identical with target release
+# Default oc on OCP 4.16 not support OpenSSL 1.x
 function extract_oc(){
     echo -e "Extracting oc\n"
-    local retry=5 tmp_oc="/tmp/client-2"
+    local retry=5 tmp_oc="/tmp/client-2" binary='oc'
     mkdir -p ${tmp_oc}
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
+    if (( TARGET_MINOR_VERSION > 15 )) && (openssl version | grep -q "OpenSSL 1") ; then
+        binary='oc.rhel8'
+    fi
+    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=${binary} --to=${tmp_oc} ${TARGET});
     do
         echo >&2 "Failed to extract oc binary, retry..."
         (( retry -= 1 ))
@@ -621,18 +629,18 @@ function admin_ack() {
 # Upgrade the cluster to target release
 function upgrade() {
     set_channel $TARGET_VERSION
-    local retry=3 conditional_updates
+    local retry=3 unrecommened_conditional_updates
     while (( retry > 0 )); do
-        conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]?.release.version' | xargs)
-        if [[ -z "${conditional_updates}" ]]; then
+        unrecommened_conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True")) | .release.version' | xargs)
+        if [[ -z "${unrecommened_conditional_updates}" ]]; then
             retry=$((retry - 1))
             sleep 60
             echo "No conditionalUpdates update available! Retry..."
         else
             #shellcheck disable=SC2076
-            if [[ " $conditional_updates " =~ " $TARGET_VERSION " ]]; then
+            if [[ " $unrecommened_conditional_updates " =~ " $TARGET_VERSION " ]]; then
                 echo "Error: $TARGET_VERSION is not recommended, for details please refer:"
-                oc get clusterversion version -o json | jq -r '.status.conditionalUpdates'
+                oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True"))'
                 exit 1
             fi
             break
@@ -641,6 +649,19 @@ function upgrade() {
 
     run_command "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
+}
+
+# Log abnormal cluster status
+function dump_status_if_unexpected() {
+    # expecting oc to equal TARGET_MINOR_VERSION, skip if less than .16
+        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+            local out; out="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 || true)"
+            # if upgrading, and not progressing well, dump status to log
+            # "resource name may not be empty" is a known issue, remove once OCPBUGS-32682 is fixed
+            if ! grep -qE 'The cluster version is not updating|Upgrade is proceeding well|resource name may not be empty' <<< "${out}" ; then
+                echo "${out}"
+            fi
+        fi
 }
 
 # Monitor the upgrade status
@@ -668,6 +689,7 @@ function check_upgrade_status() {
             echo -e "Upgrade stuck at updating RHEL worker, run the RHEL worker upgrade now...\n\n"
             return 0
         fi
+        dump_status_if_unexpected
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
         echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
@@ -932,6 +954,9 @@ do
     (( index += 1 ))
     export TARGET="${target}"
     TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
+    TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
+    export TARGET_VERSION
+    export TARGET_MINOR_VERSION
     extract_oc
 
     SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
@@ -940,9 +965,6 @@ do
     export SOURCE_MINOR_VERSION
     echo -e "Source release version is: ${SOURCE_VERSION}\nSource minor version is: ${SOURCE_MINOR_VERSION}"
 
-    TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
-    export TARGET_VERSION
-    export TARGET_MINOR_VERSION
     echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
 
     export FORCE_UPDATE="false"
