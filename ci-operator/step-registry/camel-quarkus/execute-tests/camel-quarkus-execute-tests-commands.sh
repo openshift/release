@@ -23,6 +23,7 @@ function collect-results() {
     done
 }
 
+echo "heya"
 echo "Logging to oc:"
 sh ./oc_login.sh
 echo "Executing tests:"
