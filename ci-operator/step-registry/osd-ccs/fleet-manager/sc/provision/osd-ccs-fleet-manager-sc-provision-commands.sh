@@ -8,16 +8,16 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 function wait_for_cluster()
 {
-    while true; do
-      sleep 60
-      cluster_state=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters -p search="region='${OSDFM_REGION}'" | jq -r '.items[0].status')
-      echo "service cluster state: ${cluster_state}"
-      if [[ "${cluster_state}" == "ready" ]]; then
-        echo "service cluster reported as ready"
-        break
-      fi
-    done
-    return 0
+  while true; do
+    sleep 60
+    cluster_state=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters -p search="region='${OSDFM_REGION}'" | jq -r '.items[0].status')
+    echo "service cluster state: ${cluster_state}"
+    if [[ "${cluster_state}" == "ready" ]]; then
+      echo "service cluster reported as ready"
+      break
+    fi
+  done
+  return 0
 }
 
 #Set up region
