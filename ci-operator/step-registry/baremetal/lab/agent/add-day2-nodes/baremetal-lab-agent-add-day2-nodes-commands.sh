@@ -17,6 +17,8 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
+
 function mount_virtual_media() {
   local host="${1}"
   local iso_path="${2}"
@@ -54,10 +56,13 @@ BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 
 INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
+DAY2_ASSETS_DIR="${DAY2_ASSETS_DIR:-/tmp/installer/assets}"
+
 mkdir -p "${INSTALL_DIR}"
+mkdir -p "${DAY2_ASSETS_DIR}"
 
 
-cat > "${INSTALL_DIR}/nodes-config.yaml" <<EOF
+cat > "${DAY2_ASSETS_DIR}/nodes-config.yaml" <<EOF
 hosts: []
 EOF
 
@@ -118,20 +123,27 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   "
   # Patch the nodes-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
   yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
-    "$INSTALL_DIR/nodes-config.yaml" - <<< "$ADAPTED_YAML"
+    "$DAY2_ASSETS_DIR/nodes-config.yaml" - <<< "$ADAPTED_YAML"
   fi
 done
 
-sleep 3600
+cp "${DAY2_ASSETS_DIR}/nodes-config.yaml" "${ARTIFACT_DIR}/"
 
-cp "${INSTALL_DIR}/nodes-config.yaml" "${ARTIFACT_DIR}/"
+# node-joiner-monitor.sh needs write permissions
+cp "$SHARED_DIR/kubeconfig" "${DAY2_ASSETS_DIR}/"
 
-export KUBECONFIG="$SHARED_DIR/kubeconfig"
+export KUBECONFIG="$DAY2_ASSETS_DIR/kubeconfig"
 
-curl https://github.com/openshift/installer/blob/master/docs/user/agent/add-node/node-joiner.sh --output "${INSTALL_DIR}/node-joiner.sh"
+curl https://raw.githubusercontent.com/bmanzari/installer/AGENT-912/docs/user/agent/add-node/node-joiner.sh --output "${DAY2_ASSETS_DIR}/node-joiner.sh"
 
-chmod +x "${INSTALL_DIR}/node-joiner.sh"
-sh "${INSTALL_DIR}/node-joiner.sh"
+curl https://raw.githubusercontent.com/bmanzari/installer/AGENT-912/docs/user/agent/add-node/node-joiner-monitor.sh --output "${DAY2_ASSETS_DIR}/node-joiner-monitor.sh"
+
+export http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}"
+
+chmod +x "${DAY2_ASSETS_DIR}/node-joiner.sh"
+chmod +x "${DAY2_ASSETS_DIR}/node-joiner-monitor.sh"
+
+sh "${DAY2_ASSETS_DIR}/node-joiner.sh"
 
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
@@ -139,7 +151,6 @@ sh "${INSTALL_DIR}/node-joiner.sh"
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
 
-sleep 3600
 
 gnu_arch=$(echo "$architecture" | sed 's/arm64/aarch64/;s/amd64/x86_64/;')
 case "${BOOT_MODE}" in
@@ -193,7 +204,6 @@ case "${BOOT_MODE}" in
 esac
 
 
-proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
@@ -204,25 +214,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   fi
 done
 
-sleep 3600
+sh "${DAY2_ASSETS_DIR}/node-joiner-monitor.sh"
 
-# wait for certs to be provisioned
-WAIT="true"
-while [ $WAIT == "true" ]; do
-    sleep 30
-    WAIT=false
-    for cert in $(oc get csr --no-headers); do
-          if ! [[ $(oc get csr -o json | jq -r '.items[] | select(.status == {} ) | .metadata.name') == "Pending" ]]; then
-                WAIT=true
-          fi
-    done
-done
 
-sleep 3600
-
-oc get csr -o json | jq -r '.items[] | select(.status == {} ) | .metadata.name' | xargs oc adm certificate approve
-
-oc get nodes
-
-sleep 3600
-
+sleep 7200
