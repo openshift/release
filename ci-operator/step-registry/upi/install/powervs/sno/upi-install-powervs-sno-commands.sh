@@ -5,6 +5,7 @@ set -euox pipefail
 CLUSTER_NAME="cicd-$(printf $PROW_JOB_ID|sha256sum|cut -c-10)"
 POWERVS_VSI_NAME="${CLUSTER_NAME}-worker"
 BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
+CREDENTIALS_PATH="/etc/sno-power-credentials"
 
 setup_env() {
   set +x
@@ -20,7 +21,7 @@ setup_env() {
 
   # IBM cloud login
   ibmcloud config --check-version=false
-  echo | ibmcloud login --apikey @"/etc/sno-power-credentials/.powercreds" --no-region
+  echo | ibmcloud login --apikey @"${CREDENTIALS_PATH}/.powercreds" --no-region
 
   # Installing required ibmcloud plugins
   echo "$(date) Installing required ibmcloud plugins"
@@ -126,12 +127,12 @@ patch_image_registry() {
 
 # Create private key with 0600 permission for ssh purpose
 SSH_PRIVATE="/tmp/ssh-privatekey"
-cp "/etc/sno-power-credentials/ssh-privatekey" ${SSH_PRIVATE}
+cp "${CREDENTIALS_PATH}/ssh-privatekey" ${SSH_PRIVATE}
 chmod 0600 ${SSH_PRIVATE}
 SSH_OPTIONS=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'ServerAliveInterval=60' -o 'ServerAliveCountMax=60' -o 'UserKnownHostsFile=/dev/null' -i "${SSH_PRIVATE}")
 # Save private-key, pull-secret and offline-token to bastion
 ssh "${SSH_OPTIONS[@]}" root@${BASTION} "mkdir -p ~/.sno"
-scp "${SSH_OPTIONS[@]}" /etc/sno-power-credentials/{ssh-publickey,pull-secret,pull-secret-ci,offline-token} root@${BASTION}:~/.sno/.
+scp "${SSH_OPTIONS[@]}" ${CREDENTIALS_PATH}/{ssh-publickey,pull-secret,pull-secret-ci,offline-token} root@${BASTION}:~/.sno/.
 scp "${SSH_OPTIONS[@]}" ${SSH_PRIVATE} root@${BASTION}:~/.sno/.
 # set the default INSTALL_TYPE to sno
 INSTALL_TYPE=${INSTALL_TYPE:-sno}
@@ -415,7 +416,7 @@ EOF
 
 cat > ${BASTION_CI_SCRIPTS_DIR}/grub-menu.template << EOF
     if [ \${GRUB_MAC_CONFIG} = "\${MAC_ADDRESS}" ]; then
-        linux \${KERNEL_PATH} ignition.firstboot ignition.platform.id=metal 'coreos.live.rootfs_url=http://192.168.140.2/\${ROOTFS_FILE}' 'ignition.config.url=http://192.168.140.2/\${IGNITION_FILE}'
+        linux \${KERNEL_PATH} ignition.firstboot ignition.platform.id=metal 'coreos.live.rootfs_url=\${BASTION_HTTP_URL}/\${ROOTFS_FILE}' 'ignition.config.url=\${BASTION_HTTP_URL}/\${IGNITION_FILE}'
         initrd \${INITRAMFS_PATH}
     fi
 EOF
@@ -511,6 +512,12 @@ sno_prepare_cluster() {
 
     cp \${CONFIG_DIR}/bootstrap-in-place-for-live-iso.ign \${WWW_DIR}/bootstrap.ign
     chmod 644 \${WWW_DIR}/bootstrap.ign
+
+    coreos_pxe_files=\$(./openshift-install coreos print-stream-json | jq .architectures.ppc64le.artifacts.metal.formats.pxe)
+    ROOTFS_URL=\$(echo \$coreos_pxe_files | jq -r .rootfs.location)
+    INITRAMFS_URL=\$(echo \$coreos_pxe_files | jq -r .initramfs.location)
+    KERNEL_URL=\$(echo \$coreos_pxe_files | jq -r .kernel.location)
+
     curl -s \${ROOTFS_URL} -o \${WWW_DIR}/rootfs.img
 
     curl -s \${INITRAMFS_URL} -o \${IMAGES_DIR}/initramfs.img
@@ -752,7 +759,7 @@ set +x
 ################################################################
 echo "If installation completed successfully Copying required artifacts to shared dir"
 # Powervs requires config.json
-IBMCLOUD_API_KEY=$(cat /etc/sno-power-credentials/.powercreds)
+IBMCLOUD_API_KEY=$(cat ${CREDENTIALS_PATH}/.powercreds)
 POWERVS_SERVICE_INSTANCE_ID=$(echo ${POWERVS_INSTANCE_CRN} | cut -f8 -d":")
 POWERVS_REGION=$(echo ${POWERVS_INSTANCE_CRN} | cut -f6 -d":")
 POWERVS_ZONE=$(echo ${POWERVS_REGION} | sed 's/-*[0-9].*//')
@@ -761,9 +768,7 @@ cat > /tmp/powervs-config.json << EOF
 {"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${POWERVS_RESOURCE_GROUP}"}
 EOF
 cp /tmp/powervs-config.json "${SHARED_DIR}/"
-cp /etc/sno-power-credentials/ssh-publickey "${SHARED_DIR}/"
-cp /etc/sno-power-credentials/ssh-privatekey "${SHARED_DIR}/"
-cp /etc/sno-power-credentials/pull-secret "${SHARED_DIR}/"
+cp ${CREDENTIALS_PATH}/{ssh-publickey,ssh-privatekey,pull-secret,pull-secret-ci} "${SHARED_DIR}/"
 #Copy the auth artifacts to shared dir for the next steps
 scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeadmin-password "${SHARED_DIR}/"
 scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeconfig "${SHARED_DIR}/"
