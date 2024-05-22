@@ -623,7 +623,6 @@ sleep 30
 CLAIR_ROUTE_NAME="$(oc get route -n ${clair_app_namespace} -o jsonpath='{.items[0].spec.host}')"
 echo "$CLAIR_ROUTE_NAME"
 #Save for next step and recycle
-cp $CLAIR_ROUTE_NAME ${SHARED_DIR}
-cp clair-setup-quay-operatortest.yaml ${SHARED_DIR}
+cp $CLAIR_ROUTE_NAME ${SHARED_DIR} && cp clair-setup-quay-operatortest.yaml ${SHARED_DIR} || true
 
 
