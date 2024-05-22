@@ -142,17 +142,6 @@ function set_eternal_azure_oidc() {
 }
 
 function export_envs() {
-    # kubeconfig
-    export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-    if [[ -f "${SHARED_DIR}/mgmt_kubeconfig" ]]; then
-      export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
-    fi
-
-    # aws env
-    export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-    export AWS_REGION=${REGION}
-    export AWS_PAGER=""
-
     # export capi env variables
     prefix="ci-capi-hcp-test-long-name"
     subfix=$(openssl rand -hex 10)
@@ -285,8 +274,19 @@ ${ADDITIONAL_SECURITY_GROUPS_YAML}"
 }
 
 # main
-export_envs
+# kubeconfig
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+if [[ -f "${SHARED_DIR}/mgmt_kubeconfig" ]]; then
+  export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+fi
+
+# aws env
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export AWS_REGION=${REGION}
+export AWS_PAGER=""
+
 rosa_login
+export_envs
 download_envsubst
 
 # create AWSClusterControllerIdentity
