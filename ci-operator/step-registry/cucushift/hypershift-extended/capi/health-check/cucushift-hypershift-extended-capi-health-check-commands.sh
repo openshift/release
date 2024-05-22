@@ -192,7 +192,20 @@ fi
 tags=$(jq -r '.spec.additionalTags  //""' < "${capi_cp_json_file}")
 if [[ -n "${tags}" ]]; then
   echo "check rosacontrolplane additionalTags"
-  hc_dft_sg=$(cat "${SHARED_DIR}/capi_hcp_default_security_group")
+  hc_dft_sg=""
+  if [[ -f "${SHARED_DIR}/capi_hcp_default_security_group" ]] ; then
+    hc_dft_sg=$(cat "${SHARED_DIR}/capi_hcp_default_security_group")
+  else
+    cluster_id=$(cat "${SHARED_DIR}/cluster-id")
+    hc_vpc_id=$(cat "${SHARED_DIR}/vpc_id")
+    hc_dft_sg=$(aws ec2 describe-security-groups --region ${REGION} --filters "Name=vpc-id,Values=${hc_vpc_id}" "Name=group-name,Values=${cluster_id}-default-sg" --query 'SecurityGroups[].GroupId' --output text)
+  fi
+
+  if [[ -z "${hc_dft_sg}" ]] ; then
+    echo "default security group not found error"
+    exit 1
+  fi
+
   echo "${tags}" | jq -r 'to_entries[] | "\(.key) \(.value)"' | while read key value; do
     contain_key=$(jq -e '.aws.tags | contains({"'"${key}"'": "'"${value}"'"})' < "${rosa_hcp_info_file}")
     if [[ "${contain_key}" != "true" ]] ; then
