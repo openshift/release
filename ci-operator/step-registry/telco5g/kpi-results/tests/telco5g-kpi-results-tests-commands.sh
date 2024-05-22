@@ -16,8 +16,19 @@ JQ_FILE_PATH="/tmp/jq"
 # Default value for description
 KPI_DESCRIPTION="${KPI_DESCRIPTION:-KPI}"
 
+# Default value for job name
+JOB_NAME="${JOB_NAME:-default}"
+
 # The official graph contains the mappings for all hashes to version strings
 OCP_UPGRADE_GRAPH_URL="${OCP_UPGRADE_GRAPH_URL:-https://amd64.ocp.releases.ci.openshift.org/graph}"
+
+# Supported Openshift versions
+# 4-stable runs against all 4.x releases
+# We need to fast exit successfully for all runs that are not what we support
+SUPPORTED_VERSIONS=(
+    "4.15"
+    "4.14"
+)
 
 function get_date_stamp() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')]"
@@ -65,6 +76,19 @@ function get_version_string_for_image_hash() {
 
     # Return the version but also remove any extra quotes around it
     echo "${version}" | sed 's/"//g' | sed "s/'//g"
+}
+
+function get_major_minor_version() {
+    # Get the major.minor version from ocp release
+    # e.g. input: "4.16.0-rc.0"
+    #      output: "4.16"
+    local input
+    input=$1
+    local result
+    result="$(awk -F"." '{print $1}' <<< ${input})"
+    result="${result}."
+    result="${result}$(awk -F"." '{print $2}' <<< ${input})"
+    echo "${result}"
 }
 
 function download_jq() {
@@ -237,18 +261,39 @@ function main() {
     # https://docs.ci.openshift.org/docs/architecture/ci-operator/#testing-with-an-existing-openshift-release
     # When doing this, an image digest is passed instead of a version string
     # We have to get the version string ourself from the upgrade graph
-    OCP_RELEASE_VERSION="$(get_version_string_for_image_hash "${RELEASE_IMAGE_LATEST}")"
+    local ocp_release_version
+    ocp_release_version="$(get_version_string_for_image_hash "${RELEASE_IMAGE_LATEST}")"
 
-    # check if $OCP_RELEASE_VERSION is defined
-    if [[ -z "${OCP_RELEASE_VERSION}" ]]; then
+    # check if $ocp_release_version is defined
+    if [[ -z "${ocp_release_version}" ]]; then
         print_error "Failed to get version string for image ${RELEASE_IMAGE_LATEST}"
         exit 32
     fi
 
-    print_message "Got version string '${OCP_RELEASE_VERSION}' for digest"
+    print_message "Graph returned version string '${ocp_release_version}' for digest"
+
+    local major_minor_version
+    major_minor_version="$(get_major_minor_version "${ocp_release_version}")"
+    print_message "Detected stream: '${major_minor_version}'"
+
+    # check if this is a supported version
+    if ! grep "${major_minor_version}" <<< "${SUPPORTED_VERSIONS[@]}"; then
+        # If the version is not supported then we must exit cleanly
+        print_message "Stream '${major_minor_version}' is not supported."
+        exit 0
+    fi
+
+    # check for rehearsal
+    print_message "Checking job name: '${JOB_NAME}'"
+    if [[ "${JOB_NAME}" == rehearse* ]]; then
+        # We just want to make sure the script runs in the rehearsal to this point.
+        # Whether the performance was pass or fail does not matter for rehearsal.
+        print_message "Rehearsal detected; exiting successful regardless of performance"
+        exit 0
+    fi
 
     # download the report
-    download_kpi_results_report "${OCP_RELEASE_VERSION}" "${KPI_DESCRIPTION}"
+    download_kpi_results_report "${ocp_release_version}" "${KPI_DESCRIPTION}"
 
     # Check the test data
     local test_data
