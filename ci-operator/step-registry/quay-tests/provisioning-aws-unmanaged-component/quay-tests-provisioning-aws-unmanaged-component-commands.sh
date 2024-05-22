@@ -263,10 +263,10 @@ export TF_VAR_quay_db_host="${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}"
 terraform init 
 terraform apply -auto-approve 
 
-## Provisiong Clair instance default version 4.7.4 ##
+## Provisiong Clair instance, default version 4.7.4 ##
 clair_app_namespace="clair-quay-operatortest"
 
-cat >>clair-setup-quayoperator.yaml <<EOF
+cat >>clair-setup-quay-operatortest.yaml <<EOF
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -617,13 +617,13 @@ oc new-project ${clair_app_namespace}
 #extract tls.crt from openshift-ingress and create a secret with it
 oc extract secrets/router-certs-default -n openshift-ingress && oc create secret generic clair-config-tls-secret --from-file=ocp-cluster-wildcard.cert=tls.crt  -n ${clair_app_namespace}
 
-oc apply clair-setup-quayoperator.yaml || true
+oc apply clair-setup-quay-operatortest.yaml || true
 sleep 30
 
 CLAIR_ROUTE_NAME="$(oc get route -n ${clair_app_namespace} -o jsonpath='{.items[0].spec.host}')"
 echo "$CLAIR_ROUTE_NAME"
 #Save for next step and recycle
 cp $CLAIR_ROUTE_NAME ${SHARED_DIR}
-cp clair-setup-quayoperator.yaml ${SHARED_DIR}
+cp clair-setup-quay-operatortest.yaml ${SHARED_DIR}
 
 
