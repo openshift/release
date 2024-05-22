@@ -620,9 +620,11 @@ oc extract secrets/router-certs-default -n openshift-ingress && oc create secret
 oc apply -f clair-setup-quay-operatortest.yaml || true
 sleep 30
 
-CLAIR_ROUTE_NAME="$(oc get route -n ${clair_app_namespace} -o jsonpath='{.items[0].spec.host}')"
-echo "$CLAIR_ROUTE_NAME"
+clair_route_name="$(oc get route -n ${clair_app_namespace} -o jsonpath='{.items[0].spec.host}')"
+
+echo "$clair_route_name"
 #Save for next step and recycle
-cp $CLAIR_ROUTE_NAME ${SHARED_DIR} && cp clair-setup-quay-operatortest.yaml ${SHARED_DIR} || true
+echo "${clair_route_name}" >${SHARED_DIR}/CLAIR_ROUTE_NAME
+cp clair-setup-quay-operatortest.yaml ${SHARED_DIR} || true
 
 
