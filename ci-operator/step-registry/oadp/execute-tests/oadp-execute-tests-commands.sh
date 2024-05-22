@@ -82,5 +82,6 @@ function archive-results() {
 echo "Executing tests..."
 trap archive-results SIGINT SIGTERM ERR EXIT
 cd $OADP_GIT_DIR
+go mod download
 #EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
 export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt/tests" && /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
