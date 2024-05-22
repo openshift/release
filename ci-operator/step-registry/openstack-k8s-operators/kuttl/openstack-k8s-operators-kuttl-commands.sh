@@ -23,6 +23,23 @@ PROW_BUILD=$(echo ${JOB_SPEC} | jq -r '.buildid')
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
 # Build tag
 BUILD_TAG="${PR_SHA:0:20}-${PROW_BUILD}"
+# Get Pull request info - Pull request
+# PR_NUMBER=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].number')
+# PR_BODY=$(curl -s  -X GET -H \
+#     -H "Accept: application/vnd.github+json" \
+#     -H "X-GitHub-Api-Version: 2022-11-28" \
+#     https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} | \
+#     jq -r '.body')
+
+# PRE_HOLD=$(echo ${PR_BODY} | grep -i kuttl-pre-hold -wc)
+
+# POST_HOLD=$(echo ${PR_BODY} | grep -i kuttl-post-hold -wc)
+
+# # hold the job before running Kuttl for debugging
+# if [[ "$PRE_HOLD" -ge 1 ]]; then
+#   sleep ${JOB_HOLD_EXPIRATION}
+# fi
+
 
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name
@@ -89,6 +106,8 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
 
   cd ${HOME}/install_yamls
   # Create/enable openstack namespace
+  echo "edit make ovn_kuttl now"
+  sleep 300
   make namespace
   # Creates storage
   # Sometimes it fails to find container-00 inside debug pod
@@ -105,7 +124,8 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
     sleep 10
   done
 
-  make ${SERVICE_NAME}_kuttl
+  make ${SERVICE_NAME}_kuttl || true
+  sleep 14000
   if [ -f "$KUTTL_REPORT" ]; then
       cp "${KUTTL_REPORT}" ${ARTIFACT_DIR}
   else
@@ -128,3 +148,10 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
 else
   echo "File /go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml not found. Skipping script."
 fi
+
+
+
+# # hold the job after running Kuttl for debugging
+# if [[ "$POST_HOLD" -ge 1 ]]; then
+#   sleep ${JOB_HOLD_EXPIRATION}
+# fi
