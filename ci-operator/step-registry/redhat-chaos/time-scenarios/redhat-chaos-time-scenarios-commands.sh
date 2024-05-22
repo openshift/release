@@ -40,5 +40,8 @@ pwd
 
 ./time-scenarios/prow_run.sh
 rc=$?
+
+oc -n openshift-monitoring exec -c prometheus prometheus-k8s-0 -- curl -s   'http://localhost:9090/api/v1/alerts' | jq '.data.alerts[] | select(.labels.severity=="critical")| select(.state=="firing") | [.labels.alertname, .activeAt, .annotations.description]'
+
 echo "Finished running time scenario"
 echo "Return code: $rc"
