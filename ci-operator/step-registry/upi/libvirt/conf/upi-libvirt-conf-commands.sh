@@ -42,4 +42,4 @@ fips: false
 EOF
 
 yq-v4 eval ".pullSecret = load_str(\"${CLUSTER_PROFILE_DIR}/pull-secret\")" -i "${CONFIG}"
-yq-v4 eval ".sshKey = load_str(\"${CLUSTER_PROFILE_DIR}/ssh-publickey\")" -i "${CONFIG}"
+yq-v4 eval ".sshKey = load_str(\"${CLUSTER_PROFILE_DIR}/ssh-publickey\")" -i "${CONFIG}"  
