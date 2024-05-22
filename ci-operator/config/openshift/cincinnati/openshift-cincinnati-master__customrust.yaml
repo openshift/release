@@ -25,8 +25,8 @@ images:
         dnf install -y jq python38 && \
         dnf clean all
     # build: Rust stable toolchain
-    RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.70.0 -y && \
-      rustup install 1.64.0
+    RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.76.0 -y && \
+      rustup install 1.76.0
     # install yamllint
     RUN pip3 install --user yamllint
     RUN \
@@ -145,6 +145,10 @@ tests:
           memory: 200Mi
 - as: yaml-lint
   commands: dist/prow_yaml_lint.sh
+  container:
+    from: src-rust
+- as: rustfmt-1.76.0
+  commands: dist/prow_rustfmt.sh 1.76.0
   container:
     from: src-rust
 - as: rustfmt-1.70.0
