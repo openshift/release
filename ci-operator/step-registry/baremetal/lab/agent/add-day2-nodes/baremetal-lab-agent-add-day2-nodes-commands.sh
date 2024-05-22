@@ -143,7 +143,7 @@ export http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_
 chmod +x "${DAY2_ASSETS_DIR}/node-joiner.sh"
 chmod +x "${DAY2_ASSETS_DIR}/node-joiner-monitor.sh"
 
-sh "${DAY2_ASSETS_DIR}/node-joiner.sh"
+sh "${DAY2_ASSETS_DIR}/node-joiner.sh" "$DAY2_ASSETS_DIR/nodes-config.yaml"
 
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
@@ -160,7 +160,7 @@ case "${BOOT_MODE}" in
   #oinst agent create image
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the day2 node ISO image into the bastion host..."
-  scp "${SSHOPTS[@]}" "${INSTALL_DIR}/node.x86_64.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.node.iso"
+  scp "${SSHOPTS[@]}" "${DAY2_ASSETS_DIR}/node.x86_64.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.node.iso"
   echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
   # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
