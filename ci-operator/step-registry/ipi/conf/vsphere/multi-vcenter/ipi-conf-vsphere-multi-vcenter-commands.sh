@@ -80,9 +80,9 @@ do
       server: $(echo $fd | jq -r '.vcenter')
       zone: $(echo $fd | jq -r '.zone')
       topology:
-        computeCluster: /IBMCloud/host/vcs-ci-workload
-        datacenter: IBMCloud
-        datastore: /IBMCloud/datastore/vsanDatastore
+        computeCluster: $(echo $fd | jq -r '.computeCluster')
+        datacenter: $(echo $fd | jq -r '.datacenter')
+        datastore: $(echo $fd | jq -r '.datastore')
         networks:
         - ci-vlan-${vlanid}
 EOF
