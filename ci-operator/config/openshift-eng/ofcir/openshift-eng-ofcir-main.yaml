@@ -1,10 +1,21 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "9"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.20
+    tag: rhel-9-release-golang-1.21-openshift-4.17
 canonical_go_repository: github.com/openshift/ofcir
 images:
+- dockerfile_literal: |
+    FROM base
+    USER 0
+    RUN dnf install -y podman
+  from: base
+  to: custom-src
 - dockerfile_path: Dockerfile
   to: ofcir
 promotion:
@@ -19,6 +30,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: podman-test
+  commands: sleep 900s
+  container:
+    from: custom-src
 - as: unit
   commands: |
     XDG_CACHE_HOME="/tmp/cache" \
