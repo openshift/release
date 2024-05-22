@@ -617,7 +617,7 @@ oc new-project ${clair_app_namespace}
 #extract tls.crt from openshift-ingress and create a secret with it
 oc extract secrets/router-certs-default -n openshift-ingress && oc create secret generic clair-config-tls-secret --from-file=ocp-cluster-wildcard.cert=tls.crt  -n ${clair_app_namespace}
 
-oc apply clair-setup-quay-operatortest.yaml || true
+oc apply -f clair-setup-quay-operatortest.yaml || true
 sleep 30
 
 CLAIR_ROUTE_NAME="$(oc get route -n ${clair_app_namespace} -o jsonpath='{.items[0].spec.host}')"
