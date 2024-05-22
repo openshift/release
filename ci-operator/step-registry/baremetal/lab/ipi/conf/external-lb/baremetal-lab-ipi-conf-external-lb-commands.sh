@@ -15,7 +15,6 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 echo "Creating patch file to enable UserManaged loadbalancer: ${SHARED_DIR}/install-config.yaml"
 
 cat > "${SHARED_DIR}/external_lb_patch_install_config.yaml" <<'EOF'
-featureSet: TechPreviewNoUpgrade
 platform:
   baremetal:
     loadBalancer:

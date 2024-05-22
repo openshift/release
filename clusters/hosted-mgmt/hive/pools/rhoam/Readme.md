@@ -4,7 +4,7 @@ This folder contains the manifests for RHOAM cluster pool created by Hive. [Hive
 
 ## Pool Template for RHOAM
 
-[AWS - us-east-2](rhoam-aws-us-east-2.yaml): Used for [E2E Tests](https://github.com/integr8ly/integreatly-operator/tree/master/test/e2e).
+[AWS - us-east-2](install-config-aws-us-east-2_secret.yaml) is used for [E2E Tests](https://github.com/integr8ly/integreatly-operator/tree/master/test/e2e).
 
 ## How to use RHOAM Cluster Pool in your tests?
 
