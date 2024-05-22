@@ -18,6 +18,7 @@ QUAY_AWS_RDS_POSTGRESQL_USERNAME=$(cat /var/run/quay-qe-aws-rds-postgresql-secre
 QUAY_AWS_RDS_POSTGRESQL_PASSWORD=$(cat /var/run/quay-qe-aws-rds-postgresql-secret/password)
 
 QUAY_AWS_RDS_POSTGRESQL_VERSION="$POSTGRESQL_VERSION"
+QUAY_CLAIR_VERSION="$CLAIR_VERSION"
 QUAY_UNMANAGED_AWS_TERRAFORM_PACKAGE="QUAY_UNMANAGED_AWS_TERRAFORM.tgz"
 
 #Create new directory for terraform resources
@@ -261,4 +262,368 @@ EOF
 export TF_VAR_quay_db_host="${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}"
 terraform init 
 terraform apply -auto-approve 
+
+## Provisiong Clair instance default version 4.7.4 ##
+clair_app_namespace="clair-quay-operatortest"
+
+cat >>clair-setup-quayoperator.yaml <<EOF
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clair-cluster-trusted-ca
+  namespace: ${clair_app_namespace}
+  labels:
+      config.openshift.io/inject-trusted-cabundle: 'true'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: clair-serviceaccount
+  namespace: ${clair_app_namespace}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - put
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+- apiGroups:
+  - extensions
+  - apps
+  resources:
+  - deploymentsclair-config-tls-secret
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: clair-secret-writer
+  namespace: ${clair_app_namespace}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: clair-serviceaccount
+subjects:
+- kind: ServiceAccount
+  name: default
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-clair-storage-operator
+  namespace: ${clair_app_namespace}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: postgres-clair
+  name: postgres-clair
+  namespace: ${clair_app_namespace}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-clair
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: postgres-clair
+    spec:
+      containers:
+      - env:
+        - name: POSTGRESQL_USER
+          value: clair
+        - name: POSTGRESQL_DATABASE
+          value: clair
+        - name: POSTGRESQL_PASSWORD
+          value: ${QUAY_AWS_RDS_POSTGRESQL_PASSWORD}
+        - name: POSTGRESQL_ADMIN_PASSWORD
+          value: ${QUAY_AWS_RDS_POSTGRESQL_PASSWORD}
+        - name: POSTGRESQL_SHARED_BUFFERS
+          value: 256MB
+        - name: POSTGRESQL_MAX_CONNECTIONS
+          value: "2000"
+        image: registry.redhat.io/rhel8/postgresql-13@sha256:eceab3d3b02f7d24054c410054b2f125eb4ec4ac9cca9d3f21702416d55a6c5c
+        imagePullPolicy: IfNotPresent
+        name: postgres-clair
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+        ports:
+        - containerPort: 5432
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /var/lib/pgsql/data
+          name: postgredb
+      volumes:
+      - name: postgredb
+        persistentVolumeClaim:
+          claimName: postgres-clair-storage-operator
+      terminationGracePeriodSeconds: 180
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: postgres-clair
+  name: postgres-clair
+  namespace: ${clair_app_namespace}
+spec:
+  ports:
+  - name: postgres
+    port: 5432
+    protocol: TCP
+    targetPort: 5432
+    nodePort: 30432
+  selector:
+    app: postgres-clair
+  type: NodePort
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clair-configmap
+  namespace: ${clair_app_namespace}
+data:
+  config.yaml: |
+    introspection_addr: ""
+    http_listen_addr: :8080
+    log_level: debug-color
+    updaters:
+      config:
+          rhel:
+              ignore_unpatched: false
+    indexer:
+      connstring: host=postgres-clair port=5432 dbname=clair user=clair password=${QUAY_AWS_RDS_POSTGRESQL_PASSWORD} sslmode=disable
+      scanlock_retry: 10
+      layer_scan_concurrency: 10
+      migrations: true
+      scanner:
+            package: {}
+            dist: {}
+            repo: {}
+      airgap: false
+      index_report_request_concurrency: -1
+    matcher:
+      connstring: host=postgres-clair port=5432 dbname=clair user=clair password=${QUAY_AWS_RDS_POSTGRESQL_PASSWORD} sslmode=disable
+      max_conn_pool: 100
+      indexer_addr: "http://clair-indexer"
+      migrations: true
+      period: 6h
+      disable_updaters: false
+    matchers:
+      names: null
+    notifier:
+      indexer_addr: "http://clair-indexer"
+      matcher_addr: "http://clair-matcher"
+      connstring: host=postgres-clair port=5432 dbname=clair user=clair password=${QUAY_AWS_RDS_POSTGRESQL_PASSWORD} sslmode=disable
+      migrations: true
+      delivery_interval: 1m
+      poll_interval: 6h
+      amqp: null
+      stomp: null
+    auth:
+      psk:
+        key: Y2xhaXJzaGFyZWRwYXNzd29yZA==
+        iss:
+            - quay
+    metrics:
+      name: "prometheus"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clair-deployment-quay
+  namespace: ${clair_app_namespace}
+spec:
+  selector:
+    matchLabels:
+      app: clair
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: clair
+    spec:
+      volumes:
+        - name: clair-config
+          configMap:
+            name: clair-configmap
+        - name: cluster-trusted-ca
+          configMap:
+            name: clair-cluster-trusted-ca
+            items:
+              - key: ca-bundle.crt
+                path: tls-ca-bundle.pem
+            defaultMode: 420
+        - name: certificates
+          projected:
+            sources:
+              - secret:
+                  name: clair-config-tls-secret
+              - configMap:
+                  name: openshift-service-ca.crt
+              - configMap:
+                  name: clair-cluster-trusted-ca	  
+            defaultMode: 420
+      containers:
+        - name: clair
+          image: quay.io/projectquay/clair:$QUAY_CLAIR_VERSION
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 8080
+            name: clair-http
+            protocol: TCP
+          - containerPort: 8089
+            name: clair-intro
+            protocol: TCP
+          startupProbe:
+            tcpSocket:
+              port: clair-intro
+            periodSeconds: 10
+            failureThreshold: 300
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+          livelinessProbe:
+            httpGet:
+              port: clair-intro
+              path: /healthz
+          resources:
+            limits:
+              cpu: "4"
+              memory: 16Gi
+            requests:
+              cpu: "2"
+              memory: 2Gi
+          env:
+            - name: CLAIR_MODE
+              value: combo
+            - name: CLAIR_CONF
+              value: /clair/config.yaml
+          volumeMounts:
+            - name: clair-config
+              mountPath: /clair/config.yaml
+              subPath: config.yaml
+              readOnly: true
+            - name: cluster-trusted-ca
+              mountPath: /etc/pki/ca-trust/extracted/pem
+              readOnly: true  
+            - name: certificates
+              mountPath: /var/run/certs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clair-service-quay
+  namespace: ${clair_app_namespace}
+spec:
+  selector:
+    app: clair
+  ports:
+    - name: clair-http
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+    - name: clair-introspection
+      port: 8089
+      protocol: TCP
+      targetPort: 8089
+  type: ClusterIP
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: clair-quay-operatortest
+  namespace: ${clair_app_namespace}
+spec:
+  to:
+    kind: Service
+    name: clair-service-quay
+  port:
+    targetPort: clair-http
+  wildcardPolicy: None
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: clair-service-monitor
+  namespace: ${clair_app_namespace}
+  labels:
+    app: clair
+spec:
+  selector:
+    matchLabels:
+      app: clair
+  endpoints:
+  - port: clair-introspection
+    path: /metrics
+    interval: 30s
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: clair-deployment-quay
+  namespace: ${clair_app_namespace}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: clair-deployment-quay
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 90
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 90
+EOF
+
+oc new-project ${clair_app_namespace} 
+
+#extract tls.crt from openshift-ingress and create a secret with it
+oc extract secrets/router-certs-default -n openshift-ingress && oc create secret generic clair-config-tls-secret --from-file=ocp-cluster-wildcard.cert=tls.crt  -n ${clair_app_namespace}
+
+oc apply clair-setup-quayoperator.yaml || true
+sleep 30
+
+CLAIR_ROUTE_NAME="$(oc get route -n ${clair_app_namespace} -o jsonpath='{.items[0].spec.host}')"
+echo "$CLAIR_ROUTE_NAME"
+#Save for next step and recycle
+cp $CLAIR_ROUTE_NAME ${SHARED_DIR}
+cp clair-setup-quayoperator.yaml ${SHARED_DIR}
+
 
