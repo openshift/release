@@ -9,6 +9,11 @@ build_root:
     namespace: openshift
     tag: golang-1.19
 images:
+- dockerfile_literal: |-
+    FROM cli
+    RUN dnf update -y && dnf install httpd-tools -y && dnf install rsync -y && dnf clean all
+  from: cli
+  to: htpasswd-cli
 - context_dir: .
   dockerfile_path: Dockerfile
   to: rhba-runner
@@ -45,6 +50,7 @@ tests:
         }
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
     test:
+    - ref: rhba-setup-interop-tests
     - ref: rhba-interop-tests
     workflow: firewatch-ipi-aws
 zz_generated_metadata:
