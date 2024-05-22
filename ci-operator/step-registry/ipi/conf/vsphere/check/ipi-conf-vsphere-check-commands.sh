@@ -56,6 +56,88 @@ def yamlify2:
     ;
 EOF
 
+function getTypeInHeirarchy() {
+  local DATATYPE=$1  
+  local LEVEL=$2
+
+  FOUND=0
+  while [[ $FOUND == 0 ]]; do
+    PARENTREF=$(jq --compact-output -r '.[] | select (.Name=="parent").Val' <<< $LEVEL)
+    echo $PARENTREF
+    if [[ ${PARENTREF} == "null" ]]; then
+      log "unable to find ${DATATYPE}"
+      return 1
+    fi
+    TEMPTYPE=$(jq -r .Type <<< ${PARENTREF})
+    log "type ${TEMPTYPE}"
+    LEVEL=$(govc object.collect -json ${TEMPTYPE}:$(jq --compact-output -r .Value <<< ${PARENTREF}))
+    if [[ ${TEMPTYPE} == ${DATATYPE} ]]; then
+      LEVEL_NAME=$(jq -r '.[] | select(.Name == "name") | .Val' <<< ${LEVEL})
+      FOUND=1
+    fi
+  done
+  
+  return 0
+}
+
+DVS_PATH="${SHARED_DIR}/dvs.json"
+dvsJSON="{}"
+
+# getDVSInfo build a map of JSON data for a specific network path
+function getDVSInfo() {
+  local NETWORK=$1
+  
+  if [[ $(jq -r '.["'${NETWORK}'"]' <<< ${dvsJSON}) != "null" ]]; then
+    return
+  fi
+  log "gathering clusters and UUIDs associated with ${NETWORK}"
+
+  dvsJSON=$(jq -r '. += {"'${NETWORK}'": {}}' <<< ${dvsJSON})
+  
+  local DVS_IDS
+  govc ls -json -t DistributedVirtualPortgroup ${NETWORK} > /tmp/dvs.json
+  elements=$(jq length /tmp/dvs.json)
+  DVS_idx=0
+  while [[ $DVS_idx < ${elements} ]]; do
+    log "DVS: ${DVS_idx}"
+        
+    parentDVS=$(jq --compact-output -r .elements[${DVS_idx}].Object.Config.DistributedVirtualSwitch /tmp/dvs.json)    
+    UUID_FORMATTED=$(govc object.collect -json $(jq -r .Type <<< ${parentDVS}):$(jq -r .Value <<< ${parentDVS}) | jq -r '.[] | select(.Name=="uuid") | .Val')
+    
+    # determine the cluster where this dvs instance resides
+    HOST0=$(jq --compact-output -r .elements[${DVS_idx}].Object.Host[0] /tmp/dvs.json)
+    if [[ $(jq --compact-output -r .elements[${DVS_idx}].Object.Host[0].Type /tmp/dvs.json) != "HostSystem" ]]; then
+      log "${HOST0} is not a known type"
+      continue
+    fi
+    HOST=$(govc object.collect -json HostSystem:$(jq --compact-output -r .Value <<< ${HOST0}))
+    
+    if [[ $(jq -r .elements[${DVS_idx}].Object.Host[0].Type /tmp/dvs.json) != "HostSystem" ]]; then
+      log "unable to get host. ${HOST0} is not a known type"
+      continue
+    fi
+
+    getTypeInHeirarchy "ClusterComputeResource" "${HOST}"
+    if [[ $? -ne 0 ]]; then
+      log "could not determine the compute cluster resource for ${NETWORK}"
+      exit 1
+    fi
+    local CLUSTER=${LEVEL_NAME}
+
+    getTypeInHeirarchy "Datacenter" "${HOST}"
+    if [[ $? -ne 0 ]]; then
+      log "could not determine the datacenter resource for ${NETWORK}"
+      exit 1
+    fi
+
+    log "found in cluster ${LEVEL_NAME} with UUID ${UUID_FORMATTED}"
+    dvsJSON=$(jq -r '.["'${NETWORK}'"] = {"datacenter":"'${LEVEL_NAME}'","clusters":{"'${CLUSTER}'": "'"${UUID_FORMATTED}"'"}}' <<< ${dvsJSON})
+    DVS_idx=$(($DVS_idx + 1))
+   done
+
+  echo $dvsJSON >> ${DVS_PATH}
+}
+
 if [[ ${JOB_NAME_SAFE} =~ "-upi" ]]; then
    IPI=0
    log "determined this is a UPI job"
@@ -193,6 +275,8 @@ EOF
 
   cp /tmp/lease.json ${SHARED_DIR}/LEASE_$LEASE.json
   log "discovered portgroup ${vcenter_portgroups[$VCENTER]}"
+
+  getDVSInfo ${NETWORK_PATH}
 done
 
 # retrieving resource pools 
