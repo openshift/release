@@ -7,6 +7,10 @@ base_images:
     name: "4.14"
     namespace: origin
     tag: operator-sdk
+  rhtap-installer:
+    name: redhat-appstudio
+    namespace: ci
+    tag: rhtap-installer
 build_root:
   from_repository: true
 images:
@@ -126,6 +130,31 @@ tests:
         requests:
           cpu: "2"
           memory: 6Gi
+    workflow: ipi-aws
+- as: rhtap-installer-e2e
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gitops-aws
+    env:
+      BASE_DOMAIN: ocp-gitops-qe.com
+      RHTAP_ENABLE_TPA: "false"
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        operator-sdk run bundle --security-context-config restricted -n openshift-operators "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-operators deployment openshift-gitops-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: gitops-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    - ref: redhat-appstudio-openshift-trusted-ca
+    - ref: redhat-appstudio-rhtap-installer-install-rhtap
+    - ref: redhat-appstudio-rhtap-installer-e2e-test
     workflow: ipi-aws
 zz_generated_metadata:
   branch: master
