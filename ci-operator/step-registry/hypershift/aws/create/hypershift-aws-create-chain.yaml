@@ -98,9 +98,44 @@ chain:
         --annotations=hypershift.openshift.io/skip-release-image-validation=true \
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
 
-      until [[ "$(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='{.status.version.history[?(@.state!="")].state}')" = Completed ]]; do
-          sleep 15
-      done
+      set +e
+      export CLUSTER_NAME
+      timeout 25m bash -c '
+        until [[ "$(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='"'"'{.status.version.history[?(@.state!="")].state}'"'"')" = "Completed" ]]; do
+            sleep 15
+        done
+      '
+      if [[ $? -ne 0 ]]; then
+        cat << EOF > ${ARTIFACT_DIR}/junit_hosted_cluster.xml
+      <?xml version="1.0" encoding="UTF-8"?>
+      <testsuite name="hypershift install" tests="1" failures="1">
+        <testcase name="hosted cluster version rollout succeeds">
+          <failure message="hosted cluster version rollout never completed">
+            <![CDATA[
+      error: hosted cluster version rollout never completed, dumping relevant hosted cluster condition messages
+      Degraded: $(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='{.status.conditions[?(@.type=="Degraded")].message}')
+      ClusterVersionSucceeding: $(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='{.status.conditions[?(@.type=="ClusterVersionSucceeding")].message}')
+            ]]>
+          </failure>
+        </testcase>
+      </testsuite>
+      EOF
+        exit 1
+      else
+        cat << EOF > ${ARTIFACT_DIR}/junit_hosted_cluster.xml
+      <?xml version="1.0" encoding="UTF-8"?>
+      <testsuite name="hypershift install" tests="1" failures="0">
+        <testcase name="hosted cluster version rollout succeeds">
+          <system-out>
+            <![CDATA[
+      info: hosted cluster version rollout completed successfully
+            ]]>
+          </system-out>
+        </testcase>
+      </testsuite>
+      EOF
+      fi
+      set -e
 
       echo "Cluster became available, creating kubeconfig"
       bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
@@ -110,7 +145,7 @@ chain:
       requests:
         cpu: 100m
         memory: 100Mi
-    timeout: 30m0s
+    timeout: 35m0s
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-awscreds
       name: hypershift-ci-jobs-awscreds
