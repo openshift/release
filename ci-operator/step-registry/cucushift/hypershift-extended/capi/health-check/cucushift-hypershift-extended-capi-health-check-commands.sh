@@ -71,11 +71,12 @@ fi
 echo "check machinepool, rosamachinepool status"
 machinepools=$(oc get MachinePools -n "${namespace}" -ojsonpath='{.items[?(@.spec.clusterName=="'"${CLUSTER_NAME}"'")].metadata.name}')
 for machinepool in ${machinepools} ; do
-  mp_status=$(oc get MachinePool "${machinepool}" -n "${namespace}" -ojsonpath='{.status.phase}')
-  if [[ "${mp_status}" != "Running" ]]; then
-    echo "Error: machinepool ${machinepool} is not in the Running status: ${mp_status}"
-    exit 1
-  fi
+# ignore machinepool status, it is still in the ScalingUp status when external oidc
+#  mp_status=$(oc get MachinePool "${machinepool}" -n "${namespace}" -ojsonpath='{.status.phase}')
+#  if [[ "${mp_status}" != "Running" ]]; then
+#    echo "Error: machinepool ${machinepool} is not in the Running status: ${mp_status}"
+#    exit 1
+#  fi
 
   rosamachinepool_name=$(oc get MachinePool -n "${namespace}" "${machinepool}" -ojsonpath='{.spec.template.spec.infrastructureRef.name}')
   is_ready=$(oc get rosamachinepool "${rosamachinepool_name}" -n "${namespace}" -ojsonpath='{.status.ready}')

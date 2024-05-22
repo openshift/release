@@ -74,6 +74,33 @@ function rosa_login() {
     oc create secret -n default generic rosa-creds-secret --from-literal=ocmToken="${ROSA_TOKEN}" --from-literal=ocmApiUrl="${ocm_api_url}"
 }
 
+function find_openshift_version() {
+    # Get the openshift version
+    CHANNEL_GROUP=stable
+    version_cmd="rosa list versions --hosted-cp --channel-group ${CHANNEL_GROUP} -o json"
+    if [[ ${AVAILABLE_UPGRADE} == "yes" ]] ; then
+      version_cmd="$version_cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id'"
+    else
+      version_cmd="$version_cmd | jq -r '.[].raw_id'"
+    fi
+    versionList=$(eval $version_cmd)
+    echo -e "Available cluster versions:\n${versionList}"
+
+    if [[ -z "$OPENSHIFT_VERSION" ]]; then
+      OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
+    elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
+      OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
+    else
+      # Match the whole line
+      OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
+    fi
+
+    if [[ -z "$OPENSHIFT_VERSION" ]]; then
+      echo "Requested cluster version not available!"
+      exit 1
+    fi
+}
+
 function set_eternal_azure_oidc() {
   ISSUER_URL="$(cat /var/run/hypershift-ext-oidc-app-cli/issuer-url)"
   CLI_CLIENT_ID="$(cat /var/run/hypershift-ext-oidc-app-cli/client-id)"
@@ -132,6 +159,8 @@ function export_envs() {
     CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
     echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
     export CLUSTER_NAME=${CLUSTER_NAME}
+
+    find_openshift_version
     export OPENSHIFT_VERSION=${OPENSHIFT_VERSION}
 
     AWS_ACCOUNT_ID=$(aws sts get-caller-identity  | jq '.Account' | cut -d'"' -f2 | tr -d '\n')
