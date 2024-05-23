@@ -49,6 +49,10 @@ cat >> "${SHARED_DIR}/network.xml" << EOF
   <bridge name='ocp$(leaseLookup "subnet")' stp='on' delay='0'/>
   <domain name='${BASE_URL}' localOnly='yes'/>
   <dns enable='yes'>
+    <host ip='$(leaseLookup '"bootstrap"[0].ip')'>
+      <hostname>api.${BASE_URL}</hostname>
+      <hostname>api-int.${BASE_URL}</hostname>
+    </host>
     <host ip='$(leaseLookup '"control-plane"[0].ip')'>
       <hostname>api.${BASE_URL}</hostname>
       <hostname>api-int.${BASE_URL}</hostname>
