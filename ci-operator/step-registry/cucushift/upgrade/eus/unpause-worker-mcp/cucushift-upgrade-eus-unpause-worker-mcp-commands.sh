@@ -32,7 +32,7 @@ function check_mcp() {
     while (( try < max_retries )); 
     do
         echo "Checking worker pool status #${try}..."
-        echo -e "oc get mcp\n$(oc get mcp)"
+        run_command "oc get mcp"
         out="$(oc get mcp worker --no-headers)"
         updated="$(echo "${out}" | awk '{print $3}')"
         updating="$(echo "${out}" | awk '{print $4}')"
@@ -47,6 +47,13 @@ function check_mcp() {
     echo >&2 "Worker pool status check failed" && return 1
 }
 
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
+}
+
+
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
     # shellcheck disable=SC1090
@@ -54,4 +61,10 @@ then
 fi
 
 unpause
-check_mcp
+if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
+    echo "Found rhel worker, this step is supposed to be used in eus upgrade, skipping mcp checking here, need to check it after rhel worker upgraded..."
+    run_command "oc get mcp"
+    run_command "oc get node -owide"
+else
+    check_mcp
+fi
