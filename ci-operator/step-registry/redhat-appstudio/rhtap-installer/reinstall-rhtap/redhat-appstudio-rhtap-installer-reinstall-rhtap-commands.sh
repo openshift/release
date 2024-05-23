@@ -126,7 +126,10 @@ install_rhtap(){
   fi
 
   ./bin/make.sh values
-  
+
+  echo "Disabling the default auth policy"
+  yq e -i '.debug.ci=true' private-values.yaml
+
   echo "[INFO]Install RHTAP ..."
   ./bin/make.sh apply -d -n $NAMESPACE -- --values private-values.yaml
 
