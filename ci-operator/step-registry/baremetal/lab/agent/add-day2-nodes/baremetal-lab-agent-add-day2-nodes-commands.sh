@@ -143,6 +143,9 @@ export http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_
 chmod +x "${DAY2_ASSETS_DIR}/node-joiner.sh"
 chmod +x "${DAY2_ASSETS_DIR}/node-joiner-monitor.sh"
 
+sleep 14400
+
+
 cd "${DAY2_ASSETS_DIR}/" ; sh "node-joiner.sh" "nodes-config.yaml"
 
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
