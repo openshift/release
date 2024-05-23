@@ -143,7 +143,7 @@ export http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_
 chmod +x "${DAY2_ASSETS_DIR}/node-joiner.sh"
 chmod +x "${DAY2_ASSETS_DIR}/node-joiner-monitor.sh"
 
-sh "${DAY2_ASSETS_DIR}/node-joiner.sh" "${DAY2_ASSETS_DIR}/nodes-config.yaml"
+cd "${DAY2_ASSETS_DIR}/" ; sh "node-joiner.sh" "nodes-config.yaml"
 
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
