@@ -318,3 +318,4 @@ echo "${MIRROR_REGISTRY_URL}" > "${SHARED_DIR}/mirror_registry_url"
 
 echo "Sleeping 5 mins, make sure that the bastion host is fully started."
 sleep 300
+#To run prfrsr90
