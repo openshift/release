@@ -8,20 +8,19 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   ocp_4.16_base-rhel9:
-    name: 4.17-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-enterprise-base-multi-openshift-4.17
   openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-ci-build-root-multi-openshift-4.17
 binary_build_commands: make build
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: builder-priv
+    namespace: ocp-private
+    tag: rhel-9-golang-1.21-ci-build-root-multi-openshift-4.17
 canonical_go_repository: github.com/openshift/hypershift
 images:
 - inputs:
@@ -34,9 +33,6 @@ images:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
     openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
