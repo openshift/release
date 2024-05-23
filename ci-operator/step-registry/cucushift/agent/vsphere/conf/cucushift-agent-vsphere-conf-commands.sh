@@ -26,7 +26,7 @@ fi
 }
 
 export HOME=/tmp
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
 
 declare vlanid
 declare primaryrouterhostname

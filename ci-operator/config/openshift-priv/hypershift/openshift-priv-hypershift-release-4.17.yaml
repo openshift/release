@@ -45,41 +45,33 @@ promotion:
   to:
   - additional_images:
       hypershift-tests: test-bin
+    disabled: true
     name: 4.17-priv
     namespace: ocp-private
 releases:
-  hosted-ocp-4-12-latest:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.12"
-  hosted-ocp-4-12-previous:
-    candidate:
-      product: ocp
-      relative: 1
-      stream: ci
-      version: "4.12"
-  hosted-ocp-4-13-latest:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.13"
-  hosted-ocp-4-13-previous:
-    candidate:
-      product: ocp
-      relative: 1
-      stream: ci
-      version: "4.13"
   initial:
     candidate:
       product: ocp
       stream: ci
-      version: "4.16"
+      version: "4.17"
   latest:
     integration:
       include_built_images: true
       name: 4.17-priv
       namespace: ocp-private
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.17"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -119,6 +111,8 @@ tests:
     cluster_profile: hypershift
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
     workflow: hypershift-aws-e2e-nested
 - as: e2e-kubevirt-aws-ovn
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
@@ -145,22 +139,6 @@ tests:
       KUBEVIRT_CSI_INFRA: managed-csi
       ODF_BACKEND_STORAGE_CLASS: managed-csi
     workflow: hypershift-kubevirt-e2e-azure
-- as: e2e-aws-4-12
-  optional: true
-  steps:
-    cluster_profile: hypershift
-    dependencies:
-      OCP_IMAGE_LATEST: release:hosted-ocp-4-12-latest
-      OCP_IMAGE_PREVIOUS: release:hosted-ocp-4-12-previous
-    workflow: hypershift-aws-e2e-nested
-- as: e2e-aws-4-13
-  optional: true
-  steps:
-    cluster_profile: hypershift
-    dependencies:
-      OCP_IMAGE_LATEST: release:hosted-ocp-4-13-latest
-      OCP_IMAGE_PREVIOUS: release:hosted-ocp-4-13-previous
-    workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-metrics
   optional: true
   steps:
