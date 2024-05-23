@@ -18,5 +18,8 @@ terraform init
 terraform destroy -auto-approve || true
 
 #Remove Clair instance
+clair_file="${SHARED_DIR}/clair-setup-quay-operatortest.yaml"
 clair_app_namespace="clair-quay-operatortest"
-oc delete -f ${SHARED_DIR}/clair-setup-quay-operatortest.yaml && oc delete ns ${clair_app_namespace} || true
+if [ -f $clair_file ]; then
+  oc delete -f ${SHARED_DIR}/clair-setup-quay-operatortest.yaml && oc delete ns ${clair_app_namespace} || true
+fi
