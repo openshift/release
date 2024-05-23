@@ -38,14 +38,11 @@ promotion:
   - namespace: ols
     tag: latest
 releases:
-  initial:
-    integration:
-      name: "4.15"
-      namespace: ocp
   latest:
-    integration:
-      name: "4.15"
-      namespace: ocp
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -74,8 +71,11 @@ tests:
 - as: bundle-e2e
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      HYPERSHIFT_BASE_DOMAIN: hypershift.aws-2.ci.openshift.org
     test:
+    - ref: ipi-install-rbac
     - as: e2e-install
       cli: latest
       commands: |
@@ -106,7 +106,11 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: hypershift-hostedcluster-workflow
+- as: security
+  optional: true
+  steps:
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: openshift

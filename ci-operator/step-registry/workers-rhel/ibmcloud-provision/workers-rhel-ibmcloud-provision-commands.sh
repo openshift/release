@@ -19,6 +19,7 @@ function ibmcloud_login {
   "${IBMCLOUD_CLI}" config --check-version=false
   echo "Try to login..."
   "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+  "${IBMCLOUD_CLI}" plugin list
 }
 
 ibmcloud_login
@@ -52,7 +53,9 @@ ${IBMCLOUD_CLI} is keys --all-resource-groups
 rhelSSHKey="$(cat ${CLUSTER_PROFILE_DIR}/ibmcloud-sshkey-name)"
 
 #use the same sgs created by installer, shared with the default rhcos nodes
+run_command "${IBMCLOUD_CLI} is sgs -q"
 rhel_worker_sgs="${infra_id}-sg-cluster-wide,${infra_id}-sg-openshift-net"
+echo "use the worker sgs: $rhel_worker_sgs"
 computeSubnetLength=$(yq-go r "${VPC_CONFIG}" 'platform.ibmcloud.computeSubnets' -l)
 
 # Start to provision rhel instances from template in existing VPC and NSG
@@ -62,16 +65,17 @@ for count in $(seq 1 ${RHEL_WORKER_COUNT}); do
   idx=$(((count-1) % $computeSubnetLength))
   
   subnet=$(yq-go r "${VPC_CONFIG}" "platform.ibmcloud.computeSubnets[${idx}]")
-  zone=$(ibmcloud is subnet ${subnet} --output JSON | jq -r '.zone.name')
+  zone=$(${IBMCLOUD_CLI} is subnet ${subnet} --output JSON | jq -r '.zone.name')
   volume="${infra_id}-vol-$count"
   vmName=${infra_id}-rhel-${count}
+
   echo "computeSubnet: ${subnet}; zone: ${zone}; volume: $volume; vmName: $vmName"
 
   volumeJson=$(jq -n \
     --arg vn "$volume" \
     --argjson size ${RHEL_VM_DISK_SIZE} \
     '{"name": $vn, "volume": {"capacity": $size, "profile": {"name": "general-purpose"}}}')
-  cmd="${IBMCLOUD_CLI} is instance-create $vmName ${vpcName} ${zone} ${RHEL_VM_SIZE} ${subnet} --image ${RHEL_IMAGE} --keys ${rhelSSHKey} --sgs ${rhel_worker_sgs} --boot-volume '${volumeJson}'"
+  cmd="${IBMCLOUD_CLI} is instance-create $vmName ${vpcName} ${zone} ${RHEL_VM_SIZE} ${subnet} --image ${RHEL_IMAGE} --keys ${rhelSSHKey} --pnac-vni-sgs ${rhel_worker_sgs} --boot-volume '${volumeJson}'"
 
   echo "Creating RHEL VM..."
   run_command "${cmd}"

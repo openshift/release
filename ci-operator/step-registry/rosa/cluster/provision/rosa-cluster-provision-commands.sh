@@ -92,7 +92,9 @@ else
   #set the domain prefix of length (<=15)
   MAX_DOMAIN_PREFIX_LENGTH=15
   if [[ "$SPECIFY_DOMAIN_PREFIX" == "true" ]]; then
-    DOMAIN_PREFIX="$(head /dev/urandom | tr -dc 'a-z0-9' | head -c $MAX_DOMAIN_PREFIX_LENGTH)"
+    first_char=$(head /dev/urandom | tr -dc 'a-z' | head -c 1)
+    remaining_chars=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c $((MAX_DOMAIN_PREFIX_LENGTH - 1)))
+    DOMAIN_PREFIX="$first_char$remaining_chars"
     DOMAIN_PREFIX_SWITCH="--domain-prefix $DOMAIN_PREFIX"
   fi
   #else the domain prefix will be auto generated.
@@ -114,14 +116,27 @@ else
   exit 1
 fi
 
+read_profile_file() {
+  local file="${1}"
+  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/${file}"
+  fi
+}
+
 # Log in
-ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli"
+SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+ROSA_TOKEN=$(read_profile_file "ocm-token")
+if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
+  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+  ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+elif [[ -n "${ROSA_TOKEN}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token"
   rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
   ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
 else
-  echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
+  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
   exit 1
 fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')

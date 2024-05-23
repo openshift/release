@@ -4,11 +4,11 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   metallb:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: metallb
   metallb-frr:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: metallb-frr
   ocp_builder_rhel-9-base-openshift-4.16:
@@ -20,7 +20,7 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
   operator-sdk:
-    name: "4.16"
+    name: "4.17"
     namespace: origin
     tag: operator-sdk
 build_root:
@@ -52,17 +52,17 @@ operator:
     with: pipeline:metallb-frr
 promotion:
   to:
-  - name: 4.16-priv
+  - name: 4.17-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.16-priv
+      name: 4.17-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.16-priv
+      name: 4.17-priv
       namespace: ocp-private
 resources:
   '*':
@@ -130,6 +130,13 @@ tests:
       E2E_TESTS_CONFIG: |
         IP_STACK=v4
     workflow: baremetalds-metallb-e2e
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: metallb-operator
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: openshift-priv

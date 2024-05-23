@@ -104,6 +104,7 @@ if [ X"${bastion_public_ip}" == X"" ] || [ X"${bastion_private_ip}" == X"" ] ; t
     echo "ERROR" "Failed to find bastion's public and private IP!"
     exit 1
 fi
+
 # always save bastion info to ensure deprovision works
 cat > "${bastion_info_yaml}" << EOF
 publicIpAddress: ${bastion_public_ip}
@@ -114,8 +115,7 @@ EOF
 
 #dump the info 
 run_command "${IBMCLOUD_CLI} is instance-network-interface-floating-ips ${bastion_name} $nac"
-run_command "${IBMCLOUD_CLI} is sg-rules $sg --vpc ${vpcName}"
-
+run_command "${IBMCLOUD_CLI} is sg $sg"
 #####################################
 ####Register mirror registry DNS#####
 #####################################

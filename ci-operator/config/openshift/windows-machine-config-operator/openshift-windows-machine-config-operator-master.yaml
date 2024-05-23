@@ -4,7 +4,7 @@ base_images:
     namespace: openshift
     tag: rhel-9-release-golang-1.21-openshift-4.16
   operator-sdk:
-    name: "4.16"
+    name: "4.17"
     namespace: origin
     tag: operator-sdk
   previous-bundle:
@@ -39,13 +39,13 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
 releases:
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
+      name: "4.17"
       namespace: ocp
 resources:
   '*':
@@ -95,6 +95,17 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
+- always_run: false
+  as: vsphere-disconnected-e2e-operator
+  optional: true
+  steps:
+    cluster_profile: vsphere-dis-2
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: windows-e2e-operator-test-vsphere-disconnected
 - always_run: false
   as: azure-e2e-operator
   steps:

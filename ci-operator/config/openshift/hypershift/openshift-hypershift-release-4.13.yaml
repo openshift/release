@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: "4.13"
-    namespace: ocp
-    tag: base
   cli:
     name: "4.13"
     namespace: ocp
@@ -19,14 +15,12 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- from: base
-  inputs:
+- inputs:
     openshift_release_golang-1.19:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
-  from: base
   inputs:
     ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
@@ -39,17 +33,6 @@ promotion:
     name: "4.13"
     namespace: ocp
 releases:
-  hosted-ocp-4-12-latest:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.12"
-  hosted-ocp-4-12-previous:
-    candidate:
-      product: ocp
-      relative: 1
-      stream: ci
-      version: "4.12"
   initial:
     candidate:
       product: ocp
@@ -91,14 +74,6 @@ tests:
     cluster_profile: hypershift
     env:
       DISABLE_PKI_RECONCILIATION: "true"
-    workflow: hypershift-aws-e2e-nested
-- as: e2e-aws-4-12
-  optional: true
-  steps:
-    cluster_profile: hypershift
-    dependencies:
-      OCP_IMAGE_LATEST: release:hosted-ocp-4-12-latest
-      OCP_IMAGE_PREVIOUS: release:hosted-ocp-4-12-previous
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-metrics
   optional: true

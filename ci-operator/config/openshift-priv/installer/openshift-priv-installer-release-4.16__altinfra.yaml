@@ -3,14 +3,22 @@ base_images:
     name: 4.16-priv
     namespace: ocp-private
     tag: cli
-  ocp_4.16_base:
+  ocp_4.16_base-rhel9:
     name: 4.16-priv
     namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    tag: base-rhel9
+  ocp_4.16_installer-etcd-artifacts:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: installer-etcd-artifacts
+  ocp_4.16_installer-kube-apiserver-artifacts:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: installer-kube-apiserver-artifacts
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/installer
@@ -20,12 +28,18 @@ images:
     value: "true"
   dockerfile_path: images/installer-altinfra/Dockerfile.ci
   inputs:
-    ocp_4.16_base:
+    ocp_4.16_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_4.16_installer-etcd-artifacts:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/4.16:installer-etcd-artifacts
+    ocp_4.16_installer-kube-apiserver-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.16:installer-kube-apiserver-artifacts
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: installer
 - dockerfile_literal: |
     FROM src
@@ -45,7 +59,6 @@ promotion:
   to:
   - additional_images:
       installer-altinfra: installer
-    disabled: true
     excluded_images:
     - installer
     - src-oc
@@ -156,6 +169,9 @@ tests:
         keyA valueA
         keyB valueB
         keyC valueC
+    leases:
+    - env: LEASED_RESOURCE
+      resource_type: aws-3-quota-slice
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - always_run: false
@@ -256,7 +272,7 @@ tests:
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
-    workflow: openshift-e2e-gcp-sharednetwork
+    workflow: openshift-e2e-gcp-byo-vpc
   timeout: 6h0m0s
 - always_run: false
   as: e2e-gcp-ovn-xpn-capi
@@ -446,6 +462,7 @@ tests:
   timeout: 6h0m0s
 - always_run: false
   as: openstack-capi-manifests
+  optional: true
   run_if_changed: openstack
   steps:
     cluster_profile: openstack-vexxhost
@@ -483,6 +500,16 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true","VSphereStaticIPs=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-vsphere-staticip
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-capi-multi-vcenter-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-multi-vcenter
+    env:
+      FEATURE_GATES: '["ClusterAPIInstall=true","VSphereMultiVCenters=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-vsphere-multi-vcenter
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.16

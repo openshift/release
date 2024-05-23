@@ -4,7 +4,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.10$
-    cluster: build05
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -64,7 +64,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.10$
-    cluster: build05
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -122,7 +122,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.10$
-    cluster: build05
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -180,7 +180,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.10$
-    cluster: build05
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -238,7 +238,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.10$
-    cluster: build05
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -283,6 +283,65 @@ postsubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-2\.10$
+    cluster: build02
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-stolostron-multicluster-global-hub-release-2.10-sonarcloud-post-submit
+    skip_if_only_changed: ^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/acm-sonarcloud-token
+        - --target=sonarcloud-post-submit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/acm-sonarcloud-token
+          name: acm-sonarcloud-token
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

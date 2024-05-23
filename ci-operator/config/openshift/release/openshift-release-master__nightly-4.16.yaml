@@ -83,6 +83,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.16"
+  ppc64le-latest:
+    candidate:
+      architecture: ppc64le
+      product: ocp
+      stream: nightly
+      version: "4.16"
 resources:
   '*':
     requests:
@@ -172,7 +178,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-sdn-bm
+- as: e2e-metal-ipi-ovn-bm
   cluster: build05
   interval: 168h
   steps:
@@ -182,8 +188,8 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: baremetalds-e2e-sdn-ipv4
-- as: e2e-metal-ipi-sdn-serial-ipv4
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-ovn-serial-ipv4
   cluster: build05
   interval: 168h
   steps:
@@ -191,7 +197,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: baremetalds-e2e-sdn-serial-ipv4
+    workflow: baremetalds-e2e-serial-ovn-ipv4
   timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ovn-ipv6
   cluster: build05
@@ -223,7 +229,7 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
   timeout: 5h0m0s
-- as: e2e-metal-ipi-sdn-bm-upgrade
+- as: e2e-metal-ipi-ovn-bm-upgrade
   cluster: build05
   cron: 0 12 1 1 *
   steps:
@@ -234,7 +240,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: baremetalds-e2e-upgrade-sdn
+    workflow: baremetalds-e2e-upgrade-ovn-ipv4
   timeout: 5h0m0s
 - as: e2e-metal-ipi-upgrade-ovn-ipv6
   cluster: build05
@@ -879,14 +885,45 @@ tests:
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-graceful-shutdown
-- as: e2e-aws-ovn-shared-vpc-phz-techpreview
+- as: e2e-openstack-ovn-techpreview
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: openstack-vexxhost
     env:
-      BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
       FEATURE_SET: TechPreviewNoUpgrade
-    workflow: openshift-e2e-aws-shared-vpc-phz
+      TEST_SUITE: experimental/reliability/minimal
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-nutanix-ovn-techpreview
+  cluster: build01
+  interval: 168h
+  steps:
+    cluster_profile: nutanix
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-nutanix
+- as: e2e-powervs-ovn-techpreview
+  cluster: build01
+  interval: 168h
+  steps:
+    cluster_profile: powervs-5
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.16"
+      FEATURE_SET: TechPreviewNoUpgrade
+      INSTALLER: powervs
+      TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-powervs-ipi
+  timeout: 6h0m0s
 - as: e2e-agent-compact-ipv4-conformance
   cluster: build05
   cron: 0 */12 * * *
@@ -899,7 +936,7 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: agent-e2e-generic-conformance
   timeout: 5h0m0s
-- as: e2e-agent-sno-ipv6
+- as: e2e-agent-single-node-ipv6
   cluster: build05
   cron: 0 */12 * * *
   steps:
@@ -1216,6 +1253,24 @@ tests:
       CLUSTER_NETWORK_MTU: "1100"
     workflow: openshift-e2e-aws-network-mtu-edge-zones
   timeout: 6h0m0s
+- as: metal-ovn-single-node-recert-cluster-rename
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-sno
+    test:
+    - ref: baremetalds-sno-conf
+    - ref: baremetalds-sno-rename
+    - ref: baremetalds-sno-test
+    workflow: baremetalds-sno
+- as: fips-payload-scan
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws
+    env:
+      MAJOR_MINOR: "4.16"
+    test:
+    - ref: openshift-release-fips
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -31,7 +31,7 @@ end_master_num=$((start_master_num + CONTROL_PLANE_REPLICAS - 1))
 start_worker_num=$((end_master_num + 1))
 end_worker_num=$((start_worker_num + COMPUTE_NODE_REPLICAS - 1))
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
 if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
   echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
   exit 1
@@ -363,6 +363,8 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$vm_template = "${vm_template}"
 \$vcenter = "${vsphere_url}"
 \$vcentercredpath = "secrets/vcenter-creds.xml"
+\$storagepolicy = ""
+\$secureboot = \$false
 
 \$ipam = "ipam.vmc.ci.openshift.org"
 
