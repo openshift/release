@@ -2,6 +2,13 @@
 
 set -exuo pipefail
 
+trap 'FRC=$?; [[ $FRC != 0 ]] && debug' EXIT TERM
+
+debug() {
+  oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} -o yaml
+  oc get pod -n local-cluster-${CLUSTER_NAME} -oyaml
+}
+
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
