@@ -85,6 +85,7 @@ do
         datastore: $(echo $fd | jq -r '.datastore')
         networks:
         - ci-vlan-${vlanid}
+        resourcePool: $(echo $fd | jq -r '.computeCluster')/Resources/ipi-ci-clusters
 EOF
 done
 
