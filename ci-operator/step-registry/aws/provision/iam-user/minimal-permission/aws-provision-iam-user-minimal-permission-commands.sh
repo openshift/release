@@ -164,7 +164,10 @@ elasticloadbalancing:ModifyTargetGroupAttributes
 elasticloadbalancing:RegisterInstancesWithLoadBalancer
 elasticloadbalancing:RegisterTargets
 elasticloadbalancing:SetLoadBalancerPoliciesOfListener
+ecr:CreateRepository
 iam:AddRoleToInstanceProfile
+iam:AttachRolePolicy
+iam:AttachUserPolicy
 iam:CreateAccessKey
 iam:CreateInstanceProfile
 iam:CreateRole
