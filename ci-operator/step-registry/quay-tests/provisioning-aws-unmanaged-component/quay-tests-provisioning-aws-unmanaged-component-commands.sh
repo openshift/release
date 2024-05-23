@@ -615,14 +615,20 @@ EOF
 oc new-project ${clair_app_namespace} 
 
 #extract tls.crt from openshift-ingress and create a secret with it
-oc extract secrets/router-certs-default -n openshift-ingress && oc create secret generic clair-config-tls-secret --from-file=ocp-cluster-wildcard.cert=tls.crt  -n ${clair_app_namespace}
+oc extract secrets/router-certs-default -n openshift-ingress --confirm && oc create secret generic clair-config-tls-secret --from-file=ocp-cluster-wildcard.cert=tls.crt -n ${clair_app_namespace}
 
-oc apply -f clair-setup-quay-operatortest.yaml || true
-sleep 30
+oc apply -f clair-setup-quay-operatortest.yaml -n ${clair_app_namespace} || true
+for _ in {1..60}; do
+  if [[ "$(oc -n ${clair_app_namespace} get deployment clair-deployment-quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
+    echo "Clair is in ready status" >&2
+    exit 0
+  fi
+  sleep 15
+done
 
 clair_route_name="$(oc get route -n ${clair_app_namespace} -o jsonpath='{.items[0].spec.host}')"
-
 echo "$clair_route_name"
+
 #Save for next step and recycle
 echo "${clair_route_name}" >${SHARED_DIR}/CLAIR_ROUTE_NAME
 cp clair-setup-quay-operatortest.yaml ${SHARED_DIR} || true

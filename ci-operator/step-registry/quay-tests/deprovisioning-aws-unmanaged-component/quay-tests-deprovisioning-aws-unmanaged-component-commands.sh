@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "Remove Clair instance"
+sleep 1800
+
 QUAY_UNMANAGED_AWS_TERRAFORM_PACKAGE="QUAY_UNMANAGED_AWS_TERRAFORM.tgz"
 
 echo "Copy terraform files back from $SHARED_DIR"
@@ -18,6 +21,8 @@ terraform init
 terraform destroy -auto-approve || true
 
 #Remove Clair instance
+echo "Remove Clair instance"
+
 clair_file="${SHARED_DIR}/clair-setup-quay-operatortest.yaml"
 clair_app_namespace="clair-quay-operatortest"
 if [ -f $clair_file ]; then
