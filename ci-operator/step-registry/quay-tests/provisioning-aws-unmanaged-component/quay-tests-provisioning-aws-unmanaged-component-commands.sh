@@ -266,6 +266,7 @@ terraform apply -auto-approve
 
 ## Provisiong Clair instance, default version 4.7.4 ##
 clair_app_namespace="clair-quay-operatortest"
+clair_tls_secret="clair-config-tls-secret"
 
 cat >>clair-setup-quay-operatortest.yaml <<EOF
 ---
@@ -302,7 +303,7 @@ rules:
   - extensions
   - apps
   resources:
-  - deploymentsclair-config-tls-secret
+  - deployments
   verbs:
   - get
   - list
@@ -486,7 +487,7 @@ spec:
           projected:
             sources:
               - secret:
-                  name: clair-config-tls-secret
+                  name: $clair_tls_secret
               - configMap:
                   name: openshift-service-ca.crt
               - configMap:
@@ -616,8 +617,7 @@ EOF
 oc new-project ${clair_app_namespace} 
 
 #extract tls.crt from openshift-ingress and create a secret with it
-oc extract secrets/router-certs-default -n openshift-ingress --confirm && oc create secret generic clair-config-tls-secret --from-file=ocp-cluster-wildcard.cert=tls.crt -n ${clair_app_namespace}
-
+oc extract secrets/router-certs-default -n openshift-ingress --confirm && oc create secret generic $clair_tls_secret --from-file=ocp-cluster-wildcard.cert=tls.crt -n ${clair_app_namespace}
 oc apply -f clair-setup-quay-operatortest.yaml -n ${clair_app_namespace} || true
 for _ in {1..60}; do
   if [[ "$(oc -n ${clair_app_namespace} get deployment clair-deployment-quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
