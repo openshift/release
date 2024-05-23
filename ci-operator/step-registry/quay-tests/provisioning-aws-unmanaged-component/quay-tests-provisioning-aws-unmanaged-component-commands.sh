@@ -267,8 +267,9 @@ terraform apply -auto-approve
 ## Provisiong Clair instance, default version 4.7.4 ##
 clair_app_namespace="clair-quay-operatortest"
 clair_tls_secret="clair-config-tls-secret"
+clair_setup_yaml="clair-setup-quay-operatortest.yaml"
 
-cat >>clair-setup-quay-operatortest.yaml <<EOF
+cat >>$clair_setup_yaml <<EOF
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -618,7 +619,16 @@ oc new-project ${clair_app_namespace}
 
 #extract tls.crt from openshift-ingress and create a secret with it
 oc extract secrets/router-certs-default -n openshift-ingress --confirm && oc create secret generic $clair_tls_secret --from-file=ocp-cluster-wildcard.cert=tls.crt -n ${clair_app_namespace}
-oc apply -f clair-setup-quay-operatortest.yaml -n ${clair_app_namespace} || true
+oc apply -f $clair_setup_yaml -n ${clair_app_namespace} || true
+sleep 15
+
+clair_route_name="$(oc get route -n ${clair_app_namespace} -o jsonpath='{.items[0].spec.host}')"
+echo "$clair_route_name"
+
+#Save for next step and recycle
+echo "${clair_route_name}" >${SHARED_DIR}/CLAIR_ROUTE_NAME
+cp $clair_setup_yaml ${SHARED_DIR} || true
+
 for _ in {1..60}; do
   if [[ "$(oc -n ${clair_app_namespace} get deployment clair-deployment-quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
     echo "Clair is in ready status" >&2
@@ -626,12 +636,5 @@ for _ in {1..60}; do
   fi
   sleep 15
 done
-
-clair_route_name="$(oc get route -n ${clair_app_namespace} -o jsonpath='{.items[0].spec.host}')"
-echo "$clair_route_name"
-
-#Save for next step and recycle
-echo "${clair_route_name}" >${SHARED_DIR}/CLAIR_ROUTE_NAME
-cp clair-setup-quay-operatortest.yaml ${SHARED_DIR} || true
 
 
