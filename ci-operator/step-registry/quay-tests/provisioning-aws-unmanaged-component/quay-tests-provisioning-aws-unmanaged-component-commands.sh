@@ -210,6 +210,7 @@ QUAY_AWS_RDS_POSTGRESQL_ADDRESS=$(terraform output quaydb_address | tr -d '""' |
 QUAY_REDIS_IP_ADDRESS=$(terraform output instance_public_ip | tr -d '""' | tr -d '\n')
 
 #Save for next step
+echo "${QUAY_AWS_S3_BUCKET}" >${SHARED_DIR}/QUAY_AWS_S3_BUCKET
 echo "${QUAY_REDIS_IP_ADDRESS}" >${SHARED_DIR}/QUAY_REDIS_IP_ADDRESS
 echo "${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}" >${SHARED_DIR}/QUAY_AWS_RDS_POSTGRESQL_ADDRESS
 
@@ -356,7 +357,7 @@ spec:
       containers:
       - env:
         - name: POSTGRESQL_USER
-          value: clair
+          value: ${QUAY_AWS_RDS_POSTGRESQL_USERNAME}
         - name: POSTGRESQL_DATABASE
           value: clair
         - name: POSTGRESQL_PASSWORD
@@ -419,7 +420,7 @@ data:
           rhel:
               ignore_unpatched: false
     indexer:
-      connstring: host=postgres-clair port=5432 dbname=clair user=clair password=${QUAY_AWS_RDS_POSTGRESQL_PASSWORD} sslmode=disable
+      connstring: host=postgres-clair port=5432 dbname=clair user=${QUAY_AWS_RDS_POSTGRESQL_USERNAME} password=${QUAY_AWS_RDS_POSTGRESQL_PASSWORD} sslmode=disable
       scanlock_retry: 10
       layer_scan_concurrency: 10
       migrations: true
@@ -430,7 +431,7 @@ data:
       airgap: false
       index_report_request_concurrency: -1
     matcher:
-      connstring: host=postgres-clair port=5432 dbname=clair user=clair password=${QUAY_AWS_RDS_POSTGRESQL_PASSWORD} sslmode=disable
+      connstring: host=postgres-clair port=5432 dbname=clair user=${QUAY_AWS_RDS_POSTGRESQL_USERNAME} password=${QUAY_AWS_RDS_POSTGRESQL_PASSWORD} sslmode=disable
       max_conn_pool: 100
       indexer_addr: "http://clair-indexer"
       migrations: true
@@ -441,7 +442,7 @@ data:
     notifier:
       indexer_addr: "http://clair-indexer"
       matcher_addr: "http://clair-matcher"
-      connstring: host=postgres-clair port=5432 dbname=clair user=clair password=${QUAY_AWS_RDS_POSTGRESQL_PASSWORD} sslmode=disable
+      connstring: host=postgres-clair port=5432 dbname=clair user=${QUAY_AWS_RDS_POSTGRESQL_USERNAME} password=${QUAY_AWS_RDS_POSTGRESQL_PASSWORD} sslmode=disable
       migrations: true
       delivery_interval: 1m
       poll_interval: 6h

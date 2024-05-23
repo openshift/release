@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 echo "Remove Clair instance"
-sleep 1800
+sleep 1h
 
 QUAY_UNMANAGED_AWS_TERRAFORM_PACKAGE="QUAY_UNMANAGED_AWS_TERRAFORM.tgz"
 
