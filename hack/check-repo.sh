@@ -29,7 +29,8 @@ oc --context app.ci --namespace ci extract configmap/config --to "${APPDATA}/pro
 mkdir "${APPDATA}/plugins"
 oc --context app.ci --namespace ci extract configmap/plugins --to "${APPDATA}/plugins" > /dev/null
 
-CONTAINER_ENGINE=${CONTAINER_ENGINE:-docker}
+DEFAULT_CONTAINER_ENGINE=$(command -v podman 2>&1 >/dev/null && echo podman || echo docker)
+CONTAINER_ENGINE=${CONTAINER_ENGINE:-$DEFAULT_CONTAINER_ENGINE}
 $CONTAINER_ENGINE pull registry.ci.openshift.org/ci/check-gh-automation:latest
 $CONTAINER_ENGINE run \
     --rm \

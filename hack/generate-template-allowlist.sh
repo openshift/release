@@ -6,7 +6,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-CONTAINER_ENGINE=${CONTAINER_ENGINE:-docker}
+DEFAULT_CONTAINER_ENGINE=$(command -v podman 2>&1 >/dev/null && echo podman || echo docker)
+CONTAINER_ENGINE=${CONTAINER_ENGINE:-$DEFAULT_CONTAINER_ENGINE}
 CONTAINER_ENGINE_OPTS=${CONTAINER_ENGINE_OPTS:-"--platform linux/amd64"}
 SKIP_PULL=${SKIP_PULL:-false}
 
