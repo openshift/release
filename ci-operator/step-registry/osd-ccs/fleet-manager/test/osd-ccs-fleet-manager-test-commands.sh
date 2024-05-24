@@ -1504,6 +1504,87 @@ function test_serving_machine_pools () {
 
 ###### end of test serving machine_pools verification (OCPQE-18337) ######
 
+##################################################################
+
+###### test: HO based request-serving MachinePool autoscale (OCM-8200) ######
+
+function test_500_worker_nodes_support () {
+  echo "[OCM-8200] - 500 worker nodes verification"
+  TEST_PASSED=true
+  MC_CLUSTERS=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters)
+  MC_CLUSTERS_LENGTH=$(jq -n "$MC_CLUSTERS" | jq -r .size)
+  for ((i=0; i<"$MC_CLUSTERS_LENGTH"; i++)); do
+    MC_SECTOR=$(jq -n "$MC_CLUSTERS" | jq -r .items[$i].sector)
+    MC_STATUS=$(jq -n "$MC_CLUSTERS" | jq -r .items[$i].status)
+    if [ "$MC_STATUS" == "maintenance" ] || [ "$MC_STATUS" == "ready" ]; then
+      if [ "$MC_SECTOR" == "canary" ] || [ "$MC_SECTOR" == "main" ]; then
+        MC_OSD_CLUSTER_ID=$(jq -n "$MC_CLUSTERS" | jq -r .items[$i].cluster_management_reference.cluster_id)
+        echo "Obtaining MC: $MC_OSD_CLUSTER_ID kubeconfig"
+        ocm get /api/clusters_mgmt/v1/clusters/"$MC_OSD_CLUSTER_ID"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/mc.kubeconfig"
+        export KUBECONFIG="${SHARED_DIR}/mc.kubeconfig"
+        echo "CHeck: Enable FM to set the default placeholder warmup in clustersizingconfiguration"
+        EXPECTED_PLACEHOLDERS_VALUE=2
+        PLACEHOLDERS_VALUE=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("small"))' | jq -r '.management.placeholders // empty' | xargs) || true
+        if [ "$EXPECTED_PLACEHOLDERS_VALUE" -ne "$PLACEHOLDERS_VALUE" ]; then
+          echo "[ERROR]. Expected placeholders value to be set for small csc config"
+          TEST_PASSED=false
+        fi
+        if [ "$MC_SECTOR" == "canary" ]; then
+          echo "Check: Define smaller CSC range int:canary"
+          EXPECTED_SMALL_FROM=0
+          SMALL_FROM=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("small"))' | jq -r '.criteria.from // empty' | xargs) || true
+          EXPECTED_SMALL_TO=2
+          SMALL_TO=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("small"))' | jq -r '.criteria.to // empty' | xargs) || true
+
+          EXPECTED_MEDIUM_FROM=3
+          MEDIUM_FROM=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("medium"))' | jq -r '.criteria.from // empty' | xargs) || true
+          EXPECTED_MEDIUM_TO=4
+          MEDIUM_TO=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("medium"))' | jq -r '.criteria.to // empty' | xargs) || true
+
+          EXPECTED_LARGE_FROM=5
+          LARGE_FROM=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("large"))' | jq -r '.criteria.from // empty' | xargs) || true
+
+          if [ "$EXPECTED_SMALL_FROM" -ne "$SMALL_FROM" ] || [ "$EXPECTED_SMALL_TO" -ne "$SMALL_TO" ] || [ "$EXPECTED_MEDIUM_FROM" -ne "$MEDIUM_FROM" ] || [ "$EXPECTED_MEDIUM_TO" -ne "$MEDIUM_TO" ] || [ "$EXPECTED_LARGE_FROM" -ne "$LARGE_FROM" ]; then
+            echo "[ERROR]. Expected csc sizing config for small, medium, large (from:to) to match '0:2,3:4,5:'. Got '$SMALL_FROM:$SMALL_TO,$MEDIUM_FROM:$MEDIUM_TO,$LARGE_FROM'"
+            TEST_PASSED=false
+          fi
+
+          echo "Check 'nonRequestServingNodesPerZone' values"
+          EXPECTED_NON_REQUEST_SERVING_NODES_PER_ZONE="0.11"
+          SMALL_NON_REQUEST_SERVING_NODES_PER_ZONE=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("small"))' | jq -r '.management.nonRequestServingNodesPerZone // empty' | xargs) || true
+          MEDIUM_NON_REQUEST_SERVING_NODES_PER_ZONE=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("medium"))' | jq -r '.management.nonRequestServingNodesPerZone // empty' | xargs) || true
+          LARGE_NON_REQUEST_SERVING_NODES_PER_ZONE=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("large"))' | jq -r '.management.nonRequestServingNodesPerZone // empty' | xargs) || true
+
+          if [ "$EXPECTED_NON_REQUEST_SERVING_NODES_PER_ZONE" != "$SMALL_NON_REQUEST_SERVING_NODES_PER_ZONE" ] || [ "$EXPECTED_NON_REQUEST_SERVING_NODES_PER_ZONE" != "$MEDIUM_NON_REQUEST_SERVING_NODES_PER_ZONE" ] || \
+          [ "$EXPECTED_NON_REQUEST_SERVING_NODES_PER_ZONE" != "$LARGE_NON_REQUEST_SERVING_NODES_PER_ZONE" ]; then
+            echo "[ERROR]. Expected csc config for all sizes to be '$EXPECTED_NON_REQUEST_SERVING_NODES_PER_ZONE'. Got: '$SMALL_NON_REQUEST_SERVING_NODES_PER_ZONE' (small), '$MEDIUM_NON_REQUEST_SERVING_NODES_PER_ZONE' (medium), '$LARGE_NON_REQUEST_SERVING_NODES_PER_ZONE' (large), "
+            TEST_PASSED=false
+          fi
+        else
+          echo "Check 'nonRequestServingNodesPerZone' values"
+          EXPECTED_SMALL_NON_REQUEST_SERVING_NODES_PER_ZONE="0.11"
+          EXPECTED_MEDIUM_NON_REQUEST_SERVING_NODES_PER_ZONE="0.33"
+          EXPECTED_LARGE_NON_REQUEST_SERVING_NODES_PER_ZONE="0.75"
+          SMALL_NON_REQUEST_SERVING_NODES_PER_ZONE=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("small"))' | jq -r '.management.nonRequestServingNodesPerZone // empty' | xargs) || true
+          MEDIUM_NON_REQUEST_SERVING_NODES_PER_ZONE=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("medium"))' | jq -r '.management.nonRequestServingNodesPerZone // empty' | xargs) || true
+          LARGE_NON_REQUEST_SERVING_NODES_PER_ZONE=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("large"))' | jq -r '.management.nonRequestServingNodesPerZone // empty' | xargs) || true
+
+          if [ "$EXPECTED_SMALL_NON_REQUEST_SERVING_NODES_PER_ZONE" != "$SMALL_NON_REQUEST_SERVING_NODES_PER_ZONE" ] || [ "$EXPECTED_MEDIUM_NON_REQUEST_SERVING_NODES_PER_ZONE" != "$MEDIUM_NON_REQUEST_SERVING_NODES_PER_ZONE" ] || \
+          [ "$EXPECTED_LARGE_NON_REQUEST_SERVING_NODES_PER_ZONE" != "$LARGE_NON_REQUEST_SERVING_NODES_PER_ZONE" ]; then
+            echo "[ERROR]. Expected csc config for all sizes to be '0.11, 0.33, 0.75' respectively. Got: '$SMALL_NON_REQUEST_SERVING_NODES_PER_ZONE' (small), '$MEDIUM_NON_REQUEST_SERVING_NODES_PER_ZONE' (medium), '$LARGE_NON_REQUEST_SERVING_NODES_PER_ZONE' (large), "
+            TEST_PASSED=false
+          fi
+        fi
+      fi
+    fi
+  done
+  update_results "OCM-8200" $TEST_PASSED
+}
+
+###### end of test HO based request-serving MachinePool autoscale (OCM-8200) ######
+
+##################################################################
+
 function wait_for_cluster_status() {
   CLUSTER_ID=$1
   CLUSTER_TYPE=$2
@@ -1730,7 +1811,8 @@ test_awsendpointservices_status_output_populated
 
 test_serving_machine_pools
 
-test_mc_request_serving_pool_autoscaling
+# test_mc_request_serving_pool_autoscaling
+test_500_worker_nodes_support
 
 test_delete_sc
 

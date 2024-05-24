@@ -46,8 +46,7 @@ images:
   to: hello-openshift
 promotion:
   to:
-  - disabled: true
-    name: 4.16-priv
+  - name: 4.16-priv
     namespace: ocp-private
 releases:
   initial:
@@ -132,6 +131,18 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
+- as: e2e-azure-ovn-upgrade
+  optional: true
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-azure-ovn
 - as: e2e-agnostic-ovn-cmd
   optional: true
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
@@ -446,6 +457,12 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-upi
+- as: e2e-aws-ovn-edge-zones
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-edge-zones
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

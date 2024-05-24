@@ -7,10 +7,10 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.16
+    tag: rhel-9-golang-1.21-openshift-4.16
   ovirt-prfinder:
     name: ovirt-prfinder
     namespace: openshift
@@ -24,14 +24,13 @@ images:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: ovirt-machine-controllers
 promotion:
   to:
-  - disabled: true
-    name: "4.16"
+  - name: "4.16"
     namespace: ocp
 releases:
   initial:
@@ -61,6 +60,18 @@ tests:
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-minimal
+- as: e2e-ovirt-cleanup
+  interval: 4h
+  steps:
+    cluster_profile: ovirt
+    test:
+    - ref: openshift-e2e-ovirt-cleanup-test
+- as: e2e-ovirt-prfinder
+  interval: 5m
+  steps:
+    cluster_profile: ovirt
+    test:
+    - ref: openshift-e2e-ovirt-prfinder-test
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

@@ -29,8 +29,8 @@ release_base_info=""
 
 case $OCP_IMAGE_SOURCE in
   "ci")
-  seed_base_info="$(curl -s "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep ${OCP_BASE_VERSION} | tail -n1)"
-  release_base_info="$(curl -s "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep ${OCP_BASE_VERSION} | tail -n2 | head -1)"
+  seed_base_info="$(curl -s "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep -F ${OCP_BASE_VERSION} | tail -n1)"
+  release_base_info="$(curl -s "https://amd64.ocp.releases.ci.openshift.org/graph?arch=amd64&channel=stable" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | grep -F ${OCP_BASE_VERSION} | tail -n2 | head -1)"
   ;;
   "release")
   seed_base_info="$(curl -s "https://api.openshift.com/api/upgrades_info/graph?arch=amd64&channel=stable-${OCP_BASE_VERSION}" | jq -r '.nodes[] | .version + " " + .payload' | sort -V | tail -n1)"
@@ -45,14 +45,14 @@ esac
 SEED_VERSION="$(echo ${seed_base_info} | cut -d " " -f 1)"
 RELEASE_IMAGE="$(echo ${seed_base_info} | cut -d " " -f 2)"
 
-# Save off the seed version and the recipient version for upgrades
+# Save off the seed version and the target version for upgrades
 echo "${SEED_VERSION}" > "${SHARED_DIR}/seed_version"
 
-recipient_version="$(echo ${release_base_info} | cut -d " " -f 1)"
-recipient_image="$(echo ${release_base_info} | cut -d " " -f 2)"
+target_version="$(echo ${release_base_info} | cut -d " " -f 1)"
+target_image="$(echo ${release_base_info} | cut -d " " -f 2)"
 
-echo "${recipient_version}" > "${SHARED_DIR}/recipient_version"
-echo "${recipient_image}" > "${SHARED_DIR}/recipient_image"
+echo "${target_version}" > "${SHARED_DIR}/target_version"
+echo "${target_image}" > "${SHARED_DIR}/target_image"
 
 # Calculate the tag for the seed
 SEED_IMAGE_TAG="unknown"
@@ -62,6 +62,9 @@ case $SEED_IMAGE_TAG_FORMAT in
     ;;
   "nightly")
     SEED_IMAGE_TAG="nightly-${SEED_VERSION}-$(date +%F)"
+    ;;
+  "e2e")
+    SEED_IMAGE_TAG="e2e-${SEED_VERSION}-$(date +%F)"
     ;;
   "presubmit")
     SEED_IMAGE_TAG="pre-${PULL_PULL_SHA}"

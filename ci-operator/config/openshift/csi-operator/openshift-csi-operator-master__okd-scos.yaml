@@ -3,6 +3,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
+  ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.17
   origin_scos-4.16_base-stream9:
     name: scos-4.16
     namespace: origin
@@ -13,27 +17,42 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.21-openshift-4.16
 images:
-- dockerfile_path: Dockerfile.aws-ebs
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile.azure-file
   from: origin_scos-4.16_base-stream9
   inputs:
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: aws-ebs-csi-driver-operator
-- dockerfile_path: Dockerfile.azure-disk
-  from: origin_scos-4.16_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: azure-disk-csi-driver-operator
-- dockerfile_path: Dockerfile.azure-file
-  from: origin_scos-4.16_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
+      - builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: azure-file-csi-driver-operator
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile.aws-ebs
+  from: origin_scos-4.16_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
+  to: aws-ebs-csi-driver-operator
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile.azure-disk
+  from: origin_scos-4.16_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: azure-disk-csi-driver-operator
 promotion:
   to:
   - name: scos-4.16

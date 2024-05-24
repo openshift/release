@@ -11,9 +11,11 @@ images:
     value: plain
   - name: max_jobs
     value: "8"
+  - name: nvcc_threads
+    value: "2"
   context_dir: .
   dockerfile_path: Dockerfile
-  to: vllm-main-cuda-intel-gpu
+  to: vllm-build-main-cuda
 promotion:
   to:
   - namespace: opendatahub-io
@@ -29,7 +31,7 @@ resources:
     requests:
       cpu: 200m
       memory: 200Mi
-  model-server-main-cuda-intel-gpu:
+  vllm-build-main-cuda:
     limits:
       cpu: "16"
       memory: 24Gi
@@ -40,7 +42,7 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: vllm-main-cuda-intel-gpu
+      SOURCE_IMAGE_REF: vllm-build-main-cuda
     env:
       IMAGE_REPO: vllm
     workflow: opendatahub-io-ci-image-mirror
@@ -48,7 +50,7 @@ tests:
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: vllm-main-cuda-intel-gpu
+      SOURCE_IMAGE_REF: vllm-build-main-cuda
     env:
       IMAGE_REPO: vllm
       RELEASE_VERSION: fast
@@ -57,7 +59,7 @@ tests:
   cron: 0 0 * * *
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: vllm-main-cuda-intel-gpu
+      SOURCE_IMAGE_REF: vllm-build-main-cuda
     env:
       IMAGE_REPO: vllm
       RELEASE_VERSION: fast

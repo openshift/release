@@ -39,7 +39,6 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
-    disabled: true
     name: "4.16"
     namespace: ocp
 releases:
@@ -97,6 +96,17 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
 - always_run: false
+  as: vsphere-disconnected-e2e-operator
+  optional: true
+  steps:
+    cluster_profile: vsphere-dis-2
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: windows-e2e-operator-test-vsphere-disconnected
+- always_run: false
   as: azure-e2e-operator
   steps:
     cluster_profile: azure4
@@ -119,6 +129,13 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- as: vsphere-e2e-ccm-install
+  cron: 0 9 * * 1
+  steps:
+    cluster_profile: vsphere-2
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: openshift-e2e-vsphere-ccm-ovn-hybrid-install
 - always_run: false
   as: azure-e2e-upgrade
   steps:
@@ -275,7 +292,7 @@ tests:
   steps:
     env:
       DESTINATION_BRANCH: community-4.16
-      SOURCE_BRANCH: master
+      SOURCE_BRANCH: release-4.16
     workflow: windows-ci-fastforward
 - always_run: false
   as: nutanix-e2e-operator
