@@ -37,7 +37,7 @@ if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
   --wait-until-available \
   ${EXTRA_ARGS}
 else
-  bin/hypershift install --hypershift-image="${OPERATOR_IMAGE}" \
+  bin/hypershift install --hypershift-image="virthost.ostest.test.metalkube.org:5000/hypershift/hypershift-operator:latest" \
   --platform-monitoring=All \
   --enable-ci-debug-output \
   --wait-until-available \
