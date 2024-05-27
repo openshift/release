@@ -8,20 +8,23 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   ocp_4.16_base-rhel9:
-    name: "4.17"
+    name: builder
     namespace: ocp
-    tag: base-rhel9
+    tag: rhel-9-enterprise-base-multi-openshift-4.17
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
   openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-ci-build-root-multi-openshift-4.17
 binary_build_commands: make build
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-ci-build-root-multi-openshift-4.17
 images:
 - inputs:
     openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
@@ -58,6 +61,19 @@ releases:
       include_built_images: true
       name: "4.17"
       namespace: ocp
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.17"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -97,6 +113,8 @@ tests:
     cluster_profile: hypershift
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
     workflow: hypershift-aws-e2e-nested
 - as: e2e-kubevirt-aws-ovn
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
