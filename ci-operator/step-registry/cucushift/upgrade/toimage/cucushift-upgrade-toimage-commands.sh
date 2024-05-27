@@ -283,29 +283,6 @@ function rhel_upgrade(){
     echo -e "oc get node -owide\n$(oc get node -owide)"
 }
 
-# Extract oc binary which is supposed to be identical with target release
-# Default oc on OCP 4.16 not support OpenSSL 1.x
-function extract_oc(){
-    echo -e "Extracting oc\n"
-    local retry=5 tmp_oc="/tmp/client-2" binary='oc'
-    mkdir -p ${tmp_oc}
-    if (( TARGET_MINOR_VERSION > 15 )) && (openssl version | grep -q "OpenSSL 1") ; then
-        binary='oc.rhel8'
-    fi
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=${binary} --to=${tmp_oc} ${TARGET});
-    do
-        echo >&2 "Failed to extract oc binary, retry..."
-        (( retry -= 1 ))
-        if (( retry < 0 )); then return 1; fi
-        sleep 60
-    done
-    mv ${tmp_oc}/oc ${OC_DIR} -f
-    export PATH="$PATH"
-    which oc
-    oc version --client
-    return 0
-}
-
 function run_command() {
     local CMD="$1"
     echo "Running command: ${CMD}"
@@ -550,10 +527,9 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# Target version oc will be extract in the /tmp/client directory, use it first
-mkdir -p /tmp/client
-export OC_DIR="/tmp/client"
-export PATH=${OC_DIR}:$PATH
+# oc cli is injected from release:target
+run_command "which oc"
+run_command "oc version --client"
 
 run_command "oc get machineconfig"
 
@@ -563,7 +539,6 @@ TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
 export TARGET_VERSION
 export TARGET_MINOR_VERSION
 echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
-extract_oc
 
 SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
 SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"

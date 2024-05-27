@@ -89,6 +89,19 @@ xt_u32 "Validate the module is enabled and works Should create an iptables rule 
 EOF
 }
 
+function create_tests_temp_skip_list_17 {
+# List of temporarly skipped tests for 4.17
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+EOF
+}
+
 function is_bm_node {
     node=$1
 
@@ -281,9 +294,9 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 
-if [[ "$T5CI_VERSION" == "4.16" ]]; then
+if [[ "$T5CI_VERSION" == "4.17" ]]; then
     export CNF_BRANCH="master"
-    export CNF_TESTS_IMAGE="cnf-tests:4.15"
+    export CNF_TESTS_IMAGE="cnf-tests:4.16"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
     # TARGET_RELEASE is used by cnf-features-deploy. If not set, it defaults to the main branch
@@ -305,7 +318,7 @@ fi
 pushd $CNF_REPO_DIR
 echo "******** Checking out pull request for repository cnf-features-deploy if exists"
 check_for_pr "openshift-kni" "cnf-features-deploy"
-if [[ "$T5CI_VERSION" == "4.15" ]] || [[ "$T5CI_VERSION" == "4.16" ]]; then
+if [[ "$T5CI_VERSION" == "4.15" ]] || [[ "$T5CI_VERSION" == "4.16" ]] || [[ "$T5CI_VERSION" == "4.17" ]]; then
     echo "Updating all submodules for >=4.15 versions"
     # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
     sed -i "s@https://github.com/openshift/metallb-operator.git@https://github.com/openshift/metallb-operator.git\n        branch = main@" .gitmodules
@@ -345,8 +358,12 @@ if [[ "$CNF_BRANCH" == *"4.15"* ]]; then
     create_tests_temp_skip_list_15
     export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
 fi
-if [[ "$CNF_BRANCH" == *"4.16"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+if [[ "$CNF_BRANCH" == *"4.16"* ]]; then
     create_tests_temp_skip_list_16
+    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
+fi
+if [[ "$CNF_BRANCH" == *"4.17"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+    create_tests_temp_skip_list_17
     export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"

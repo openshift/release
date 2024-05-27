@@ -32,6 +32,12 @@ function populate_artifact_dir() {
 	s/UserData:.*,/UserData: REDACTED,/;
 	' "${dir}/terraform.txt"
   tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt"
+
+  # Copy CAPI-generated artifacts if they exist
+  if [ -d "${dir}/.clusterapi_output" ]; then
+    echo "Copying Cluster API generated manifests..."
+    cp -rpv "${dir}/.clusterapi_output" "${ARTIFACT_DIR}/" 2>/dev/null
+  fi
 }
 
 function prepare_next_steps() {

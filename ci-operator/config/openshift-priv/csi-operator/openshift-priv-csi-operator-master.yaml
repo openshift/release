@@ -1,34 +1,46 @@
 base_images:
+  csi-driver-smb-test:
+    name: 4.17-priv
+    namespace: ocp-private
+    tag: csi-driver-smb-test
   livenessprobe-operand:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: csi-livenessprobe
   ocp_4.16_base-rhel9:
-    name: 4.16-priv
+    name: 4.17-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_4.17_base-rhel9:
+    name: 4.17-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
+  ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.17
   operator-index:
     name: redhat-operator-index
     namespace: ci
     tag: v4.10
   provisioner-operand:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: csi-external-provisioner
   proxy-operand:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: kube-rbac-proxy
   registrar-operand:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: csi-node-driver-registrar
   smb-driver-operand:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: csi-driver-smb
   tests-private:
@@ -45,9 +57,15 @@ images:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
   to: aws-ebs-csi-driver-operator
 - dockerfile_path: Dockerfile.azure-disk
   inputs:
@@ -110,17 +128,17 @@ operator:
     with: pipeline:proxy-operand
 promotion:
   to:
-  - name: 4.16-priv
+  - name: 4.17-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.16-priv
+      name: 4.17-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.16-priv
+      name: 4.17-priv
       namespace: ocp-private
 resources:
   '*':
@@ -214,6 +232,18 @@ tests:
       OO_PACKAGE: smb-csi-driver-operator
       OO_TARGET_NAMESPACES: '!all'
     workflow: openshift-e2e-azure-csi-smb
+- as: smb-operator-e2e-extended
+  optional: true
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_INDEX: ci-index-smb-csi-driver-operator-bundle
+    env:
+      OO_CHANNEL: preview
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: smb-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+    workflow: openshift-e2e-azure-csi-smb-extended
 - as: verify-deps
   steps:
     test:

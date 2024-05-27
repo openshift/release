@@ -169,6 +169,14 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-c9s-python-3.9
   to: cuda-rstudio-c9s-python-3.9
+- context_dir: amd/c9s-python-3.9
+  dockerfile_path: Dockerfile
+  from: base-c9s-python-3.9
+  to: amd-c9s-python-3.9
+- context_dir: jupyter/minimal/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: amd-c9s-python-3.9
+  to: amd-jupyter-minimal-c9s-python-3.9
 - context_dir: base/anaconda-python-3.8
   dockerfile_path: Dockerfile
   to: base-anaconda-python-3.8
@@ -984,6 +992,45 @@ tests:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: cuda-rstudio-c9s-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-amd-c9s-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: amd-c9s-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: amd-c9s-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-amd-c9s-python-3-9-pr-image-mirror
+  run_if_changed: (base\/c9s-python-3.9\/*)|(amd\/c9s-python-3.9\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: amd-c9s-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: amd-c9s-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-amd-jupyter-minimal-c9s-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: amd-jupyter-minimal-c9s-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: amd-jupyter-minimal-c9s-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-amd-jupyter-minimal-c9s-python-3-9-pr-image-mirror
+  run_if_changed: (amd\/c9s-python-3.9\/*)|(base\/c9s-python-3.9\/*)|(jupyter\/minimal\/ubi9-python-3.9\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: amd-jupyter-minimal-c9s-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      RELEASE_VERSION: amd-jupyter-minimal-c9s-python-3.9
     workflow: opendatahub-io-ci-image-mirror
 - as: jupyter-datascience-anaconda-python-3-8-pr-image-mirror
   run_if_changed: (base\/anaconda-python-3.8\/*)|(jupyter\/datascience\/anaconda-python-3.8\/*)
