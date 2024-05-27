@@ -1003,3 +1003,4 @@ for target in "${TARGET_RELEASES[@]}"; do
         run_upgrade_e2e "${index}"
     fi
 done
+sleep 10h
