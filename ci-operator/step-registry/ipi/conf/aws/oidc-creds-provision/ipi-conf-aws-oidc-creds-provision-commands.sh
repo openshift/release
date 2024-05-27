@@ -4,6 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+set -x
 MPREFIX="${SHARED_DIR}/manifest"
 TPREFIX="${SHARED_DIR}/tls"
 infra_name=${NAMESPACE}-${UNIQUE_HASH}
@@ -135,6 +136,8 @@ fi
 # copy generated service account signing from ccoctl target directory into shared directory
 cp "/tmp/tls/bound-service-account-signing-key.key" "${TPREFIX}_bound-service-account-signing-key.key"
 
+sleep 7200
+
 echo "Cluster authentication:"
 cat "/tmp/manifests/cluster-authentication-02-config.yaml"
 echo -e "\n"
@@ -149,3 +152,5 @@ if [[ ${ingress_role_arn} != "" ]]; then
   echo "Saving ingress role: ${ingress_role_arn}"
   echo "${ingress_role_arn}" > ${SHARED_DIR}/sts_ingress_role_arn
 fi
+
+set +x
