@@ -5,15 +5,13 @@ WORKSPACE=$(pwd)
 cd /tmp || exit
 
 oc version
-echo "OCP_VERSION : $OCP_VERSION"
+echo "OC_CLIENT_VERSION : $OC_CLIENT_VERSION"
 
-if [ -n "${OCP_VERSION}" ]; then
-    mkdir -p /tmp/openshift-client
-    # Download and Extract the oc binary
-    wget -O /tmp/openshift-client/openshift-client-linux-$OCP_VERSION.tar.gz https://mirror.openshift.com/pub/openshift-v4/clients/ocp/$OCP_VERSION/openshift-client-linux.tar.gz
-    tar -C /tmp/openshift-client -xvf /tmp/openshift-client/openshift-client-linux-$OCP_VERSION.tar.gz
-    export PATH=/tmp/openshift-client:$PATH
-fi
+mkdir -p /tmp/openshift-client
+# Download and Extract the oc binary
+wget -O /tmp/openshift-client/openshift-client-linux-$OC_CLIENT_VERSION.tar.gz https://mirror.openshift.com/pub/openshift-v4/clients/ocp/$OC_CLIENT_VERSION/openshift-client-linux.tar.gz
+tar -C /tmp/openshift-client -xvf /tmp/openshift-client/openshift-client-linux-$OC_CLIENT_VERSION.tar.gz
+export PATH=/tmp/openshift-client:$PATH
 
 oc version
 
