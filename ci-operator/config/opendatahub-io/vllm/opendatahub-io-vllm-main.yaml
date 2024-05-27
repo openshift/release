@@ -31,6 +31,15 @@ resources:
     requests:
       cpu: 200m
       memory: 200Mi
+  smoke-test:
+    limits:
+      cpu: "4"
+      memory: 24Gi
+      nvidia.com/gpu: "1"
+    requests:
+      cpu: "4"
+      memory: 8Gi
+      nvidia.com/gpu: "1"
   vllm-build-main-cuda:
     limits:
       cpu: "16"
@@ -39,6 +48,39 @@ resources:
       cpu: "16"
       memory: 24Gi
 tests:
+- always_run: false
+  as: smoke-test
+  cluster: build05
+  commands: |
+    set -euxo pipefail
+
+    # we will need to download test models off HF hub
+    unset HF_HUB_OFFLINE
+    # spin up the server and run it in the background, allowing for images download
+    python -m vllm.entrypoints.openai.api_server &
+    server_pid=$!
+
+    # wait for the server to be up
+    sleep 60
+
+    curl -v --no-progress-meter --fail-with-body \
+      localhost:8000/v1/models | python -m json.tool || \
+      (kill -9 $server_pid && exit 1)
+
+    curl -v --no-progress-meter --fail-with-body \
+      --header "Content-Type: application/json" \
+      --data '{
+        "prompt": "A red fedora symbolizes ",
+        "model": "facebook/opt-125m"
+    }' \
+      localhost:8000/v1/completions | python -m json.tool || \
+        (kill -9 $server_pid && exit 1)
+
+    echo "success"
+    kill -9 $server_pid
+  container:
+    clone: false
+    from: vllm-build-main-cuda
 - as: pr-image-mirror
   steps:
     dependencies:
