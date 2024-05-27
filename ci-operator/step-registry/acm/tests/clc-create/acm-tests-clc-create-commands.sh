@@ -14,6 +14,10 @@ if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
     cp ${SECRETS_DIR}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
 fi 
 
+export QT_X11_NO_MITSHM=1
+export _X11_NO_MITSHM=1
+export _MITSHM=0
+
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 cp ${SECRETS_DIR}/clc/secret-options-yaml ./options.yaml
