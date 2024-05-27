@@ -53,15 +53,15 @@ then
 fi
 
 # restore external oidc cache dir for oc
-if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
-    echo "Restoring external OIDC cache dir for oc"
-    export KUBECACHEDIR
-    KUBECACHEDIR="/tmp/output/oc-oidc"
-    token_cache_dir="$KUBECACHEDIR/oc"
-    mkdir -p "$token_cache_dir"
-    cat "$SHARED_DIR/oc-oidc-token" > "$token_cache_dir/$(cat "$SHARED_DIR/oc-oidc-token-filename")"
-    oc whoami
-fi
+#if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
+#    echo "Restoring external OIDC cache dir for oc"
+#    export KUBECACHEDIR
+#    KUBECACHEDIR="/tmp/output/oc-oidc"
+#    token_cache_dir="$KUBECACHEDIR/oc"
+#    mkdir -p "$token_cache_dir"
+#    cat "$SHARED_DIR/oc-oidc-token" > "$token_cache_dir/$(cat "$SHARED_DIR/oc-oidc-token-filename")"
+#    oc whoami
+#fi
 
 # although we set this env var, but it does not exist if the CLUSTER_TYPE is not gcp.
 # so, currently some cases need to access gcp service whether the cluster_type is gcp or not
@@ -87,6 +87,16 @@ which extended-platform-tests
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
     source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
+    echo "Restoring external OIDC cache dir for oc"
+    export KUBECACHEDIR
+    KUBECACHEDIR="/tmp/output/oc-oidc"
+    token_cache_dir="$KUBECACHEDIR/oc"
+    mkdir -p "$token_cache_dir"
+    cat "$SHARED_DIR/oc-oidc-token" > "$token_cache_dir/$(cat "$SHARED_DIR/oc-oidc-token-filename")"
+    oc whoami
 fi
 
 #setup bastion
