@@ -158,10 +158,11 @@ function export_envs() {
     OIDC_CONFIG_ID=$(cat "${SHARED_DIR}/oidc-config" | jq -r '.id')
     export OIDC_CONFIG_ID=${OIDC_CONFIG_ID}
 
-    ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
+    CLUSTER_PREFIX=$(head -n 1 "${SHARED_DIR}/cluster-prefix")
+    ACCOUNT_ROLES_PREFIX=$CLUSTER_PREFIX
     export ACCOUNT_ROLES_PREFIX=${ACCOUNT_ROLES_PREFIX}
 
-    OPERATOR_ROLES_PREFIX=$(cat "${SHARED_DIR}/operator-roles-prefix")
+    OPERATOR_ROLES_PREFIX=$CLUSTER_PREFIX
     export OPERATOR_ROLES_PREFIX=${OPERATOR_ROLES_PREFIX}
 
     OPERATOR_ROLES_ARNS_FILE="${SHARED_DIR}/operator-roles-arns"
