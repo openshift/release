@@ -97,54 +97,10 @@ tests:
         requests:
           cpu: 100m
     workflow: hypershift-hostedcluster-workflow
-- always_run: false
-  as: response-sanity-check
-  cron: 30 10 * * 1
+- as: security
+  optional: true
   steps:
-    cluster_profile: aws-2
-    env:
-      HYPERSHIFT_BASE_DOMAIN: hypershift.aws-2.ci.openshift.org
-    test:
-    - as: e2e
-      cli: latest
-      commands: |
-        export BAM_PROVIDER_KEY_PATH=/var/run/bam/token
-        export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
-        export OPENAI_PROVIDER_KEY_PATH=/var/run/openai/token
-        export WATSONX_PROVIDER_KEY_PATH=/var/run/watsonx/token
-
-        export PROVIDER_KEY_PATH=/var/run/openai/token
-        export PROVIDER=openai
-        export MODEL=gpt-3.5-turbo-1106
-        export RESPONSE_EVALUATION=true
-
-        export CP_OFFLINE_TOKEN=$(cat /var/run/insights-stage-upload-offline-token/token)
-
-        tests/scripts/test-e2e-cluster.sh
-      credentials:
-      - mount_path: /var/run/azure_openai
-        name: azureopenai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/bam
-        name: bam-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/openai
-        name: openai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/watsonx
-        name: watsonx-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/insights-stage-upload-offline-token
-        name: insights-stage-upload-offline-token
-        namespace: test-credentials
-      dependencies:
-      - env: OLS_IMAGE
-        name: lightspeed-service-api
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: hypershift-hostedcluster-workflow
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -11,10 +11,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -24,9 +24,9 @@ images:
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cluster-config-api
 promotion:
   to:
@@ -88,9 +88,13 @@ tests:
     dir=$GOPATH/src/github.com/openshift/client-go
     git clone https://github.com/openshift/client-go --branch ${PULL_BASE_REF:-master} --single-branch $dir
     rm -rf $dir/vendor/github.com/openshift/api/*
-    cp -Rf * $dir/vendor/github.com/openshift/api/
-    rm -rf $dir/vendor/github.com/openshift/api/vendor
+    cp -Rf ./ $dir/api/
+    rm -rf $dir/api/vendor
     cd $dir
+    echo "replace github.com/openshift/api => ./api" >> go.mod
+    echo "# github.com/openshift/api => ./api" >> vendor/modules.txt
+    sed -i "/github.com\/openshift\/api v0.0.0/ s/$/ => \.\/api/" vendor/modules.txt
+    go mod vendor
     make generate
     go build ./...
   container:
