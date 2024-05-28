@@ -72,7 +72,7 @@ function reboot_cluster() {
     done
 
     if [ X"${try}" == X"${max_try}" ]; then
-	echo "$(date -u --rfc-3339=seconds) - ERROR: some nodes are not ready!"
+    	echo "$(date -u --rfc-3339=seconds) - ERROR: some nodes are not ready!"
         run_command "oc get node"
         return 1
     else
