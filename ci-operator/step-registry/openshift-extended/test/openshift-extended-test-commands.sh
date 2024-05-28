@@ -141,6 +141,7 @@ then
     export CLUSTER_ID
 fi
 
+sleep 14400
 # configure environment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in

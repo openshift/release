@@ -268,4 +268,3 @@ check_node || exit 1
 
 echo "Step #4: check all pods are in status running or complete"
 check_pod || exit 1
-sleep 14400
