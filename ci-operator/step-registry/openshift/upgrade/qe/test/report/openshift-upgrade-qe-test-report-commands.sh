@@ -18,4 +18,3 @@ if [[ -f "${SHARED_DIR}/${TEST_REPORT_FILE}" ]] ; then
         exit 1
     fi
 fi
-sleep 10h

@@ -70,6 +70,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.14"
+  intermediate415:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.15"
   latest:
     release:
       architecture: amd64
@@ -87,15 +93,21 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: gcp-ipi-f30
-  cron: 21 7 29 * *
+- as: gcp-ipi-t1
   steps:
     cluster_profile: gcp-qe
+    post:
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    pre:
+    - chain: ipi-conf-gcp
+    - chain: ipi-install
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE48},${RELEASE_IMAGE_INTERMEDIATE49},${RELEASE_IMAGE_INTERMEDIATE410},${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE48},${RELEASE_IMAGE_INTERMEDIATE49},${RELEASE_IMAGE_INTERMEDIATE410},${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_INTERMEDIATE413},${RELEASE_IMAGE_INTERMEDIATE414},${RELEASE_IMAGE_INTERMEDIATE415},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE415
+        name: release:intermediate415
       - env: RELEASE_IMAGE_INTERMEDIATE414
         name: release:intermediate414
       - env: RELEASE_IMAGE_INTERMEDIATE413
@@ -117,8 +129,8 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - chain: openshift-upgrade-qe-test-chainupgrade
-    workflow: cucushift-installer-rehearse-gcp-ipi
+    - ref: cucushift-upgrade-drop-last-hop
+    - ref: cucushift-chainupgrade-toimage
 zz_generated_metadata:
   branch: release-4.15
   org: openshift
