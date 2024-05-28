@@ -147,12 +147,6 @@ platform:
   fi
 fi
 
-if [ "${FIPS_ENABLED}" == "true" ]; then
-  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
-fips: true
-"
-fi
-
 echo "[INFO] Looking for patches to the install-config.yaml..."
 
 shopt -s nullglob
