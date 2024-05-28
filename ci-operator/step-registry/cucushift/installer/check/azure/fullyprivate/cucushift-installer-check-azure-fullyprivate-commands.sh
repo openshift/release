@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the check status into install-post-check-status.txt
+# for junit xml file generated
+post_check_exit_code=0
+EXIT_CODE_POSTCHECK=100
+trap 'if [[ "$?" != 0 ]]; then post_check_exit_code=${EXIT_CODE_POSTCHECK}; fi; echo "$post_check_exit_code" > "${SHARED_DIR}/install-post-check-status.txt"' EXIT TERM
+
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
 echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 export HOME="${HOME:-/tmp/home}"
