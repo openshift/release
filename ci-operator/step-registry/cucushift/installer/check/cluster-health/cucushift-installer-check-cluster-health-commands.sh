@@ -4,7 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-sleep 14400
 function run_command() {
     local CMD="$1"
     echo "Running command: ${CMD}"
@@ -269,3 +268,4 @@ check_node || exit 1
 
 echo "Step #4: check all pods are in status running or complete"
 check_pod || exit 1
+sleep 14400
