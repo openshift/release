@@ -76,3 +76,5 @@ if [ -n "${FEATURE_GATES}" ]; then
 featureGates: ${FEATURE_GATES}
 EOF
 fi
+
+cat "${out}"
