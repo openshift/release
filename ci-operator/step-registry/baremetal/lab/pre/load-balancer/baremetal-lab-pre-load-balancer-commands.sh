@@ -6,7 +6,7 @@ set -o pipefail
 
 CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
 
-MC=""
+MC22623=""
 MC22624=""
 APISRV=""
 INGRESS80=""
@@ -24,7 +24,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   fi
 
   if [[ "$name" =~ bootstrap* ]] || [[ "$name" =~ master* ]]; then
-    MC="$MC
+    MC22623="$MC22623
       server $name $ip:22623 check inter 1s
       server $name-v6 [$ipv6]:22623 check inter 1s"
     MC22624="$MC22624
@@ -90,7 +90,7 @@ $APISRV
 listen machine-config-server-22623
     bind *:22623
     mode tcp
-$MC
+$MC22623
 listen machine-config-server-22624
     bind *:22624
     mode tcp
