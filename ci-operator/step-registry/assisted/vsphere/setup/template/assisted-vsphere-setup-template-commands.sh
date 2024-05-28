@@ -21,11 +21,17 @@ declare vsphere_portgroup
 
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
-SSH_PUBLIC_KEY="$(cat /var/run/vault/sshkeys/public_key)"
+SSH_PUBLIC_KEY="$(cat /var/run/vault/sshkeys/ssh_public_key)"
 
 mkdir -p build/packer
 cp -r packer_files/vsphere_centos_template/* build/packer/
 cd build/packer/
+
+# Get Centos Stream 8 latest version checksum
+STREAM8_ISO="CentOS-Stream-8-x86_64-latest-boot.iso"
+ISO_CHECKSUM=$(curl -s http://rep-centos-il.upress.io/8-stream/isos/x86_64/CHECKSUM | grep "${STREAM8_ISO}" | awk -F' = ' '{print $2}' | tr -d '\n')
+
+echo "Checksum for CentOS-Stream-8-x86_64-latest-boot.iso = ${ISO_CHECKSUM}"
 
 # Create packer variables file
 cat >> vsphere-params.hcl << EOF
@@ -39,9 +45,9 @@ vsphere_network = "${vsphere_portgroup}"
 vsphere_folder = "assisted-test-infra-ci"
 vm_name = "assisted-test-infra-machine-template"
 ssh_public_key = "${SSH_PUBLIC_KEY}"
-ssh_private_key_file = "/var/run/vault/sshkeys/private_key"
-iso_url = "http://rep-centos-il.upress.io/8-stream/isos/x86_64/CentOS-Stream-8-20231023.2-x86_64-boot.iso"
-iso_checksum = "7d1967869643a66c83cedd5580cb45c0810ca9f6f47a8e36a8efbcf4824219a8"
+ssh_private_key_file = "/var/run/vault/sshkeys/ssh_private_key"
+iso_url = "http://rep-centos-il.upress.io/8-stream/isos/x86_64/${STREAM8_ISO}"
+iso_checksum = "${ISO_CHECKSUM}"
 EOF
 
 export PACKER_CONFIG_DIR="/home/assisted-test-infra/build/packer/config"
