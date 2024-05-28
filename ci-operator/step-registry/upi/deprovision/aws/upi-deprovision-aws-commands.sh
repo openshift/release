@@ -28,6 +28,16 @@ AWS_DEFAULT_REGION=$(cat ${SHARED_DIR}/AWS_REGION)  # CLI prefers the former
 export AWS_DEFAULT_REGION
 CLUSTER_NAME=$(cat ${SHARED_DIR}/CLUSTER_NAME)
 
+if [[ -e "${SHARED_DIR}/bastion_ign_location" ]]; then
+    echo "Deleting bastion host ignition ..."
+    aws s3 rb "$(head -n 1 ${SHARED_DIR}/bastion_ign_location)" --force
+fi
+
+if [[ -e "${SHARED_DIR}/bastion_host_stack_name" ]]; then
+    echo "Deleting bastion host ..."
+    aws cloudformation delete-stack --stack-name "$(head -n 1 ${SHARED_DIR}/bastion_host_stack_name)"
+fi
+
 aws cloudformation describe-stack-resources --stack-name "${CLUSTER_NAME}-control-plane" \
     --query 'StackResources[?ResourceType==`AWS::EC2::Instance`].PhysicalResourceId' --output text | sed 's,\t,\n,g' > /tmp/node-provider-IDs
 for INDEX in 0 1 2
