@@ -6,6 +6,10 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+function log() {
+  echo "$(date -u --rfc-3339=seconds) - " + $1
+}
+
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
   echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
   exit 1
@@ -16,79 +20,144 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-openshift_install_path="/var/lib/openshift-install"
+FAILURE_DOMAIN_PATH=$SHARED_DIR/fds.txt
+FAILURE_DOMAIN_JSON=$SHARED_DIR/fds.json
+FIRST=1
+function getFailureDomainsWithDSwitchForVCenter() {  
+    vcenter=$1
 
-echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
-# shellcheck source=/dev/null
+    FAILURE_DOMAIN_OUT="[]"
+    
+    echo "[" > ${FAILURE_DOMAIN_PATH}
+
+    for LEASE in $SHARED_DIR/LEASE*; do      
+      if [[ $LEASE =~ "single" ]]; then 
+        continue
+      fi
+      log "getting failure domain from ${LEASE}"
+
+      server=$(jq -r .status.server $LEASE)
+      log "found vCenter ${server}, looking for ${vcenter}"
+      if [ $server != $vcenter ]; then
+        continue
+      fi      
+      
+      log "compiling failure domain"
+
+      if [ ${FIRST} == 0 ]; then
+      echo "    }," >> ${FAILURE_DOMAIN_PATH}  
+      fi
+      echo "    {" >> ${FAILURE_DOMAIN_PATH}
+      FIRST=0
+
+      log "finding DVS for ${GOVC_NETWORK}"
+
+      DVS=$(jq --compact-output -r '."'${GOVC_NETWORK}'"' ${SHARED_DIR}/dvs.json)
+
+      log "got DVS json"
+      jq -r .status.envVars ${LEASE} > /tmp/envvars
+      source /tmp/envvars
+
+      CLUSTER=$(jq -r .status.topology.computeCluster ${LEASE} | cut -d '/' -f 4)
+      DVS_UUID=$(echo $DVS | jq -r '.cluster["'$CLUSTER'"]')
+      log "${CLUSTER} DVS_UUID: ${DVS_UUID}"
+
+      echo "        server = ${GOVC_URL}" >> ${FAILURE_DOMAIN_PATH}
+      echo "        datacenter = ${GOVC_DATACENTER}" >> ${FAILURE_DOMAIN_PATH}
+      echo "        cluster = ${CLUSTER}" >> ${FAILURE_DOMAIN_PATH}
+      echo "        datastore = ${GOVC_DATASTORE}" >> ${FAILURE_DOMAIN_PATH}
+      echo "        network = ${GOVC_NETWORK}" >> ${FAILURE_DOMAIN_PATH}
+      echo "        distributed_virtual_switch_uuid = ${DVS_UUID}" >> ${FAILURE_DOMAIN_PATH}
+
+      FAILURE_DOMAIN_OUT=$(echo $FAILURE_DOMAIN_OUT | jq --compact-output -r '. += [{"datacenter":"'${GOVC_DATACENTER}'","cluster":"'${CLUSTER}'","datastore":"'${GOVC_DATASTORE}'","network":"'${GOVC_NETWORK}'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]'); 
+    done
+    echo "    }" >> ${FAILURE_DOMAIN_PATH}  
+    echo "]" >> ${FAILURE_DOMAIN_PATH}
+
+    echo ${FAILURE_DOMAIN_OUT} | jq . > ${FAILURE_DOMAIN_JSON}
+}
+
+declare vsphere_url
+declare GOVC_URL
+declare GOVC_DATACENTER
+declare GOVC_DATASTORE
+declare GOVC_NETWORK
+declare vsphere_cluster
+declare vsphere_resource_pool
 declare vsphere_datacenter
 declare vsphere_datastore
-declare vsphere_cluster
-declare dns_server
-declare vsphere_url
-declare vlanid
-declare primaryrouterhostname
 declare vsphere_portgroup
-
+declare gateway
+declare vlanid
+declare phydc
+declare primaryrouterhostname
+declare LEASE_PATH
+declare NETWORK_PATH
+declare GOVC_INSECURE
+declare vsphere_resource_pool
+declare GOVC_RESOURCE_POOL
+declare cloud_where_run
+declare GOVC_USERNAME
+declare GOVC_PASSWORD
+declare GOVC_TLS_CA_CERTS
 source "${SHARED_DIR}/vsphere_context.sh"
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 
-if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
-  exit 1
-fi
+openshift_install_path="/var/lib/openshift-install"
 
-# ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
+start_master_num=4
+end_master_num=$((start_master_num + CONTROL_PLANE_REPLICAS - 1))
 
-dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
-gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
-netmask=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].mask' "${SUBNETS_CONFIG}")
+start_worker_num=$((end_master_num + 1))
+end_worker_num=$((start_worker_num + COMPUTE_NODE_REPLICAS - 1))
 
-lb_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[2]' "${SUBNETS_CONFIG}")
-bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[3]' "${SUBNETS_CONFIG}")
-machine_cidr=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
+NETWORK_CONFIG=${SHARED_DIR}/NETWORK_single.json
 
-printf "***** DEBUG %s %s %s %s ******\n" "$dns_server" "$lb_ip_address" "$bootstrap_ip_address" "$machine_cidr"
+dns_server=$(jq -r '.status.gateway' "${NETWORK_CONFIG}")
+gateway=${dns_server}
+netmask=$(jq -r '.status.netmask' "${NETWORK_CONFIG}")
+
+lb_ip_address=$(jq -r '.spec.ipAddresses[2]' "${NETWORK_CONFIG}")
+bootstrap_ip_address=$(jq -r '.spec.ipAddresses[3]' "${NETWORK_CONFIG}")
+machine_cidr=$(jq -r '.spec.machineNetworkCidr' "${NETWORK_CONFIG}")
+
+# printf "***** DEBUG dns: %s lb: %s bootstrap: %s cidr: %s ******\n" "$dns_server" "$lb_ip_address" "$bootstrap_ip_address" "$machine_cidr"
 
 control_plane_idx=0
 control_plane_addrs=()
 control_plane_hostnames=()
-start_master_num=4
-end_master_num=$((start_master_num + CONTROL_PLANE_REPLICAS - 1))
-start_worker_num=$((end_master_num + 1))
-end_worker_num=$((start_worker_num + COMPUTE_NODE_REPLICAS - 1))
-
 for n in $(seq "$start_master_num" "$end_master_num"); do
-  control_plane_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+  control_plane_addrs+=("$(jq -r --argjson N "$n" '.spec.ipAddresses[$N]' "${NETWORK_CONFIG}")")
   control_plane_hostnames+=("control-plane-$((control_plane_idx++))")
 done
-
-printf "**** DEBUG %s ******\n" "${control_plane_addrs[@]}"
+printf "**** controlplane DEBUG %s ******\n" "${control_plane_addrs[@]}"
 
 printf -v control_plane_ip_addresses "\"%s\"," "${control_plane_addrs[@]}"
 control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
+
+
+printf "**** DEBUG start_worker_num: %s end_worker_num: %s ******\n" "${start_worker_num}" "${end_worker_num}"
 
 compute_idx=0
 compute_addrs=()
 compute_hostnames=()
 for n in $(seq "$start_worker_num" "$end_worker_num"); do
-  compute_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+  compute_addrs+=("$(jq -r --argjson N "$n" '.spec.ipAddresses[$N]' "${NETWORK_CONFIG}")")
   compute_hostnames+=("compute-$((compute_idx++))")
 done
 
-printf "**** DEBUG %s ******\n" "${compute_addrs[@]}"
+printf "**** compute DEBUG %s ******\n" "${compute_addrs[@]}"
 
 printf -v compute_ip_addresses "\"%s\"," "${compute_addrs[@]}"
 compute_ip_addresses="[${compute_ip_addresses%,}]"
-
 
 # First one for api, second for apps.
 echo "${lb_ip_address}" >>"${SHARED_DIR}"/vips.txt
 echo "${lb_ip_address}" >>"${SHARED_DIR}"/vips.txt
 
 export HOME=/tmp
-#export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
-echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
 
@@ -137,26 +206,19 @@ ova_url=$(<"${SHARED_DIR}"/ova_url.txt)
 
 vm_template="${ova_url##*/}"
 
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/govc.sh"
-
 # select a hardware version for testing
-vsphere_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $1}')
-vsphere_minor_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $3}')
-hw_versions=(15 17 18 19)
-if [[ ${vsphere_version} -eq 8 ]]; then
-  hw_versions=(20)
-  if [[ ${vsphere_minor_version} -ge 2 ]]; then
-  hw_versions=(20 21)
-  fi
-fi
+hw_versions=(15 17 19)
 hw_available_versions=${#hw_versions[@]}
 selected_hw_version_index=$((RANDOM % ${hw_available_versions}))
 target_hw_version=${hw_versions[$selected_hw_version_index]}
 echo "$(date -u --rfc-3339=seconds) - Selected hardware version ${target_hw_version}"
 vm_template=${vm_template}-hw${target_hw_version}
 
+echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 echo "export target_hw_version=${target_hw_version}" >>${SHARED_DIR}/vsphere_context.sh
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/vsphere_context.sh"
+
 echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
 
 # If platform none is present in the install-config, extension is skipped.
@@ -229,19 +291,18 @@ baseDomain: $base_domain
 controlPlane:
   name: "master"
   replicas: ${CONTROL_PLANE_REPLICAS}
+
 compute:
 - name: "worker"
-  replicas: 0
+  replicas: ${COMPUTE_NODE_REPLICAS}
+
 platform:
   vsphere:
-    vcenter: "${vsphere_url}"
-    datacenter: "${vsphere_datacenter}"
-    defaultDatastore: "${vsphere_datastore}"
-    cluster: "${vsphere_cluster}"
-    network: "${vsphere_portgroup}"
-    password: "${GOVC_PASSWORD}"
-    username: "${GOVC_USERNAME}"
-    folder: "/${vsphere_datacenter}/vm/${cluster_name}"
+$(cat $SHARED_DIR/platform.yaml)
+
+networking:
+  machineNetwork:
+  - cidr: "${machine_cidr}"
 EOF
 
 #set machine cidr if proxy is enabled
@@ -249,19 +310,19 @@ if grep 'httpProxy' "${install_config}"; then
   cat >>"${install_config}" <<EOF
 networking:
   machineNetwork:
-  - cidr: "$machine_cidr"
+  - cidr: "${machine_cidr}"
 EOF
 fi
 
+echo "$(date -u --rfc-3339=seconds) - ***** DEBUG ***** DNS: ${dns_server}"
+
+echo "$(date -u --rfc-3339=seconds) - Getting failure domains ..."
+getFailureDomainsWithDSwitchForVCenter ${vsphere_url}
+
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat >"${SHARED_DIR}/terraform.tfvars" <<-EOF
-
 machine_cidr = "${machine_cidr}"
-
 vm_template = "${vm_template}"
-vsphere_cluster = "${vsphere_cluster}"
-vsphere_datacenter = "${vsphere_datacenter}"
-vsphere_datastore = "${vsphere_datastore}"
 vsphere_server = "${vsphere_url}"
 ipam = "ipam.vmc.ci.openshift.org"
 cluster_id = "${cluster_name}"
@@ -270,15 +331,15 @@ cluster_domain = "${cluster_domain}"
 ssh_public_key_path = "${ssh_pub_key_path}"
 compute_memory = "16384"
 compute_num_cpus = "4"
-vm_network = "${vsphere_portgroup}"
 vm_dns_addresses = ["${dns_server}"]
 bootstrap_ip_address = "${bootstrap_ip_address}"
 lb_ip_address = "${lb_ip_address}"
 
-control_plane_count = ${CONTROL_PLANE_REPLICAS}
-compute_count = ${COMPUTE_NODE_REPLICAS}
 compute_ip_addresses = ${compute_ip_addresses}
 control_plane_ip_addresses = ${control_plane_ip_addresses}
+control_plane_count = ${CONTROL_PLANE_REPLICAS}
+compute_count = ${COMPUTE_NODE_REPLICAS}
+failure_domains = $(cat $FAILURE_DOMAIN_PATH)
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Create variables.ps1 ..."
@@ -292,10 +353,6 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 
 \$vm_template = "${vm_template}"
 \$vcenter = "${vsphere_url}"
-\$portgroup = "${vsphere_portgroup}"
-\$datastore = "${vsphere_datastore}"
-\$datacenter = "${vsphere_datacenter}"
-\$cluster = "${vsphere_cluster}"
 \$vcentercredpath = "secrets/vcenter-creds.xml"
 \$storagepolicy = ""
 \$secureboot = \$false
@@ -320,6 +377,10 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$compute_count = ${COMPUTE_NODE_REPLICAS}
 \$compute_ip_addresses = $(echo ${compute_ip_addresses} | tr -d [])
 \$compute_hostnames = $(printf "\"%s\"," "${compute_hostnames[@]}" | sed 's/,$//')
+
+\$failure_domains = @"
+$(cat ${FAILURE_DOMAIN_JSON})
+"@
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Create secrets.auto.tfvars..."
@@ -342,10 +403,6 @@ cp -t "${dir}" \
   "${SHARED_DIR}/install-config.yaml"
 
 echo "$(date +%s)" >"${SHARED_DIR}/TEST_TIME_INSTALL_START"
-
-if [ "${FIPS_ENABLED:-false}" = "true" ]; then
-    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
-fi
 
 ### Create manifests
 echo "Creating manifests..."
@@ -372,8 +429,9 @@ rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 echo "Removing compute machinesets..."
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 
-### Remove CPMS manifests
-rm -f openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml || true
+### Remove control-plane machinesets
+echo "Removing control-plane machineset..."
+rm -f openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
 
 ### Make control-plane nodes unschedulable
 echo "Making control-plane nodes unschedulable..."

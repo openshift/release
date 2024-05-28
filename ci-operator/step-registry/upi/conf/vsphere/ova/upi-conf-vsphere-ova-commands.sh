@@ -21,24 +21,30 @@ echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 
+declare vsphere_url
+declare GOVC_URL
+declare GOVC_DATACENTER
+declare GOVC_DATASTORE
+declare GOVC_NETWORK
 declare vsphere_cluster
+declare vsphere_resource_pool
+declare vsphere_datacenter
+declare vsphere_datastore
 declare vsphere_portgroup
+declare gateway
+declare vlanid
+declare phydc
+declare primaryrouterhostname
+declare LEASE_PATH
+declare NETWORK_PATH
+declare GOVC_INSECURE
+declare vsphere_resource_pool
+declare GOVC_RESOURCE_POOL
+declare cloud_where_run
+declare GOVC_USERNAME
+declare GOVC_PASSWORD
+declare GOVC_TLS_CA_CERTS
 source "${SHARED_DIR}/vsphere_context.sh"
-
-DATACENTERS=("$GOVC_DATACENTER")
-DATASTORES=("$GOVC_DATASTORE")
-CLUSTERS=("$vsphere_cluster")
-
-# If testing a zonal install, the template also needs to be available in the
-# secondary datacenter
-if [ -f "${SHARED_DIR}/ova-datacenters" ]; then
-    if [ -f "${SHARED_DIR}/ova-datastores" ]; then
-        echo "$(date -u --rfc-3339=seconds) - Adding zonal datacenters/datastores..."
-        mapfile DATACENTERS <${SHARED_DIR}/ova-datacenters
-        mapfile DATASTORES <${SHARED_DIR}/ova-datastores
-        mapfile CLUSTERS <${SHARED_DIR}/ova-clusters
-    fi
-fi
 
 govc_version=$(govc version)
 
@@ -48,14 +54,22 @@ echo "$(date -u --rfc-3339=seconds) - Checking if RHCOS OVA needs to be download
 
 vsphere_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $1}')
 vsphere_minor_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $3}')
-for i in "${!DATACENTERS[@]}"; do
-    DATACENTER=$(echo -n ${DATACENTERS[$i]} | tr -d '\n')
-    export GOVC_DATACENTER=$DATACENTER
-    DATASTORE=$(echo -n ${DATASTORES[$i]} | tr -d '\n')
-    export GOVC_DATASTORE=$DATASTORE
-    CLUSTER=$(echo -n ${CLUSTERS[$i]} | tr -d '\n')
-    RESOURCE_POOL="/$DATACENTER/host/$CLUSTER/Resources"
-    export GOVC_RESOURCE_POOL=$RESOURCE_POOL
+FDS=$(jq '.failureDomains | length' $SHARED_DIR/platform.json)
+fd_idx=0
+
+# iterate each failure domain and ensure a template is available in 
+# each failure domain
+while [[ $fd_idx < $FDS ]]; do    
+    FD=$(jq -c -r '.failureDomains['${fd_idx}']' $SHARED_DIR/platform.json)
+    VCENTER=$(jq -c -r '.vcenters[] | select(.server=="'$(echo $FD | jq -r .server)'")' $SHARED_DIR/platform.json)
+            
+    CLUSTER=${vsphere_cluster}
+    GOVC_USERNAME=$(echo ${VCENTER} | jq -r .user)
+    GOVC_PASSWORD=$(echo ${VCENTER} | jq -r .password)
+    GOVC_DATASTORE=$(echo ${FD} | jq -r .datastore)
+    GOVC_DATACENTER=$(echo ${FD} | jq -r .datacenter)
+    GOVC_RESOURCE_POOL=$(echo ${FD} | jq -r .resourcePool)
+    vsphere_portgroup=$(echo ${FD} | jq -r .networks[0])
 
     OVA_NETWORK=""
     mapfile -t NETWORKS < <(govc find -i network -name $vsphere_portgroup)
@@ -83,7 +97,7 @@ for i in "${!DATACENTERS[@]}"; do
             esac
         done
     else
-        echo "$(date -u --rfc-3339=seconds) - Only one network found with name=${vsphere_portgroup} for datacenter ${DATACENTER}.  Setting ova network to ${vsphere_portgroup}"
+        echo "$(date -u --rfc-3339=seconds) - Only one network found with name=${vsphere_portgroup} for datacenter ${GOVC_DATACENTER}.  Setting ova network to ${vsphere_portgroup}"
         OVA_NETWORK=${vsphere_portgroup}
     fi
 
@@ -138,4 +152,6 @@ EOF
             echo "$(date -u --rfc-3339=seconds) - Skipping ova import for hw${hw_version} due to image already existing."
         fi
     done
+    
+    fd_idx=$((fd_idx+1)); 
 done

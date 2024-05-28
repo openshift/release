@@ -10,6 +10,8 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
+
 declare vsphere_datacenter
 
 # only used in zonal and vsphere environments with
@@ -131,7 +133,7 @@ function getDVSInfo() {
     fi
 
     log "found in cluster ${LEVEL_NAME} with UUID ${UUID_FORMATTED}"
-    dvsJSON=$(jq -r '.["'${NETWORK}'"] = {"datacenter":"'${LEVEL_NAME}'","clusters":{"'${CLUSTER}'": "'"${UUID_FORMATTED}"'"}}' <<< ${dvsJSON})
+    dvsJSON=$(jq -r '.["'${NETWORK}'"] = {"datacenter":"'${LEVEL_NAME}'","cluster":{"'${CLUSTER}'": "'"${UUID_FORMATTED}"'"}}' <<< ${dvsJSON})
     DVS_idx=$(($DVS_idx + 1))
    done
 
@@ -195,7 +197,7 @@ fi
 POOLS=${POOLS:-}
 declare -a pools=($POOLS)
 
-SA_KUBECONFIG=${SA_KUBECONFIG:-/var/run/vsphere-ibmcloud-ci/vsphere-capacity-manager-kubeconfig}
+SA_KUBECONFIG=${SA_KUBECONFIG:-/var/run/vault/vsphere-ibmcloud-ci/vsphere-capacity-manager-kubeconfig}
 OPENSHIFT_REQUIRED_CORES=${OPENSHIFT_REQUIRED_CORES:-24}
 OPENSHIFT_REQUIRED_MEMORY=${OPENSHIFT_REQUIRED_MEMORY:-96}
 
@@ -275,8 +277,6 @@ EOF
 
   cp /tmp/lease.json ${SHARED_DIR}/LEASE_$LEASE.json
   log "discovered portgroup ${vcenter_portgroups[$VCENTER]}"
-
-  getDVSInfo ${NETWORK_PATH}
 done
 
 # retrieving resource pools 
@@ -366,7 +366,7 @@ cp /tmp/lease.json $SHARED_DIR/LEASE_single.json
 NETWORK_RESOURCE=$(cat /tmp/lease.json | jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name')
 cp "${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE}.json" $SHARED_DIR/NETWORK_single.json
 
-cat ${SHARED_DIR}/LEASE_single.json | jq -r '.status.envVars' > /tmp/envvars
+jq -r '.status.envVars' ${SHARED_DIR}/LEASE_single.json > /tmp/envvars
 source /tmp/envvars
 
 if [ $IPI -eq 0 ]; then
@@ -386,7 +386,8 @@ export GOVC_RESOURCE_POOL=${resource_pool}
 export cloud_where_run=IBM
 export GOVC_USERNAME="${pool_usernames[${GOVC_URL}]}"
 export GOVC_PASSWORD="${pool_passwords[${GOVC_URL}]}"
-export GOVC_TLS_CA_CERTS=/var/run/vsphere-ibmcloud-ci/vcenter-certificate
+export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
+export SSL_CERT_FILE=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 EOF
 
 log "Creating vsphere_context.sh file..."
@@ -402,23 +403,40 @@ cp "${SHARED_DIR}/govc.sh" "${SHARED_DIR}/vsphere_context.sh"
 # randomly delete may fail, this shouldn't cause an immediate issue
 # but should eventually be cleaned up.
 
-# set +e
-# for LEASE in $LEASES; do
-#   cat $SHARED_DIR/LEASE_$LEASE.json | jq -r '.status.envVars' > /tmp/envvars
-#   source /tmp/envvars
+set +e
+for LEASE in $LEASES; do
+  cat $SHARED_DIR/LEASE_$LEASE.json | jq -r '.status.envVars' > /tmp/envvars
+  source /tmp/envvars
 
-#   export GOVC_USERNAME="${pool_usernames[$vsphere_url]}"
-#   export GOVC_PASSWORD="${pool_passwords[$vsphere_url]}"
-#   export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
+  export GOVC_USERNAME="${pool_usernames[$vsphere_url]}"
+  export GOVC_PASSWORD="${pool_passwords[$vsphere_url]}"
+  export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 
-#   echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${vsphere_portgroup} in DC ${vsphere_datacenter} and destroy"
-#   govc ls -json "${vsphere_portgroup}" |
-#   jq '.elements[]?.Object.Vm[]?.Value' |
-#   xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |
-#   jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |
-#   xargs -I {} --no-run-if-empty govc vm.destroy {}
-# done
-# set -e
+  echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${vsphere_portgroup} in DC ${vsphere_datacenter} and destroy"
+  govc ls -json "${vsphere_portgroup}" |
+  jq '.elements[]?.Object.Vm[]?.Value' |
+  xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |
+  jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |
+  xargs -I {} --no-run-if-empty govc vm.destroy {}
+done
+set -e
+
+for LEASE in $SHARED_DIR/LEASE*; do      
+  if [[ $LEASE =~ "single" ]]; then 
+    continue
+  fi
+  
+  jq -r .status.envVars ${LEASE} > /tmp/envvars
+  source /tmp/envvars
+
+  log "checking ${LEASE} and ${GOVC_NETWORK} for DVS UUID"
+
+  export GOVC_USERNAME="${pool_usernames[$vsphere_url]}"
+  export GOVC_PASSWORD="${pool_passwords[$vsphere_url]}"
+  
+  getDVSInfo "${GOVC_NETWORK}"
+done
 
 log "writing the platform spec"
+echo $platformSpec > $SHARED_DIR/platform.json
 echo $platformSpec | jq -r yamlify2 | sed --expression='s/^/    /g' > $SHARED_DIR/platform.yaml

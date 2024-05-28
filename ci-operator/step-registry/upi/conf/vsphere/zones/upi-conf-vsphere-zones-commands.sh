@@ -16,12 +16,80 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-declare vlanid
-declare primaryrouterhostname
-declare vsphere_portgroup
-declare dns_server
+FAILURE_DOMAIN_PATH=/tmp/fds.txt
+FAILURE_DOMAIN_JSON=/tmp/fds.json
+FIRST=1
+function getFailureDomainsWithDSwitchForVCenter() {  
+    vcenter=$1
+
+    FAILURE_DOMAIN_OUT="[]"
+    
+    echo "[" > ${FAILURE_DOMAIN_PATH}
+    
+    for LEASE in $SHARED_DIR/LEASE*; do      
+      if [[ $LEASE =~ "single" ]]; then 
+        continue
+      fi
+
+      server=$(jq -r .status.server $LEASE)
+      if [ $server != $vcenter ]; then
+        continue
+      fi      
+
+      if [ ${FIRST} == 0 ]; then
+      echo "    }," >> ${FAILURE_DOMAIN_PATH}  
+      fi
+      echo "    {" >> ${FAILURE_DOMAIN_PATH}
+      FIRST=0
+
+      DVS=$(jq --compact-output -r '."'$GOVC_NETWORK'"' ${SHARED_DIR}/dvs.json)
+      jq -r .status.envVars ${LEASE} > /tmp/envvars
+      source /tmp/envvars
+
+      CLUSTER=$(jq -r .status.topology.computeCluster ${LEASE} | cut -d '/' -f 4)
+      DVS_UUID=$(echo $DVS | jq -r .cluster.$CLUSTER)
+
+      echo "        server = ${GOVC_URL}" >> ${FAILURE_DOMAIN_PATH}
+      echo "        datacenter = ${GOVC_DATACENTER}" >> ${FAILURE_DOMAIN_PATH}
+      echo "        cluster = ${CLUSTER}" >> ${FAILURE_DOMAIN_PATH}
+      echo "        datastore = ${GOVC_DATASTORE}" >> ${FAILURE_DOMAIN_PATH}
+      echo "        network = ${GOVC_NETWORK}" >> ${FAILURE_DOMAIN_PATH}
+      echo "        distributed_virtual_switch_uuid = ${DVS_UUID}" >> ${FAILURE_DOMAIN_PATH}
+
+      FAILURE_DOMAIN_OUT=$(echo $FAILURE_DOMAIN_OUT | jq --compact-output -r '. += [{"datacenter":"'${GOVC_DATACENTER}'","cluster":"'${CLUSTER}'","datastore":"'${GOVC_DATASTORE}'","network":"'${GOVC_NETWORK}'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]'); 
+    done
+    echo "    }" >> ${FAILURE_DOMAIN_PATH}  
+    echo "]" >> ${FAILURE_DOMAIN_PATH}
+
+    echo ${FAILURE_DOMAIN_OUT} | jq . > ${FAILURE_DOMAIN_JSON}
+}
+
 declare vsphere_url
+declare GOVC_URL
+declare GOVC_DATACENTER
+declare GOVC_DATASTORE
+declare GOVC_NETWORK
+declare vsphere_cluster
+declare vsphere_resource_pool
+declare vsphere_datacenter
+declare vsphere_datastore
+declare vsphere_portgroup
+declare gateway
+declare vlanid
+declare phydc
+declare primaryrouterhostname
+declare LEASE_PATH
+declare NETWORK_PATH
+declare GOVC_INSECURE
+declare vsphere_resource_pool
+declare GOVC_RESOURCE_POOL
+declare cloud_where_run
+declare GOVC_USERNAME
+declare GOVC_PASSWORD
+declare GOVC_TLS_CA_CERTS
 source "${SHARED_DIR}/vsphere_context.sh"
+
+export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 
 openshift_install_path="/var/lib/openshift-install"
 
@@ -31,27 +99,23 @@ end_master_num=$((start_master_num + CONTROL_PLANE_REPLICAS - 1))
 start_worker_num=$((end_master_num + 1))
 end_worker_num=$((start_worker_num + COMPUTE_NODE_REPLICAS - 1))
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
-if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
-  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
-  exit 1
-fi
+NETWORK_CONFIG=${SHARED_DIR}/NETWORK_single.json
 
-dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
-gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
-netmask=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].mask' "${SUBNETS_CONFIG}")
+dns_server=$(jq -r '.status.gateway' "${NETWORK_CONFIG}")
+gateway=${dns_server}
+netmask=$(jq -r '.status.netmask' "${NETWORK_CONFIG}")
 
-lb_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[2]' "${SUBNETS_CONFIG}")
-bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[3]' "${SUBNETS_CONFIG}")
-machine_cidr=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
+lb_ip_address=$(jq -r '.spec.ipAddresses[2]' "${NETWORK_CONFIG}")
+bootstrap_ip_address=$(jq -r '.spec.ipAddresses[3]' "${NETWORK_CONFIG}")
+machine_cidr=$(jq -r '.spec.machineNetworkCidr' "${NETWORK_CONFIG}")
 
-printf "***** DEBUG dns: %s lb: %s bootstrap: %s cidr: %s ******\n" "$dns_server" "$lb_ip_address" "$bootstrap_ip_address" "$machine_cidr"
+# printf "***** DEBUG dns: %s lb: %s bootstrap: %s cidr: %s ******\n" "$dns_server" "$lb_ip_address" "$bootstrap_ip_address" "$machine_cidr"
 
 control_plane_idx=0
 control_plane_addrs=()
 control_plane_hostnames=()
 for n in $(seq "$start_master_num" "$end_master_num"); do
-  control_plane_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+  control_plane_addrs+=("$(jq -r --argjson N "$n" '.status.ipAddresses[$N]' "${NETWORK_CONFIG}")")
   control_plane_hostnames+=("control-plane-$((control_plane_idx++))")
 done
 printf "**** controlplane DEBUG %s ******\n" "${control_plane_addrs[@]}"
@@ -66,7 +130,7 @@ compute_idx=0
 compute_addrs=()
 compute_hostnames=()
 for n in $(seq "$start_worker_num" "$end_worker_num"); do
-  compute_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+  compute_addrs+=("$(jq -r --argjson N "$n" '.status.ipAddresses[$N]' "${NETWORK_CONFIG}")")
   compute_hostnames+=("compute-$((compute_idx++))")
 done
 
@@ -99,10 +163,6 @@ cluster_domain=$(<"${SHARED_DIR}"/clusterdomain.txt)
 
 ssh_pub_key_path="${CLUSTER_PROFILE_DIR}/ssh-publickey"
 install_config="${SHARED_DIR}/install-config.yaml"
-
-printf "IBMCloud\ndatacenter-2" >"${SHARED_DIR}/ova-datacenters"
-printf "mdcnc-ds-1\nmdcnc-ds-4" >"${SHARED_DIR}/ova-datastores"
-printf "vcs-mdcnc-workload-1\nvcs-mdcnc-workload-4" >"${SHARED_DIR}/ova-clusters"
 
 legacy_installer_json="${openshift_install_path}/rhcos.json"
 fcos_json_file="${openshift_install_path}/fcos.json"
@@ -145,9 +205,6 @@ echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..
 echo "export target_hw_version=${target_hw_version}" >>${SHARED_DIR}/vsphere_context.sh
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
-
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/govc.sh"
 
 echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
 
@@ -221,67 +278,14 @@ baseDomain: $base_domain
 controlPlane:
   name: "master"
   replicas: ${CONTROL_PLANE_REPLICAS}
-  platform:
-    vsphere:
-      zones:
-       - "us-east-1"
-       - "us-east-2"
-       - "us-east-3"
+
 compute:
 - name: "worker"
   replicas: ${COMPUTE_NODE_REPLICAS}
-  platform:
-    vsphere:
-      zones:
-       - "us-east-1"
-       - "us-east-2"
-       - "us-east-3"
-       - "us-west-1"
+
 platform:
   vsphere:
-    vCenter: "${vsphere_url}"
-    username: "${GOVC_USERNAME}"
-    password: ${GOVC_PASSWORD}
-    network: ${vsphere_portgroup}
-    datacenter: "IBMCloud"
-    cluster: vcs-mdcnc-workload-1
-    defaultDatastore: mdcnc-ds-shared
-    folder: "/IBMCloud/vm/${cluster_name}"
-    failureDomains:
-    - name: us-east-1
-      region: us-east
-      zone: us-east-1a
-      topology:
-        computeCluster: /IBMCloud/host/vcs-mdcnc-workload-1
-        networks:
-        - ${vsphere_portgroup}
-        datastore: mdcnc-ds-1
-    - name: us-east-2
-      region: us-east
-      zone: us-east-2a
-      topology:
-        computeCluster: /IBMCloud/host/vcs-mdcnc-workload-2
-        networks:
-        - ${vsphere_portgroup}
-        datastore: mdcnc-ds-2
-    - name: us-east-3
-      region: us-east
-      zone: us-east-3a
-      topology:
-        computeCluster: /IBMCloud/host/vcs-mdcnc-workload-3
-        networks:
-        - ${vsphere_portgroup}
-        datastore: mdcnc-ds-3
-    - name: us-west-1
-      region: us-west
-      zone: us-west-1a
-      topology:
-        datacenter: datacenter-2
-        computeCluster: /datacenter-2/host/vcs-mdcnc-workload-4
-        networks:
-        - ${vsphere_portgroup}
-        datastore: mdcnc-ds-4
-        folder: "/datacenter-2/vm/${cluster_name}"
+$(cat $SHARED_DIR/platform.yaml)
 
 networking:
   machineNetwork:
@@ -298,6 +302,9 @@ EOF
 fi
 
 echo "$(date -u --rfc-3339=seconds) - ***** DEBUG ***** DNS: ${dns_server}"
+
+echo "$(date -u --rfc-3339=seconds) - Getting failure domains ..."
+getFailureDomainsWithDSwitchForVCenter ${vsphere_url}
 
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat >"${SHARED_DIR}/terraform.tfvars" <<-EOF
@@ -319,36 +326,7 @@ compute_ip_addresses = ${compute_ip_addresses}
 control_plane_ip_addresses = ${control_plane_ip_addresses}
 control_plane_count = ${CONTROL_PLANE_REPLICAS}
 compute_count = ${COMPUTE_NODE_REPLICAS}
-failure_domains = [
-    {
-        datacenter = "IBMCloud"
-        cluster = "vcs-mdcnc-workload-1"
-        datastore = "mdcnc-ds-1"
-        network = "${vsphere_portgroup}"
-        distributed_virtual_switch_uuid = "50 05 37 56 0d b0 eb 3a-e4 4c 68 33 1b 64 9e a2"
-    },
-    {
-        datacenter = "IBMCloud"
-        cluster = "vcs-mdcnc-workload-2"
-        datastore = "mdcnc-ds-2"
-        network = "${vsphere_portgroup}"
-        distributed_virtual_switch_uuid = "50 05 37 56 0d b0 eb 3a-e4 4c 68 33 1b 64 9e a2"
-    },
-    {
-        datacenter = "IBMCloud"
-        cluster = "vcs-mdcnc-workload-3"
-        datastore = "mdcnc-ds-3"
-        network = "${vsphere_portgroup}"
-        distributed_virtual_switch_uuid = "50 05 37 56 0d b0 eb 3a-e4 4c 68 33 1b 64 9e a2"
-    },
-    {
-        datacenter = "datacenter-2"
-        cluster = "vcs-mdcnc-workload-4"
-        datastore = "mdcnc-ds-4"
-        network = "${vsphere_portgroup}"
-        distributed_virtual_switch_uuid = "50 05 92 5b 73 ea fd cb-1c 02 ad e4 df fd fb 8c"
-    }
-]
+failure_domains = $(cat $FAILURE_DOMAIN_PATH)
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Create variables.ps1 ..."
@@ -388,32 +366,7 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$compute_hostnames = $(printf "\"%s\"," "${compute_hostnames[@]}" | sed 's/,$//')
 
 \$failure_domains = @"
-[
-    {
-        "datacenter": "IBMCloud",
-        "cluster": "vcs-mdcnc-workload-1",
-        "datastore": "mdcnc-ds-1",
-        "network": "${vsphere_portgroup}"
-    },
-    {
-        "datacenter": "IBMCloud",
-        "cluster": "vcs-mdcnc-workload-2",
-        "datastore": "mdcnc-ds-2",
-        "network": "${vsphere_portgroup}"
-    },
-    {
-        "datacenter": "IBMCloud",
-        "cluster": "vcs-mdcnc-workload-3",
-        "datastore": "mdcnc-ds-3",
-        "network": "${vsphere_portgroup}"
-    },
-    {
-        "datacenter": "datacenter-2",
-        "cluster": "vcs-mdcnc-workload-4",
-        "datastore": "mdcnc-ds-4",
-        "network": "${vsphere_portgroup}"
-    }
-]
+$(cat ${FAILURE_DOMAIN_JSON})
 "@
 EOF
 
