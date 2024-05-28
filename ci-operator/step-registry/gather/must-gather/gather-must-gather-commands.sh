@@ -10,6 +10,8 @@ function createInstallJunit() {
   EXIT_CODE_BOOTSTRAP=5
   EXIT_CODE_CLUSTER=6
   EXIT_CODE_OPERATORS=7
+  EXIT_CODE_PRECONFIG=100
+  EXIT_CODE_POSTCHECK=101
   if test -f "${SHARED_DIR}/install-status.txt"
   then
     EXIT_CODE=`tail -n1 "${SHARED_DIR}/install-status.txt" | awk '{print $1}'`
@@ -133,6 +135,71 @@ EOF
       </testsuite>
 EOF
     fi
+  fi
+
+  # generate junit file for pre configuration steps failed
+  if test -f "${SHARED_DIR}/install-pre-config-status.txt" && [ "$(<"${SHARED_DIR}/install-pre-config-status.txt")" == "${EXIT_CODE_PRECONFIG}" ]
+  then
+    cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+      <testsuite name="cluster install" tests="2" failures="2">
+        <testcase name="install should succeed: pre configuration">
+          <failure message="">pre configuration failed</failure>
+        </testcase>
+        <testcase name="install should succeed: overall">
+          <failure message="">openshift cluster install failed overall</failure>
+        </testcase>
+      </testsuite>
+EOF
+  fi
+
+  # overide junit file to insert post check
+  # once found installation post check failure
+  if test -f "${SHARED_DIR}/install-post-check-status.txt"
+  then
+    if grep -q "^$EXIT_CODE_POSTCHECK$" "${SHARED_DIR}/install-post-check-status.txt"; then
+      INSTALL_POSTCHECK_FAILURE=2
+    else
+      INSTALL_POSTCHECK_FAILURE=0
+    fi
+
+    if test -f "${SHARED_DIR}/install-pre-config-status.txt"; then
+      cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+      <testsuite name="cluster install" tests="9" failures="$INSTALL_POSTCHECK_FAILURE">
+        <testcase name="install should succeed: pre configuration"/>
+EOF
+    else
+      cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+      <testsuite name="cluster install" tests="8" failures="$INSTALL_POSTCHECK_FAILURE">
+EOF
+    fi
+
+    cat >>"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+        <testcase name="install should succeed: other"/>
+        <testcase name="install should succeed: configuration"/>
+        <testcase name="install should succeed: infrastructure"/>
+        <testcase name="install should succeed: cluster bootstrap"/>
+        <testcase name="install should succeed: cluster creation"/>
+        <testcase name="install should succeed: cluster operator stability"/>
+EOF
+    if [ "$INSTALL_POSTCHECK_FAILURE" = 0 ]
+    then
+      cat >>"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+        <testcase name="install should succeed: post check"/>
+        <testcase name="install should succeed: overall"/>
+EOF
+    else
+      cat >>"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+        <testcase name="install should succeed: post check">
+          <failure message="">openshift cluster install succedded, but failed at post check steps</failure>
+        </testcase>
+        <testcase name="install should succeed: overall">
+          <failure message="">openshift cluster install failed overall</failure>
+        </testcase>
+EOF
+    fi
+      cat >>"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+      </testsuite>
+EOF
   fi
 }
 
