@@ -10,7 +10,7 @@ export BACKUP_LOCATION=$OADP_BACKUP_LOCATION
 export PROW_NAMESPACE=$NAMESPACE
 export NAMESPACE="openshift-adp"
 export BUCKET="${PROW_NAMESPACE}-${BUCKET_NAME}"
-export KUBECONFIG="/home/jenkins/.kube/config"
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export OADP_TEST_FOCUS="--ginkgo.focus=${OADP_TEST_FOCUS}"
 export ANSIBLE_REMOTE_TMP="/tmp/"
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
