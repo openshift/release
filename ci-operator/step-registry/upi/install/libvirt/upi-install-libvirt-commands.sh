@@ -30,6 +30,12 @@ function save_credentials () {
   cp /tmp/auth/kubeadmin-password ${SHARED_DIR}
 }
 
+echo "FIPS_ENABLED = $FIPS_ENABLED"  # Delete before merge
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+  echo "Ignoring host encryption validation for FIPS testing..."
+  export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
+
 # download the correct openshift-install from the payload
 oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
   --command=openshift-install --to=/tmp
