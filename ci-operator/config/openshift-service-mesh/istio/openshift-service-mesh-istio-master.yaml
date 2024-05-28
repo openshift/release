@@ -195,19 +195,17 @@ tests:
     - as: integ-helm-test-run
       cli: latest
       commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export KUBECONFIG=/work/ci-kubeconfig && \
-          oc version && \
-          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
-          export BUILD_WITH_CONTAINER="0" && \
-          export VARIANT=distroless && \
-          export GCP_REGISTRIES=" " && \
-          cd /work && \
-          entrypoint \
-          prow/integ-suite-ocp.sh \
-          helm 'TestDefaultInPlaceUpgradeFromPreviousMinorRelease|TestCanaryUpgradeFromPreviousMinorRelease|TestCanaryUpgradeFromTwoMinorRelease|TestStableRevisionLabelsUpgradeFromPreviousMinorRelease|TestStableRevisionLabelsUpgradeFromTwoMinorRelease|TestAmbientInPlaceUpgradeFromPreviousMinorRelease'"
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" <<EOF
+          export KUBECONFIG=/work/ci-kubeconfig
+          oc version
+          export ARTIFACT_DIR="${ARTIFACT_DIR}"
+          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')"
+          export BUILD_WITH_CONTAINER="0"
+          export VARIANT=distroless
+          export GCP_REGISTRIES=" "
+          cd /work
+          entrypoint prow/integ-suite-ocp.sh helm 'TestDefaultInPlaceUpgradeFromPreviousMinorRelease|TestCanaryUpgradeFromPreviousMinorRelease|TestCanaryUpgradeFromTwoMinorRelease|TestStableRevisionLabelsUpgradeFromPreviousMinorRelease|TestStableRevisionLabelsUpgradeFromTwoMinorRelease|TestAmbientInPlaceUpgradeFromPreviousMinorRelease'
+        EOF
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
