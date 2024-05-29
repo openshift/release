@@ -16,7 +16,7 @@ function deploy_tektonhub() {
     api:
       catalogRefreshInterval: 10m
 EOF
-  for i in {1..30}
+  for _ in {1..30}
   do
     if oc get tektonhub hub -n openshift-pipelines; then
       echo "TektonHub deployed successfully."
@@ -49,7 +49,7 @@ function create_pvc() {
       requests:
         storage: 2Gi
 EOF
-  for i in {1..30}
+  for _ in {1..30}
   do
     if oc get pvc tekton-logs -n openshift-pipelines; then
       echo "PVC created successfully."
@@ -83,7 +83,7 @@ function deploy_tektonresult() {
     server_port: 8080
     prometheus_port: 9090
 EOF
-  for i in {1..30}
+  for _ in {1..30}
   do
     if oc get tektonresult result -n openshift-pipelines; then
       echo "TektonResult deployed successfully."
@@ -97,7 +97,7 @@ EOF
 
 function create_results_route() {
   oc create route -n openshift-pipelines passthrough tekton-results-api-service --service=tekton-results-api-service --port=8080
-  for i in {1..30}
+  for _ in {1..30}
   do
     if oc get route tekton-results-api-service -n openshift-pipelines; then
       echo "Route created successfully."
