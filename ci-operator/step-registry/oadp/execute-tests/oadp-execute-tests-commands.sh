@@ -10,7 +10,7 @@ export BACKUP_LOCATION=$OADP_BACKUP_LOCATION
 export PROW_NAMESPACE=$NAMESPACE
 export NAMESPACE="openshift-adp"
 export BUCKET="${PROW_NAMESPACE}-${BUCKET_NAME}"
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+export KUBECONFIG="/home/jenkins/.kube/config"
 export OADP_TEST_FOCUS="--ginkgo.focus=${OADP_TEST_FOCUS}"
 export ANSIBLE_REMOTE_TMP="/tmp/"
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
@@ -84,5 +84,5 @@ trap archive-results SIGINT SIGTERM ERR EXIT
 cd $OADP_GIT_DIR
 go mod edit -replace=gitlab.cee.redhat.com/app-mig/oadp-e2e-qe=$OADP_GIT_DIR/e2e
 go mod tidy
-#EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
-export KUBECONFIG="${SHARED_DIR}/kubeconfig" && export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" && /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
+EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
+#export KUBECONFIG="${SHARED_DIR}/kubeconfig" && export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" && /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
