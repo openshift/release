@@ -11,6 +11,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: "4.16"
+    namespace: ocp
+    tag: hypershift-operator
   operator-sdk:
     name: "4.16"
     namespace: origin
@@ -569,6 +573,55 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-ui-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-efs
+- as: aws-ipi-ovn-hypershift-mgmt-f7
+  cron: 56 1 6,13,20,29 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      ADDITIONAL_HYPERSHIFT_NODE_COUNT: "1"
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_ARGS: --multi-arch
+      HYPERSHIFT_NODE_COUNT: "2"
+      TEST_ADDITIONAL: Hypershift|Network_Observability
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
+      TEST_TIMEOUT: "35"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-heterogeneous
+- as: aws-ipi-ovn-hypershift-guest-f7
+  cron: 52 17 3,12,19,26 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_HYPERSHIFT_NODE_COUNT: "1"
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_ARGS: --multi-arch
+      HYPERSHIFT_NODE_COUNT: "2"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-heterogeneous-guest
+- as: aws-ipi-ovn-hypershift-guest-f14-destructive
+  cron: 13 2 3,19 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_HYPERSHIFT_NODE_COUNT: "1"
+      ADDITIONAL_WORKERS: "1"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_ARGS: --multi-arch
+      HYPERSHIFT_NODE_COUNT: "2"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-heterogeneous-guest
 - as: aws-ipi-ovn-ipsec-amd-mixarch-f9-destructive
   cron: 18 5 1,10,22 * *
   steps:
