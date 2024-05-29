@@ -38,17 +38,12 @@ export ACS__API_TOKEN \
   RHTAP_ENABLE_TAS \
   RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES \
   RHTAP_ENABLE_TPA \
-  RED_HAT_DEVELOPER_HUB_URL \
-  GITHUB__TOKEN \
   GITLAB__APP__CLIENT__ID \
   GITLAB__APP__CLIENT__SECRET \
-  GITHUB_ORGANIZATION QUAY_IMAGE_ORG \
-  APPLICATION_ROOT_NAMESPACE \
-  NODE_TLS_REJECT_UNAUTHORIZED
-
+  QUAY__API_TOKEN
 
 RHTAP_ENABLE_GITHUB=${RHTAP_ENABLE_GITHUB:-'true'} 
-RHTAP_ENABLE_GITLAB=${RHTAP_ENABLE_GITLAB:-'false'}
+RHTAP_ENABLE_GITLAB=${RHTAP_ENABLE_GITLAB:-'true'}
 RHTAP_ENABLE_DEVELOPER_HUB=${RHTAP_ENABLE_DEVELOPER_HUB:-'true'}
 RHTAP_ENABLE_TAS=${RHTAP_ENABLE_TAS:-'true'}
 RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES=${RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES:-'true'}
@@ -69,6 +64,9 @@ GITOPS__GIT_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
 QUAY__DOCKERCONFIGJSON=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhtap_quay_ci_token)
 SPRAYPROXY_SERVER_URL=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-url)
 SPRAYPROXY_SERVER_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-token)
+GITLAB__APP__CLIENT__ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_oauth_client_id)
+GITLAB__APP__CLIENT__SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_oauth_client_secret)
+QUAY__API_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/quay_api_token)
 
 TPA__GUAC__PASSWORD="guac1234" # notsecret
 TPA__KEYCLOAK__ADMIN_PASSWORD="admin123456" # notsecret
@@ -128,7 +126,10 @@ install_rhtap(){
   fi
 
   ./bin/make.sh values
-  
+
+  echo "Disabling the default auth policy"
+  yq e -i '.debug.ci=true' private-values.yaml
+
   echo "[INFO]Install RHTAP ..."
   ./bin/make.sh apply -d -n $NAMESPACE -- --values private-values.yaml
 
@@ -159,9 +160,9 @@ EOF
   wait_for_pipeline "pipelineruns/$pipeline_name" "$NAMESPACE"
   tkn -n "$NAMESPACE" pipelinerun logs "$pipeline_name" -f >"$DEBUG_OUTPUT"
 
-  homepage_url=$(grep "homepage-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
-  callback_url=$(grep "callback-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
-  webhook_url=$(grep "webhook-url" < "$DEBUG_OUTPUT"  | sed 's/.*: //g') 
+  homepage_url=$(grep --max-count 1 "homepage-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
+  callback_url=$(grep --max-count 1 "callback-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
+  webhook_url=$(grep --max-count 1 "webhook-url" < "$DEBUG_OUTPUT"  | sed 's/.*: //g') 
 
   echo "$homepage_url" | tee "${SHARED_DIR}/homepage_url"
   echo "$callback_url" | tee "${SHARED_DIR}/callback_url"
@@ -180,12 +181,26 @@ remove_rhtap(){
 
 e2e_test(){
   echo "[INFO]Trigger installer e2e tests..."
+  export APPLICATION_ROOT_NAMESPACE \
+    QUAY_IMAGE_ORG \
+    GITHUB_ORGANIZATION \
+    GITHUB_TOKEN \
+    RED_HAT_DEVELOPER_HUB_URL \
+    NODE_TLS_REJECT_UNAUTHORIZED \
+    GITLAB_TOKEN \
+    GITLAB_ORGANIZATION \
+    GITLAB_WEBHOOK_SECRET
+
+  GITLAB_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_token)
+  GITLAB_ORGANIZATION="rhtap-qe"
+  GITLAB_WEBHOOK_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-webhook-secret)
 
   APPLICATION_ROOT_NAMESPACE="rhtap-app"
   QUAY_IMAGE_ORG="rhtap_qe"
   GITHUB_ORGANIZATION="rhtap-rhdh-qe"
-  GITHUB__TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
+  GITHUB_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
   RED_HAT_DEVELOPER_HUB_URL=https://"$(oc get route redhat-developer-hub -n $NAMESPACE -o jsonpath='{.spec.host}')"
+
 
   cd "$(mktemp -d)"
 
@@ -194,7 +209,6 @@ e2e_test(){
   NODE_TLS_REJECT_UNAUTHORIZED=0
   yarn && yarn test
 }
-
 
 login_ocp
 install_rhtap

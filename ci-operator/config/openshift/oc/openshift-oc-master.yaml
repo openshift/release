@@ -1,18 +1,18 @@
 base_images:
   base:
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
     tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.16_base:
-    name: "4.16"
+  must-gather-base:
+    name: "4.17"
     namespace: ocp
-    tag: base
-  ocp_4.16_base-rhel9:
-    name: "4.16"
+    tag: must-gather
+  ocp_4.17_base-rhel9:
+    name: "4.17"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-8-golang-1.21-openshift-4.16:
@@ -23,8 +23,12 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
+  ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.17
   tests-base:
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
     tag: tests
 binary_build_commands: make build --warn-undefined-variables
@@ -33,27 +37,27 @@ build_root:
 images:
 - dockerfile_path: images/cli/Dockerfile.rhel
   inputs:
-    ocp_4.16_base:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
   to: cli
 - dockerfile_path: images/tools/Dockerfile
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
   to: tools
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: tests-base
@@ -64,7 +68,20 @@ images:
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
   to: tests
+- dockerfile_path: images/cli/Dockerfile.rhel
+  from: must-gather-base
+  inputs:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
+  to: must-gather
 - context_dir: images/deployer
   dockerfile_path: Dockerfile.rhel
   from: cli
@@ -89,8 +106,9 @@ promotion:
       oc-rpms: rpms
     excluded_images:
     - tests
+    - must-gather
     - oc-base-with-rpms
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
 raw_steps:
 - rpm_image_injection_step:
@@ -99,12 +117,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: "4.16"
+      name: "4.17"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
+      name: "4.17"
       namespace: ocp
 resources:
   '*':

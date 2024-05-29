@@ -28,8 +28,9 @@ We are automating the configuration of three primary IDP solutions:
 
 ### FreeIPA
 
-- **Automation Status**: In Progress
+- **Automation Status**: Fully Automated
 - **Purpose**: User configuration through FreeIPA Identity.
+- **Script URL**: [FreeIPA IDP Script](https://github.com/openshift/release/blob/master/ci-operator/step-registry/idp/freeipa/idp-freeipa-ref.yaml)
 
 ## Pre-requisites
 
@@ -60,7 +61,7 @@ Included in the `openshift-e2e-test-qe*` chains by default, highlighting our com
 
 ### OpenLDAP Identity Configuration
 
-Configured for selected Prow jobs for selected CI profiles. To configure it in new a Prow job, add the `idp-openldap` step before executing the `openshift-e2e-test-qe*` chain, which will make the `idp-htpasswd` step not configure an htpasswd IDP any more.
+Configured for selected Prow jobs for selected CI profiles. To configure it in new a Prow job, add the `idp-openldap` or `idp-freeipa` step before executing the `openshift-e2e-test-qe*` chain, which will make the `idp-htpasswd` step not configure an htpasswd IDP any more.
 
 ## Future Directions & Contributions
 

@@ -54,6 +54,9 @@ def generate_app_ci_content(config, git_clone_dir):
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin_deploy-ocp-publish-art.yaml'), context=config) as gendoc:
         content.add_art_publish(gendoc)
 
+    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('ibm_managed_control_plane_testing.yaml'), context=config) as gendoc:
+        content.add_ibm_managed_control_plane_testing(gendoc)
+
     with genlib.GenDoc(config.paths.path_rc_rpms.joinpath('rpms-ocp-3.11.yaml'), context=config) as gendoc:
         content.add_rpm_mirror_service(gendoc, git_clone_dir, '3.11')
 

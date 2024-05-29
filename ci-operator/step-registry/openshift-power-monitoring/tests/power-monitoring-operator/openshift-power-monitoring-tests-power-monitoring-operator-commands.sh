@@ -23,11 +23,11 @@ must_gather() {
 	echo "Gather OLM resources"
 
 	for x in $(oc api-resources --api-group=operators.coreos.com -o name); do
-		oc get "$x" -n "$OPERATORS_NS" -o yaml | tee "$LOGS_DIR/$x.yaml"
+		oc get "$x" -n "$OPERATORS_NS" -o yaml | tee "$LOGS_DIR/$x.yaml" >/dev/null
 	done
-	oc get pods -n "$OPERATORS_NS" -o yaml | tee "$LOGS_DIR/pod.yaml"
-	oc describe deployment "$OPERATOR_DEPLOY_NAME" -n "$OPERATORS_NS" | tee "$LOGS_DIR/$OPERATOR_DEPLOY_NAME"
-	oc logs -n "$OPERATORS_NS" "deployment/$OPERATOR_DEPLOY_NAME" | tee "$LOGS_DIR/$OPERATOR_DEPLOY_NAME.log"
+	oc get pods -n "$OPERATORS_NS" -o yaml | tee "$LOGS_DIR/pod.yaml" >/dev/null
+	oc describe deployment "$OPERATOR_DEPLOY_NAME" -n "$OPERATORS_NS" | tee "$LOGS_DIR/$OPERATOR_DEPLOY_NAME" >/dev/null
+	oc logs -n "$OPERATORS_NS" "deployment/$OPERATOR_DEPLOY_NAME" | tee "$LOGS_DIR/$OPERATOR_DEPLOY_NAME.log" >/dev/null
 }
 
 log_events() {
@@ -35,7 +35,7 @@ log_events() {
 	shift
 	oc get events -w \
 		-o custom-columns=FirstSeen:.firstTimestamp,LastSeen:.lastTimestamp,Count:.count,From:.source.component,Type:.type,Reason:.reason,Message:.message \
-		-n "$ns" | tee "$LOGS_DIR/$ns-events.log"
+		-n "$ns" | tee "$LOGS_DIR/$ns-events.log" >/dev/null
 }
 
 validate_ds() {
@@ -99,7 +99,7 @@ EOF
 
 	validate_ds default dummy-model-server 5 20 || {
 		echo "daemonset not in ready state"
-		oc get daemonset -n default -o yaml | tee "$LOGS_DIR/model-server-ds.yaml"
+		oc get daemonset -n default -o yaml | tee "$LOGS_DIR/model-server-ds.yaml" >/dev/null
 		return 1
 	}
 	oc delete -n default daemonset dummy-model-server # Deleting the daemonset to make sure it doesn't interfere with the test

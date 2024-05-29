@@ -26,7 +26,7 @@ fi
 }
 
 export HOME=/tmp
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
 
 declare vlanid
 declare primaryrouterhostname
@@ -247,6 +247,10 @@ dir=/tmp/installer
 mkdir "${dir}/"
 pushd ${dir}
 cp -t "${dir}" "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 /tmp/openshift-install agent create image --dir="${dir}" --log-level debug &
 

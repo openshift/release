@@ -138,7 +138,7 @@ tests:
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: s390x
       ADDITIONAL_WORKER_VM_TYPE: bz2-4x16
-      BASE_DOMAIN: ocp-dev-ppc64le.com
+      BASE_DOMAIN: multi-arch-cicd.cis.ibm.net
       LOKI_ENABLED: "false"
       RESOURCE_GROUP: ibmcloud-multi-s390x-rg
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
@@ -160,10 +160,10 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: ocp-dev-ppc64le.com
+      BASE_DOMAIN: multi-arch-cicd.cis.ibm.net
       IBMCLOUD_CIS_CRN: 'crn:v1:bluemix:public:internet-svcs:global:a/3c24cb272ca44aa1ac9f6e9490ac5ecd:9b372a78-cec3-45b7-875e-04ba0270c87d::'
       JQ_VERSION: "1.6"
-      RESOURCE_GROUP: ipi-cicd-resource-group
+      RESOURCE_GROUP: multi-arch-cicd-resource-group
       TERRAFORM_VERSION: 1.5.5
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
         FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
@@ -334,12 +334,12 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: ppc64le
-      BASE_DOMAIN: ocp-dev-ppc64le.com
+      BASE_DOMAIN: multi-arch-cicd.cis.ibm.net
       GO_VERSION: 1.20.7
       JQ_VERSION: "1.6"
       LOKI_ENABLED: "false"
       OCP_VERSION: "4.16"
-      RESOURCE_GROUP: ipi-cicd-resource-group
+      RESOURCE_GROUP: multi-arch-cicd-resource-group
       SIZE_VARIANT: compact
       TERRAFORM_VERSION: 1.5.5
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
@@ -390,13 +390,12 @@ tests:
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:s390x-latest
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
       ARCH: s390x
       BRANCH: "4.16"
-      NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-libvirt
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-libvirt-s390x-heterogeneous
   cluster: build01
   cron: 0 8,20 * * 1-5
@@ -496,14 +495,13 @@ tests:
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+      OPENSHIFT_INSTALL_TARGET: release:ppc64le-latest
     env:
       ARCH: ppc64le
       BRANCH: "4.16"
-      MASTER_MEMORY: "34816"
       TEST_TYPE: conformance-parallel
       USE_RAMFS: "true"
-    workflow: openshift-e2e-libvirt
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-heavy-build-ovn-remote-libvirt-ppc64le
   cluster: build01
   cron: 0 13 * * 1-5
@@ -698,6 +696,12 @@ tests:
       OCP_ARCH: amd64
       TEST_SUITE: upgrade-conformance
     workflow: openshift-upgrade-gcp-heterogeneous
+- as: e2e-agent-ibmz-sno
+  cluster: build01
+  cron: 0 20 * * 0
+  steps:
+    workflow: agent-ibmz-sno-e2e
+  timeout: 3h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

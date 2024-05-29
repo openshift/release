@@ -3,58 +3,22 @@ base_images:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.21-openshift-4.16
-  cli:
-    name: cli
-    namespace: openshift
-    tag: latest
-  elasticsearch-operator:
-    name: "5.8"
-    namespace: logging
-    tag: elasticsearch-operator
-  elasticsearch-operator-registry:
-    name: "5.8"
-    namespace: logging
-    tag: elasticsearch-operator-registry
   elasticsearch-operator-src:
     name: "5.8"
     namespace: logging
     tag: elasticsearch-operator-src
-  elasticsearch-proxy:
-    name: 5.y
-    namespace: logging
-    tag: elasticsearch-proxy
   log-file-metric-exporter:
     name: 6.y
     namespace: logging
     tag: log-file-metric-exporter
-  logging-elasticsearch6:
-    name: 5.y
-    namespace: logging
-    tag: logging-elasticsearch6
   logging-eventrouter:
     name: 5.y
     namespace: logging
     tag: logging-eventrouter
-  logging-fluentd:
-    name: v1.16.x
-    namespace: logging
-    tag: logging-fluentd
-  logging-kibana6:
-    name: 5.y
-    namespace: logging
-    tag: logging-kibana6
   logging-vector:
-    name: "5.9"
+    name: "6.0"
     namespace: logging
     tag: vector
-  logging-view-plugin:
-    name: 5.y
-    namespace: logging
-    tag: logging-view-plugin
-  oauth-proxy:
-    name: "4.14"
-    namespace: ocp
-    tag: oauth-proxy
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -101,14 +65,10 @@ operator:
   substitutions:
   - pullspec: quay.io/openshift-logging/cluster-logging-operator:latest
     with: pipeline:cluster-logging-operator
-  - pullspec: quay.io/openshift-logging/fluentd:latest
-    with: pipeline:logging-fluentd
   - pullspec: quay.io/openshift-logging/vector:latest
     with: pipeline:logging-vector
   - pullspec: quay.io/openshift-logging/log-file-metric-exporter:latest
     with: pipeline:log-file-metric-exporter
-  - pullspec: quay.io/openshift-logging/logging-view-plugin:latest
-    with: pipeline:logging-view-plugin
 promotion:
   to:
   - name: "6.0"
@@ -141,42 +101,26 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: cvp
+    labels:
+      region: us-east-2
+    owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.15"
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     test:
     - as: test
       cli: latest
       commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-e2e-olm
+        make test-e2e
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
         name: pipeline:cluster-logging-operator-registry
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR
         name: pipeline:cluster-logging-operator
-      - env: IMAGE_ELASTICSEARCH_OPERATOR
-        name: pipeline:elasticsearch-operator
-      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
-        name: pipeline:elasticsearch-operator-registry
-      - env: IMAGE_OAUTH_PROXY
-        name: pipeline:oauth-proxy
-      - env: IMAGE_LOGGING_CONSOLE_PLUGIN
-        name: pipeline:logging-view-plugin
-      - env: RELATED_IMAGE_LOGGING_CONSOLE_PLUGIN
-        name: pipeline:logging-view-plugin
-      - env: IMAGE_LOGGING_FLUENTD
-        name: pipeline:logging-fluentd
       - env: IMAGE_LOGGING_VECTOR
         name: pipeline:logging-vector
-      - env: IMAGE_ELASTICSEARCH_PROXY
-        name: pipeline:elasticsearch-proxy
-      - env: IMAGE_ELASTICSEARCH6
-        name: pipeline:logging-elasticsearch6
-      - env: IMAGE_LOGGING_KIBANA6
-        name: pipeline:logging-kibana6
       - env: IMAGE_LOGGING_EVENTROUTER
         name: pipeline:logging-eventrouter
       - env: IMAGE_LOG_FILE_METRIC_EXPORTER
@@ -192,10 +136,12 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: cvp
+    labels:
+      region: us-east-2
+    owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.15"
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     test:
@@ -208,20 +154,8 @@ tests:
         name: pipeline:cluster-logging-operator-registry
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR
         name: pipeline:cluster-logging-operator
-      - env: IMAGE_OAUTH_PROXY
-        name: pipeline:oauth-proxy
-      - env: IMAGE_LOGGING_CONSOLE_PLUGIN
-        name: pipeline:logging-view-plugin
-      - env: IMAGE_LOGGING_FLUENTD
-        name: pipeline:logging-fluentd
       - env: IMAGE_LOGGING_VECTOR
         name: pipeline:logging-vector
-      - env: IMAGE_ELASTICSEARCH_PROXY
-        name: pipeline:elasticsearch-proxy
-      - env: IMAGE_ELASTICSEARCH6
-        name: pipeline:logging-elasticsearch6
-      - env: IMAGE_LOGGING_KIBANA6
-        name: pipeline:logging-kibana6
       - env: IMAGE_LOGGING_EVENTROUTER
         name: pipeline:logging-eventrouter
       - env: IMAGE_LOG_FILE_METRIC_EXPORTER

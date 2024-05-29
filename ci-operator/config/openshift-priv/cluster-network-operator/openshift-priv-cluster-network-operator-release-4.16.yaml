@@ -35,8 +35,7 @@ images:
   to: cluster-network-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.16-priv
+  - name: 4.16-priv
     namespace: ocp-private
 releases:
   initial:
@@ -73,6 +72,12 @@ tests:
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-upgrade-aws-sdn
+- always_run: false
+  as: e2e-aws-ovn-ipsec-upgrade
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn-ipsec-upgrade
 - as: e2e-ovn-step-registry
   optional: true
   steps:
@@ -195,6 +200,14 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp-ovn
 - always_run: false
+  as: e2e-aws-ovn-techpreview-serial
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws-ovn-serial
+- always_run: false
   as: e2e-vsphere-ovn-windows
   optional: true
   steps:
@@ -222,7 +235,6 @@ tests:
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-multicast
-    - ref: ovn-sdn-live-migration-init
     - ref: openshift-e2e-test
     - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
@@ -239,7 +251,6 @@ tests:
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-multicast
-    - ref: ovn-sdn-live-migration-init
     - ref: openshift-e2e-test
     - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-validate-multicast

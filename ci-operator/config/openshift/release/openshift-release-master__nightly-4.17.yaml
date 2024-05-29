@@ -133,6 +133,17 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node
+- as: e2e-aws-ovn-single-node-techpreview
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-ovn-single-node-serial
   interval: 168h
   steps:
@@ -144,10 +155,24 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node
+- as: e2e-aws-ovn-single-node-techpreview-serial
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node
 - as: e2e-metal-ovn-single-node-live-iso
   interval: 168h
   steps:
     cluster_profile: packet-sno
+    env:
+      PACKET_OS: rocky_9
     observers:
       enable:
       - observers-resource-watch
@@ -157,6 +182,7 @@ tests:
   steps:
     cluster_profile: packet-sno
     env:
+      PACKET_OS: rocky_9
       PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
     observers:
@@ -274,16 +300,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-proxy
-- as: e2e-vsphere-sdn
-  interval: 168h
-  steps:
-    cluster_profile: vsphere-8-vpn
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-vsphere-sdn
 - as: e2e-vsphere-ovn-techpreview
   interval: 168h
   steps:
@@ -667,17 +683,16 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azurestack-upi-csi
-- as: e2e-aws-sdn-cgroupsv2
+- as: e2e-aws-ovn-cgroupsv2
   interval: 168h
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-aws-sdn-cgroupsv2
+    workflow: openshift-e2e-aws-ovn-cgroupsv2
 - as: e2e-aws-sdn-crun
   interval: 168h
   steps:
@@ -752,7 +767,7 @@ tests:
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 0 9 */1 * *
+  cron: 0 18 */1 * *
   steps:
     env:
       T5CI_JOB_TYPE: ptp
@@ -825,16 +840,14 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-nutanix
-- as: e2e-gcp-sdn-serial
+- as: e2e-gcp-ovn-serial
   interval: 168h
   steps:
     cluster_profile: gcp-3
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-gcp-sdn-serial
+    workflow: openshift-e2e-gcp-ovn-serial
 - as: e2e-aws-ovn-etcd-scaling
   interval: 168h
   steps:
@@ -899,7 +912,7 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: agent-e2e-generic-conformance
   timeout: 5h0m0s
-- as: e2e-agent-sno-ipv6
+- as: e2e-agent-single-node-ipv6
   cluster: build05
   cron: 0 */12 * * *
   steps:
@@ -1151,6 +1164,15 @@ tests:
     - ref: baremetalds-sno-rename
     - ref: baremetalds-sno-test
     workflow: baremetalds-sno
+- as: fips-payload-scan
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws
+    env:
+      MAJOR_MINOR: "4.17"
+    test:
+    - ref: openshift-release-fips
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

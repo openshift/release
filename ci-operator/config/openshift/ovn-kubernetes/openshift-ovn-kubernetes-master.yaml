@@ -4,11 +4,11 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
     tag: hypershift-operator
   ocp_4.16_base-rhel9:
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-8-golang-1.21-openshift-4.16:
@@ -19,11 +19,15 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.21
 images:
 - dockerfile_path: Dockerfile.base
   inputs:
@@ -50,17 +54,17 @@ images:
   to: ovn-kubernetes-microshift
 promotion:
   to:
-  - name: "4.16"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.16"
+      name: "4.17"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
+      name: "4.17"
       namespace: ocp
 resources:
   '*':
@@ -112,6 +116,16 @@ tests:
 - as: e2e-aws-ovn
   steps:
     cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn
+- always_run: false
+  as: e2e-aws-ovn-fdp-qe
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      PARALLEL: "1"
+    test:
+    - chain: openshift-e2e-test-network-qe
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-windows
   steps:
@@ -356,7 +370,6 @@ tests:
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-multicast
-    - ref: ovn-sdn-live-migration-init
     - ref: openshift-e2e-test
     - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
@@ -373,7 +386,6 @@ tests:
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-multicast
-    - ref: ovn-sdn-live-migration-init
     - ref: openshift-e2e-test
     - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-validate-multicast

@@ -1,18 +1,18 @@
 base_images:
-  openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
+  openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
+    tag: rhel-9-release-golang-1.22-openshift-4.17
   operator-sdk:
-    name: "4.16"
+    name: "4.17"
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: windows-machine-config-operator-bundle
   previous-wmco:
-    name: 4.15-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: windows-machine-config-operator-test
 binary_build_commands: make build
@@ -23,9 +23,9 @@ canonical_go_repository: github.com/openshift/windows-machine-config-operator
 images:
 - dockerfile_path: build/Dockerfile.ci
   inputs:
-    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
   to: windows-machine-config-operator-test
 operator:
   bundles:
@@ -40,13 +40,13 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
 releases:
   latest:
     integration:
       include_built_images: true
-      name: 4.16-priv
+      name: 4.17-priv
       namespace: ocp-private
 resources:
   '*':
@@ -96,6 +96,17 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
+- always_run: false
+  as: vsphere-disconnected-e2e-operator
+  optional: true
+  steps:
+    cluster_profile: vsphere-dis-2
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: windows-e2e-operator-test-vsphere-disconnected
 - always_run: false
   as: azure-e2e-operator
   steps:

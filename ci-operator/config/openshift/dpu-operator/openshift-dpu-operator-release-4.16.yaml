@@ -37,10 +37,14 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: dpu-daemon
+- dockerfile_literal: |
+    FROM base
+    RUN dnf install -y python3-pip && pip3 install yq && dnf install -y podman
+  from: src
+  to: custom-src
 promotion:
   to:
-  - disabled: true
-    name: "4.16"
+  - name: "4.16"
     namespace: ocp
 releases:
   initial:
@@ -60,11 +64,17 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
-  commands: HOME=/tmp make test
+- as: make-fmt-check
+  commands: HOME=/tmp make fmt-check
   container:
-    from: src
-- as: e2e-dpu-operator-tests
+    from: custom-src
+- as: make-test
+  cluster: build05
+  steps:
+    workflow: dpu-operator-tests-workflow
+  timeout: 1h0m0s
+- always_run: false
+  as: e2e-dpu-operator-tests
   cluster: build05
   steps:
     workflow: dpu-operator-e2e-tests-workflow

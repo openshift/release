@@ -7,10 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.16_base:
+  must-gather-base:
     name: "4.16"
     namespace: ocp
-    tag: base
+    tag: must-gather
   ocp_4.16_base-rhel9:
     name: "4.16"
     namespace: ocp
@@ -33,15 +33,9 @@ build_root:
 images:
 - dockerfile_path: images/cli/Dockerfile.rhel
   inputs:
-    ocp_4.16_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base
     ocp_4.16_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
@@ -65,6 +59,13 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: tests
+- dockerfile_path: images/cli/Dockerfile.rhel
+  from: must-gather-base
+  inputs:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: must-gather
 - context_dir: images/deployer
   dockerfile_path: Dockerfile.rhel
   from: cli
@@ -87,9 +88,9 @@ promotion:
   to:
   - additional_images:
       oc-rpms: rpms
-    disabled: true
     excluded_images:
     - tests
+    - must-gather
     - oc-base-with-rpms
     name: "4.16"
     namespace: ocp

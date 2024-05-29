@@ -12,7 +12,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-8-golang-1.21-openshift-4.16
 images:
 - build_args:
   - name: TARGETOS
@@ -42,8 +42,8 @@ releases:
 resources:
   '*':
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: 200m
+      memory: 400Mi
 tests:
 - as: power-monitoring-operator-e2e-aws
   postsubmit: true
@@ -55,14 +55,14 @@ tests:
     - as: install
       cli: latest
       commands: |
-        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout=5m
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout=15m
       dependencies:
       - env: OO_BUNDLE
         name: power-monitoring-operator-bundle
       from: operator-sdk
       resources:
         requests:
-          cpu: 100m
+          cpu: 200m
           memory: 400Mi
     - ref: openshift-power-monitoring-tests-power-monitoring-operator
     workflow: cucushift-installer-rehearse-aws-ipi
@@ -74,14 +74,14 @@ tests:
     - as: install
       cli: latest
       commands: |
-        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout=5m
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout=15m
       dependencies:
       - env: OO_BUNDLE
         name: power-monitoring-operator-bundle
       from: operator-sdk
       resources:
         requests:
-          cpu: 100m
+          cpu: 200m
           memory: 400Mi
     - ref: openshift-power-monitoring-tests-power-monitoring-operator
     workflow: cucushift-installer-rehearse-gcp-ipi

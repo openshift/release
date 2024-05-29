@@ -12,10 +12,14 @@ chain:
       documentation: "The cluster's FQDN will be a subdomain of the base domain."
     - name: HYPERSHIFT_AWS_REGION
       default: "us-east-1"
-      documentation: "The AWS region of the cluster."
+      documentation: |
+        Specifies the AWS region for the cluster. If intentionally left as an empty string, 
+        the region defaults to that of the management cluster.
     - name: HYPERSHIFT_HC_ZONES
       default: "us-east-1a"
-      documentation: "The zones where to create NodePools"
+      documentation: |
+        Specifies the AWS AZs to create the NodePools. If intentionally left as an empty string,  
+        it defaults to an AZ utilized by the management cluster.
     - name: ENDPOINT_ACCESS
       default: "Public"
       documentation: "Access for control plane endpoints (Public, PublicAndPrivate, Private)"
@@ -51,6 +55,12 @@ chain:
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
       
+      HC_REGION=${HYPERSHIFT_AWS_REGION:-$LEASED_RESOURCE}
+      HC_ZONES="${HYPERSHIFT_HC_ZONES}"
+      if [[ -z "$HC_ZONES" ]]; then
+        HC_ZONES="$(oc get node -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/zone}')"
+      fi
+      
       if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
         AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
         DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
@@ -77,8 +87,8 @@ chain:
         --instance-type ${HYPERSHIFT_INSTANCE_TYPE} \
         --base-domain ${DOMAIN} \
         --endpoint-access ${ENDPOINT_ACCESS} \
-        --region ${HYPERSHIFT_AWS_REGION} \
-        --zones ${HYPERSHIFT_HC_ZONES} \
+        --region ${HC_REGION} \
+        --zones ${HC_ZONES} \
         --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
         --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
@@ -88,26 +98,54 @@ chain:
         --annotations=hypershift.openshift.io/skip-release-image-validation=true \
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
 
-      # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
-      echo "Waiting for cluster to become available"
-      oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
+      set +e
+      export CLUSTER_NAME
+      timeout 25m bash -c '
+        until [[ "$(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='"'"'{.status.version.history[?(@.state!="")].state}'"'"')" = "Completed" ]]; do
+            sleep 15
+        done
+      '
+      if [[ $? -ne 0 ]]; then
+        cat << EOF > ${ARTIFACT_DIR}/junit_hosted_cluster.xml
+      <?xml version="1.0" encoding="UTF-8"?>
+      <testsuite name="hypershift install" tests="1" failures="1">
+        <testcase name="hosted cluster version rollout succeeds">
+          <failure message="hosted cluster version rollout never completed">
+            <![CDATA[
+      error: hosted cluster version rollout never completed, dumping relevant hosted cluster condition messages
+      Degraded: $(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='{.status.conditions[?(@.type=="Degraded")].message}')
+      ClusterVersionSucceeding: $(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='{.status.conditions[?(@.type=="ClusterVersionSucceeding")].message}')
+            ]]>
+          </failure>
+        </testcase>
+      </testsuite>
+      EOF
+        exit 1
+      else
+        cat << EOF > ${ARTIFACT_DIR}/junit_hosted_cluster.xml
+      <?xml version="1.0" encoding="UTF-8"?>
+      <testsuite name="hypershift install" tests="1" failures="0">
+        <testcase name="hosted cluster version rollout succeeds">
+          <system-out>
+            <![CDATA[
+      info: hosted cluster version rollout completed successfully
+            ]]>
+          </system-out>
+        </testcase>
+      </testsuite>
+      EOF
+      fi
+      set -e
+
       echo "Cluster became available, creating kubeconfig"
       bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
-      echo "Waiting for clusteroperators to be ready"
-      export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-      until \
-        oc wait clusterversion/version --for='condition=Available=True' > /dev/null; do
-          echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
-          oc get clusterversion 2>/dev/null || true
-          sleep 1s
-      done
     from: hypershift-operator
     grace_period: 5m0s
     resources:
       requests:
         cpu: 100m
         memory: 100Mi
-    timeout: 30m0s
+    timeout: 35m0s
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-awscreds
       name: hypershift-ci-jobs-awscreds

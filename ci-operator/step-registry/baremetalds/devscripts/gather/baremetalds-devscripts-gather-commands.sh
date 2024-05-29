@@ -46,6 +46,26 @@ tar -czC "/var/log/libvirt/qemu" -f "/tmp/artifacts/libvirt-logs.tar.gz" --trans
 . network.sh
 . utils.sh
 
+echo "Get the bootstrap logs if it is around and we didn't already collect them..."
+if ! compgen -G "/root/dev-scripts/ocp/ostest/log-bundle*.tar.gz" > /dev/null 2>&1
+then
+  # Collect log bundle
+  ssh "${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \$BOOTSTRAP_PROVISIONING_IP) TAR_FILE=/tmp/log-bundle-bootstrap.tar.gz sudo -E /usr/local/bin/installer-gather.sh --id bootstrap \${NODE_IPS[@]} &&
+  scp "${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \$BOOTSTRAP_PROVISIONING_IP):/tmp/log-bundle-bootstrap.tar.gz /tmp/artifacts/log-bundle-bootstrap.tar.gz || true
+fi
+
+echo "Get the proxy logs..."
+if podman container exists external-squid
+then
+  mkdir -p /tmp/squid-logs-$NAMESPACE
+  podman cp external-squid:/var/log/squid/access.log /tmp/squid-logs-$NAMESPACE || true
+  podman cp external-squid:/var/log/squid/cache.log /tmp/squid-logs-$NAMESPACE || true
+  tar -czC "/tmp" -f "/tmp/artifacts/squid-logs-$NAMESPACE.tar.gz" squid-logs-$NAMESPACE/
+fi
+
+# Exit if we have access to the API, the other gather steps will get logs
+if [ "\$(cat logs/installer-status.txt)" == "0" ] ; then exit 0 ; fi
+
 # Pass master and workers IPs to installer-gather script to collect info from nodes which didn't join the cluster
 NODE_NAMES=()
 for (( n=0; n<\$NUM_MASTERS; n++ ))
@@ -79,27 +99,13 @@ for NODE_IP in \${NODE_IPS[@]}; do
   echo "Fetching SOS report from \${NODE_IP}"
   ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} sudo mkdir /run/artifacts &&
   ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} \
-    sudo tar -czf /run/artifacts/journal_\${NODE_IP}.tar.gz /var/log || true
+    sudo journalctl \| sudo dd of=/var/log/journal.log || true
+  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} \
+    sudo tar -czf /run/artifacts/journal_\${NODE_IP//:/_}.tar.gz --exclude='var/log/journal' /var/log || true
   ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} sudo chown -R core:core /run/artifacts
   scp "\${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \${NODE_IP}):/run/artifacts/*.tar* /tmp/artifacts/ || true
 done
 
-echo "Get the bootstrap logs if it is around and we didn't already collect them..."
-if ! compgen -G "/root/dev-scripts/ocp/ostest/log-bundle*.tar.gz" > /dev/null 2>&1
-then
-  # Collect log bundle
-  ssh "${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \$BOOTSTRAP_PROVISIONING_IP) TAR_FILE=/tmp/log-bundle-bootstrap.tar.gz sudo -E /usr/local/bin/installer-gather.sh --id bootstrap \${NODE_IPS[@]} &&
-  scp "${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \$BOOTSTRAP_PROVISIONING_IP):/tmp/log-bundle-bootstrap.tar.gz /tmp/artifacts/log-bundle-bootstrap.tar.gz || true
-fi
-
-echo "Get the proxy logs..."
-if podman container exists external-squid
-then
-  mkdir -p /tmp/squid-logs-$NAMESPACE
-  podman cp external-squid:/var/log/squid/access.log /tmp/squid-logs-$NAMESPACE || true
-  podman cp external-squid:/var/log/squid/cache.log /tmp/squid-logs-$NAMESPACE || true
-  tar -czC "/tmp" -f "/tmp/artifacts/squid-logs-$NAMESPACE.tar.gz" squid-logs-$NAMESPACE/
-fi
 EOF
 
 echo "### Fetching must-gather image information..."

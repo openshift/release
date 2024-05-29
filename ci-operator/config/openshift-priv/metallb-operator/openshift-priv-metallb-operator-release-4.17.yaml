@@ -52,7 +52,8 @@ operator:
     with: pipeline:metallb-frr
 promotion:
   to:
-  - name: 4.17-priv
+  - disabled: true
+    name: 4.17-priv
     namespace: ocp-private
 releases:
   initial:
@@ -130,6 +131,13 @@ tests:
       E2E_TESTS_CONFIG: |
         IP_STACK=v4
     workflow: baremetalds-metallb-e2e
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: metallb-operator
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.17
   org: openshift-priv

@@ -5,6 +5,8 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
+curl https://raw.githubusercontent.com/openshift/openshift-docs/main/scripts/get-updated-distros.sh > scripts/get-updated-distros.sh
+
 IFS=' ' read -r -a DISTROS <<< "${DISTROS}"
 
 for DISTRO in "${DISTROS[@]}"; do

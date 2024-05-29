@@ -7,14 +7,6 @@ set -x
 
 source "${SHARED_DIR}/packet-conf.sh"
 
-# shellcheck disable=SC2087
-ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
-output=\$(oc get node -lnode-role.kubernetes.io/worker="" -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}')
-for ip_worker in \${output}; do
-    ssh -o StrictHostKeyChecking=no -i /root/.ssh/id_rsa core@\$ip_worker "sudo mkfs.ext4 /dev/vda; sudo wipefs -a /dev/vda"
-done
-EOF
-
 cat <<EOF | oc apply -f -
 apiVersion: lvm.topolvm.io/v1alpha1
 kind: LVMCluster

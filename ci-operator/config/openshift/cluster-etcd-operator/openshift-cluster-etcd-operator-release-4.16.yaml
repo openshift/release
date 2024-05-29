@@ -54,8 +54,7 @@ images:
   to: cluster-etcd-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.16"
+  - name: "4.16"
     namespace: ocp
 releases:
   initial:
@@ -121,7 +120,8 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
+      FEATURE_GATES: '[EtcdBackendQuota=true,AutomatedEtcdBackup=true]'
+      FEATURE_SET: CustomNoUpgrade
     test:
     - as: test
       cli: latest
@@ -133,10 +133,12 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-operator-fips
+  optional: true
   steps:
     cluster_profile: aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
+      FEATURE_GATES: '[EtcdBackendQuota=true,AutomatedEtcdBackup=true]'
+      FEATURE_SET: CustomNoUpgrade
       FIPS_ENABLED: "true"
     test:
     - as: test

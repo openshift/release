@@ -27,7 +27,7 @@ log_events() {
 	shift
 	oc get events -w \
 		-o custom-columns=FirstSeen:.firstTimestamp,LastSeen:.lastTimestamp,Count:.count,From:.source.component,Type:.type,Reason:.reason,Message:.message \
-		-n "$ns" | tee "$LOGS_DIR/$ns-events.log"
+		-n "$ns" | tee "$LOGS_DIR/$ns-events.log" >/dev/null
 }
 main() {
 	mkdir -p "$LOGS_DIR"

@@ -1,8 +1,4 @@
 base_images:
-  cli-operator-sdk:
-    name: cli-operator-sdk
-    namespace: ocp
-    tag: v1.30.0
   os:
     name: centos
     namespace: origin
@@ -43,24 +39,53 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: medik8s-aws
-    dependencies:
-      OO_BUNDLE: my-bundle
     env:
       BASE_DOMAIN: medik8s-ci.projects.ecosystem.sysdeseng.com
-      OO_INSTALL_NAMESPACE: far-install
+      OPERATOR_NAMESPACE: far-install
     test:
-    - as: e2e-test
+    - as: e2e-install-operator-last-version
       cli: latest
-      commands: export OPERATOR_NS="$OO_INSTALL_NAMESPACE" SKIP_OOST_REMEDIATION_VERIFICATION="true"
-        && make ocp-aws-credentials test-e2e
+      commands: |
+        make create-ns
+
+        # workaround for OLM pod not running with restricted PSA
+        oc label --overwrite ns "$OPERATOR_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "$OPERATOR_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+
+        # OPERATOR_NAMESPACE variable is used by bundle-run and bundle-run-update
+        BUNDLE_IMG=quay.io/medik8s/fence-agents-remediation-operator-bundle:v0.3.0 make bundle-run
       env:
-      - name: OO_INSTALL_NAMESPACE
+      - name: OPERATOR_NAMESPACE
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-operator-sdk-aws
+    - as: e2e-upgrade-operator-latest
+      cli: latest
+      commands: BUNDLE_IMG="$OO_BUNDLE" make bundle-run-update
+      dependencies:
+      - env: OO_BUNDLE
+        name: my-bundle
+      env:
+      - name: OPERATOR_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      cli: latest
+      commands: export OPERATOR_NS="$OPERATOR_NAMESPACE" SKIP_OOST_REMEDIATION_VERIFICATION="true"
+        && make ocp-aws-credentials test-e2e
+      env:
+      - name: OPERATOR_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: medik8s
