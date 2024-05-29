@@ -72,9 +72,10 @@ echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
 if [ "${FIPS_ENABLED:-false}" = "true" ]; then
   export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
   # Use injected oc binary, same version as release payload
-  sleep 600
+  # OC binary from qe-infra image is not up to date
   /cli/oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
-  --command=openshift-install-fips --to=/tmp
+  --command=openshift-install-fips --to=/tmp/openshift-install
+  # Rename binary to keep compatibility
   mv /tmp/openshift-install-fips /tmp/openshift-install
 else
   oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
