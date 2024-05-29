@@ -60,9 +60,6 @@ oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INST
 
 CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 OCPINSTALL='/tmp/openshift-install'
-RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
-QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
-VOLUME_NAME="ocp-${BRANCH}-rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
 # All virsh commands need to be run on the hypervisor
 LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
 # Simplify the virsh command
@@ -81,42 +78,53 @@ else
   ${VIRSH} pool-start ${POOL_NAME}
 fi
 
-# Check if we need to update the source volume
-CURRENT_SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep "ocp-${BRANCH}-rhcos" | awk '{ print $1 }' || true)
-if [[ "${CURRENT_SOURCE_VOLUME}" != "${VOLUME_NAME}" ]]; then
-  # Delete the old source volume
-  if [[ ! -z "${CURRENT_SOURCE_VOLUME}" ]]; then
-    echo "Deleting ${CURRENT_SOURCE_VOLUME} source volume..."
-    ${VIRSH} vol-delete --pool ${POOL_NAME} ${CURRENT_SOURCE_VOLUME}
-  fi
-
-  # Download the new rhcos image
-  echo "Downloading new rhcos image..."
-  curl -L "${QCOW_URL}" | gunzip -c > /tmp/${VOLUME_NAME} || true
-
-  # Resize the rhcos image to match the volume capacity
-  echo "Resizing rhcos image to match volume capacity..."
-  qemu-img resize /tmp/${VOLUME_NAME} ${VOLUME_CAPACITY}
-
-  # Create the new source volume
-  echo "Creating source volume..."
-  ${VIRSH} vol-create-as \
-    --name ${VOLUME_NAME} \
-    --pool ${POOL_NAME} \
-    --format qcow2 \
-    --capacity ${VOLUME_CAPACITY}
-
-  # Upload the rhcos image to the source volume
-  echo "Uploading rhcos image to source volume..."
-  ${VIRSH} vol-upload \
-    --vol ${VOLUME_NAME} \
-    --pool ${POOL_NAME} \
-    /tmp/${VOLUME_NAME}
-fi
-
 # Move the install config to the install directory
 echo "Move the install config to the install directory..."
 cp ${SHARED_DIR}/install-config.yaml /tmp
+
+if [ "$INSTALLER_TYPE" == "agent" ]; then
+  cp ${SHARED_DIR}/agent-config.yaml /tmp
+  ${OCPINSTALL} --dir /tmp agent create image
+  ls /tmp
+  exit 0
+else
+  RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
+  QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
+  VOLUME_NAME="rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
+
+  # Check if we need to update the source volume
+  CURRENT_SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep "ocp-${BRANCH}-rhcos" | awk '{ print $1 }' || true)
+  if [[ "${CURRENT_SOURCE_VOLUME}" != "${VOLUME_NAME}" ]]; then
+    # Delete the old source volume
+    if [[ ! -z "${CURRENT_SOURCE_VOLUME}" ]]; then
+      echo "Deleting ${CURRENT_SOURCE_VOLUME} source volume..."
+      ${VIRSH} vol-delete --pool ${POOL_NAME} ${CURRENT_SOURCE_VOLUME}
+    fi
+
+    # Download the new rhcos image
+    echo "Downloading new rhcos image..."
+    curl -L "${QCOW_URL}" | gunzip -c > /tmp/${VOLUME_NAME} || true
+
+    # Resize the rhcos image to match the volume capacity
+    echo "Resizing rhcos image to match volume capacity..."
+    qemu-img resize /tmp/${VOLUME_NAME} ${VOLUME_CAPACITY}
+
+    # Create the new source volume
+    echo "Creating source volume..."
+    ${VIRSH} vol-create-as \
+      --name ${VOLUME_NAME} \
+      --pool ${POOL_NAME} \
+      --format qcow2 \
+      --capacity ${VOLUME_CAPACITY}
+
+    # Upload the rhcos image to the source volume
+    echo "Uploading rhcos image to source volume..."
+    ${VIRSH} vol-upload \
+      --vol ${VOLUME_NAME} \
+      --pool ${POOL_NAME} \
+      /tmp/${VOLUME_NAME}
+  fi
+fi
 
 # Generate manifests for cluster modifications
 echo "Generating manifests..."
@@ -143,29 +151,31 @@ if [ -f "${STATIC_POD_DEGRADED_YAML}" ]; then
   cp ${STATIC_POD_DEGRADED_YAML} /tmp/manifests
 fi
 
-# Generating ignition configs
-echo "Generating ignition configs..."
-${OCPINSTALL} create ignition-configs --dir /tmp
+if [ "$INSTALLER_TYPE" == "base" ]; then
+  # Generating ignition configs
+  echo "Generating ignition configs..."
+  ${OCPINSTALL} create ignition-configs --dir /tmp
 
-save_credentials
+  save_credentials
 
-# Create ignition volumes and upload the ignition configs
-for IGNITION_TYPE in bootstrap master worker; do
-  NAME=${LEASED_RESOURCE}-${IGNITION_TYPE}-ignition-volume
+  # Create ignition volumes and upload the ignition configs
+  for IGNITION_TYPE in bootstrap master worker; do
+    NAME=${LEASED_RESOURCE}-${IGNITION_TYPE}-ignition-volume
 
-  echo "Creating ${IGNITION_TYPE} ignition volume..."
-  ${VIRSH} vol-create-as \
-    --name ${NAME} \
-    --pool ${POOL_NAME} \
-    --format raw \
-    --capacity 1M
+    echo "Creating ${IGNITION_TYPE} ignition volume..."
+    ${VIRSH} vol-create-as \
+      --name ${NAME} \
+      --pool ${POOL_NAME} \
+      --format raw \
+      --capacity 1M
 
-  echo "Uploading ${IGNITION_TYPE}.ign to ${NAME} volume..."
-  ${VIRSH} vol-upload \
-    --vol ${NAME} \
-    --pool ${POOL_NAME} \
-    /tmp/${IGNITION_TYPE}.ign
-done
+    echo "Uploading ${IGNITION_TYPE}.ign to ${NAME} volume..."
+    ${VIRSH} vol-upload \
+      --vol ${NAME} \
+      --pool ${POOL_NAME} \
+      /tmp/${IGNITION_TYPE}.ign
+  done
+fi
 
 clone_volume () {
   if [ -z $1 ]; then
@@ -209,12 +219,14 @@ create_vm () {
     --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
 }
 
-# Create the bootstrap node.
-NODE="${LEASED_RESOURCE}-bootstrap"
-echo "Creating ${NODE} node..."
-MAC_ADDRESS=$(leaseLookup "bootstrap[0].mac")
-clone_volume ${NODE}-volume
-create_vm ${NODE} ${MAC_ADDRESS} bootstrap
+if [ "$INSTALLER_TYPE" == "base" ]; then
+  # Create the bootstrap node.
+  NODE="${LEASED_RESOURCE}-bootstrap"
+  echo "Creating ${NODE} node..."
+  MAC_ADDRESS=$(leaseLookup "bootstrap[0].mac")
+  clone_volume ${NODE}-volume
+  create_vm ${NODE} ${MAC_ADDRESS} bootstrap
+fi
 
 # Create the control plane nodes.
 for (( i=0; i<=${CONTROL_COUNT}-1; i++ )); do
@@ -236,37 +248,48 @@ done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
-${OCPINSTALL} --dir "/tmp" wait-for bootstrap-complete &
+if [ "$INSTALLER_TYPE" == "agent" ]; then
+  ${OCPINSTALL} --dir "/tmp" agent wait-for bootstrap-complete --log-level=info &
+else
+  ${OCPINSTALL} --dir "/tmp" wait-for bootstrap-complete &
+fi
+
 wait "$!"
 
-# Sleep between destroy and undefine to allow for a slight destroy lag
-echo "Deleting ${LEASED_RESOURCE}-bootstrap node..."
-${VIRSH} destroy "${LEASED_RESOURCE}-bootstrap"
-sleep 1s
-${VIRSH} undefine "${LEASED_RESOURCE}-bootstrap"
+if [ "$INSTALLER_TYPE" == "base" ]; then
+  # Sleep between destroy and undefine to allow for a slight destroy lag
+  echo "Deleting ${LEASED_RESOURCE}-bootstrap node..."
+  ${VIRSH} destroy "${LEASED_RESOURCE}-bootstrap"
+  sleep 1s
+  ${VIRSH} undefine "${LEASED_RESOURCE}-bootstrap"
 
-echo "Approving pending CSRs..."
-approve_csrs () {
-  oc version --client
-  while true; do
-    if [[ ! -f /tmp/install-complete ]]; then
-      # even if oc get csr fails continue
-      oc get csr -ojson | yq-v4 -oy '.items[] | select(.status | length == 0) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve || true
-      sleep 15 & wait
-      continue
-    else
-      break
-    fi
-  done
-}
-approve_csrs &
+  echo "Approving pending CSRs..."
+  approve_csrs () {
+    oc version --client
+    while true; do
+      if [[ ! -f /tmp/install-complete ]]; then
+        # even if oc get csr fails continue
+        oc get csr -ojson | yq-v4 -oy '.items[] | select(.status | length == 0) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve || true
+        sleep 15 & wait
+        continue
+      else
+        break
+      fi
+    done
+  }
+  approve_csrs &
+fi
 
 # Add a small buffer before waiting for install completion
 sleep 5m
 
 set +x
 echo "Completing UPI setup..."
-${OCPINSTALL} --dir="/tmp" wait-for install-complete 2>&1 | grep --line-buffered -v password &
+if [ "$INSTALLER_TYPE" == "agent" ]; then
+  ${OCPINSTALL} --dir="/tmp" agent wait-for install-complete 2>&1 | grep --line-buffered -v password &
+else
+  ${OCPINSTALL} --dir="/tmp" wait-for install-complete 2>&1 | grep --line-buffered -v password &
+fi
 wait "$!"
 
 # Check for image registry availability
