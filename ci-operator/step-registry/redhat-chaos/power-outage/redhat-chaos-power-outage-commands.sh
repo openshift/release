@@ -23,9 +23,11 @@ if [ "$platform" = "AWS" ]; then
     cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
     export AWS_DEFAULT_REGION=us-west-2
 elif [ "$platform" = "GCP" ]; then
+    export CLOUD_TYPE="gcp"
     export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
     export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 elif [ "$platform" = "Azure" ]; then
+    export CLOUD_TYPE="azure"
     export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
     # jq is not available in the ci image...
     AZURE_SUBSCRIPTION_ID="$(jq -r .subscriptionId ${AZURE_AUTH_LOCATION})"
@@ -41,6 +43,7 @@ elif [ "$platform" = "IBMCloud" ]; then
     export IBMCLOUD_CLI=ibmcloud
     export IBMCLOUD_HOME=/output   
     region="${LEASED_RESOURCE}"
+    export CLOUD_TYPE="ibmcloud"
     export region
     export IBMC_URL="https://${region}.iaas.cloud.ibm.com/v1"
     export IBMC_APIKEY=${CLUSTER_PROFILE_DIR}/ibmcloud-api-key
