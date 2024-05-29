@@ -50,6 +50,9 @@ RHTAP_ENABLE_TAS=${RHTAP_ENABLE_TAS:-'true'}
 RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES=${RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES:-'true'}
 RHTAP_ENABLE_TPA=${RHTAP_ENABLE_TPA:-'true'}
 
+echo "Enabled Components....."
+env | grep '^RHTAP_ENABLE'
+
 ACS__API_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-api-token)
 ACS__CENTRAL_ENDPOINT=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-central-endpoint)
 DEVELOPER_HUB__CATALOG__URL=https://github.com/redhat-appstudio/tssc-sample-templates/blob/main/all.yaml
@@ -119,6 +122,9 @@ install_rhtap(){
   echo "[INFO]Generate private-values.yaml file ..."
   ./bin/make.sh values
   
+  echo "Disabling the default auth policy"
+  yq e -i '.debug.ci=true' private-values.yaml
+
   echo "[INFO]Install RHTAP ..."
   ./bin/make.sh apply -d -n $NAMESPACE -- --values private-values.yaml
 

@@ -40,7 +40,7 @@ else
 fi
 
 # If the byo operator roles exist, do deletion.
-OPERATOR_ROLES_PREFIX_FILE="${SHARED_DIR}/operator-roles-prefix"
+OPERATOR_ROLES_PREFIX_FILE="${SHARED_DIR}/cluster-prefix"
 if [[ -e "${OPERATOR_ROLES_PREFIX_FILE}" ]]; then
   OPERATOR_ROLES_PREFIX=$(cat "${OPERATOR_ROLES_PREFIX_FILE}")
 

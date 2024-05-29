@@ -257,32 +257,33 @@ chmod 0600 ${tmp_ssh_key}
 ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "${tmp_ssh_key}")
 echo "Downloading the rootfs image locally and transferring to HTTPD server"
 curl -k -L --output $HOME/rootfs.img "$rootfs_url"
-scp "${ssh_options[@]}" $HOME/rootfs.img root@$httpd_vsi_ip:/var/www/html/rootfs.img 
-ssh "${ssh_options[@]}" root@$httpd_vsi_ip "chmod 644 /var/www/html/rootfs.img"
+scp "${ssh_options[@]}" $HOME/rootfs.img root@$httpd_vsi_ip:/var/www/html/rootfs-$PROW_JOB_ID.img 
+ssh "${ssh_options[@]}" root@$httpd_vsi_ip "chmod 644 /var/www/html/rootfs-$PROW_JOB_ID.img"
 echo "Downloading the setup script for pxeboot of agents"
-curl -k -L --output $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot.sh"
+curl -k -L --output $HOME/trigger_pxeboot.sh "http://$httpd_vsi_ip:80/trigger_pxeboot.sh"
 minitrd_url="${initrd_url//&/\\&}"                                 # Escaping & while replacing the URL
 export minitrd_url
 mkernel_url="${kernel_url//&/\\&}"                                 # Escaping & while replacing the URL
 export mkernel_url
-sed -i "s|INITRD_URL|${minitrd_url}|" $HOME/setup_pxeboot.sh 
-sed -i "s|KERNEL_URL|${mkernel_url}|" $HOME/setup_pxeboot.sh 
-sed -i "s|HTTPD_VSI_IP|${httpd_vsi_ip}|" $HOME/setup_pxeboot.sh 
-chmod 700 $HOME/setup_pxeboot.sh
+rootfs_url_httpd="http://$httpd_vsi_ip:80/rootfs-$PROW_JOB_ID.img"
+export rootfs_url_httpd
+sed -i "s|INITRD_URL|${minitrd_url}|" $HOME/trigger_pxeboot.sh 
+sed -i "s|KERNEL_URL|${mkernel_url}|" $HOME/trigger_pxeboot.sh 
+sed -i "s|ROOTFS_URL|${rootfs_url_httpd}|" $HOME/trigger_pxeboot.sh  
+chmod 700 $HOME/trigger_pxeboot.sh
 
 # Booting up zVSIs as agents
 for fip in "${zvsi_fip_list[@]}"; do
   echo "Transferring the setup script to zVSI $fip"
-  scp "${ssh_options[@]}" $HOME/setup_pxeboot.sh core@$fip:/var/home/core/setup_pxeboot.sh
+  scp "${ssh_options[@]}" $HOME/trigger_pxeboot.sh root@$fip:/root/trigger_pxeboot.sh
   echo "Triggering the script in the zVSI $fip"
-  ssh "${ssh_options[@]}" core@$fip "/var/home/core/setup_pxeboot.sh" &
+  ssh "${ssh_options[@]}" root@$fip "/root/trigger_pxeboot.sh" &
   sleep 60
   echo "Successfully booted the zVSI $fip as agent"
 done
 
 # Deleting the resources downloaded in the pod
-rm -f $HOME/setup_pxeboot.sh  $HOME/rootfs.img
-
+rm -f $HOME/trigger_pxeboot.sh  $HOME/rootfs-$PROW_JOB_ID.img
 # Wait for agents to join (max: 20 min)
 for ((i=50; i>=1; i--)); do
   agents_count=$(oc get agents -n $hcp_ns --no-headers | wc -l)

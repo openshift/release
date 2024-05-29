@@ -196,6 +196,11 @@ spec:
         - --authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.
         - --art-suffix=-art-latest-multi
         - --manifest-list-mode
+        env:
+        - name: HOME
+          value: /tmp/home
+        - name: XDG_RUNTIME_DIR
+          value: /tmp/home/run
         image: release-controller:latest
         livenessProbe:
           httpGet:
@@ -232,6 +237,15 @@ spec:
         - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
           readOnly: true
+        - mountPath: /tmp/home
+          name: home
+        - mountPath: /tmp/git
+          name: oc-cache
+        - mountPath: /tmp/home/.git-credentials
+          name: git-credentials
+          subPath: .git-credentials
+        - mountPath: /tmp/pull-secret
+          name: pull-secret
       initContainers:
       - args:
         - --repo=https://github.com/openshift/release.git
@@ -249,6 +263,27 @@ spec:
         volumeMounts:
         - mountPath: /tmp/git-sync
           name: release
+      - command:
+        - /bin/bash
+        - -c
+        - "#!/bin/bash\nset -euo pipefail\ntrap 'kill $(jobs -p); exit 0' TERM\n\nSECONDS=0\n\n# ensure we are logged in to our registry\nmkdir -p ${XDG_RUNTIME_DIR}/containers\ncp /tmp/pull-secret/auth.json ${XDG_RUNTIME_DIR}/containers/auth.json || true\n\n# global git config stored to $HOME/.gitconfig which is shared with the main release-controller pods\ngit config --global credential.helper store\ngit config --global user.name test\ngit config --global user.email test@test.com\noc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json\n\nFROM=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-stable\"][0] // empty')\nTO=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-dev-preview\"][0] // empty')\n\nif [[ -n \"$FROM\" && -n \"$TO\" ]]\nthen\n    echo \"Pre-populating the git cache...\"\n    oc adm release info --changelog=/tmp/git quay.io/openshift-release-dev/ocp-release:$FROM-x86_64 quay.io/openshift-release-dev/ocp-release:$TO-x86_64\nelse\n    echo \"Unable to Pre-populate the git cache!\"\nfi\n\nDURATION=$SECONDS\necho \"Took: $(($DURATION / 60))m $(($DURATION % 60))s\"\n            "
+        env:
+        - name: HOME
+          value: /tmp/home
+        - name: XDG_RUNTIME_DIR
+          value: /tmp/home/run
+        image: release-controller:latest
+        name: oc-prepare
+        volumeMounts:
+        - mountPath: /tmp/home
+          name: home
+        - mountPath: /tmp/git
+          name: oc-cache
+        - mountPath: /tmp/home/.git-credentials
+          name: git-credentials
+          subPath: .git-credentials
+        - mountPath: /tmp/pull-secret
+          name: pull-secret
       serviceAccountName: release-controller-ocp-multi
       volumes:
       - configMap:
@@ -273,6 +308,21 @@ spec:
         secret:
           defaultMode: 420
           secretName: release-controller-kubeconfigs
+      - emptyDir: {}
+        name: home
+      - emptyDir: {}
+        name: oc-cache
+      - name: git-credentials
+        secret:
+          defaultMode: 420
+          items:
+          - key: .git-credentials
+            path: .git-credentials
+          secretName: release-controller-oc-git-credentials
+      - name: pull-secret
+        secret:
+          defaultMode: 420
+          secretName: release-controller-oc-pull-secret
 ---
 #---------------------------------------------------------------------------------
 # osd_rc_deployments.py added the following resource
@@ -310,6 +360,11 @@ spec:
         - --enable-jira
         - --jira-endpoint=https://issues.redhat.com
         - --jira-bearer-token-file=/etc/jira/api
+        env:
+        - name: HOME
+          value: /tmp/home
+        - name: XDG_RUNTIME_DIR
+          value: /tmp/home/run
         image: release-controller-api:latest
         livenessProbe:
           httpGet:
@@ -329,22 +384,68 @@ spec:
           requests:
             memory: 2Gi
         volumeMounts:
-        - mountPath: /etc/kubeconfigs
-          name: release-controller-kubeconfigs
-          readOnly: true
         - mountPath: /etc/jira
           name: jira
           readOnly: true
+        - mountPath: /etc/kubeconfigs
+          name: release-controller-kubeconfigs
+          readOnly: true
+        - mountPath: /tmp/home
+          name: home
+        - mountPath: /tmp/git
+          name: oc-cache
+        - mountPath: /tmp/home/.git-credentials
+          name: git-credentials
+          subPath: .git-credentials
+        - mountPath: /tmp/pull-secret
+          name: pull-secret
+      initContainers:
+      - command:
+        - /bin/bash
+        - -c
+        - "#!/bin/bash\nset -euo pipefail\ntrap 'kill $(jobs -p); exit 0' TERM\n\nSECONDS=0\n\n# ensure we are logged in to our registry\nmkdir -p ${XDG_RUNTIME_DIR}/containers\ncp /tmp/pull-secret/auth.json ${XDG_RUNTIME_DIR}/containers/auth.json || true\n\n# global git config stored to $HOME/.gitconfig which is shared with the main release-controller pods\ngit config --global credential.helper store\ngit config --global user.name test\ngit config --global user.email test@test.com\noc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json\n\nFROM=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-stable\"][0] // empty')\nTO=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-dev-preview\"][0] // empty')\n\nif [[ -n \"$FROM\" && -n \"$TO\" ]]\nthen\n    echo \"Pre-populating the git cache...\"\n    oc adm release info --changelog=/tmp/git quay.io/openshift-release-dev/ocp-release:$FROM-x86_64 quay.io/openshift-release-dev/ocp-release:$TO-x86_64\nelse\n    echo \"Unable to Pre-populate the git cache!\"\nfi\n\nDURATION=$SECONDS\necho \"Took: $(($DURATION / 60))m $(($DURATION % 60))s\"\n            "
+        env:
+        - name: HOME
+          value: /tmp/home
+        - name: XDG_RUNTIME_DIR
+          value: /tmp/home/run
+        image: release-controller:latest
+        name: oc-prepare
+        volumeMounts:
+        - mountPath: /tmp/home
+          name: home
+        - mountPath: /tmp/git
+          name: oc-cache
+        - mountPath: /tmp/home/.git-credentials
+          name: git-credentials
+          subPath: .git-credentials
+        - mountPath: /tmp/pull-secret
+          name: pull-secret
       serviceAccountName: release-controller-ocp-multi
       volumes:
-      - name: release-controller-kubeconfigs
-        secret:
-          defaultMode: 420
-          secretName: release-controller-kubeconfigs
       - name: jira
         secret:
           defaultMode: 420
           secretName: jira-credentials-openshift-jira-robot
+      - name: release-controller-kubeconfigs
+        secret:
+          defaultMode: 420
+          secretName: release-controller-kubeconfigs
+      - emptyDir: {}
+        name: home
+      - emptyDir: {}
+        name: oc-cache
+      - name: git-credentials
+        secret:
+          defaultMode: 420
+          items:
+          - key: .git-credentials
+            path: .git-credentials
+          secretName: release-controller-oc-git-credentials
+      - name: pull-secret
+        secret:
+          defaultMode: 420
+          secretName: release-controller-oc-pull-secret
 ---
 #---------------------------------------------------------------------------------
 # osd_files_cache_rbac.py added the following resource

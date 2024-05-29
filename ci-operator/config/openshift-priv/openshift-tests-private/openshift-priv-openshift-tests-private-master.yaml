@@ -3,24 +3,24 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
-  ci_tests-private-base_4.16:
+  ci_tests-private-base_4.17:
     name: tests-private-base
     namespace: ci
-    tag: "4.16"
-  ci_tests-private-baseui_4.16:
+    tag: "4.17"
+  ci_tests-private-baseui_4.17:
     name: tests-private-baseui
     namespace: ci
-    tag: "4.16"
+    tag: "4.17"
   ci_tests-private-builder_4.16:
     name: tests-private-builder
     namespace: ci
     tag: "4.16"
   cli:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: cli
   upi-installer:
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
     tag: upi-installer
 binary_build_commands: make go-mod-tidy;make all
@@ -32,7 +32,7 @@ build_root:
 canonical_go_repository: github.com/openshift/openshift-tests-private
 images:
 - dockerfile_path: images/Dockerfile.golang
-  from: ci_tests-private-base_4.16
+  from: ci_tests-private-base_4.17
   inputs:
     ci_rosa-aws-cli_latest:
       as:
@@ -43,16 +43,16 @@ images:
   to: tests-private
 - dockerfile_literal: |
     FROM src AS builder
-    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.16
+    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.17
     RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
         yum install -y ./google-chrome-stable_current_*.rpm && \
         mkdir -p /go/src/github.com/openshift
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
     WORKDIR /go/src/github.com/openshift/openshift-tests-private
   inputs:
-    ci_tests-private-baseui_4.16:
+    ci_tests-private-baseui_4.17:
       as:
-      - registry.ci.openshift.org/ci/tests-private-baseui:4.16
+      - registry.ci.openshift.org/ci/tests-private-baseui:4.17
     src:
       as:
       - src
@@ -67,7 +67,7 @@ images:
         if [ "V${rcgaver}V" != "VV"  ]; then CLIENTURL=${MIRROR2URL}/x86_64/clients/ocp/${rcgaver}; fi  && \
         curl -s -k -L ${CLIENTURL}/opm-src.tar.gz -o opm-src.tar.gz  &&  tar -vzxf opm-src.tar.gz && opmdir=$(find ./ -type d -name "operator-framework-olm*") && \
         cd $opmdir && make build/opm && cp ./bin/opm /tmp/opm
-    FROM registry.ci.openshift.org/ci/tests-private-base:4.16
+    FROM registry.ci.openshift.org/ci/tests-private-base:4.17
     RUN mkdir -p /go/src/github.com/openshift
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
     COPY --from=builder /tmp/opm /usr/bin
@@ -78,9 +78,9 @@ images:
     bin:
       as:
       - bin
-    ci_tests-private-base_4.16:
+    ci_tests-private-base_4.17:
       as:
-      - registry.ci.openshift.org/ci/tests-private-base:4.16
+      - registry.ci.openshift.org/ci/tests-private-base:4.17
   to: tests-private-newpr
 - dockerfile_literal: |
     FROM bin
@@ -101,7 +101,7 @@ promotion:
     - tests-private-ui
     - tests-private-pr
     - tests-private-newpr
-    name: 4.16-priv
+    name: 4.17-priv
     namespace: ocp-private
 releases:
   arm64-latest:
@@ -153,7 +153,7 @@ tests:
 - as: code-check
   commands: |
     unset GOFLAGS
-    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1 2> /dev/null
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2 2> /dev/null
     which golangci-lint
     make check-code
   container:

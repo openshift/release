@@ -1,8 +1,12 @@
+binary_build_commands: make build
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  from_repository: true
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN pip3 install yamllint
+  from: src
+  to: openstack-operator-ci-yamllint
 resources:
   '*':
     limits:
@@ -14,7 +18,7 @@ tests:
 - as: unit
   commands: yamllint -c .yamllint.yml -s .
   container:
-    from: src
+    from: openstack-operator-ci-yamllint
 zz_generated_metadata:
   branch: main
   org: openstack-k8s-operators

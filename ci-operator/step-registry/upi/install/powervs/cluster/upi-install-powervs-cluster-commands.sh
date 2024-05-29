@@ -133,7 +133,7 @@ rhel_image_name     = "CentOS-Stream-9"
 rhcos_import_image              = true
 rhcos_import_image_filename     = "${COREOS_NAME}"
 rhcos_import_image_storage_type = "tier1"
-system_type         = "s922"
+system_type         = "s1022"
 cluster_domain      = "${CLUSTER_DOMAIN}"
 cluster_id_prefix   = "rh-ci"
 bastion   = { memory = "16", processors = "1", "count" = 1 }

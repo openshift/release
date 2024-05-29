@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 set -x
 
-if [[ ! ${RUN_CERBERUS} ]]; then
+if [ ${RUN_CERBERUS} == "false" ]; then
   exit 0
 fi
 

@@ -13,6 +13,8 @@ export GITHUB_TOKEN=$github_token
 release_payload_modifier_token=$(cat /var/run/vault/release-payload-modifier-token/token)
 export RELEASE_PAYLOAD_MODIFIER_TOKEN=$release_payload_modifier_token
 
+export GCS_CRED_FILE=/var/run/vault/release-tests-sa/gcs_sa_for_qe_artifact_access.json
+
 echo "Login cluster app.ci"
 oc login api.ci.l2s4.p1.openshiftapps.com:6443 --token=$RELEASE_PAYLOAD_MODIFIER_TOKEN
 

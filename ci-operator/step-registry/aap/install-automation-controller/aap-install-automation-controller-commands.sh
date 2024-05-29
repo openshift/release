@@ -4,18 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-AAP_CONTROLLER_NAME=${AAP_CONTROLLER_NAME:-'interop-automation-controller-instance'}
-PROJECT_NAMESPACE=${PROJECT_NAMESPACE:-'aap'}
+AAP_CONTROLLER_NAME="interop-automation-controller-instance"
+PROJECT_NAMESPACE="aap"
 
-echo "Creating ${PROJECT_NAMESPACE} namespace..."
 oc apply -f - <<EOF
     apiVersion: v1
     kind: Namespace
     metadata:
-        name: "${PROJECT_NAMESPACE}"
+        name: ${PROJECT_NAMESPACE}
 EOF
 
-echo "Provisioning Ansible Automation Controller for Interop testing..."
 oc apply -f - <<EOF
 apiVersion: automationcontroller.ansible.com/v1beta1
 kind: AutomationController
@@ -23,31 +21,32 @@ metadata:
   name: ${AAP_CONTROLLER_NAME}
   namespace: ${PROJECT_NAMESPACE}
 spec:
-  admin_user: admin
-  auto_upgrade: true
-  create_preload_data: true
-  garbage_collect_secrets: false
-  image_pull_policy: IfNotPresent
-  ingress_type: Route
-  ipv6_disabled: false
-  loadbalancer_ip: ""
-  loadbalancer_port: 80
-  loadbalancer_protocol: http
-  no_log: true
-  postgres_keepalives: true
   postgres_keepalives_count: 5
   postgres_keepalives_idle: 5
-  postgres_keepalives_interval: 5
-  projects_persistence: false
-  projects_storage_access_mode: ReadWriteMany
-  projects_storage_size: 8Gi
-  replicas: 1
+  metrics_utility_cronjob_report_schedule: '@monthly'
+  create_preload_data: true
   route_tls_termination_mechanism: Edge
-  set_self_labels: true
+  garbage_collect_secrets: false
+  ingress_type: Route
+  loadbalancer_port: 80
+  no_log: true
+  image_pull_policy: IfNotPresent
+  projects_storage_size: 8Gi
+  auto_upgrade: true
   task_privileged: false
+  postgres_keepalives: true
+  metrics_utility_enabled: false
+  postgres_keepalives_interval: 5
+  ipv6_disabled: false
+  projects_storage_access_mode: ReadWriteMany
+  metrics_utility_pvc_claim_size: 5Gi
+  set_self_labels: true
+  projects_persistence: false
+  replicas: 3
+  admin_user: admin
+  loadbalancer_protocol: http
+  metrics_utility_cronjob_gather_schedule: '@hourly'
 EOF
-
-# Wait for operator readiness 15 minutes or fail
 
 x=0
 taskDeploy=""

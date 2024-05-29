@@ -45,14 +45,14 @@ esac
 SEED_VERSION="$(echo ${seed_base_info} | cut -d " " -f 1)"
 RELEASE_IMAGE="$(echo ${seed_base_info} | cut -d " " -f 2)"
 
-# Save off the seed version and the recipient version for upgrades
+# Save off the seed version and the target version for upgrades
 echo "${SEED_VERSION}" > "${SHARED_DIR}/seed_version"
 
-recipient_version="$(echo ${release_base_info} | cut -d " " -f 1)"
-recipient_image="$(echo ${release_base_info} | cut -d " " -f 2)"
+target_version="$(echo ${release_base_info} | cut -d " " -f 1)"
+target_image="$(echo ${release_base_info} | cut -d " " -f 2)"
 
-echo "${recipient_version}" > "${SHARED_DIR}/recipient_version"
-echo "${recipient_image}" > "${SHARED_DIR}/recipient_image"
+echo "${target_version}" > "${SHARED_DIR}/target_version"
+echo "${target_image}" > "${SHARED_DIR}/target_image"
 
 # Calculate the tag for the seed
 SEED_IMAGE_TAG="unknown"
@@ -77,6 +77,11 @@ case $SEED_IMAGE_TAG_FORMAT in
     exit 1
     ;;
 esac
+
+# Add a prefix if necessary
+if [[ ! -z "${SEED_IMAGE_TAG_PREFIX}" ]]; then
+  SEED_IMAGE_TAG="${SEED_IMAGE_TAG_PREFIX}-${SEED_IMAGE_TAG}"
+fi
 
 echo "${SEED_IMAGE_TAG}" > "${SHARED_DIR}/seed_tag"
 echo "${SEED_VM_NAME}" > "${SHARED_DIR}/seed_vm_name"

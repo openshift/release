@@ -2489,6 +2489,89 @@ presubmits:
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: vsphere02
+    context: ci/prow/altinfra-e2e-vsphere-capi-multi-vcenter-ovn
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-multi-vcenter
+      ci-operator.openshift.io/variant: altinfra
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.17-altinfra-e2e-vsphere-capi-multi-vcenter-ovn
+    optional: true
+    rerun_command: /test altinfra-e2e-vsphere-capi-multi-vcenter-ovn
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-vsphere-capi-multi-vcenter-ovn-cluster-profile
+        - --target=e2e-vsphere-capi-multi-vcenter-ovn
+        - --variant=altinfra
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-vsphere-capi-multi-vcenter-ovn-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-vsphere
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )altinfra-e2e-vsphere-capi-multi-vcenter-ovn,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.17$
+    - ^release-4\.17-
+    cluster: vsphere02
     context: ci/prow/altinfra-e2e-vsphere-capi-ovn
     decorate: true
     decoration_config:
@@ -2753,7 +2836,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         - --target=installer
         - --variant=altinfra
         command:
@@ -3097,96 +3179,13 @@ presubmits:
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build05
-    context: ci/prow/e2e-agent-compact-ipv4-appliance
-    decorate: true
-    decoration_config:
-      timeout: 6h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.17-e2e-agent-compact-ipv4-appliance
-    optional: true
-    rerun_command: /test e2e-agent-compact-ipv4-appliance
-    run_if_changed: ^(cmd|pkg|data).*/agent/
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-agent-compact-ipv4-appliance-cluster-profile
-        - --target=e2e-agent-compact-ipv4-appliance
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-agent-compact-ipv4-appliance-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-equinix-ocp-metal
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-agent-compact-ipv4-appliance,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.17$
-    - ^release-4\.17-
-    cluster: build05
     context: ci/prow/e2e-agent-compact-ipv4-appliance-diskimage
     decorate: true
     decoration_config:
       timeout: 6h0m0s
     labels:
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -3246,7 +3245,7 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
-          secretName: cluster-secrets-equinix-ocp-metal
+          secretName: cluster-secrets-packet-assisted
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -3589,88 +3588,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-agent-sno-ipv6,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.17$
-    - ^release-4\.17-
-    cluster: build03
-    context: ci/prow/e2e-aws-custom-security-groups
-    decorate: true
-    decoration_config:
-      timeout: 6h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.17-e2e-aws-custom-security-groups
-    optional: true
-    rerun_command: /test e2e-aws-custom-security-groups
-    run_if_changed: aws
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-custom-security-groups-cluster-profile
-        - --target=e2e-aws-custom-security-groups
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-custom-security-groups-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-custom-security-groups,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -4329,7 +4246,7 @@ presubmits:
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build03
-    context: ci/prow/e2e-aws-ovn-shared-vpc
+    context: ci/prow/e2e-aws-ovn-shared-vpc-custom-security-groups
     decorate: true
     decoration_config:
       timeout: 6h0m0s
@@ -4338,9 +4255,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.17-e2e-aws-ovn-shared-vpc
+    name: pull-ci-openshift-installer-release-4.17-e2e-aws-ovn-shared-vpc-custom-security-groups
     optional: true
-    rerun_command: /test e2e-aws-ovn-shared-vpc
+    rerun_command: /test e2e-aws-ovn-shared-vpc-custom-security-groups
     run_if_changed: aws
     spec:
       containers:
@@ -4350,8 +4267,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-ovn-shared-vpc-cluster-profile
-        - --target=e2e-aws-ovn-shared-vpc
+        - --secret-dir=/usr/local/e2e-aws-ovn-shared-vpc-custom-security-groups-cluster-profile
+        - --target=e2e-aws-ovn-shared-vpc-custom-security-groups
         command:
         - ci-operator
         image: ci-operator:latest
@@ -4367,7 +4284,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-ovn-shared-vpc-cluster-profile
+        - mountPath: /usr/local/e2e-aws-ovn-shared-vpc-custom-security-groups-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -4404,7 +4321,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-shared-vpc,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-shared-vpc-custom-security-groups,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -5560,7 +5477,7 @@ presubmits:
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build02
-    context: ci/prow/e2e-gcp-ovn-shared-vpc
+    context: ci/prow/e2e-gcp-ovn-byo-vpc
     decorate: true
     decoration_config:
       timeout: 6h0m0s
@@ -5569,9 +5486,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.17-e2e-gcp-ovn-shared-vpc
+    name: pull-ci-openshift-installer-release-4.17-e2e-gcp-ovn-byo-vpc
     optional: true
-    rerun_command: /test e2e-gcp-ovn-shared-vpc
+    rerun_command: /test e2e-gcp-ovn-byo-vpc
     run_if_changed: (gcp|google)
     spec:
       containers:
@@ -5581,8 +5498,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-gcp-ovn-shared-vpc-cluster-profile
-        - --target=e2e-gcp-ovn-shared-vpc
+        - --secret-dir=/usr/local/e2e-gcp-ovn-byo-vpc-cluster-profile
+        - --target=e2e-gcp-ovn-byo-vpc
         command:
         - ci-operator
         image: ci-operator:latest
@@ -5598,7 +5515,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-ovn-shared-vpc-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-ovn-byo-vpc-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -5639,7 +5556,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-ovn-shared-vpc,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-ovn-byo-vpc,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -8132,7 +8049,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -8831,7 +8747,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )okd-e2e-vsphere,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -8851,7 +8767,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         - --variant=okd
         command:
         - ci-operator
@@ -9129,7 +9044,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         - --variant=terraform
         command:
         - ci-operator
