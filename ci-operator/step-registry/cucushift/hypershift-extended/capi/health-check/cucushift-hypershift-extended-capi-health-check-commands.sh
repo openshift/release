@@ -14,11 +14,11 @@ function set_proxy () {
 }
 
 function rosa_login() {
-    ROSA_VERSION=$(rosa version)
+    # ROSA_VERSION=$(rosa version)
     ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 
     if [[ ! -z "${ROSA_TOKEN}" ]]; then
-      echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+      echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli"
       rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
       ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
     else
@@ -71,11 +71,12 @@ fi
 echo "check machinepool, rosamachinepool status"
 machinepools=$(oc get MachinePools -n "${namespace}" -ojsonpath='{.items[?(@.spec.clusterName=="'"${CLUSTER_NAME}"'")].metadata.name}')
 for machinepool in ${machinepools} ; do
-  mp_status=$(oc get MachinePool "${machinepool}" -n "${namespace}" -ojsonpath='{.status.phase}')
-  if [[ "${mp_status}" != "Running" ]]; then
-    echo "Error: machinepool ${machinepool} is not in the Running status: ${mp_status}"
-    exit 1
-  fi
+# ignore machinepool status, it is still in the ScalingUp status when external oidc
+#  mp_status=$(oc get MachinePool "${machinepool}" -n "${namespace}" -ojsonpath='{.status.phase}')
+#  if [[ "${mp_status}" != "Running" ]]; then
+#    echo "Error: machinepool ${machinepool} is not in the Running status: ${mp_status}"
+#    exit 1
+#  fi
 
   rosamachinepool_name=$(oc get MachinePool -n "${namespace}" "${machinepool}" -ojsonpath='{.spec.template.spec.infrastructureRef.name}')
   is_ready=$(oc get rosamachinepool "${rosamachinepool_name}" -n "${namespace}" -ojsonpath='{.status.ready}')
@@ -191,7 +192,20 @@ fi
 tags=$(jq -r '.spec.additionalTags  //""' < "${capi_cp_json_file}")
 if [[ -n "${tags}" ]]; then
   echo "check rosacontrolplane additionalTags"
-  hc_dft_sg=$(cat "${SHARED_DIR}/capi_hcp_default_security_group")
+  hc_dft_sg=""
+  if [[ -f "${SHARED_DIR}/capi_hcp_default_security_group" ]] ; then
+    hc_dft_sg=$(cat "${SHARED_DIR}/capi_hcp_default_security_group")
+  else
+    cluster_id=$(cat "${SHARED_DIR}/cluster-id")
+    hc_vpc_id=$(cat "${SHARED_DIR}/vpc_id")
+    hc_dft_sg=$(aws ec2 describe-security-groups --region ${REGION} --filters "Name=vpc-id,Values=${hc_vpc_id}" "Name=group-name,Values=${cluster_id}-default-sg" --query 'SecurityGroups[].GroupId' --output text)
+  fi
+
+  if [[ -z "${hc_dft_sg}" ]] ; then
+    echo "default security group not found error"
+    exit 1
+  fi
+
   echo "${tags}" | jq -r 'to_entries[] | "\(.key) \(.value)"' | while read key value; do
     contain_key=$(jq -e '.aws.tags | contains({"'"${key}"'": "'"${value}"'"})' < "${rosa_hcp_info_file}")
     if [[ "${contain_key}" != "true" ]] ; then
