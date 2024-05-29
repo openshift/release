@@ -78,6 +78,11 @@ case $SEED_IMAGE_TAG_FORMAT in
     ;;
 esac
 
+# Add a prefix if necessary
+if [[ ! -z "${SEED_IMAGE_TAG_PREFIX}" ]]; then
+  SEED_IMAGE_TAG="${SEED_IMAGE_TAG_PREFIX}-${SEED_IMAGE_TAG}"
+fi
+
 echo "${SEED_IMAGE_TAG}" > "${SHARED_DIR}/seed_tag"
 echo "${SEED_VM_NAME}" > "${SHARED_DIR}/seed_vm_name"
 
