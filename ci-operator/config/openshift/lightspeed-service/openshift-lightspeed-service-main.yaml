@@ -76,6 +76,11 @@ tests:
 
         export CP_OFFLINE_TOKEN=$(cat /var/run/insights-stage-upload-offline-token/token)
 
+        dnf install -y jq && \
+        S3_UPLOADER_TAG=$(curl https://gitlab.cee.redhat.com/api/v4/projects/insights-qe%2Fupload-artifact-s3/repository/tags | jq '.[0].name' | tr -d '"') && \
+        curl -L https://gitlab.cee.redhat.com/api/v4/projects/insights-qe%2Fupload-artifact-s3/jobs/artifacts/$S3_UPLOADER_TAG/raw/upload-artifact-s3-latest?job=build -o /usr/bin/upload-artifact-s3 && \
+        chmod a+x /usr/bin/upload-artifact-s3
+
         tests/scripts/test-e2e-cluster.sh
       credentials:
       - mount_path: /var/run/azure_openai
