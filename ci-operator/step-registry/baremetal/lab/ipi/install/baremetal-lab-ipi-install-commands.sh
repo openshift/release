@@ -65,7 +65,7 @@ echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
 # the installer for different architectures in the same single-arch payload (and then support using a remote libvirt uri
 # for the provisioning host).
 #oc adm release extract -a "$PULL_SECRET_PATH" "${MULTI_RELEASE_IMAGE}" \
-oc adm release extract -a "$PULL_SECRET_PATH" registry.build03.ci.openshift.org/ci-ln-kyb2xc2/release:latest \
+oc adm release extract -a "$PULL_SECRET_PATH" registry.build03.ci.openshift.org/ci-ln-c6x6iwk/release:latest \
   --command=openshift-baremetal-install --to=/tmp
 
 # We change the payload image to the one in the mirror registry only when the mirroring happens.
