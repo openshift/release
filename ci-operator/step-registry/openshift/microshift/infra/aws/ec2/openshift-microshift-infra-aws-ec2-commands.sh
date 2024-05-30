@@ -82,7 +82,7 @@ Mappings:
    VirtualMachine:
      PrimaryVolumeSize: "200"
      SecondaryVolumeSize: "10"
-     Throughput: 125
+     Throughput: 500
 Parameters:
   EC2Type:
     Default: 'VirtualMachine'
