@@ -129,21 +129,14 @@ done
 
 cp "${DAY2_ASSETS_DIR}/nodes-config.yaml" "${ARTIFACT_DIR}/"
 
-# node-joiner-monitor.sh needs write permissions
-cp "$SHARED_DIR/kubeconfig" "${DAY2_ASSETS_DIR}/"
 
-export KUBECONFIG="$DAY2_ASSETS_DIR/kubeconfig"
+export KUBECONFIG="$SHARED_DIR/kubeconfig"
 
 curl https://raw.githubusercontent.com/bmanzari/installer/AGENT-912/docs/user/agent/add-node/node-joiner.sh --output "${DAY2_ASSETS_DIR}/node-joiner.sh"
-
-curl https://raw.githubusercontent.com/bmanzari/installer/AGENT-912/docs/user/agent/add-node/node-joiner-monitor.sh --output "${DAY2_ASSETS_DIR}/node-joiner-monitor.sh"
 
 export http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}"
 
 chmod +x "${DAY2_ASSETS_DIR}/node-joiner.sh"
-chmod +x "${DAY2_ASSETS_DIR}/node-joiner-monitor.sh"
-
-sleep 14400
 
 
 cd "${DAY2_ASSETS_DIR}/" ; sh "node-joiner.sh" "nodes-config.yaml"
@@ -217,7 +210,46 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   fi
 done
 
-#sh "${DAY2_ASSETS_DIR}/node-joiner-monitor.sh"
 
+sleep 600
+# To check if there are pending CSRs
+function wait_for_pending_csrs_and_approve() {
+  for ((i = 0; i < 18; i++)); do
+    pending_csrs=$(oc get csr | grep Pending | awk '{print $1}')
+    if [ -n "$pending_csrs" ]; then
+      for csr in $pending_csrs; do
+        echo "Approving CSR: $csr"
+        oc adm certificate approve "$csr"
+      done
+      echo "All pending CSRs approved."
+      break
+    fi
+    echo "No pending CSRs found. Waiting..."
+    sleep 30
+  done
+}
 
-sleep 7200
+node_count=$(($(oc get nodes --no-headers | wc -l | tr -d '[:space:]') + total_workers))
+wait_for_pending_csrs_and_approve
+
+for ((i = 0; i < 5; i++)); do
+  updated_node_count=$(oc get nodes --no-headers | wc -l | tr -d '[:space:]')
+  echo "Waiting for nodes to reach count $node_count. Current count: ${updated_node_count}"
+  if [ "${updated_node_count}" -eq "${node_count}" ]; then
+    break
+  fi
+  sleep 30
+done
+
+if [ "${updated_node_count}" -ne "${node_count}" ]; then
+  echo "Expected count ${node_count} does not match the actual count ${updated_node_count}. Exiting."
+  exit 1
+fi
+
+if oc wait --for=condition=Ready node --all --timeout=3m; then
+  echo "Successfully added all the worker nodes."
+else
+  echo "Timed out waiting for nodes to be Ready. Exiting."
+  oc get nodes
+  exit 1
+fi
