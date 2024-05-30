@@ -379,12 +379,23 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-upi-proxy
   timeout: 6h0m0s
-- as: e2e-aws-ovn-shared-vpc
+- as: e2e-aws-ovn-shared-vpc-custom-security-groups
   optional: true
   run_if_changed: aws
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws-sharednetwork
+    post:
+    - chain: ipi-aws-post
+    - ref: ipi-deprovision-aws-custom-security-groups
+    - ref: aws-deprovision-security-group
+    - ref: ipi-deprovision-aws-sharednetwork
+    pre:
+    - chain: ipi-conf-aws-sharednetwork
+    - ref: aws-provision-security-group
+    - ref: ipi-conf-aws-custom-security-groups
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-edge-zones
@@ -723,13 +734,6 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
-  timeout: 6h0m0s
-- as: e2e-aws-custom-security-groups
-  optional: true
-  run_if_changed: aws
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-custom-security-groups
   timeout: 6h0m0s
 - as: e2e-metal-single-node-live-iso
   optional: true

@@ -30,7 +30,7 @@ rosa login --env "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 COMMIT_FOCUS="/rosa/tests/ci/data/commit-focus"
 FOCUS=$(cat "${COMMIT_FOCUS}")
 FOCUS_LABEL_FILTER=""
-FOCUS_SWITCH="--ginkgo.focus ${FOCUS}"
+FOCUS_SWITCH="--ginkgo.focus '${FOCUS}'"
 if [[ -z "$FOCUS" ]]; then
   echo "Warning: No TC updated, focus on Critial"
   FOCUS_LABEL_FILTER="Critical"
