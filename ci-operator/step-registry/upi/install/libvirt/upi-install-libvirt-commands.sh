@@ -219,10 +219,12 @@ create_vm () {
       --osinfo ${VIRT_INSTALL_OSINFO} \
       --graphics=none \
       --cdrom "${ISO_PATH}" \
-      --extra-args "rd.neednet=1 nameserver=192.168.$(leaseLookup 'subnet').1 ip=dhcp ignition.firstboot ignition.platform.id=metal" \
       --noautoconsole \
+      --debug \
       --autostart \
       --wait=-1 &
+      #--extra-args "rd.neednet=1 nameserver=192.168.$(leaseLookup 'subnet').1 ip=dhcp ignition.firstboot ignition.platform.id=metal" \
+
   else
     # Pre-create the disk volume
     clone_volume ${NAME}-volume
