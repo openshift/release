@@ -19,6 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
 binary_build_commands: make manager
 build_root:
   from_repository: true
@@ -94,6 +98,17 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
+- as: regression-clusterinfra-aws-ipi-proxy-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_FILTERS: CAPI
+      TEST_SCENARIOS: Cluster_Infrastructure
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
 - as: e2e-hypershift
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:

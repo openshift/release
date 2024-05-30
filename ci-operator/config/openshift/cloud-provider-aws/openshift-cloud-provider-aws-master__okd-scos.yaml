@@ -11,7 +11,8 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.21-openshift-4.16
+canonical_go_repository: k8s.io/cloud-provider-aws
 images:
 - build_args:
   - name: TAGS
@@ -26,18 +27,35 @@ images:
   to: aws-cloud-controller-manager
 promotion:
   to:
-  - name: scos-4.16
+  - additional_images:
+      cloud-provider-aws-rpms: rpms
+    excluded_images:
+    - base-with-rpms
+    name: scos-4.16
     namespace: origin
+raw_steps:
+- rpm_image_injection_step:
+    from: origin_scos-4.16_base-stream9
+    to: base-with-rpms
 releases:
+  initial:
+    integration:
+      name: scos-4.16
+      namespace: origin
   latest:
     integration:
+      include_built_images: true
       name: scos-4.16
       namespace: origin
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
+rpm_build_commands: openshift-hack/build-rpm.sh 4.16.0
+rpm_build_location: _output/RPMS/x86_64
 zz_generated_metadata:
   branch: master
   org: openshift
