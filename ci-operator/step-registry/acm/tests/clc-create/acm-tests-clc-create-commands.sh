@@ -14,9 +14,13 @@ if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
     cp ${SECRETS_DIR}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
 fi 
 
+######### added for debugging purposes #########
 export QT_X11_NO_MITSHM=1
 export _X11_NO_MITSHM=1
 export _MITSHM=0
+export LIBGL_ALWAYS_INDIRECT=1
+export DISPLAY=0
+###############################################
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
