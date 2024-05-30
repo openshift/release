@@ -59,8 +59,12 @@ cp ${SHARED_DIR}/install-config.yaml /tmp
 if [ "$INSTALLER_TYPE" == "agent" ]; then
   cp ${SHARED_DIR}/agent-config.yaml /tmp
   ${OCPINSTALL} --dir /tmp agent create image
-  ls /tmp
-  exit 0
+
+  ISO_PATH="/tmp/agent.${ARCH}.iso"
+  if [[ ! -f "${ISO_PATH}" ]]; then
+      echo 'Agent ISO image could not be found, exiting.'
+      exit 1
+  fi
 else
   RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
   QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
@@ -145,25 +149,44 @@ create_vm () {
   MAC_ADDRESS=${2}
   IGNITION_VOLUME=${LEASED_RESOURCE}-${3}-ignition-volume
 
-  virt-install \
-    --connect ${LIBVIRT_CONNECTION} \
-    --name ${NAME} \
-    --memory ${DOMAIN_MEMORY} \
-    --vcpus ${DOMAIN_VCPUS} \
-    --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
-    --disk="vol=${POOL_NAME}/${NAME}-volume" \
-    --osinfo ${VIRT_INSTALL_OSINFO} \
-    --graphics=none \
-    --import \
-    --noautoconsole \
-    --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
+  if [ "$INSTALLER_TYPE" == "agent" ]; then
+    virt-install \
+      --connect ${LIBVIRT_CONNECTION} \
+      --name ${NAME} \
+      --memory ${DOMAIN_MEMORY} \
+      --vcpus ${DOMAIN_VCPUS} \
+      --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
+      --disk="path=${NAME}-volume.qcow2,pool=${POOL_NAME},size=120" \
+      --osinfo ${VIRT_INSTALL_OSINFO} \
+      --graphics=none \
+      --cdrom "${ISO_PATH}" \
+      --extra-args "rd.neednet=1 nameserver=192.168.$(leaseLookup 'subnet').1 ip=dhcp ignition.firstboot ignition.platform.id=metal" \
+      --noautoconsole \
+      --autostart \
+      --wait=-1 &
+  else
+    # Pre-create the disk volume
+    clone_volume ${NAME}-volume
+
+    virt-install \
+      --connect ${LIBVIRT_CONNECTION} \
+      --name ${NAME} \
+      --memory ${DOMAIN_MEMORY} \
+      --vcpus ${DOMAIN_VCPUS} \
+      --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
+      --disk="vol=${POOL_NAME}/${NAME}-volume" \
+      --osinfo ${VIRT_INSTALL_OSINFO} \
+      --graphics=none \
+      --import \
+      --noautoconsole \
+      --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
+  fi
 }
 
 if [ "$INSTALLER_TYPE" == "base" ]; then
   # Create the bootstrap node.
   NODE="${LEASED_RESOURCE}-bootstrap"
   MAC_ADDRESS=$(leaseLookup "bootstrap[0].mac")
-  clone_volume ${NODE}-volume
   create_vm ${NODE} ${MAC_ADDRESS} bootstrap
 fi
 
@@ -171,7 +194,6 @@ fi
 for (( i=0; i<=${CONTROL_COUNT}-1; i++ )); do
   NODE="${LEASED_RESOURCE}-control-${i}"
   MAC_ADDRESS=$(leaseLookup "control-plane[$i].mac")
-  clone_volume ${NODE}-volume
   create_vm ${NODE} ${MAC_ADDRESS} master
 done
 
@@ -179,14 +201,13 @@ done
 for (( i=0; i<=${COMPUTE_COUNT}-1; i++ )); do
   NODE="${LEASED_RESOURCE}-compute-${i}"
   MAC_ADDRESS=$(leaseLookup "compute[$i].mac")
-  clone_volume ${NODE}-volume
   create_vm ${NODE} ${MAC_ADDRESS} worker
 done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 if [ "$INSTALLER_TYPE" == "agent" ]; then
-  ${OCPINSTALL} --dir "/tmp" agent wait-for bootstrap-complete --log-level=info &
+  ${OCPINSTALL} --dir "/tmp" agent wait-for bootstrap-complete --log-level=debug &
 else
   ${OCPINSTALL} --dir "/tmp" wait-for bootstrap-complete &
 fi
@@ -223,7 +244,7 @@ sleep 5m
 set +x
 echo "Completing UPI setup"
 if [ "$INSTALLER_TYPE" == "agent" ]; then
-  ${OCPINSTALL} --dir="/tmp" agent wait-for install-complete 2>&1 | grep --line-buffered -v password &
+  ${OCPINSTALL} --dir="/tmp" agent wait-for install-complete --log-level=debug 2>&1 | grep --line-buffered -v password &
 else
   ${OCPINSTALL} --dir="/tmp" wait-for install-complete 2>&1 | grep --line-buffered -v password &
 fi
@@ -263,3 +284,4 @@ cp /tmp/.openshift_install.log "${SHARED_DIR}"/.openshift_install.log
 save_credentials
 
 touch /tmp/install-complete
+sleep 20m
