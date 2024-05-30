@@ -43,7 +43,7 @@ if [[ ! -z "$(${VIRSH} pool-list | grep ${POOL_NAME})" ]]; then
   echo "Removing conflicing cluster volumes..."
   for VOLUME in $(${VIRSH} vol-list --pool ${POOL_NAME} | grep "${LEASED_RESOURCE}" | awk '{ print $1 }')
   do
-    ${VIRSH} vol-delete --pool ${POOL_NAME} --vol ${VOLUME}
+    ${VIRSH} vol-delete --pool ${POOL_NAME} --vol ${VOLUME} || true
   done
 fi
 
