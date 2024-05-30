@@ -19,7 +19,7 @@ export QT_X11_NO_MITSHM=1
 export _X11_NO_MITSHM=1
 export _MITSHM=0
 export LIBGL_ALWAYS_INDIRECT=1
-export DISPLAY=1
+export DISPLAY=:0
 ###############################################
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
