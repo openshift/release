@@ -40,7 +40,7 @@ fi
 # summarize test results
 echo "Summarizing test results..."
 failures=0 errors=0 skipped=0 tests=0
-grep -r -E -h -o 'testsuite[^>]+' "${ARTIFACT_DIR}/gui_test_screenshots/console-cypress.xml" 2>/dev/null | tr -d '[A-Za-z="_]' > /tmp/zzz-tmp.log
+grep -r -E -h -o 'testsuite[^>]+' "${ARTIFACT_DIR}/gui_test_screenshots/junit-console-cypress.xml" 2>/dev/null | tr -d '[A-Za-z="_]' > /tmp/zzz-tmp.log
 while read -a row ; do
     # if the last ARG of command `let` evaluates to 0, `let` returns 1
     let errors+=${row[0]} failures+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
@@ -63,3 +63,4 @@ if [ $((failures)) != 0 ] ; then
     done
 fi
 cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
+sleep 3200
