@@ -29,6 +29,14 @@ chain:
   - as: run-e2e-external
     cli: latest
     commands: |-
+        function cleanup() {
+          for child in $( jobs -p ); do
+            kill "${child}"
+          done
+          wait
+        }
+        trap cleanup EXIT
+
         if [ "${RUN_EXTERNAL_INFRA_TEST}" == "false" ]
         then
           echo "External infra test suite is not supported in this version and skipped."
