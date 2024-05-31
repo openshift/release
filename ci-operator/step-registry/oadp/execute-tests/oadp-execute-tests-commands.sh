@@ -64,6 +64,10 @@ python3 -m pip install ansible_runner
 python3 -m pip install "${OADP_APPS_DIR}" --target "${OADP_GIT_DIR}/sample-applications/"
 python3 -m pip install "${PYCLIENT_DIR}"
 
+# Set default storage class to ocs-storagecluster-ceph-rbd
+oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class-
+oc annotate storageclass ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class=true
+
 # Archive results function
 function archive-results() {
     if [[ -f "${RESULTS_FILE}" ]] && [[ ! -f "${ARTIFACT_DIR}/junit_oadp_interop_results.xml" ]]; then
@@ -85,5 +89,5 @@ cd $OADP_GIT_DIR
 go mod edit -replace=gitlab.cee.redhat.com/app-mig/oadp-e2e-qe=$OADP_GIT_DIR/e2e
 go mod tidy
 #EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
-sleep 7200
+
 export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" && /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
