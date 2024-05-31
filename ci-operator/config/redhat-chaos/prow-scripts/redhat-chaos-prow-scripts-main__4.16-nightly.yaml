@@ -81,6 +81,26 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     test:
     - ref: redhat-chaos-zone-outage
+- as: krkn-hub-cloud-gcp-api-tests
+  cron: 0 4 * * 1
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - chain: redhat-chaos-krkn-hub-cloud-tests
+    workflow: openshift-qe-installer-gcp
+- as: krkn-hub-cloud-azure-api-tests
+  cron: 0 4 * * 1
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D8s_v3
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D16s_v3
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
+      OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE: Standard_D32s_v3
+    test:
+    - chain: redhat-chaos-krkn-hub-cloud-tests
+    workflow: openshift-qe-installer-azure
 - as: krkn-hub-ibm-cloud-api-tests
   always_run: false
   steps:
