@@ -76,7 +76,9 @@ postsubmits:
     cluster: build03
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
@@ -84,7 +86,7 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-openshift-priv-kubernetes-master-okd-scos-images
-    path_alias: github.com/openshift/kubernetes
+    path_alias: k8s.io/kubernetes
     spec:
       containers:
       - args:
@@ -95,6 +97,7 @@ postsubmits:
         - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=artifacts
         - --variant=okd-scos
         command:
         - ci-operator
@@ -125,9 +128,6 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

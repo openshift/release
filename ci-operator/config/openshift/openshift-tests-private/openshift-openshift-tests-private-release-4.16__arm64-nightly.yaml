@@ -69,6 +69,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.16"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.16"
   target:
     candidate:
       architecture: multi
@@ -198,6 +204,56 @@ tests:
     test:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi-private
+- as: azure-ipi-ovn-hypershift-guest-f7
+  cron: 31 8 6,13,20,27 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      HO_MULTI: "true"
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-hypershift-guest
+- as: azure-ipi-ovn-hypershift-guest-f14-destructive
+  cron: 6 16 1,17 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      HO_MULTI: "true"
+      OCP_ARCH: arm64
+      TEST_ADDITIONAL: Network_Observability
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-hypershift-guest
+- as: azure-ipi-ovn-hypershift-mgmt-f7
+  cron: 15 21 7,16,23,30 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      HO_MULTI: "true"
+      OCP_ARCH: arm64
+      TEST_ADDITIONAL: Hypershift
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
+      TEST_TIMEOUT: "35"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-hypershift
 - as: azure-ipi-private-f28-disasterrecovery
   cron: 35 19 22 * *
   steps:

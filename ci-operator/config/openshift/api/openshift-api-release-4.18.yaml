@@ -88,9 +88,13 @@ tests:
     dir=$GOPATH/src/github.com/openshift/client-go
     git clone https://github.com/openshift/client-go --branch ${PULL_BASE_REF:-master} --single-branch $dir
     rm -rf $dir/vendor/github.com/openshift/api/*
-    cp -Rf * $dir/vendor/github.com/openshift/api/
-    rm -rf $dir/vendor/github.com/openshift/api/vendor
+    cp -Rf ./ $dir/api/
+    rm -rf $dir/api/vendor
     cd $dir
+    echo "replace github.com/openshift/api => ./api" >> go.mod
+    echo "# github.com/openshift/api => ./api" >> vendor/modules.txt
+    sed -i "/github.com\/openshift\/api v0.0.0/ s/$/ => \.\/api/" vendor/modules.txt
+    go mod vendor
     make generate
     go build ./...
   container:
