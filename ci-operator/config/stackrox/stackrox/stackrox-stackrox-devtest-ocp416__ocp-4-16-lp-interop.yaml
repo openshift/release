@@ -21,14 +21,16 @@ resources:
       memory: 8000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
-- as: acs-tests-aws
-  cron: 0 6 11 2 *
+- always_run: false
+  as: acs-tests-aws
+  presubmit: true
   steps:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      MAX_WAIT_SECONDS: 600
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -38,7 +40,7 @@ tests:
               {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
               {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "stackrox-*", "failure_type": "pod_failure", "classification": "ACS Test Execution", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "stackrox-*", "failure_type": "test_failure", "classification": "ACS Test Failure", "jira_project": "ROX", "jira_assignee": "davidh@redhat.com", "jira_additional_labels": ["!default","interop-tests"]}
+              {"step": "stackrox-*", "failure_type": "test_failure", "classification": "ACS Test Failure", "jira_project": "ROX", "jira_assignee": "dahouse@redhat.com", "jira_additional_labels": ["!default","interop-tests"]}
             ],
           "success_rules":
             [
@@ -54,7 +56,7 @@ tests:
     workflow: firewatch-ipi-aws
   timeout: 8h0m0s
 zz_generated_metadata:
-  branch: master
+  branch: devtest-ocp416
   org: stackrox
   repo: stackrox
   variant: ocp-4-16-lp-interop
