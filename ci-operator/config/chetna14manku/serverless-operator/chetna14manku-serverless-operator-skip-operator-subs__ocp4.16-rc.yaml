@@ -1,0 +1,216 @@
+base_images:
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  ocp-addons-operators-cli:
+    name: ocp-addons-operators-cli
+    namespace: ci
+    tag: latest
+  ocp_4.15_cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  ocp_ubi-minimal_8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  openshift_eventing-istio-src_knative-v1.12:
+    name: eventing-istio-src
+    namespace: openshift
+    tag: knative-v1.12
+  openshift_eventing-kafka-broker-src_knative-v1.12:
+    name: eventing-kafka-broker-src
+    namespace: openshift
+    tag: knative-v1.12
+  openshift_knative-eventing-src_knative-v1.12:
+    name: knative-eventing-src
+    namespace: openshift
+    tag: knative-v1.12
+  openshift_knative-serving-src_knative-v1.12:
+    name: knative-serving-src
+    namespace: openshift
+    tag: knative-v1.12
+  openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.21-openshift-4.16
+  origin_4.15_operator-registry:
+    name: "4.15"
+    namespace: origin
+    tag: operator-registry
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+images:
+- dockerfile_path: knative-operator/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.ci.openshift.org/ocp/ubi-minimal:8
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
+  to: serverless-knative-operator
+- dockerfile_path: olm-catalog/serverless-operator/Dockerfile
+  to: serverless-bundle
+- dockerfile_path: olm-catalog/serverless-operator/index/Dockerfile
+  inputs:
+    origin_4.15_operator-registry:
+      as:
+      - registry.ci.openshift.org/origin/4.15:operator-registry
+  to: serverless-index
+- dockerfile_path: openshift-knative-operator/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.ci.openshift.org/ocp/ubi-minimal:8
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
+  to: serverless-openshift-knative-operator
+- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+  from: src
+  inputs:
+    ocp_4.15_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:cli
+    openshift_eventing-istio-src_knative-v1.12:
+      as:
+      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.12
+    openshift_eventing-kafka-broker-src_knative-v1.12:
+      as:
+      - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.12
+    openshift_knative-eventing-src_knative-v1.12:
+      as:
+      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.12
+    openshift_knative-serving-src_knative-v1.12:
+      as:
+      - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.12
+  to: serverless-source-image
+- dockerfile_path: serving/ingress/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.ci.openshift.org/ocp/ubi-minimal:8
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
+  to: serverless-ingress
+- dockerfile_path: serving/metadata-webhook/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - registry.ci.openshift.org/ocp/ubi-minimal:8
+    openshift_release_rhel-8-release-golang-1.21-openshift-4.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.21-openshift-4.16
+  to: serverless-metadata-webhook
+releases:
+  latest:
+    release:
+      channel: candidate
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: serverless-p2p-rosa
+  cron: 0 6 11 2 *
+  steps:
+    cluster_profile: aws-managed-cspi-qe
+    env:
+      CHANNEL_GROUP: candidate
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+          [
+            {"step": "aws-*", "failure_type": "all", "classification": "Infrastructure AWS", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+            {"step": "rosa-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+            {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+            {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+            {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+            {"step": "mesh-e2e", "failure_type": "test_failure", "classification": "mesh-e2e Test Failure", "jira_project": "SRVCOM", "jira_additional_labels": ["!default","interop-tests"]},
+            {"step": "ui-e2e", "failure_type": "test_failure", "classification": "ui-e2e Test Failure", "jira_project": "SRVCOM", "jira_additional_labels": ["!default","interop-tests"]},
+            {"step": "mesh-e2e", "failure_type": "pod_failure", "classification": "mesh-e2e Test Execution", "jira_additional_labels": ["!default","interop-tests"]},
+            {"step": "ui-e2e", "failure_type": "pod_failure", "classification": "ui-e2e Test Execution", "jira_additional_labels": ["!default","interop-tests"]},
+          ],
+          "success_rules":
+          [
+            {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
+          ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp-p2p","rosa-classic-lp","serverless-p2p"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.16"
+      REGION: us-west-2
+      SLEEP_DURATION: 30m
+    test:
+    - ref: wait
+    - as: mesh-e2e
+      cli: latest
+      commands: SKIP_OPERATOR_SUBSCRIPTION=true make mesh-e2e
+      dependencies:
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    - as: ui-e2e
+      cli: latest
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make ui-e2e
+      dependencies:
+      - env: SERVERLESS_KNATIVE_OPERATOR
+        name: serverless-knative-operator
+      - env: SERVERLESS_BUNDLE
+        name: serverless-bundle
+      - env: SERVERLESS_INDEX
+        name: serverless-index
+      - env: SERVERLESS_OPENSHIFT_KNATIVE_OPERATOR
+        name: serverless-openshift-knative-operator
+      - env: SERVERLESS_SOURCE_IMAGE
+        name: serverless-source-image
+      - env: SERVERLESS_INGRESS
+        name: serverless-ingress
+      - env: SERVERLESS_METADATA_WEBHOOK
+        name: serverless-metadata-webhook
+      from: serverless-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: firewatch-rosa-aws-sts-hypershift
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: skip-operator-subs
+  org: chetna14manku
+  repo: serverless-operator
+  variant: ocp4.16-rc
