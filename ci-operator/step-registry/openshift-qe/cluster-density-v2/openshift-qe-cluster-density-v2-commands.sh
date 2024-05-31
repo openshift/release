@@ -31,7 +31,12 @@ iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
 export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-export EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE} --local-indexing"
+EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
+
+if [[ "${USE_HORREUM_WEBHOOK}" == "true" ]]; then
+    EXTRA_FLAGS+=" --local-indexing"
+fi
+export EXTRA_FLAGS
 
 rm -f ${SHARED_DIR}/index.json
 ./run.sh
@@ -40,7 +45,7 @@ folder_name=$(ls -t -d /tmp/*/ | head -1)
 jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
 
 
-if [[ "${USE_WEBHOOK}" == "true" ]]; then
+if [[ "${USE_HORREUM_WEBHOOK}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
     cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
     
