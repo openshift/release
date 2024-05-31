@@ -196,6 +196,9 @@ spec:
     managed: true
 EOF
 
+//debug the ODF issue
+sleep 3600*3
+
 for _ in {1..60}; do
   if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')" == "True" ]]; then
     echo "Quay is in ready status" >&2
