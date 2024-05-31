@@ -9,16 +9,14 @@ pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
-<<<<<<< HEAD
+
 if [[ $TAG == "latest" ]]; then
     LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name');
 else 
     LATEST_TAG=$TAG
 fi
 git clone --branch $LATEST_TAG $ORION_REPO --depth 1
-=======
-git clone --branch $BRANCH $ORION_REPO
->>>>>>> adding orion test
+
 pushd orion
 
 pip install -r requirements.txt
