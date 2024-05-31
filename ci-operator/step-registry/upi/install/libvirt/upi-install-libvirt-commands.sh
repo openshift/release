@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+INSTALL_DIR=/tmp
+
 # ensure hostname can be found
 HOSTNAME="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".hostname" "${CLUSTER_PROFILE_DIR}/leases")"
 if [[ -z "${HOSTNAME}" ]]; then
@@ -25,17 +27,17 @@ function leaseLookup () {
 function save_credentials () {
   # Save credentials for diagnostic steps going forward
   echo "Saving authentication files for next steps..."
-  cp /tmp/metadata.json ${SHARED_DIR}
-  cp /tmp/auth/kubeconfig ${SHARED_DIR}
-  cp /tmp/auth/kubeadmin-password ${SHARED_DIR}
+  cp ${INSTALL_DIR}/metadata.json ${SHARED_DIR}
+  cp ${INSTALL_DIR}/auth/kubeconfig ${SHARED_DIR}
+  cp ${INSTALL_DIR}/auth/kubeadmin-password ${SHARED_DIR}
 }
 
 # download the correct openshift-install from the payload
 oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
-  --command=openshift-install --to=/tmp
+  --command=openshift-install --to="${INSTALL_DIR}"
 
 CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
-OCPINSTALL='/tmp/openshift-install'
+OCPINSTALL="${INSTALL_DIR}/openshift-install"
 # All virsh commands need to be run on the hypervisor
 LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
 # Simplify the virsh command
@@ -54,15 +56,35 @@ else
   ${VIRSH} pool-start ${POOL_NAME}
 fi
 
-cp ${SHARED_DIR}/install-config.yaml /tmp
+cp ${SHARED_DIR}/install-config.yaml ${INSTALL_DIR}
 
 if [ "$INSTALLER_TYPE" == "agent" ]; then
-  cp ${SHARED_DIR}/agent-config.yaml /tmp
-  ${OCPINSTALL} --dir /tmp agent create image
+  cp ${SHARED_DIR}/agent-config.yaml ${INSTALL_DIR}
+  ${OCPINSTALL} --dir ${INSTALL_DIR} agent create pxe-files
 
-  ISO_PATH="/tmp/agent.${ARCH}.iso"
-  if [[ ! -f "${ISO_PATH}" ]]; then
-      echo 'Agent ISO image could not be found, exiting.'
+  BOOT_ARTIFACTS_DIR="${INSTALL_DIR}/boot-artifacts/"
+  INITRD="agent.${ARCH}-merged-initrd.img"
+
+  # The name of the kernel artifact depends on the arch
+  if [ "$ARCH" == "s390x" ]; then
+    KERNEL="agent.${ARCH}-kernel.img"
+  elif [ "$ARCH" == "ppc64le" ]; then
+    KERNEL="agent.${ARCH}-vmlinuz"
+  else
+    echo "Unrecognized architecture: $ARCH"
+    exit 1
+  fi
+
+  # For some reason, order matters when merging these
+  cat "${BOOT_ARTIFACTS_DIR}/agent.${ARCH}-rootfs.img" "${BOOT_ARTIFACTS_DIR}/agent.${ARCH}-initrd.img" > "${BOOT_ARTIFACTS_DIR}/${INITRD}"
+  ls ${BOOT_ARTIFACTS_DIR}
+
+  if [[ ! -f "${BOOT_ARTIFACTS_DIR}/${KERNEL}" ]]; then
+      echo "Agent installer couldn't create kernel image, exiting."
+      exit 1
+  fi
+  if [[ ! -f "${BOOT_ARTIFACTS_DIR}/${INITRD}" ]]; then
+      echo "Agent installer couldn't create combined rootfs and initrd image, exiting."
       exit 1
   fi
 else
@@ -83,10 +105,10 @@ else
     fi
 
     # Download the new qcow image
-    curl -L "${QCOW_URL}" | gunzip -c > /tmp/${VOLUME_NAME} || true
+    curl -L "${QCOW_URL}" | gunzip -c > ${INSTALL_DIR}/${VOLUME_NAME} || true
 
     # Resize the qemu to match the volume capacity
-    qemu-img resize /tmp/${VOLUME_NAME} ${VOLUME_CAPACITY}
+    qemu-img resize ${INSTALL_DIR}/${VOLUME_NAME} ${VOLUME_CAPACITY}
 
     # Create the new source volume
     ${VIRSH} vol-create-as \
@@ -99,11 +121,11 @@ else
     ${VIRSH} vol-upload \
       --vol ${VOLUME_NAME} \
       --pool ${POOL_NAME} \
-      /tmp/${VOLUME_NAME}
+      ${INSTALL_DIR}/${VOLUME_NAME}
   fi
 
   # Generating ignition configs
-  ${OCPINSTALL} create ignition-configs --dir /tmp
+  ${OCPINSTALL} create ignition-configs --dir ${INSTALL_DIR}
   save_credentials
 
   # Create ignition volumes and upload the ignition configs
@@ -119,7 +141,7 @@ else
     ${VIRSH} vol-upload \
       --vol ${NAME} \
       --pool ${POOL_NAME} \
-      /tmp/${IGNITION_TYPE}.ign
+      ${INSTALL_DIR}/${IGNITION_TYPE}.ign
   done
 fi
 
@@ -159,12 +181,11 @@ create_vm () {
       --disk="path=${NAME}-volume.qcow2,pool=${POOL_NAME},size=120" \
       --osinfo ${VIRT_INSTALL_OSINFO} \
       --graphics=none \
-      --cdrom "${ISO_PATH}" \
+      --location "${BOOT_ARTIFACTS_DIR},kernel=${KERNEL},initrd=${INITRD}" \
+      --extra-args "rd.neednet=1 nameserver=192.168.$(leaseLookup 'subnet').1 ip=dhcp ignition.firstboot ignition.platform.id=metal" \
       --noautoconsole \
-      --debug \
       --autostart \
       --wait=-1 &
-      #--extra-args "rd.neednet=1 nameserver=192.168.$(leaseLookup 'subnet').1 ip=dhcp ignition.firstboot ignition.platform.id=metal" \
 
   else
     # Pre-create the disk volume
@@ -209,9 +230,9 @@ done
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 if [ "$INSTALLER_TYPE" == "agent" ]; then
-  ${OCPINSTALL} --dir "/tmp" agent wait-for bootstrap-complete --log-level=debug &
+  ${OCPINSTALL} --dir "${INSTALL_DIR}" agent wait-for bootstrap-complete --log-level=debug &
 else
-  ${OCPINSTALL} --dir "/tmp" wait-for bootstrap-complete &
+  ${OCPINSTALL} --dir "${INSTALL_DIR}" wait-for bootstrap-complete &
 fi
 
 # TODO: collect logs in case of failure
@@ -227,7 +248,7 @@ if [ "$INSTALLER_TYPE" == "base" ]; then
   approve_csrs () {
     oc version --client
     while true; do
-      if [[ ! -f /tmp/install-complete ]]; then
+      if [[ ! -f ${INSTALL_DIR}/install-complete ]]; then
         # even if oc get csr fails continue
         oc get csr -ojson | yq-v4 -oy '.items[] | select(.status | length == 0) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve || true
         sleep 15 & wait
@@ -246,9 +267,9 @@ sleep 5m
 set +x
 echo "Completing UPI setup"
 if [ "$INSTALLER_TYPE" == "agent" ]; then
-  ${OCPINSTALL} --dir="/tmp" agent wait-for install-complete --log-level=debug 2>&1 | grep --line-buffered -v password &
+  ${OCPINSTALL} --dir="${INSTALL_DIR}" agent wait-for install-complete --log-level=debug 2>&1 | grep --line-buffered -v password &
 else
-  ${OCPINSTALL} --dir="/tmp" wait-for install-complete 2>&1 | grep --line-buffered -v password &
+  ${OCPINSTALL} --dir="${INSTALL_DIR}" wait-for install-complete 2>&1 | grep --line-buffered -v password &
 fi
 wait "$!"
 
@@ -279,11 +300,11 @@ done
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
 # Password for the cluster gets leaked in the installer logs and hence removing them.
-sed -i 's/password: .*/password: REDACTED"/g' /tmp/.openshift_install.log
-cp /tmp/.openshift_install.log "${SHARED_DIR}"/.openshift_install.log
+sed -i 's/password: .*/password: REDACTED"/g' ${INSTALL_DIR}/.openshift_install.log
+cp ${INSTALL_DIR}/.openshift_install.log "${SHARED_DIR}"/.openshift_install.log
 
 # Save the kubeconfig again to make sure any changes during install are captured in future steps
 save_credentials
 
-touch /tmp/install-complete
+touch ${INSTALL_DIR}/install-complete
 sleep 20m
