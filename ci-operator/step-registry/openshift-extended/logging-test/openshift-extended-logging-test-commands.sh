@@ -523,3 +523,6 @@ function set_gloki_credentials() {
     fi
 }
 run
+
+echo "Sleep 5h to provide debug Env"
+sleep 5h
