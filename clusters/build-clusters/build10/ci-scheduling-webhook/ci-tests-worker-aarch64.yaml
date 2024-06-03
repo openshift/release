@@ -1,7 +1,7 @@
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 metadata:
-  name: build10-znq8n-worker-amd64-us-east-2a
+  name: build10-znq8n-ci-tests-worker-us-east-2a
   namespace: openshift-machine-api
   labels:
     machine.openshift.io/cluster-api-cluster: build10-znq8n
@@ -9,15 +9,22 @@ spec:
   selector:
     matchLabels:
       machine.openshift.io/cluster-api-cluster: build10-znq8n
-      machine.openshift.io/cluster-api-machineset: build10-znq8n-worker-amd64-us-east-2a
+      machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-tests-worker-us-east-2a
   template:
     metadata:
       labels:
         machine.openshift.io/cluster-api-cluster: build10-znq8n
         machine.openshift.io/cluster-api-machine-role: worker
         machine.openshift.io/cluster-api-machine-type: worker
-        machine.openshift.io/cluster-api-machineset: build10-znq8n-worker-amd64-us-east-2a
+        machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-tests-worker-us-east-2a
     spec:
+      metadata:
+        labels:
+          ci-workload: tests
+      taints:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/ci-tests-worker
+          value: ci-tests-worker
       providerSpec:
         value:
           userDataSecret:
@@ -27,14 +34,14 @@ spec:
             region: us-east-2
           credentialsSecret:
             name: aws-cloud-credentials
-          instanceType: m6a.4xlarge
+          instanceType: m6g.4xlarge
           metadata:
             creationTimestamp: null
           publicIp: true
           blockDevices:
             - ebs:
                 encrypted: true
-                iops: 0
+                iops: 5000
                 kmsKey:
                   arn: ''
                 volumeSize: 800
@@ -51,7 +58,7 @@ spec:
               value: owned
           deviceIndex: 0
           ami:
-            id: ami-0545fae7edbbbf061
+            id: ami-0e9cdc0e85e0a6aeb
           subnet:
             id: subnet-0a93915ad14a9ec30
           apiVersion: machine.openshift.io/v1beta1
@@ -61,20 +68,20 @@ spec:
 apiVersion: autoscaling.openshift.io/v1beta1
 kind: MachineAutoscaler
 metadata:
-  name: build10-znq8n-worker-amd64-us-east-2a
+  name: build10-znq8n-ci-tests-worker-us-east-2a
   namespace: openshift-machine-api
 spec:
-  maxReplicas: 5
+  maxReplicas: 15
   minReplicas: 0
   scaleTargetRef:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
-    name: build10-znq8n-worker-amd64-us-east-2a
+    name: build10-znq8n-ci-tests-worker-us-east-2a
 ---
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 metadata:
-  name: build10-znq8n-worker-amd64-us-east-2b
+  name: build10-znq8n-ci-tests-worker-us-east-2b
   namespace: openshift-machine-api
   labels:
     machine.openshift.io/cluster-api-cluster: build10-znq8n
@@ -82,15 +89,22 @@ spec:
   selector:
     matchLabels:
       machine.openshift.io/cluster-api-cluster: build10-znq8n
-      machine.openshift.io/cluster-api-machineset: build10-znq8n-worker-amd64-us-east-2b
+      machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-tests-worker-us-east-2b
   template:
     metadata:
       labels:
         machine.openshift.io/cluster-api-cluster: build10-znq8n
         machine.openshift.io/cluster-api-machine-role: worker
         machine.openshift.io/cluster-api-machine-type: worker
-        machine.openshift.io/cluster-api-machineset: build10-znq8n-worker-amd64-us-east-2b
+        machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-tests-worker-us-east-2b
     spec:
+      metadata:
+        labels:
+          ci-workload: tests
+      taints:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/ci-tests-worker
+          value: ci-tests-worker
       providerSpec:
         value:
           userDataSecret:
@@ -100,14 +114,14 @@ spec:
             region: us-east-2
           credentialsSecret:
             name: aws-cloud-credentials
-          instanceType: m6a.4xlarge
+          instanceType: m6g.4xlarge
           metadata:
             creationTimestamp: null
           publicIp: true
           blockDevices:
             - ebs:
                 encrypted: true
-                iops: 0
+                iops: 5000
                 kmsKey:
                   arn: ''
                 volumeSize: 800
@@ -124,7 +138,7 @@ spec:
               value: owned
           deviceIndex: 0
           ami:
-            id: ami-0545fae7edbbbf061
+            id: ami-0e9cdc0e85e0a6aeb
           subnet:
             id: subnet-08eee64128a4e06be
           apiVersion: machine.openshift.io/v1beta1
@@ -134,20 +148,20 @@ spec:
 apiVersion: autoscaling.openshift.io/v1beta1
 kind: MachineAutoscaler
 metadata:
-  name: build10-znq8n-worker-amd64-us-east-2b
+  name: build10-znq8n-ci-tests-worker-us-east-2b
   namespace: openshift-machine-api
 spec:
-  maxReplicas: 5
+  maxReplicas: 15
   minReplicas: 0
   scaleTargetRef:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
-    name: build10-znq8n-worker-amd64-us-east-2b
+    name: build10-znq8n-ci-tests-worker-us-east-2b
 ---
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 metadata:
-  name: build10-znq8n-worker-amd64-us-east-2c
+  name: build10-znq8n-ci-tests-worker-us-east-2c
   namespace: openshift-machine-api
   labels:
     machine.openshift.io/cluster-api-cluster: build10-znq8n
@@ -155,15 +169,22 @@ spec:
   selector:
     matchLabels:
       machine.openshift.io/cluster-api-cluster: build10-znq8n
-      machine.openshift.io/cluster-api-machineset: build10-znq8n-worker-amd64-us-east-2c
+      machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-tests-worker-us-east-2c
   template:
     metadata:
       labels:
         machine.openshift.io/cluster-api-cluster: build10-znq8n
         machine.openshift.io/cluster-api-machine-role: worker
         machine.openshift.io/cluster-api-machine-type: worker
-        machine.openshift.io/cluster-api-machineset: build10-znq8n-worker-amd64-us-east-2c
+        machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-tests-worker-us-east-2c
     spec:
+      metadata:
+        labels:
+          ci-workload: tests
+      taints:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/ci-tests-worker
+          value: ci-tests-worker
       providerSpec:
         value:
           userDataSecret:
@@ -173,14 +194,14 @@ spec:
             region: us-east-2
           credentialsSecret:
             name: aws-cloud-credentials
-          instanceType: m6a.4xlarge
+          instanceType: m6g.4xlarge
           metadata:
             creationTimestamp: null
           publicIp: true
           blockDevices:
             - ebs:
                 encrypted: true
-                iops: 0
+                iops: 5000
                 kmsKey:
                   arn: ''
                 volumeSize: 800
@@ -197,7 +218,7 @@ spec:
               value: owned
           deviceIndex: 0
           ami:
-            id: ami-0545fae7edbbbf061
+            id: ami-0e9cdc0e85e0a6aeb
           subnet:
             id: subnet-0e19e8bcfe18ea0c2
           apiVersion: machine.openshift.io/v1beta1
@@ -207,12 +228,12 @@ spec:
 apiVersion: autoscaling.openshift.io/v1beta1
 kind: MachineAutoscaler
 metadata:
-  name: build10-znq8n-worker-amd64-us-east-2c
+  name: build10-znq8n-ci-tests-worker-us-east-2c
   namespace: openshift-machine-api
 spec:
-  maxReplicas: 5
+  maxReplicas: 15
   minReplicas: 0
   scaleTargetRef:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
-    name: build10-znq8n-worker-amd64-us-east-2c
+    name: build10-znq8n-ci-tests-worker-us-east-2c
