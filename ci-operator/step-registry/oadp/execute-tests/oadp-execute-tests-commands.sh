@@ -91,3 +91,4 @@ go mod tidy
 #EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
 oc describe nodes
 export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" && /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
+sleep 7200
