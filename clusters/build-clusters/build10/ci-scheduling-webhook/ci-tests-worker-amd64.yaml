@@ -1,7 +1,7 @@
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 metadata:
-  name: build10-znq8n-worker-amd64-us-east-2a
+  name: build10-znq8n-ci-tests-worker-amd64-us-east-2a
   namespace: openshift-machine-api
   labels:
     machine.openshift.io/cluster-api-cluster: build10-znq8n
@@ -9,15 +9,22 @@ spec:
   selector:
     matchLabels:
       machine.openshift.io/cluster-api-cluster: build10-znq8n
-      machine.openshift.io/cluster-api-machineset: build10-znq8n-worker-amd64-us-east-2a
+      machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-tests-worker-amd64-us-east-2a
   template:
     metadata:
       labels:
         machine.openshift.io/cluster-api-cluster: build10-znq8n
         machine.openshift.io/cluster-api-machine-role: worker
         machine.openshift.io/cluster-api-machine-type: worker
-        machine.openshift.io/cluster-api-machineset: build10-znq8n-worker-amd64-us-east-2a
+        machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-tests-worker-amd64-us-east-2a
     spec:
+      metadata:
+        labels:
+          ci-workload: tests
+      taints:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-tests-worker
+        value: ci-tests-worker
       providerSpec:
         value:
           userDataSecret:
@@ -61,7 +68,7 @@ spec:
 apiVersion: autoscaling.openshift.io/v1beta1
 kind: MachineAutoscaler
 metadata:
-  name: build10-znq8n-worker-amd64-us-east-2a
+  name: build10-znq8n-ci-tests-worker-amd64-us-east-2a
   namespace: openshift-machine-api
 spec:
   maxReplicas: 5
@@ -69,12 +76,12 @@ spec:
   scaleTargetRef:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
-    name: build10-znq8n-worker-amd64-us-east-2a
+    name: build10-znq8n-ci-tests-worker-amd64-us-east-2a
 ---
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 metadata:
-  name: build10-znq8n-worker-amd64-us-east-2b
+  name: build10-znq8n-ci-tests-worker-amd64-us-east-2b
   namespace: openshift-machine-api
   labels:
     machine.openshift.io/cluster-api-cluster: build10-znq8n
@@ -82,15 +89,22 @@ spec:
   selector:
     matchLabels:
       machine.openshift.io/cluster-api-cluster: build10-znq8n
-      machine.openshift.io/cluster-api-machineset: build10-znq8n-worker-amd64-us-east-2b
+      machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-tests-worker-amd64-us-east-2b
   template:
     metadata:
       labels:
         machine.openshift.io/cluster-api-cluster: build10-znq8n
         machine.openshift.io/cluster-api-machine-role: worker
         machine.openshift.io/cluster-api-machine-type: worker
-        machine.openshift.io/cluster-api-machineset: build10-znq8n-worker-amd64-us-east-2b
+        machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-tests-worker-amd64-us-east-2b
     spec:
+      metadata:
+        labels:
+          ci-workload: tests
+      taints:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/ci-tests-worker
+          value: ci-tests-worker
       providerSpec:
         value:
           userDataSecret:
@@ -107,7 +121,7 @@ spec:
           blockDevices:
             - ebs:
                 encrypted: true
-                iops: 0
+                iops: 5000
                 kmsKey:
                   arn: ''
                 volumeSize: 800
@@ -134,7 +148,7 @@ spec:
 apiVersion: autoscaling.openshift.io/v1beta1
 kind: MachineAutoscaler
 metadata:
-  name: build10-znq8n-worker-amd64-us-east-2b
+  name: build10-znq8n-ci-tests-worker-amd64-us-east-2b
   namespace: openshift-machine-api
 spec:
   maxReplicas: 5
@@ -142,12 +156,12 @@ spec:
   scaleTargetRef:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
-    name: build10-znq8n-worker-amd64-us-east-2b
+    name: build10-znq8n-ci-tests-worker-amd64-us-east-2b
 ---
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 metadata:
-  name: build10-znq8n-worker-amd64-us-east-2c
+  name: build10-znq8n-ci-tests-worker-amd64-us-east-2c
   namespace: openshift-machine-api
   labels:
     machine.openshift.io/cluster-api-cluster: build10-znq8n
@@ -155,15 +169,22 @@ spec:
   selector:
     matchLabels:
       machine.openshift.io/cluster-api-cluster: build10-znq8n
-      machine.openshift.io/cluster-api-machineset: build10-znq8n-worker-amd64-us-east-2c
+      machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-tests-worker-amd64-us-east-2c
   template:
     metadata:
       labels:
         machine.openshift.io/cluster-api-cluster: build10-znq8n
         machine.openshift.io/cluster-api-machine-role: worker
         machine.openshift.io/cluster-api-machine-type: worker
-        machine.openshift.io/cluster-api-machineset: build10-znq8n-worker-amd64-us-east-2c
+        machine.openshift.io/cluster-api-machineset: build10-znq8n-ci-tests-worker-amd64-us-east-2c
     spec:
+      metadata:
+        labels:
+          ci-workload: tests
+      taints:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/ci-tests-worker
+          value: ci-tests-worker
       providerSpec:
         value:
           userDataSecret:
@@ -180,7 +201,7 @@ spec:
           blockDevices:
             - ebs:
                 encrypted: true
-                iops: 0
+                iops: 5000
                 kmsKey:
                   arn: ''
                 volumeSize: 800
@@ -207,7 +228,7 @@ spec:
 apiVersion: autoscaling.openshift.io/v1beta1
 kind: MachineAutoscaler
 metadata:
-  name: build10-znq8n-worker-amd64-us-east-2c
+  name: build10-znq8n-ci-tests-worker-amd64-us-east-2c
   namespace: openshift-machine-api
 spec:
   maxReplicas: 5
@@ -215,4 +236,4 @@ spec:
   scaleTargetRef:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
-    name: build10-znq8n-worker-amd64-us-east-2c
+    name: build10-znq8n-ci-tests-worker-amd64-us-east-2c
