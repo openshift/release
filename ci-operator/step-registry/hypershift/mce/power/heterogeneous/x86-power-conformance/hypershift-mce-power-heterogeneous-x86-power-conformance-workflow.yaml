@@ -1,0 +1,61 @@
+workflow:
+  as: hypershift-mce-power-heterogeneous-x86-power-conformance
+  documentation: |-
+    The hypershift-mce-power-heterogeneous workflow executes tests against a new ephemeral Hypershift heterogeneous agent cluster
+    created on Power and x86 Nodes to validate the cluster creation reaches completed state.
+  steps:
+    pre:
+      - ref: ingress-aws-nlb-manifest
+      - chain: ipi-aws-pre
+      - ref: hypershift-mce-install
+      - ref: hypershift-mce-conf-os-images
+      - ref: hypershift-mce-power-create-hcp
+      - chain: hypershift-mce-power-heterogeneous-power-create-nodepool
+      - ref: hypershift-mce-power-heterogeneous-x86-create-nodepool
+      - chain: hypershift-mce-power-heterogeneous-x86-create-workers
+    test:
+      - chain: hypershift-mce-power-test
+      - ref: hypershift-mce-agent-info
+      - chain: hypershift-conformance
+    post:
+      - ref: hypershift-mce-dump
+      - chain: hypershift-mce-power-heterogeneous-power-destroy
+      - ref: hypershift-mce-power-heterogeneous-x86-destroy
+      - chain: ipi-aws-post
+    env:
+      HYPERSHIFT_BASE_DOMAIN: "hypershift.cis.ibm.net"
+      HYPERSHIFT_NODE_COUNT: 2
+      POWERVS_INSTANCE_CRN: "crn:v1:bluemix:public:power-iaas:wdc06:a/c265c8cefda241ca9c107adcbbacaa84:d75d8c87-de61-4ed6-8d90-45e132685b4a::"
+      POWERVS_IMAGE: "rhcos-none"
+      POWERVS_NETWORK: "private-net"
+      RESOURCE_GROUP_NAME: "ibm-hypershift-dev"
+      VPC_REGION: "us-east"
+      VPC_NAME: "rh-upstream-hypershift-agent-heterogeneous-vpc"
+      VPC_SUBNET_ID: "0757-3cf78413-763a-4c72-8a70-f48b2cc311bf"
+      CIS_INSTANCE: "hypershift.cis.ibm.net"
+      CIS_DOMAIN_ID: "2efc206d822e60cd3586d1f482ffac97"
+      BASTION: "rh-agent-ci-bastion.hypershift.cis.ibm.net"
+      BASTION_CI_SCRIPTS_DIR: "/root/agent-ci/scripts"
+      USE_GLB: "no"
+      # NOTE: Aggregator test is skipped as it is a known flake - https://github.com/kubernetes/kubernetes/issues/122333
+      # TODO: Re-enable this test once the underlying flakiness issue is resolved.
+      TEST_SKIPS: >-
+        etcd leader changes are not excessive\|
+        Kubectl client Simple pod should support exec through an HTTP proxy\|
+        Managed cluster should have no crashlooping recycler pods over four minutes\|
+        PersistentVolumes NFS when invoking the Recycle reclaim policy should test that a PV becomes Available and is clean after the PVC is deleted\|
+        CSI Mock volume expansion CSI Volume expansion\|
+        Services should have session affinity timeout work for NodePort service\|
+        deploymentconfigs with multiple image change triggers should run a successful deployment with a trigger used by different containers\|
+        deploymentconfigs with multiple image change triggers should run a successful deployment with multiple triggers\|
+        deploymentconfigs when changing image change trigger should successfully trigger from an updated image\|
+        oc new-app should succeed with a --name of 58 characters\|
+        Image layer subresource should return layers from tagged images\|
+        deploymentconfigs won't deploy RC with unresolved images when patched with empty image\|
+        s2i build with a root user image should create a root build and pass with a privileged SCC\|
+        The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it\|
+        build can reference a cluster service with a build being created from new-build should be able to run a build that references a cluster service\|
+        oc tag should change image reference for internal images\|
+        Services should be able to switch session affinity for NodePort service\|
+        Services should have session affinity work for NodePort service\|
+        Aggregator Should be able to support the 1.17 Sample API Server using the current Aggregator
