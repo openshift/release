@@ -281,6 +281,11 @@ done
 echo "$(date) Setup nested_kubeconfig"
 ${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --name=${HOSTED_CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
 
+if [ ${USE_GLB} == "no" ]; then
+  # Setting nodeSelector on ingresscontroller to worker to make sure router pod gets spawn on each worker node
+  oc patch ingresscontroller default -n openshift-ingress-operator -p '{"spec": {"nodePlacement": {"nodeSelector": { "matchLabels": { "node-role.kubernetes.io/worker": ""}}}}}' --type=merge --kubeconfig=${SHARED_DIR}/nested_kubeconfig
+fi
+
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=http://${BASTION}:2005/
 export HTTPS_PROXY=http://${BASTION}:2005/
