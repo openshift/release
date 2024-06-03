@@ -9,11 +9,11 @@ export HOSTED_CLUSTER_NAME
 export HOSTED_CONTROL_PLANE_NAMESPACE="${CLUSTERS_NAMESPACE}-${HOSTED_CLUSTER_NAME}"
 
 # PowerVS VSI(Virtual Server Instance) configs
-POWERVS_VSI_NAME="${HOSTED_CLUSTER_NAME}-worker"
+POWERVS_VSI_NAME="power-${HOSTED_CLUSTER_NAME}-worker"
 POWERVS_VSI_MEMORY=16
 POWERVS_VSI_PROCESSORS=0.5
 POWERVS_VSI_PROC_TYPE="shared"
-POWERVS_VSI_SYS_TYPE="s922"
+POWERVS_VSI_SYS_TYPE="e980"
 
 # InfraEnv configs
 SSH_PUB_KEY_FILE="${AGENT_POWER_CREDENTIALS}/ssh-publickey"
@@ -186,6 +186,11 @@ if [ ${USE_GLB} == "yes" ]; then
   # Creating dns record for ingress
   echo "$(date) Creating dns record for ingress"
   ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type CNAME --name "*.apps.${HOSTED_CLUSTER_NAME}" --content "${lb_name}"
+elif [ ${USE_GLB} == "no" ]; then
+    echo "$(date) GLB not created, so assigning first node's ip to ingress dns record"
+    ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "*.apps.${HOSTED_CLUSTER_NAME}" --content "${IP_ADDRESSES[0]}"
+else
+    echo "DNS record entry for *.apps.${HOSTED_CLUSTER_NAME} not added."
 fi
 
 # Waiting for discovery iso file to ready
@@ -213,6 +218,9 @@ for (( i = 0; i < ${HYPERSHIFT_NODE_COUNT}; i++ )); do
     serverArgs+="${INSTANCE_NAMES[i]},${MAC_ADDRESSES[i]},${IP_ADDRESSES[i]} "
     echo $serverArgs
 done
+
+# Save VMs ips to ${SHARED_DIR} for use in other scenarios.
+echo "${IP_ADDRESSES[@]}" > "${SHARED_DIR}/ippoweraddr"
 
 # Setup pxe boot on bastion for agents to boot
 echo "$(date) Setup pxe boot in bastion"
