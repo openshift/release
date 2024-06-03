@@ -76,3 +76,14 @@ if [ -n "${FEATURE_GATES}" ]; then
 featureGates: ${FEATURE_GATES}
 EOF
 fi
+
+# Set image-registry replicas to 3.
+cat >> ${SHARED_DIR}/manifest_image_registry-config.yml <<EOF
+apiVersion: imageregistry.operator.openshift.io/v1
+kind: Config
+metadata:
+  name: cluster
+spec:
+  managementState: "Managed"
+  replicas: 3
+EOF
