@@ -56,7 +56,7 @@ terraform init
 terraform apply -auto-approve || true
 
 #Share Terraform Var and Terraform Directory
-echo "${QUAY_GCP_STORAGE_ID}" > ${SHARED_DIR}/QUAY_GCP_STORAGE_ID
+echo "${QUAY_AWS_S3_BUCKET}" > ${SHARED_DIR}/QUAY_AWS_S3_BUCKET
 tar -cvzf terraform.tgz --exclude=".terraform" *
 cp terraform.tgz ${SHARED_DIR}
 
