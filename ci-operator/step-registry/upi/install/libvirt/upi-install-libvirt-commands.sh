@@ -136,7 +136,18 @@ create_vm () {
   NAME=${1}
   MAC_ADDRESS=${2}
   IGNITION_VOLUME=${LEASED_RESOURCE}-${3}-ignition-volume
-
+  echo "***************************"
+  echo ${LIBVIRT_CONNECTION}
+  echo ${NAME}
+  echo ${DOMAIN_MEMORY}
+  echo ${DOMAIN_VCPUS}
+  echo ${CLUSTER_NAME}
+  echo ${MAC_ADDRESS}
+  echo ${POOL_NAME}
+  echo ${VIRT_INSTALL_OSINFO}
+  echo ${IGNITION_VOLUME}
+  echo "***************************"
+  sleep 2000s
   virt-install \
     --connect ${LIBVIRT_CONNECTION} \
     --name ${NAME} \
@@ -155,14 +166,19 @@ create_vm () {
 NODE="${LEASED_RESOURCE}-bootstrap"
 MAC_ADDRESS=$(leaseLookup "bootstrap[0].mac")
 clone_volume ${NODE}-volume
+echo "cloned volume"
 create_vm ${NODE} ${MAC_ADDRESS} bootstrap
+echo "Created bootstrap"
 
 # Create the control plane nodes.
 for (( i=0; i<=${CONTROL_COUNT}-1; i++ )); do
+
   NODE="${LEASED_RESOURCE}-control-${i}"
   MAC_ADDRESS=$(leaseLookup "control-plane[$i].mac")
   clone_volume ${NODE}-volume
+  echo "Created volume ${NODE}-volume"
   create_vm ${NODE} ${MAC_ADDRESS} master
+  echo "Created vm ${NODE}"
 done
 
 # Create the compute nodes.
@@ -170,7 +186,9 @@ for (( i=0; i<=${COMPUTE_COUNT}-1; i++ )); do
   NODE="${LEASED_RESOURCE}-compute-${i}"
   MAC_ADDRESS=$(leaseLookup "compute[$i].mac")
   clone_volume ${NODE}-volume
+  echo "Created volume ${NODE}-volume"
   create_vm ${NODE} ${MAC_ADDRESS} worker
+  echo "Created vm ${NODE}"
 done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
