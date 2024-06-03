@@ -20,6 +20,10 @@ ref_machineset_name=$(oc -n openshift-machine-api get -o 'jsonpath={range .items
 winworker_machineset_name="windows"
 export ref_machineset_name winworker_machineset_name
 
+#weinliu debug
+echo "=====weinliu debug======"
+instance_type=${instance_type:-default_value}
+
 # Get a templated json from worker machineset, apply Windows specific settings
 # and pass it to `oc` to create a new machineset
 oc get machineset "${ref_machineset_name}" -n openshift-machine-api -o json |
