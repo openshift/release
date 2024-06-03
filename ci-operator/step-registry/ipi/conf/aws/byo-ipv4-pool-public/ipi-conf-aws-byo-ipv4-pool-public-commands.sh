@@ -75,6 +75,10 @@ fi
 
 echo "Found ${available_ips} BYOIP address(es) available in custom IPv4 pool ${pool_id}, the installation will use ${expected_ip_available}."
 
+unused_ip_addresses=$((IP_POOL_AVAILABLE-expected_ip_available))
+echo "Releasing $unused_ip_addresses unused ip addresses"
+echo "$unused_ip_addresses" >> "${SHARED_DIR}/UNUSED_IP_COUNT"
+
 CONFIG_PATCH="/tmp/install-config-public-ipv4-pool.yaml.patch"
 cat > "${CONFIG_PATCH}" << EOF
 platform:
