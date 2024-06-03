@@ -63,4 +63,3 @@ if [ $((failures)) != 0 ] ; then
     done
 fi
 cat "${TEST_RESULT_FILE}" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report" || true
-sleep 3200
