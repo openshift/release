@@ -15,11 +15,8 @@ if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
 fi 
 
 ######### added for debugging purposes #########
-export QT_X11_NO_MITSHM=1
-export _X11_NO_MITSHM=1
-export _MITSHM=0
-export LIBGL_ALWAYS_INDIRECT=1
-#export DISPLAY=:0
+export DISPLAY=:99
+Xvfb :99 -screen 0 1024x768x16 2>/dev/null &
 ###############################################
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
