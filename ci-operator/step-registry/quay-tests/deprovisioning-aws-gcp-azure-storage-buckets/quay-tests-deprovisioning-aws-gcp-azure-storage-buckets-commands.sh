@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 
-if [[ "$QUAY_STORAGE_PROVIDER" == 'GCP' ]]; then
+if [[ "$QUAY_STORAGE_PROVIDER" == 'gcp' ]]; then
     #Copy GCP auth.json from mounted secret to current directory
     mkdir -p QUAY_GCP && cd QUAY_GCP
     cp /var/run/quay-qe-gcp-secret/auth.json .
@@ -20,7 +20,7 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'GCP' ]]; then
     terraform destroy -auto-approve || true          
 fi
 
-if [[ "$QUAY_STORAGE_PROVIDER" == 'AZURE' ]]; then
+if [[ "$QUAY_STORAGE_PROVIDER" == 'azure' ]]; then
     mkdir -p QUAY_AZURE && cd QUAY_AZURE
     cp ${SHARED_DIR}/terraform.tgz .
     tar -xzvf terraform.tgz && ls
@@ -36,7 +36,7 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'AZURE' ]]; then
 fi
 
 
-if [[ "$QUAY_STORAGE_PROVIDER" == 'AWS' ]]; then
+if [[ "$QUAY_STORAGE_PROVIDER" == 'aws' ]]; then
     mkdir -p QUAY_AWS && cd QUAY_AWS
     cp ${SHARED_DIR}/terraform.tgz .
     tar -xzvf terraform.tgz && ls
