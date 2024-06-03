@@ -1,0 +1,37 @@
+workflow:
+  as: hypershift-mce-power-heterogeneous-x86-power
+  documentation: |-
+    The hypershift-mce-power-heterogeneous-x86-power workflow executes tests against a new ephemeral Hypershift heterogeneous agent cluster
+    created on Power and x86 Nodes to validate the cluster creation reaches completed state.
+  steps:
+    pre:
+      - ref: ingress-aws-nlb-manifest
+      - chain: ipi-aws-pre
+      - ref: hypershift-mce-install
+      - ref: hypershift-mce-conf-os-images
+      - ref: hypershift-mce-power-create-hcp
+      - ref: hypershift-mce-power-create-nodepool
+      - chain: hypershift-mce-power-create-ibmcloud-workers
+    test:
+      - chain: hypershift-mce-power-test
+      - ref: hypershift-mce-agent-info
+    post:
+      - ref: hypershift-mce-dump
+      - ref: hypershift-mce-power-destroy
+      - chain: ipi-aws-post
+    env:
+      HYPERSHIFT_BASE_DOMAIN: "hypershift.cis.ibm.net"
+      HYPERSHIFT_NODE_COUNT: 1
+      POWERVS_IMAGE: "rhcos-none"
+      POWERVS_NETWORK: "private-net"
+      RESOURCE_GROUP_NAME: "ibm-hypershift-dev"
+      CIS_INSTANCE: "hypershift.cis.ibm.net"
+      CIS_DOMAIN_ID: "2efc206d822e60cd3586d1f482ffac97"
+      BASTION: "rh-agent-het-ci-bastion.hypershift.cis.ibm.net"
+      BASTION_CI_SCRIPTS_DIR: "/root/agent-ci/scripts"
+      HYPERSHIFT_INFRA_AVAILABILITY_POLICY: "HighlyAvailable"
+      USE_GLB: "no"
+      IS_HETEROGENEOUS: "yes"
+      ADDITIONAL_HYPERSHIFT_NODEPOOL_CONFIG: |
+        NAME_SUFFIX=power, CPU_ARCH=ppc64le, NODE_ARCH=ppc64le
+        NAME_SUFFIX=x86, CPU_ARCH=x86_64, NODE_ARCH=amd64
