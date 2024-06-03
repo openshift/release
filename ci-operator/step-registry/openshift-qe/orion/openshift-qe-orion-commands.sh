@@ -10,7 +10,7 @@ python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
 if [[ $TAG == "latest" ]]; then
-    LATEST_TAG=$(curl -s "https://github.com/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name');
+    LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name');
 else 
     LATEST_TAG=$TAG
 fi
