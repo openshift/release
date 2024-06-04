@@ -16,10 +16,12 @@ fi
 
 ######### added for debugging purposes #########
 export DISPLAY=:99
-Xvfb :99 -screen 0 1024x768x16 2>/dev/null &
+Xvfb :99 &s
+# Xvfb :99 -screen 0 1024x768x16 2>/dev/null &
+
 
 export CYPRESS_video=false
-export CYPRESS_videoCompression=false
+# export CYPRESS_videoCompression=false
 ###############################################
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
