@@ -11,9 +11,17 @@ CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
 REGION="${LEASED_RESOURCE}"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
+if [ ! -f "${CONFIG}" ]; then
+    echo "File not found: ${CONFIG}"
+    exit 1
+fi
 # yq-go is not available in the ci image...
 #BASE_DOMAIN_RESOURCE_GROUP_NAME=$(yq-go r "${CONFIG}" 'platform.azure.baseDomainResourceGroupName')
 BASE_DOMAIN_RESOURCE_GROUP_NAME=$(fgrep 'baseDomainResourceGroupName:' ${CONFIG} | cut -d ":" -f2 | tr -d " ")
+if [ -z "${BASE_DOMAIN_RESOURCE_GROUP_NAME}" ]; then
+    echo "baseDomainResourceGroupName is empty"
+    exit 1
+fi
 
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 if [ ! -f "$AZURE_AUTH_LOCATION" ]; then
