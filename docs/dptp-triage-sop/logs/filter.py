@@ -151,7 +151,11 @@ elif mode == "errors":
         lambda message: matches(message, "pj-rehearse", msg="couldn't prepare candidate"),
         lambda message: matches(message, "pj-rehearse", error="failed waiting for prowjobs to finish: timed out waiting for the condition"),
 
-        lambda message: matches(message, "boskos", msg="Acquire failed")
+        lambda message: matches(message, "boskos", msg="Acquire failed"),
+
+        # DPTP-3925
+        lambda message: matches(message, "crier", error="failed to report job: error setting status: Unknown prowjob state: scheduling"),
+        lambda message: matches(message, "crier", error="error setting status: Unknown prowjob state: scheduling"),
         ]
 
 else:
