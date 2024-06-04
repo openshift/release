@@ -48,32 +48,13 @@ tests:
   container:
     from: test-bin
   run_if_changed: ^(cmd/.*|data/.*|hack/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
-- as: publish
-  cron: '@daily'
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: agent-preinstall-image-builder
-    env:
-      IMAGE_REPO: openshift-appliance
-      IMAGE_TAG: latest
-    test:
-    - ref: assisted-baremetal-images-publish
 - as: e2e-compact-ipv4-static
   cluster: build05
   run_if_changed: ^(cmd/.*|data/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
   steps:
     allow_skip_on_success: true
-    cluster_profile: equinix-ocp-metal
-    dependencies:
-      APPLIANCE_IMAGE: agent-preinstall-image-builder
-    env:
-      AGENT_E2E_TEST_BOOT_MODE: DISKIMAGE
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_BOOT_MODE=DISKIMAGE
-        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
-        NETWORK_TYPE=OVNKubernetes
-        INSTALLER_PROXY=true
-    workflow: agent-e2e-generic
+    cluster_profile: packet-assisted
+    workflow: agent-e2e-appliance-ipv4
   timeout: 6h0m0s
 - as: e2e-sno-dualstack-dhcp
   cluster: build05
@@ -81,30 +62,10 @@ tests:
   run_if_changed: ^(cmd/.*|data/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
   steps:
     allow_skip_on_success: true
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: packet-assisted
     dependencies:
       APPLIANCE_IMAGE: agent-preinstall-image-builder
-    env:
-      AGENT_E2E_TEST_BOOT_MODE: DISKIMAGE
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_BOOT_MODE=DISKIMAGE
-        AGENT_E2E_TEST_SCENARIO=SNO_IPV4V6_DHCP
-        INSTALLER_PROXY=true
-    workflow: agent-e2e-generic
-  timeout: 6h0m0s
-- as: e2e-sno-dualstack-dhcp-periodic
-  cron: 00 00 */1 * 5
-  steps:
-    cluster_profile: equinix-ocp-metal
-    dependencies:
-      APPLIANCE_IMAGE: agent-preinstall-image-builder
-    env:
-      AGENT_E2E_TEST_BOOT_MODE: DISKIMAGE
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_BOOT_MODE=DISKIMAGE
-        AGENT_E2E_TEST_SCENARIO=SNO_IPV4V6_DHCP
-        INSTALLER_PROXY=true
-    workflow: agent-e2e-generic
+    workflow: agent-e2e-appliance-dualstack
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.17

@@ -30,7 +30,7 @@ function debug() {
         echo -e "\n# Describing abnormal operators...\n"
         oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
         echo -e "\n# Describing abnormal mcp...\n"
-        oc get mcp --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
+        oc get machineconfigpools --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
     fi
 }
 
@@ -185,102 +185,6 @@ function cco_annotation(){
     if (( wait_time_loop_var >= 5 )); then
         echo >&2 "Timed out waiting for CCO annotation completing, exiting" && return 1
     fi
-}
-
-# Update RHEL repo before upgrade
-function rhel_repo(){
-    echo "Updating RHEL node repo"
-    # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
-    # to be able to SSH.
-    if ! whoami &> /dev/null; then
-        if [[ -w /etc/passwd ]]; then
-            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-        else
-            echo "/etc/passwd is not writeable, and user matching this uid is not found."
-            exit 1
-        fi
-    fi
-    SOURCE_REPO_VERSION=$(echo "${SOURCE_VERSION}" | cut -d'.' -f1,2)
-    TARGET_REPO_VERSION=$(echo "${TARGET_VERSION}" | cut -d'.' -f1,2)
-    export SOURCE_REPO_VERSION
-    export TARGET_REPO_VERSION
-
-    cat > /tmp/repo.yaml <<-'EOF'
----
-- name: Update repo Playbook
-  hosts: workers
-  any_errors_fatal: true
-  gather_facts: false
-  vars:
-    source_repo_version: "{{ lookup('env', 'SOURCE_REPO_VERSION') }}"
-    target_repo_version: "{{ lookup('env', 'TARGET_REPO_VERSION') }}"
-    platform_version: "{{ lookup('env', 'PLATFORM_VERSION') }}"
-    major_platform_version: "{{ platform_version[:1] }}"
-  tasks:
-  - name: Wait for host connection to ensure SSH has started
-    wait_for_connection:
-      timeout: 600
-  - name: Replace source release version with target release version in the files
-    replace:
-      path: "/etc/yum.repos.d/rhel-{{ major_platform_version }}-server-ose-rpms.repo"
-      regexp: "{{ source_repo_version }}"
-      replace: "{{ target_repo_version }}"
-  - name: Clean up yum cache
-    command: yum clean all
-EOF
-
-    # current Server version may not be the expected branch when cluster is not fully upgraded 
-    # using TARGET_REPO_VERSION instead directly
-    version_info="${TARGET_REPO_VERSION}"
-    openshift_ansible_branch='master'
-    if [[ "$version_info" =~ [4-9].[0-9]+ ]] ; then
-        openshift_ansible_branch="release-${version_info}"
-        minor_version="${version_info##*.}"
-        if [[ -n "$minor_version" ]] && [[ $minor_version -le 10 ]] ; then
-            source /opt/python-env/ansible2.9/bin/activate
-        else
-            source /opt/python-env/ansible-core/bin/activate
-        fi
-        ansible --version
-    else
-        echo "WARNING: version_info is $version_info"
-    fi
-    echo -e "Using openshift-ansible branch $openshift_ansible_branch\n"
-    cd /usr/share/ansible/openshift-ansible
-    git stash || true
-    git checkout "$openshift_ansible_branch"
-    git pull || true
-    ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
-    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/repo.yaml -vvv
-}
-
-# Upgrade RHEL node
-function rhel_upgrade(){
-    echo "Upgrading RHEL nodes"
-    echo "Validating parsed Ansible inventory"
-    ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
-    echo -e "\nRunning RHEL worker upgrade"
-    sed -i 's|^remote_tmp.*|remote_tmp = /tmp/.ansible|g' /usr/share/ansible/openshift-ansible/ansible.cfg
-    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv
-
-    if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "triggered" ]]; then
-        echo -e "RHEL worker upgrade completed, but the cluster upgrade hasn't been finished, check the cluster status again...\    n"
-        check_upgrade_status
-    fi
-
-    echo "Check K8s version on the RHEL node"
-    master_0=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
-    rhel_0=$(oc get nodes -l node.openshift.io/os_id=rhel -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
-    exp_version=$(oc get node ${master_0} --output=jsonpath='{.status.nodeInfo.kubeletVersion}' | cut -d '.' -f 1,2)
-    act_version=$(oc get node ${rhel_0} --output=jsonpath='{.status.nodeInfo.kubeletVersion}' | cut -d '.' -f 1,2)
-
-    echo -e "Expected K8s version is: ${exp_version}\nActual K8s version is: ${act_version}"
-    if [[ ${exp_version} == "${act_version}" ]]; then
-        echo "RHEL worker has correct K8s version"
-    else
-        echo "RHEL worker has incorrect K8s version" && exit 1
-    fi
-    echo -e "oc get node -owide\n$(oc get node -owide)"
 }
 
 function run_command() {
@@ -475,8 +379,8 @@ function check_upgrade_status() {
             return 0
         fi
         if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${cluster_version}"* ]]; then
-	    UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
-            echo -e "Upgrade stuck at updating RHEL worker, run the RHEL worker upgrade now...\n\n"
+            UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
+            echo -e "Upgrade stuck at updating RHEL worker, need to run the RHEL worker upgrade later...\n\n"
             return 0
         fi
         dump_status_if_unexpected
@@ -530,7 +434,7 @@ fi
 # oc cli is injected from release:target
 run_command "which oc"
 run_command "oc version --client"
-
+run_command "oc get machineconfigpools"
 run_command "oc get machineconfig"
 
 export TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
@@ -567,9 +471,6 @@ fi
 upgrade
 check_upgrade_status
 
-if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
-    echo -e "oc get node -owide\n$(oc get node -owide)"
-    rhel_repo
-    rhel_upgrade
+if [[ "$UPGRADE_RHEL_WORKER_BEFOREHAND" != "triggered" ]]; then
+    check_history
 fi
-check_history
