@@ -26,7 +26,7 @@ oc get machineset "${ref_machineset_name}" -n openshift-machine-api -o json |
   jq --arg winworker_machineset_name "${winworker_machineset_name}" \
      --arg win_os_id "${WINDOWS_OS_ID}" \
      --arg user_data_secret "${WINDOWS_USER_DATA_SECRET}" \
-     --arg instance_type "${INSTANCE_TYPE}" \
+     --arg instance_type "${instance_type}" \
      '
       .metadata.name = $winworker_machineset_name |
       .spec.replicas = 0 |
