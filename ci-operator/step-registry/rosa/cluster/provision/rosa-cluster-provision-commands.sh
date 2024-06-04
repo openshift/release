@@ -333,19 +333,19 @@ if [[ "$HOSTED_CP" == "true" ]]; then
       fi
     fi
 
-    PROVISION_SHARD_ID=""
-    # ensure the SC is not for ibm usage so that it could support the latest version of the hosted cluster
-    for ps in $psList ; do
-      topology=$(ocm get /api/clusters_mgmt/v1/provision_shards/${ps} | jq -r '.hypershift_config.topology')
-      if [[ "$topology" == "dedicated"  ]] ; then
-      	PROVISION_SHARD_ID=${ps}
-      fi
-    done
+    PROVISION_SHARD_ID="88d699d7-7821-11ee-8b13-0a580a82022a"
+    # # ensure the SC is not for ibm usage so that it could support the latest version of the hosted cluster
+    # for ps in $psList ; do
+    #   topology=$(ocm get /api/clusters_mgmt/v1/provision_shards/${ps} | jq -r '.hypershift_config.topology')
+    #   if [[ "$topology" == "dedicated"  ]] ; then
+    #   	PROVISION_SHARD_ID=${ps}
+    #   fi
+    # done
 
-    if [[ -z "$PROVISION_SHARD_ID" ]]; then
-        echo "No available provision shard found! psList: $psList"
-        exit 1
-    fi
+    # if [[ -z "$PROVISION_SHARD_ID" ]]; then
+    #     echo "No available provision shard found! psList: $psList"
+    #     exit 1
+    # fi
 
     HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
     record_cluster "properties" "provision_shard_id" ${PROVISION_SHARD_ID}
