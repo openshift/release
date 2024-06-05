@@ -85,7 +85,11 @@ readarray -t items < <(gcloud compute forwarding-rules list --filter="name~${CLU
 for line in "${items[@]}"; do
   name="${line%% *}"
   region="${line##* }"
-  current_labels="$(gcloud compute forwarding-rules describe ${name} --region ${region} --format json | jq -r -c .labels)"
+  if [[ "${region}" == "${name}" ]]; then
+    current_labels="$(gcloud compute forwarding-rules describe ${name} --global --format json | jq -r -c .labels)"
+  else
+    current_labels="$(gcloud compute forwarding-rules describe ${name} --region ${region} --format json | jq -r -c .labels)"
+  fi
   validate_user_labels "${current_labels}"
   if [ $? -gt 0 ]; then
     echo "$(date -u --rfc-3339=seconds) - Unexpected labels '${current_labels}' for '${name}'."
