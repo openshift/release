@@ -83,7 +83,9 @@ spec:
 
           set -x
 
-          git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          #[dev-ci] use forked dev repo
+          #git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          git clone --single-branch --branch OPERATOR_VERSION https://github.com/jzding/ptp-operator.git
           cd ptp-operator
           export IMG=PTP_IMAGE
           sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
@@ -219,6 +221,11 @@ else
 fi
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
+#[dev-ci] use dev branch for test code if needed
+#export TEST_BRANCH="dev-branch-for-ci-fix"
+#[dev-ci] use dev branch for product code
+export PTP_UNDER_TEST_BRANCH="dev-branch-for-ptp-fix"
+
 pattern="4.[0-9]+"
 if [[ "$T5CI_VERSION" =~ $pattern ]]; then
   source $HOME/golang-1.20
@@ -236,7 +243,9 @@ build_images
 
 # deploy ptp-operator
 
-git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+#[dev-ci] use dev branch for product code
+#git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+git clone https://github.com/jzding/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
 
 cd ptp-operator-under-test
 
@@ -258,6 +267,8 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 # Run ptp conformance test
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
+#[dev-ci] use dev branch for test code if needed
+#git clone https://github.com/jzding/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
