@@ -4,8 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
-  echo "using VCM sibling of this step"
+if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
+  echo "using legacy sibling of this step"
   exit 0
 fi
 

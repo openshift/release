@@ -4,8 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
-  echo "using VCM sibling of this step"
+if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
+  echo "using legacy sibling of this step"
   exit 0
 fi
 
@@ -119,7 +119,7 @@ fi
 
 if [ ${Z_VERSION} -gt 9 ]; then
   echo "$(date -u --rfc-3339=seconds) - 4.x installation is later than 4.9, will install with resource pool"
-  RESOURCE_POOL_DEF="resourcePool: /${vsphere_datacenter}/host/${vsphere_cluster}/Resources/ipi-ci-clusters"
+  RESOURCE_POOL_DEF="resourcePool: ${vsphere_cluster}/Resources/ipi-ci-clusters"
 fi
 if [ ${Z_VERSION} -lt 11 ]; then
   MACHINE_POOL_OVERRIDES="controlPlane:
@@ -165,6 +165,9 @@ compute:
 fi
 
 if [ "${Z_VERSION}" -lt 13 ]; then
+  cluster_name=$(echo "${vsphere_cluster}" | rev | cut -d '/' -f 1 | rev)
+  datastore_name=$(echo "${vsphere_datastore}" | rev | cut -d '/' -f 1 | rev)
+
   cat >>"${CONFIG}" <<EOF
 baseDomain: $base_domain
 $MACHINE_POOL_OVERRIDES
@@ -172,8 +175,8 @@ platform:
   vsphere:
     vcenter: "${vsphere_url}"
     datacenter: "${vsphere_datacenter}"
-    defaultDatastore: "${vsphere_datastore}"
-    cluster: "${vsphere_cluster}"
+    defaultDatastore: "${datastore_name}"
+    cluster: "${cluster_name}"
     network: "${vsphere_portgroup}"
     password: "${GOVC_PASSWORD}"
     username: "${GOVC_USERNAME}"
@@ -185,25 +188,7 @@ baseDomain: $base_domain
 $MACHINE_POOL_OVERRIDES
 platform:
   vsphere:
-    vcenters:
-    - datacenters:
-       - ${vsphere_datacenter}
-      password: ${GOVC_PASSWORD}
-      port: 443
-      server: ${vsphere_url}
-      user: ${GOVC_USERNAME}
-    failureDomains:
-    - name: generated-failure-domain
-      region: generated-region
-      server: ${vsphere_url}
-      topology:
-        computeCluster: /${vsphere_datacenter}/host/${vsphere_cluster}
-        datacenter: ${vsphere_datacenter}
-        datastore: /${vsphere_datacenter}/datastore/${vsphere_datastore}
-        networks:
-        - ${vsphere_portgroup}
-        ${RESOURCE_POOL_DEF}
-      zone: generated-zone
+$(cat $SHARED_DIR/platform.yaml)
 EOF
 fi
 
