@@ -393,8 +393,6 @@ metadata:
 rendezvousIP: \${IP_ADDRESS}
 hosts:
   - hostname: \${CLUSTER_NAME}
-    rootDeviceHints:
-      deviceName: \${INSTALLATION_DISK}
     role: master
     interfaces:
        - name: eth0
