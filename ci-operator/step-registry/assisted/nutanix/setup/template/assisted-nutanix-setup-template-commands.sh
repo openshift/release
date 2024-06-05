@@ -73,7 +73,7 @@ cat nutanix-params.hcl
 export PACKER_CONFIG_DIR=/home/assisted-test-infra/build/packer/config
 export PACKER_CACHE_DIR=$PACKER_CONFIG_DIR/cache
 
-sed -i "s#SSH_KEY_PLACEHOLDER#$(cat /var/run/vault/assisted-ci-vault/ssh_public_key)#g" packer_files/nutanix_centos_template/cloud-config.yaml
+sed -i "s#SSH_KEY_PLACEHOLDER#$(cat /var/run/vault/assisted-ci-vault/ssh_public_key)#g" cloud-config.yaml
 
 packer.io init .
 packer.io build -on-error=cleanup -var-file=nutanix-params.hcl .
