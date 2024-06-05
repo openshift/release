@@ -15,11 +15,16 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-if test ! -f "${KUBECONFIG}"
-then
-	echo "No kubeconfig, can not continue."
-	exit 0
-fi
+# Getting all worker nodes' names
+mapfile -t WORKER_NODES < <(  oc get nodes -o 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' | grep worker )
 
-# Adding the infra label to all workers
-for i in `oc get nodes -o 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' | grep worker`; do oc label nodes/$i node-role.kubernetes.io/infra=; done
+# Adding the app label to the first worker node
+oc label nodes/${WORKER_NODES[0]} node-role.kubernetes.io/app=
+
+# Adding the infra label to the rest of the worker nodes
+for i in "${WORKER_NODES[@]:1}"; do oc label nodes/$i node-role.kubernetes.io/infra=; done
+
+# Adding the defaultNodeSelector field with the appropriate node selector
+oc get scheduler cluster -o yaml > scheduler.cluster.yaml
+yq -i '.spec = .spec + {"defaultNodeSelector": "node-role.kubernetes.io/infra=\"\""}' scheduler.cluster.yaml 
+oc apply -f scheduler.cluster.yaml
