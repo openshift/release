@@ -476,11 +476,6 @@ WWW_DIR="/var/www/html/\${CLUSTER_NAME}"
 
 mkdir -p \$IMAGES_DIR \$WWW_DIR \$CONFIG_DIR
 
-if [[ \${INSTALL_TYPE} != "sno" ]]; then
-    # install required package for agent based installer
-    dnf install -y /usr/bin/nmstatectl coreos-installer jq
-fi
-
 download_installer() {
     echo "Dowmload openshift-install"
     install_tar_file="openshift-install-linux.tar.gz"
