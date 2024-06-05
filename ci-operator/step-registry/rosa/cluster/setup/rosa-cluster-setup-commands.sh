@@ -12,6 +12,7 @@ export COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
 export OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
 export CHANNEL_GROUP=${CHANNEL_GROUP:-"stable"}
 export AVAILABLE_UPGRADE=${AVAILABLE_UPGRADE:-"no"}
+export WAIT_SETUP_CLUSTER_READY=${WAIT_SETUP_CLUSTER_READY:-false}
 CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
 
 log(){
@@ -19,14 +20,10 @@ log(){
 }
 
 # Configure aws
-if [[ -z "$REGION" ]]; then
-  REGION=${LEASED_RESOURCE}
-fi
-
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
-  export AWS_DEFAULT_REGION="${REGION}"
+  export AWS_DEFAULT_REGION=${REGION:-$LEASED_RESOURCE}
 else
   echo "Did not find compatible cloud provider cluster_profile"
   exit 1
@@ -68,7 +65,7 @@ fi
 
 rosatest --ginkgo.v --ginkgo.no-color \
   --ginkgo.timeout "30m" \
-  --ginkgo.label-filter "day1-prepare" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
+  --ginkgo.label-filter "day1" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
 # CLUSER_ID=$(cat "${SHARED_DIR}/cluster-id")
 # CLUSER_NAME=$(rosa describe cluster -c ${CLUSER_ID} -o json | jq -r '.name')
 # echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"

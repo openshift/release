@@ -37,7 +37,7 @@ CONFIG = {
         'ap-northeast-1': 5,
     },
     'aws-autorelease-qe-quota-slice': {
-        'us-east-1': 2,
+        'us-east-1': 4,
     },
     'aws-terraform-qe-quota-slice': {
         'ap-northeast-1': 2,
@@ -89,6 +89,9 @@ CONFIG = {
     },
     'aws-rhtap-qe-quota-slice': {
         'us-east-1': 10
+    },
+    'aws-konflux-qe-quota-slice': {
+        'us-west-2': 10
     },
     'aws-rhtap-performance-quota-slice': {
         'eu-west-1': 10

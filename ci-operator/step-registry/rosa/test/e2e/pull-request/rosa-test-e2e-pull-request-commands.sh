@@ -30,7 +30,7 @@ rosa login --env "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 COMMIT_FOCUS="/rosa/tests/ci/data/commit-focus"
 FOCUS=$(cat "${COMMIT_FOCUS}")
 FOCUS_LABEL_FILTER=""
-FOCUS_SWITCH="--ginkgo.focus ${FOCUS}"
+FOCUS_SWITCH="--ginkgo.focus '${FOCUS}'"
 if [[ -z "$FOCUS" ]]; then
   echo "Warning: No TC updated, focus on Critial"
   FOCUS_LABEL_FILTER="Critical"
@@ -47,9 +47,11 @@ if [[ ! -z "$FOCUS_LABEL_FILTER" ]]; then
 fi
 if [[ ! -z "$TEST_LABEL_FILTERS" ]]; then
   echo "Label Filter: $TEST_LABEL_FILTERS"
-  LABEL_FILTER_SWITCH="--ginkgo.label-filter ${TEST_LABEL_FILTERS}"
+  LABEL_FILTER_SWITCH="--ginkgo.label-filter '${TEST_LABEL_FILTERS}'"
 fi
 
 log "INFO: Start pull reqeust testing ..."
 junit_xml="${ARTIFACT_DIR}/pull-request.xml"
-rosatest --ginkgo.v --ginkgo.no-color --ginkgo.junit-report "$junit_xml" ${FOCUS_SWITCH} ${LABEL_FILTER_SWITCH}
+cmd="rosatest --ginkgo.v --ginkgo.no-color --ginkgo.junit-report $junit_xml ${FOCUS_SWITCH} ${LABEL_FILTER_SWITCH}"
+echo "Command: $cmd"
+eval "${cmd}" 
