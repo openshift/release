@@ -83,7 +83,9 @@ spec:
 
           set -x
 
+          #[dev-ci] use forked dev repo
           git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          #git clone --single-branch --branch OPERATOR_VERSION https://github.com/jzding/ptp-operator.git
           cd ptp-operator
           export IMG=PTP_IMAGE
           export T5CI_VERSION="T5CI_VERSION_VAL"
@@ -232,6 +234,11 @@ else
   source "$HOME"/golang-1.22.4
 fi
 
+#[dev-ci] use dev branch for test code if needed
+export TEST_BRANCH="test-slave-if"
+#[dev-ci] use dev branch for product code
+#export PTP_UNDER_TEST_BRANCH="dev-branch-for-ptp-fix"
+
 temp_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$temp_dir" || exit 1
 
@@ -244,7 +251,9 @@ build_images
 
 # deploy ptp-operator
 
+#[dev-ci] use dev branch for product code
 git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+#git clone https://github.com/jzding/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
 
 cd ptp-operator-under-test
 
@@ -290,7 +299,9 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 # Run ptp conformance test
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
-git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+#[dev-ci] use dev branch for test code if needed
+git clone https://github.com/jzding/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+#git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 
