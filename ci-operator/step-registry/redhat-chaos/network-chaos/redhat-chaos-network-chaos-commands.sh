@@ -25,16 +25,6 @@ export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 
-
-platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}') 
-if [ "$platform" = "AWS" ]; then
-    export INTERFACES="['ens5']"
-elif [ "$platform" = "GCP" ]; then
-    export INTERFACES="['ens4']"
-elif [ "$platform" = "Azure" ]; then
-    export INTERFACES="['ens0']"
-fi
-
 ./network-chaos/prow_run.sh
 rc=$?
 echo "Finished running network chaos"
