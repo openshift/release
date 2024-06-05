@@ -83,6 +83,39 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
+- as: aws-ipi-f7-longduration-workload
+  cron: 55 14 1,8,15,22 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      TEST_SCENARIOS: Workloads
+      TEST_TIMEOUT: "600"
+    test:
+    - ref: idp-htpasswd
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-f9-longduration-apiserver
+  cron: 12 12 6,18,27 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      TEST_SCENARIOS: API_Server
+      TEST_TIMEOUT: "600"
+    test:
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-f9-longduration-part1-3
   cron: 19 9 3,12,21 * *
   steps:
@@ -384,6 +417,21 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-dual-stack
+- as: gcp-ipi-proxy-private-f28-disasterrecovery
+  cron: 27 19 13 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
+      TEST_SCENARIOS: DR_Testing
+    test:
+    - ref: idp-htpasswd
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
 - as: gcp-ipi-to-multiarch-f14
   cron: 37 4 7,23 * *
   steps:
@@ -402,6 +450,20 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-upi-f28-ui
+  cron: 24 22 15 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BOOTSTRAP_NODE_TYPE: t2a-standard-4
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      CONTROL_PLANE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-e2e-test-qe-ui
+    workflow: cucushift-installer-rehearse-gcp-upi
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

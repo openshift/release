@@ -82,23 +82,21 @@ git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
 echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 
 cd "$(mktemp -d)"
-git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
-git version
+git clone --origin upstream --branch main "https://${GITHUB_TOKEN}@github.com/konflux-ci/e2e-tests.git" .
 
-echo PULL_NUMBER
-echo $PULL_NUMBER
-UPGRADE_BRANCH=$(curl -s "https://api.github.com/repos/redhat-appstudio/infra-deployments/pulls/${PULL_NUMBER}" | jq -r .head.ref)
-echo UPGRADE_BRANCH
-echo $UPGRADE_BRANCH
+export UPGRADE_BRANCH UPGRADE_FORK_ORGANIZATION
 
-export UPGRADE_BRANCH
+if [ "$REPO_NAME" == "infra-deployments" ]; then
+    UPGRADE_BRANCH=$(curl -s "https://api.github.com/repos/redhat-appstudio/infra-deployments/pulls/${PULL_NUMBER}" | jq -r .head.ref)
+    REPO_URL=$(curl -s "https://api.github.com/repos/redhat-appstudio/infra-deployments/pulls/${PULL_NUMBER}" | jq -r .head.repo.html_url)
+    UPGRADE_FORK_ORGANIZATION=$(echo "$REPO_URL" | sed 's|https://github.com/||' | sed 's|/infra-deployments||'  )
+else
+    UPGRADE_BRANCH=main
+    UPGRADE_FORK_ORGANIZATION=redhat-appstudio
+    echo "Running the job outside of infra-deploments repository"
+fi
 
-REPO_URL=$(curl -s "https://api.github.com/repos/redhat-appstudio/infra-deployments/pulls/${PULL_NUMBER}" | jq -r .head.repo.html_url)
-OWNER=$(echo $REPO_URL | sed 's|https://github.com/||' | sed 's|/infra-deployments||'  )
-
-echo UPGRADE_FORK_ORGANIZATION
-echo $OWNER
-
-export UPGRADE_FORK_ORGANIZATION=$OWNER
+echo "UPGRADE_BRANCH: $UPGRADE_BRANCH"
+echo "UPGRADE_FORK_ORGANIZATION: $UPGRADE_FORK_ORGANIZATION"
 
 make ci/test/upgrade

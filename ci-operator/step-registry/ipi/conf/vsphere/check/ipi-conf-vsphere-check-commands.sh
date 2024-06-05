@@ -30,7 +30,7 @@ declare vsphere_portgroup
 declare -a portgroup_list
 declare multizone
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
 declare vsphere_url
 
 # notes: jcallen: split the LEASED_RESOURCE e.g. bcr01a.dal10.1153
@@ -76,7 +76,7 @@ fi
 vc_info='{"vcenters":[]}'
 for vcenter in $vsphere_urls; do
   vsphere_url="${vcenter}"
-  source /var/run/vault/vsphere-config/load-vsphere-env-config.sh
+  source /var/run/vault/vsphere-ibmcloud-config/load-vsphere-env-config.sh
 
   declare vcenter_usernames
   declare vcenter_passwords

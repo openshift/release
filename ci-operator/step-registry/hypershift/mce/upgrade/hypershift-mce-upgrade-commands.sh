@@ -2,6 +2,19 @@
 
 set -ex
 
+trap 'FRC=$?; debug' EXIT TERM
+
+debug() {
+  if (( FRC != 0 )); then
+    oc get catalogsource -n openshift-marketplace multiclusterengine-catalog -o yaml
+    oc get pod -n multicluster-engine -o wide
+    oc get pod -n hypershift -o wide
+    oc get subscription -n multicluster-engine multicluster-engine -o yaml
+    oc get csv -n multicluster-engine -o yaml
+    oc get multiclusterengines multiclusterengine-sample -o yaml
+  fi
+}
+
 if [[ -f "${SHARED_DIR}/mgmt_kubeconfig" ]]; then
   export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
 fi
@@ -65,7 +78,9 @@ oc wait --timeout=20m csv -n multicluster-engine --all --for=jsonpath='{.status.
 until oc get multiclusterengines multiclusterengine-sample -ojsonpath="{.status.currentVersion}" | grep -q "$MCE_TARGET_VERSION"; do
   sleep 10
 done
-oc wait --timeout=20m pod -n multicluster-engine --all --for=condition=Ready
+until ! oc get pod -n multicluster-engine -o jsonpath='{.items[*].status.conditions[*].status}' | grep -q "False"; do
+  sleep 30
+done
 echo "multiclusterengine upgrade successfully"
 until [[ $(oc get deployment -n hypershift operator -o jsonpath='{.status.updatedReplicas}') == $(oc get deployment -n hypershift operator -o jsonpath='{.status.replicas}') ]]; do
     echo "Waiting for updated replicas to match replicas..."

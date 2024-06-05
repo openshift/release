@@ -24,6 +24,8 @@ oc image mirror -f /tmp/mirror --registry-config ${DS_WORKING_DIR}/pull_secret.j
 oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.8  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-28-registry-k8s-io-pause-3-8-aP7uYsw5XCmoDy5W
 # until we land k8s 1.28 we need to mirror both the 3.8 (current image) and 3.9 (coming in k8s 1.28)
 oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.9  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-27-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
+# after recent updates to images, we need to also mirror the new location of the image as well
+oc image mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --filter-by-os="linux/${ARCHITECTURE}.*" registry.k8s.io/pause:3.9  $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-28-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
 EOF
         TEST_ARGS="--from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO}"
 }

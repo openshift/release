@@ -25,7 +25,7 @@ function debug() {
         echo -e "Describing abnormal operators...\n"
         oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
         echo -e "Describing abnormal mcp...\n"
-        oc get mcp --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
+        oc get machineconfigpools --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
     fi
 }
 
@@ -180,30 +180,6 @@ function cco_annotation(){
     if (( wait_time_loop_var >= 5 )); then
         echo >&2 "Timed out waiting for CCO annotation completing, exiting" && return 1
     fi
-}
-
-# Extract oc binary which is supposed to be identical with target release
-# Default oc on OCP 4.16 not support OpenSSL 1.x
-function extract_oc(){
-    echo -e "Extracting oc\n"
-    local minor_version retry=5 tmp_oc="/tmp/client-2" binary='oc'
-    mkdir -p ${tmp_oc}
-    minor_version=$( echo "${DUMMY_TARGET_VERSION}" | cut -f2 -d. )
-    if (( minor_version > 15 )) && (openssl version | grep -q "OpenSSL 1") ; then
-        binary='oc.rhel8'
-    fi
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=${binary} --to=${tmp_oc} ${DUMMY_TARGET});
-    do
-        echo >&2 "Failed to extract oc binary, retry..."
-        (( retry -= 1 ))
-        if (( retry < 0 )); then return 1; fi
-        sleep 60
-    done
-    mv ${tmp_oc}/oc ${OC_DIR} -f
-    export PATH="$PATH"
-    which oc
-    oc version --client
-    return 0
 }
 
 function run_command() {
@@ -418,20 +394,14 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# This step slim down for one-hop upgrade only. 
-# If we will call it in chanin upgrade in the future, we need add target loop and health_check back. 
-export OC="run_command_oc"
-# Target version oc will be extract in the /tmp/client directory, use it first
-mkdir -p /tmp/client
-export OC_DIR="/tmp/client"
-export PATH=${OC_DIR}:$PATH
+# oc cli is injected from release:target
+run_command "which oc"
+run_command "oc version --client"
 
 export DUMMY_TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
 # we need this DUMMY_TARGET_VERSION from ci config to download oc and do some pre-check
 DUMMY_TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${DUMMY_TARGET}" --output=json | jq -r '.metadata.version')"
-export DUMMY_TARGET_VERSION
 echo "Target version of ci config is: ${DUMMY_TARGET_VERSION}"
-extract_oc
 
 SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
 SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
@@ -478,5 +448,3 @@ run_command "${upgrade_cmd}"
 echo "Upgrading cluster to ${TARGET_VERSION} gets started..."
 check_upgrade_status
 check_history
-
-

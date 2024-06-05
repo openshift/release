@@ -10,7 +10,7 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
 declare vlanid
 declare primaryrouterhostname
 source "${SHARED_DIR}/vsphere_context.sh"

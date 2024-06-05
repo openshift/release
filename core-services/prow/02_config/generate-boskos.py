@@ -37,7 +37,7 @@ CONFIG = {
         'ap-northeast-1': 5,
     },
     'aws-autorelease-qe-quota-slice': {
-        'us-east-1': 2,
+        'us-east-1': 4,
     },
     'aws-terraform-qe-quota-slice': {
         'ap-northeast-1': 2,
@@ -89,6 +89,9 @@ CONFIG = {
     },
     'aws-rhtap-qe-quota-slice': {
         'us-east-1': 10
+    },
+    'aws-konflux-qe-quota-slice': {
+        'us-west-2': 10
     },
     'aws-rhtap-performance-quota-slice': {
         'eu-west-1': 10
@@ -243,6 +246,7 @@ CONFIG = {
     'vsphere-multizone-2-quota-slice':{},
     'vsphere-8-vpn-quota-slice':{},
     'vsphere-multi-vcenter-quota-slice':{},
+    'vsphere-elastic-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
     },
@@ -441,6 +445,9 @@ for i in [1287,1289,1296,1298,1300,1302]:
 
 for i in [1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274]:
     CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
+
+for i in range(0,10):
+    CONFIG['vsphere-elastic-quota-slice']['vsphere-elastic-{}'.format(i)] = 1
 
 for i in [1148]:
     CONFIG['vsphere-multi-vcenter-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1

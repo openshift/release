@@ -24,7 +24,7 @@ cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
 echo "$(date -u --rfc-3339=seconds) - Setting up external load balancer"
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
 if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
   echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
   exit 1
