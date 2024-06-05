@@ -45,6 +45,12 @@ promotion:
   - name: "4.17"
     namespace: ocp-kni
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.17"
   initial:
     integration:
       name: "4.17"
@@ -91,6 +97,35 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-ci-tests-arm64
+  skip_if_only_changed: ^ztp
+  steps:
+    cluster_profile: aws-telco
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m6g.metal
+      OCP_ARCH: arm64
+      SPOT_INSTANCES: "true"
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-test-platform arm64
+        ci-job-branch master
+        ci-job-fullname openshift-kni-cnf-features-deploy-e2e-aws-ci-tests-arm64-master
+        ci-job-type e2e-aws-ci-tests
+        ci-repo-name cnf-features-deploy
+        ci-org-name openshift-kni
+    test:
+    - as: e2e-aws-ci-tests
+      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" make functests-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ran-profile
   optional: true
   steps:
@@ -101,6 +136,37 @@ tests:
         ci-job-source prowci
         ci-job-branch master
         ci-job-fullname openshift-kni-cnf-features-deploy-e2e-aws-ran-profile-master
+        ci-job-type e2e-aws-ran-profile
+        ci-repo-name cnf-features-deploy
+        ci-org-name openshift-kni
+    test:
+    - as: e2e-aws-ran-profile
+      commands: FEATURES_ENVIRONMENT=cn-ran-overlays FEATURES=ran-profile-gcp SKIP_TESTS="xt_u32
+        container-mount-namespace gatekeeper n3000 fec metallb sro multinetworkpolicy"
+        make validate-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-ran-profile-arm64
+  optional: true
+  steps:
+    cluster_profile: aws-telco
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m6g.metal
+      OCP_ARCH: arm64
+      SPOT_INSTANCES: "true"
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-test-platform arm64
+        ci-job-branch master
+        ci-job-fullname openshift-kni-cnf-features-deploy-e2e-aws-ran-profile-arm64-master
         ci-job-type e2e-aws-ran-profile
         ci-repo-name cnf-features-deploy
         ci-org-name openshift-kni
