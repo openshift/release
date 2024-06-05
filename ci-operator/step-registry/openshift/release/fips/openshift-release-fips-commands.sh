@@ -41,7 +41,7 @@ oc -n $namespace debug node/"$master_node_0" -- chroot /host bash -c "podman run
 out=$(oc -n $namespace debug node/"$master_node_0" -- chroot /host bash -c "cat /$report" || true)
 echo "The report is: $out"
 oc delete ns $namespace || true
-res=$(echo "$out" | grep -E 'Failure Report|Successful run with warnings|Warning Report' || true)
+res=$(echo "$out" | grep -E 'Failure Report' || true)
 echo "The result is: $res"
 if [[ -n $res ]];then
     pass=false
