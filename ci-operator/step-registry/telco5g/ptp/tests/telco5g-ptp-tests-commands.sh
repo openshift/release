@@ -83,7 +83,9 @@ spec:
 
           set -x
 
-          git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          #[dev-ci] use forked dev repo
+          #git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          git clone --single-branch --branch OPERATOR_VERSION https://github.com/jzding/ptp-operator.git
           cd ptp-operator
           export IMG=PTP_IMAGE
           sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
@@ -215,6 +217,11 @@ export IMG_VERSION="release-${T5CI_VERSION}"
 
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
+#[dev-ci] use dev branch for test code if needed
+export TEST_BRANCH="ci-v2"
+#[dev-ci] use dev branch for product code
+export PTP_UNDER_TEST_BRANCH="oran-4.16"
+
 # Set go version
 if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
     source $HOME/golang-1.20
@@ -236,7 +243,9 @@ build_images
 
 # deploy ptp-operator
 
-git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+#[dev-ci] use dev branch for product code
+#git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+git clone https://github.com/jzding/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
 
 cd ptp-operator-under-test
 
@@ -250,9 +259,7 @@ make deploy
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
 
 # patching to add events
-#TODOv2 update after v2 backport to 4.16
-#if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
-if [[ "$T5CI_VERSION" =~ 4.1[2-6]+ ]]; then
+if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
     export EVENT_API_VERSION="1.0"
     oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "storageType":"emptyDir"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
 else
@@ -260,9 +267,7 @@ else
     oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "apiVersion":"2.0"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
 fi
 
-#TODOv2 update after v2 backport to 4.16
-#if [[ "$T5CI_VERSION" =~ 4.1[6-7]+ ]]; then
-if [[ "$T5CI_VERSION" =~ 4.1[7]+ ]]; then
+if [[ "$T5CI_VERSION" =~ 4.1[6-7]+ ]]; then
     export ENABLE_V1_REGRESSION="true"
 else
     export ENABLE_V1_REGRESSION="false"
@@ -274,7 +279,9 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 # Run ptp conformance test
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
-git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+#[dev-ci] use dev branch for test code if needed
+#git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+git clone https://github.com/jzding/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 
