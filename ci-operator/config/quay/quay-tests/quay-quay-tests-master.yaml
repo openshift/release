@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.21
 images:
 - dockerfile_literal: |
     FROM src
@@ -81,9 +81,11 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       QUAY_OPERATOR_CHANNEL: stable-3.11
+      QUAY_STORAGE_PROVIDER: azure
     test:
     - ref: quay-tests-deploy-quay-azure
     - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-deprovisioning-aws-gcp-azure-storage-buckets
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: quay-e2e-tests-quay311-ocp416-ibmcos
   cron: 0 12 * * 5
@@ -117,9 +119,11 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       QUAY_OPERATOR_CHANNEL: stable-3.11
+      QUAY_STORAGE_PROVIDER: gcp
     test:
     - ref: quay-tests-deploy-quay-gcp
     - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-deprovisioning-aws-gcp-azure-storage-buckets
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: quay-e2e-tests-quay311-ocp416-proxy
   cron: 0 0 15 * *
