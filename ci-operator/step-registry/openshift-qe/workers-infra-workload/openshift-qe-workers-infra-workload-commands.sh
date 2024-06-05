@@ -182,7 +182,7 @@ function create_machineset() {
 
     #Set default value for key VARIABLE
     #Use the first machineset name by default if no REF_MACHINESET_NAME specified
-    ref_machineset_name=$(oc -n openshift-machine-api get -o 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' machinesets | grep worker | head -n1)
+    ref_machineset_name=$(oc -n openshift-machine-api get -o 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' machinesets | grep worker | grep -v rhel | head -n1)
     REF_MACHINESET_NAME=${REF_MACHINESET_NAME:-$ref_machineset_name}
 
     get_ref_machineset_info $REF_MACHINESET_NAME
@@ -581,8 +581,8 @@ platform_type=$(oc get infrastructure cluster -ojsonpath='{.status.platformStatu
 platform_type=$(echo $platform_type | tr -s 'A-Z' 'a-z')
 node_arch=$(echo $node_arch | tr -s " " "\n"| sort -u)
 all_machinesets=$(oc -n openshift-machine-api get machineset -ojsonpath='{.items[*].metadata.name}{"\n"}')
-machineset_list=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win"| head -n3)
-machineset_count=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win"| head -n3 |wc -l)
+machineset_list=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win|rhel"| head -n3)
+machineset_count=$(echo $all_machinesets | tr -s ' ' '\n'| sort -u| grep -v -i -E "infra|workload|win|rhel"| head -n3 |wc -l)
 total_worker_nodes=$(oc get nodes -l node-role.kubernetes.io/worker= -oname|wc -l)
 
 scale_type=""
@@ -605,13 +605,13 @@ case ${SET_ENV_BY_PLATFORM} in
      #ARM64 Architecture:
 	   if [[ $node_arch == "arm64" ]];then
 	      if [[ ${scale_type} == "medium" ]];then
-                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=m6g.12xlarge
-                OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=m6g.8xlarge
+                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=m6g.4xlarge
+                OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=m6g.4xlarge
 	      elif [[ ${scale_type} == "small" ]];then
-                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=m6g.8xlarge
+                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=m6g.2xlarge
                 OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=m6g.2xlarge
 	      elif [[ ${scale_type} == "extrasmall" ]];then
-                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=m6g.2xlarge
+                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=m6g.xlarge
                 OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=m6g.xlarge
 	      fi
 	   else
@@ -708,8 +708,10 @@ esac
 
 #Create infra and workload machineconfigpool
 create_machineconfigpool infra
-create_machineconfigpool workload
 
+if [[ $IF_CREATE_WORKLOAD_NODE == "true" ]];then
+  create_machineconfigpool workload
+fi
 #Set default value to none if no specified value, using cpu and ram of worker nodes to create machineset
 #This also used for some property don't exist in a certain cloud provider, but need to pass correct parameter for create_machineset
 OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=${OPENSHIFT_INFRA_NODE_INSTANCE_TYPE:-none}

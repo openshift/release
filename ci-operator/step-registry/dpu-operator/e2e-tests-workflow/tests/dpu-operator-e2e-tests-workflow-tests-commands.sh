@@ -10,6 +10,13 @@ endpoint_resolve="${endpoint}:443:10.0.180.88"
 max_sleep_duration=86400  # Maximum sleep duration in seconds (2 hours)
 sleep_counter=0
 #this is a queue system in case other jobs are running
+
+BUILD_NUMBER=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/api/json" | jq -r '.actions[]? | select(.["_class"] == "hudson.model.ParametersAction") | .parameters[]? | select(.name == "pullnumber") | .value')
+
+if [ $PULL_NUMBER == $BUILD_NUMBER ]; then
+	curl -k -s --resolve "$endpoint_resolve" "${job_url}/stop"
+	sleep 20
+fi
 while : 
 do
     job_check=$(curl -k -s --resolve "$endpoint_resolve" "$job_url/api/json")
@@ -45,7 +52,11 @@ do
     if [ "$result" != "null" ]; then
         # Job has completed
         echo "Job Result: $result"
-        if [ "$result" == "SUCCESS" ]; then
+	
+	curl_info=$(curl -k -s --resolve "$endpoint_resolve" "${job_url}/consoleText")
+	echo "$curl_info"
+        
+	if [ "$result" == "SUCCESS" ]; then
             exit 0
         else
             exit 1

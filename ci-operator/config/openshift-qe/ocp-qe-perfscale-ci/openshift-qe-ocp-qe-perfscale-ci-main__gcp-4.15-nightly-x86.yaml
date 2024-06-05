@@ -22,8 +22,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: control-plane-private-24nodes
+- as: control-plane-private-24nodes
+  cron: 0 8 9,23 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
@@ -43,6 +43,28 @@ tests:
     test:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-gcp-ipi-ovn-private
+  timeout: 5h0m0s
+- always_run: false
+  as: node-density-heavy-etcd-fips-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "24"
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+  timeout: 5h0m0s
+- always_run: false
+  as: node-density-etcd-fips-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "24"
+    test:
+    - chain: openshift-qe-node-density
+    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: main

@@ -2,17 +2,17 @@ build_root:
   project_image:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi8/ubi
-      RUN yum install -y --nodocs make git golang
-      RUN ln -s /cli/oc /usr/bin/kubectl
+      RUN dnf install -y --nodocs make git golang jq python3.9 python3-pip
+      RUN pip3.9 install --upgrade pip
 images:
 - dockerfile_path: Dockerfile
   to: model-registry
 releases:
   latest:
     release:
-      architecture: amd64
+      architecture: multi
       channel: stable
-      version: "4.14"
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -21,23 +21,107 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-odh-cfo
+- as: e2e-odh-mro-cron
+  cron: 0 1 * * *
   steps:
     cluster_profile: aws-opendatahub
     env:
       BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
       HYPERSHIFT_AWS_REGION: us-west-2
       HYPERSHIFT_NODE_COUNT: "3"
+      WAIT_FOR_OLM: "true"
     test:
     - as: e2e-odh-mr
       cli: latest
       commands: |
-        echo "Testing for Model-Registry Openshift-CI will happen here."
+        ./openshift-ci/scripts/oci-model-registry-deploy.sh
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: hypershift-hostedcluster-workflow
+- as: e2e-odh-mro-optional
+  optional: true
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+      WAIT_FOR_OLM: "true"
+    test:
+    - as: e2e-odh-mr
+      cli: latest
+      commands: |
+        ./openshift-ci/scripts/oci-model-registry-deploy.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
+- as: e2e-odh-model-registry-python-client
+  optional: true
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+      WAIT_FOR_OLM: "true"
+    test:
+    - as: main
+      cli: latest
+      commands: |
+        ### PREPARE NECESSARY VARIABLES ###
+        # Set name of pod to run Python client tests in
+        POD_NAME="test-python-client"
+        # Set name of namespace for pod to run Python client tests in
+        POD_NAMESPACE_NAME="opendatahub"
+        # Construct script to run in Python client tests pod
+        SCRIPT="""
+        # Print last commit of current code
+        git show
+        # Install Robot Framework tests requirements
+        pip3.9 install -r test/robot/requirements.txt
+        # Install Python client for model-registry
+        pip3.9 install -e clients/python
+        # Update host for tests in Python files
+        sed -i -e \"s/localhost/modelregistry-sample/g\" test/robot/*.py
+        # Run Robot Framework tests
+        TEST_MODE=Python python3.9 -m robot test/robot/MRandLogicalModel.robot
+        """
+
+        ### RUN TEST CODE ###
+        # Print last commit of current code
+        git show
+        # Check state of ODH operator source
+        oc describe catalogsource -n openshift-marketplace community-operators
+        # Deploy ODH operator and other necessary resources
+        ./openshift-ci/scripts/oci-model-registry-deploy.sh
+        # Create Python client tests pod
+        oc run "${POD_NAME}" -n "${POD_NAMESPACE_NAME}" --image=ubi8/python-39 sleep 99d
+        # Wait for Python client tests pod to be ready
+        oc wait pod --for=condition=Ready -n "${POD_NAMESPACE_NAME}" "${POD_NAME}"
+        # Copy model-registry repo to pod
+        oc rsync . "${POD_NAME}":. -n "${POD_NAMESPACE_NAME}"
+        # Run script to test Python client in pod
+        oc exec "${POD_NAME}" -n "${POD_NAMESPACE_NAME}" -- /bin/bash -c "${SCRIPT}"
+        # Save return code of the last command
+        EXIT_STATUS=$?
+        # Save artifacts
+        oc rsync "${POD_NAME}":./output.xml "${ARTIFACT_DIR}" -n "${POD_NAMESPACE_NAME}"
+        oc rsync "${POD_NAME}":./log.html "${ARTIFACT_DIR}" -n "${POD_NAMESPACE_NAME}"
+        oc rsync "${POD_NAME}":./report.html "${ARTIFACT_DIR}" -n "${POD_NAMESPACE_NAME}"
+        # Delete Python client tests pod
+        oc delete pod -n "${POD_NAMESPACE_NAME}" "${POD_NAME}"
+        # Exit with return code of tests
+        exit $EXIT_STATUS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
+  timeout: 4h0m0s
 zz_generated_metadata:
   branch: main
   org: opendatahub-io

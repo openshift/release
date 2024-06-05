@@ -3,14 +3,14 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
-  ci_tests-private-base_4.16:
+  ci_tests-private-base_4.17:
     name: tests-private-base
     namespace: ci
-    tag: "4.16"
-  ci_tests-private-baseui_4.16:
+    tag: "4.17"
+  ci_tests-private-baseui_4.17:
     name: tests-private-baseui
     namespace: ci
-    tag: "4.16"
+    tag: "4.17"
   ci_tests-private-builder_4.16:
     name: tests-private-builder
     namespace: ci
@@ -38,7 +38,7 @@ build_root:
     tag: rhel-8-golang-1.21-openshift-4.16
 images:
 - dockerfile_path: images/Dockerfile.golang
-  from: ci_tests-private-base_4.16
+  from: ci_tests-private-base_4.17
   inputs:
     ci_rosa-aws-cli_latest:
       as:
@@ -49,16 +49,16 @@ images:
   to: tests-private
 - dockerfile_literal: |
     FROM src AS builder
-    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.16
+    FROM registry.ci.openshift.org/ci/tests-private-baseui:4.17
     RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
         yum install -y ./google-chrome-stable_current_*.rpm && \
         mkdir -p /go/src/github.com/openshift
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
     WORKDIR /go/src/github.com/openshift/openshift-tests-private
   inputs:
-    ci_tests-private-baseui_4.16:
+    ci_tests-private-baseui_4.17:
       as:
-      - registry.ci.openshift.org/ci/tests-private-baseui:4.16
+      - registry.ci.openshift.org/ci/tests-private-baseui:4.17
     src:
       as:
       - src
@@ -114,6 +114,8 @@ promotion:
   to:
   - namespace: ci
     tag: "4.17"
+  - namespace: ci
+    tag: latest
 resources:
   '*':
     limits:

@@ -90,8 +90,8 @@ fi
 if [ "$TEMPEST_REGEX" ]; then
     tempest run --regex $TEMPEST_REGEX "${TEMPEST_ARGS[@]}"
 else
-    curl -O https://raw.githubusercontent.com/openstack-k8s-operators/ci-framework/main/roles/tempest/files/list_allowed.yml
-    curl -O https://raw.githubusercontent.com/openstack-k8s-operators/ci-framework/main/roles/tempest/files/list_skipped.yml
+    curl -O https://raw.githubusercontent.com/openstack-k8s-operators/ci-framework/main/roles/test_operator/files/list_allowed.yml
+    curl -O https://raw.githubusercontent.com/openstack-k8s-operators/ci-framework/main/roles/test_operator/files/list_skipped.yml
 
     tempest-skip list-allowed --file list_allowed.yml --group ${BASE_OP} --job ${BASE_OP} -f value > allow.txt
     tempest-skip list-skipped --file list_skipped.yml --job ${BASE_OP} -f value > skip.txt

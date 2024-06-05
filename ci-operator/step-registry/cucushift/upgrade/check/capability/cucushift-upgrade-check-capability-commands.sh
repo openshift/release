@@ -125,12 +125,6 @@ function get_actual_implicit_caps {
     # The condition message could be "The following capabilities could not be disabled: Console, Insights, Storage"
     tmp_capabilities=$(echo "$implicit_message" | grep -oE 'could not be disabled: (.*)' | cut -d':' -f2)
     actual_implicit_caps=$(echo "$tmp_capabilities" | awk -F', ' '{ for (i=1; i<=NF; i++) print $i }')
-    # need to remove once pr https://github.com/openshift/cluster-version-operator/pull/946 is merged
-    for version in "${!always_enabled_caps[@]}"; do
-        if [[ ${ocp_version/.} -ge ${version} ]]; then
-            actual_implicit_caps="${actual_implicit_caps} ${always_enabled_caps[$version]}"
-        fi
-    done
     # echo "Actual implicitly enabled capabilities list is ${actual_implicit_caps}"
 }
 
@@ -224,13 +218,6 @@ function check_cvo_cap() {
             result=1
         else
             cvo_caps_str=$(echo $cvo_caps | tr -d '["]' | tr "," " " | xargs -n1 | sort -u | xargs)
-            # need to remove once pr https://github.com/openshift/cluster-version-operator/pull/946 is merged
-            for version in "${!always_enabled_caps[@]}"; do
-                if [[ ${ocp_version/.} -ge ${version} ]]; then
-                    cvo_caps_str="${cvo_caps_str} ${always_enabled_caps[$version]}"
-                fi
-            done
-            cvo_caps_str=$(echo ${cvo_caps_str} | xargs -n1 | sort -u | xargs)
             
             if [[ "${cvo_caps_str}" == "${capability_set}" ]]; then
                 echo "INFO: ${expected_status} capabilities matches with cvo ${cvo_field}!"
@@ -267,11 +254,6 @@ if [[ -z "${baselinecaps_from_cluster}" || "${baselinecaps_from_cluster}" == "nu
     exit 0
 fi
 echo "baselinecaps_from_cluster: ${baselinecaps_from_cluster}"
-
-ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2 | tr -d '.')
-# always enabled capabilities
-declare -A always_enabled_caps
-always_enabled_caps[416]="Ingress"
 
 # shellcheck disable=SC2207
 version_set=($(oc get clusterversion version -ojson | jq -r .status.history[].version))

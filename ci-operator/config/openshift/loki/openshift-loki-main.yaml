@@ -4,17 +4,17 @@ base_images:
     namespace: ocp
     tag: base-rhel9
   loki-tag:
-    name: v2.9.6
+    name: v2.9.8
     namespace: logging
     tag: loki
   lokistack-gateway:
     name: mirror-5.y
     namespace: logging
     tag: lokistack-gateway
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.21-builder-multi-openshift-4.16:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
   opa-openshift:
     name: mirror-5.y
     namespace: logging
@@ -23,29 +23,25 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.21-builder-multi-openshift-4.16
 images:
 - dockerfile_path: Dockerfile.ocp
   from: base
   inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-builder-multi-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: loki
 - dockerfile_path: Dockerfile.promtail.ocp
   from: base
   inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.21-builder-multi-openshift-4.16:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: promtail
 - context_dir: operator
   dockerfile_path: Dockerfile
   from: base
-  inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - golang:1.21.7
   to: loki-operator
 operator:
   bundles:
@@ -55,7 +51,7 @@ operator:
   substitutions:
   - pullspec: quay.io/openshift-logging/loki-operator:0.1.0
     with: pipeline:loki-operator
-  - pullspec: quay.io/openshift-logging/loki:v2.9.6
+  - pullspec: quay.io/openshift-logging/loki:v2.9.8
     with: pipeline:loki-tag
   - pullspec: quay.io/observatorium/api:latest
     with: pipeline:lokistack-gateway
@@ -133,7 +129,9 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs-logging
     product: ocp
     timeout: 1h0m0s
     version: "4.15"

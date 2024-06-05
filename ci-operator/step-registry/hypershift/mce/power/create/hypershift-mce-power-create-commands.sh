@@ -16,9 +16,8 @@ POWERVS_VSI_PROC_TYPE="shared"
 POWERVS_VSI_SYS_TYPE="e980"
 
 # MCE agentserviceconfig configs
-export DB_VOLUME_SIZE="10Gi"
-export FS_VOLUME_SIZE="10Gi"
-export ARCH="ppc64le"
+DB_VOLUME_SIZE="10Gi"
+FS_VOLUME_SIZE="10Gi"
 
 # InfraEnv configs
 SSH_PUB_KEY_FILE="${AGENT_POWER_CREDENTIALS}/ssh-publickey"
@@ -142,29 +141,11 @@ data:
 EOF
 
 
- oc adm release info ${OCP_IMAGE_MULTI} --filter-by-os=linux/ppc64le -o json > ocpversion.json
- OPENSHIFT_VERSION="$(cat ocpversion.json | jq -r . | grep "BUILD_VERSION=v" |  tr -d 'v",' | awk -F '=' '{print $2}')"
- export OPENSHIFT_VERSION
-
- if [[ "${OPENSHIFT_VERSION}" == *"4.14."* ]]
- then
-   RHCOS_VERSION="4.14-9.2"
- elif [[ "${OPENSHIFT_VERSION}" == *"4.15."* ]]
- then
-   RHCOS_VERSION="4.15-9.2"
- else
-   echo "unrecognized version for RHCOS"
-   exit 1
- fi
-
- RHCOS_BUILD_VERSION=$(cat ocpversion.json | jq -r '.displayVersions."machine-os".Version')
- export RHCOS_BUILD_VERSION
- export ISO_URL="https://rhcos.mirror.openshift.com/art/storage/prod/streams/${RHCOS_VERSION}/builds/${RHCOS_BUILD_VERSION}/ppc64le/rhcos-${RHCOS_BUILD_VERSION}-live.ppc64le.iso"
- export ROOT_FS_URL="https://rhcos.mirror.openshift.com/art/storage/prod/streams/${RHCOS_VERSION}/builds/${RHCOS_BUILD_VERSION}/ppc64le/rhcos-${RHCOS_BUILD_VERSION}-live-rootfs.ppc64le.img"
-
 # Creating AgentServiceConfig
+CLUSTER_VERSION=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
+OS_IMAGES=$(jq --arg CLUSTER_VERSION "${CLUSTER_VERSION}" '[.[] | select(.openshift_version == $CLUSTER_VERSION)]' "${SHARED_DIR}/default_os_images.json")
 echo "$(date) Creating AgentServiceConfig"
-envsubst <<"EOF" | oc apply -f -
+cat <<EOF | oc create -f -
 apiVersion: agent-install.openshift.io/v1beta1
 kind: AgentServiceConfig
 metadata:
@@ -185,11 +166,10 @@ spec:
   mirrorRegistryRef:
     name: mirror-config
   osImages:
-    - openshiftVersion: "${OPENSHIFT_VERSION}"
-      version: "${RHCOS_BUILD_VERSION}"
-      url: "${ISO_URL}"
-      rootFSUrl: "${ROOT_FS_URL}"
-      cpuArchitecture: "${ARCH}"
+    - openshiftVersion: "${CLUSTER_VERSION}"
+      version: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "ppc64le").version')
+      url: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "ppc64le").url')
+      cpuArchitecture: ppc64le
 EOF
 
 oc wait --timeout=5m --for=condition=DeploymentsHealthy agentserviceconfig agent
@@ -274,7 +254,7 @@ metadata:
   name: ${HOSTED_CLUSTER_NAME}
   namespace: ${HOSTED_CONTROL_PLANE_NAMESPACE}
 spec:
-  cpuArchitecture: $ARCH
+  cpuArchitecture: ppc64le
   pullSecretRef:
     name: pull-secret
   sshAuthorizedKey: ${SSH_PUB_KEY}

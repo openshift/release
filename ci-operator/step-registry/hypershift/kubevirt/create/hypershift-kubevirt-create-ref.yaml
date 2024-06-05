@@ -1,0 +1,51 @@
+ref:
+  as: hypershift-kubevirt-create
+  from: hypershift-operator
+  grace_period: 5m0s
+  timeout: 1h
+  cli: latest
+  env:
+    - name: HYPERSHIFT_NODE_COUNT
+      default: "3"
+      documentation: "The number nodes to automatically create and join to the cluster."
+    - name: HYPERSHIFT_NODE_MEMORY
+      default: "16"
+      documentation: "The amount of RAM that will be allocated for the kubevirt hosted cluster's nodes in Gi"
+    - name: HYPERSHIFT_NODE_CPU_CORES
+      default: "4"
+      documentation: "The number of CPU cores that will be assigned for the kubevirt hosted cluster's nodes."
+    - name: RUN_HOSTEDCLUSTER_CREATION
+      default: "true"
+      documentation: |-
+        Indicates whether this step should be skipped. Useful when it is a part of a workflow used in various
+        branches, and some branches don't need to execute that step.
+    - name: KUBEVIRT_CSI_INFRA
+      default: ""
+      documentation: |-
+        The default storage class on the infra cluster to be used by the guest cluster with the
+        kubevirt csi-driver.
+    - name: ENABLE_ICSP
+      default: "false"
+      documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_iscp.yaml)"
+    - name: ETCD_STORAGE_CLASS
+      default: ""
+      documentation: |-
+        The storage class that will be used for etcd on the hosted control plane.
+    - name: MCE_VERSION
+      default: ""
+      documentation: "version of the mce, if installed; if not the default empty string will skip all the MCE specific commands. (\"\", 2.2, 2.3, 2.4, 2.5)"
+    - name: DISCONNECTED
+      default: "false"
+      documentation: Should we work on top of a disconnected environment
+  commands: hypershift-kubevirt-create-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials
+  dependencies:
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST

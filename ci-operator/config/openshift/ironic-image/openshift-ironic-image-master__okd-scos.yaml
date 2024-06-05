@@ -1,27 +1,32 @@
 base_images:
-  centos:
-    name: stream9
-    namespace: coreos
-    tag: "9"
+  ocp_builder_stream9:
+    name: builder
+    namespace: ocp
+    tag: stream9
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
 images:
-- dockerfile_path: Dockerfile.scos
-  from: centos
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile.scos
+  from: ocp_builder_stream9
+  inputs:
+    ocp_builder_stream9:
+      as:
+      - builder
   to: ironic
 promotion:
   to:
-  - name: scos-4.15
+  - name: scos-4.16
     namespace: origin
 releases:
-  initial:
-    integration:
-      name: scos-4.15
-      namespace: origin
   latest:
     integration:
-      include_built_images: true
-      name: scos-4.15
+      name: scos-4.16
       namespace: origin
 resources:
   '*':

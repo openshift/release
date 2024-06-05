@@ -32,6 +32,12 @@ function populate_artifact_dir() {
 	s/UserData:.*,/UserData: REDACTED,/;
 	' "${dir}/terraform.txt"
   tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt"
+
+  # Copy CAPI-generated artifacts if they exist
+  if [ -d "${dir}/.clusterapi_output" ]; then
+    echo "Copying Cluster API generated manifests..."
+    cp -rpv "${dir}/.clusterapi_output" "${ARTIFACT_DIR}/" 2>/dev/null
+  fi
 }
 
 function prepare_next_steps() {
@@ -186,6 +192,10 @@ cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 echo "install-config.yaml"
 echo "-------------------"
 cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure

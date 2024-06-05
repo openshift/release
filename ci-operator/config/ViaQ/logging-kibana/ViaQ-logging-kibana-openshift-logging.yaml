@@ -1,8 +1,4 @@
 base_images:
-  cluster-logging-operator-5-5:
-    name: "5.5"
-    namespace: logging
-    tag: cluster-logging-operator
   cluster-logging-operator-5-6:
     name: "5.6"
     namespace: logging
@@ -11,10 +7,6 @@ base_images:
     name: "5.7"
     namespace: logging
     tag: cluster-logging-operator
-  cluster-logging-operator-e2e-5-5:
-    name: "5.5"
-    namespace: logging
-    tag: cluster-logging-operator-e2e
   cluster-logging-operator-e2e-5-6:
     name: "5.6"
     namespace: logging
@@ -23,10 +15,6 @@ base_images:
     name: "5.7"
     namespace: logging
     tag: cluster-logging-operator-e2e
-  cluster-logging-operator-registry-5-5:
-    name: "5.5"
-    namespace: logging
-    tag: cluster-logging-operator-registry
   cluster-logging-operator-registry-5-6:
     name: "5.6"
     namespace: logging
@@ -35,10 +23,6 @@ base_images:
     name: "5.7"
     namespace: logging
     tag: cluster-logging-operator-registry
-  elasticsearch-operator-5-5:
-    name: "5.5"
-    namespace: logging
-    tag: elasticsearch-operator
   elasticsearch-operator-5-6:
     name: "5.6"
     namespace: logging
@@ -47,10 +31,6 @@ base_images:
     name: "5.7"
     namespace: logging
     tag: elasticsearch-operator
-  elasticsearch-operator-registry-5-5:
-    name: "5.5"
-    namespace: logging
-    tag: elasticsearch-operator-registry
   elasticsearch-operator-registry-5-6:
     name: "5.6"
     namespace: logging
@@ -119,10 +99,12 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.13"
   steps:
     test:
     - as: test
@@ -164,7 +146,9 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs-logging
     product: ocp
     timeout: 1h0m0s
     version: "4.12"
@@ -199,51 +183,6 @@ tests:
       - env: IMAGE_LOG_FILE_METRIC_EXPORTER
         name: pipeline:log-file-metric-exporter
       from: pipeline:cluster-logging-operator-e2e-5-6
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h0m0s
-    workflow: generic-claim
-  timeout: 5h0m0s
-- as: cluster-logging-operator-e2e-5-5
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.11"
-  steps:
-    test:
-    - as: test
-      cli: latest
-      commands: export GINKGO_OPTS="-ginkgo.skip vector"; FAKE_HOME_DIR=/tmp/home
-        LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-e2e-olm
-      dependencies:
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
-        name: pipeline:cluster-logging-operator-registry-5-5
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
-        name: pipeline:cluster-logging-operator-5-5
-      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
-        name: pipeline:elasticsearch-operator-registry-5-5
-      - env: IMAGE_ELASTICSEARCH_OPERATOR
-        name: pipeline:elasticsearch-operator-5-5
-      - env: IMAGE_OAUTH_PROXY
-        name: pipeline:oauth-proxy
-      - env: IMAGE_LOGGING_FLUENTD
-        name: pipeline:logging-fluentd
-      - env: IMAGE_ELASTICSEARCH_PROXY
-        name: pipeline:elasticsearch-proxy
-      - env: IMAGE_ELASTICSEARCH6
-        name: pipeline:logging-elasticsearch6
-      - env: IMAGE_LOGGING_KIBANA6
-        name: pipeline:logging-kibana6
-      - env: IMAGE_LOGGING_EVENTROUTER
-        name: pipeline:logging-eventrouter
-      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
-        name: pipeline:log-file-metric-exporter
-      from: pipeline:cluster-logging-operator-e2e-5-5
       resources:
         requests:
           cpu: 100m

@@ -117,8 +117,11 @@ function filter_test_by_network() {
         ovnkubernetes)
 	    networktag='@network-ovnkubernetes'
 	    ;;
+        other)
+	    networktag=''
+	    ;;
         *)
-	    echo "######Expected network to be SDN/OVN, but got: $networktype"
+	    echo "######Expected network to be SDN/OVN/Other, but got: $networktype"
 	    ;;
     esac
     if [[ -n $networktag ]] ; then

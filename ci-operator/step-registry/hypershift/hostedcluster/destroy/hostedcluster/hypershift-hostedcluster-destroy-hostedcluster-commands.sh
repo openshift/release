@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euox pipefail
 
-echo "Set KUBECONFIG to Hive cluster"
+echo "Set KUBECONFIG to management cluster"
 export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
 
 DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com

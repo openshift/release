@@ -31,7 +31,7 @@ declare vsphere_portgroup
 
 source "${SHARED_DIR}/vsphere_context.sh"
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
 
 if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
   echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
@@ -297,6 +297,8 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$datacenter = "${vsphere_datacenter}"
 \$cluster = "${vsphere_cluster}"
 \$vcentercredpath = "secrets/vcenter-creds.xml"
+\$storagepolicy = ""
+\$secureboot = \$false
 
 \$ipam = "ipam.vmc.ci.openshift.org"
 
@@ -340,6 +342,10 @@ cp -t "${dir}" \
   "${SHARED_DIR}/install-config.yaml"
 
 echo "$(date +%s)" >"${SHARED_DIR}/TEST_TIME_INSTALL_START"
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 ### Create manifests
 echo "Creating manifests..."

@@ -9,9 +9,9 @@ base_images:
     tag: operator-sdk
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
 - context_dir: .
   dockerfile_path: build/Dockerfile
@@ -38,7 +38,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -51,9 +51,8 @@ tests:
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  optional: true
+    timeout: 3h0m0s
+    version: "4.15"
   steps:
     test:
     - as: install
@@ -70,21 +69,7 @@ tests:
         requests:
           cpu: 100m
           memory: 400Mi
-    - as: obo-e2e
-      cli: latest
-      commands: |
-        if ! which kubectl; then
-            mkdir -p /tmp/obo
-            export PATH=$PATH:/tmp/obo
-            ln -s "$(which oc)" /tmp/obo/kubectl
-        fi
-        export GOFLAGS=""
-        ./test/run-e2e.sh --no-deploy --ns obo --ci
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 400Mi
+    - ref: rhobs-obo-test-harness
     workflow: generic-claim
 zz_generated_metadata:
   branch: main

@@ -22,28 +22,27 @@ images:
   to: lightspeed-operator
 - dockerfile_path: bundle.Dockerfile
   to: lightspeed-operator-bundle
+- dockerfile_path: lightspeed-catalog.Dockerfile
+  to: lightspeed-operator-catalog
 operator:
   bundles:
   - as: lightspeed-bundle-test
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/openshift/lightspeed-operator:latest
+  - pullspec: quay.io/openshift-lightspeed/lightspeed-operator:latest
     with: pipeline:lightspeed-operator
-  - pullspec: quay.io/openshift/lightspeed-service-api:latest
+  - pullspec: quay.io/openshift-lightspeed/lightspeed-service-api:latest
     with: pipeline:lightspeed-service-api
 promotion:
   to:
   - namespace: ols
     tag: latest
 releases:
-  initial:
-    integration:
-      name: "4.15"
-      namespace: ocp
   latest:
-    integration:
-      name: "4.15"
-      namespace: ocp
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -70,17 +69,13 @@ tests:
     clone: true
     from: golangci-lint
 - as: bundle-e2e
-  cluster_claim:
-    architecture: amd64
-    as: custom
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.15"
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
+    cluster_profile: aws-2
+    env:
+      HYPERSHIFT_BASE_DOMAIN: hypershift.aws-2.ci.openshift.org
     test:
+    - ref: ipi-install-rbac
     - as: e2e-install
       cli: latest
       commands: |
@@ -95,7 +90,27 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: generic-claim
+    - as: e2e-test
+      cli: latest
+      commands: |
+        export LLM_PROVIDER=openai
+        export LLM_MODEL=gpt-3.5-turbo
+        export LLM_TOKEN=$(cat /var/run/openai/token)
+        export CONDITION_TIMEOUT=600
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
+- as: security
+  optional: true
+  steps:
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: openshift

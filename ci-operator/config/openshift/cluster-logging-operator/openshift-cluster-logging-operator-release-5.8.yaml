@@ -2,7 +2,7 @@ base_images:
   base:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.20-openshift-4.14
+    tag: rhel-9-release-golang-1.21-openshift-4.16
   cli:
     name: "4.14"
     namespace: origin
@@ -24,7 +24,7 @@ base_images:
     namespace: logging
     tag: elasticsearch-proxy
   log-file-metric-exporter:
-    name: 5.y
+    name: "5.8"
     namespace: logging
     tag: log-file-metric-exporter
   logging-elasticsearch6:
@@ -63,7 +63,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.20-openshift-4.14
+    tag: rhel-9-release-golang-1.21-openshift-4.16
 images:
 - from: ubi9-minimal
   inputs:
@@ -77,8 +77,25 @@ images:
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: base
   to: cluster-logging-operator-registry
-- dockerfile_path: Dockerfile.e2e
-  from: elasticsearch-operator-src
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src AS es-src
+    FROM registry.redhat.io/ubi9/go-toolset:latest
+    ADD . /go/src/github.com/openshift/cluster-logging-operator
+    COPY --from=es-src /go/src/github.com/openshift/elasticsearch-operator /go/src/github.com/openshift/elasticsearch-operator
+    WORKDIR /go/src/github.com/openshift/cluster-logging-operator
+    USER 0
+    RUN mkdir -p /go/src/github.com/openshift/cluster-logging-operator/bin/
+    RUN go mod download
+    RUN make tools
+    RUN chmod -R 777 /go
+    RUN make bin/functional-benchmarker
+  inputs:
+    base:
+      as:
+      - registry.redhat.io/ubi9/go-toolset:latest
+    elasticsearch-operator-src:
+      as:
+      - registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src
   to: cluster-logging-operator-e2e
 operator:
   bundles:
@@ -127,7 +144,9 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: cvp
+    labels:
+      region: us-east-2
+    owner: obs-logging
     product: ocp
     timeout: 1h0m0s
     version: "4.14"
@@ -178,7 +197,9 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs-logging
     product: ocp
     timeout: 1h0m0s
     version: "4.13"
@@ -230,7 +251,9 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs-logging
     product: ocp
     timeout: 1h0m0s
     version: "4.12"
@@ -282,7 +305,9 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs-logging
     product: ocp
     timeout: 1h0m0s
     version: "4.13"
@@ -326,7 +351,9 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: cvp
+    labels:
+      region: us-east-2
+    owner: obs-logging
     product: ocp
     timeout: 1h0m0s
     version: "4.14"

@@ -8,10 +8,7 @@ base_images:
     namespace: ci
     tag: latest
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
+  from_repository: true
 resources:
   '*':
     requests:
@@ -151,17 +148,33 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-- as: aws-prod-cleanup
+- as: stage-clusters-cleanup
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="stage"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --clusters --dry-run=false
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 0 * * 2
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: prod-clusters-cleanup
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="prod"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
 
-    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --clusters --dry-run=false
   container:
     clone: true
     from: osde2e
-  cron: 45 * * * *
+  cron: 45 0 * * 2
   secrets:
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
@@ -264,11 +277,11 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-informing
     name: osde2e-informing
-- as: cleanup-tekton-aws-iam
+- as: cleanup-tekton-aws
   commands: |
     export SECRET_LOCATIONS="/usr/local/osde2e-tekton-copy"
 
-    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --dry-run=false
+    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --s3 --elastic-ip --dry-run=false
   container:
     clone: true
     from: osde2e
@@ -276,11 +289,11 @@ tests:
   secrets:
   - mount_path: /usr/local/osde2e-tekton-copy
     name: osde2e-tekton-copy
-- as: cleanup-dev-aws-iam
+- as: cleanup-dev-aws
   commands: |
-    export SECRET_LOCATIONS="/usr/local/osde2e-dev"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-dev"
 
-    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --dry-run=false
+    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --s3 --elastic-ip --dry-run=false
   container:
     clone: true
     from: osde2e
@@ -288,11 +301,11 @@ tests:
   secrets:
   - mount_path: /usr/local/osde2e-dev
     name: osde2e-dev
-- as: cleanup-hypershift-aws-iam
+- as: cleanup-hypershift-aws
   commands: |
-    export SECRET_LOCATIONS="/usr/local/osde2e-hypershift-credentials"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-hypershift-credentials"
 
-    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --dry-run=false
+    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --s3 --elastic-ip --dry-run=false
   container:
     clone: true
     from: osde2e
@@ -300,11 +313,11 @@ tests:
   secrets:
   - mount_path: /usr/local/osde2e-hypershift-credentials
     name: osde2e-hypershift-credentials
-- as: cleanup-trt-aws-iam
+- as: cleanup-trt-aws
   commands: |
-    export SECRET_LOCATIONS="/usr/local/osde2e-trt-credentials"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-trt-credentials"
 
-    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --dry-run=false
+    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --s3 --elastic-ip --dry-run=false
   container:
     clone: true
     from: osde2e
@@ -312,11 +325,11 @@ tests:
   secrets:
   - mount_path: /usr/local/osde2e-trt-credentials
     name: osde2e-trt-credentials
-- as: cleanup-informing-aws-iam
+- as: cleanup-informing-aws
   commands: |
-    export SECRET_LOCATIONS="/usr/local/osde2e-informing"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-informing"
 
-    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --dry-run=false
+    osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --iam --s3 --elastic-ip --dry-run=false
   container:
     clone: true
     from: osde2e

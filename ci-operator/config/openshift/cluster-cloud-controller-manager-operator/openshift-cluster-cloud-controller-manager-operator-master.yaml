@@ -1,12 +1,16 @@
 base_images:
   ocp_4.16_base-rhel9:
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.21-openshift-4.16:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
 binary_build_commands: go build cmd/cluster-cloud-controller-manager-operator/main.go
 build_root:
   from_repository: true
@@ -22,22 +26,22 @@ images:
   to: cluster-cloud-controller-manager-operator
 promotion:
   to:
-  - name: "4.16"
+  - name: "4.17"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.16"
+      name: "4.17"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
+      name: "4.17"
       namespace: ocp
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -98,6 +102,17 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
+- as: level0-clusterinfra-azure-ipi-proxy-tests
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      TEST_FILTERS: LEVEL0
+      TEST_SCENARIOS: Cluster_Infrastructure
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-ipi-proxy
 - as: e2e-gcp-ovn
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -132,6 +147,19 @@ tests:
   steps:
     cluster_profile: vsphere-2
     workflow: openshift-e2e-vsphere
+- as: regression-vsphere-ipi-ccmo
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
+  steps:
+    cluster_profile: vsphere-multizone-2
+    env:
+      TEST_FILTERS: CCM
+      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_TIMEOUT: "1200"
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-vsphere-ipi-zones
 - as: e2e-nutanix-ovn
   cluster: build01
   optional: true

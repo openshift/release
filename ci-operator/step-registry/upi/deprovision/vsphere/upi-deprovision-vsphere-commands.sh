@@ -89,7 +89,7 @@ then
   terraform destroy -refresh=false -auto-approve -no-color &
   wait "$!"
 else
-  pwsh -file upi-destroy.ps1 &
+  pwsh -file powercli/upi-destroy.ps1 &
   wait "$!"
 fi
 

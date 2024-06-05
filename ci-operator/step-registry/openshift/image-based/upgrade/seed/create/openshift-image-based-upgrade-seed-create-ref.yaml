@@ -1,0 +1,46 @@
+ref:
+  as: openshift-image-based-upgrade-seed-create
+  grace_period: 10m
+  commands: openshift-image-based-upgrade-seed-create-commands.sh
+  from_image:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.16
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: ibu-backup-secret
+    mount_path: /var/run/ibu-backup-secret
+  - mount_path: /var/run/pull-secret
+    name: registry-pull-credentials
+    namespace: test-credentials
+  env:
+  - name: SEED_IMAGE
+    default: quay.io/openshift-kni/image-based-seeds
+    documentation: The repo where the seed image will be uploaded. The backup secret needs to have access to this repo
+  - name: SEED_IMAGE_TAG_FORMAT
+    default: latest
+    documentation: The tag format to apply to the seed image (latest, presubmit, nightly, e2e)
+  - name: SEED_IMAGE_TAG_PREFIX
+    default: ""
+    documentation: An optional prefix to apply to the seed image tag
+  - name: OCP_BASE_VERSION
+    default: "4.15"
+    documentation: The base OCP version that will be used for the seed. This will translate to x.y-latest
+  - name: OCP_IMAGE_SOURCE
+    default: release
+    documentation: This defines how the OCP base image should be pulled. The only options here are 'release' and 'ci'
+  - name: RECERT_IMAGE
+    default: quay.io/edge-infrastructure/recert:v0
+    documentation: the pullspec of recert to use for seed creation
+  dependencies:
+  - name: lca-operator
+    env: LCA_PULL_REF
+  documentation: |-
+    This will create the seed image for use with IBU.
+
+    In order to create the seed image, this step will use the configured EC2 host to setup a VM, install Openshift in the VM and generate the seed image.
+    The resulting image will be pushed to quay and can be used to upgrade another cluster

@@ -92,6 +92,7 @@ if [ -n "${is_dev_version:-}" ]; then
     export SRIOV_NETWORK_CONFIG_DAEMON_IMAGE=quay.io/openshift/origin-sriov-network-config-daemon:${oc_version}
     export SRIOV_NETWORK_WEBHOOK_IMAGE=quay.io/openshift/origin-sriov-network-webhook:${oc_version}
     export SRIOV_NETWORK_OPERATOR_IMAGE=quay.io/openshift/origin-sriov-network-operator:${oc_version}
+    export OVS_CNI_IMAGE=""
     unset NAMESPACE
     # CLUSTER_TYPE is used by both openshift/release and the operator, so we need to unset it
     # to let the operator figure out which cluster type it is.

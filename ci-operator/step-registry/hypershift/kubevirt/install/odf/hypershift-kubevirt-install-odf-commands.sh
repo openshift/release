@@ -198,4 +198,33 @@ for item in $(oc get sc --no-headers | awk '{print $1}'); do
 	oc annotate --overwrite sc $item storageclass.kubernetes.io/is-default-class='false'
 done
 oc annotate --overwrite sc ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class='true'
+oc annotate --overwrite volumesnapshotclass ocs-storagecluster-rbdplugin-snapclass snapshot.storage.kubernetes.io/is-default-class='true'
 echo "ocs-storagecluster-ceph-rbd is set as default storage class"
+
+# Ensure that the csi-snapshot-controller is restarted so that it picks up the annotation on the volume snapshot class
+replica_count=$(oc get deployment -n openshift-cluster-storage-operator csi-snapshot-controller -o=jsonpath='{@.spec.replicas}')
+echo "Current replica count $replica_count"
+
+if [[ $(oc get csisnapshotcontroller cluster -o=jsonpath='{@.spec.managementState}') ]]; then
+oc patch csisnapshotcontroller cluster --type=json -p='[{"op": "remove", "path": "/spec/managementState"}]' -n openshift-cluster-storage-operator
+fi
+oc scale deployment -n openshift-cluster-storage-operator csi-snapshot-controller --replicas=0
+
+RETRIES=60
+echo "Waiting for pods to be gone"
+for ((i=1; i <= $RETRIES; i++)); do
+    availableReplicas=$(oc get deployment -n openshift-cluster-storage-operator csi-snapshot-controller -o=jsonpath='{@.status.availableReplicas}')
+    if [[ -z "$availableReplicas" ]]; then
+        echo "No csi snapshot controller replicas left"
+        break
+    else
+      echo "Still $availableReplicas replicas available"
+    fi
+    sleep 1
+done
+
+echo "managing deployment again, will restore to needed value"
+oc patch csisnapshotcontroller cluster --type=json -p='[{"op": "add", "path": "/spec/managementState", "value": "Managed"}]' -n openshift-cluster-storage-operator
+echo "waiting for deployment to be ready"
+oc rollout status deployment/csi-snapshot-controller -n openshift-cluster-storage-operator
+

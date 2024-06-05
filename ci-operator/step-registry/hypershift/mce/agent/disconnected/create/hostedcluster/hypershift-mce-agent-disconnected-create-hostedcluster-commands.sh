@@ -47,6 +47,7 @@ if [[ "\$DISCONNECTED" == "true" ]]; then
   podman pull --authfile /tmp/.dockerconfigjson "\$HO_OPERATOR_IMAGE"
   EXTRA_ARGS+=\$(echo "--annotations=hypershift.openshift.io/control-plane-operator-image=\$HO_OPERATOR_IMAGE ")
   EXTRA_ARGS+=\$(echo "--additional-trust-bundle /etc/pki/ca-trust/source/anchors/registry.2.crt ")
+  EXTRA_ARGS+="--olm-disable-default-sources "
 fi
 
 if [[ "\${IP_STACK}" == "v6" ]]; then

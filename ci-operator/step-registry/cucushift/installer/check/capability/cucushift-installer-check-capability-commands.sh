@@ -95,8 +95,8 @@ caps_operator[Ingress]="ingress"
 # Need to be updated when new resource marks as optional
 caps_resource_list="Build DeploymentConfig"
 declare -A caps_resource
-caps_resource[Build]="build"
-caps_resource[DeploymentConfig]="deploymentconfig"
+caps_resource[Build]="builds buildconfigs"
+caps_resource[DeploymentConfig]="deploymentconfigs"
 
 v411="baremetal marketplace openshift-samples"
 # shellcheck disable=SC2034
@@ -108,8 +108,8 @@ v416=" ${v415} CloudControllerManager Ingress"
 latest_defined="v416"
 always_default="${!latest_defined}"
 # always enabled capabilities
-#declare -A always_enabled_caps
-#always_enabled_caps[416]="Ingress"
+declare -A always_enabled_caps
+always_enabled_caps[416]="Ingress"
 
 # Determine vCurrent
 declare "v${ocp_major_version}${ocp_minor_version}"
@@ -161,12 +161,12 @@ additional_caps_from_config=$(yq-go r "${SHARED_DIR}/install-config.yaml" "capab
 if [[ "${additional_caps_from_config}" != "" ]]; then
     enabled_capability_set="${enabled_capability_set} ${additional_caps_from_config}"
 fi
-# Once pr https://github.com/openshift/cluster-version-operator/pull/946 merged, the code can be opened
-#for version in "${!always_enabled_caps[@]}"; do
-#    if [[ ${ocp_version/.} -ge ${version} ]]; then
-#        enabled_capability_set="${enabled_capability_set} ${always_enabled_caps[$version]}"
-#    fi
-#done
+
+for version in "${!always_enabled_caps[@]}"; do
+    if [[ ${ocp_version/.} -ge ${version} ]]; then
+        enabled_capability_set="${enabled_capability_set} ${always_enabled_caps[$version]}"
+    fi
+done
 enabled_capability_set=$(echo ${enabled_capability_set} | xargs -n1 | sort -u | xargs)
 disabled_capability_set="${vCurrent}"
 for cap in $enabled_capability_set; do
@@ -185,13 +185,15 @@ for cap in $enabled_capability_set; do
     echo "check capability ${cap}"
     #shellcheck disable=SC2076
     if [[ " ${caps_resource_list} " =~ " ${cap} " ]]; then
-        resource="${caps_resource[$cap]}"
-        res_ret=0
-        oc api-resources | grep ${resource} || res_ret=1
-        if [[ ${res_ret} -eq 1 ]] ; then
-            echo "ERROR: capability ${cap}: resources ${resource} -- not found!"
-            check_result=1
-        fi
+        resources="${caps_resource[$cap]}"
+        for res in ${resources}; do
+            res_ret=0
+            oc api-resources | grep -w "${res}" || res_ret=1
+            if [[ ${res_ret} -eq 1 ]] ; then
+                echo "ERROR: capability ${cap}: resources ${res} -- not found!"
+                check_result=1
+            fi
+        done
         continue
     fi
     for op in ${caps_operator[$cap]}; do
@@ -209,13 +211,15 @@ for cap in $disabled_capability_set; do
     echo "check capability ${cap}"
     #shellcheck disable=SC2076
     if [[ " ${caps_resource_list} " =~ " ${cap} " ]]; then
-        resource="${caps_resource[$cap]}"
-        res_ret=0
-        oc api-resources | grep ${resource} || res_ret=1
-        if [[ ${res_ret} -eq 0 ]]; then
-            echo "ERROR: capability ${cap}: resources ${resource} -- found!"
-            check_result=1
-        fi
+        resources="${caps_resource[$cap]}"
+        for res in ${resources}; do
+            res_ret=0
+            oc api-resources | grep -w ${res} || res_ret=1
+            if [[ ${res_ret} -eq 0 ]]; then
+                echo "ERROR: capability ${cap}: resources ${res} -- found!"
+                check_result=1
+            fi
+        done
         continue
     fi
     for op in ${caps_operator[$cap]}; do

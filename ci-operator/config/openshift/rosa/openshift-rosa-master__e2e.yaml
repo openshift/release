@@ -1,0 +1,58 @@
+base_images:
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
+releases:
+  latest:
+    integration:
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 150m
+      memory: 300Mi
+tests:
+- as: rosa-profile-demo
+  cron: 53 0 10 2 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: stable
+      TEST_PROFILE: rosa-advanced
+    test:
+    - ref: rosa-test-e2e
+    workflow: rosa-test-profile
+- as: rosa-sts-advanced-f3
+  cron: 45 1 1,4,7,10,13,16,19,22,25,28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: stable
+      TEST_LABEL_FILTERS: (day1,day1-post,day2)&&!NonClassicCluster&&!Exclude
+      TEST_PROFILE: rosa-advanced
+    test:
+    - ref: rosa-test-e2e
+    workflow: rosa-test-profile-ocm
+- as: rosa-hcp-advanced-f3
+  cron: 29 17 1,4,7,10,13,16,19,22,25,28 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: stable
+      TEST_LABEL_FILTERS: (day1,day1-post,day2)&&!NonHCPCluster&&!Exclude
+      TEST_PROFILE: rosa-hcp-advanced
+    test:
+    - ref: rosa-test-e2e
+    workflow: rosa-test-profile-ocm
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: rosa
+  variant: e2e

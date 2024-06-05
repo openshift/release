@@ -1,7 +1,7 @@
 chain:
   as: hypershift-kubevirt-run-e2e-external
   steps:
-  - chain: hypershift-kubevirt-create
+  - ref: hypershift-kubevirt-create
     credentials:
       - mount_path: /etc/ci-pull-credentials
         name: ci-pull-credentials
@@ -29,6 +29,14 @@ chain:
   - as: run-e2e-external
     cli: latest
     commands: |-
+        function cleanup() {
+          for child in $( jobs -p ); do
+            kill "${child}"
+          done
+          wait
+        }
+        trap cleanup EXIT
+
         if [ "${RUN_EXTERNAL_INFRA_TEST}" == "false" ]
         then
           echo "External infra test suite is not supported in this version and skipped."
@@ -42,6 +50,8 @@ chain:
       
         export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
         export RESTRICTED_INFRA_KUBECONFIG="/tmp/secret/restricted_infra_kubeconfig"
+      
+        INFRA_PLATFORM_TYPE=$(oc --kubeconfig /tmp/secret/kubeconfig get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
 
         while [ ! -e "${RESTRICTED_INFRA_KUBECONFIG}" ]; do
           sleep 10
@@ -65,7 +75,8 @@ chain:
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
                   --e2e.kubevirt-infra-kubeconfig=${RESTRICTED_INFRA_KUBECONFIG} \
                   ${STORAGE_CLASS_FLAG} \
-                  --e2e.kubevirt-infra-namespace=${EXTERNAL_INFRA_NS}
+                  --e2e.kubevirt-infra-namespace=${EXTERNAL_INFRA_NS} \
+                  --e2e.annotations=hypershift.openshift.io/management-platform=${INFRA_PLATFORM_TYPE}
 
     credentials:
       - mount_path: /etc/ci-pull-credentials

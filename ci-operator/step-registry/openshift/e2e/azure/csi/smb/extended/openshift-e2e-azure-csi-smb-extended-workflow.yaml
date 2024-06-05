@@ -1,0 +1,21 @@
+workflow:
+  as: openshift-e2e-azure-csi-smb-extended
+  steps:
+    pre:
+    - chain: ipi-azure-pre
+    - ref: optional-operators-subscribe
+    - ref: storage-create-csi-smb
+    - ref: storage-conf-wait-for-csi-driver
+    - ref: storage-obj-save
+    test:
+    - chain: openshift-e2e-azure-csi-smb-extended
+    post:
+    - ref: storage-obj-check
+    - ref: storage-destroy-csi-smb
+    - chain: ipi-azure-post
+    env:
+      CLUSTERCSIDRIVER: smb.csi.k8s.io
+      TRUECONDITIONS: SambaDriverControllerServiceControllerAvailable SambaDriverNodeServiceControllerAvailable
+      TEST_CSI_DRIVER_MANIFEST: manifest-samba.yaml
+  documentation: |-
+    The Openshift E2E Samba extended workflow installs the SMB CSI Driver Operator and executes the extended end-to-end test suite on the CSI driver that was installed during cluster setup.

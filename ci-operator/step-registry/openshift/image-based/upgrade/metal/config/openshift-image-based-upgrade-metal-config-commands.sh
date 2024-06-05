@@ -31,6 +31,32 @@ cat <<EOF > ${SHARED_DIR}/install.sh
 #!/bin/bash
 set -euo pipefail
 
+function dnf_install_retry {
+  packages=(\$@)
+  echo "Installing packages with retry"
+
+  for _ in \$(seq 3) ; do
+    sudo dnf clean -y all # clean the cache
+
+    # shellcheck disable=SC2086
+    sudo dnf install -y \${packages[*]} && return 0
+     
+    rc=\$? # save the return code
+
+    if [ \$rc -ne 0 ]
+    then
+      echo "Failed to run dnf install, retrying"
+    fi
+  done
+
+  if [ \$rc -ne 0 ]
+  then
+    echo "Failed to run dnf install after 3 attempts"
+  fi
+
+  return "\${rc}"
+}
+
 sudo subscription-manager config --rhsm.manage_repos=1 --rhsmcertd.disable=redhat-access-insights
 
 if ! sudo subscription-manager status >&/dev/null; then
@@ -47,14 +73,18 @@ sudo subscription-manager repos \
 cd ${remote_workdir}
 
 sudo dnf -y copr enable nmstate/nmstate-git
-sudo dnf -y clean all
-sudo dnf -y update
-sudo dnf -y install nmstate virt-install virt-manager libvirt-nss openshift-clients cockpit-machines golang jq sos
+dnf_install_retry nmstate virt-install virt-manager libvirt-nss openshift-clients cockpit-machines golang jq sos podman
 
 sudo systemctl start libvirtd
 sudo systemctl enable libvirtd
 
 sudo usermod -a -G libvirt ec2-user
+
+# Check for git
+if ! command -v git &> /dev/null
+then
+    dnf_install_retry git
+fi
 
 git clone https://github.com/rh-ecosystem-edge/ib-orchestrate-vm.git
 cd ib-orchestrate-vm && git checkout ${IB_ORCHESTRATE_VM_REF}

@@ -8,6 +8,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 REGION=${REGION:-$LEASED_RESOURCE}
+KMS_KEY_PREFIX=$(head -n 1 "${SHARED_DIR}/cluster-prefix")
 
 # get user arn
 user_arn=$(aws sts get-caller-identity --output json | jq -r .Arn)
@@ -76,7 +77,7 @@ if [[ -e "${OPERATOR_ROLES_ARNS_FILE}" ]]; then
 fi
 
 ts=$(date +%m%d%H%M%S)
-alias_name="${NAMESPACE}-${ts}"
+alias_name="${KMS_KEY_PREFIX}-${ts}"
 echo "Creating KMS key: $alias_name"
 key_output=${ARTIFACT_DIR}/key_output.json
 

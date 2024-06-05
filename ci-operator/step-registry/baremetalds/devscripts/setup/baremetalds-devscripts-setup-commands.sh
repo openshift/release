@@ -315,8 +315,17 @@ then
   # There may have only been one disk
   if [ -n "\$DATA_DISK" ] ; then
     mkfs.xfs -f "\${DATA_DISK}"
-    mkdir /opt/dev-scripts
-    mount "\${DATA_DISK}" /opt/dev-scripts
+
+    DATA_DISK_SIZE=\$(lsblk -o size --noheadings --bytes -d \${DATA_DISK})
+    # If there is a data disk but its less the 200G, its not big enough for both
+    # the storage pools and the registry, just place the pool on it.
+    if [ "\$DATA_DISK_SIZE" -lt "$(( 1024 ** 3 * 200 ))" ] ; then
+        mkdir -p /opt/dev-scripts/pool
+        mount "\${DATA_DISK}" /opt/dev-scripts/pool
+    else
+        mkdir /opt/dev-scripts
+        mount "\${DATA_DISK}" /opt/dev-scripts
+    fi
   fi
 elif [ ! -z "${NVME_DEVICE}" ] && [ -e "${NVME_DEVICE}" ] && [[ "\$(mount | grep ${NVME_DEVICE})" == "" ]];
 then

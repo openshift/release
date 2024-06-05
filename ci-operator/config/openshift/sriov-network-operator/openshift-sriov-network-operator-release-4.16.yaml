@@ -84,8 +84,7 @@ operator:
     with: pipeline:sriov-network-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.16"
+  - name: "4.16"
     namespace: ocp
 releases:
   initial:
@@ -176,6 +175,13 @@ tests:
       ADDITIONAL_WORKERS_NETWORKS: ""
       OPENSTACK_SRIOV_NETWORK: mellanox-hwoffload
     workflow: openshift-e2e-openstack-sriov-cgroupsv1
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: sriov-network-operator
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
 - always_run: false
   as: e2e-telco5g-cnftests
   cluster: build05

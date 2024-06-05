@@ -3,22 +3,10 @@
 set -o nounset
 set -o pipefail
 
-function extract_oc(){
-    echo -e "Extracting oc\n"
-    local retry=5 
-    tmp_oc="/tmp/client"
-    mkdir -p ${tmp_oc}
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE});
-    do
-        echo >&2 "Failed to extract oc binary, retry..."
-        (( retry -= 1 ))
-        if (( retry < 0 )); then return 1; fi
-        sleep 60
-    done
-    mv ${tmp_oc}/oc /tmp -f
-    export PATH="$PATH"
-    which oc
-    oc version --client
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
 }
 
 function get_tp_operator(){
@@ -260,6 +248,20 @@ function post-OCP-56083(){
     return 1
 }
 
+function post-OCP-23799(){
+        export OC_ENABLE_CMD_UPGRADE_ROLLBACK="true" #OCPBUGS-33905, rollback is protected by env feature gate now
+        SOURCE_VERSION="$(oc get clusterversion version -ojsonpath='{.status.history[1].version}')"
+        TARGET_VERSION="$(oc get clusterversion version -ojsonpath='{.status.history[0].version}')"
+        out="$(oc adm upgrade rollback 2>&1 || true)" # expecting an error, capture and don't fail
+        expected="error: ${SOURCE_VERSION} is less than the current target ${TARGET_VERSION} and matches the cluster's previous version, but rollbacks that change major or minor versions are not recommended."
+        if [[ ${out} != "${expected}" ]]; then
+            echo -e "to-latest rollback reject step failed. \nexpecting: \"${expected}\" \nreceived: \"${out}\""
+            return 1
+        else
+            echo "to-latest rollback reject step passed."
+        fi
+}
+
 # This func run all test cases with with checkpoints which will not break other cases,
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be ran or not
@@ -300,8 +302,9 @@ if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
 fi
 
 report_file="${ARTIFACT_DIR}/ota-test-result.txt"
-export PATH=/tmp:${PATH}
-extract_oc
+# oc cli is injected from release:target
+run_command "which oc"
+run_command "oc version --client"
 
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig

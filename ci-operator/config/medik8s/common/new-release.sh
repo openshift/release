@@ -36,5 +36,5 @@ for file in $(ls | grep main__); do
 done
 
 echo "Done, please run 'make update' for creating jobs"
-echo "HEADS UP: update branch protection in core-services/prow/02_config/medik8s!"
+echo "HEADS UP: update branch protection in core-services/prow/02_config/medik8s/_prowconfig.yaml !"
 

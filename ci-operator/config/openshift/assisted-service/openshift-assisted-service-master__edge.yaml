@@ -107,6 +107,15 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-service
+- build_args:
+  - name: BASE_TAG
+    value: stream8
+  dockerfile_path: Dockerfile.assisted-service
+  inputs:
+    openshift_release_golang-1.20:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.20
+  to: assisted-service-el8
 - dockerfile_literal: |
     FROM coreos/centos
     COPY . .
@@ -114,7 +123,7 @@ images:
   to: assisted-service-scripts
 - dockerfile_literal: |
     FROM coreos/centos
-    RUN yum install -y skopeo
+    RUN yum install -y --skip-broken skopeo pip
   from: src
   to: assisted-service-publish-index
 operator:
@@ -167,11 +176,29 @@ tests:
       SOURCE_IMAGE_REF: assisted-service
     test:
     - ref: assisted-baremetal-images-publish
+- as: mirror-nightly-image-el8
+  cron: '@daily'
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-service-el8
+    env:
+      IMAGE_REPO: assisted-service-el8
+    test:
+    - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-service
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: mirror-vcsref-image-el8
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-service-el8
+    env:
+      IMAGE_REPO: assisted-service-el8
     test:
     - ref: assisted-baremetal-images-publish
 - as: operator-publish
@@ -237,7 +264,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.15"
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     allow_best_effort_post_steps: true
@@ -272,7 +299,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.15"
   cron: 00 00 */1 * 0-5
   steps:
     allow_best_effort_post_steps: true
@@ -307,7 +334,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.15"
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     allow_best_effort_post_steps: true
@@ -343,7 +370,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.15"
   cron: 00 00 */1 * 0-5
   steps:
     allow_best_effort_post_steps: true
@@ -1036,6 +1063,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         WORKER_DISK=40000000000
+      PACKET_PLAN: m3.large.x86
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
@@ -1050,6 +1078,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         WORKER_DISK=40000000000
+      PACKET_PLAN: m3.large.x86
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)

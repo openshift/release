@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
     tag: base
 build_root:
@@ -19,17 +19,17 @@ operator:
     with: pipeline:lifecycle-agent-operator
 promotion:
   to:
-  - name: "4.16"
+  - name: "4.17"
     namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.16"
+      name: "4.17"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
+      name: "4.17"
       namespace: ocp
 resources:
   '*':
@@ -86,16 +86,32 @@ tests:
 - as: ibu-e2e-flow
   cluster: build02
   optional: true
+  skip_if_only_changed: ^docs/|LICENSE|OWNERS|\.md$|^hack$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+    env:
+      OCP_BASE_VERSION: "4.16"
+      OCP_IMAGE_SOURCE: ci
+      SEED_IMAGE_TAG_FORMAT: presubmit
+    workflow: openshift-image-based-upgrade-presubmit
+  timeout: 4h0m0s
+- as: ibi-e2e-flow
+  cluster: build02
+  optional: true
+  skip_if_only_changed: ^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
     cluster_profile: aws
     dependencies:
       LCA_PULL_REF: pipeline:lifecycle-agent-operator
     env:
       OCP_BASE_VERSION: "4.15"
-      OCP_IMAGE_SOURCE: release
+      OCP_IMAGE_SOURCE: ci
       SEED_IMAGE_TAG_FORMAT: presubmit
-    workflow: openshift-image-based-upgrade-presubmit
-  timeout: 4h0m0s
+      SEED_IMAGE_TAG_PREFIX: ibi
+    workflow: openshift-image-based-install
+  timeout: 3h0m0s
 - as: security
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

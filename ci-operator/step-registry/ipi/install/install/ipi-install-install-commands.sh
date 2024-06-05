@@ -123,6 +123,12 @@ function populate_artifact_dir() {
       awk -F'id=' '/alicloud_instance.*Creation complete/ && /master/{ print $2 }' "${dir}/.openshift_install.log" | tr -d ']"' > "${SHARED_DIR}/alibaba-instance-ids.txt";;
   *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
   esac
+
+  # Copy CAPI-generated artifacts if they exist
+  if [ -d "${dir}/.clusterapi_output" ]; then
+    echo "Copying Cluster API generated manifests..."
+    cp -rpv "${dir}/.clusterapi_output" "${ARTIFACT_DIR}/" 2>/dev/null
+  fi
 }
 
 
@@ -577,7 +583,7 @@ alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.i
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
 vsphere*)
     export VSPHERE_PERSIST_SESSION=true
-    export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
+    export SSL_CERT_FILE=/var/run/vsphere-ibmcloud-ci/vcenter-certificate
     ;;
 openstack-osuosl) ;;
 openstack-ppc64le) ;;
@@ -594,6 +600,11 @@ cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 echo "install-config.yaml"
 echo "-------------------"
 cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
+
+# Don't require the installer to run in a FIPS-enabled environment
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure
@@ -645,6 +656,10 @@ do
   cp "${item}" "${dir}/tls/${manifest##tls_}"
 done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -print0)
 
+# Collect bootstrap logs for all azure clusters
+case "${CLUSTER_TYPE}" in
+azure4|azure-arm64) OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP=true ;;
+esac
 if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
   set +o errexit
   # Inject promtail in bootstrap.ign

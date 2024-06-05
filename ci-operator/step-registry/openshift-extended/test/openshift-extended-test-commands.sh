@@ -4,7 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'warn_0_case_executed' INT TERM EXIT
 function warn_0_case_executed {
     local count
     count="$(ls ${ARTIFACT_DIR} | wc -l)"
@@ -20,6 +19,24 @@ EOF
 
     fi
 }
+
+function save_oidc_tokens {
+    echo "Saving oidc tokens back to SHARED_DIR"
+    cp "$token_cache_dir"/* "$SHARED_DIR"/oc-oidc-token
+    ls "$token_cache_dir" > "$SHARED_DIR"/oc-oidc-token-filename
+}
+
+function exit_trap {
+    echo "Exit trap triggered"
+    date '+%s' > "${SHARED_DIR}/TEST_TIME_TEST_END" || :
+    warn_0_case_executed
+    if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
+        save_oidc_tokens
+    fi
+}
+
+trap 'exit_trap' EXIT
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
@@ -39,8 +56,6 @@ fi
 # so, currently some cases need to access gcp service whether the cluster_type is gcp or not
 # and they will fail, like some cvo cases, because /var/run/secrets/ci.openshift.io/cluster-profile/gce.json does not exist.
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
-
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 # prepare for the future usage on the kubeconfig generation of different workflow
 test -n "${KUBECONFIG:-}" && echo "${KUBECONFIG}" || echo "no KUBECONFIG is defined"
@@ -63,7 +78,18 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-#setup bastion
+# restore external oidc cache dir for oc
+if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
+    echo "Restoring external OIDC cache dir for oc"
+    export KUBECACHEDIR
+    KUBECACHEDIR="/tmp/output/oc-oidc"
+    token_cache_dir="$KUBECACHEDIR/oc"
+    mkdir -p "$token_cache_dir"
+    cat "$SHARED_DIR/oc-oidc-token" > "$token_cache_dir/$(cat "$SHARED_DIR/oc-oidc-token-filename")"
+    oc whoami
+fi
+
+# setup bastion
 if test -f "${SHARED_DIR}/bastion_public_address"
 then
     QE_BASTION_PUBLIC_ADDRESS=$(cat "${SHARED_DIR}/bastion_public_address")
@@ -115,7 +141,7 @@ then
     export CLUSTER_ID
 fi
 
-# configure enviroment for different cluster
+# configure environment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
 gcp)
@@ -205,8 +231,8 @@ cd /tmp/output
 
 if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     pushd /tmp
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
-    tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
+    tar -xzf google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
     export PATH=$PATH:/tmp/google-cloud-sdk/bin
     mkdir -p gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig
@@ -216,13 +242,40 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
 fi
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
-trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
 # check if the cluster is ready
 oc version --client
 oc wait nodes --all --for=condition=Ready=true --timeout=15m
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
 oc get clusterversion version -o yaml || true
+
+function remove_kubeadmin_user() {
+    if [[ "$KUBEADMIN_REMOVED" == "true" ]]; then
+        ret_delete_admin=0
+
+        ## it is hosted cluster only for workflow cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+        ## it means you only see hosted cluster in testing
+        if test -f "${SHARED_DIR}/nested_kubeconfig" && diff -q "${SHARED_DIR}/nested_kubeconfig" "${SHARED_DIR}/kubeconfig" >/dev/null; then
+            return
+        fi
+
+        echo "KUBEADMIN_REMOVED is set to 'true' and it is not hosted cluster. Deleting kubeadmin secret..."
+        oc --kubeconfig="${SHARED_DIR}/kubeconfig" delete secrets kubeadmin -n kube-system || ret_delete_admin=$?
+        if [ "W${ret_delete_admin}W" != "W0W" ]; then
+            echo "fail to delete kubeadmin-password in mgmt clusger or non-hypershift cluster"
+            if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
+                echo "do not force success exit"
+                exit 1
+            fi
+            echo "force success exit"
+            exit 0
+        fi
+        echo "Kubeadmin secret deleted successfully for mgmt cluster or non-hypershift cluster."
+
+    else
+        echo '$KUBEADMIN_REMOVED not set to "true". Skipping deletion.'
+    fi
+}
 
 # execute the cases
 function run {
@@ -314,6 +367,7 @@ function run {
     touch "${ARTIFACT_DIR}/skip_overall_if_fail"
     ret_value=0
     set -x
+    remove_kubeadmin_user
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
         extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         -o "${ARTIFACT_DIR}/extended.log" \

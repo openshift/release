@@ -48,7 +48,7 @@ for count in $(seq 1 ${RHEL_WORKER_COUNT}); do
 
   # az command to create RHEL VM and append --zone when the region has AZ
   # add --assign-identity in the vm creation command to add cluster identity to the RHEL vm
-  cmd="az vm create --resource-group '${cluster_rg}' --name '${infra_id}-rhel-${count}' --image '${RHEL_IMAGE}' --ssh-key-values '${SSH_PUB_KEY_PATH}' --admin-user '${RHEL_USER}' --public-ip-address '' --size '${RHEL_VM_SIZE}' --os-disk-size-gb '${RHEL_VM_DISK_SIZE}' --nsg '' --subnet '${computeSubnetID}' --assign-identity '${infra_id}-identity'"
+  cmd="az vm create --resource-group '${cluster_rg}' --name '${infra_id}-rhel-${count}' --image '${RHEL_IMAGE}' --ssh-key-values '${SSH_PUB_KEY_PATH}' --admin-user '${RHEL_USER}' --accelerated-networking 'true' --public-ip-address '' --size '${RHEL_VM_SIZE}' --os-disk-size-gb '${RHEL_VM_DISK_SIZE}' --nsg '' --subnet '${computeSubnetID}' --assign-identity '${infra_id}-identity'"
 
   if [ "${az_num}" != "0" ]; then
     cmd="${cmd} --zone $((${count} % ${az_num} + 1))"

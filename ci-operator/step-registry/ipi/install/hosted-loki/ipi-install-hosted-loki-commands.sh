@@ -21,8 +21,9 @@ then
     PROXYCFGLINE="        proxy_url: http://[fd00:1101::1]:8213"
     PROXYLINE="          - name: https_proxy
             value: http://[fd00:1101::1]:8213"
-# Some kinds of jobs need to skip installing loki by default
-elif [[ "$JOB_NAME" =~ .*proxy.* ]]
+# Some kinds of jobs need to skip installing loki by default; but to make
+# sure we rightfully skip them, we have two different conditions.
+elif [[ "$JOB_NAME" =~ .*proxy.* ]] || test -f "${SHARED_DIR}/proxy-conf.sh"
 then
   echo "Clusters using a proxy are not yet supported for loki"
   exit 0
@@ -431,6 +432,7 @@ spec:
           readOnlyRootFilesystem: true
           runAsGroup: 0
           runAsUser: 0
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: "/etc/promtail"
           name: config
@@ -469,7 +471,7 @@ spec:
             cpu: 20m
             memory: 50Mi
         terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /etc/tls/private
           name: proxy-tls
@@ -487,6 +489,7 @@ spec:
         - --oidc.issuer-url=https://sso.redhat.com/auth/realms/redhat-external
         - --margin=10m
         - --file=/tmp/shared/prod_bearer_token
+        terminationMessagePolicy: FallbackToLogsOnError
         env:
           - name: CLIENT_ID
             valueFrom:
@@ -744,6 +747,7 @@ spec:
               memory: 20Mi
           args:
             - -conf=/data/config.yaml
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - mountPath: /data
               name: cfg

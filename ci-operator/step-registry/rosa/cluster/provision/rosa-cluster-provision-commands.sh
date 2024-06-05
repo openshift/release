@@ -32,6 +32,7 @@ CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
 ADDITIONAL_SECURITY_GROUP=${ADDITIONAL_SECURITY_GROUP:-false}
 NO_CNI=${NO_CNI:-false}
 CONFIGURE_CLUSTER_AUTOSCALER=${CONFIGURE_CLUSTER_AUTOSCALER:-false}
+CLUSTER_PREFIX=$(head -n 1 "${SHARED_DIR}/cluster-prefix")
 
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
@@ -65,19 +66,32 @@ fi
 
 # Define cluster name
 CLUSTER_NAME=""
+DOMAIN_PREFIX_SWITCH=""
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]] && [[ -e "${SHARED_DIR}/cluster-name" ]]; then
   # For Shared VPC cluster, cluster name is determined in step aws-provision-route53-private-hosted-zone
   #   as Private Hosted Zone needs to be ready before installing Shared VPC cluster
   CLUSTER_NAME=$(head -n 1 "${SHARED_DIR}/cluster-name")
 else
-  prefix="ci-rosa"
-  if [[ "$HOSTED_CP" == "true" ]]; then
-    prefix="ci-rosa-h"
-  elif [[ "$STS" == "true" ]]; then
-    prefix="ci-rosa-s"
+  CLUSTER_NAME=${CLUSTER_NAME:-$CLUSTER_PREFIX}
+  # For long cluster name enabled, append a "long_name_prefix_len" chars long random string to cluster name
+  # Max possible prefix length is 14, hyppen is used 1 times, random string of length "long_name_prefix_len"
+  # (14 + 1 + "long_name_prefix_len" = 54 )
+  MAX_CLUSTER_NAME_LENGTH=54
+  if [[ "$LONG_CLUSTER_NAME_ENABLED" == "true" ]]; then
+    long_name_prefix_len=$(( MAX_CLUSTER_NAME_LENGTH - $(echo -n "$CLUSTER_NAME" | wc -c) - 1 ))
+    long_name_prefix=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c $long_name_prefix_len)
+    CLUSTER_NAME="$CLUSTER_PREFIX-$long_name_prefix"
   fi
-  subfix=$(openssl rand -hex 2)
-  CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
+  
+  #set the domain prefix of length (<=15)
+  MAX_DOMAIN_PREFIX_LENGTH=15
+  if [[ "$SPECIFY_DOMAIN_PREFIX" == "true" ]]; then
+    first_char=$(head /dev/urandom | tr -dc 'a-z' | head -c 1)
+    remaining_chars=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c $((MAX_DOMAIN_PREFIX_LENGTH - 1)))
+    DOMAIN_PREFIX="$first_char$remaining_chars"
+    DOMAIN_PREFIX_SWITCH="--domain-prefix $DOMAIN_PREFIX"
+  fi
+  #else the domain prefix will be auto generated.
 fi
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
@@ -96,15 +110,27 @@ else
   exit 1
 fi
 
+read_profile_file() {
+  local file="${1}"
+  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/${file}"
+  fi
+}
+
 # Log in
-ROSA_VERSION=$(rosa version)
-ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+ROSA_TOKEN=$(read_profile_file "ocm-token")
+if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
+  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+  ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+elif [[ -n "${ROSA_TOKEN}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token"
   rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
   ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
 else
-  echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
+  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
   exit 1
 fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
@@ -306,7 +332,20 @@ if [[ "$HOSTED_CP" == "true" ]]; then
         exit 1
       fi
     fi
-    PROVISION_SHARD_ID=$(echo "$psList" | head -n 1)
+
+    PROVISION_SHARD_ID=""
+    # ensure the SC is not for ibm usage so that it could support the latest version of the hosted cluster
+    for ps in $psList ; do
+      topology=$(ocm get /api/clusters_mgmt/v1/provision_shards/${ps} | jq -r '.hypershift_config.topology')
+      if [[ "$topology" == "*dedicated*" ]] ; then
+      	PROVISION_SHARD_ID=${ps}
+      fi
+    done
+
+    if [[ -z "$PROVISION_SHARD_ID" ]]; then
+        echo "No available provision shard found! psList: $psList"
+        exit 1
+    fi
 
     HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
     record_cluster "properties" "provision_shard_id" ${PROVISION_SHARD_ID}
@@ -395,7 +434,7 @@ if [[ "$STS" == "true" ]]; then
   STS_SWITCH="--sts"
 
   # Account roles
-  ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
+  ACCOUNT_ROLES_PREFIX=$CLUSTER_PREFIX
   echo -e "Get the ARNs of the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
 
   roleARNFile="${SHARED_DIR}/account-roles-arns"
@@ -423,7 +462,7 @@ if [[ "$STS" == "true" ]]; then
 
   if [[ "$BYO_OIDC" == "true" ]]; then
     oidc_config_id=$(cat "${SHARED_DIR}/oidc-config" | jq -r '.id')
-    operator_roles_prefix=$(cat "${SHARED_DIR}/operator-roles-prefix")
+    operator_roles_prefix=$CLUSTER_PREFIX
     BYO_OIDC_SWITCH="--oidc-config-id ${oidc_config_id} --operator-roles-prefix ${operator_roles_prefix}"
     record_cluster "aws.sts" "oidc_config_id" $oidc_config_id
     record_cluster "aws.sts" "operator_roles_prefix" $operator_roles_prefix
@@ -507,6 +546,7 @@ ${HYPERSHIFT_SWITCH} \
 --channel-group ${CHANNEL_GROUP} \
 --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
 --tags ${TAGS} \
+${DOMAIN_PREFIX_SWITCH} \
 ${ACCOUNT_ROLES_SWITCH} \
 ${EC2_METADATA_HTTP_TOKENS_SWITCH} \
 ${MULTI_AZ_SWITCH} \

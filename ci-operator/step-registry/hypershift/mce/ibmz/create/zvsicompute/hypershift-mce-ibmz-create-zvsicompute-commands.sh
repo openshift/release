@@ -3,14 +3,19 @@
 set -x
 
 # Session variables
-infra_name="$HC_NAME-$(echo -n $PROW_JOB_ID|cut -c-8)"
+HC_NAME="$(printf $PROW_JOB_ID|sha256sum|cut -c-20)"
+export HC_NAME
+job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
+export job_id
 plugins_list=("vpc-infrastructure" "cloud-dns-services")
+infra_name="hcp-ci-$job_id"
+export infra_name
 hcp_ns=$HC_NS-$HC_NAME
 export hcp_ns
+hcp_domain="$job_id-$HYPERSHIFT_BASEDOMAIN"
+export hcp_domain
 IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
-httpd_vsi_pub_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key"
-export httpd_vsi_pub_key
 httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
 
@@ -67,15 +72,7 @@ else
   echo "Resource Group $infra_name-rg is created successfully and is in active state in the $IC_REGION region."
 fi
 
-# Create SSH key
-set -e
-echo "Creating an SSH key in the resource group $infra_name-rg"
-ibmcloud is key-create $infra_name-key @$httpd_vsi_pub_key --resource-group-name $infra_name-rg
-ibmcloud is keys --resource-group-name $infra_name-rg | grep -i $infra_name-key
-set +e
-
 # Create VPC
-set -e
 echo "Creating a VPC in the resource group $infra_name-rg"
 ibmcloud is vpc-create $infra_name-vpc --resource-group-name $infra_name-rg
 set +e
@@ -101,6 +98,41 @@ else
   echo "Subnet $infra_name-sn is created successfully in the $infra_name-vpc VPC."
 fi
 
+# Create a bastion node in the same VPC for configuring proxy server
+set -e
+echo "Triggering the $infra_name-bastion VSI creation on IBM Cloud in the VPC $infra_name-vpc"
+ibmcloud is instance-create $infra_name-bastion $infra_name-vpc $IC_REGION-1 bx2-2x8 $infra_name-sn --image ibm-redhat-9-2-minimal-amd64-2 --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg
+sleep 60
+set +e
+bvsi_state=$(ibmcloud is instance $infra_name-bastion | awk '/Status/{print $2}')
+if [ "$bvsi_state" != "running" ]; then
+  echo "Error: Instance $infra_name-bastion is not created properly in the $infra_name-vpc VPC."
+  exit 1
+else 
+  echo "Instance $infra_name-bastion is created successfully in the $infra_name-vpc VPC."
+fi
+bsg_name=$(ibmcloud is instance $infra_name-bastion --output JSON | jq -r '.network_interfaces|.[].security_groups|.[].name')
+echo "Adding an inbound rule in the $infra_name-bastion instance security group for ssh and scp."
+ibmcloud is sg-rulec $bsg_name inbound tcp --port-min 22 --port-max 22
+ibmcloud is sg-rulec $bsg_name inbound all
+
+if [ $? -eq 0 ]; then
+    echo "Successfully added the inbound rule."
+else
+    echo "Failure while adding the inbound rule to the $infra_name-bastion instance security group."
+    exit 1
+fi  
+echo "Getting the Virtual Network Interface ID for bastion VSI"
+bvni_id=$(ibmcloud is instance $infra_name-bastion | awk '/Primary/{print $7}')
+echo "Creating a Floating IP for bastion VSI"
+bvsi_fip=$(ibmcloud is floating-ip-reserve $infra_name-bastion-ip --nic $bvni_id | awk '/Address/{print $2}')
+if [ -z "$bvsi_fip" ]; then
+  echo "Error: Floating IP assignment is failed to the bastion VSI."
+  exit 1
+else
+  echo "Floating IP is assigned to the bastion VSI : $bvsi_fip"
+fi
+
 # Create zVSI compute nodes
 set -e
 zvsi_rip_list=()
@@ -108,7 +140,7 @@ zvsi_fip_list=()
 for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
   echo "Triggering the $infra_name-compute-$i zVSI creation on IBM Cloud in the VPC $infra_name-vpc"
   vol_json=$(jq -n -c --arg volume "$infra_name-compute-$i-volume" '{"name": $volume, "volume": {"name": $volume, "capacity": 250, "profile": {"name": "general-purpose"}}}')
-  ibmcloud is instance-create $infra_name-compute-$i $infra_name-vpc $IC_REGION-1 $ZVSI_PROFILE $infra_name-sn --image $ZVSI_IMAGE --keys $infra_name-key --resource-group-name $infra_name-rg --boot-volume $vol_json
+  ibmcloud is instance-create $infra_name-compute-$i $infra_name-vpc $IC_REGION-1 $ZVSI_PROFILE $infra_name-sn --image $ZVSI_IMAGE --keys hcp-prow-ci-dnd-key --resource-group-name $infra_name-rg --boot-volume $vol_json
   set +e
   sleep 60
   zvsi_state=$(ibmcloud is instance $infra_name-compute-$i | awk '/Status/{print $2}')
@@ -129,18 +161,18 @@ for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
       echo "Failure while adding the inbound rule to the $infra_name-compute-$i instance security group."
       exit 1
   fi  
-  nic_name=$(ibmcloud is in-nics $infra_name-compute-$i -q | grep -v ID | awk '{print $2}')
+  
+  echo "Getting the Virtual Network Interface ID for zVSI"
+  vni_id=$(ibmcloud is instance $infra_name-compute-$i | awk '/Primary/{print $7}')
   echo "Creating a Floating IP for zVSI"
-  zvsi_fip=$(ibmcloud is ipc $infra_name-compute-$i-ip --zone $IC_REGION-1 --resource-group-name $infra_name-rg | awk '/Address/{print $2}')
-  echo "Assigning the Floating IP for zVSI"
-  zvsi_fip_status=$(ibmcloud is in-nic-ipc $infra_name-compute-$i $nic_name $infra_name-compute-$i-ip | awk '/Status/{print $2}')
-  if [ "$zvsi_fip_status" != "available" ]; then
-    echo "Error: Floating IP $infra_name-compute-ip is not assigned to the $infra_name-compute instance."
+  zvsi_fip=$(ibmcloud is floating-ip-reserve $infra_name-compute-$i-ip --nic $vni_id | awk '/Address/{print $2}')
+  if [ -z "$zvsi_fip" ]; then
+    echo "Error: Floating IP assignment failed. zvsi_fip is empty."
     exit 1
-  else 
-    echo "Floating IP $infra_name-compute-ip is successfully assigned to the $infra_name-compute instance."
-    zvsi_fip_list+=("$zvsi_fip")
+  else
+    echo "Floating IP assigned to zVSI : $zvsi_fip"
   fi
+  zvsi_fip_list+=("$zvsi_fip")
 done
 
 # Creating DNS service
@@ -153,30 +185,30 @@ else
   exit 1
 fi
 
-echo "Creating the DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN in the instance $infra_name-dns."
-dns_zone_id=$(ibmcloud dns zone-create "$HC_NAME.$HYPERSHIFT_BASEDOMAIN" -i $infra_name-dns --output JSON | jq -r '.id')
+echo "Creating the DNS zone $HC_NAME.$hcp_domain in the instance $infra_name-dns."
+dns_zone_id=$(ibmcloud dns zone-create "$HC_NAME.$hcp_domain" -i $infra_name-dns --output JSON | jq -r '.id')
 if [ -z $dns_zone_id ]; then
-  echo "DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN is not created properly as it is not possesing any ID."
+  echo "DNS zone $HC_NAME.$hcp_domain is not created properly as it is not possesing any ID."
   exit 1
 else 
-  echo "DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN is created successfully in the instance $infra_name-dns."
+  echo "DNS zone $HC_NAME.$hcp_domain is created successfully in the instance $infra_name-dns."
 fi
 
-echo "Adding VPC network $infra_name-vpc to the DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN"
+echo "Adding VPC network $infra_name-vpc to the DNS zone $HC_NAME.$hcp_domain"
 dns_network_state=$(ibmcloud dns permitted-network-add $dns_zone_id --type vpc --vpc-crn $vpc_crn -i $infra_name-dns --output JSON | jq -r '.state')
 if [ "$dns_network_state" != "ACTIVE" ]; then
-  echo "VPC network $infra_name-vpc which is added to the DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN is not in ACTIVE state."
+  echo "VPC network $infra_name-vpc which is added to the DNS zone $HC_NAME.$hcp_domain is not in ACTIVE state."
   exit 1
 else 
-  echo "VPC network $infra_name-vpc is successfully added to the DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN."
-  echo "DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN is in the ACTIVE state."
+  echo "VPC network $infra_name-vpc is successfully added to the DNS zone $HC_NAME.$hcp_domain."
+  echo "DNS zone $HC_NAME.$hcp_domain is in the ACTIVE state."
 fi
 
 echo "Fetching the hosted cluster IP address for resolution"
 hc_url=$(cat ${SHARED_DIR}/nested_kubeconfig | awk '/server/{print $2}' | cut -c 9- | cut -d ':' -f 1)
 hc_ip=$(dig +short $hc_url | head -1)
 
-echo "Adding A records in the DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN to resolve the api URLs of hosted cluster to the hosted cluster IP."
+echo "Adding A records in the DNS zone $HC_NAME.$hcp_domain to resolve the api URLs of hosted cluster to the hosted cluster IP."
 ibmcloud dns resource-record-create $dns_zone_id --type A --name "api" --ipv4 $hc_ip -i $infra_name-dns
 ibmcloud dns resource-record-create $dns_zone_id --type A --name "api-int" --ipv4 $hc_ip -i $infra_name-dns
 if [ $? -eq 0 ]; then
@@ -225,32 +257,33 @@ chmod 0600 ${tmp_ssh_key}
 ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "${tmp_ssh_key}")
 echo "Downloading the rootfs image locally and transferring to HTTPD server"
 curl -k -L --output $HOME/rootfs.img "$rootfs_url"
-scp "${ssh_options[@]}" $HOME/rootfs.img root@$httpd_vsi_ip:/var/www/html/rootfs.img 
-ssh "${ssh_options[@]}" root@$httpd_vsi_ip "chmod 644 /var/www/html/rootfs.img"
+scp "${ssh_options[@]}" $HOME/rootfs.img root@$httpd_vsi_ip:/var/www/html/rootfs-$PROW_JOB_ID.img 
+ssh "${ssh_options[@]}" root@$httpd_vsi_ip "chmod 644 /var/www/html/rootfs-$PROW_JOB_ID.img"
 echo "Downloading the setup script for pxeboot of agents"
-curl -k -L --output $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot.sh"
+curl -k -L --output $HOME/trigger_pxeboot.sh "http://$httpd_vsi_ip:80/trigger_pxeboot.sh"
 minitrd_url="${initrd_url//&/\\&}"                                 # Escaping & while replacing the URL
 export minitrd_url
 mkernel_url="${kernel_url//&/\\&}"                                 # Escaping & while replacing the URL
 export mkernel_url
-sed -i "s|INITRD_URL|${minitrd_url}|" $HOME/setup_pxeboot.sh 
-sed -i "s|KERNEL_URL|${mkernel_url}|" $HOME/setup_pxeboot.sh 
-sed -i "s|HTTPD_VSI_IP|${httpd_vsi_ip}|" $HOME/setup_pxeboot.sh 
-chmod 700 $HOME/setup_pxeboot.sh
+rootfs_url_httpd="http://$httpd_vsi_ip:80/rootfs-$PROW_JOB_ID.img"
+export rootfs_url_httpd
+sed -i "s|INITRD_URL|${minitrd_url}|" $HOME/trigger_pxeboot.sh 
+sed -i "s|KERNEL_URL|${mkernel_url}|" $HOME/trigger_pxeboot.sh 
+sed -i "s|ROOTFS_URL|${rootfs_url_httpd}|" $HOME/trigger_pxeboot.sh  
+chmod 700 $HOME/trigger_pxeboot.sh
 
 # Booting up zVSIs as agents
 for fip in "${zvsi_fip_list[@]}"; do
   echo "Transferring the setup script to zVSI $fip"
-  scp "${ssh_options[@]}" $HOME/setup_pxeboot.sh core@$fip:/var/home/core/setup_pxeboot.sh
+  scp "${ssh_options[@]}" $HOME/trigger_pxeboot.sh root@$fip:/root/trigger_pxeboot.sh
   echo "Triggering the script in the zVSI $fip"
-  ssh "${ssh_options[@]}" core@$fip "/var/home/core/setup_pxeboot.sh" &
+  ssh "${ssh_options[@]}" root@$fip "/root/trigger_pxeboot.sh" &
   sleep 60
   echo "Successfully booted the zVSI $fip as agent"
 done
 
 # Deleting the resources downloaded in the pod
-rm -f $HOME/setup_pxeboot.sh  $HOME/rootfs.img
-
+rm -f $HOME/trigger_pxeboot.sh  $HOME/rootfs-$PROW_JOB_ID.img
 # Wait for agents to join (max: 20 min)
 for ((i=50; i>=1; i--)); do
   agents_count=$(oc get agents -n $hcp_ns --no-headers | wc -l)
@@ -272,7 +305,7 @@ agents=$(oc get agents -n $hcp_ns --no-headers | awk '{print $1}')
 agents=$(echo "$agents" | tr '\n' ' ')
 IFS=' ' read -ra agents_list <<< "$agents"
 for ((i=0; i<$HYPERSHIFT_NODE_COUNT; i++)); do
-  oc -n $hcp_ns patch agent ${agents_list[i]} -p "{\"spec\":{\"approved\":true,\"hostname\":\"compute-$i.${HYPERSHIFT_BASEDOMAIN}\"}}" --type merge
+  oc -n $hcp_ns patch agent ${agents_list[i]} -p "{\"spec\":{\"approved\":true,\"hostname\":\"compute-$i.${hcp_domain}\"}}" --type merge
 done
 
 # Scaling up nodepool
@@ -287,4 +320,30 @@ echo "$(date) All the agents are attached as compute nodes to the hosted control
 echo "$(date) Checking the compute nodes in the hosted control plane"
 oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
 oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=30m
+
+# Configuring proxy server on bastion 
+echo "Getting management cluster basedomain to allow traffic to proxy server"
+mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut -d':' -f1)
+
+echo "Downloading the proxy setup script"
+curl -k -L --output $HOME/setup_proxy.sh "http://$httpd_vsi_ip:80/setup_proxy.sh"
+
+sed -i "s|MGMT_DOMAIN|${mgmt_domain}|" $HOME/setup_proxy.sh 
+sed -i "s|HCP_DOMAIN|${hcp_domain}|" $HOME/setup_proxy.sh 
+chmod 700 $HOME/setup_proxy.sh
+
+echo "Transferring the setup script to Bastion"
+scp "${ssh_options[@]}" $HOME/setup_proxy.sh root@$bvsi_fip:/root/setup_proxy.sh
+echo "Triggering the proxy server setup on Bastion"
+ssh "${ssh_options[@]}" root@$bvsi_fip "/root/setup_proxy.sh"
+
+cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
+export HTTP_PROXY=http://${bvsi_fip}:3128/
+export HTTPS_PROXY=http://${bvsi_fip}:3128/
+export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+
+export http_proxy=http://${bvsi_fip}:3128/
+export https_proxy=http://${bvsi_fip}:3128/
+export no_proxy="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+EOF
 echo "$(date) Successfully completed the e2e creation chain"

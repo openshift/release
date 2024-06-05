@@ -23,13 +23,17 @@ function preparation_for_test() {
     fi
     #shellcheck source=${SHARED_DIR}/runtime_env
     source "${SHARED_DIR}/runtime_env"
-    upuser1=$(echo "${USERS}" | cut -d ',' -f 30)
-    upuser2=$(echo "${USERS}" | cut -d ',' -f 29)
+    IFS=',' read upuser1 upuser2 _ < <(echo $USERS | cut -d',' -f8-10)
+    apiport="$(yq '.environments.ocp4.api_port' <<< $BUSHSLICER_CONFIG)"
+    version="$(yq '.environments.ocp4.version' <<< $BUSHSLICER_CONFIG)"
+    browser="$(yq '.global.browser' <<< $BUSHSLICER_CONFIG)"
     export BUSHSLICER_CONFIG="
 global:
-  browser: chrome
+  browser: '${browser}'
 environments:
   ocp4:
+    api_port: '${apiport}'
+    version: '${version}'
     static_users_map:
       upuser1: '${upuser1}'
       upuser2: '${upuser2}'
@@ -105,8 +109,11 @@ function filter_test_by_network() {
         ovnkubernetes)
 	    networktag='@network-ovnkubernetes'
 	    ;;
+        other)
+	    networktag=''
+	    ;;
         *)
-	    echo "######Expected network to be SDN/OVN, but got: $networktype"
+	    echo "######Expected network to be SDN/OVN/Other, but got: $networktype"
 	    ;;
     esac
     if [[ -n $networktag ]] ; then

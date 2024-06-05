@@ -1,15 +1,11 @@
-build_root:
-  image_stream_tag:
-    name: builder
+base_images:
+  base:
+    name: ubi-minimal
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
-releases:
-  latest:
-    candidate:
-      architecture: amd64
-      product: ocp
-      stream: nightly
-      version: "4.14"
+    tag: "9"
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 resources:
   '*':
     limits:
@@ -22,6 +18,26 @@ tests:
   commands: GOFLAGS="" make test
   container:
     from: src
+- as: e2e-oncluster-test
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  steps:
+    test:
+    - as: test
+      commands: |
+        openshift/cluster-prepare.sh
+        openshift/e2e_oncluster_tests.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1h0m0s
+    workflow: generic-claim
 zz_generated_metadata:
   branch: release-next
   org: openshift-knative

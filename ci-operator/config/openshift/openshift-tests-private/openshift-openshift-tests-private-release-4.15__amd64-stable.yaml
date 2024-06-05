@@ -422,6 +422,22 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-aws-sts-hcp-private-proxy
+- as: aws-rosa-hcp-sector-private-proxy-prod-stable-critical-f28
+  cron: 12 2 27 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: canary
+      E2E_RUN_TAGS: '@rosa and @critical'
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.15"
+      REGION: us-east-1
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hcp-private-proxy
 - as: aws-usgov-ipi-private-sts-f14
   cron: 44 17 13,29 * *
   steps:
@@ -481,7 +497,6 @@ tests:
   steps:
     cluster_profile: azurestack-qe
     env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
     test:
@@ -609,17 +624,18 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-nutanix-ipi
-- as: nutanix-ipi-disc-f14
+- as: nutanix-ipi-disc-rt-f14
   cluster: build01
   cron: 23 3 7,23 * *
   steps:
     cluster_profile: nutanix-qe-dis
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
+      RT_ENABLED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-nutanix-ipi-disconnected
-- as: nutanix-ipi-proxy-fips-f14
+- as: nutanix-ipi-proxy-fips-mini-perm-f14
   cluster: build01
   cron: 27 20 3,17 * *
   steps:
@@ -629,7 +645,7 @@ tests:
       FIPS_ENABLED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
+    workflow: cucushift-installer-rehearse-nutanix-ipi-proxy-minimal-permission
 - as: vsphere-ipi-disc-f14
   cron: 24 0 8,22 * *
   steps:
@@ -666,6 +682,27 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones
+- as: telcov10n-hub-spoke-gitops-ztp-f360
+  cluster: build05
+  cron: 1 1 1 1 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "1"
+      ADDITIONAL_WORKERS_DAY2: "true"
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    test:
+    - ref: telcov10n-hub-spoke-gitops-ztp-debug
+    workflow: telcov10n-hub-spoke-gitops-ztp
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

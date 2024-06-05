@@ -164,15 +164,6 @@ tests:
         OPENSHIFT_VERSION=4.14
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-11-periodic
-  cron: 00 02 */1 * 0,3
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.11
-      TEST_SUITE: full
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-12-periodic
   cron: 00 02 */1 * 0,3
   steps:
@@ -180,7 +171,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.12
-      TEST_SUITE: full
+      TEST_SUITE: none
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-13-periodic
   cron: 00 02 */1 * 0-5
@@ -189,7 +180,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.13
-      TEST_SUITE: full
+      TEST_SUITE: none
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-14-periodic
   cron: 00 03 */1 * 0-5
@@ -391,6 +382,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         WORKER_DISK=40000000000
+      PACKET_PLAN: m3.large.x86
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
@@ -878,6 +870,33 @@ tests:
         OPENSHIFT_VERSION=4.14
       PLATFORM: nutanix
     workflow: assisted-nutanix
+- as: e2e-nutanix-assisted-periodic
+  cluster: build01
+  interval: 24h
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
+- as: e2e-nutanix-assisted-4-14-periodic
+  cluster: build01
+  interval: 48h
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
+        OPENSHIFT_VERSION=4.14
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
 - always_run: false
   as: e2e-metal-assisted-day2-arm-workers
   optional: true
@@ -954,6 +973,15 @@ tests:
       ASSISTED_CONFIG: |
         OCI_BOOT_VOLUME_TYPE="ISCSI"
     workflow: assisted-oci
+- always_run: false
+  as: e2e-metal-assisted-rocky9
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      PACKET_OS: rocky_9
+      PACKET_PLAN: m3.small.x86
+    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master
   org: openshift

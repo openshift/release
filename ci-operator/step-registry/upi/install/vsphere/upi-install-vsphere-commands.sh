@@ -163,6 +163,7 @@ fi
 
 if [ ${SECURE_BOOT_ENABLED} = "true" ]; then
   sed -i '/guest_id/a\  firmware         = "efi"\n  efi_secure_boot_enabled = "true"' ./vm/main.tf
+  sed -i "s/\$secureboot = \$false/\$secureboot = \$true/" ./variables.ps1
 fi
 
 if [ "${STORAGE_POLICY_ID}" != "" ]; then
@@ -175,6 +176,7 @@ if [ "${STORAGE_POLICY_ID}" != "" ]; then
     exit "$ret"
   fi
   sed -i "/guest_id/a\ storage_policy_id = \"${STORAGE_POLICY_ID}\"" ./vm/main.tf
+  sed -i "s/\$storagepolicy = \"\"/\$storagepolicy = \"${STORAGE_POLICY_ID}\"/" ./variables.ps1
 fi
 
 date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
@@ -195,7 +197,7 @@ then
   wait "$!"
 else
   echo "$(date -u --rfc-3339=seconds) - pwsh upi.ps1..."
-  pwsh -f upi.ps1 &
+  pwsh -f powercli/upi.ps1 &
   wait "$!"
 fi
 

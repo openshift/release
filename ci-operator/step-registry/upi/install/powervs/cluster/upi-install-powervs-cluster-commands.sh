@@ -93,7 +93,7 @@ function setup_upi_workspace(){
   cd "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir || true
   curl -sL https://raw.githubusercontent.com/ocp-power-automation/openshift-install-power/"${UPI_AUTOMATION_VERSION}"/openshift-install-powervs -o ./openshift-install-powervs
   chmod +x ./openshift-install-powervs
-  ./openshift-install-powervs setup
+  ./openshift-install-powervs setup -ignore-os-checks
 }
 
 function create_upi_tf_varfile(){
@@ -133,7 +133,7 @@ rhel_image_name     = "CentOS-Stream-9"
 rhcos_import_image              = true
 rhcos_import_image_filename     = "${COREOS_NAME}"
 rhcos_import_image_storage_type = "tier1"
-system_type         = "s922"
+system_type         = "s1022"
 cluster_domain      = "${CLUSTER_DOMAIN}"
 cluster_id_prefix   = "rh-ci"
 bastion   = { memory = "16", processors = "1", "count" = 1 }
@@ -162,7 +162,7 @@ function create_upi_powervs_cluster() {
   # Dev Note: https://github.com/ocp-power-automation/openshift-install-power/blob/devel/openshift-install-powervs#L767C1-L767C145
   # May trigger the redaction
   OUTPUT="yes"
-  ./openshift-install-powervs create -var-file var-mac-upi.tfvars -verbose | sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d; /Login to the console with user/d' | \
+  ./openshift-install-powervs create -ignore-os-checks -var-file var-mac-upi.tfvars -verbose | sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d; /Login to the console with user/d' | \
     while read LINE
     do
         if [[ "${LINE}" == *"BEGIN RSA PRIVATE KEY"* ]]
@@ -179,11 +179,11 @@ function create_upi_powervs_cluster() {
         fi
     done || true
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate "${SHARED_DIR}"/terraform-mac-upi.tfstate
-  ./openshift-install-powervs output > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
-  ./openshift-install-powervs access-info > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
+  ./openshift-install-powervs output -ignore-os-checks > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
+  ./openshift-install-powervs access-info -ignore-os-checks > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
   # Dev Note: the following two lines may be causing the redaction routine to remove the log
-  ./openshift-install-powervs output bastion_private_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
-  ./openshift-install-powervs output bastion_public_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
+  ./openshift-install-powervs output -ignore-os-checks bastion_private_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
+  ./openshift-install-powervs output -ignore-os-checks bastion_public_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
 
   BASTION_PUBLIC_IP=$(<"${SHARED_DIR}/BASTION_PUBLIC_IP")
   echo "BASTION_PUBLIC_IP:- $BASTION_PUBLIC_IP"
@@ -191,8 +191,12 @@ function create_upi_powervs_cluster() {
   echo "BASTION_PRIVATE_IP:- $BASTION_PRIVATE_IP"
 
   export BASTION_PUBLIC_IP
+  echo "Retrieving the SSH key"
   scp -i "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/id_rsa root@"${BASTION_PUBLIC_IP}":~/openstack-upi/auth/kubeconfig  "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/
+  echo "Done with retrieval"
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/kubeconfig "${SHARED_DIR}"/kubeconfig
+  echo "Done copying the kubeconfig"
+  exit 0
 }
 
 function ic() {
@@ -443,7 +447,7 @@ function create_transit_gateway() {
   TGW_NAME="${workspace_name}"-tg
 
   ##Create the Transit Gateway
-  ic tg gateway-create --name "${TGW_NAME}" --location "${VPC_REGION}" --routing global --resource-group-id "${RESOURCE_GROUP_ID}" --output json | tee /tmp/tgw.id
+  ic tg gateway-create --name "${TGW_NAME}" --location "${VPC_REGION}" --routing local --resource-group-id "${RESOURCE_GROUP_ID}" --output json | tee /tmp/tgw.id
   TGW_ID=$(cat /tmp/tgw.id | grep id | awk -F'"' '/"id":/{print $4; exit}')
   export TGW_ID
   echo "${TGW_ID}" > "${SHARED_DIR}"/TGW_ID
@@ -595,7 +599,7 @@ case "$CLUSTER_TYPE" in
 
   # Generates a workspace name like rdr-mac-upi-4-14-au-syd-n1
   # this keeps the workspace unique
-  CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
+  CLEAN_VERSION=$(echo "${OCP_VERSION}" | sed 's/\([0-9]*\.[0-9]*\).*/\1/' | tr '.' '-')
   WORKSPACE_NAME=rdr-mac-p2-"${CLEAN_VERSION}"-"${POWERVS_ZONE}"
   VPC_NAME="${WORKSPACE_NAME}"-vpc
   echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
@@ -621,6 +625,7 @@ case "$CLUSTER_TYPE" in
   create_upi_tf_varfile "${WORKSPACE_NAME}"
   fix_user_permissions
   create_upi_powervs_cluster
+  exit 0
 ;;
 *)
   echo "Creating UPI based PowerVS cluster using ${CLUSTER_TYPE} is not implemented yet..."
