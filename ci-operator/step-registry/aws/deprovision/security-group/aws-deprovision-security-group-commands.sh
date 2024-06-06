@@ -8,6 +8,11 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
+if [[ ! -f ${SHARED_DIR}/security_groups_ids ]]; then
+    echo "No custom SG was created, skip now."
+    exit 0
+fi
+
 REGION="${LEASED_RESOURCE}"
 
 for sg_id in $(cat ${SHARED_DIR}/security_groups_ids); do
