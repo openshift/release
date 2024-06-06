@@ -26,16 +26,11 @@ resources:
       memory: 200Mi
 tests:
 - as: opentelemetry-stage-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 3h0m0s
-    version: "4.12"
   cron: 0 6 1 10 *
   steps:
+    cluster_profile: aws-qe
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "jaeger-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespace": "", "operator_group": "openshift-distributed-tracing"},
@@ -47,7 +42,7 @@ tests:
     - ref: enable-stage-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-downstream
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: main
   org: openshift
