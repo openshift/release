@@ -22,8 +22,8 @@ cp \
 	"${SHARED_DIR}/inventory.yaml" \
 	./
 
-if [[ -e "${SHARED_DIR}/netid.yaml" ]]; then
-    cp "${SHARED_DIR}/netid.yaml" .
+if [[ -e "${SHARED_DIR}/netid.json" ]]; then
+    cp "${SHARED_DIR}/netid.json" .
 fi
 
 
