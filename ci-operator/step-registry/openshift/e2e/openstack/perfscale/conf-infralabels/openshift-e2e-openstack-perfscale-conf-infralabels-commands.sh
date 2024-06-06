@@ -25,13 +25,10 @@ oc label nodes/${WORKER_NODES[0]} node-role.kubernetes.io/app=
 for i in "${WORKER_NODES[@]:1}"; do oc label nodes/$i node-role.kubernetes.io/infra=; done
 
 # Adding the defaultNodeSelector field with the appropriate node selector
-podman pull docker.io/mikefarah/yq:latest
-yq() {
-  podman run --rm -i -v /tmp:/workdir mikefarah/yq "$@"
-}
+wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /tmp/yq && chmod +x /tmp/yq
 
 SCHEDULER_CLUSTER_YAML=/tmp/scheduler.cluster.yaml
 oc get scheduler cluster -o yaml > ${SCHEDULER_CLUSTER_YAML}
-cat ${SCHEDULER_CLUSTER_YAML} | yq '.spec = .spec + {"defaultNodeSelector": "node-role.kubernetes.io/infra=\"\""}' | tee ${SCHEDULER_CLUSTER_YAML}.tmp 
+cat ${SCHEDULER_CLUSTER_YAML} | /tmp/yq '.spec = .spec + {"defaultNodeSelector": "node-role.kubernetes.io/infra=\"\""}' | tee ${SCHEDULER_CLUSTER_YAML}.tmp 
 oc apply -f ${SCHEDULER_CLUSTER_YAML}.tmp
 rm -f ${SCHEDULER_CLUSTER_YAML}*
