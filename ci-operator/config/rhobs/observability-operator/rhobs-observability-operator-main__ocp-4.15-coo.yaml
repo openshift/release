@@ -27,25 +27,40 @@ resources:
       memory: 200Mi
 tests:
 - as: qeindex
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs-coo
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.15"
   cron: 0 8 * * 1
   steps:
-    cluster_profile: aws-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "cluster-observability-operator", "source": "qe-app-registry", "channel": "development", "install_namespace": "openshift-coo", "target_namespaces": "", "operator_group":"openshift-coo-og"}
         ]
     test:
+    - ref: enable-qe-catalogsource
     - ref: install-operators
     - ref: rhobs-obo-test-harness
-    workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
+    workflow: generic-claim
 - as: stage
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs-coo
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.15"
   cron: 0 6 1 8 *
   steps:
-    cluster_profile: aws-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "cluster-observability-operator", "source": "dt-catalogsource", "channel": "development", "install_namespace": "openshift-coo", "target_namespaces": "", "operator_group":"openshift-coo-og"}
@@ -54,7 +69,7 @@ tests:
     - ref: enable-stage-catalogsource
     - ref: install-operators
     - ref: rhobs-obo-test-harness
-    workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: rhobs
