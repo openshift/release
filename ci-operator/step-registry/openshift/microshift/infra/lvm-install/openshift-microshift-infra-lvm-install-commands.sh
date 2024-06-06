@@ -24,6 +24,7 @@ if [[ "${EC2_INSTANCE_TYPE%.*}" =~ .*"g".* || "${EC2_INSTANCE_TYPE%.*}" =~ "t3".
   # Sometimes, devices are in different order and nvme1 stores OS while nvme0 should hold LVM for topolvm.
   # If /dev/nvme0 is already partitioned (operating system), then use nvme1 for lvm.
   # If `partx /dev/nvme0n1` fails (rc=1), it couldn't read partition table, so it's the one to use for lvm.
+  # TODO
   if ssh "${INSTANCE_PREFIX}" "sudo partx /dev/nvme0n1"; then
     device="/dev/nvme1n1"
   else
