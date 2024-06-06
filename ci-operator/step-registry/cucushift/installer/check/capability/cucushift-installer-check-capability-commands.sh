@@ -108,8 +108,8 @@ v416=" ${v415} CloudControllerManager Ingress"
 latest_defined="v416"
 always_default="${!latest_defined}"
 # always enabled capabilities
-declare -A always_enabled_caps
-always_enabled_caps[416]="Ingress"
+#declare -A always_enabled_caps
+#always_enabled_caps[416]="Ingress"
 
 # Determine vCurrent
 declare "v${ocp_major_version}${ocp_minor_version}"
@@ -162,11 +162,11 @@ if [[ "${additional_caps_from_config}" != "" ]]; then
     enabled_capability_set="${enabled_capability_set} ${additional_caps_from_config}"
 fi
 
-for version in "${!always_enabled_caps[@]}"; do
-    if [[ ${ocp_version/.} -ge ${version} ]]; then
-        enabled_capability_set="${enabled_capability_set} ${always_enabled_caps[$version]}"
-    fi
-done
+#for version in "${!always_enabled_caps[@]}"; do
+#    if [[ ${ocp_version/.} -ge ${version} ]]; then
+#        enabled_capability_set="${enabled_capability_set} ${always_enabled_caps[$version]}"
+#    fi
+#done
 enabled_capability_set=$(echo ${enabled_capability_set} | xargs -n1 | sort -u | xargs)
 disabled_capability_set="${vCurrent}"
 for cap in $enabled_capability_set; do
