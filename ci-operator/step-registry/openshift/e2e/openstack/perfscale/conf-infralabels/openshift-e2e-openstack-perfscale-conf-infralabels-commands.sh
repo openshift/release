@@ -25,6 +25,8 @@ oc label nodes/${WORKER_NODES[0]} node-role.kubernetes.io/app=
 for i in "${WORKER_NODES[@]:1}"; do oc label nodes/$i node-role.kubernetes.io/infra=; done
 
 # Adding the defaultNodeSelector field with the appropriate node selector
-oc get scheduler cluster -o yaml > scheduler.cluster.yaml
-yq -i '.spec = .spec + {"defaultNodeSelector": "node-role.kubernetes.io/infra=\"\""}' scheduler.cluster.yaml 
-oc apply -f scheduler.cluster.yaml
+SCHEDULER_CLUSTER_YAML=/tmp/scheduler.cluster.yaml
+oc get scheduler cluster -o yaml > ${SCHEDULER_CLUSTER_YAML}
+cat ${SCHEDULER_CLUSTER_YAML} | yq '.spec = .spec + {"defaultNodeSelector": "node-role.kubernetes.io/infra=\"\""}' | tee ${SCHEDULER_CLUSTER_YAML}.tmp 
+oc apply -f ${SCHEDULER_CLUSTER_YAML}.tmp
+rm -f ${SCHEDULER_CLUSTER_YAML}*
