@@ -77,7 +77,8 @@ featureGates: ${FEATURE_GATES}
 EOF
 fi
 
-# Set image-registry replicas to 3.
+# Set image-registry replicas to 3; today, we will add in the anti-affinity configuration
+# because the image-registry operator only adds this when the replicas is set to 2.
 cat >> ${SHARED_DIR}/manifest_image_registry-config.yml <<EOF
 apiVersion: imageregistry.operator.openshift.io/v1
 kind: Config
@@ -86,4 +87,13 @@ metadata:
 spec:
   managementState: "Managed"
   replicas: 3
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            docker-registry: default
+        namespaces:
+        - openshift-image-registry
+        topologyKey: kubernetes.io/hostname
 EOF
