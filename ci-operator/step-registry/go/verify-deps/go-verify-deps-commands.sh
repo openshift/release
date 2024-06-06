@@ -11,7 +11,18 @@ die_modlist() {
     exit 1
 }
 
+go() {
+  if command -v go.real &>/dev/null; then
+    go.real "$@"
+  else
+    command go "$@"
+  fi
+}
+
 # For debugging
+go version
+
+export GOTOOLCHAIN=local
 go version
 
 echo "Checking that all modules can be resolved offline"
