@@ -444,18 +444,18 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
-- as: aws-ipi-ovn-hypershift-guest-critical-f7
-  cron: 53 18 5,12,21,28 * *
+- as: aws-ipi-ovn-hypershift-guest-ext-oidc-f7
+  cron: 3 13 7,14,22,30 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@critical'
+      EXT_OIDC_INCLUDE_CLI_CLIENT: "false"
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_IMPORTANCE: Critical
     test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-hypershift-extended-external-oidc-guest
 - as: aws-ipi-ovn-hypershift-guest-f7
   cron: 16 13 4,11,18,25 * *
   steps:
@@ -647,11 +647,9 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       FIPS_ENABLED: "true"
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
-      TEST_SCENARIOS: DR_Testing
     test:
     - ref: idp-htpasswd
-    - ref: openshift-extended-test-longduration
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-aws-ipi-private-sdn
 - as: aws-ipi-private-shared-vpc-phz-sts-f2
   cron: 1 10 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
@@ -1036,33 +1034,31 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-aws-sts-hcp-cilium
-- as: aws-rosa-hcp-capi-stage-critical-f2
-  cron: 5 2 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29 * *
+- as: aws-rosa-hcp-capi-stage-f7
+  cron: 12 6 7,14,23,30 * *
   steps:
     cluster_profile: aws-sd-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: 4.15.0
+      OPENSHIFT_VERSION: "4.15"
       REGION: us-west-2
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-      TEST_IMPORTANCE: Critical
     test:
-    - chain: openshift-e2e-test-hypershift-qe
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
     workflow: rosa-aws-sts-hcp-capi
-- as: aws-rosa-hcp-capi-private-stage-critical-f7
-  cron: 15 14 3,10,17,24 * *
+- as: aws-rosa-hcp-capi-private-stage-f7
+  cron: 9 23 3,12,19,26 * *
   steps:
     cluster_profile: aws-sd-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@rosa'
-      OPENSHIFT_VERSION: 4.15.0
+      OPENSHIFT_VERSION: "4.15"
       REGION: us-west-2
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
-      TEST_IMPORTANCE: Critical
     test:
-    - chain: openshift-e2e-test-hypershift-qe
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
     workflow: rosa-aws-sts-hcp-capi-private
 - as: aws-rosa-hcp-int-full-f7
   cron: 29 23 4,13,20,27 * *
@@ -1367,11 +1363,9 @@ tests:
       AZURE_VNET_TAGS: qekey=qevalue
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
-      TEST_SCENARIOS: DR_Testing
     test:
     - ref: idp-htpasswd
-    - ref: openshift-extended-test-longduration
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-azure-ipi-private
 - as: azure-ipi-proxy-workers-rhcos-rhel8-f2
   cron: 54 13 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
@@ -1583,13 +1577,11 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
+        WORKER_MEMORY=14336
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST=vda
-        VM_EXTRADISKS_SIZE=1024G
+        VM_EXTRADISKS_SIZE=500G
         NUM_EXTRA_WORKERS=3
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=16384
-        EXTRA_WORKER_DISK=100
       IP_STACK: v4v6
       LVM_OPERATOR_SUB_CHANNEL: stable-4.15
       MCE_VERSION: "2.5"
@@ -1607,13 +1599,11 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
+        WORKER_MEMORY=14336
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST=vda
-        VM_EXTRADISKS_SIZE=1024G
+        VM_EXTRADISKS_SIZE=500G
         NUM_EXTRA_WORKERS=3
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=16384
-        EXTRA_WORKER_DISK=100
       IP_STACK: v4v6
       LVM_OPERATOR_SUB_CHANNEL: stable-4.15
       MCE_VERSION: "2.5"
@@ -1631,13 +1621,11 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
+        WORKER_MEMORY=14336
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST=vda
-        VM_EXTRADISKS_SIZE=1024G
+        VM_EXTRADISKS_SIZE=500G
         NUM_EXTRA_WORKERS=3
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=16384
-        EXTRA_WORKER_DISK=100
       IP_STACK: v4v6
       LVM_OPERATOR_SUB_CHANNEL: stable-4.15
       MCE_VERSION: "2.5"
@@ -2051,11 +2039,10 @@ tests:
     cluster_profile: gcp-qe
     env:
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
-      TEST_SCENARIOS: DR_Testing
+      TEST_FILTERS_DISASTERRECOVERY: ~ChkUpgrade&;NonPreRelease&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - ref: idp-htpasswd
-    - ref: openshift-extended-test-longduration
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
 - as: gcp-ipi-proxy-etcd-encryption-f28-security-profiles-operator
   cron: 42 17 16 * *

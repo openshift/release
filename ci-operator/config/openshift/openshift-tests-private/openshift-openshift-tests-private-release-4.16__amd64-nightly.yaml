@@ -482,18 +482,17 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
-- as: aws-ipi-ovn-hypershift-guest-critical-f7
-  cron: 4 11 2,11,18,25 * *
+- as: aws-ipi-ovn-hypershift-guest-ext-oidc-f7
+  cron: 25 4 4,12,20,27 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@critical'
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_IMPORTANCE: Critical
     test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-hypershift-extended-external-oidc-guest
 - as: aws-ipi-ovn-hypershift-guest-f7
   cron: 46 12 5,12,19,26 * *
   steps:
@@ -618,25 +617,20 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
-      TEST_SCENARIOS: DR_Testing
     test:
     - ref: idp-htpasswd
-    - ref: openshift-extended-test-longduration
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-aws-ipi-private
 - as: vsphere-ipi-proxy-f14-disasterrecovery
   cron: 11 1 8,22 * *
   steps:
     cluster_profile: vsphere-dis-2
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
-      TEST_SCENARIOS: DR_Testing
     leases:
     - env: VSPHERE_BASTION_LEASED_RESOURCE
       resource_type: vsphere-connected-2-quota-slice
     test:
     - ref: idp-htpasswd
-    - ref: openshift-extended-test-longduration
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: aws-ipi-private-shared-vpc-phz-sts-f2
   cron: 31 11 2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 * *
@@ -1332,11 +1326,9 @@ tests:
       AZURE_VNET_TAGS: qekey=qevalue
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
-      TEST_SCENARIOS: DR_Testing
     test:
     - ref: idp-htpasswd
-    - ref: openshift-extended-test-longduration
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-azure-ipi-private
 - as: azure-ipi-proxy-workers-rhcos-rhel8-f14
   cron: 26 22 3,17 * *
@@ -1506,11 +1498,9 @@ tests:
     cluster_profile: azurestack-qe
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      TEST_SCENARIOS: DR_Testing
     test:
     - ref: idp-htpasswd
-    - ref: openshift-extended-test-longduration
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
 - as: azure-stack-upi-f28
   cluster: build01
@@ -1861,11 +1851,10 @@ tests:
     cluster_profile: gcp-qe
     env:
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
-      TEST_SCENARIOS: DR_Testing
+      TEST_FILTERS_DISASTERRECOVERY: ~ChkUpgrade&;NonPreRelease&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - ref: idp-htpasswd
-    - ref: openshift-extended-test-longduration
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
 - as: gcp-ipi-proxy-etcd-encryption-f28-security-profiles-operator
   cron: 32 21 26 * *
@@ -2232,11 +2221,9 @@ tests:
     cluster_profile: nutanix-qe-dis
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      TEST_SCENARIOS: DR_Testing
     test:
     - ref: idp-htpasswd
-    - ref: openshift-extended-test-longduration
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
 - as: nutanix-ipi-tp-f28
   cluster: build01
@@ -2326,6 +2313,68 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-agent-vsphere-disconnected-install-compact
+- as: vsphere-agent-ha-day2-add-nodes-f14
+  cron: 35 15 5,19 * *
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      ADDITIONAL_WORKERS_DAY2: "2"
+      MASTERS: "3"
+      WORKERS: "2"
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-agent-vsphere-install-day2-add-nodes
+- as: vsphere-agent-compact-day2-add-nodes-f14
+  cron: 40 16 6,20 * *
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      ADDITIONAL_WORKERS_DAY2: "2"
+      MASTERS: "3"
+      WORKERS: "0"
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-agent-vsphere-install-day2-add-nodes
+- as: vsphere-agent-disc-compact-day2-add-nodes-f14
+  cron: 20 18 7,21 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      ADDITIONAL_WORKERS_DAY2: "2"
+      E2E_RUN_TAGS: '@disconnected'
+      MASTERS: "3"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      WORKERS: "0"
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-agent-vsphere-disconnected-install-day2-add-nodes
+- as: vsphere-agent-dualstack-compact-day2-add-nodes-f14
+  cron: 12 20 8,22 * *
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      ADDITIONAL_WORKERS_DAY2: "2"
+      IP_FAMILIES: DualStack
+      MASTERS: "3"
+      WORKERS: "0"
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-agent-vsphere-dualstack-install-day2-add-nodes
+- as: vsphere-agent-sno-day2-add-nodes-f14
+  cron: 22 21 9,23 * *
+  steps:
+    cluster_profile: vsphere-2
+    env:
+      ADDITIONAL_WORKERS_DAY2: "2"
+      MASTERS: "1"
+      SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
+      WORKERS: "0"
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-agent-vsphere-install-day2-add-nodes
 - as: vsphere-agent-disc-ha-f14
   cron: 3 4 1,17 * *
   steps:
@@ -2867,6 +2916,39 @@ tests:
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
+- as: vsphere-ipi-transit-masq-subnet-f28
+  cron: 8 3 5 * *
+  steps:
+    cluster_profile: vsphere-2
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-custom-transit-switch-masquerade-subnet
+- as: vsphere-ipi-transit-masq-subnet-f28-destructive
+  cron: 57 14 27 * *
+  steps:
+    cluster_profile: vsphere-2
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-custom-transit-switch-masquerade-subnet
+- as: telcov10n-hub-spoke-gitops-ztp-f360
+  cluster: build05
+  cron: 1 1 1 1 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "1"
+      ADDITIONAL_WORKERS_DAY2: "true"
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    workflow: telcov10n-hub-spoke-gitops-ztp
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

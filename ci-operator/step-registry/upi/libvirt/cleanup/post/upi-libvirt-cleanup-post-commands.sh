@@ -29,8 +29,8 @@ mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list
 
 set +e
 
-# Remove conflicting domains
-echo "Removing conflicting domains..."
+# Remove stale domains
+echo "Removing stale domains..."
 for DOMAIN in $(${VIRSH} list --all --name | grep "${LEASED_RESOURCE}")
 do
   ${VIRSH} destroy "${DOMAIN}"
@@ -39,8 +39,8 @@ do
 done
 
 if [[ ! -z "$(${VIRSH} pool-list | grep ${POOL_NAME})" ]]; then
-  # Remove conflicting volumes
-  echo "Removing conflicing cluster volumes..."
+  # Remove stale volumes
+  echo "Removing stale volumes..."
   for VOLUME in $(${VIRSH} vol-list --pool ${POOL_NAME} | grep "${LEASED_RESOURCE}" | awk '{ print $1 }')
   do
     ${VIRSH} vol-delete --pool ${POOL_NAME} --vol ${VOLUME}
@@ -51,8 +51,8 @@ fi
 #echo "Removing the source volume..."
 #${VIRSH} vol-delete --pool ${POOL_NAME} --vol "$(${VIRSH} vol-list --pool ${POOL_NAME} | grep rhcos | awk '{ print $1 }' || true)"
 
-# Remove conflicting pools  # this is old behavior removal.  Can leave it for now, but its technically a noop
-echo "Removing conflicting pools..."
+# Remove stale pools  # this is old behavior removal.  Can leave it for now, but its technically a noop
+echo "Removing stale pools..."
 for POOL in $(${VIRSH} pool-list --all --name | grep "${LEASED_RESOURCE}")
 do
   ${VIRSH} pool-destroy "${POOL}"
@@ -61,7 +61,7 @@ do
 done
 
 # Remove conflicting networks
-echo "Removing conflicting networks..."
+echo "Removing stale networks..."
 for NET in $(${VIRSH} net-list --all --name | grep "${LEASED_RESOURCE}")
 do
   ${VIRSH} net-destroy "${NET}"
@@ -70,12 +70,14 @@ done
 
 # Detect conflicts
 CONFLICTING_DOMAINS=$(${VIRSH} list --all --name | grep "${LEASED_RESOURCE}")
-CONFLICTING_VOLUMES=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep "${LEASED_RESOURCE}" | awk '{ print $1 }' || true)
+CONFLICTING_VOLUMES=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep -E "${LEASED_RESOURCE}-(bootstrap|master|worker|compute|control)" | awk '{ print $1 }' || true)
+STALE_IPI_VOLUMES=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep "${LEASED_RESOURCE}" | grep -Ev "(bootstrap|master|worker|compute|control)" | awk '{ print $1 }' || true)
 CONFLICTING_POOLS=$(${VIRSH} pool-list --all --name | grep "${LEASED_RESOURCE}")
 CONFLICTING_NETWORKS=$(${VIRSH} net-list --all --name | grep "${LEASED_RESOURCE}")
 
 set -e
 
+echo "Checking for remaining resource conflicts..."
 if [ ! -z "${CONFLICTING_DOMAINS}" ] || [ ! -z "${CONFLICTING_VOLUMES}" ] || [ ! -z "${CONFLICTING_POOLS}" ] || [ ! -z "${CONFLICTING_NETWORKS}" ]; then
   echo "Could not ensure clean state for lease ${LEASED_RESOURCE}"
   echo "Conflicting domains: $CONFLICTING_DOMAINS"
@@ -83,4 +85,9 @@ if [ ! -z "${CONFLICTING_DOMAINS}" ] || [ ! -z "${CONFLICTING_VOLUMES}" ] || [ !
   echo "Conflicting pools: $CONFLICTING_POOLS"
   echo "Conflicting networks: $CONFLICTING_NETWORKS"
   exit 1
+fi
+
+if [ ! -z "${STALE_IPI_VOLUMES}" ]; then
+  echo "Stale IPI volumes remain..."
+  echo "Stale volumes: ${STALE_IPI_VOLUMES}"
 fi

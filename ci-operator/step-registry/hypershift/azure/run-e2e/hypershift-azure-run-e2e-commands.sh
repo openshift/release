@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -o xtrace
 
 function cleanup() {
   for child in $( jobs -p ); do
@@ -12,4 +13,5 @@ function cleanup() {
 }
 trap cleanup EXIT
 
-make ci-test-e2e-azure
+make ci-test-e2e-azure &
+wait $!
