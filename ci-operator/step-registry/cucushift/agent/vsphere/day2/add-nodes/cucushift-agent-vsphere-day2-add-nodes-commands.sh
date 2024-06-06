@@ -18,13 +18,22 @@ fi
 }
 
 export HOME=/tmp
-SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+
+# subnets.json is no longer available in vault
+#SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+
+SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
 
 declare vlanid
 declare primaryrouterhostname
 declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 source "${SHARED_DIR}/govc.sh"
+
+# These two environment variables are coming from vsphere_context.sh and
+# the file they are assigned to is not available in this step.
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 declare vsphere_datacenter
 declare vsphere_datastore

@@ -10,10 +10,17 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+# subnets.json is no longer available in vault
+#SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+
+SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
 declare vlanid
 declare primaryrouterhostname
 source "${SHARED_DIR}/vsphere_context.sh"
+# These two environment variables are coming from vsphere_context.sh and
+# the file they are assigned to is not available in this step.
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
   echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"

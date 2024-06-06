@@ -15,6 +15,11 @@ source "${SHARED_DIR}/govc.sh"
 declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 
+# These two environment variables are coming from vsphere_context.sh and
+# the file they are assigned to is not available in this step.
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
 echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${vsphere_portgroup} and destroy"
 
 govc ls -json "/${GOVC_DATACENTER}/network/${vsphere_portgroup}" |
