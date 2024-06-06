@@ -13,4 +13,5 @@ function cleanup() {
 }
 trap cleanup EXIT
 
-make ci-test-e2e-azure
+make ci-test-e2e-azure &
+wait $!

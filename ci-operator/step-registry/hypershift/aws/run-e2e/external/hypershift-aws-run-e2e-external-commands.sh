@@ -13,4 +13,5 @@ function cleanup() {
 }
 trap cleanup EXIT
 
-make ci-test-e2e
+make ci-test-e2e &
+wait $!
