@@ -13,22 +13,24 @@ GITHUB_REPOSITORY_NAME="backstage-showcase"
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd backstage-showcase || exit
+git checkout "1.2.x" || exit
 
 git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
 
-if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
-    # if this is executed as PR check of https://github.com/janus-idp/backstage-showcase.git repo, switch to PR branch.
-    git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
-    git checkout PR"${GIT_PR_NUMBER}"
-    git merge origin/1.2.x --no-edit
-    GIT_PR_RESPONSE=$(curl -s "https://api.github.com/repos/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/pulls/${GIT_PR_NUMBER}")
-    LONG_SHA=$(echo "$GIT_PR_RESPONSE" | jq -r '.head.sha')
-    SHORT_SHA=$(git rev-parse --short ${LONG_SHA})
-    TAG_NAME="pr-${GIT_PR_NUMBER}-${SHORT_SHA}"
-    echo "Tag name: $TAG_NAME"
-    IMAGE_NAME="${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}:${TAG_NAME}"
-fi
+GIT_PR_NUMBER=1305
+
+# if this is executed as PR check of https://github.com/janus-idp/backstage-showcase.git repo, switch to PR branch.
+git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
+git checkout PR"${GIT_PR_NUMBER}"
+git merge origin/1.2.x --no-edit
+GIT_PR_RESPONSE=$(curl -s "https://api.github.com/repos/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/pulls/${GIT_PR_NUMBER}")
+LONG_SHA=$(echo "$GIT_PR_RESPONSE" | jq -r '.head.sha')
+SHORT_SHA=$(git rev-parse --short ${LONG_SHA})
+TAG_NAME="pr-${GIT_PR_NUMBER}-${SHORT_SHA}"
+echo "Tag name: $TAG_NAME"
+IMAGE_NAME="${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}:${TAG_NAME}"
+
 
 PR_CHANGESET=$(git diff --name-only 1.2.x)
 echo "Changeset: $PR_CHANGESET"
