@@ -288,6 +288,47 @@ tests:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-aws-cilium
   timeout: 7h0m0s
+- always_run: false
+  as: hybrid-control-plane-120nodes
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      CONTROL_PLANE_INSTANCE_TYPE: m5.4xlarge
+      EXTRA_FLAGS: --churn-duration=20m --service-latency
+      PLATFORM_VERSION: "8.9"
+      PROFILE_TYPE: reporting
+      RHEL_VM_TYPE: m5.xlarge
+      RHEL_WORKER_COUNT_PER_ZONE: "20"
+      SIZE_VARIANT: large
+      WORKER_REPLICA_COUNT: "60"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-aws-hybrid-nodes
+  timeout: 6h0m0s
+- always_run: false
+  as: hybrid-data-path-9nodes
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "4"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
+      PLATFORM_VERSION: "8.9"
+      RHEL_VM_TYPE: m5.2xlarge
+      RHEL_WORKER_COUNT_PER_ZONE: "2"
+      SET_ENV_BY_PLATFORM: custom
+      SIZE_VARIANT: large
+      WORKER_REPLICA_COUNT: "3"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-aws-hybrid-nodes
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-qe
