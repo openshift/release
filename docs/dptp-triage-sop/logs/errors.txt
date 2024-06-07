@@ -1,4 +1,4 @@
- fields @message
+ fields @message, structured.component as component
 | sort @timestamp
 | filter(level = "error" or level = "fatal")
 | filter(not(
@@ -6,4 +6,5 @@
 	component="entrypoint" or component="sidecar" or component="clonerefs" or component="initupload" # these are logs from jobs, which we don't care about
 	or `kubernetes.pod_labels.prow.k8s.io/type`="presubmit" or `kubernetes.pod_labels.prow.k8s.io/type`="batch" # presubmits can fail, it is their job
 	or `kubernetes.pod_labels.ci.openshift.io/role`="infra" or `kubernetes.pod_labels.ci.openshift.io/role`="infra-internal" # infra jobs have dedicated alerts
+	or `stream_name` like "kubernetes.var.log.pods.ci_release-payload-controller" or `stream_name` like "kubernetes.var.log.pods.ci_ci-chat-bot" or `stream_name` like "kubernetes.var.log.pods.ci_release-controller" # DPTP doesn't care about these as they are for CRT
 ))

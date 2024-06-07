@@ -150,16 +150,25 @@ elif mode == "errors":
 
         lambda message: matches(message, "pj-rehearse", msg="couldn't prepare candidate"),
         lambda message: matches(message, "pj-rehearse", error="failed waiting for prowjobs to finish: timed out waiting for the condition"),
+
+        lambda message: matches(message, "boskos", msg="Acquire failed"),
+
+        # DPTP-3925
+        lambda message: matches(message, "crier", error="failed to report job: error setting status: Unknown prowjob state: scheduling"),
+        lambda message: matches(message, "crier", error="error setting status: Unknown prowjob state: scheduling"),
         ]
 
 else:
     print("Filter mode must be 'warnings' or 'errors', not " + mode)
 
 def matches(message, component, *args, **kwargs):
-    if not component in message.get("component", ""):
+    structured = message.get("structured", "")
+    if not isinstance(structured, dict):
+        return False
+    if not component in structured.get("component", ""):
         return False
     for field, symptom in kwargs.items():
-        if not symptom in message.get(field, ""):
+        if not symptom in structured.get(field, ""):
             return False
     return True
 

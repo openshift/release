@@ -8,7 +8,7 @@ from tabulate import tabulate
 
 headers = ["time", "level", "message", "file", "func", "fields"]
 truncated_headers = ["time", "level", "message"]
-ignored_fields = ["component", "kubernetes", "severity", "source_type", "stream"]
+ignored_fields = ["structured.component", "kubernetes", "severity", "source_type", "stream"]
 term_width = os.get_terminal_size().columns
 
 output_file = sys.argv[1] + ".table"
@@ -20,7 +20,13 @@ data = json.load(open(sys.argv[1]))
 data = itertools.chain(*data)
 data = filter(lambda x: x["field"] == "@message", data)
 data = map(lambda x: json.loads(x["value"]), data)
-key = lambda x: x.get("component", "unknown")
+
+
+def key(x):
+    if "structured" in x:
+        return x["structured"].get("component", "unknown")
+    return "unknown"
+
 data = sorted(data, key=key)
 data = itertools.groupby(data, key)
 for component, fields in data:
@@ -31,12 +37,14 @@ for component, fields in data:
         entry = []
         entry.append(raw_entry.pop("time", ""))
         entry.append(raw_entry.pop("level", ""))
-        message = "msg=" + raw_entry.pop("msg", "")
-        if "error" in raw_entry:
-            message += ", error=" + raw_entry.pop("error", "")
-        entry.append(message)
-        entry.append(raw_entry.pop("file", ""))
-        entry.append(raw_entry.pop("func", ""))
+        structured = raw_entry.pop("structured", "")
+        if isinstance(structured, dict):
+            message = "msg=" + structured.pop("msg", "")
+            if "error" in structured:
+                message += ", error=" + structured.pop("error", "")
+            entry.append(message)
+            entry.append(structured.pop("file", ""))
+            entry.append(structured.pop("func", ""))
         fields = []
         for key, value in sorted(raw_entry.items()):
             fields.append("{}={}".format(key, value))
@@ -59,7 +67,7 @@ for component, fields in data:
         truncated_entry = []
         for item in entry[:len(truncated_headers)]:
             if len(item) > width:
-                bound = int(width/2)
+                bound = int(width / 2)
                 truncated_entry.append(item[0:bound] + " ... " + item[-bound:])
             else:
                 truncated_entry.append(item)

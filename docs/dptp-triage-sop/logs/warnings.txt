@@ -1,7 +1,8 @@
- fields @message
+ fields @message, structured.component as component
 | sort @timestamp
 | filter(level = "warning")
 | filter(not(
 	component="entrypoint" or component="sidecar" or component="clonerefs" or component="initupload" # these are logs from jobs, which we don't care about
 	or `kubernetes.pod_labels.prow.k8s.io/type`="presubmit" or `kubernetes.pod_labels.prow.k8s.io/type`="batch" # these are logs from jobs, which we don't care about
+	or `stream_name` like "kubernetes.var.log.pods.ci_release-payload-controller" or `stream_name` like "kubernetes.var.log.pods.ci_ci-chat-bot" or `stream_name` like "kubernetes.var.log.pods.ci_release-controller" # DPTP doesn't care about these as they are for CRT
 ))
