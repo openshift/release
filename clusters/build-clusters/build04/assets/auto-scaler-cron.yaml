@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  annotations:
+    openshift.io/description: a workaround for https://issues.redhat.com/browse/OHSS-34642
+  name: autoscaler-purge
+  namespace: autoscaler-purge
+spec:
+  schedule: "0 */2 * * *"  # Runs every 2 hours
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: autoscaler-purge
+            image: registry.ci.openshift.org/ocp/4.15:cli
+            args:
+            - -c
+            - |
+              oc -n openshift-machine-api delete pods -l 'k8s-app==cluster-autoscaler-operator'
+            command:
+            - /bin/bash
+          restartPolicy: OnFailure
