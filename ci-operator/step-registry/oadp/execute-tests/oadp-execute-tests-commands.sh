@@ -80,6 +80,11 @@ function archive-results() {
             cp -r "${LOGS_FOLDER}" "${ARTIFACT_DIR}/logs"
         fi
     fi
+
+    if [ -d "/alabama/cspi/e2e/kubevirt-plugin/logs" ]; then
+        echo "Copying /alabama/cspi/e2e/kubevirt-plugin/logs to ${ARTIFACT_DIR}..."
+        cp -r "/alabama/cspi/e2e/kubevirt-plugin/logs" "${ARTIFACT_DIR}/logs"
+    fi
 }
 
 # Execute tests
