@@ -4,51 +4,99 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-function run_command() {
-    local CMD="$1"
-    echo "Running Command: ${CMD}"
-    eval "${CMD}"
+getMasterNode() {
+    local master_node
+    
+    master_node=$(oc get node -l node-role.kubernetes.io/master= --no-headers | awk '!/NotReady|SchedulingDisabled/{print $1; exit}')
+    if [[ -z $master_node ]]; then
+        echo "Error master node name is null!"
+        exit 1
+    fi
+    echo "$master_node"
 }
 
-pass=true
+setupNamespace() {
+  local namespace=$1
+
+  oc create ns $namespace -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite
+
+  if [ $? != 0 ]; then
+    echo "Failed to create $namespace namespace."
+    exit 1
+  fi
+  echo "Created $namespace namespace successfully"
+}
+
+runScan() {
+  # Run the static or dynamic scan
+  local namespace=$1
+  local master_node=$2
+  local payload_pullspec=$3
+  local scan_report=$4
+  local mode=$5
+  local base_command="podman run --privileged -i -v /:/myroot"
+  local check_payload_image="registry.ci.openshift.org/ci/check-payload:latest"
+
+  if [[  $mode == "static" ]]; then
+    oc -n "$namespace" debug node/"$master_node" -- chroot /host bash -c "$base_command -e REGISTRY_AUTH_FILE=/myroot/var/lib/kubelet/config.json $check_payload_image scan payload -V $MAJOR_MINOR --url $payload_pullspec &> $scan_report"
+  elif [[  $mode == "dynamic" ]]; then
+    oc -n "$namespace" debug node/"$master_node" -- chroot /host bash -c "$base_command $check_payload_image scan node --root /myroot &> $scan_report"
+  else
+    echo "Invalid scan mode. Exiting."
+    exit 1
+  fi
+  out=$(oc -n "$namespace" debug node/"$master_node" -- chroot /host bash -c "cat $scan_report")
+
+  res=$(echo "$out" | grep -iE "Successful run" || false)
+  scan_flag=false
+  if [[ -n $res ]]; then
+      scan_flag=true
+  fi
+
+  echo $scan_flag
+}
+
+# create a privileged namespace
+namespace="tmp-fips-scan-payload-$RANDOM"
+setupNamespace $namespace
 
 # get a master node
-master_node_0=$(oc get node -l node-role.kubernetes.io/master= --no-headers | grep -Ev "NotReady|SchedulingDisabled"| awk '{print $1}' | awk 'NR==1{print}')
-if [[ -z $master_node_0 ]]; then
-    echo "Error master node0 name is null!"
-    pass=false
-fi
+master_node=$(getMasterNode)
 
-# create a ns
-namespace="fips-scan-payload-$RANDOM"
-run_command "oc create ns $namespace -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
+# Get pullspec of nightly under test
+payload_pullspec="$(oc get clusterversion version -o json | jq -r .status.desired.image)"
 
-if [ $? == 0 ]; then
-    echo "create $namespace namespace successfully"
+static_scan_log_file="/tmp/fips-static-payload-scan.log"
+dynamic_scan_log_file="/tmp/fips-dynamic-payload-scan.log"
+static_scan_result=$(runScan "$namespace" "$master_node" "$payload_pullspec" "$static_scan_log_file" "static")
+dynamic_scan_result=$(runScan "$namespace" "$master_node" "$payload_pullspec" "$dynamic_scan_log_file" "dynamic")
+
+if [[ "$static_scan_result" != "true" ]]; then
+  echo "FIPS static scan has FAILED"
+
+  # Print logs if the scan failed
+  # Since the cat command has to be quoted
+  # shellcheck disable=SC2046
+  echo $(oc -n "$namespace" debug node/"$master_node" -- chroot /host bash -c "cat $static_scan_log_file")
 else
-    echo "Fail to create $namespace namespace."
-    pass=false
+  echo "FIPS static scan has SUCCEEDED"
 fi
 
+if [[ "$dynamic_scan_result" != "true" ]]; then
+  echo "FIPS dynamic scan has FAILED"
 
-payload_pullspec=$(oc get clusterversion version -o json | jq -r .status.desired.image)
+  # Print logs if the scan failed
+  # Since the cat command has to be quoted
+  # shellcheck disable=SC2046
+  echo $(oc -n "$namespace" debug node/"$master_node" -- chroot /host bash -c "cat $dynamic_scan_log_file")
+else
+  echo "FIPS dynamic scan has SUCCEEDED"
+fi
 
-# run node scan and check the result
-report="/tmp/fips-check-payload-scan.log"
-
-# REGISTRY_AUTH_FILE use the location of kublets default pull secret
-oc -n $namespace debug node/"$master_node_0" -- chroot /host bash -c "podman run --privileged -i -v /:/myroot -e REGISTRY_AUTH_FILE=/myroot/var/lib/kubelet/config.json registry.ci.openshift.org/ci/check-payload:latest scan payload -V $MAJOR_MINOR --url $payload_pullspec &> $report" || true
-out=$(oc -n $namespace debug node/"$master_node_0" -- chroot /host bash -c "cat /$report" || true)
-echo "The report is: $out"
 oc delete ns $namespace || true
-res=$(echo "$out" | grep -E 'Failure Report' || true)
-echo "The result is: $res"
-if [[ -n $res ]];then
-    pass=false
-fi
 
-if $pass; then
-    exit 0
-else
-    exit 1
+
+if [[ "$static_scan_result" != "true" ]] || [[ "$dynamic_scan_result" != "true" ]]; then
+  echo "FIPS job has failed. Exiting."
+  exit 1
 fi
