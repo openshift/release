@@ -12,6 +12,17 @@ images:
 - dockerfile_path: .ci/Dockerfile
   to: registry
 releases:
+  arm64-initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+      architecture: arm64
+  arm64-latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+      architecture: arm64
   initial:
     integration:
       name: "4.14"
@@ -32,8 +43,11 @@ tests:
 - as: registry-test
   steps:
     cluster_profile: aws-devfile
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: devfile-ci.com
+      OCP_ARCH: arm64
     test:
     - as: registry-test-steps
       commands: |
@@ -41,7 +55,7 @@ tests:
         mkdir /tmp/bin
         curl -L --fail https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/candidate-4.14/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
-        .ci/openshift_integration.sh
+        .ci/openshift_integration.sh arm64
       dependencies:
       - env: REGISTRY_IMAGE
         name: registry
