@@ -40,8 +40,8 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-tes
 export WORKLOAD=web-burner-init
 EXTRA_FLAGS="--gc=false --sriov=true --alerting=true --check-health=true --local-indexing=false --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD} --profile-type=${PROFILE_TYPE}" ./run.sh
 
-# The node-density run
-export WORKLOAD=web-burner-node-density
+# The node-density or cluster-density run
+export WORKLOAD="$WEBBURNER_WORKLOAD"
 EXTRA_FLAGS="--gc=${GC} --sriov=true --alerting=true --check-health=true --probe=${PROBE} --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD} --profile-type=${PROFILE_TYPE}" ./run.sh
 
 if [ ${BAREMETAL} == "true" ]; then
