@@ -368,8 +368,7 @@ function run {
 
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
-ginkgo:
-  type: openshift-extended-test-disruptive
+openshift-extended-test-disruptive:
   total: $tests
   failures: $failures
   errors: $errors

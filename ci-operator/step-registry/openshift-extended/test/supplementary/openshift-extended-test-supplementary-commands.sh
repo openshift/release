@@ -364,8 +364,7 @@ function run {
 
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
-ginkgo:
-  type: openshift-extended-test-supplementary
+openshift-extended-test-supplementary:
   total: $tests
   failures: $failures
   errors: $errors

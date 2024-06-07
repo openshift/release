@@ -135,8 +135,7 @@ function do_run {
 
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
-ginkgo:
-  type: openshift-extended-rosacli-tests
+openshift-extended-rosacli-tests:
   total: $tests
   failures: $failures
   errors: $errors
