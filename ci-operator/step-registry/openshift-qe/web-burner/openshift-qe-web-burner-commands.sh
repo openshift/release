@@ -37,11 +37,9 @@ pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
 # Inicialize the environment
-export WORKLOAD=web-burner-init
-EXTRA_FLAGS="--gc=false --sriov=true --alerting=true --check-health=true --local-indexing=false --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD} --profile-type=${PROFILE_TYPE}" ./run.sh
+WORKLOAD=web-burner-init EXTRA_FLAGS="--gc=false --sriov=true --alerting=true --check-health=true --local-indexing=false --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD} --profile-type=${PROFILE_TYPE}" ./run.sh
 
-# The node-density or cluster-density run
-export WORKLOAD="$WEBBURNER_WORKLOAD"
+# The web-burner node-density or cluster-density run
 EXTRA_FLAGS="--gc=${GC} --sriov=true --alerting=true --check-health=true --probe=${PROBE} --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD} --profile-type=${PROFILE_TYPE}" ./run.sh
 
 if [ ${BAREMETAL} == "true" ]; then
