@@ -34,8 +34,37 @@ export TESTS_PULL_REF='${TESTS_PULL_REF}'
 echo '${PULL_SECRET}' > ${remote_workdir}/.dockerconfig.json
 export REGISTRY_AUTH_FILE='${remote_workdir}/.dockerconfig.json'
 
+date
 # Configure the local image registry since the tests need it
 oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed", "storage":{"emptyDir":{}}}}'
+
+# Wait till the image registry change will be applied
+date
+oc wait --timeout=2m co image-registry --for=condition=Progressing=true
+oc get co
+date
+oc wait --timeout=10m co image-registry --for=condition=Available=true
+date
+
+# it take time till operators will finish rollouts
+sleep 5m
+
+# Loop until all operators are healthy
+until [ -z "$(oc get co -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Available" and .status!="True")) | .metadata.name')" ]; do
+  echo "Waiting for all operators to become healthy..."
+  oc get co
+  oc get clusterversion
+  # Print the names of unhealthy operators
+  # Wait before checking again
+  sleep 1m
+done
+oc get clusterversion
+
+echo "All operators are healthy."
+oc get co
+
+oc wait --timeout=10m clusterversion version --for=condition=Failing=false
+date
 
 mkdir tmp
 
