@@ -273,7 +273,7 @@ done
 oc delete pvc -n openshift-cluster-csi-drivers ${nutanix_pvc_name}
 
 until
-  oc wait --all=true clusteroperator --for='condition=Available=True' >/dev/null &&
+    oc wait --all=true clusteroperator --timeout=5m --for='condition=Available=True' >/dev/null &&
     oc wait --all=true clusteroperator --for='condition=Progressing=False' >/dev/null &&
     oc wait --all=true clusteroperator --for='condition=Degraded=False' >/dev/null
 do
