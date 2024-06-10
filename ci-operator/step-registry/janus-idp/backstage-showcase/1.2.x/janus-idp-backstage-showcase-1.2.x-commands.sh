@@ -50,9 +50,10 @@ for change in $PR_CHANGESET; do
 done
 
 if $ONLY_IN_DIRS || [[ "$JOB_NAME" == rehearse-* ]]; then
-    echo "Skipping wait for new PR image and proceeding with image tag : next"
-    echo "updated image tag : next"
-    TAG_NAME="next"
+    echo "Skipping wait for new PR image and proceeding with image tag : 1.2"
+    echo "updated image tag : 1.2"
+    QUAY_REPO="rhdh/rhdh-hub-rhel9"
+    TAG_NAME="1.2"
 else
     TIMEOUT=3000         # Maximum wait time of 50 mins (3000 seconds)
     INTERVAL=60             # Check every 60 seconds
