@@ -3,6 +3,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: installer
+  openstack-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: openstack-installer
 binary_build_commands: go build -o /bin/prune .
 build_root:
   from_repository: true
@@ -10,18 +14,12 @@ images:
 - dockerfile_literal: FROM bin
   from: bin
   to: shiftstack-prune-image
-- dockerfile_literal: |-
-    FROM src
-    RUN dnf -y install python3-openstackclient python3-octaviaclient jq && dnf clean all
-    ADD openshift-install /usr/bin/openshift-install
-    RUN python -m pip install yq
-  from: src
-  inputs:
-    installer:
-      paths:
-      - destination_dir: .
-        source_path: /bin/openshift-install
-  to: openstack-installer
+promotion:
+  to:
+  - additional_images:
+      prune: bin
+    name: tooling
+    namespace: shiftstack
 resources:
   '*':
     limits:
