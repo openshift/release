@@ -1,16 +1,16 @@
 base_images:
-  ocp_4.17_base:
-    name: 4.17-priv
-    namespace: ocp-private
+  ocp_4.14_base:
+    name: "4.14"
+    namespace: ocp
     tag: base
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
-  openshift_release_golang-1.22:
+    tag: rhel-8-golang-1.20-openshift-4.14
+  openshift_release_golang-1.15:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: golang-1.15
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -18,18 +18,18 @@ canonical_go_repository: github.com/openshift/cluster-resource-override-admissio
 images:
 - dockerfile_path: images/ci/Dockerfile
   inputs:
-    ocp_4.17_base:
+    ocp_4.14_base:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.14:base
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: cluster-resource-override-admission-operator
 - dockerfile_path: images/operator-registry/Dockerfile.registry.ci
   inputs:
-    openshift_release_golang-1.22:
+    openshift_release_golang-1.15:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.22
+      - registry.ci.openshift.org/openshift/release:golang-1.15
   to: cluster-resource-override-admission-operator-registry
 promotion:
   to:
