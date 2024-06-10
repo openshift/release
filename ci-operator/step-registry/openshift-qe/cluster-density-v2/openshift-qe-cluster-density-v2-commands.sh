@@ -70,6 +70,7 @@ if [[ "${USE_HORREUM_WEBHOOK}" == "true" ]]; then
     curl -X POST \
          -u "user:$WEBHOOK_USER"  \
          --header "Content-Type: application/json" \
+         --retry 5 \
          "$WEBHOOK_URL" \
          -d "$JSON_DATA"
 
