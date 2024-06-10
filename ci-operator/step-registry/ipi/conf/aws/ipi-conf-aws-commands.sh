@@ -7,6 +7,7 @@ set -o pipefail
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
+exit 1
 
 expiration_date=$(date -d '8 hours' --iso=minutes --utc)
 
