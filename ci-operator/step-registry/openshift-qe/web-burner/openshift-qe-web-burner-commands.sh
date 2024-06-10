@@ -25,6 +25,10 @@ pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
+# Clean up leftovers for previous test
+oc delete project $(for i in {0..${LIMIT_COUNT}}; do echo served-ns-$i serving-ns-$i; done)
+oc delete AdminPolicyBasedExternalRoute --all
+
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
 
@@ -36,11 +40,17 @@ pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
+UUID=$(uuidgen)
+
 # Inicialize the environment
-WORKLOAD=web-burner-init EXTRA_FLAGS="--gc=false --sriov=true --alerting=true --check-health=true --local-indexing=false --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD} --profile-type=${PROFILE_TYPE}" ./run.sh
+WORKLOAD=web-burner-init EXTRA_FLAGS="--uuid=${UUID} --gc=false --sriov=true --alerting=true --check-health=true --local-indexing=false --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD} --profile-type=${PROFILE_TYPE}" ./run.sh
 
 # The web-burner node-density or cluster-density run
-WORKLOAD=$WORKLOAD EXTRA_FLAGS="--gc=${GC} --sriov=true --alerting=true --check-health=true --probe=${PROBE} --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD} --profile-type=${PROFILE_TYPE}" ./run.sh
+EXTRA_FLAGS="--uuid=${UUID} --gc=${GC} --sriov=true --alerting=true --check-health=true --probe=${PROBE} --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD} --profile-type=${PROFILE_TYPE}" ./run.sh
+
+# Clean up
+oc delete project $(for i in {0..${LIMIT_COUNT}}; do echo served-ns-$i serving-ns-$i; done)
+oc delete AdminPolicyBasedExternalRoute --all
 
 if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
