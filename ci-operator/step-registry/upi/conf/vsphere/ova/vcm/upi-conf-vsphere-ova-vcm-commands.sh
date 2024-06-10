@@ -28,6 +28,9 @@ declare GOVC_RESOURCE_POOL
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 
+unset SSL_CERT_FILE 
+unset GOVC_TLS_CA_CERTS
+
 govc_version=$(govc version)
 
 echo "$(date -u --rfc-3339=seconds) - govc version: ${govc_version}"

@@ -17,7 +17,14 @@ declare vsphere_portgroup
 declare dns_server
 declare vsphere_datastore
 declare vsphere_resource_pool
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE 
+unset GOVC_TLS_CA_CERTS
 
 
 cluster_name=${NAMESPACE}-${UNIQUE_HASH}
@@ -60,9 +67,6 @@ vm_template="${OVA_URL##*/}"
 # Troubleshooting UPI OVA import issue
 echo "$(date -u --rfc-3339=seconds) - vm_template: ${vm_template}"
 
-echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/govc.sh"
 
 cat >/tmp/rhcos.json <<EOF
 {
