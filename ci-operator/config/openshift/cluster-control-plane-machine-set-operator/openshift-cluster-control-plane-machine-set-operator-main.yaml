@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
+  upi-installer:
+    name: "4.15"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -24,21 +28,43 @@ promotion:
   - name: "4.17"
     namespace: ocp
 releases:
+  arm64-initial:
+    prerelease:
+      architecture: arm64
+      product: ocp
+      version_bounds:
+        lower: 4.14.0-0
+        upper: 4.15.0-0
   arm64-latest:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.15"
   initial:
-    integration:
-      name: "4.17"
-      namespace: ocp
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.14.0-0
+        upper: 4.15.0-0
   latest:
-    integration:
-      include_built_images: true
-      name: "4.17"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+  multi-initial:
+    prerelease:
+      architecture: multi
+      product: ocp
+      version_bounds:
+        lower: 4.14.0-0
+        upper: 4.15.0-0
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -86,6 +112,16 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
+- as: ocp-e2e-aws-ovn-heterogeneous-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    workflow: openshift-upgrade-aws-heterogeneous
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
