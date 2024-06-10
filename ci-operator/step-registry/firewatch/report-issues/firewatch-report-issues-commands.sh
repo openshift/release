@@ -27,4 +27,5 @@ if [[ -z "${FIREWATCH_CONFIG_PLATFORM}" ]]; then
     fi
 fi
 
+echo $report_command
 eval "$report_command"
