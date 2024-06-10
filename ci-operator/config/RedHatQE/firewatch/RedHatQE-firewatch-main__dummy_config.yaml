@@ -1,23 +1,29 @@
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
-images:
-- context_dir: .
-  dockerfile_path: Dockerfile
-  to: main
-promotion:
-  to:
-  - name: firewatch
-    namespace: firewatch
+base_images:
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: test-base-config-file
+  steps:
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","service-registry-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+    workflow: firewatch-ipi-aws
 zz_generated_metadata:
   branch: main
   org: RedHatQE
   repo: firewatch
-  variant: image
+  variant: dummy_config
