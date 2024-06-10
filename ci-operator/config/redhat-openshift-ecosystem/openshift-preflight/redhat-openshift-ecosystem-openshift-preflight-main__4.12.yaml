@@ -58,6 +58,16 @@ tests:
     timeout: 1h0m0s
     version: "4.12"
   steps:
+    env:
+      CHANGE_CHANNEL_BASE: candidate
+      CINCINNATI_URL: https://api.integration.openshift.com/api/upgrades_info/graph
+    post:
+    - chain: gather
+    pre:
+    - ref: ipi-install-rbac
+    - ref: openshift-configure-cincinnati
+    - ref: operator-pipelines-preflight-prod-approve-csrs
+    - ref: operator-pipelines-preflight-prod-operator-registry-cache-fix
     test:
     - as: e2e
       commands: |
@@ -81,7 +91,6 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: redhat-openshift-ecosystem
