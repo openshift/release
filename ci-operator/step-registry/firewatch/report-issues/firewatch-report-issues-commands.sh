@@ -24,6 +24,7 @@ fi
 if [[ -z "${FIREWATCH_CONFIG_PLATFORM}" ]]; then
     if [[ "${FIREWATCH_CONFIG_PLATFORM,,}" == "aws" ]]; then
         report_command+=" --firewatch-config-path=https://raw.githubusercontent.com/oharan2/cspi-utils/firewatch_base_configs/firewatch-base-configs/lp-interop-aws-ipi-base-config.json"
+    fi
 fi
 
 eval "$report_command"
