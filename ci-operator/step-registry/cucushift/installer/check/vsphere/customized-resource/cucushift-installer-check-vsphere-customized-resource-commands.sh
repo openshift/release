@@ -17,7 +17,7 @@ function get_node_names() {
    else
       mapfile -t  node_lists < <(oc get node --no-headers | awk '{print $1}')
    fi
-  
+
    echo ${node_lists[*]}
 }
 

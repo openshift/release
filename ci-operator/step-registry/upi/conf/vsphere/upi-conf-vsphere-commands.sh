@@ -35,8 +35,6 @@ declare primaryrouterhostname
 declare vsphere_portgroup
 
 # shellcheck source=/dev/null
-source "${SHARED_DIR}/govc.sh"
-# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
