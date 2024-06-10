@@ -13,12 +13,12 @@ tar -C /tmp/openshift-client -xvf /tmp/openshift-client/openshift-client-linux-$
 export PATH=/tmp/openshift-client:$PATH
 oc version
 
-export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME NAME_SPACE TAG_NAME
+export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME QUAY_REPO TAG_NAME
 
 GITHUB_ORG_NAME="janus-idp"
 GITHUB_REPOSITORY_NAME="backstage-showcase"
-NAME_SPACE="showcase-ci-nightly"
-TAG_NAME="next"
+QUAY_REPO="rhdh/rhdh-hub-rhel9"
+TAG_NAME="1.2"
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
