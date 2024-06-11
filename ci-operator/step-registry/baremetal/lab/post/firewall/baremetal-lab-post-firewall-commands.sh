@@ -41,6 +41,6 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   INTERNAL_NET_CIDR="${1}"
   IP_ARRAY="${@:2}"
   for ip in $IP_ARRAY; do
-    iptables -D FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" -j DROP
+    iptables -D FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" ! -p tcp --dport 22 -j DROP
   done
 EOF
