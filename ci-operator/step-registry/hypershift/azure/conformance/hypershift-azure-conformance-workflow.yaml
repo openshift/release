@@ -17,8 +17,9 @@ workflow:
 
     - Alberto Lamela (agarcial@redhat.com)
     - Seth Jennings (sjenning@redhat.com)
-    - Dan Mace (dmace@redhat.com)
     - Cesar Wong (cewong@redhat.com)
+    - Patryk Stefanski (pstefans@redhat.com)
+    
 
     Learn more about HyperShift here: https://github.com/openshift/hypershift
 
@@ -27,10 +28,17 @@ workflow:
     post:
     - chain: hypershift-dump
     - chain: hypershift-azure-destroy
-    - chain: ipi-azure-post
+    - chain: hypershift-destroy-nested-management-cluster
     test:
     - chain: hypershift-conformance
     pre:
-    - chain: ipi-azure-pre
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
     - ref: hypershift-install
     - chain: hypershift-azure-create
+    env:
+      USE_HYPERSHIFT_AZURE_CREDS: "true"
+      TEST_SKIPS: "azure-disk"
+      CLOUD_PROVIDER: "Azure"
+      HYPERSHIFT_NODE_COUNT: "3"
+      HYPERSHIFT_BASE_DOMAIN: "hypershift.azure.devcluster.openshift.com"
