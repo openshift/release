@@ -4,13 +4,14 @@ HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
-export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME NAME_SPACE NAME_SPACE_RBAC QUAY_REPO
+export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME NAME_SPACE NAME_SPACE_RBAC NAME_SPACE_POSTGRES_DB QUAY_REPO
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
 echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
 GITHUB_ORG_NAME="janus-idp"
 GITHUB_REPOSITORY_NAME="backstage-showcase"
 NAME_SPACE="showcase-1-2-x"
 NAME_SPACE_RBAC="showcase-rbac-1-2-x"
+NAME_SPACE_POSTGRES_DB=postgress-external-db-1-2-x
 QUAY_REPO="janus-idp/backstage-showcase"
 
 # Clone and checkout the specific PR
