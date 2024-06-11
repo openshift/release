@@ -23,7 +23,9 @@ HOSTS_FILE="/var/run/secrets/ci.openshift.io/multi-stage/hosts.yaml"
 
 COREOS_STREAM_FILE="/var/run/secrets/ci.openshift.io/multi-stage/coreos-stream.json"
 
-INSTALL_COMPLETE_FILE="/var/run/secrets/ci.openshift.io/multi-stage/INSTALL_COMPLETE"
+INSTALL_SUCCESS_FILE="/var/run/secrets/ci.openshift.io/multi-stage/success"
+INSTALL_FAILURE_FILE="/var/run/secrets/ci.openshift.io/multi-stage/failure"
+
 
 # https://docs.ci.openshift.org/docs/internals/observer-pods/
 
@@ -274,7 +276,7 @@ function isNodeAlive(){
 
 function handleReboot(){
   # handle reboot only if happens during install (skip post-wipe)
-  if [ ! -f "${INSTALL_COMPLETE_FILE}" ]; then
+  if [ ! -f "${INSTALL_SUCCESS_FILE}" ]; then
     local bmhost="${1}"
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
     writeFSMFile $host "${NODE_REBOOTING}"
@@ -424,26 +426,49 @@ function initFSM(){
   done
 }
 
+INSTALL_SUCCESS=false
+INSTALL_FAILURE=false
 
-function waitForInstall(){
-
-  while [ ! -f "${INSTALL_COMPLETE_FILE}" ]; do
-    printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${INSTALL_COMPLETE_FILE}"
-    sleep 30
-  done
-  printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${INSTALL_COMPLETE_FILE}"
+function postInstall(){
   for bmhost in $(yq e -o=j -I=0 '.[]' "${HOSTS_FILE}"); do
         . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
         writeFSMFile $host "${INSTALL_COMPLETE}"
         # Use code '0' when everything is working as expected, green junit report, append line only once
-        echo 0 "${host} ${name}" >> "${ARTIFACT_DIR}/install-status.txt"
+        if [ "$INSTALL_SUCCESS" = "true" ]; then
+          echo 0 "${host} ${name}" >> "${ARTIFACT_DIR}/install-status.txt"
+        else
+          echo 1 "${host} ${name}" >> "${ARTIFACT_DIR}/install-status.txt"
+        fi
   done
   # Let the monitorFSM loop process the INSTALL_COMPLETE status
   sleep 60
   echo "Killing processes running on bastion host before exit"
   killPendingBastionProcesses
+}
 
+function waitForInstallSuccess(){
+  while [ ! -f "${INSTALL_SUCCESS_FILE}" ]; do
+    printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${INSTALL_SUCCESS_FILE}"
+    sleep 30
+  done
+  printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${INSTALL_SUCCESS_FILE}"
+  INSTALL_SUCCESS=true
+  postInstall
+}
 
+function waitForInstallFailure(){
+  while [ ! -f "${INSTALL_FAILURE_FILE}" ]; do
+    printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${INSTALL_FAILURE_FILE}"
+    sleep 30
+  done
+  printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${INSTALL_FAILURE_FILE}"
+  INSTALL_FAILURE=true
+  postInstall
+}
+
+function waitForInstall(){
+  waitForInstallSuccess &
+  waitForInstallFailure &
 }
 
 function monitorFSM(){

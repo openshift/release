@@ -339,6 +339,8 @@ echo -e "\nLaunching 'wait-for install-complete' installation step....."
 oinst wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
+  # Used by observer pod
+  touch  "${SHARED_DIR}/failure"
   # TODO
   exit 1
 fi
