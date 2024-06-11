@@ -22,6 +22,7 @@ export ref_machineset_name winworker_machineset_name
 
 # Get a templated json from worker machineset, apply Windows specific settings
 # and pass it to `oc` to create a new machinesetoc get machineset "${ref_machineset_name}" -n openshift-machine-api -o json |
+oc get machineset "${ref_machineset_name}" -n openshift-machine-api -o json |
   jq --arg winworker_machineset_name "${winworker_machineset_name}" \
      --arg win_os_id "${WINDOWS_OS_ID}" \
      --arg user_data_secret "${WINDOWS_USER_DATA_SECRET}" \
@@ -42,6 +43,7 @@ export ref_machineset_name winworker_machineset_name
       del(.metadata.selfLink) |
       del(.metadata.uid)
      ' | oc create -f -
+
      
 # Scale machineset to expected number of replicas
 oc -n openshift-machine-api scale machineset/"${winworker_machineset_name}" --replicas="${WINDOWS_NODE_REPLICAS}"
