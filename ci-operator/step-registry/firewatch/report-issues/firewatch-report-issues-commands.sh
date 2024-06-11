@@ -22,11 +22,11 @@ fi
 
 # If the user specified a platform to use in a basic configuration file
 if [ "${FIREWATCH_CONFIG_PLATFORM,,}" = "aws" ]; then
-    report_command+=" --firewatch-config-path=https://raw.githubusercontent.com/oharan2/cspi-utils/firewatch_base_configs/firewatch-base-configs/lp-interop-aws-ipi-base-config.json"
+    report_command+=" --firewatch-config-path=https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json"
 fi
 
 if [ "${FIREWATCH_CONFIG_PLATFORM,,}" = "rosa" ]; then
-    report_command+=" --firewatch-config-path=https://raw.githubusercontent.com/oharan2/cspi-utils/firewatch_base_configs/firewatch-base-configs/lp-interop-rosa-base-config.json"
+    report_command+=" --firewatch-config-path=https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json"
 fi
 
 eval "$report_command"
