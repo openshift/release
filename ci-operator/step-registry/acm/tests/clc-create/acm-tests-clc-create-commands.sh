@@ -19,7 +19,6 @@ export DISPLAY=:99
 Xvfb :99 &
 # Xvfb :99 -screen 0 1024x768x16 2>/dev/null &
 
-
 export CYPRESS_video=false
 # export CYPRESS_videoCompression=false
 ###############################################
