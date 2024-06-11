@@ -32,6 +32,7 @@ CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
 ADDITIONAL_SECURITY_GROUP=${ADDITIONAL_SECURITY_GROUP:-false}
 NO_CNI=${NO_CNI:-false}
 CONFIGURE_CLUSTER_AUTOSCALER=${CONFIGURE_CLUSTER_AUTOSCALER:-false}
+BILLING_ACCOUNT=${BILLING_ACCOUNT}
 CLUSTER_PREFIX=$(head -n 1 "${SHARED_DIR}/cluster-prefix")
 
 log(){
@@ -274,6 +275,12 @@ if [[ "$ENABLE_AUDIT_LOG" == "true" ]]; then
   record_cluster "audit_log_arn" $iam_role_arn
 fi
 
+BILLING_ACCOUNT_SWITCH=""
+if [[ ! -z "$BILLING_ACCOUNT" ]]; then
+  BILLING_ACCOUNT_SWITCH="--billing-account ${BILLING_ACCOUNT}"
+  record_cluster "billing_account" ${BILLING_ACCOUNT}
+fi
+
 # If the node count is >=24 we enable autoscaling with max replicas set to the replica count so we can bypass the day2 rollout.
 # This requires a second step in the waiting for nodes phase where we put the config back to the desired setup.
 COMPUTE_NODES_SWITCH=""
@@ -501,6 +508,7 @@ echo "Parameters for cluster request:"
 echo "  Cluster name: ${CLUSTER_NAME}"
 echo "  STS mode: ${STS}"
 echo "  Hypershift: ${HOSTED_CP}"
+echo "  Billing Account: ${BILLING_ACCOUNT:-default}"
 echo "  Byo OIDC: ${BYO_OIDC}"
 echo "  Compute machine type: ${COMPUTE_MACHINE_TYPE}"
 echo "  Worker disk size: ${WORKER_DISK_SIZE}"
@@ -569,6 +577,7 @@ ${SHARED_VPC_SWITCH} \
 ${SECURITY_GROUP_ID_SWITCH} \
 ${NO_CNI_SWITCH} \
 ${CONFIGURE_CLUSTER_AUTOSCALER_SWITCH} \
+${BILLING_ACCOUNT_SWITCH} \
 ${DRY_RUN_SWITCH}
 "
 echo "$cmd"| sed -E 's/\s{2,}/ /g' > "${SHARED_DIR}/create_cluster.sh"
