@@ -26,7 +26,8 @@ python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
 # Clean up leftovers for previous test
-oc delete project "$(for i in $(seq 0 $LIMITCOUNT); do echo served-ns-$i serving-ns-$i; done)" || echo "No leftovers to be deleted"
+oc delete projects -l kube-burner-job=init-served-job
+oc delete projects -l kube-burner-job=create-serviceaccounts-job
 oc delete AdminPolicyBasedExternalRoute --all
 
 ES_PASSWORD=$(cat "/secret/password")
@@ -49,7 +50,8 @@ WORKLOAD=web-burner-init EXTRA_FLAGS="--uuid=${UUID} --gc=false --sriov=true --a
 EXTRA_FLAGS="--uuid=${UUID} --gc=${GC} --sriov=true --alerting=true --check-health=true --probe=${PROBE} --bfd=${BFD} --limitcount=${LIMIT_COUNT} --scale=${SCALE} --crd=${CRD} --profile-type=${PROFILE_TYPE}" ./run.sh
 
 # Clean up
-oc delete project "$(for i in $(seq 0 $LIMITCOUNT); do echo served-ns-$i serving-ns-$i; done)"
+oc delete projects -l kube-burner-job=init-served-job
+oc delete projects -l kube-burner-job=create-serviceaccounts-job
 oc delete AdminPolicyBasedExternalRoute --all
 
 if [ ${BAREMETAL} == "true" ]; then
