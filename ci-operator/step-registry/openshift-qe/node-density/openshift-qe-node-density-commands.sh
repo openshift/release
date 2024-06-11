@@ -24,6 +24,10 @@ export WORKLOAD=node-density
 # A non-indexed warmup run
 ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50 --pod-ready-threshold=60s" ./run.sh
 
+if [[ "${USE_HORREUM_WEBHOOK}" == "true" ]]; then
+    export PROFILE_TYPE="reporting"
+fi
+
 # The measurable run
 EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --local-indexing"
 
