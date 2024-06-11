@@ -8,7 +8,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 function wait_for_cluster() {
   while true; do
-    cluster_state=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters/"$sc_cluster_id" | jq -r '.status')
+    cluster_state=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters/"$sc_cluster_id" | jq -r '.status // empty') || true
     echo "service cluster state: ${cluster_state}"
     if [[ "${cluster_state}" == "ready" ]]; then
       echo "service cluster: '$sc_cluster_id' reported as ready"
@@ -21,7 +21,7 @@ function wait_for_cluster() {
 
 function wait_for_provision_shard() {
   while true; do
-    shard_id=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters/"$sc_cluster_id" | jq -r '.provision_shard_reference.id // empty')
+    shard_id=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters/"$sc_cluster_id" | jq -r '.provision_shard_reference.id // empty') || true
     if [[ "${shard_id}" != "" ]]; then
       echo "provision shard reference obtained successfully"
       break
