@@ -12,6 +12,7 @@ declare vsphere_datacenter
 # shellcheck disable=SC1091
 source "${SHARED_DIR}/vsphere_context.sh"
 
+
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"

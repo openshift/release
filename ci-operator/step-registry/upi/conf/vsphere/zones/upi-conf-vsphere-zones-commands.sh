@@ -23,6 +23,9 @@ declare dns_server
 declare vsphere_url
 source "${SHARED_DIR}/vsphere_context.sh"
 
+unset SSL_CERT_FILE 
+unset GOVC_TLS_CA_CERTS
+
 openshift_install_path="/var/lib/openshift-install"
 
 start_master_num=4
@@ -148,6 +151,9 @@ source "${SHARED_DIR}/vsphere_context.sh"
 
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE 
+unset GOVC_TLS_CA_CERTS
 
 echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
 

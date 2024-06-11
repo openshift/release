@@ -5,7 +5,9 @@ set -o errexit
 set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 # These two environment variables are coming from vsphere_context.sh and
 # the file they are assigned to is not available in this step.
