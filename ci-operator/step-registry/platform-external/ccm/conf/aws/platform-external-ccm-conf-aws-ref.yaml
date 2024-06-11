@@ -1,0 +1,26 @@
+ref:
+  as: platform-external-ccm-conf-aws
+  from: cli
+  commands: platform-external-ccm-conf-aws-commands.sh
+  grace_period: 20m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    The step configure the CCM deployment manifests for AWS when using Platform External.
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    - name: "release:initial"
+      env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+  env:
+  - name: PLATFORM_EXTERNAL_CCM_ENABLED
+    default: "no"
+    documentation: |-
+      When setting to "yes", the step will create the manifests required to install CCM
+      in the temporary control plane when the cluster is initialized.
+  - name: CCM_NAMESPACE
+    default: "openshift-cloud-controller-manager"
+    documentation: |-
+      Allow installing CCM.
