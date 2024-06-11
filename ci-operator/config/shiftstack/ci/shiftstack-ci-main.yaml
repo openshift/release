@@ -1,8 +1,16 @@
 base_images:
+  openstack-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: openstack-installer
   shiftstack-bugwatcher-image:
     name: tooling
     namespace: shiftstack
     tag: bugwatcher
+  shiftstack-prune-image:
+    name: tooling
+    namespace: shiftstack
+    tag: prune
 resources:
   '*':
     limits:
@@ -11,6 +19,41 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: cleanup-vexxhost
+  interval: 6h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
+- as: cleanup-openstack-nfv
+  interval: 6h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-nfv
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
+- as: cleanup-openstack-hwoffload
+  interval: 6h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-hwoffload
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
+- as: cleanup-vh-mecha-central
+  interval: 6h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
+- as: cleanup-vh-mecha-az0
+  interval: 6h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-az0
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
 - as: bugwatcher-doctext
   cron: 0 8 * * 1-5
   steps:
