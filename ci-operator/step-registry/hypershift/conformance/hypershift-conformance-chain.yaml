@@ -74,6 +74,11 @@ chain:
       export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
       export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
       [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+      
+      if [[ -n "${USE_HYPERSHIFT_AZURE_CREDS:-}" ]]; then
+        export AZURE_AUTH_LOCATION=/etc/hypershift-ci-jobs-azurecreds/credentials.json
+      fi
+      
       export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
       if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
         source "${SHARED_DIR}/proxy-conf.sh"
@@ -97,7 +102,11 @@ chain:
           ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
           export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
           ;;
-      azure4|azure) export TEST_PROVIDER=azure;;
+      azure4|azure) 
+          REGION="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/region}' nodes)"
+          ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
+          export TEST_PROVIDER="{\"type\":\"azure\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\"}"
+          ;;
       azurestack)
           export TEST_PROVIDER="none"
           ;;
@@ -197,6 +206,9 @@ chain:
     - mount_path: /etc/hypershift-pool-aws-credentials
       name: hypershift-pool-aws-credentials
       namespace: test-credentials
+    - mount_path: /etc/hypershift-ci-jobs-azurecreds
+      name: hypershift-ci-jobs-azurecreds
+      namespace: test-credentials
     timeout: 14400s
     grace_period: 30m0s
     env:
@@ -226,6 +238,9 @@ chain:
     - name: ARCHITECTURE
       default: "amd64"
       documentation: Set the architecture for disconnected conformance (amd64, arm64, ppc64le, s390x)
+    - name: USE_HYPERSHIFT_AZURE_CREDS
+      default: "false"
+      documentation: "Whether to use hypershift-ci-jobs-azurecreds secret for Azure credentials. Set to 'true' to use the secret. Set to 'false' to use the default credentials."
     resources:
       requests:
         cpu: "3"
