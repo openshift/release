@@ -11,6 +11,9 @@ if [[ -z "${HOSTNAME}" ]]; then
   exit 1
 fi
 
+trap 'prepare_next_steps' EXIT TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
 LEASE_CONF="${CLUSTER_PROFILE_DIR}/leases"
 function leaseLookup () {
   local lookup
@@ -28,6 +31,17 @@ function save_credentials () {
   cp /tmp/metadata.json ${SHARED_DIR}
   cp /tmp/auth/kubeconfig ${SHARED_DIR}
   cp /tmp/auth/kubeadmin-password ${SHARED_DIR}
+}
+
+function prepare_next_steps () {
+  echo "$?" > "${SHARED_DIR}/install-status.txt"
+  set +e
+  echo "Setup phase finished, prepare env for next steps"
+  # Password for the cluster gets leaked in the installer logs and hence removing them.
+  sed -i 's/password: .*/password: REDACTED"/g' /tmp/.openshift_install.log
+  cp /tmp/.openshift_install.log "${ARTIFACT_DIR}"/.openshift_install.log
+  save_credentials
+  set -e
 }
 
 echo "FIPS_ENABLED = $FIPS_ENABLED"  # Delete before merge
@@ -239,12 +253,5 @@ for i in {1..30}; do
 done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
-
-# Password for the cluster gets leaked in the installer logs and hence removing them.
-sed -i 's/password: .*/password: REDACTED"/g' /tmp/.openshift_install.log
-cp /tmp/.openshift_install.log "${SHARED_DIR}"/.openshift_install.log
-
-# Save the kubeconfig again to make sure any changes during install are captured in future steps
-save_credentials
 
 touch /tmp/install-complete
