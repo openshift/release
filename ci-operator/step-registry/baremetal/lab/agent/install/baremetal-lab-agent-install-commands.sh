@@ -241,7 +241,7 @@ http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="
   oinst agent wait-for bootstrap-complete 2>&1 &
 if ! wait $!; then
   # Used by observer pod
-  touch "${SHARED_DIR}/INSTALL_FAILED"
+  touch "${SHARED_DIR}/failure"
   # TODO: gather logs??
   echo "ERROR: Bootstrap failed. Aborting execution."
   exit 1
@@ -254,10 +254,10 @@ http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   # Used by observer pod
-  touch "${SHARED_DIR}/INSTALL_FAILED"
+  touch "${SHARED_DIR}/failure"
   # TODO: gather logs??
   exit 1
 fi
 
 # Used by observer pod
-touch "${SHARED_DIR}/INSTALL_COMPLETE"
+touch  "${SHARED_DIR}/success"
