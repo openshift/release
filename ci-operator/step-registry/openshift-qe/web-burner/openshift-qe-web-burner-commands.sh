@@ -26,7 +26,7 @@ python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
 # Clean up leftovers for previous test
-oc delete project "$(for i in $(seq 0 $LIMITCOUNT); do echo served-ns-$i serving-ns-$i; done)" || echo "No leftovers to delete"
+oc delete project "$(for i in $(seq 0 $LIMITCOUNT); do echo served-ns-$i serving-ns-$i; done)" || echo "No leftovers to be deleted"
 oc delete AdminPolicyBasedExternalRoute --all
 
 ES_PASSWORD=$(cat "/secret/password")
