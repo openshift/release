@@ -21,7 +21,7 @@ declare vsphere_portgroup
 
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
-SSH_PUBLIC_KEY="$(cat /var/run/vault/sshkeys/ssh_public_key)"
+SSH_PUBLIC_KEY="$(cat /var/run/vault/assisted-ci-vault/ssh_public_key)"
 
 mkdir -p build/packer
 cp -r packer_files/vsphere_centos_template/* build/packer/
@@ -45,7 +45,7 @@ vsphere_network = "${vsphere_portgroup}"
 vsphere_folder = "assisted-test-infra-ci"
 vm_name = "assisted-test-infra-machine-template"
 ssh_public_key = "${SSH_PUBLIC_KEY}"
-ssh_private_key_file = "/var/run/vault/sshkeys/ssh_private_key"
+ssh_private_key_file = "/var/run/vault/assisted-ci-vault/ssh_private_key"
 iso_url = "http://rep-centos-il.upress.io/8-stream/isos/x86_64/${STREAM8_ISO}"
 iso_checksum = "${ISO_CHECKSUM}"
 EOF

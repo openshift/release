@@ -28,29 +28,51 @@ tests:
       TEST_PROFILE: rosa-advanced
     test:
     - ref: rosa-test-e2e
-    workflow: rosa-test-profile
+    workflow: rosa-lifecycle-advanced
 - as: rosa-sts-advanced-f3
   cron: 45 1 1,4,7,10,13,16,19,22,25,28 * *
   steps:
     cluster_profile: aws-qe
     env:
       CHANNEL_GROUP: stable
-      TEST_LABEL_FILTERS: (day1,day1-post,day2)&&!NonClassicCluster&&!Exclude
+      IMPORTANCE: (Critical,High)
       TEST_PROFILE: rosa-advanced
     test:
-    - ref: rosa-test-e2e
-    workflow: rosa-test-profile-ocm
+    - chain: rosa-tests-e2e-fullcycle
+    workflow: rosa-lifecycle
+- as: rosa-sts-private-link-f3
+  cron: 21 8 1,4,7,10,13,16,19,22,25,28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: stable
+      IMPORTANCE: (Critical,High)
+      TEST_PROFILE: rosa-private-link
+    test:
+    - chain: rosa-tests-e2e-fullcycle
+    workflow: rosa-lifecycle
 - as: rosa-hcp-advanced-f3
   cron: 29 17 1,4,7,10,13,16,19,22,25,28 * *
   steps:
     cluster_profile: aws-sd-qe
     env:
       CHANNEL_GROUP: stable
-      TEST_LABEL_FILTERS: (day1,day1-post,day2)&&!NonHCPCluster&&!Exclude
+      IMPORTANCE: (Critical,High)
       TEST_PROFILE: rosa-hcp-advanced
     test:
-    - ref: rosa-test-e2e
-    workflow: rosa-test-profile-ocm
+    - chain: rosa-tests-e2e-fullcycle
+    workflow: rosa-lifecycle
+- as: rosa-hcp-private-link-f3
+  cron: 45 10 3,6,9,12,15,18,21,24,27,30 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: stable
+      IMPORTANCE: (Critical,High)
+      TEST_PROFILE: rosa-hcp-pl
+    test:
+    - chain: rosa-tests-e2e-fullcycle
+    workflow: rosa-lifecycle
 zz_generated_metadata:
   branch: master
   org: openshift
