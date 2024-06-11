@@ -207,6 +207,13 @@ cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
 scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
+# Copy coreos stream file so the observer pod can check if the correct live image was booted
+echo -e "\nGenerating coreOS stream file..."
+
+# Creating file straight into $SHARED_DIR is not 100% reliable because of propagation issues (author guessing)
+oinst coreos print-stream-json > "${INSTALL_DIR}/coreos-stream.json"
+cp "${INSTALL_DIR}/coreos-stream.json" "${SHARED_DIR}/"
+
 proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
@@ -233,6 +240,8 @@ echo "Launching 'wait-for bootstrap-complete' installation step....."
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
   oinst agent wait-for bootstrap-complete 2>&1 &
 if ! wait $!; then
+  # Used by observer pod
+  touch "${SHARED_DIR}/INSTALL_FAILED"
   # TODO: gather logs??
   echo "ERROR: Bootstrap failed. Aborting execution."
   exit 1
@@ -244,6 +253,11 @@ http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="
   oinst agent wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
+  # Used by observer pod
+  touch "${SHARED_DIR}/INSTALL_FAILED"
   # TODO: gather logs??
   exit 1
 fi
+
+# Used by observer pod
+touch "${SHARED_DIR}/INSTALL_COMPLETE"
