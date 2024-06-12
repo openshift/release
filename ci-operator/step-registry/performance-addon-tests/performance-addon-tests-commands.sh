@@ -7,7 +7,7 @@ set -o pipefail
 PAO_INSTALL_NAMESPACE=performance-addon-operator
 
 
-echo "Installing PAO from ${PAO_OPERATOR_CHANNEL} into ${PAO_INSTALL_NAMESPACE}"
+echo "Installing PAO  into ${PAO_INSTALL_NAMESPACE}"
 
 # create the install namespace
 oc apply -f - <<EOF
