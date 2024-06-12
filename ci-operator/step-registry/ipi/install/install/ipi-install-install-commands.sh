@@ -660,6 +660,8 @@ if test "${ret}" -ne 0 ; then
 	echo "Create manifests exit code: $ret"
 	exit "${ret}"
 fi
+#debug
+ls -ltr "${dir}/openshift"
 set -o errexit
 
 # Platform specific manifests adjustments
