@@ -1,0 +1,215 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  annotations:
+    exclude.release.openshift.io/internal-openshift-hosted: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    kubernetes.io/description: Alerting rules for when cluster-version operator metrics
+      call for administrator attention.
+  creationTimestamp: "2024-06-11T10:41:12Z"
+  generation: 1
+  labels:
+    k8s-app: cluster-version-operator
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:exclude.release.openshift.io/internal-openshift-hosted: {}
+          f:include.release.openshift.io/self-managed-high-availability: {}
+          f:kubernetes.io/description: {}
+        f:labels:
+          .: {}
+          f:k8s-app: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"7f5ed23b-8031-407e-bbf3-8850738c2d59"}: {}
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"cluster-operators"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"cluster-version"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: cluster-version-operator
+    operation: Update
+    time: "2024-06-11T10:41:12Z"
+  name: cluster-version-operator
+  namespace: openshift-cluster-version
+  ownerReferences:
+  - apiVersion: config.openshift.io/v1
+    controller: true
+    kind: ClusterVersion
+    name: version
+    uid: 7f5ed23b-8031-407e-bbf3-8850738c2d59
+  resourceVersion: "1744"
+  uid: b10fc4d2-3df1-496a-a7ae-301b6b05559f
+spec:
+  groups:
+  - name: cluster-version
+    rules:
+    - alert: ClusterVersionOperatorDown
+      annotations:
+        description: The operator may be down or disabled. The cluster will not be
+          kept up to date and upgrades will not be possible. Inspect the openshift-cluster-version
+          namespace for events or changes to the cluster-version-operator deployment
+          or pods to diagnose and repair. {{ with $console_url := "console_url" |
+          query }}{{ if ne (len (label "url" (first $console_url ) ) ) 0}} For more
+          information refer to {{ label "url" (first $console_url ) }}/k8s/cluster/projects/openshift-cluster-version.{{
+          end }}{{ end }}
+        summary: Cluster version operator has disappeared from Prometheus target discovery.
+      expr: |
+        absent(up{job="cluster-version-operator"} == 1)
+      for: 10m
+      labels:
+        namespace: openshift-cluster-version
+        severity: critical
+    - alert: CannotRetrieveUpdates
+      annotations:
+        description: Failure to retrieve updates means that cluster administrators
+          will need to monitor for available updates on their own or risk falling
+          behind on security or other bugfixes. If the failure is expected, you can
+          clear spec.channel in the ClusterVersion object to tell the cluster-version
+          operator to not retrieve updates. Failure reason {{ with $cluster_operator_conditions
+          := "cluster_operator_conditions" | query}}{{range $value := .}}{{if and
+          (eq (label "name" $value) "version") (eq (label "condition" $value) "RetrievedUpdates")
+          (eq (label "endpoint" $value) "metrics") (eq (value $value) 0.0)}}{{label
+          "reason" $value}} {{end}}{{end}}{{end}}. For more information refer to `oc
+          get clusterversion/version -o=jsonpath="{.status.conditions[?(.type=='RetrievedUpdates')]}{'\n'}"`{{
+          with $console_url := "console_url" | query }}{{ if ne (len (label "url"
+          (first $console_url ) ) ) 0}} or {{ label "url" (first $console_url ) }}/settings/cluster/{{
+          end }}{{ end }}.
+        summary: Cluster version operator has not retrieved updates in {{ $value |
+          humanizeDuration }}.
+      expr: "max by (namespace)\n(\n  (\n    time()-cluster_version_operator_update_retrieval_timestamp_seconds\n
+        \ ) >= 3600 \n  and ignoring(condition, name, reason) \n  (cluster_operator_conditions{name=\"version\",
+        condition=\"RetrievedUpdates\", endpoint=\"metrics\", reason!=\"NoChannel\"})\n)\n"
+      labels:
+        severity: warning
+    - alert: UpdateAvailable
+      annotations:
+        description: For more information refer to 'oc adm upgrade'{{ with $console_url
+          := "console_url" | query }}{{ if ne (len (label "url" (first $console_url
+          ) ) ) 0}} or {{ label "url" (first $console_url ) }}/settings/cluster/{{
+          end }}{{ end }}.
+        summary: Your upstream update recommendation service recommends you update
+          your cluster.
+      expr: |
+        sum by (channel, namespace, upstream) (cluster_version_available_updates) > 0
+      labels:
+        severity: info
+    - alert: ClusterReleaseNotAccepted
+      annotations:
+        description: The desired cluster release has not been accepted because {{
+          $labels.reason }}, and the cluster will continue to reconcile an earlier
+          release instead of moving towards that desired release.  For more information
+          refer to 'oc adm upgrade'{{ with $console_url := "console_url" | query }}{{
+          if ne (len (label "url" (first $console_url ) ) ) 0}} or {{ label "url"
+          (first $console_url ) }}/settings/cluster/{{ end }}{{ end }}.
+        summary: The desired cluster release has not been accepted for at least an
+          hour.
+      expr: |
+        max by (namespace, name, reason) (cluster_operator_conditions{name="version", condition="ReleaseAccepted", endpoint="metrics"} == 0)
+      for: 60m
+      labels:
+        severity: warning
+  - name: cluster-operators
+    rules:
+    - alert: ClusterNotUpgradeable
+      annotations:
+        description: In most cases, you will still be able to apply patch releases.
+          Reason {{ with $cluster_operator_conditions := "cluster_operator_conditions"
+          | query}}{{range $value := .}}{{if and (eq (label "name" $value) "version")
+          (eq (label "condition" $value) "Upgradeable") (eq (label "endpoint" $value)
+          "metrics") (eq (value $value) 0.0) (ne (len (label "reason" $value)) 0)
+          }}{{label "reason" $value}}.{{end}}{{end}}{{end}} For more information refer
+          to 'oc adm upgrade'{{ with $console_url := "console_url" | query }}{{ if
+          ne (len (label "url" (first $console_url ) ) ) 0}} or {{ label "url" (first
+          $console_url ) }}/settings/cluster/{{ end }}{{ end }}.
+        summary: One or more cluster operators have been blocking minor version cluster
+          upgrades for at least an hour.
+      expr: |
+        max by (namespace, name, condition, endpoint) (cluster_operator_conditions{name="version", condition="Upgradeable", endpoint="metrics"} == 0)
+      for: 60m
+      labels:
+        severity: info
+    - alert: ClusterOperatorDown
+      annotations:
+        description: The {{ $labels.name }} operator may be down or disabled because
+          {{ $labels.reason }}, and the components it manages may be unavailable or
+          degraded.  Cluster upgrades may not complete. For more information refer
+          to '{{ if eq $labels.name "version" }}oc adm upgrade{{ else }}oc get -o
+          yaml clusteroperator {{ $labels.name }}{{ end }}'{{ with $console_url :=
+          "console_url" | query }}{{ if ne (len (label "url" (first $console_url )
+          ) ) 0}} or {{ label "url" (first $console_url ) }}/settings/cluster/{{ end
+          }}{{ end }}.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-monitoring-operator/ClusterOperatorDown.md
+        summary: Cluster operator has not been available for 10 minutes.
+      expr: |
+        max by (namespace, name, reason) (cluster_operator_up{job="cluster-version-operator"} == 0)
+      for: 10m
+      labels:
+        severity: critical
+    - alert: ClusterOperatorDegraded
+      annotations:
+        description: The {{ $labels.name }} operator is degraded because {{ $labels.reason
+          }}, and the components it manages may have reduced quality of service.  Cluster
+          upgrades may not complete. For more information refer to '{{ if eq $labels.name
+          "version" }}oc adm upgrade{{ else }}oc get -o yaml clusteroperator {{ $labels.name
+          }}{{ end }}'{{ with $console_url := "console_url" | query }}{{ if ne (len
+          (label "url" (first $console_url ) ) ) 0}} or {{ label "url" (first $console_url
+          ) }}/settings/cluster/{{ end }}{{ end }}.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-monitoring-operator/ClusterOperatorDegraded.md
+        summary: Cluster operator has been degraded for 30 minutes.
+      expr: |
+        max by (namespace, name, reason)
+        (
+          (
+            cluster_operator_conditions{job="cluster-version-operator", name!="version", condition="Degraded"}
+            or on (namespace, name)
+            cluster_operator_conditions{job="cluster-version-operator", name="version", condition="Failing"}
+            or on (namespace, name)
+            group by (namespace, name) (cluster_operator_up{job="cluster-version-operator"})
+          ) == 1
+        )
+      for: 30m
+      labels:
+        severity: warning
+    - alert: ClusterOperatorFlapping
+      annotations:
+        description: The  {{ $labels.name }} operator behavior might cause upgrades
+          to be unstable. For more information refer to '{{ if eq $labels.name "version"
+          }}oc adm upgrade{{ else }}oc get -o yaml clusteroperator {{ $labels.name
+          }}{{ end }}'{{ with $console_url := "console_url" | query }}{{ if ne (len
+          (label "url" (first $console_url ) ) ) 0}} or {{ label "url" (first $console_url
+          ) }}/settings/cluster/{{ end }}{{ end }}.
+        summary: Cluster operator up status is changing often.
+      expr: |
+        max by (namespace, name) (changes(cluster_operator_up{job="cluster-version-operator"}[2m]) > 2)
+      for: 10m
+      labels:
+        severity: warning
+    - alert: CannotEvaluateConditionalUpdates
+      annotations:
+        description: Failure to evaluate conditional update matches means that Cluster
+          Version Operator cannot decide whether an update path is recommended or
+          not.
+        summary: Cluster Version Operator cannot evaluate conditional update matches
+          for {{ $value | humanizeDuration }}.
+      expr: |
+        max by (version, condition, status, reason)
+        (
+          (
+            time()-cluster_version_conditional_update_condition_seconds{condition="Recommended", status="Unknown"}
+          ) >= 3600
+        )
+      labels:
+        severity: warning

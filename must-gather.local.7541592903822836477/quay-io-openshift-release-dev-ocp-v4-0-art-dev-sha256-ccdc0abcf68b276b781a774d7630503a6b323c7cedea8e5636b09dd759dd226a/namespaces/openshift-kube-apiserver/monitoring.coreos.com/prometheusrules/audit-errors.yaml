@@ -1,0 +1,42 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  creationTimestamp: "2024-06-11T10:48:38Z"
+  generation: 1
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"apiserver-audit"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: cluster-kube-apiserver-operator
+    operation: Update
+    time: "2024-06-11T10:48:38Z"
+  name: audit-errors
+  namespace: openshift-kube-apiserver
+  resourceVersion: "8657"
+  uid: a489158e-cc26-450f-817b-388aceede59c
+spec:
+  groups:
+  - name: apiserver-audit
+    rules:
+    - alert: AuditLogError
+      annotations:
+        description: An API Server had an error writing to an audit log.
+        summary: |-
+          An API Server instance was unable to write audit logs. This could be
+          triggered by the node running out of space, or a malicious actor
+          tampering with the audit logs.
+      expr: |
+        sum by (apiserver,instance)(rate(apiserver_audit_error_total{apiserver=~".+-apiserver"}[5m])) / sum by (apiserver,instance) (rate(apiserver_audit_event_total{apiserver=~".+-apiserver"}[5m])) > 0
+      for: 1m
+      labels:
+        namespace: openshift-kube-apiserver
+        severity: warning

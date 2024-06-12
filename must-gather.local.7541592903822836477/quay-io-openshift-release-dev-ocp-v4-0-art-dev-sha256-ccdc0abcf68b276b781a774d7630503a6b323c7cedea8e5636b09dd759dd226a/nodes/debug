@@ -1,0 +1,254 @@
+[openshift-must-gather-nrc2g/10.128.0.73/must-gather-zm9cb]
+{
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+        "annotations": {
+            "k8s.ovn.org/pod-networks": "{\"default\":{\"ip_addresses\":[\"10.128.0.73/23\"],\"mac_address\":\"0a:58:0a:80:00:49\",\"gateway_ips\":[\"10.128.0.1\"],\"routes\":[{\"dest\":\"10.128.0.0/14\",\"nextHop\":\"10.128.0.1\"},{\"dest\":\"172.30.0.0/16\",\"nextHop\":\"10.128.0.1\"},{\"dest\":\"100.64.0.0/16\",\"nextHop\":\"10.128.0.1\"}],\"ip_address\":\"10.128.0.73/23\",\"gateway_ip\":\"10.128.0.1\"}}",
+            "k8s.v1.cni.cncf.io/network-status": "[{\n    \"name\": \"ovn-kubernetes\",\n    \"interface\": \"eth0\",\n    \"ips\": [\n        \"10.128.0.73\"\n    ],\n    \"mac\": \"0a:58:0a:80:00:49\",\n    \"default\": true,\n    \"dns\": {}\n}]"
+        },
+        "creationTimestamp": "2024-06-11T11:33:40Z",
+        "generateName": "must-gather-",
+        "labels": {
+            "app": "must-gather"
+        },
+        "name": "must-gather-zm9cb",
+        "namespace": "openshift-must-gather-nrc2g",
+        "resourceVersion": "39757",
+        "uid": "45adef01-fb0e-4375-a4a1-dc7c06d3f0f1"
+    },
+    "spec": {
+        "containers": [
+            {
+                "command": [
+                    "/bin/bash",
+                    "-c",
+                    "\necho \"volume percentage checker started.....\"\nwhile true; do \ndisk_usage=$(du -s \"/must-gather\" | awk '{print $1}')\ndisk_space=$(df -P \"/must-gather\" | awk 'NR==2 {print $2}')\nusage_percentage=$(( (disk_usage * 100) / disk_space ))\necho \"volume usage percentage $usage_percentage\" \nif [ \"$usage_percentage\" -gt \"30\" ]; then \n\techo \"Disk usage exceeds the volume percentage of 30 for mounted directory. Exiting...\" \n\t# kill gathering process in gather container to prevent disk to use more.\n\tpkill --signal SIGKILL -f /usr/bin/gather\n\texit 1\nfi\nsleep 5\ndone \u0026 /usr/bin/gather; sync"
+                ],
+                "env": [
+                    {
+                        "name": "NODE_NAME",
+                        "valueFrom": {
+                            "fieldRef": {
+                                "apiVersion": "v1",
+                                "fieldPath": "spec.nodeName"
+                            }
+                        }
+                    },
+                    {
+                        "name": "POD_NAME",
+                        "valueFrom": {
+                            "fieldRef": {
+                                "apiVersion": "v1",
+                                "fieldPath": "metadata.name"
+                            }
+                        }
+                    }
+                ],
+                "image": "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:ccdc0abcf68b276b781a774d7630503a6b323c7cedea8e5636b09dd759dd226a",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "gather",
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                    {
+                        "mountPath": "/must-gather",
+                        "name": "must-gather-output"
+                    },
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-dwvcx",
+                        "readOnly": true
+                    }
+                ]
+            },
+            {
+                "command": [
+                    "/bin/bash",
+                    "-c",
+                    "trap : TERM INT; sleep infinity \u0026 wait"
+                ],
+                "image": "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:ccdc0abcf68b276b781a774d7630503a6b323c7cedea8e5636b09dd759dd226a",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "copy",
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                    {
+                        "mountPath": "/must-gather",
+                        "name": "must-gather-output"
+                    },
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-dwvcx",
+                        "readOnly": true
+                    }
+                ]
+            }
+        ],
+        "dnsPolicy": "ClusterFirst",
+        "enableServiceLinks": true,
+        "imagePullSecrets": [
+            {
+                "name": "default-dockercfg-vcfp7"
+            }
+        ],
+        "nodeName": "ci-op-9xx71rvq-1e28e-w667k-master-0",
+        "nodeSelector": {
+            "kubernetes.io/os": "linux",
+            "node-role.kubernetes.io/master": ""
+        },
+        "preemptionPolicy": "PreemptLowerPriority",
+        "priority": 2000000000,
+        "priorityClassName": "system-cluster-critical",
+        "restartPolicy": "Never",
+        "schedulerName": "default-scheduler",
+        "securityContext": {},
+        "serviceAccount": "default",
+        "serviceAccountName": "default",
+        "terminationGracePeriodSeconds": 0,
+        "tolerations": [
+            {
+                "operator": "Exists"
+            }
+        ],
+        "volumes": [
+            {
+                "emptyDir": {},
+                "name": "must-gather-output"
+            },
+            {
+                "name": "kube-api-access-dwvcx",
+                "projected": {
+                    "defaultMode": 420,
+                    "sources": [
+                        {
+                            "serviceAccountToken": {
+                                "expirationSeconds": 3607,
+                                "path": "token"
+                            }
+                        },
+                        {
+                            "configMap": {
+                                "items": [
+                                    {
+                                        "key": "ca.crt",
+                                        "path": "ca.crt"
+                                    }
+                                ],
+                                "name": "kube-root-ca.crt"
+                            }
+                        },
+                        {
+                            "downwardAPI": {
+                                "items": [
+                                    {
+                                        "fieldRef": {
+                                            "apiVersion": "v1",
+                                            "fieldPath": "metadata.namespace"
+                                        },
+                                        "path": "namespace"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "configMap": {
+                                "items": [
+                                    {
+                                        "key": "service-ca.crt",
+                                        "path": "service-ca.crt"
+                                    }
+                                ],
+                                "name": "openshift-service-ca.crt"
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "status": {
+        "conditions": [
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2024-06-11T11:33:45Z",
+                "status": "True",
+                "type": "PodReadyToStartContainers"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2024-06-11T11:33:40Z",
+                "status": "True",
+                "type": "Initialized"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2024-06-11T11:33:45Z",
+                "status": "True",
+                "type": "Ready"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2024-06-11T11:33:45Z",
+                "status": "True",
+                "type": "ContainersReady"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2024-06-11T11:33:40Z",
+                "status": "True",
+                "type": "PodScheduled"
+            }
+        ],
+        "containerStatuses": [
+            {
+                "containerID": "cri-o://932b848a79068737ca7ee7c769aaa386e663f14976f7c2af9c0fb36506337e01",
+                "image": "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:ccdc0abcf68b276b781a774d7630503a6b323c7cedea8e5636b09dd759dd226a",
+                "imageID": "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:ccdc0abcf68b276b781a774d7630503a6b323c7cedea8e5636b09dd759dd226a",
+                "lastState": {},
+                "name": "copy",
+                "ready": true,
+                "restartCount": 0,
+                "started": true,
+                "state": {
+                    "running": {
+                        "startedAt": "2024-06-11T11:33:44Z"
+                    }
+                }
+            },
+            {
+                "containerID": "cri-o://48aa418da8c77a1de7183e1bac8a6f7ad0160bc06b0e104bca158c873b8cf457",
+                "image": "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:ccdc0abcf68b276b781a774d7630503a6b323c7cedea8e5636b09dd759dd226a",
+                "imageID": "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:ccdc0abcf68b276b781a774d7630503a6b323c7cedea8e5636b09dd759dd226a",
+                "lastState": {},
+                "name": "gather",
+                "ready": true,
+                "restartCount": 0,
+                "started": true,
+                "state": {
+                    "running": {
+                        "startedAt": "2024-06-11T11:33:43Z"
+                    }
+                }
+            }
+        ],
+        "hostIP": "10.0.0.8",
+        "hostIPs": [
+            {
+                "ip": "10.0.0.8"
+            }
+        ],
+        "phase": "Running",
+        "podIP": "10.128.0.73",
+        "podIPs": [
+            {
+                "ip": "10.128.0.73"
+            }
+        ],
+        "qosClass": "BestEffort",
+        "startTime": "2024-06-11T11:33:40Z"
+    }
+}

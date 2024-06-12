@@ -1,0 +1,217 @@
+---
+apiVersion: apps/v1
+items:
+- apiVersion: apps/v1
+  kind: DaemonSet
+  metadata:
+    annotations:
+      deprecated.daemonset.template.generation: "1"
+      operator.openshift.io/spec-hash: 98377935d04804f8e157ebcf75ea7f6ccecda5951dccc060d6c59f3c9108b397
+    creationTimestamp: "2024-06-11T11:07:00Z"
+    generation: 1
+    managedFields:
+    - apiVersion: apps/v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            .: {}
+            f:deprecated.daemonset.template.generation: {}
+            f:operator.openshift.io/spec-hash: {}
+        f:spec:
+          f:revisionHistoryLimit: {}
+          f:selector: {}
+          f:template:
+            f:metadata:
+              f:annotations:
+                .: {}
+                f:openshift.io/required-scc: {}
+                f:target.workload.openshift.io/management: {}
+              f:labels:
+                .: {}
+                f:name: {}
+            f:spec:
+              f:containers:
+                k:{"name":"node-ca"}:
+                  .: {}
+                  f:command: {}
+                  f:image: {}
+                  f:imagePullPolicy: {}
+                  f:name: {}
+                  f:resources:
+                    .: {}
+                    f:requests:
+                      .: {}
+                      f:cpu: {}
+                      f:memory: {}
+                  f:securityContext:
+                    .: {}
+                    f:privileged: {}
+                    f:runAsGroup: {}
+                    f:runAsUser: {}
+                  f:terminationMessagePath: {}
+                  f:terminationMessagePolicy: {}
+                  f:volumeMounts:
+                    .: {}
+                    k:{"mountPath":"/etc/docker/certs.d"}:
+                      .: {}
+                      f:mountPath: {}
+                      f:name: {}
+                    k:{"mountPath":"/tmp/serviceca"}:
+                      .: {}
+                      f:mountPath: {}
+                      f:name: {}
+              f:dnsPolicy: {}
+              f:hostNetwork: {}
+              f:nodeSelector: {}
+              f:priorityClassName: {}
+              f:restartPolicy: {}
+              f:schedulerName: {}
+              f:securityContext: {}
+              f:serviceAccount: {}
+              f:serviceAccountName: {}
+              f:terminationGracePeriodSeconds: {}
+              f:tolerations: {}
+              f:volumes:
+                .: {}
+                k:{"name":"host"}:
+                  .: {}
+                  f:hostPath:
+                    .: {}
+                    f:path: {}
+                    f:type: {}
+                  f:name: {}
+                k:{"name":"serviceca"}:
+                  .: {}
+                  f:configMap:
+                    .: {}
+                    f:defaultMode: {}
+                    f:name: {}
+                  f:name: {}
+          f:updateStrategy:
+            f:rollingUpdate:
+              .: {}
+              f:maxSurge: {}
+              f:maxUnavailable: {}
+            f:type: {}
+      manager: cluster-image-registry-operator
+      operation: Update
+      time: "2024-06-11T11:07:00Z"
+    - apiVersion: apps/v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:status:
+          f:currentNumberScheduled: {}
+          f:desiredNumberScheduled: {}
+          f:numberAvailable: {}
+          f:numberReady: {}
+          f:observedGeneration: {}
+          f:updatedNumberScheduled: {}
+      manager: kube-controller-manager
+      operation: Update
+      subresource: status
+      time: "2024-06-11T11:07:06Z"
+    name: node-ca
+    namespace: openshift-image-registry
+    resourceVersion: "26421"
+    uid: aa6c60c4-8ab2-4fec-bed6-39320ca82a6e
+  spec:
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        name: node-ca
+    template:
+      metadata:
+        annotations:
+          openshift.io/required-scc: privileged
+          target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        creationTimestamp: null
+        labels:
+          name: node-ca
+      spec:
+        containers:
+        - command:
+          - /bin/sh
+          - -c
+          - |
+            trap 'jobs -p | xargs -r kill; echo shutting down node-ca; exit 0' TERM
+            while [ true ];
+            do
+              for f in $(ls /tmp/serviceca); do
+                  echo $f
+                  ca_file_path="/tmp/serviceca/${f}"
+                  f=$(echo $f | sed  -r 's/(.*)\.\./\1:/')
+                  reg_dir_path="/etc/docker/certs.d/${f}"
+                  if [ -e "${reg_dir_path}" ]; then
+                      cp -u $ca_file_path $reg_dir_path/ca.crt
+                  else
+                      mkdir $reg_dir_path
+                      cp $ca_file_path $reg_dir_path/ca.crt
+                  fi
+              done
+              for d in $(ls /etc/docker/certs.d); do
+                  echo $d
+                  dp=$(echo $d | sed  -r 's/(.*):/\1\.\./')
+                  reg_conf_path="/tmp/serviceca/${dp}"
+                  if [ ! -e "${reg_conf_path}" ]; then
+                      rm -rf /etc/docker/certs.d/$d
+                  fi
+              done
+              sleep 60 & wait ${!}
+            done
+          image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:739be161a33def82332ba37b9a997041006b673f8379218be7b0ac2d58512d30
+          imagePullPolicy: IfNotPresent
+          name: node-ca
+          resources:
+            requests:
+              cpu: 10m
+              memory: 10Mi
+          securityContext:
+            privileged: true
+            runAsGroup: 0
+            runAsUser: 1001
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+          - mountPath: /tmp/serviceca
+            name: serviceca
+          - mountPath: /etc/docker/certs.d
+            name: host
+        dnsPolicy: ClusterFirst
+        hostNetwork: true
+        nodeSelector:
+          kubernetes.io/os: linux
+        priorityClassName: system-cluster-critical
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: node-ca
+        serviceAccountName: node-ca
+        terminationGracePeriodSeconds: 30
+        tolerations:
+        - operator: Exists
+        volumes:
+        - hostPath:
+            path: /etc/docker/certs.d
+            type: ""
+          name: host
+        - configMap:
+            defaultMode: 420
+            name: image-registry-certificates
+          name: serviceca
+    updateStrategy:
+      rollingUpdate:
+        maxSurge: 0
+        maxUnavailable: 10%
+      type: RollingUpdate
+  status:
+    currentNumberScheduled: 6
+    desiredNumberScheduled: 6
+    numberAvailable: 6
+    numberMisscheduled: 0
+    numberReady: 6
+    observedGeneration: 1
+    updatedNumberScheduled: 6
+kind: DaemonSetList
+metadata:
+  resourceVersion: "39937"

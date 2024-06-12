@@ -1,0 +1,277 @@
+---
+apiVersion: apps/v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "2"
+      kubernetes.io/description: |
+        This deployment launches the Multus admisson controller component.
+      networkoperator.openshift.io/non-critical: ""
+      release.openshift.io/version: 4.16.0-0.nightly-2024-06-10-211334
+    creationTimestamp: "2024-06-11T10:46:57Z"
+    generation: 2
+    labels:
+      app: multus-admission-controller
+      networkoperator.openshift.io/generates-operator-status: stand-alone
+    managedFields:
+    - apiVersion: apps/v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            f:kubernetes.io/description: {}
+            f:networkoperator.openshift.io/non-critical: {}
+            f:release.openshift.io/version: {}
+          f:labels:
+            f:app: {}
+            f:networkoperator.openshift.io/generates-operator-status: {}
+          f:ownerReferences:
+            k:{"uid":"62ee1ce2-90a7-43aa-95fc-751c249264a6"}: {}
+        f:spec:
+          f:replicas: {}
+          f:selector: {}
+          f:template:
+            f:metadata:
+              f:annotations:
+                f:cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: {}
+                f:target.workload.openshift.io/management: {}
+              f:labels:
+                f:app: {}
+                f:component: {}
+                f:namespace: {}
+                f:openshift.io/component: {}
+                f:type: {}
+            f:spec:
+              f:containers:
+                k:{"name":"kube-rbac-proxy"}:
+                  .: {}
+                  f:args: {}
+                  f:image: {}
+                  f:name: {}
+                  f:ports:
+                    k:{"containerPort":8443,"protocol":"TCP"}:
+                      .: {}
+                      f:containerPort: {}
+                      f:name: {}
+                  f:resources:
+                    f:requests:
+                      f:cpu: {}
+                      f:memory: {}
+                  f:terminationMessagePolicy: {}
+                  f:volumeMounts:
+                    k:{"mountPath":"/etc/webhook"}:
+                      .: {}
+                      f:mountPath: {}
+                      f:name: {}
+                      f:readOnly: {}
+                k:{"name":"multus-admission-controller"}:
+                  .: {}
+                  f:command: {}
+                  f:image: {}
+                  f:imagePullPolicy: {}
+                  f:name: {}
+                  f:ports:
+                    k:{"containerPort":9091,"protocol":"TCP"}:
+                      .: {}
+                      f:containerPort: {}
+                      f:name: {}
+                  f:resources:
+                    f:requests:
+                      f:cpu: {}
+                      f:memory: {}
+                  f:terminationMessagePolicy: {}
+                  f:volumeMounts:
+                    k:{"mountPath":"/etc/webhook"}:
+                      .: {}
+                      f:mountPath: {}
+                      f:name: {}
+                      f:readOnly: {}
+              f:nodeSelector: {}
+              f:priorityClassName: {}
+              f:restartPolicy: {}
+              f:securityContext:
+                f:runAsNonRoot: {}
+                f:runAsUser: {}
+              f:serviceAccountName: {}
+              f:tolerations: {}
+              f:volumes:
+                k:{"name":"webhook-certs"}:
+                  .: {}
+                  f:name: {}
+                  f:secret:
+                    f:secretName: {}
+      manager: cluster-network-operator/operconfig
+      operation: Apply
+      time: "2024-06-11T10:49:48Z"
+    - apiVersion: apps/v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            f:deployment.kubernetes.io/revision: {}
+        f:status:
+          f:availableReplicas: {}
+          f:conditions:
+            .: {}
+            k:{"type":"Available"}:
+              .: {}
+              f:lastTransitionTime: {}
+              f:lastUpdateTime: {}
+              f:message: {}
+              f:reason: {}
+              f:status: {}
+              f:type: {}
+            k:{"type":"Progressing"}:
+              .: {}
+              f:lastTransitionTime: {}
+              f:lastUpdateTime: {}
+              f:message: {}
+              f:reason: {}
+              f:status: {}
+              f:type: {}
+          f:observedGeneration: {}
+          f:readyReplicas: {}
+          f:replicas: {}
+          f:updatedReplicas: {}
+      manager: kube-controller-manager
+      operation: Update
+      subresource: status
+      time: "2024-06-11T10:50:43Z"
+    name: multus-admission-controller
+    namespace: openshift-multus
+    ownerReferences:
+    - apiVersion: operator.openshift.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Network
+      name: cluster
+      uid: 62ee1ce2-90a7-43aa-95fc-751c249264a6
+    resourceVersion: "13258"
+    uid: fa0a4de7-a965-487b-a5c1-04d7961f09e3
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 2
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: multus-admission-controller
+        namespace: openshift-multus
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: hosted-cluster-api-access
+          target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        creationTimestamp: null
+        labels:
+          app: multus-admission-controller
+          component: network
+          namespace: openshift-multus
+          openshift.io/component: network
+          type: infra
+      spec:
+        containers:
+        - command:
+          - /bin/bash
+          - -c
+          - |-
+            set -euo pipefail
+            exec /usr/bin/webhook \
+              -bind-address=0.0.0.0 \
+              -port=6443 \
+              -tls-private-key-file=/etc/webhook/tls.key \
+              -tls-cert-file=/etc/webhook/tls.crt \
+              -metrics-listen-address=127.0.0.1:9091 \
+              -alsologtostderr=true \
+              -ignore-namespaces=openshift-etcd,openshift-console,openshift-ingress-canary,openshift-apiserver,openshift-apiserver-operator,openshift-authentication,openshift-authentication-operator,openshift-cloud-controller-manager,openshift-cloud-controller-manager-operator,openshift-cloud-credential-operator,openshift-cloud-network-config-controller,openshift-cluster-csi-drivers,openshift-cluster-machine-approver,openshift-cluster-node-tuning-operator,openshift-cluster-samples-operator,openshift-cluster-storage-operator,openshift-cluster-version,openshift-config-operator,openshift-controller-manager,openshift-controller-manager-operator,openshift-dns,openshift-dns-operator,openshift-etcd-operator,openshift-image-registry,openshift-ingress,openshift-ingress-operator,openshift-insights,openshift-kube-apiserver,openshift-kube-apiserver-operator,openshift-kube-controller-manager,openshift-kube-controller-manager-operator,openshift-kube-scheduler,openshift-kube-scheduler-operator,openshift-kube-storage-version-migrator,openshift-kube-storage-version-migrator-operator,openshift-machine-api,openshift-machine-config-operator,openshift-marketplace,openshift-monitoring,openshift-multus,openshift-network-diagnostics,openshift-network-node-identity,openshift-network-operator,openshift-oauth-apiserver,openshift-operator-lifecycle-manager,openshift-ovn-kubernetes,openshift-route-controller-manager,openshift-service-ca-operator,openshift-user-workload-monitoring
+          image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:bcd2eac2f4a4060a04319748ae6123c9e8fa96dfd8e16c530be345b3434cc6e9
+          imagePullPolicy: IfNotPresent
+          name: multus-admission-controller
+          ports:
+          - containerPort: 9091
+            name: metrics-port
+            protocol: TCP
+          resources:
+            requests:
+              cpu: 10m
+              memory: 50Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+          - mountPath: /etc/webhook
+            name: webhook-certs
+            readOnly: true
+        - args:
+          - --logtostderr
+          - --secure-listen-address=:8443
+          - --tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+          - --upstream=http://127.0.0.1:9091/
+          - --tls-private-key-file=/etc/webhook/tls.key
+          - --tls-cert-file=/etc/webhook/tls.crt
+          image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:592ec166fee1aabf6b7dfd82cdd541e5cb608f99c7cc41c9ad3841dd1b854776
+          imagePullPolicy: IfNotPresent
+          name: kube-rbac-proxy
+          ports:
+          - containerPort: 8443
+            name: https
+            protocol: TCP
+          resources:
+            requests:
+              cpu: 10m
+              memory: 20Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+          - mountPath: /etc/webhook
+            name: webhook-certs
+            readOnly: true
+        dnsPolicy: ClusterFirst
+        nodeSelector:
+          node-role.kubernetes.io/master: ""
+        priorityClassName: system-cluster-critical
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+        serviceAccount: multus-ac
+        serviceAccountName: multus-ac
+        terminationGracePeriodSeconds: 30
+        tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+        volumes:
+        - name: webhook-certs
+          secret:
+            defaultMode: 420
+            secretName: multus-admission-controller-secret
+  status:
+    availableReplicas: 2
+    conditions:
+    - lastTransitionTime: "2024-06-11T10:49:25Z"
+      lastUpdateTime: "2024-06-11T10:49:25Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2024-06-11T10:46:57Z"
+      lastUpdateTime: "2024-06-11T10:50:43Z"
+      message: ReplicaSet "multus-admission-controller-5c8c884d57" has successfully
+        progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 2
+    readyReplicas: 2
+    replicas: 2
+    updatedReplicas: 2
+kind: DeploymentList
+metadata:
+  resourceVersion: "40010"

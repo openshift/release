@@ -1,0 +1,69 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  annotations:
+    exclude.release.openshift.io/internal-openshift-hosted: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+  creationTimestamp: "2024-06-11T10:41:12Z"
+  generation: 1
+  labels:
+    prometheus: k8s
+    role: alert-rules
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:exclude.release.openshift.io/internal-openshift-hosted: {}
+          f:include.release.openshift.io/self-managed-high-availability: {}
+          f:include.release.openshift.io/single-node-developer: {}
+        f:labels:
+          .: {}
+          f:prometheus: {}
+          f:role: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"7f5ed23b-8031-407e-bbf3-8850738c2d59"}: {}
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"cluster-machine-approver.rules"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: cluster-version-operator
+    operation: Update
+    time: "2024-06-11T10:41:12Z"
+  name: machineapprover-rules
+  namespace: openshift-cluster-machine-approver
+  ownerReferences:
+  - apiVersion: config.openshift.io/v1
+    controller: true
+    kind: ClusterVersion
+    name: version
+    uid: 7f5ed23b-8031-407e-bbf3-8850738c2d59
+  resourceVersion: "1737"
+  uid: da6f81d7-a8e4-4b7c-bfb6-a968dd6e3876
+spec:
+  groups:
+  - name: cluster-machine-approver.rules
+    rules:
+    - alert: MachineApproverMaxPendingCSRsReached
+      annotations:
+        description: |
+          The number of pending CertificateSigningRequests has exceeded the
+          maximum threshold (current number of machine + 100). Check the
+          pending CSRs to determine which machines need approval, also check
+          that the nodelink controller is running in the openshift-machine-api
+          namespace.
+        summary: max pending CSRs threshold reached.
+      expr: |
+        mapi_current_pending_csr > mapi_max_pending_csr
+      for: 5m
+      labels:
+        severity: warning

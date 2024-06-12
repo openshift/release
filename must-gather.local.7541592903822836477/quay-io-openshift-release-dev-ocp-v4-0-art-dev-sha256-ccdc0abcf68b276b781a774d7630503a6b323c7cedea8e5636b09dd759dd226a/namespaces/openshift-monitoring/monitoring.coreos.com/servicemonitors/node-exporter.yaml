@@ -1,0 +1,79 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  creationTimestamp: "2024-06-11T11:01:27Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/component: exporter
+    app.kubernetes.io/managed-by: cluster-monitoring-operator
+    app.kubernetes.io/name: node-exporter
+    app.kubernetes.io/part-of: openshift-monitoring
+    app.kubernetes.io/version: 1.8.0
+    monitoring.openshift.io/collection-profile: full
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:labels:
+          .: {}
+          f:app.kubernetes.io/component: {}
+          f:app.kubernetes.io/managed-by: {}
+          f:app.kubernetes.io/name: {}
+          f:app.kubernetes.io/part-of: {}
+          f:app.kubernetes.io/version: {}
+          f:monitoring.openshift.io/collection-profile: {}
+      f:spec:
+        .: {}
+        f:endpoints: {}
+        f:jobLabel: {}
+        f:namespaceSelector: {}
+        f:selector: {}
+    manager: operator
+    operation: Update
+    time: "2024-06-11T11:01:27Z"
+  name: node-exporter
+  namespace: openshift-monitoring
+  resourceVersion: "22928"
+  uid: 0b760bd9-8d5f-4307-b5b2-b85d12330f34
+spec:
+  endpoints:
+  - interval: 15s
+    metricRelabelings:
+    - action: replace
+      regex: (node_mountstats_nfs_read_bytes_total|node_mountstats_nfs_write_bytes_total|node_mountstats_nfs_operations_requests_total)
+      replacement: "true"
+      sourceLabels:
+      - __name__
+      targetLabel: __tmp_keep
+    - action: drop
+      regex: node_mountstats_nfs_.+;
+      sourceLabels:
+      - __name__
+      - __tmp_keep
+    - action: labeldrop
+      regex: __tmp_keep
+    port: https
+    relabelings:
+    - action: replace
+      regex: (.*)
+      replacement: $1
+      sourceLabels:
+      - __meta_kubernetes_pod_node_name
+      targetLabel: instance
+    scheme: https
+    tlsConfig:
+      ca: {}
+      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+      cert: {}
+      certFile: /etc/prometheus/secrets/metrics-client-certs/tls.crt
+      keyFile: /etc/prometheus/secrets/metrics-client-certs/tls.key
+      serverName: node-exporter.openshift-monitoring.svc
+  jobLabel: app.kubernetes.io/name
+  namespaceSelector: {}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: exporter
+      app.kubernetes.io/name: node-exporter
+      app.kubernetes.io/part-of: openshift-monitoring

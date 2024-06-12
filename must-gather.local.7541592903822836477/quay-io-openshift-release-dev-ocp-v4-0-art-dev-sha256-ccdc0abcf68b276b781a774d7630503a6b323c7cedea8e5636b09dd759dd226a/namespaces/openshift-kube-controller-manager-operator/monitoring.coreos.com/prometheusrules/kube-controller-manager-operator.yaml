@@ -1,0 +1,95 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  annotations:
+    exclude.release.openshift.io/internal-openshift-hosted: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+  creationTimestamp: "2024-06-11T10:41:14Z"
+  generation: 1
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:exclude.release.openshift.io/internal-openshift-hosted: {}
+          f:include.release.openshift.io/self-managed-high-availability: {}
+          f:include.release.openshift.io/single-node-developer: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"7f5ed23b-8031-407e-bbf3-8850738c2d59"}: {}
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"cluster-version"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: cluster-version-operator
+    operation: Update
+    time: "2024-06-11T10:41:14Z"
+  name: kube-controller-manager-operator
+  namespace: openshift-kube-controller-manager-operator
+  ownerReferences:
+  - apiVersion: config.openshift.io/v1
+    controller: true
+    kind: ClusterVersion
+    name: version
+    uid: 7f5ed23b-8031-407e-bbf3-8850738c2d59
+  resourceVersion: "1787"
+  uid: 8ea01ce6-d985-4cc9-8b43-ea501b981ebc
+spec:
+  groups:
+  - name: cluster-version
+    rules:
+    - alert: KubeControllerManagerDown
+      annotations:
+        description: KubeControllerManager has disappeared from Prometheus target
+          discovery.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-kube-controller-manager-operator/KubeControllerManagerDown.md
+        summary: Target disappeared from Prometheus target discovery.
+      expr: |
+        absent(up{job="kube-controller-manager"} == 1)
+      for: 15m
+      labels:
+        namespace: openshift-kube-controller-manager
+        severity: critical
+    - alert: PodDisruptionBudgetAtLimit
+      annotations:
+        description: The pod disruption budget is at the minimum disruptions allowed
+          level. The number of current healthy pods is equal to the desired healthy
+          pods.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-kube-controller-manager-operator/PodDisruptionBudgetAtLimit.md
+        summary: The pod disruption budget is preventing further disruption to pods.
+      expr: |
+        max by(namespace, poddisruptionbudget) (kube_poddisruptionbudget_status_current_healthy == kube_poddisruptionbudget_status_desired_healthy and on (namespace, poddisruptionbudget) kube_poddisruptionbudget_status_expected_pods > 0)
+      for: 60m
+      labels:
+        severity: warning
+    - alert: PodDisruptionBudgetLimit
+      annotations:
+        description: The pod disruption budget is below the minimum disruptions allowed
+          level and is not satisfied. The number of current healthy pods is less than
+          the desired healthy pods.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-kube-controller-manager-operator/PodDisruptionBudgetLimit.md
+        summary: The pod disruption budget registers insufficient amount of pods.
+      expr: |
+        max by (namespace, poddisruptionbudget) (kube_poddisruptionbudget_status_current_healthy < kube_poddisruptionbudget_status_desired_healthy)
+      for: 15m
+      labels:
+        severity: critical
+    - alert: GarbageCollectorSyncFailed
+      annotations:
+        description: Garbage Collector had a problem with syncing and monitoring the
+          available resources. Please see KubeControllerManager logs for more details.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-kube-controller-manager-operator/GarbageCollectorSyncFailed.md
+        summary: There was a problem with syncing the resources for garbage collection.
+      expr: |
+        rate(garbagecollector_controller_resources_sync_error_total{}[5m]) > 0
+      for: 60m
+      labels:
+        severity: warning

@@ -1,0 +1,216 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+  creationTimestamp: "2024-06-11T10:41:19Z"
+  generation: 1
+  labels:
+    k8s-app: machine-config-daemon
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:include.release.openshift.io/ibm-cloud-managed: {}
+          f:include.release.openshift.io/self-managed-high-availability: {}
+          f:include.release.openshift.io/single-node-developer: {}
+        f:labels:
+          .: {}
+          f:k8s-app: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"7f5ed23b-8031-407e-bbf3-8850738c2d59"}: {}
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"extremely-high-individual-control-plane-memory"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"high-overall-control-plane-memory"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"mcd-kubelet-health-state-error"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"mcd-missing-mc"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"mcd-pivot-error"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"mcd-reboot-error"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"system-memory-exceeds-reservation"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: cluster-version-operator
+    operation: Update
+    time: "2024-06-11T10:41:19Z"
+  name: machine-config-daemon
+  namespace: openshift-machine-config-operator
+  ownerReferences:
+  - apiVersion: config.openshift.io/v1
+    controller: true
+    kind: ClusterVersion
+    name: version
+    uid: 7f5ed23b-8031-407e-bbf3-8850738c2d59
+  resourceVersion: "1925"
+  uid: 639c54c1-8bc0-4af3-badc-ba96ab0d953d
+spec:
+  groups:
+  - name: mcd-reboot-error
+    rules:
+    - alert: MCDRebootError
+      annotations:
+        description: 'Reboot failed on {{ $labels.node }} , update may be blocked.
+          For more details:  oc logs -f -n {{ $labels.namespace }} {{ $labels.pod
+          }} -c machine-config-daemon '
+        summary: Alerts the user that a node failed to reboot one or more times over
+          a span of 5 minutes.
+      expr: |
+        mcd_reboots_failed_total > 0
+      for: 5m
+      labels:
+        namespace: openshift-machine-config-operator
+        severity: critical
+  - name: mcd-pivot-error
+    rules:
+    - alert: MCDPivotError
+      annotations:
+        description: 'Error detected in pivot logs on {{ $labels.node }} , upgrade
+          may be blocked. For more details:  oc logs -f -n {{ $labels.namespace }}
+          {{ $labels.pod }} -c machine-config-daemon '
+        summary: Alerts the user when an error is detected upon pivot. This triggers
+          if the pivot errors are above zero for 2 minutes.
+      expr: |
+        mcd_pivot_errors_total > 0
+      for: 2m
+      labels:
+        namespace: openshift-machine-config-operator
+        severity: warning
+  - name: mcd-kubelet-health-state-error
+    rules:
+    - alert: KubeletHealthState
+      annotations:
+        description: Kubelet health failure threshold reached
+        summary: This keeps track of Kubelet health failures, and tallys them. The
+          warning is triggered if 2 or more failures occur.
+      expr: |
+        mcd_kubelet_state > 2
+      labels:
+        namespace: openshift-machine-config-operator
+        severity: warning
+  - name: system-memory-exceeds-reservation
+    rules:
+    - alert: SystemMemoryExceedsReservation
+      annotations:
+        description: System memory usage of {{ $value | humanize }} on {{ $labels.node
+          }} exceeds 95% of the reservation. Reserved memory ensures system processes
+          can function even when the node is fully allocated and protects against
+          workload out of memory events impacting the proper functioning of the node.
+          The default reservation is expected to be sufficient for most configurations
+          and should be increased (https://docs.openshift.com/container-platform/latest/nodes/nodes/nodes-nodes-managing.html)
+          when running nodes with high numbers of pods (either due to rate of change
+          or at steady state).
+        summary: Alerts the user when, for 15 miutes, a specific node is using more
+          memory than is reserved
+      expr: |
+        sum by (node) (container_memory_rss{id="/system.slice"}) > ((sum by (node) (kube_node_status_capacity{resource="memory"} - kube_node_status_allocatable{resource="memory"})) * 0.95)
+      for: 15m
+      labels:
+        namespace: openshift-machine-config-operator
+        severity: warning
+  - name: high-overall-control-plane-memory
+    rules:
+    - alert: HighOverallControlPlaneMemory
+      annotations:
+        description: Given three control plane nodes, the overall memory utilization
+          may only be about 2/3 of all available capacity. This is because if a single
+          control plane node fails, the kube-apiserver and etcd may be slow to respond.
+          To fix this, increase memory of the control plane nodes.
+        summary: Memory utilization across all control plane nodes is high, and could
+          impact responsiveness and stability.
+      expr: |
+        (
+          1
+          -
+          sum (
+            node_memory_MemFree_bytes
+            + node_memory_Buffers_bytes
+            + node_memory_Cached_bytes
+            AND on (instance)
+            label_replace( kube_node_role{role="master"}, "instance", "$1", "node", "(.+)" )
+          ) / sum (
+            node_memory_MemTotal_bytes
+            AND on (instance)
+            label_replace( kube_node_role{role="master"}, "instance", "$1", "node", "(.+)" )
+          )
+        ) * 100 > 60
+      for: 1h
+      labels:
+        namespace: openshift-machine-config-operator
+        severity: warning
+  - name: extremely-high-individual-control-plane-memory
+    rules:
+    - alert: ExtremelyHighIndividualControlPlaneMemory
+      annotations:
+        description: The memory utilization per instance within control plane nodes
+          influence the stability, and responsiveness of the cluster. This can lead
+          to cluster instability and slow responses from kube-apiserver or failing
+          requests specially on etcd. Moreover, OOM kill is expected which negatively
+          influences the pod scheduling. If this happens on container level, the descheduler
+          will not be able to detect it, as it works on the pod level. To fix this,
+          increase memory of the affected node of control plane nodes.
+        summary: Extreme memory utilization per node within control plane nodes is
+          extremely high, and could impact responsiveness and stability.
+      expr: |
+        (
+          1
+          -
+          sum by (instance) (
+            node_memory_MemFree_bytes
+            + node_memory_Buffers_bytes
+            + node_memory_Cached_bytes
+            AND on (instance)
+            label_replace( kube_node_role{role="master"}, "instance", "$1", "node", "(.+)" )
+          ) / sum by (instance) (
+            node_memory_MemTotal_bytes
+            AND on (instance)
+            label_replace( kube_node_role{role="master"}, "instance", "$1", "node", "(.+)" )
+          )
+        ) * 100 > 90
+      for: 45m
+      labels:
+        namespace: openshift-machine-config-operator
+        severity: critical
+  - name: mcd-missing-mc
+    rules:
+    - alert: MissingMachineConfig
+      annotations:
+        description: Could not find config {{ $labels.mc }} in-cluster, this likely
+          indicates the MachineConfigs in-cluster has changed during the install process.  If
+          you are seeing this when installing the cluster, please compare the in-cluster
+          rendered machineconfigs to /etc/mcs-machine-config-content.json
+        summary: This keeps track of Machine Config failures. Specifically a common
+          failure on install when a rendered Machine Config is missing. Triggered
+          when this error happens once.
+      expr: |
+        mcd_missing_mc > 0
+      labels:
+        namespace: openshift-machine-config-operator
+        severity: warning

@@ -1,0 +1,302 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    deprecated.daemonset.template.generation: "1"
+    kubernetes.io/description: |
+      This daemonset launches the network-node-identity networking components.
+    release.openshift.io/version: 4.16.0-0.nightly-2024-06-10-211334
+  creationTimestamp: "2024-06-11T10:47:10Z"
+  generation: 1
+  labels:
+    networkoperator.openshift.io/generates-operator-status: stand-alone
+  managedFields:
+  - apiVersion: apps/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          f:kubernetes.io/description: {}
+          f:release.openshift.io/version: {}
+        f:labels:
+          f:networkoperator.openshift.io/generates-operator-status: {}
+        f:ownerReferences:
+          k:{"uid":"62ee1ce2-90a7-43aa-95fc-751c249264a6"}: {}
+      f:spec:
+        f:selector: {}
+        f:template:
+          f:metadata:
+            f:annotations:
+              f:target.workload.openshift.io/management: {}
+            f:labels:
+              f:app: {}
+              f:component: {}
+              f:kubernetes.io/os: {}
+              f:openshift.io/component: {}
+              f:type: {}
+          f:spec:
+            f:containers:
+              k:{"name":"approver"}:
+                .: {}
+                f:command: {}
+                f:env:
+                  k:{"name":"LOGLEVEL"}:
+                    .: {}
+                    f:name: {}
+                    f:value: {}
+                f:image: {}
+                f:name: {}
+                f:resources:
+                  f:requests:
+                    f:cpu: {}
+                    f:memory: {}
+                f:terminationMessagePolicy: {}
+                f:volumeMounts:
+                  k:{"mountPath":"/env"}:
+                    .: {}
+                    f:mountPath: {}
+                    f:name: {}
+                  k:{"mountPath":"/var/run/ovnkube-identity-config"}:
+                    .: {}
+                    f:mountPath: {}
+                    f:name: {}
+              k:{"name":"webhook"}:
+                .: {}
+                f:command: {}
+                f:env:
+                  k:{"name":"KUBERNETES_NODE_NAME"}:
+                    .: {}
+                    f:name: {}
+                    f:valueFrom:
+                      f:fieldRef: {}
+                  k:{"name":"LOGLEVEL"}:
+                    .: {}
+                    f:name: {}
+                    f:value: {}
+                f:image: {}
+                f:name: {}
+                f:resources:
+                  f:requests:
+                    f:cpu: {}
+                    f:memory: {}
+                f:terminationMessagePolicy: {}
+                f:volumeMounts:
+                  k:{"mountPath":"/env"}:
+                    .: {}
+                    f:mountPath: {}
+                    f:name: {}
+                  k:{"mountPath":"/etc/webhook-cert/"}:
+                    .: {}
+                    f:mountPath: {}
+                    f:name: {}
+                  k:{"mountPath":"/var/run/ovnkube-identity-config"}:
+                    .: {}
+                    f:mountPath: {}
+                    f:name: {}
+            f:dnsPolicy: {}
+            f:hostNetwork: {}
+            f:nodeSelector: {}
+            f:priorityClassName: {}
+            f:serviceAccountName: {}
+            f:terminationGracePeriodSeconds: {}
+            f:tolerations: {}
+            f:volumes:
+              k:{"name":"env-overrides"}:
+                .: {}
+                f:configMap:
+                  f:name: {}
+                  f:optional: {}
+                f:name: {}
+              k:{"name":"ovnkube-identity-cm"}:
+                .: {}
+                f:configMap:
+                  f:items: {}
+                  f:name: {}
+                f:name: {}
+              k:{"name":"webhook-cert"}:
+                .: {}
+                f:name: {}
+                f:secret:
+                  f:secretName: {}
+        f:updateStrategy:
+          f:rollingUpdate:
+            f:maxSurge: {}
+            f:maxUnavailable: {}
+          f:type: {}
+    manager: cluster-network-operator/operconfig
+    operation: Apply
+    time: "2024-06-11T10:47:10Z"
+  - apiVersion: apps/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:currentNumberScheduled: {}
+        f:desiredNumberScheduled: {}
+        f:numberAvailable: {}
+        f:numberReady: {}
+        f:observedGeneration: {}
+        f:updatedNumberScheduled: {}
+    manager: kube-controller-manager
+    operation: Update
+    subresource: status
+    time: "2024-06-11T11:04:38Z"
+  name: network-node-identity
+  namespace: openshift-network-node-identity
+  ownerReferences:
+  - apiVersion: operator.openshift.io/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Network
+    name: cluster
+    uid: 62ee1ce2-90a7-43aa-95fc-751c249264a6
+  resourceVersion: "23930"
+  uid: b875a6a5-e8c0-40a3-ab61-b17d9bcb02ac
+spec:
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: network-node-identity
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      creationTimestamp: null
+      labels:
+        app: network-node-identity
+        component: network
+        kubernetes.io/os: linux
+        openshift.io/component: network
+        type: infra
+    spec:
+      containers:
+      - command:
+        - /bin/bash
+        - -c
+        - |
+          set -xe
+          if [[ -f "/env/_master" ]]; then
+            set -o allexport
+            source "/env/_master"
+            set +o allexport
+          fi
+          # OVN-K will try to remove hybrid overlay node annotations even when the hybrid overlay is not enabled.
+          # https://github.com/ovn-org/ovn-kubernetes/blob/ac6820df0b338a246f10f412cd5ec903bd234694/go-controller/pkg/ovn/master.go#L791
+          ho_enable="--enable-hybrid-overlay"
+          echo "I$(date "+%m%d %H:%M:%S.%N") - network-node-identity - start webhook"
+          # extra-allowed-user: service account `ovn-kubernetes-control-plane`
+          # sets pod annotations in multi-homing layer3 network controller (cluster-manager)
+          exec /usr/bin/ovnkube-identity  --k8s-apiserver=https://api-int.ci-op-9xx71rvq-1e28e.qe.azure.devcluster.openshift.com:6443 \
+              --webhook-cert-dir="/etc/webhook-cert" \
+              --webhook-host=127.0.0.1 \
+              --webhook-port=9743 \
+              ${ho_enable} \
+              --enable-interconnect \
+              --disable-approver \
+              --extra-allowed-user="system:serviceaccount:openshift-ovn-kubernetes:ovn-kubernetes-control-plane" \
+              --wait-for-kubernetes-api=200s \
+              --pod-admission-conditions="/var/run/ovnkube-identity-config/additional-pod-admission-cond.json" \
+              --loglevel="${LOGLEVEL}"
+        env:
+        - name: LOGLEVEL
+          value: "2"
+        - name: KUBERNETES_NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:f51f47793a3eda34f600e1e7eab027bc309b914eb8ea948765cf1a03549b34e4
+        imagePullPolicy: IfNotPresent
+        name: webhook
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /etc/webhook-cert/
+          name: webhook-cert
+        - mountPath: /env
+          name: env-overrides
+        - mountPath: /var/run/ovnkube-identity-config
+          name: ovnkube-identity-cm
+      - command:
+        - /bin/bash
+        - -c
+        - |
+          set -xe
+          if [[ -f "/env/_master" ]]; then
+            set -o allexport
+            source "/env/_master"
+            set +o allexport
+          fi
+
+          echo "I$(date "+%m%d %H:%M:%S.%N") - network-node-identity - start approver"
+          exec /usr/bin/ovnkube-identity  --k8s-apiserver=https://api-int.ci-op-9xx71rvq-1e28e.qe.azure.devcluster.openshift.com:6443 \
+              --disable-webhook \
+              --csr-acceptance-conditions="/var/run/ovnkube-identity-config/additional-cert-acceptance-cond.json" \
+              --loglevel="${LOGLEVEL}"
+        env:
+        - name: LOGLEVEL
+          value: "4"
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:f51f47793a3eda34f600e1e7eab027bc309b914eb8ea948765cf1a03549b34e4
+        imagePullPolicy: IfNotPresent
+        name: approver
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /env
+          name: env-overrides
+        - mountPath: /var/run/ovnkube-identity-config
+          name: ovnkube-identity-cm
+      dnsPolicy: Default
+      hostNetwork: true
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+        node-role.kubernetes.io/master: ""
+      priorityClassName: system-node-critical
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: network-node-identity
+      serviceAccountName: network-node-identity
+      terminationGracePeriodSeconds: 200
+      tolerations:
+      - operator: Exists
+      volumes:
+      - name: webhook-cert
+        secret:
+          defaultMode: 420
+          secretName: network-node-identity-cert
+      - configMap:
+          defaultMode: 420
+          name: env-overrides
+          optional: true
+        name: env-overrides
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: additional-cert-acceptance-cond.json
+            path: additional-cert-acceptance-cond.json
+          - key: additional-pod-admission-cond.json
+            path: additional-pod-admission-cond.json
+          name: ovnkube-identity-cm
+        name: ovnkube-identity-cm
+  updateStrategy:
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 0
+    type: RollingUpdate
+status:
+  currentNumberScheduled: 3
+  desiredNumberScheduled: 3
+  numberAvailable: 3
+  numberMisscheduled: 0
+  numberReady: 3
+  observedGeneration: 1
+  updatedNumberScheduled: 3

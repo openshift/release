@@ -1,0 +1,91 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  creationTimestamp: "2024-06-11T11:28:27Z"
+  generation: 1
+  labels:
+    olm.managed: "true"
+    prometheus: k8s
+    role: alert-rules
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:labels:
+          .: {}
+          f:olm.managed: {}
+          f:prometheus: {}
+          f:role: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"a0a7c4c6-c170-4ed6-a097-59927e134481"}: {}
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"windows.rules"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: catalog
+    operation: Update
+    time: "2024-06-11T11:28:27Z"
+  name: windows-prometheus-k8s-rules
+  namespace: openshift-windows-machine-config-operator
+  ownerReferences:
+  - apiVersion: operators.coreos.com/v1alpha1
+    blockOwnerDeletion: false
+    controller: false
+    kind: ClusterServiceVersion
+    name: windows-machine-config-operator.v10.16.0
+    uid: a0a7c4c6-c170-4ed6-a097-59927e134481
+  resourceVersion: "37908"
+  uid: a4d1ae87-e665-4b4f-b92d-765a47c33282
+spec:
+  groups:
+  - name: windows.rules
+    rules:
+    - expr: |
+        avg without (core, mode)(rate(windows_cpu_time_total{mode="idle"}[1m]))
+      record: instance:node_cpu_utilisation:rate1m
+    - expr: |
+        sum(rate(windows_cpu_time_total{mode="idle",mode!="iowait"}[3m])) BY (instance)
+      record: instance:node_cpu:rate:sum
+    - expr: |
+        windows_logical_disk_size_bytes
+      record: node_filesystem_size_bytes
+    - expr: |
+        windows_logical_disk_free_bytes
+      record: node_filesystem_avail_bytes
+    - expr: |
+        rate(windows_net_bytes_received_total[1m])
+      record: node_network_receive_bytes_total
+    - expr: |
+        rate(windows_net_bytes_sent_total[1m])
+      record: node_network_transmit_bytes_total
+    - expr: |
+        windows_logical_disk_free_bytes
+      record: node_filesystem_free_bytes
+    - expr: |
+        windows_memory_available_bytes
+      record: node_memory_MemAvailable_bytes
+    - expr: |
+        windows_cs_physical_memory_bytes
+      record: node_memory_MemTotal_bytes
+    - expr: |
+        windows_cpu_info
+      record: node_cpu_info
+    - expr: |
+        sum(rate(windows_container_cpu_usage_seconds_total[5m]) * on(container_id) group_left(namespace, pod, container) kube_pod_container_info{container_id!=""}) by (pod,namespace)
+      record: pod:container_cpu_usage:sum
+    - expr: |
+        label_replace(windows_container_memory_usage_private_working_set_bytes * on(container_id) group_left(namespace, pod, container) kube_pod_container_info{container_id!=""},"container","","","")
+      record: container_memory_working_set_bytes
+    - expr: |
+        sum(irate(windows_container_network_receive_bytes_total[5m]) * on(container_id) group_left(namespace, pod, interface) kube_pod_container_info{container_id!=""}) by (pod,namespace)
+      record: pod_interface_network:container_network_receive_bytes:irate5m
+    - expr: |
+        sum(irate(windows_container_network_transmit_bytes_total[5m]) * on(container_id) group_left(namespace, pod, interface) kube_pod_container_info{container_id!=""}) by (pod,namespace)
+      record: pod_interface_network:container_network_transmit_bytes_total:irate5m

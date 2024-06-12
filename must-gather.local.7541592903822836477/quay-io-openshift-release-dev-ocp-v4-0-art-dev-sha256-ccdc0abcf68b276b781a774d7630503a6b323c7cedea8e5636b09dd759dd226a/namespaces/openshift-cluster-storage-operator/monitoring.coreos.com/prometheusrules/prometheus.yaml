@@ -1,0 +1,111 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  annotations:
+    capability.openshift.io/name: Storage
+    include.release.openshift.io/hypershift: "true"
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+  creationTimestamp: "2024-06-11T10:49:26Z"
+  generation: 1
+  labels:
+    role: alert-rules
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:capability.openshift.io/name: {}
+          f:include.release.openshift.io/hypershift: {}
+          f:include.release.openshift.io/ibm-cloud-managed: {}
+          f:include.release.openshift.io/self-managed-high-availability: {}
+          f:include.release.openshift.io/single-node-developer: {}
+        f:labels:
+          .: {}
+          f:role: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"7f5ed23b-8031-407e-bbf3-8850738c2d59"}: {}
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"default-storage-classes.rules"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"storage-operations.rules"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"storage-selinux.rules"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: cluster-version-operator
+    operation: Update
+    time: "2024-06-11T10:49:26Z"
+  name: prometheus
+  namespace: openshift-cluster-storage-operator
+  ownerReferences:
+  - apiVersion: config.openshift.io/v1
+    controller: true
+    kind: ClusterVersion
+    name: version
+    uid: 7f5ed23b-8031-407e-bbf3-8850738c2d59
+  resourceVersion: "10938"
+  uid: c2127457-72c1-4696-b0fc-834988feba87
+spec:
+  groups:
+  - name: default-storage-classes.rules
+    rules:
+    - alert: MultipleDefaultStorageClasses
+      annotations:
+        description: |
+          Cluster storage operator monitors all storage classes configured in the cluster
+          and checks there is not more than one default StorageClass configured.
+        message: StorageClass count check is failing (there should not be more than
+          one default StorageClass)
+        summary: More than one default StorageClass detected.
+      expr: max_over_time(default_storage_class_count[5m]) > 1
+      for: 10m
+      labels:
+        severity: warning
+  - name: storage-operations.rules
+    rules:
+    - alert: PodStartupStorageOperationsFailing
+      annotations:
+        description: |
+          Failing storage operation "{{ $labels.operation_name }}" of volume plugin {{ $labels.volume_plugin }} was preventing Pods on node {{ $labels.node }}
+          from starting for past 5 minutes.
+          Please investigate Pods that are "ContainerCreating" on the node: "oc get pod --field-selector=spec.nodeName={{ $labels.node }} --all-namespaces | grep ContainerCreating".
+          Events of the Pods should contain exact error message: "oc describe pod -n <pod namespace> <pod name>".
+        summary: Pods can't start because {{ $labels.operation_name }} of volume plugin
+          {{ $labels.volume_plugin }} is permanently failing on node {{ $labels.node
+          }}.
+      expr: |
+        increase(storage_operation_duration_seconds_count{status != "success", operation_name =~"volume_attach|volume_mount"}[5m]) > 0
+          and ignoring(status) (sum without(status)
+            (increase(storage_operation_duration_seconds_count{status = "success", operation_name =~"volume_attach|volume_mount"}[5m]))
+              or increase(storage_operation_duration_seconds_count{status != "success", operation_name =~"volume_attach|volume_mount"}[5m]) * 0
+            ) == 0
+      for: 5m
+      labels:
+        severity: info
+  - name: storage-selinux.rules
+    rules:
+    - expr: sum(volume_manager_selinux_pod_context_mismatch_warnings_total) + sum(volume_manager_selinux_pod_context_mismatch_errors_total)
+      record: cluster:volume_manager_selinux_pod_context_mismatch_total
+    - expr: sum by(volume_plugin) (volume_manager_selinux_volume_context_mismatch_warnings_total{volume_plugin
+        !~".*-e2e-.*"})
+      record: cluster:volume_manager_selinux_volume_context_mismatch_warnings_total
+    - expr: sum by(volume_plugin) (volume_manager_selinux_volume_context_mismatch_errors_total{volume_plugin
+        !~".*-e2e-.*"})
+      record: cluster:volume_manager_selinux_volume_context_mismatch_errors_total
+    - expr: sum by(volume_plugin) (volume_manager_selinux_volumes_admitted_total{volume_plugin
+        !~".*-e2e-.*"})
+      record: cluster:volume_manager_selinux_volumes_admitted_total

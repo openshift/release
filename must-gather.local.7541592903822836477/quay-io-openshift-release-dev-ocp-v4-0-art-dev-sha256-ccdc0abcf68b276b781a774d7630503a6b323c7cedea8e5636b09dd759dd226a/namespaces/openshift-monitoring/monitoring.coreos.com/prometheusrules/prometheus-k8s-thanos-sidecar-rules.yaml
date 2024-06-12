@@ -1,0 +1,72 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  creationTimestamp: "2024-06-11T11:11:34Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/component: prometheus
+    app.kubernetes.io/instance: k8s
+    app.kubernetes.io/managed-by: cluster-monitoring-operator
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/part-of: openshift-monitoring
+    app.kubernetes.io/version: 2.52.0
+    prometheus: k8s
+    role: alert-rules
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:labels:
+          .: {}
+          f:app.kubernetes.io/component: {}
+          f:app.kubernetes.io/instance: {}
+          f:app.kubernetes.io/managed-by: {}
+          f:app.kubernetes.io/name: {}
+          f:app.kubernetes.io/part-of: {}
+          f:app.kubernetes.io/version: {}
+          f:prometheus: {}
+          f:role: {}
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"thanos-sidecar"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: operator
+    operation: Update
+    time: "2024-06-11T11:11:34Z"
+  name: prometheus-k8s-thanos-sidecar-rules
+  namespace: openshift-monitoring
+  resourceVersion: "31155"
+  uid: 7889e7ee-535f-4c9c-802a-c1b3f43f6f37
+spec:
+  groups:
+  - name: thanos-sidecar
+    rules:
+    - alert: ThanosSidecarBucketOperationsFailed
+      annotations:
+        description: Thanos Sidecar {{$labels.instance}} in {{$labels.namespace}}
+          bucket operations are failing
+        summary: Thanos Sidecar bucket operations are failing
+      expr: |
+        sum by (namespace, job, instance) (rate(thanos_objstore_bucket_operation_failures_total{job=~"prometheus-(k8s|user-workload)-thanos-sidecar"}[5m])) > 0
+      for: 1h
+      labels:
+        severity: warning
+    - alert: ThanosSidecarNoConnectionToStartedPrometheus
+      annotations:
+        description: Thanos Sidecar {{$labels.instance}} in {{$labels.namespace}}
+          is unhealthy.
+        summary: Thanos Sidecar cannot access Prometheus, even though Prometheus seems
+          healthy and has reloaded WAL.
+      expr: |
+        thanos_sidecar_prometheus_up{job=~"prometheus-(k8s|user-workload)-thanos-sidecar"} == 0
+        AND on (namespace, pod)
+        prometheus_tsdb_data_replay_duration_seconds != 0
+      for: 1h
+      labels:
+        severity: warning

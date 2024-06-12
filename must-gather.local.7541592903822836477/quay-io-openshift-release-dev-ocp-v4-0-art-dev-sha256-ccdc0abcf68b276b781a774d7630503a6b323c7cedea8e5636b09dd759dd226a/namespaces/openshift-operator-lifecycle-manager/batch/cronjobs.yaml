@@ -1,0 +1,206 @@
+---
+apiVersion: batch/v1
+items:
+- apiVersion: batch/v1
+  kind: CronJob
+  metadata:
+    annotations:
+      capability.openshift.io/name: OperatorLifecycleManager
+      include.release.openshift.io/hypershift: "true"
+      include.release.openshift.io/ibm-cloud-managed: "true"
+      include.release.openshift.io/self-managed-high-availability: "true"
+    creationTimestamp: "2024-06-11T10:41:22Z"
+    generation: 2
+    managedFields:
+    - apiVersion: batch/v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            .: {}
+            f:capability.openshift.io/name: {}
+            f:include.release.openshift.io/hypershift: {}
+            f:include.release.openshift.io/ibm-cloud-managed: {}
+            f:include.release.openshift.io/self-managed-high-availability: {}
+          f:ownerReferences:
+            .: {}
+            k:{"uid":"7f5ed23b-8031-407e-bbf3-8850738c2d59"}: {}
+        f:spec:
+          f:concurrencyPolicy: {}
+          f:failedJobsHistoryLimit: {}
+          f:jobTemplate:
+            f:spec:
+              f:backoffLimit: {}
+              f:completionMode: {}
+              f:suspend: {}
+              f:template:
+                f:metadata:
+                  f:annotations:
+                    .: {}
+                    f:openshift.io/required-scc: {}
+                    f:target.workload.openshift.io/management: {}
+                f:spec:
+                  f:containers:
+                    k:{"name":"collect-profiles"}:
+                      .: {}
+                      f:args: {}
+                      f:command: {}
+                      f:image: {}
+                      f:imagePullPolicy: {}
+                      f:name: {}
+                      f:resources:
+                        .: {}
+                        f:requests:
+                          .: {}
+                          f:cpu: {}
+                          f:memory: {}
+                      f:securityContext:
+                        .: {}
+                        f:allowPrivilegeEscalation: {}
+                        f:capabilities:
+                          .: {}
+                          f:drop: {}
+                      f:terminationMessagePath: {}
+                      f:terminationMessagePolicy: {}
+                      f:volumeMounts:
+                        .: {}
+                        k:{"mountPath":"/etc/config"}:
+                          .: {}
+                          f:mountPath: {}
+                          f:name: {}
+                        k:{"mountPath":"/var/run/secrets/serving-cert"}:
+                          .: {}
+                          f:mountPath: {}
+                          f:name: {}
+                  f:dnsPolicy: {}
+                  f:priorityClassName: {}
+                  f:restartPolicy: {}
+                  f:schedulerName: {}
+                  f:securityContext:
+                    .: {}
+                    f:runAsNonRoot: {}
+                    f:seccompProfile:
+                      .: {}
+                      f:type: {}
+                  f:serviceAccount: {}
+                  f:serviceAccountName: {}
+                  f:terminationGracePeriodSeconds: {}
+                  f:volumes:
+                    .: {}
+                    k:{"name":"config-volume"}:
+                      .: {}
+                      f:configMap:
+                        .: {}
+                        f:defaultMode: {}
+                        f:name: {}
+                      f:name: {}
+                    k:{"name":"secret-volume"}:
+                      .: {}
+                      f:name: {}
+                      f:secret:
+                        .: {}
+                        f:defaultMode: {}
+                        f:secretName: {}
+          f:schedule: {}
+          f:successfulJobsHistoryLimit: {}
+          f:suspend: {}
+      manager: cluster-version-operator
+      operation: Update
+      time: "2024-06-11T10:41:49Z"
+    - apiVersion: batch/v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:status:
+          f:lastScheduleTime: {}
+          f:lastSuccessfulTime: {}
+      manager: kube-controller-manager
+      operation: Update
+      subresource: status
+      time: "2024-06-11T11:30:04Z"
+    name: collect-profiles
+    namespace: openshift-operator-lifecycle-manager
+    ownerReferences:
+    - apiVersion: config.openshift.io/v1
+      controller: true
+      kind: ClusterVersion
+      name: version
+      uid: 7f5ed23b-8031-407e-bbf3-8850738c2d59
+    resourceVersion: "38568"
+    uid: 145d4158-804a-4c1f-9992-08224a57f3a9
+  spec:
+    concurrencyPolicy: Replace
+    failedJobsHistoryLimit: 1
+    jobTemplate:
+      metadata:
+        creationTimestamp: null
+      spec:
+        backoffLimit: 6
+        completionMode: NonIndexed
+        suspend: false
+        template:
+          metadata:
+            annotations:
+              openshift.io/required-scc: restricted-v2
+              target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+            creationTimestamp: null
+          spec:
+            containers:
+            - args:
+              - -n
+              - openshift-operator-lifecycle-manager
+              - --config-mount-path
+              - /etc/config
+              - --cert-mount-path
+              - /var/run/secrets/serving-cert
+              - olm-operator-heap-:https://olm-operator-metrics:8443/debug/pprof/heap
+              - catalog-operator-heap-:https://catalog-operator-metrics:8443/debug/pprof/heap
+              command:
+              - bin/collect-profiles
+              image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:0c98f79ab486ea5a1d832c1393ca7da8a3131096a54ea4a1779a8a57f7025fdb
+              imagePullPolicy: IfNotPresent
+              name: collect-profiles
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 80Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                  - ALL
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: FallbackToLogsOnError
+              volumeMounts:
+              - mountPath: /etc/config
+                name: config-volume
+              - mountPath: /var/run/secrets/serving-cert
+                name: secret-volume
+            dnsPolicy: ClusterFirst
+            priorityClassName: openshift-user-critical
+            restartPolicy: Never
+            schedulerName: default-scheduler
+            securityContext:
+              runAsNonRoot: true
+              seccompProfile:
+                type: RuntimeDefault
+            serviceAccount: collect-profiles
+            serviceAccountName: collect-profiles
+            terminationGracePeriodSeconds: 30
+            volumes:
+            - configMap:
+                defaultMode: 420
+                name: collect-profiles-config
+              name: config-volume
+            - name: secret-volume
+              secret:
+                defaultMode: 420
+                secretName: pprof-cert
+    schedule: '*/15 * * * *'
+    successfulJobsHistoryLimit: 3
+    suspend: false
+  status:
+    lastScheduleTime: "2024-06-11T11:30:00Z"
+    lastSuccessfulTime: "2024-06-11T11:30:04Z"
+kind: CronJobList
+metadata:
+  resourceVersion: "40204"

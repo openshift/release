@@ -1,0 +1,235 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    capability.openshift.io/name: NodeTuning
+    include.release.openshift.io/hypershift: "true"
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+  creationTimestamp: "2024-06-11T10:40:58Z"
+  generation: 1
+  managedFields:
+  - apiVersion: apiextensions.k8s.io/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:capability.openshift.io/name: {}
+          f:include.release.openshift.io/hypershift: {}
+          f:include.release.openshift.io/ibm-cloud-managed: {}
+          f:include.release.openshift.io/self-managed-high-availability: {}
+          f:include.release.openshift.io/single-node-developer: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"7f5ed23b-8031-407e-bbf3-8850738c2d59"}: {}
+      f:spec:
+        f:conversion:
+          .: {}
+          f:strategy: {}
+        f:group: {}
+        f:names:
+          f:kind: {}
+          f:listKind: {}
+          f:plural: {}
+          f:singular: {}
+        f:scope: {}
+        f:versions: {}
+    manager: cluster-version-operator
+    operation: Update
+    time: "2024-06-11T10:40:58Z"
+  - apiVersion: apiextensions.k8s.io/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:acceptedNames:
+          f:kind: {}
+          f:listKind: {}
+          f:plural: {}
+          f:singular: {}
+        f:conditions:
+          k:{"type":"Established"}:
+            .: {}
+            f:lastTransitionTime: {}
+            f:message: {}
+            f:reason: {}
+            f:status: {}
+            f:type: {}
+          k:{"type":"NamesAccepted"}:
+            .: {}
+            f:lastTransitionTime: {}
+            f:message: {}
+            f:reason: {}
+            f:status: {}
+            f:type: {}
+    manager: kube-apiserver
+    operation: Update
+    subresource: status
+    time: "2024-06-11T10:40:58Z"
+  name: profiles.tuned.openshift.io
+  ownerReferences:
+  - apiVersion: config.openshift.io/v1
+    controller: true
+    kind: ClusterVersion
+    name: version
+    uid: 7f5ed23b-8031-407e-bbf3-8850738c2d59
+  resourceVersion: "1147"
+  uid: 3732ced1-6953-4814-87ed-3c44827dda44
+spec:
+  conversion:
+    strategy: None
+  group: tuned.openshift.io
+  names:
+    kind: Profile
+    listKind: ProfileList
+    plural: profiles
+    singular: profile
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.config.tunedProfile
+      name: Tuned
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Applied")].status
+      name: Applied
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Degraded")].status
+      name: Degraded
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: Profile is a specification for a Profile resource.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              config:
+                properties:
+                  debug:
+                    description: option to debug TuneD daemon execution
+                    type: boolean
+                  providerName:
+                    description: 'Name of the cloud provider as taken from the Node
+                      providerID: <ProviderName>://<ProviderSpecificNodeID>'
+                    type: string
+                  tunedConfig:
+                    description: Global configuration for the TuneD daemon as defined
+                      in tuned-main.conf
+                    properties:
+                      reapply_sysctl:
+                        description: 'turn reapply_sysctl functionality on/off for
+                          the TuneD daemon: true/false'
+                        type: boolean
+                    type: object
+                  tunedProfile:
+                    description: TuneD profile to apply
+                    type: string
+                required:
+                - tunedProfile
+                type: object
+              profile:
+                description: Tuned profiles.
+                items:
+                  description: A Tuned profile.
+                  properties:
+                    data:
+                      description: Specification of the Tuned profile to be consumed
+                        by the Tuned daemon.
+                      type: string
+                    name:
+                      description: Name of the Tuned profile to be used in the recommend
+                        section.
+                      minLength: 1
+                      type: string
+                  required:
+                  - data
+                  - name
+                  type: object
+                type: array
+            required:
+            - config
+            type: object
+          status:
+            description: ProfileStatus is the status for a Profile resource; the status
+              is for internal use only and its fields may be changed/removed in the
+              future.
+            properties:
+              conditions:
+                description: conditions represents the state of the per-node Profile
+                  application
+                items:
+                  description: ProfileStatusCondition represents a partial state of
+                    the per-node Profile application.
+                  properties:
+                    lastTransitionTime:
+                      description: lastTransitionTime is the time of the last update
+                        to the current status property.
+                      format: date-time
+                      type: string
+                    message:
+                      description: message provides additional information about the
+                        current condition. This is only to be consumed by humans.
+                      type: string
+                    reason:
+                      description: reason is the CamelCase reason for the condition's
+                        current status.
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: type specifies the aspect reported by this condition.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              tunedProfile:
+                description: the current profile in use by the Tuned daemon
+                type: string
+            required:
+            - tunedProfile
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: Profile
+    listKind: ProfileList
+    plural: profiles
+    singular: profile
+  conditions:
+  - lastTransitionTime: "2024-06-11T10:40:58Z"
+    message: no conflicts found
+    reason: NoConflicts
+    status: "True"
+    type: NamesAccepted
+  - lastTransitionTime: "2024-06-11T10:40:58Z"
+    message: the initial names have been accepted
+    reason: InitialNamesAccepted
+    status: "True"
+    type: Established
+  storedVersions:
+  - v1

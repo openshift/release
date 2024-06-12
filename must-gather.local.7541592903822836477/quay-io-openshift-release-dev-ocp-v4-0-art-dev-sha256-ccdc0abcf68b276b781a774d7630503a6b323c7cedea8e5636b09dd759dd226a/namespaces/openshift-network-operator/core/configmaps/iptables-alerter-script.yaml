@@ -1,0 +1,145 @@
+---
+apiVersion: v1
+data:
+  iptables-alerter.sh: |-
+    #!/bin/bash
+
+    set -euo pipefail
+
+    function crictl {
+        case "${1}" in
+        inspectp)
+            # Eat errors, since the pod may have exited since we started the loop.
+            # The caller will catch the empty return value
+            chroot /host /bin/crictl "$@" 2>/dev/null || true
+            ;;
+        *)
+            chroot /host /bin/crictl "$@"
+            ;;
+        esac
+    }
+    function jq {
+        chroot /host /bin/jq "$@"
+    }
+    function ip {
+        chroot /host /sbin/ip "$@"
+    }
+
+    while :; do
+        date
+        # Iterate over local pods
+        for id in $(crictl pods -q); do
+            # Check that it's a pod-network pod
+            netns=$(crictl inspectp "${id}" | jq -r .status.linux.namespaces.options.network)
+            if [[ "${netns}" == "NODE" ]]; then
+                continue
+            fi
+
+            # Find the network namespace
+            netns_path=$(crictl inspectp "${id}" | jq -r '.info.runtimeSpec.linux.namespaces[] | select(.type == "network").path')
+            if [[ ! "${netns_path}" =~ ^/var/run/netns/ ]]; then
+                continue
+            fi
+            netns=$(basename "${netns_path}")
+
+            # Gather pod metadata
+            pod_namespace=$(crictl inspectp "${id}" | jq -r .status.metadata.namespace)
+            pod_name=$(crictl inspectp "${id}" | jq -r .status.metadata.name)
+            pod_uid=$(crictl inspectp "${id}" | jq -r .status.metadata.uid)
+
+            # If the pod exited already then crictl will have returned "" for everything
+            if [[ -z "${pod_uid}" ]]; then
+                continue
+            fi
+
+            # Check if we already logged an event for it
+            events=$(kubectl get events -n "${pod_namespace}" -l pod-uid="${pod_uid}" 2>/dev/null)
+            if [[ -n "${events}" ]]; then
+                echo "Skipping pod ${pod_namespace}/${pod_name} which we already logged an event for."
+                continue
+            fi
+
+            # Set iptables_output to the first iptables rule in the pod's network
+            # namespace, if any. (We use `awk` here rather than `grep` intentionally
+            # to avoid awkwardness with grep's exit status on no match.)
+            iptables_output=$(
+                (ip netns exec "${netns}" iptables-save || true;
+                 ip netns exec "${netns}" ip6tables-save || true) 2>/dev/null | \
+                awk '/^-A/ {print; exit}'
+            )
+            if [[ -z "${iptables_output}" ]]; then
+                continue
+            fi
+
+            echo "Logging event for ${pod_namespace}/${pod_name} which has iptables rules"
+
+            # eg "2023-10-19T15:45:10.353846Z"
+            event_time=$(date -u +%FT%T.%6NZ)
+
+            kubectl create -f - <<EOF
+    apiVersion: events.k8s.io/v1
+    kind: Event
+    metadata:
+      namespace: ${pod_namespace}
+      generateName: iptables-alert-
+      labels:
+        pod-uid: ${pod_uid}
+    regarding:
+      apiVersion: v1
+      kind: Pod
+      namespace: ${pod_namespace}
+      name: ${pod_name}
+      uid: ${pod_uid}
+    reportingController: openshift.io/iptables-deprecation-alerter
+    reportingInstance: ${ALERTER_POD_NAME}
+    action: IPTablesUsageObserved
+    reason: IPTablesUsageObserved
+    type: Normal
+    note: |
+      This pod appears to have created one or more iptables rules. IPTables is
+      deprecated and will no longer be available in RHEL 10 and later. You should
+      consider migrating to another API such as nftables or eBPF. See also
+      https://access.redhat.com/solutions/6739041
+
+      Example iptables rule seen in this pod:
+      ${iptables_output}
+    eventTime: ${event_time}
+    EOF
+        done
+
+        echo ""
+        sleep 3600
+    done
+kind: ConfigMap
+metadata:
+  annotations:
+    kubernetes.io/description: |
+      This is a script used by the iptables-alerter DaemonSet
+    release.openshift.io/version: 4.16.0-0.nightly-2024-06-10-211334
+  creationTimestamp: "2024-06-11T10:47:11Z"
+  managedFields:
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:data:
+        f:iptables-alerter.sh: {}
+      f:metadata:
+        f:annotations:
+          f:kubernetes.io/description: {}
+          f:release.openshift.io/version: {}
+        f:ownerReferences:
+          k:{"uid":"62ee1ce2-90a7-43aa-95fc-751c249264a6"}: {}
+    manager: cluster-network-operator/operconfig
+    operation: Apply
+    time: "2024-06-11T10:47:11Z"
+  name: iptables-alerter-script
+  namespace: openshift-network-operator
+  ownerReferences:
+  - apiVersion: operator.openshift.io/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Network
+    name: cluster
+    uid: 62ee1ce2-90a7-43aa-95fc-751c249264a6
+  resourceVersion: "5014"
+  uid: 4d760f75-5ad5-4869-8fd4-7677d7eccb3f

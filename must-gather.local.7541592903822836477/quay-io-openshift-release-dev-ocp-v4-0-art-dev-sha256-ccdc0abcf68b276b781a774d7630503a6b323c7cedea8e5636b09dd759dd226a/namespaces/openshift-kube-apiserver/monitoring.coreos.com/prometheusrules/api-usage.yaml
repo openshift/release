@@ -1,0 +1,65 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  creationTimestamp: "2024-06-11T10:48:38Z"
+  generation: 1
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"pre-release-lifecycle"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: cluster-kube-apiserver-operator
+    operation: Update
+    time: "2024-06-11T10:48:38Z"
+  name: api-usage
+  namespace: openshift-kube-apiserver
+  resourceVersion: "8656"
+  uid: 768cf63c-559a-489c-b367-d076a32f8c4e
+spec:
+  groups:
+  - name: pre-release-lifecycle
+    rules:
+    - alert: APIRemovedInNextReleaseInUse
+      annotations:
+        description: Deprecated API that will be removed in the next version is being
+          used. Removing the workload that is using the {{ $labels.group }}.{{ $labels.version
+          }}/{{ $labels.resource }} API might be necessary for a successful upgrade
+          to the next cluster version with Kubernetes {{ $labels.removed_release }}.
+          Refer to `oc get apirequestcounts {{ $labels.resource }}.{{ $labels.version
+          }}.{{ $labels.group }} -o yaml` to identify the workload.
+        summary: Deprecated API that will be removed in the next version is being
+          used.
+      expr: group by (group,version,resource,removed_release) (apiserver_requested_deprecated_apis{removed_release="1.30"})
+        * on (group,version,resource) group_left () sum by (group,version,resource)
+        ( rate(apiserver_request_total{system_client!="kube-controller-manager",system_client!="cluster-policy-controller"}[4h])
+        ) > 0
+      for: 1h
+      labels:
+        namespace: openshift-kube-apiserver
+        severity: info
+    - alert: APIRemovedInNextEUSReleaseInUse
+      annotations:
+        description: Deprecated API that will be removed in the next EUS version is
+          being used. Removing the workload that is using the {{ $labels.group }}.{{
+          $labels.version }}/{{ $labels.resource }} API might be necessary for a successful
+          upgrade to the next EUS cluster version with Kubernetes {{ $labels.removed_release
+          }}. Refer to `oc get apirequestcounts {{ $labels.resource }}.{{ $labels.version
+          }}.{{ $labels.group }} -o yaml` to identify the workload.
+        summary: Deprecated API that will be removed in the next EUS version is being
+          used.
+      expr: group by (group,version,resource,removed_release) (apiserver_requested_deprecated_apis{removed_release=~"1.3[01]"})
+        * on (group,version,resource) group_left () sum by (group,version,resource)
+        ( rate(apiserver_request_total{system_client!="kube-controller-manager",system_client!="cluster-policy-controller"}[4h])
+        ) > 0
+      for: 1h
+      labels:
+        namespace: openshift-kube-apiserver
+        severity: info

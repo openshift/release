@@ -1,0 +1,332 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    capability.openshift.io/name: MachineAPI
+    exclude.release.openshift.io/internal-openshift-hosted: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+  creationTimestamp: "2024-06-11T10:40:54Z"
+  generation: 1
+  managedFields:
+  - apiVersion: apiextensions.k8s.io/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:capability.openshift.io/name: {}
+          f:exclude.release.openshift.io/internal-openshift-hosted: {}
+          f:include.release.openshift.io/self-managed-high-availability: {}
+          f:include.release.openshift.io/single-node-developer: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"7f5ed23b-8031-407e-bbf3-8850738c2d59"}: {}
+      f:spec:
+        f:conversion:
+          .: {}
+          f:strategy: {}
+        f:group: {}
+        f:names:
+          f:kind: {}
+          f:listKind: {}
+          f:plural: {}
+          f:shortNames: {}
+          f:singular: {}
+        f:scope: {}
+        f:versions: {}
+    manager: cluster-version-operator
+    operation: Update
+    time: "2024-06-11T10:40:54Z"
+  - apiVersion: apiextensions.k8s.io/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:acceptedNames:
+          f:kind: {}
+          f:listKind: {}
+          f:plural: {}
+          f:shortNames: {}
+          f:singular: {}
+        f:conditions:
+          k:{"type":"Established"}:
+            .: {}
+            f:lastTransitionTime: {}
+            f:message: {}
+            f:reason: {}
+            f:status: {}
+            f:type: {}
+          k:{"type":"NamesAccepted"}:
+            .: {}
+            f:lastTransitionTime: {}
+            f:message: {}
+            f:reason: {}
+            f:status: {}
+            f:type: {}
+    manager: kube-apiserver
+    operation: Update
+    subresource: status
+    time: "2024-06-11T10:40:54Z"
+  name: clusterautoscalers.autoscaling.openshift.io
+  ownerReferences:
+  - apiVersion: config.openshift.io/v1
+    controller: true
+    kind: ClusterVersion
+    name: version
+    uid: 7f5ed23b-8031-407e-bbf3-8850738c2d59
+  resourceVersion: "927"
+  uid: 58fa7d70-6623-47c9-9fbd-da6f2d802062
+spec:
+  conversion:
+    strategy: None
+  group: autoscaling.openshift.io
+  names:
+    kind: ClusterAutoscaler
+    listKind: ClusterAutoscalerList
+    plural: clusterautoscalers
+    shortNames:
+    - ca
+    singular: clusterautoscaler
+  scope: Cluster
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: ClusterAutoscaler is the Schema for the clusterautoscalers API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Desired state of ClusterAutoscaler resource
+            properties:
+              balanceSimilarNodeGroups:
+                description: BalanceSimilarNodeGroups enables/disables the `--balance-similar-node-groups`
+                  cluster-autoscaler feature. This feature will automatically identify
+                  node groups with the same instance type and the same set of labels
+                  and try to keep the respective sizes of those node groups balanced.
+                type: boolean
+              balancingIgnoredLabels:
+                description: BalancingIgnoredLabels sets "--balancing-ignore-label
+                  <label name>" flag on cluster-autoscaler for each listed label.
+                  This option specifies labels that cluster autoscaler should ignore
+                  when considering node group similarity. For example, if you have
+                  nodes with "topology.ebs.csi.aws.com/zone" label, you can add name
+                  of this label here to prevent cluster autoscaler from spliting nodes
+                  into different node groups based on its value.
+                items:
+                  type: string
+                type: array
+              expanders:
+                description: 'Sets the type and order of expanders to be used during
+                  scale out operations. This option specifies an ordered list, highest
+                  priority first, of expanders that will be used by the cluster autoscaler
+                  to select node groups for expansion when scaling out. Expanders
+                  instruct the autoscaler on how to choose node groups when scaling
+                  out the cluster. They can be specified in order so that the result
+                  from the first expander is used as the input to the second, and
+                  so forth. For example, if set to `[LeastWaste, Random]` the autoscaler
+                  will first evaluate node groups to determine which will have the
+                  least resource waste, if multiple groups are selected the autoscaler
+                  will then randomly choose between those groups to determine the
+                  group for scaling. The following expanders are available: * LeastWaste
+                  - selects the node group that will have the least idle CPU (if tied,
+                  unused memory) after scale-up. * Priority - selects the node group
+                  that has the highest priority assigned by the user. For details,
+                  please see https://github.com/openshift/kubernetes-autoscaler/blob/master/cluster-autoscaler/expander/priority/readme.md
+                  * Random - selects the node group randomly. If not specified, the
+                  default value is `Random`, available options are: `LeastWaste`,
+                  `Priority`, `Random`.'
+                items:
+                  description: ExpanderString contains the name of an expander to
+                    be used by the cluster autoscaler.
+                  enum:
+                  - LeastWaste
+                  - Priority
+                  - Random
+                  type: string
+                maxItems: 3
+                type: array
+                x-kubernetes-list-type: set
+              ignoreDaemonsetsUtilization:
+                description: Enables/Disables `--ignore-daemonsets-utilization` CA
+                  feature flag. Should CA ignore DaemonSet pods when calculating resource
+                  utilization for scaling down. false by default
+                type: boolean
+              logVerbosity:
+                description: "Sets the autoscaler log level. Default value is 1, level
+                  4 is recommended for DEBUGGING and level 6 will enable almost everything.
+                  \n This option has priority over log level set by the `CLUSTER_AUTOSCALER_VERBOSITY`
+                  environment variable."
+                format: int32
+                minimum: 0
+                type: integer
+              maxNodeProvisionTime:
+                description: Maximum time CA waits for node to be provisioned
+                pattern: ^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$
+                type: string
+              maxPodGracePeriod:
+                description: Gives pods graceful termination time before scaling down
+                format: int32
+                type: integer
+              podPriorityThreshold:
+                description: 'To allow users to schedule "best-effort" pods, which
+                  shouldn''t trigger Cluster Autoscaler actions, but only run when
+                  there are spare resources available, More info: https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/FAQ.md#how-does-cluster-autoscaler-work-with-pod-priority-and-preemption'
+                format: int32
+                type: integer
+              resourceLimits:
+                description: Constraints of autoscaling resources
+                properties:
+                  cores:
+                    description: Minimum and maximum number of cores in cluster, in
+                      the format <min>:<max>. Cluster autoscaler will not scale the
+                      cluster beyond these numbers.
+                    properties:
+                      max:
+                        format: int32
+                        type: integer
+                      min:
+                        format: int32
+                        minimum: 0
+                        type: integer
+                    required:
+                    - max
+                    - min
+                    type: object
+                  gpus:
+                    description: Minimum and maximum number of different GPUs in cluster,
+                      in the format <gpu_type>:<min>:<max>. Cluster autoscaler will
+                      not scale the cluster beyond these numbers. Can be passed multiple
+                      times.
+                    items:
+                      properties:
+                        max:
+                          format: int32
+                          minimum: 1
+                          type: integer
+                        min:
+                          format: int32
+                          minimum: 0
+                          type: integer
+                        type:
+                          description: The type of GPU to associate with the minimum
+                            and maximum limits. This value is used by the Cluster
+                            Autoscaler to identify Nodes that will have GPU capacity
+                            by searching for it as a label value on the Node objects.
+                            For example, Nodes that carry the label key `cluster-api/accelerator`
+                            with the label value being the same as the Type field
+                            will be counted towards the resource limits by the Cluster
+                            Autoscaler.
+                          minLength: 1
+                          type: string
+                      required:
+                      - max
+                      - min
+                      - type
+                      type: object
+                    type: array
+                  maxNodesTotal:
+                    description: Maximum number of nodes in all node groups. Cluster
+                      autoscaler will not grow the cluster beyond this number.
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  memory:
+                    description: Minimum and maximum number of GiB of memory in cluster,
+                      in the format <min>:<max>. Cluster autoscaler will not scale
+                      the cluster beyond these numbers.
+                    properties:
+                      max:
+                        format: int32
+                        type: integer
+                      min:
+                        format: int32
+                        minimum: 0
+                        type: integer
+                    required:
+                    - max
+                    - min
+                    type: object
+                type: object
+              scaleDown:
+                description: Configuration of scale down operation
+                properties:
+                  delayAfterAdd:
+                    description: How long after scale up that scale down evaluation
+                      resumes
+                    pattern: ([0-9]*(\.[0-9]*)?[a-z]+)+
+                    type: string
+                  delayAfterDelete:
+                    description: How long after node deletion that scale down evaluation
+                      resumes, defaults to scan-interval
+                    pattern: ([0-9]*(\.[0-9]*)?[a-z]+)+
+                    type: string
+                  delayAfterFailure:
+                    description: How long after scale down failure that scale down
+                      evaluation resumes
+                    pattern: ([0-9]*(\.[0-9]*)?[a-z]+)+
+                    type: string
+                  enabled:
+                    description: Should CA scale down the cluster
+                    type: boolean
+                  unneededTime:
+                    description: How long a node should be unneeded before it is eligible
+                      for scale down
+                    pattern: ([0-9]*(\.[0-9]*)?[a-z]+)+
+                    type: string
+                  utilizationThreshold:
+                    description: Node utilization level, defined as sum of requested
+                      resources divided by capacity, below which a node can be considered
+                      for scale down
+                    pattern: (0.[0-9]+)
+                    type: string
+                required:
+                - enabled
+                type: object
+              skipNodesWithLocalStorage:
+                description: Enables/Disables `--skip-nodes-with-local-storage` CA
+                  feature flag. If true cluster autoscaler will never delete nodes
+                  with pods with local storage, e.g. EmptyDir or HostPath. true by
+                  default at autoscaler
+                type: boolean
+            type: object
+          status:
+            description: Most recently observed status of ClusterAutoscaler resource
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ClusterAutoscaler
+    listKind: ClusterAutoscalerList
+    plural: clusterautoscalers
+    shortNames:
+    - ca
+    singular: clusterautoscaler
+  conditions:
+  - lastTransitionTime: "2024-06-11T10:40:54Z"
+    message: no conflicts found
+    reason: NoConflicts
+    status: "True"
+    type: NamesAccepted
+  - lastTransitionTime: "2024-06-11T10:40:54Z"
+    message: the initial names have been accepted
+    reason: InitialNamesAccepted
+    status: "True"
+    type: Established
+  storedVersions:
+  - v1
