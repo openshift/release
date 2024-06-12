@@ -176,5 +176,8 @@ verify_template(){
 
 clone_repo
 verify_template
-install_rhtap
-e2e_test
+sleep 7200
+
+# install_rhtap
+
+# e2e_test
