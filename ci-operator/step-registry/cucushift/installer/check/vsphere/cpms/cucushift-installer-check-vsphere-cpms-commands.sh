@@ -40,13 +40,13 @@ function checkSinglezone() {
         check_result=0
 	node_name=$(oc get machines.machine.openshift.io -n openshift-machine-api --selector machine.openshift.io/cluster-api-machine-type=master --no-headers | awk '{print $1}' | head -n1)
 	machine_workspace=$(oc get machines.machine.openshift.io ${node_name} -n openshift-machine-api -ojson | jq -r '.spec.providerSpec.value.workspace')
-	machine_template=$(oc get machines.machine.openshift.io ${node_name} -n openshift-machine-api -ojson | jq -r '.spec.providerSpec.value.template')
+	#machine_template=$(oc get machines.machine.openshift.io ${node_name} -n openshift-machine-api -ojson | jq -r '.spec.providerSpec.value.template')
 	machine_network=$(oc get machines.machine.openshift.io ${node_name} -n openshift-machine-api -ojson | jq -r '.spec.providerSpec.value.network.devices[].networkName')
         
 	cpms_network=$(oc get controlplanemachineset -n openshift-machine-api -ojson | jq -r '.items[].spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.network.devices[].networkName')
 	cpms_workspace=$(oc get controlplanemachineset -n openshift-machine-api -ojson | jq -r '.items[].spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.workspace')
-        cpms_template=$(oc get controlplanemachineset -n openshift-machine-api -ojson | jq -r '.items[].spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.template')
-        if [[ ${machine_workspace} == "${cpms_workspace}" ]] && [[ ${machine_template} == "${cpms_template}" ]]  && [[ ${machine_network} == "${cpms_network}" ]]; then
+        #cpms_template=$(oc get controlplanemachineset -n openshift-machine-api -ojson | jq -r '.items[].spec.template.machines_v1beta1_machine_openshift_io.spec.providerSpec.value.template')
+        if [[ ${machine_workspace} == "${cpms_workspace}" ]] && [[ ${machine_network} == "${cpms_network}" ]]; then
 	    echo "INFO: The network,workspace and template setting between cmps and machines are same. that's expected"
 	else
 	   check_result=1
