@@ -237,7 +237,7 @@ function filter_tests() {
     echo_e2e_tags
 }
 function test_execution() {
-    pushd verification-tests
+    pushd /verification-tests
     # run normal tests in parallel
     export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-normal"
     SECONDS=0
