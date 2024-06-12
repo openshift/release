@@ -43,7 +43,9 @@ cat > "${WORKER_MANIFEST}" <<EOF
         files:
 EOF
 
+# shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+  # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   br_ex_configuration="
   interfaces:
