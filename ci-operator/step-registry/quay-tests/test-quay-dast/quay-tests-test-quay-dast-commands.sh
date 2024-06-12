@@ -86,4 +86,4 @@ EOF
 cp config-zap-prowci.yaml config || true
 ./rapidast.py --config ./config/config-zap-prowci.yaml || true
 mv results $ARTIFACT_DIR || true
-sleep 20000
+sleep 30000
