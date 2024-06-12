@@ -1,8 +1,8 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.21-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.21-openshift-4.17
   origin_scos-4.17_base-stream9:
     name: scos-4.17
     namespace: origin
@@ -16,14 +16,25 @@ images:
 - build_args:
   - name: TAGS
     value: scos
-  dockerfile_path: Dockerfile.rhel7
+  dockerfile_path: Dockerfile.rhel
   from: origin_scos-4.17_base-stream9
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
       as:
       - builder
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-  to: cluster-config-operator
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
+  to: etcd
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile.installer
+  from: origin_scos-4.17_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.16
+  to: installer-etcd-artifacts
 promotion:
   to:
   - name: scos-4.17
@@ -39,7 +50,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 zz_generated_metadata:
-  branch: master
+  branch: openshift-4.17
   org: openshift
-  repo: cluster-config-operator
+  repo: etcd
   variant: okd-scos

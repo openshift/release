@@ -1,54 +1,42 @@
 base_images:
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
   ocp_builder_rhel-8-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.22-openshift-4.17
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
-  origin_scos-4.16_base-stream9:
-    name: scos-4.16
+  origin_scos-4.17_base-stream9:
+    name: scos-4.17
     namespace: origin
     tag: base-stream9
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
 images:
 - build_args:
   - name: TAGS
     value: scos
   dockerfile_path: images/cli/Dockerfile.rhel
-  from: origin_scos-4.16_base-stream9
+  from: origin_scos-4.17_base-stream9
   inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - builder
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
+      - builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cli
 - build_args:
   - name: TAGS
     value: scos
   dockerfile_path: images/tools/Dockerfile
-  from: origin_scos-4.16_base-stream9
+  from: origin_scos-4.17_base-stream9
   inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - builder
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
+      - builder
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: tools
 - build_args:
@@ -63,52 +51,29 @@ images:
   dockerfile_path: images/cli-artifacts/Dockerfile.rhel
   from: cli
   inputs:
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-      as:
-      - builder
     ocp_builder_rhel-8-golang-1.22-openshift-4.17:
       as:
+      - builder
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - builder-rhel-9
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
+      - builder-rhel-9
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cli-artifacts
 promotion:
   to:
-  - additional_images:
-      oc-rpms: rpms
-    excluded_images:
-    - base-with-rpms
-    name: scos-4.16
+  - name: scos-4.17
     namespace: origin
-raw_steps:
-- rpm_image_injection_step:
-    from: origin_scos-4.16_base-stream9
-    to: base-with-rpms
 releases:
   latest:
     integration:
-      name: scos-4.16
+      name: scos-4.17
       namespace: origin
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-rpm_build_commands: |-
-  dnf install -y rpmdevtools createrepo
-  dnf builddep -y oc.spec
-  TMPDIR=$( mktemp -d )
-  RPMBUILD_DIR=_rpmbuild/
-  mkdir -p ${RPMBUILD_DIR}/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-  tar -czf "${TMPDIR}/openshift-clients-0.0.1.tar.gz" --exclude='.git' --transform='s|^.|openshift-clients-0.0.1|' --exclude='openshift-clients-0.0.1.tar.gz' ./
-  cp ./oc.spec "${RPMBUILD_DIR}/SPECS/"
-  cp "${TMPDIR}/openshift-clients-0.0.1.tar.gz" "${RPMBUILD_DIR}/SOURCES/"
-  rpmbuild -ba --nodeps --define "_topdir $( pwd )/${RPMBUILD_DIR}" ${RPMBUILD_DIR}/SPECS/oc.spec --define "os_git_vars OS_GIT_VERSION='4.16.0' OS_GIT_COMMIT='${OPENSHIFT_BUILD_COMMIT::8}' OS_GIT_MAJOR='' OS_GIT_MINOR='' OS_GIT_TREE_STATE=''"
-rpm_build_location: _rpmbuild/RPMS/
 zz_generated_metadata:
   branch: master
   org: openshift
