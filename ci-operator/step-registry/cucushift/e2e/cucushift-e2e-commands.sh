@@ -307,7 +307,7 @@ function test_execution_ui_destructive {
     test_execution_cucumber 'uidestructive' '@console and @destructive'
 }
 function test_execution() {
-    pushd verification-tests
+    pushd /verification-tests
     case "$E2E_TEST_TYPE" in
         default)
             export E2E_RUN_TAGS="${E2E_RUN_TAGS} and not @destructive and not @long-duration"
@@ -346,8 +346,7 @@ function summarize_test_results() {
     done < /tmp/zzz-tmp.log
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
-cucushift:
-  type: cucushift-e2e
+cucushift-e2e:
   total: $tests
   failures: $failures
   errors: $errors

@@ -124,6 +124,16 @@ images:
       - destination_dir: .
         source_path: /usr/bin/manifest-tool
   to: ci-operator
+- context_dir: images/ci-operator-minimal/
+  from: ubi_minimal
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-operator
+      - destination_dir: .
+        source_path: /usr/bin/manifest-tool
+  to: ci-operator-minimal
 - context_dir: images/ci-operator-checkconfig/
   from: os
   inputs:
@@ -660,6 +670,8 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/job-run-aggregator
+      - destination_dir: .
+        source_path: /go/bin/prcreator
   to: job-run-aggregator
 - dockerfile_literal: |-
     FROM quay.io/centos/centos:stream9
@@ -893,11 +905,9 @@ tests:
     from: test-bin
   node_architecture: arm64
 - as: lint
-  cluster: build10
   commands: make lint
   container:
     from: golangci-lint
-  node_architecture: arm64
 - as: canary-build09
   cluster: build09
   interval: 10m

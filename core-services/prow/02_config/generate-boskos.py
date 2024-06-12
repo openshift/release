@@ -153,6 +153,9 @@ CONFIG = {
         'southcentralus': 10,
         'centralus': 10
     },
+    'azure-autorelease-qe-quota-slice': {
+        'eastus2': 4
+    },
     'azure-arm64-qe-quota-slice': {
         'centralus': 6,
         'eastus': 6,
@@ -174,6 +177,9 @@ CONFIG = {
     },
     'gcp-qe-quota-slice': {
         'us-central1': 30,
+    },
+    'gcp-autorelease-qe-quota-slice': {
+        'us-central1': 4,
     },
     'gcp-quota-slice': {
         'us-central1': 80,
