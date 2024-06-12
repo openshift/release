@@ -6,22 +6,22 @@ presubmits:
     - ^maistra-2\.3$
     - ^maistra-2\.3-
     cluster: build03
-    context: ci/prow/istio-operator-gencheck-2-3
+    context: ci/prow/gencheck
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-maistra-istio-operator-maistra-2.3-istio-operator-gencheck-2-3
-    rerun_command: /test istio-operator-gencheck-2-3
+    name: pull-ci-maistra-istio-operator-maistra-2.3-gencheck
+    rerun_command: /test gencheck
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=istio-operator-gencheck-2-3
+        - --target=gencheck
         command:
         - ci-operator
         image: ci-operator:latest
@@ -54,29 +54,29 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )istio-operator-gencheck-2-3,?($|\s.*)
+    trigger: (?m)^/test( | .* )gencheck,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^maistra-2\.3$
     - ^maistra-2\.3-
     cluster: build03
-    context: ci/prow/istio-operator-lint-2-3
+    context: ci/prow/lint
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-maistra-istio-operator-maistra-2.3-istio-operator-lint-2-3
-    rerun_command: /test istio-operator-lint-2-3
+    name: pull-ci-maistra-istio-operator-maistra-2.3-lint
+    rerun_command: /test lint
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=istio-operator-lint-2-3
+        - --target=lint
         command:
         - ci-operator
         image: ci-operator:latest
@@ -109,63 +109,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )istio-operator-lint-2-3,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^maistra-2\.3$
-    - ^maistra-2\.3-
-    cluster: build03
-    context: ci/prow/istio-operator-unit-2-3
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 4h0m0s
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-maistra-istio-operator-maistra-2.3-istio-operator-unit-2-3
-    rerun_command: /test istio-operator-unit-2-3
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=istio-operator-unit-2-3
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )istio-operator-unit-2-3,?($|\s.*)
+    trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -246,3 +190,59 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )push-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^maistra-2\.3$
+    - ^maistra-2\.3-
+    cluster: build03
+    context: ci/prow/unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 4h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-maistra-istio-operator-maistra-2.3-unit
+    rerun_command: /test unit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=unit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
