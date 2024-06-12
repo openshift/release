@@ -2,25 +2,23 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
+    tag: rhel-8-golang-1.20-openshift-4.14
 images:
 - dockerfile_path: Dockerfile
-  from: src
-  to: oadp-operator
+  to: oadp-operator-1.0
 - dockerfile_path: build/ci-Dockerfile
-  from: src
-  to: test-oadp-operator
+  to: test-oadp-operator-1.0
 operator:
   bundles:
   - dockerfile_path: build/Dockerfile.bundle
   substitutions:
-  - pullspec: quay.io/konveyor/oadp-operator:latest
-    with: oadp-operator
+  - pullspec: quay.io/konveyor/oadp-operator:oadp-1.0
+    with: oadp-operator-1.0
 releases:
   latest:
     release:
       channel: fast
-      version: "4.9"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -49,7 +47,7 @@ tests:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
-      from: test-oadp-operator
+      from: test-oadp-operator-1.0
       resources:
         requests:
           cpu: 1000m
@@ -74,64 +72,14 @@ tests:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
-      from: test-oadp-operator
+      from: test-oadp-operator-1.0
       resources:
         requests:
           cpu: 1000m
           memory: 512Mi
     workflow: optional-operators-ci-aws
-- as: e2e-test-gcp-periodic
-  cron: 10 7 1,28 * *
-  steps:
-    cluster_profile: gcp
-    dependencies:
-      OO_INDEX: ci-index
-    env:
-      OO_CHANNEL: stable-1.0
-      OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!install'
-    test:
-    - as: e2e
-      cli: latest
-      commands: make test-e2e
-      credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
-      from: test-oadp-operator
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 512Mi
-    workflow: optional-operators-ci-gcp
-- as: e2e-test-azure-periodic
-  cron: 12 1 7,17 * *
-  steps:
-    cluster_profile: azure4
-    dependencies:
-      OO_INDEX: ci-index
-    env:
-      OO_CHANNEL: stable-1.0
-      OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!install'
-    test:
-    - as: e2e
-      cli: latest
-      commands: make test-e2e
-      credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
-      from: test-oadp-operator
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 512Mi
-    workflow: optional-operators-ci-azure
 zz_generated_metadata:
   branch: oadp-1.0
   org: openshift
   repo: oadp-operator
-  variant: "4.9"
+  variant: "4.14"
