@@ -5,7 +5,6 @@ set -o errexit
 set -o pipefail
 
 PAO_INSTALL_NAMESPACE=performance-addon-operator
-PAO_OPERATOR_CHANNEL="$PAO_OPERATOR_CHANNEL"
 
 
 echo "Installing PAO from ${PAO_OPERATOR_CHANNEL} into ${PAO_INSTALL_NAMESPACE}"
