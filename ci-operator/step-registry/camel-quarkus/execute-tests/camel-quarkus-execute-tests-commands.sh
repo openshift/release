@@ -22,7 +22,7 @@ function collect-results() {
       done
     done
 }
-
+echo "Temporary echo"
 echo "Logging to oc:"
 sh ./oc_login.sh
 echo "Executing tests:"
