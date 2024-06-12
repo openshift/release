@@ -1,0 +1,52 @@
+base_images:
+  ocp-addons-operators-cli:
+    name: ocp-addons-operators-cli
+    namespace: ci
+    tag: latest
+build_root:
+  project_image:
+    dockerfile_path: ci/Dockerfile
+images:
+- dockerfile_path: ci/Dockerfile
+  from: src
+  to: rhtap-installer
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pre-gitops-rhtap-installer-e2e-nightly
+  cluster_profile: aws-konflux-qe
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  cron: 0 */4 * * *
+  steps:
+    env:
+      INSTALL_FROM_IIB: "true"
+      OPERATOR1_CONFIG: name=gitops-operator
+      RHTAP_ENABLE_TPA: "true"
+      S3_BUCKET_OPERATORS_LATEST_IIB_PATH: s3://operators-latest-iib/operators-latest-iib.json
+      AWS_REGION: us-east-1
+    test:
+    - ref: redhat-appstudio-rhtap-installer-e2e-test
+    workflow: redhat-appstudio-rhtap-installer-gitops-prerelease
+zz_generated_metadata:
+  branch: release-1.0
+  org: redhat-appstudio
+  repo: rhtap-installer
