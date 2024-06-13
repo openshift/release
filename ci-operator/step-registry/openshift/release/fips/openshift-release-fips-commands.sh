@@ -72,29 +72,24 @@ static_scan_result=$(runScan "$namespace" "$master_node" "$payload_pullspec" "$s
 dynamic_scan_result=$(runScan "$namespace" "$master_node" "$payload_pullspec" "$dynamic_scan_log_file" "dynamic")
 
 if [[ "$static_scan_result" != "true" ]]; then
-  echo "FIPS static scan has FAILED"
-
   # Print logs if the scan failed
-  # Since the cat command has to be quoted
-  # shellcheck disable=SC2046
-  echo $(oc -n "$namespace" debug node/"$master_node" -- chroot /host bash -c "cat $static_scan_log_file")
+  oc -n "$namespace" debug node/"$master_node" -- chroot /host bash -c "cat $static_scan_log_file"
+
+  echo "FIPS static scan has FAILED"
 else
   echo "FIPS static scan has SUCCEEDED"
 fi
 
 if [[ "$dynamic_scan_result" != "true" ]]; then
-  echo "FIPS dynamic scan has FAILED"
-
   # Print logs if the scan failed
-  # Since the cat command has to be quoted
-  # shellcheck disable=SC2046
-  echo $(oc -n "$namespace" debug node/"$master_node" -- chroot /host bash -c "cat $dynamic_scan_log_file")
+  oc -n "$namespace" debug node/"$master_node" -- chroot /host bash -c "cat $dynamic_scan_log_file"
+
+  echo "FIPS dynamic scan has FAILED"
 else
   echo "FIPS dynamic scan has SUCCEEDED"
 fi
 
 oc delete ns $namespace || true
-
 
 if [[ "$static_scan_result" != "true" ]] || [[ "$dynamic_scan_result" != "true" ]]; then
   echo "FIPS job has failed. Exiting."
