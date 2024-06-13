@@ -7,7 +7,9 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere-aws/.awscred
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+
 unset SSL_CERT_FILE 
 unset GOVC_TLS_CA_CERTS
 

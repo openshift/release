@@ -10,6 +10,9 @@ declare vsphere_portgroup
 declare vsphere_bastion_portgroup
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc.sh"
 unset SSL_CERT_FILE 
 unset GOVC_TLS_CA_CERTS
 
@@ -28,9 +31,6 @@ if [[ -z "${vsphere_bastion_portgroup:-}" ]]; then
   vsphere_bastion_portgroup=${vsphere_portgroup}
 fi
 
-echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/govc.sh"
 
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
@@ -40,7 +40,7 @@ unset GOVC_TLS_CA_CERTS
 echo "$(date -u --rfc-3339=seconds) - Get avaiable ova template..."
 vm_template="${BASTION_OVA_URI##*/}"
 
-if [[ "$(govc vm.info ${vm_template} | wc -c)" -eq 0 ]]; then
+if [[ "$(govc vm.info "${vm_template}" | wc -c)" -eq 0 ]]; then
   if [[ "$(govc vm.info ${vm_template}-bastion | wc -c)" -eq 0 ]]; then
     echo "${vm_template} and ${vm_template}-bastion does not exist, creating it from ${BASTION_OVA_URI}..."
 
