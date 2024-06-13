@@ -80,3 +80,28 @@ if [ ${FIPS_ENABLED} = "true" ]; then
 fips: true
 EOF
 fi
+
+if [ ${NODE_TUNING} = "true" ]; then
+  echo "Saving node tuning yaml config"
+  cat >> ${SHARED_DIR}/99-sysctl-worker.yaml << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-sysctl-worker
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          # kernel.sched_migration_cost_ns=25000
+          source: data:text/plain;charset=utf-8;base64,a2VybmVsLnNjaGVkX21pZ3JhdGlvbl9jb3N0X25zID0gMjUwMDA=
+        filesystem: root
+        mode: 0644
+        overwrite: true
+        path: /etc/sysctl.conf
+EOF
+fi

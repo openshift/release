@@ -43,13 +43,13 @@ if [[ ! -z "$(${VIRSH} pool-list | grep ${POOL_NAME})" ]]; then
   echo "Removing stale volumes..."
   for VOLUME in $(${VIRSH} vol-list --pool ${POOL_NAME} | grep "${LEASED_RESOURCE}" | awk '{ print $1 }')
   do
-    ${VIRSH} vol-delete --pool ${POOL_NAME} --vol ${VOLUME}
+    ${VIRSH} vol-delete --pool ${POOL_NAME} ${VOLUME}
   done
 fi
 
 # DEBUG ONLY : Uncomment the following line to always remove the source volume.
 #echo "Removing the source volume..."
-#${VIRSH} vol-delete --pool ${POOL_NAME} --vol "$(${VIRSH} vol-list --pool ${POOL_NAME} | grep rhcos | awk '{ print $1 }' || true)"
+#${VIRSH} vol-delete --pool ${POOL_NAME} "$(${VIRSH} vol-list --pool ${POOL_NAME} | grep rhcos | awk '{ print $1 }' || true)"
 
 # Remove stale pools  # this is old behavior removal.  Can leave it for now, but its technically a noop
 echo "Removing stale pools..."
