@@ -42,4 +42,4 @@ set -o pipefail
 #   sourceNamespace: openshift-marketplace
 # EOF
 
-sleep 1800
+sleep 3200
