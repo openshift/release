@@ -1929,6 +1929,69 @@ function test_shard_topology () {
 
 ##################################################################
 
+function wait_for_managedcluster_available() {
+  MC_NAME=$1
+  STATUS_AVAILABLE=""
+  for ((i=0; i<10; i++)); do
+    echo "Checking if 'ManagedClusterAvailable' condition is 'True' for managedcluster: '$MC_NAME'"
+    STATUS_AVAILABLE=$(oc get managedcluster "$MC_NAME" -o json | jq -r .status.conditions[] | jq 'select(.reason == ("ManagedClusterAvailable"))' | jq -r .status) || true
+    if [ "$STATUS_AVAILABLE" != "True" ]; then
+      echo "managedcluster: '$MC_NAME' not available. Sleeping for 15 seconds"
+      sleep 15
+    else
+      echo "managedcluster: '$MC_NAME' available!"
+      break
+    fi
+  done
+  if [ "$STATUS_AVAILABLE" != "True" ]; then
+    echo "ERROR. managedcluster: '$MC_NAME' not available after 10 retries"
+  fi
+}
+
+###### test: ACM Hub repeatedly losing connection to managed cluster (OCP-74294) ######
+
+function check_managedcluster_connection() {
+  echo "[OCP-74294] - ACM Hub repeatedly losing connection to managed cluster"
+  TEST_PASSED=true
+  export KUBECONFIG="${SHARED_DIR}/hs-sc.kubeconfig"
+
+  MANAGEDCLUSTER_NAME=""
+  echo "Getting 'managedcluster' resource name from SC"
+  MANAGEDCLUSTER_NAME=$(oc get managedcluster -A -o json | jq -r .items[].metadata.name | grep "hs-mc" | head -n 1) || true
+  if [ "$MANAGEDCLUSTER_NAME" == "" ]; then
+    echo "ERROR. Unable to get 'managedcluster' resource name"
+    TEST_PASSED=false
+  else
+    echo "Getting hs-mc managedcluster import secret name"
+    IMPORT_SECRET_NAME=""
+    IMPORT_SECRET_NAME=$(oc get secret "$MANAGEDCLUSTER_NAME-import" -n "$MANAGEDCLUSTER_NAME" -o json | jq -r .metadata.name) || true
+    if [ "$IMPORT_SECRET_NAME" == "" ]; then
+      echo "ERROR. Unable to get '$MANAGEDCLUSTER_NAME-import' secret from $MANAGEDCLUSTER_NAME namespace"
+      TEST_PASSED=false
+    else
+      wait_for_managedcluster_available "$MANAGEDCLUSTER_NAME"
+      echo "Deleting '$MANAGEDCLUSTER_NAME-import' secret (should be automatically recreated)"
+      oc -n "$MANAGEDCLUSTER_NAME" delete secret "$MANAGEDCLUSTER_NAME"-import
+      echo "Sleeping for 30 seconds before checking if secret is recreated"
+      sleep 30
+      echo "Getting hs-mc managedcluster import secret name"
+      IMPORT_SECRET_NAME=""
+      IMPORT_SECRET_NAME=$(oc get secret "$MANAGEDCLUSTER_NAME-import" -n "$MANAGEDCLUSTER_NAME" -o json | jq -r .metadata.name) || true
+      if [ "$IMPORT_SECRET_NAME" == "" ]; then
+        echo "ERROR. Unable to get '$MANAGEDCLUSTER_NAME-import' secret from $MANAGEDCLUSTER_NAME namespace"
+        TEST_PASSED=false
+      else
+        wait_for_managedcluster_available "$MANAGEDCLUSTER_NAME"
+      fi
+    fi
+  fi
+  update_results "OCP-74294" $TEST_PASSED
+}
+
+###### end of test:  ACM Hub repeatedly losing connection to managed cluster (OCP-74294) ######
+
+##################################################################
+
 # Test all cases and print results
 
 test_monitoring_disabled
@@ -1976,6 +2039,8 @@ test_serving_machine_pools
 test_500_worker_nodes_support
 
 test_shard_topology
+
+check_managedcluster_connection
 
 test_delete_sc
 
