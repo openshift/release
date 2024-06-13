@@ -124,6 +124,16 @@ images:
       - destination_dir: .
         source_path: /usr/bin/manifest-tool
   to: ci-operator
+- context_dir: images/ci-operator-minimal/
+  from: ubi_minimal
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-operator
+      - destination_dir: .
+        source_path: /usr/bin/manifest-tool
+  to: ci-operator-minimal
 - context_dir: images/ci-operator-checkconfig/
   from: os
   inputs:
@@ -660,6 +670,8 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/job-run-aggregator
+      - destination_dir: .
+        source_path: /go/bin/prcreator
   to: job-run-aggregator
 - dockerfile_literal: |-
     FROM quay.io/centos/centos:stream9
@@ -756,17 +768,23 @@ tests:
     from: src
   node_architecture: arm64
 - as: codegen
+  cluster: build10
   commands: make verify-gen
   container:
     from: src
+  node_architecture: arm64
 - as: format
+  cluster: build10
   commands: make format
   container:
     from: src
+  node_architecture: arm64
 - as: integration
+  cluster: build10
   commands: make integration
   container:
     from: test-bin
+  node_architecture: arm64
 - always_run: false
   as: e2e
   steps:
@@ -862,22 +880,30 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: breaking-changes
+  cluster: build10
   commands: make check-breaking-changes
   container:
     from: test-bin
+  node_architecture: arm64
   optional: true
 - as: checkconfig
+  cluster: build10
   commands: make validate-checkconfig
   container:
     from: test-bin
+  node_architecture: arm64
 - as: validate-vendor
+  cluster: build10
   commands: make validate-vendor
   container:
     from: src
+  node_architecture: arm64
 - as: frontend-checks
+  cluster: build10
   commands: make verify-frontend-format frontend-checks
   container:
     from: test-bin
+  node_architecture: arm64
 - as: lint
   commands: make lint
   container:

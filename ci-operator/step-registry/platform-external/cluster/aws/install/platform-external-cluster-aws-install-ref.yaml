@@ -1,0 +1,38 @@
+ref:
+  as: platform-external-cluster-aws-install
+  from_image:
+    namespace: ocp
+    name: "4.15"
+    tag: upi-installer
+  commands: platform-external-cluster-aws-install-commands.sh
+  grace_period: 1h
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: MACHINE_CIDR
+    default: "10.0.0.0/16"
+    documentation: |-
+      Machine CIDR to create the VPC, must be syncronized with install-config.yaml.
+  - name: BOOTSTRAP_INSTANCE_TYPE
+    default: "m6i.xlarge"
+    documentation: |-
+      AWS EC2 instance type for bootstrap machine.
+  - name: MASTER_INSTANCE_TYPE
+    default: "m6i.xlarge"
+    documentation: |-
+      AWS EC2 instance type for control plane machines.
+  - name: WORKER_INSTANCE_TYPE
+    default: "m6i.xlarge"
+    documentation: |-
+      AWS EC2 instance type for compute machines.
+  - name: GATHER_BOOTSTRAP_ARGS
+    default: ""
+    documentation: |-
+      Extra bootstrap args to prepend the gather.
+  documentation: |-
+    UPI steps to deploy AWS resources required to install OpenShift cluster using Platform External.
+    The UPI steps are based in the AWS CloudFormation templates provided by installer repo (upi).
+    Note 1: long-term goal is to create a generic step to be reused on regular UPI flow, preventing
+    openshift-install's commands on platform-specific step.

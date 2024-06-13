@@ -51,7 +51,7 @@ controlPlane:
   architecture: "${ARCH}"
   hyperthreading: Enabled
   name: master
-  replicas: ${CONTROL_REPLICAS}
+  replicas: ${CONTROL_COUNT}
 networking:
   clusterNetwork:
   - cidr: 10.128.0.0/14
@@ -65,7 +65,7 @@ compute:
 - architecture: "${ARCH}"
   hyperthreading: Enabled
   name: worker
-  replicas: ${COMPUTE_REPLICAS}
+  replicas: ${COMPUTE_COUNT}
 platform:
   none: {}
 pullSecret: >
@@ -73,3 +73,10 @@ pullSecret: >
 sshKey: |
   $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 EOF
+
+if [ ${FIPS_ENABLED} = "true" ]; then
+	echo "Adding 'fips: true' to install-config.yaml"
+	cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+fips: true
+EOF
+fi

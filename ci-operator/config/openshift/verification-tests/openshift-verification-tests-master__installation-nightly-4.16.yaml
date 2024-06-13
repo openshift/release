@@ -70,6 +70,20 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-preserve-bootstrap-ign
+- as: aws-ipi-proxy-whitelist-arm-f14
+  cron: 28 6 12,26 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-whitelist
 - as: aws-ipi-shared-phz-f14
   cron: 14 0 5,19 * *
   steps:
@@ -297,9 +311,9 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-upi-xpn
-- as: nutanix-ipi-zones-single-os-image-f28
+- as: nutanix-ipi-zones-single-osimage-customized-f28
   cluster: build01
-  cron: 27 16 16 * *
+  cron: 22 22 26 * *
   steps:
     cluster_profile: nutanix-qe-zone
     env:
@@ -308,7 +322,7 @@ tests:
       SINGLE_ZONE: "true"
     test:
     - ref: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-nutanix-ipi-zones
+    workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
 - as: vsphere-ipi-customized-resource-f28
   cron: 12 15 6 * *
   steps:
