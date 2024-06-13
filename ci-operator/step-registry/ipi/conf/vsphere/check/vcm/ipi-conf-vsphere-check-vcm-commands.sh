@@ -153,6 +153,9 @@ function getDVSInfo() {
   echo "$dvsJSON" > "${DVS_PATH}"
 }
 
+
+SA_KUBECONFIG=${SA_KUBECONFIG:-/var/run/vault/vsphere-ibmcloud-ci/vsphere-capacity-manager-kubeconfig}
+
 if [[ ${JOB_NAME_SAFE} =~ "-upi" ]]; then
    IPI=0
    log "determined this is a UPI job"
@@ -210,11 +213,9 @@ spec:
   networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
 fi
 
-
 POOLS=${POOLS:-}
 IFS=" " read -r -a pools <<< "${POOLS}"
 
-SA_KUBECONFIG=${SA_KUBECONFIG:-/var/run/vault/vsphere-ibmcloud-ci/vsphere-capacity-manager-kubeconfig}
 OPENSHIFT_REQUIRED_CORES=${OPENSHIFT_REQUIRED_CORES:-24}
 OPENSHIFT_REQUIRED_MEMORY=${OPENSHIFT_REQUIRED_MEMORY:-96}
 
