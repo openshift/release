@@ -1,0 +1,77 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  creationTimestamp: "2024-06-11T11:01:26Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/component: exporter
+    app.kubernetes.io/managed-by: cluster-monitoring-operator
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/part-of: openshift-monitoring
+    app.kubernetes.io/version: 2.12.0
+    prometheus: k8s
+    role: alert-rules
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:labels:
+          .: {}
+          f:app.kubernetes.io/component: {}
+          f:app.kubernetes.io/managed-by: {}
+          f:app.kubernetes.io/name: {}
+          f:app.kubernetes.io/part-of: {}
+          f:app.kubernetes.io/version: {}
+          f:prometheus: {}
+          f:role: {}
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"kube-state-metrics"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: operator
+    operation: Update
+    time: "2024-06-11T11:01:26Z"
+  name: kube-state-metrics-rules
+  namespace: openshift-monitoring
+  resourceVersion: "22903"
+  uid: 176ec367-744b-45f8-bf15-2cdec21fb44c
+spec:
+  groups:
+  - name: kube-state-metrics
+    rules:
+    - alert: KubeStateMetricsListErrors
+      annotations:
+        description: kube-state-metrics is experiencing errors at an elevated rate
+          in list operations. This is likely causing it to not be able to expose metrics
+          about Kubernetes objects correctly or at all.
+        summary: kube-state-metrics is experiencing errors in list operations.
+      expr: |
+        (sum(rate(kube_state_metrics_list_total{job="kube-state-metrics",result="error"}[5m])) by (cluster)
+          /
+        sum(rate(kube_state_metrics_list_total{job="kube-state-metrics"}[5m])) by (cluster))
+        > 0.01
+      for: 15m
+      labels:
+        namespace: openshift-monitoring
+        severity: warning
+    - alert: KubeStateMetricsWatchErrors
+      annotations:
+        description: kube-state-metrics is experiencing errors at an elevated rate
+          in watch operations. This is likely causing it to not be able to expose
+          metrics about Kubernetes objects correctly or at all.
+        summary: kube-state-metrics is experiencing errors in watch operations.
+      expr: |
+        (sum(rate(kube_state_metrics_watch_total{job="kube-state-metrics",result="error"}[5m])) by (cluster)
+          /
+        sum(rate(kube_state_metrics_watch_total{job="kube-state-metrics"}[5m])) by (cluster))
+        > 0.01
+      for: 15m
+      labels:
+        namespace: openshift-monitoring
+        severity: warning

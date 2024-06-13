@@ -1,0 +1,85 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+  creationTimestamp: "2024-06-11T10:41:12Z"
+  generation: 1
+  labels:
+    role: alert-rules
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:include.release.openshift.io/ibm-cloud-managed: {}
+          f:include.release.openshift.io/self-managed-high-availability: {}
+          f:include.release.openshift.io/single-node-developer: {}
+        f:labels:
+          .: {}
+          f:role: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"7f5ed23b-8031-407e-bbf3-8850738c2d59"}: {}
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"openshift-dns.rules"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: cluster-version-operator
+    operation: Update
+    time: "2024-06-11T10:41:12Z"
+  name: dns
+  namespace: openshift-dns-operator
+  ownerReferences:
+  - apiVersion: config.openshift.io/v1
+    controller: true
+    kind: ClusterVersion
+    name: version
+    uid: 7f5ed23b-8031-407e-bbf3-8850738c2d59
+  resourceVersion: "1724"
+  uid: 0e0b5e2a-edf7-416f-9695-42f35b35c22f
+spec:
+  groups:
+  - name: openshift-dns.rules
+    rules:
+    - alert: CoreDNSPanicking
+      annotations:
+        description: '{{ $value }} CoreDNS panics observed on {{ $labels.instance
+          }}'
+        summary: CoreDNS panic
+      expr: increase(coredns_panics_total[10m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+    - alert: CoreDNSHealthCheckSlow
+      annotations:
+        description: CoreDNS Health Checks are slowing down (instance {{ $labels.instance
+          }})
+        summary: CoreDNS health checks
+      expr: histogram_quantile(.95, sum(rate(coredns_health_request_duration_seconds_bucket[5m]))
+        by (instance, le)) > 10
+      for: 5m
+      labels:
+        severity: warning
+    - alert: CoreDNSErrorsHigh
+      annotations:
+        description: CoreDNS is returning SERVFAIL for {{ $value | humanizePercentage
+          }} of requests.
+        summary: CoreDNS serverfail
+      expr: |
+        (sum by(namespace) (rate(coredns_dns_responses_total{rcode="SERVFAIL"}[5m]))
+          /
+        sum by(namespace) (rate(coredns_dns_responses_total[5m])))
+        > 0.01
+      for: 5m
+      labels:
+        severity: warning

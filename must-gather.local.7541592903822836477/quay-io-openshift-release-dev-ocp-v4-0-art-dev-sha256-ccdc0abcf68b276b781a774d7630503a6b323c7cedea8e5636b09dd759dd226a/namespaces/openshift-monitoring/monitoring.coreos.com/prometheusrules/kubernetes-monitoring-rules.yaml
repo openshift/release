@@ -1,0 +1,926 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  creationTimestamp: "2024-06-11T11:01:21Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/managed-by: cluster-monitoring-operator
+    app.kubernetes.io/name: kube-prometheus
+    app.kubernetes.io/part-of: openshift-monitoring
+    prometheus: k8s
+    role: alert-rules
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:labels:
+          .: {}
+          f:app.kubernetes.io/managed-by: {}
+          f:app.kubernetes.io/name: {}
+          f:app.kubernetes.io/part-of: {}
+          f:prometheus: {}
+          f:role: {}
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"k8s.rules.container_cpu_usage_seconds_total"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"k8s.rules.container_memory_cache"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"k8s.rules.container_memory_rss"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"k8s.rules.container_memory_swap"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"k8s.rules.container_memory_working_set_bytes"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"k8s.rules.container_resource"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"k8s.rules.pod_owner"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"kube-scheduler.rules"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"kubelet.rules"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"kubernetes-apps"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"kubernetes-resources"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"kubernetes-storage"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"kubernetes-system"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"kubernetes-system-apiserver"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"kubernetes-system-kubelet"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"node.rules"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: operator
+    operation: Update
+    time: "2024-06-11T11:01:21Z"
+  name: kubernetes-monitoring-rules
+  namespace: openshift-monitoring
+  resourceVersion: "22549"
+  uid: cfd6204c-0391-4408-8ffb-38e12b653788
+spec:
+  groups:
+  - name: kubernetes-apps
+    rules:
+    - alert: KubePodCrashLooping
+      annotations:
+        description: 'Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container
+          }}) is in waiting state (reason: "CrashLoopBackOff").'
+        summary: Pod is crash looping.
+      expr: |
+        max_over_time(kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff", namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}[5m]) >= 1
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubePodNotReady
+      annotations:
+        description: Pod {{ $labels.namespace }}/{{ $labels.pod }} has been in a non-ready
+          state for longer than 15 minutes.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-monitoring-operator/KubePodNotReady.md
+        summary: Pod has been in a non-ready state for more than 15 minutes.
+      expr: |
+        sum by (namespace, pod, cluster) (
+          max by(namespace, pod, cluster) (
+            kube_pod_status_phase{namespace=~"(openshift-.*|kube-.*|default)", job="kube-state-metrics", phase=~"Pending|Unknown"}
+            unless ignoring(phase) (kube_pod_status_unschedulable{job="kube-state-metrics"} == 1)
+          ) * on(namespace, pod, cluster) group_left(owner_kind) topk by(namespace, pod, cluster) (
+            1, max by(namespace, pod, owner_kind, cluster) (kube_pod_owner{owner_kind!="Job"})
+          )
+        ) > 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeDeploymentGenerationMismatch
+      annotations:
+        description: Deployment generation for {{ $labels.namespace }}/{{ $labels.deployment
+          }} does not match, this indicates that the Deployment has failed but has
+          not been rolled back.
+        summary: Deployment generation mismatch due to possible roll-back
+      expr: |
+        kube_deployment_status_observed_generation{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+          !=
+        kube_deployment_metadata_generation{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeDeploymentRolloutStuck
+      annotations:
+        description: Rollout of deployment {{ $labels.namespace }}/{{ $labels.deployment
+          }} is not progressing for longer than 15 minutes.
+        summary: Deployment rollout is not progressing.
+      expr: |
+        kube_deployment_status_condition{condition="Progressing", status="false",namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+        != 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeStatefulSetReplicasMismatch
+      annotations:
+        description: StatefulSet {{ $labels.namespace }}/{{ $labels.statefulset }}
+          has not matched the expected number of replicas for longer than 15 minutes.
+        summary: StatefulSet has not matched the expected number of replicas.
+      expr: |
+        (
+          kube_statefulset_status_replicas_ready{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+            !=
+          kube_statefulset_status_replicas{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+        ) and (
+          changes(kube_statefulset_status_replicas_updated{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}[10m])
+            ==
+          0
+        )
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeStatefulSetGenerationMismatch
+      annotations:
+        description: StatefulSet generation for {{ $labels.namespace }}/{{ $labels.statefulset
+          }} does not match, this indicates that the StatefulSet has failed but has
+          not been rolled back.
+        summary: StatefulSet generation mismatch due to possible roll-back
+      expr: |
+        kube_statefulset_status_observed_generation{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+          !=
+        kube_statefulset_metadata_generation{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeStatefulSetUpdateNotRolledOut
+      annotations:
+        description: StatefulSet {{ $labels.namespace }}/{{ $labels.statefulset }}
+          update has not been rolled out.
+        summary: StatefulSet update has not been rolled out.
+      expr: |
+        (
+          max without (revision) (
+            kube_statefulset_status_current_revision{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+              unless
+            kube_statefulset_status_update_revision{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+          )
+            *
+          (
+            kube_statefulset_replicas{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+              !=
+            kube_statefulset_status_replicas_updated{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+          )
+        )  and (
+          changes(kube_statefulset_status_replicas_updated{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}[5m])
+            ==
+          0
+        )
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeDaemonSetRolloutStuck
+      annotations:
+        description: DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset }} has
+          not finished or progressed for at least 30 minutes.
+        summary: DaemonSet rollout is stuck.
+      expr: |
+        (
+          (
+            kube_daemonset_status_current_number_scheduled{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+             !=
+            kube_daemonset_status_desired_number_scheduled{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+          ) or (
+            kube_daemonset_status_number_misscheduled{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+             !=
+            0
+          ) or (
+            kube_daemonset_status_updated_number_scheduled{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+             !=
+            kube_daemonset_status_desired_number_scheduled{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+          ) or (
+            kube_daemonset_status_number_available{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+             !=
+            kube_daemonset_status_desired_number_scheduled{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+          )
+        ) and (
+          changes(kube_daemonset_status_updated_number_scheduled{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}[5m])
+            ==
+          0
+        )
+      for: 30m
+      labels:
+        severity: warning
+    - alert: KubeContainerWaiting
+      annotations:
+        description: pod/{{ $labels.pod }} in namespace {{ $labels.namespace }} on
+          container {{ $labels.container}} has been in waiting state for longer than
+          1 hour.
+        summary: Pod container waiting longer than 1 hour
+      expr: |
+        sum by (namespace, pod, container, cluster) (kube_pod_container_status_waiting_reason{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}) > 0
+      for: 1h
+      labels:
+        severity: warning
+    - alert: KubeDaemonSetNotScheduled
+      annotations:
+        description: '{{ $value }} Pods of DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset
+          }} are not scheduled.'
+        summary: DaemonSet pods are not scheduled.
+      expr: |
+        kube_daemonset_status_desired_number_scheduled{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+          -
+        kube_daemonset_status_current_number_scheduled{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"} > 0
+      for: 10m
+      labels:
+        severity: warning
+    - alert: KubeDaemonSetMisScheduled
+      annotations:
+        description: '{{ $value }} Pods of DaemonSet {{ $labels.namespace }}/{{ $labels.daemonset
+          }} are running where they are not supposed to run.'
+        summary: DaemonSet pods are misscheduled.
+      expr: |
+        kube_daemonset_status_number_misscheduled{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"} > 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeJobNotCompleted
+      annotations:
+        description: Job {{ $labels.namespace }}/{{ $labels.job_name }} is taking
+          more than {{ "43200" | humanizeDuration }} to complete.
+        summary: Job did not complete in time
+      expr: |
+        time() - max by(namespace, job_name, cluster) (kube_job_status_start_time{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+          and
+        kube_job_status_active{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"} > 0) > 43200
+      labels:
+        severity: warning
+    - alert: KubeJobFailed
+      annotations:
+        description: Job {{ $labels.namespace }}/{{ $labels.job_name }} failed to
+          complete. Removing failed job after investigation should clear this alert.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-monitoring-operator/KubeJobFailed.md
+        summary: Job failed to complete.
+      expr: |
+        kube_job_failed{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}  > 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeHpaReplicasMismatch
+      annotations:
+        description: HPA {{ $labels.namespace }}/{{ $labels.horizontalpodautoscaler  }}
+          has not matched the desired number of replicas for longer than 15 minutes.
+        summary: HPA has not matched desired number of replicas.
+      expr: |
+        (kube_horizontalpodautoscaler_status_desired_replicas{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+          !=
+        kube_horizontalpodautoscaler_status_current_replicas{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"})
+          and
+        (kube_horizontalpodautoscaler_status_current_replicas{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+          >
+        kube_horizontalpodautoscaler_spec_min_replicas{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"})
+          and
+        (kube_horizontalpodautoscaler_status_current_replicas{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+          <
+        kube_horizontalpodautoscaler_spec_max_replicas{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"})
+          and
+        changes(kube_horizontalpodautoscaler_status_current_replicas{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}[15m]) == 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeHpaMaxedOut
+      annotations:
+        description: HPA {{ $labels.namespace }}/{{ $labels.horizontalpodautoscaler  }}
+          has been running at max replicas for longer than 15 minutes.
+        summary: HPA is running at max replicas
+      expr: |
+        kube_horizontalpodautoscaler_status_current_replicas{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+          ==
+        kube_horizontalpodautoscaler_spec_max_replicas{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"}
+      for: 15m
+      labels:
+        severity: warning
+  - name: kubernetes-resources
+    rules:
+    - alert: KubeCPUOvercommit
+      annotations:
+        description: Cluster {{ $labels.cluster }} has overcommitted CPU resource
+          requests for Pods by {{ $value }} CPU shares and cannot tolerate node failure.
+        summary: Cluster has overcommitted CPU resource requests.
+      expr: |
+        sum(namespace_cpu:kube_pod_container_resource_requests:sum{job="kube-state-metrics",}) by (cluster) - (sum(kube_node_status_allocatable{job="kube-state-metrics",resource="cpu"}) by (cluster) - max(kube_node_status_allocatable{job="kube-state-metrics",resource="cpu"}) by (cluster)) > 0
+        and
+        (sum(kube_node_status_allocatable{job="kube-state-metrics",resource="cpu"}) by (cluster) - max(kube_node_status_allocatable{job="kube-state-metrics",resource="cpu"}) by (cluster)) > 0
+      for: 10m
+      labels:
+        namespace: kube-system
+        severity: warning
+    - alert: KubeMemoryOvercommit
+      annotations:
+        description: Cluster {{ $labels.cluster }} has overcommitted memory resource
+          requests for Pods by {{ $value | humanize }} bytes and cannot tolerate node
+          failure.
+        summary: Cluster has overcommitted memory resource requests.
+      expr: |
+        sum(namespace_memory:kube_pod_container_resource_requests:sum{}) by (cluster) - (sum(kube_node_status_allocatable{resource="memory", job="kube-state-metrics"}) by (cluster) - max(kube_node_status_allocatable{resource="memory", job="kube-state-metrics"}) by (cluster)) > 0
+        and
+        (sum(kube_node_status_allocatable{resource="memory", job="kube-state-metrics"}) by (cluster) - max(kube_node_status_allocatable{resource="memory", job="kube-state-metrics"}) by (cluster)) > 0
+      for: 10m
+      labels:
+        namespace: kube-system
+        severity: warning
+    - alert: KubeQuotaAlmostFull
+      annotations:
+        description: Namespace {{ $labels.namespace }} is using {{ $value | humanizePercentage
+          }} of its {{ $labels.resource }} quota.
+        summary: Namespace quota is going to be full.
+      expr: |
+        kube_resourcequota{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics", type="used"}
+          / ignoring(instance, job, type)
+        (kube_resourcequota{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics", type="hard"} > 0)
+          > 0.9 < 1
+      for: 15m
+      labels:
+        severity: info
+    - alert: KubeQuotaFullyUsed
+      annotations:
+        description: Namespace {{ $labels.namespace }} is using {{ $value | humanizePercentage
+          }} of its {{ $labels.resource }} quota.
+        summary: Namespace quota is fully used.
+      expr: |
+        kube_resourcequota{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics", type="used"}
+          / ignoring(instance, job, type)
+        (kube_resourcequota{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics", type="hard"} > 0)
+          == 1
+      for: 15m
+      labels:
+        severity: info
+    - alert: KubeQuotaExceeded
+      annotations:
+        description: Namespace {{ $labels.namespace }} is using {{ $value | humanizePercentage
+          }} of its {{ $labels.resource }} quota.
+        summary: Namespace quota has exceeded the limits.
+      expr: |
+        kube_resourcequota{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics", type="used"}
+          / ignoring(instance, job, type)
+        (kube_resourcequota{namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics", type="hard"} > 0)
+          > 1
+      for: 15m
+      labels:
+        severity: warning
+  - name: kubernetes-storage
+    rules:
+    - alert: KubePersistentVolumeFillingUp
+      annotations:
+        description: The PersistentVolume claimed by {{ $labels.persistentvolumeclaim
+          }} in Namespace {{ $labels.namespace }} {{ with $labels.cluster -}} on Cluster
+          {{ . }} {{- end }} is only {{ $value | humanizePercentage }} free.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-monitoring-operator/KubePersistentVolumeFillingUp.md
+        summary: PersistentVolume is filling up.
+      expr: |
+        (
+          kubelet_volume_stats_available_bytes{namespace=~"(openshift-.*|kube-.*|default)",job="kubelet", metrics_path="/metrics"}
+            /
+          kubelet_volume_stats_capacity_bytes{namespace=~"(openshift-.*|kube-.*|default)",job="kubelet", metrics_path="/metrics"}
+        ) < 0.03
+        and
+        kubelet_volume_stats_used_bytes{namespace=~"(openshift-.*|kube-.*|default)",job="kubelet", metrics_path="/metrics"} > 0
+        unless on(cluster, namespace, persistentvolumeclaim)
+        kube_persistentvolumeclaim_access_mode{namespace=~"(openshift-.*|kube-.*|default)", access_mode="ReadOnlyMany"} == 1
+        unless on(cluster, namespace, persistentvolumeclaim)
+        kube_persistentvolumeclaim_labels{namespace=~"(openshift-.*|kube-.*|default)",label_alerts_k8s_io_kube_persistent_volume_filling_up="disabled"} == 1
+      for: 1m
+      labels:
+        severity: critical
+    - alert: KubePersistentVolumeFillingUp
+      annotations:
+        description: Based on recent sampling, the PersistentVolume claimed by {{
+          $labels.persistentvolumeclaim }} in Namespace {{ $labels.namespace }} {{
+          with $labels.cluster -}} on Cluster {{ . }} {{- end }} is expected to fill
+          up within four days. Currently {{ $value | humanizePercentage }} is available.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-monitoring-operator/KubePersistentVolumeFillingUp.md
+        summary: PersistentVolume is filling up.
+      expr: |
+        (
+          kubelet_volume_stats_available_bytes{namespace=~"(openshift-.*|kube-.*|default)",job="kubelet", metrics_path="/metrics"}
+            /
+          kubelet_volume_stats_capacity_bytes{namespace=~"(openshift-.*|kube-.*|default)",job="kubelet", metrics_path="/metrics"}
+        ) < 0.15
+        and
+        kubelet_volume_stats_used_bytes{namespace=~"(openshift-.*|kube-.*|default)",job="kubelet", metrics_path="/metrics"} > 0
+        and
+        predict_linear(kubelet_volume_stats_available_bytes{namespace=~"(openshift-.*|kube-.*|default)",job="kubelet", metrics_path="/metrics"}[6h], 4 * 24 * 3600) < 0
+        unless on(cluster, namespace, persistentvolumeclaim)
+        kube_persistentvolumeclaim_access_mode{namespace=~"(openshift-.*|kube-.*|default)", access_mode="ReadOnlyMany"} == 1
+        unless on(cluster, namespace, persistentvolumeclaim)
+        kube_persistentvolumeclaim_labels{namespace=~"(openshift-.*|kube-.*|default)",label_alerts_k8s_io_kube_persistent_volume_filling_up="disabled"} == 1
+      for: 1h
+      labels:
+        severity: warning
+    - alert: KubePersistentVolumeInodesFillingUp
+      annotations:
+        description: The PersistentVolume claimed by {{ $labels.persistentvolumeclaim
+          }} in Namespace {{ $labels.namespace }} {{ with $labels.cluster -}} on Cluster
+          {{ . }} {{- end }} only has {{ $value | humanizePercentage }} free inodes.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-monitoring-operator/KubePersistentVolumeInodesFillingUp.md
+        summary: PersistentVolumeInodes are filling up.
+      expr: |
+        (
+          kubelet_volume_stats_inodes_free{namespace=~"(openshift-.*|kube-.*|default)",job="kubelet", metrics_path="/metrics"}
+            /
+          kubelet_volume_stats_inodes{namespace=~"(openshift-.*|kube-.*|default)",job="kubelet", metrics_path="/metrics"}
+        ) < 0.03
+        and
+        kubelet_volume_stats_inodes_used{namespace=~"(openshift-.*|kube-.*|default)",job="kubelet", metrics_path="/metrics"} > 0
+        unless on(cluster, namespace, persistentvolumeclaim)
+        kube_persistentvolumeclaim_access_mode{namespace=~"(openshift-.*|kube-.*|default)", access_mode="ReadOnlyMany"} == 1
+        unless on(cluster, namespace, persistentvolumeclaim)
+        kube_persistentvolumeclaim_labels{namespace=~"(openshift-.*|kube-.*|default)",label_alerts_k8s_io_kube_persistent_volume_filling_up="disabled"} == 1
+      for: 1m
+      labels:
+        severity: critical
+    - alert: KubePersistentVolumeInodesFillingUp
+      annotations:
+        description: Based on recent sampling, the PersistentVolume claimed by {{
+          $labels.persistentvolumeclaim }} in Namespace {{ $labels.namespace }} {{
+          with $labels.cluster -}} on Cluster {{ . }} {{- end }} is expected to run
+          out of inodes within four days. Currently {{ $value | humanizePercentage
+          }} of its inodes are free.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-monitoring-operator/KubePersistentVolumeInodesFillingUp.md
+        summary: PersistentVolumeInodes are filling up.
+      expr: |
+        (
+          kubelet_volume_stats_inodes_free{namespace=~"(openshift-.*|kube-.*|default)",job="kubelet", metrics_path="/metrics"}
+            /
+          kubelet_volume_stats_inodes{namespace=~"(openshift-.*|kube-.*|default)",job="kubelet", metrics_path="/metrics"}
+        ) < 0.15
+        and
+        kubelet_volume_stats_inodes_used{namespace=~"(openshift-.*|kube-.*|default)",job="kubelet", metrics_path="/metrics"} > 0
+        and
+        predict_linear(kubelet_volume_stats_inodes_free{namespace=~"(openshift-.*|kube-.*|default)",job="kubelet", metrics_path="/metrics"}[6h], 4 * 24 * 3600) < 0
+        unless on(cluster, namespace, persistentvolumeclaim)
+        kube_persistentvolumeclaim_access_mode{namespace=~"(openshift-.*|kube-.*|default)", access_mode="ReadOnlyMany"} == 1
+        unless on(cluster, namespace, persistentvolumeclaim)
+        kube_persistentvolumeclaim_labels{namespace=~"(openshift-.*|kube-.*|default)",label_alerts_k8s_io_kube_persistent_volume_filling_up="disabled"} == 1
+      for: 1h
+      labels:
+        severity: warning
+    - alert: KubePersistentVolumeErrors
+      annotations:
+        description: The persistent volume {{ $labels.persistentvolume }} {{ with
+          $labels.cluster -}} on Cluster {{ . }} {{- end }} has status {{ $labels.phase
+          }}.
+        summary: PersistentVolume is having issues with provisioning.
+      expr: |
+        kube_persistentvolume_status_phase{phase=~"Failed|Pending",namespace=~"(openshift-.*|kube-.*|default)",job="kube-state-metrics"} > 0
+      for: 5m
+      labels:
+        severity: warning
+  - name: kubernetes-system
+    rules:
+    - alert: KubeClientErrors
+      annotations:
+        description: Kubernetes API server client '{{ $labels.job }}/{{ $labels.instance
+          }}' is experiencing {{ $value | humanizePercentage }} errors.'
+        summary: Kubernetes API server client is experiencing errors.
+      expr: |
+        (sum(rate(rest_client_requests_total{job="apiserver",code=~"5.."}[5m])) by (cluster, instance, job, namespace)
+          /
+        sum(rate(rest_client_requests_total{job="apiserver"}[5m])) by (cluster, instance, job, namespace))
+        > 0.01
+      for: 15m
+      labels:
+        severity: warning
+  - name: kubernetes-system-apiserver
+    rules:
+    - alert: KubeAggregatedAPIErrors
+      annotations:
+        description: Kubernetes aggregated API {{ $labels.name }}/{{ $labels.namespace
+          }} has reported errors. It has appeared unavailable {{ $value | humanize
+          }} times averaged over the past 10m.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-monitoring-operator/KubeAggregatedAPIErrors.md
+        summary: Kubernetes aggregated API has reported errors.
+      expr: |
+        sum by(name, namespace, cluster)(increase(aggregator_unavailable_apiservice_total{job="apiserver"}[10m])) > 4
+      labels:
+        severity: warning
+    - alert: KubeAggregatedAPIDown
+      annotations:
+        description: Kubernetes aggregated API {{ $labels.name }}/{{ $labels.namespace
+          }} has been only {{ $value | humanize }}% available over the last 10m.
+        summary: Kubernetes aggregated API is down.
+      expr: |
+        (1 - max by(name, namespace, cluster)(avg_over_time(aggregator_unavailable_apiservice{job="apiserver"}[10m]))) * 100 < 85
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeAPIDown
+      annotations:
+        description: KubeAPI has disappeared from Prometheus target discovery.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-monitoring-operator/KubeAPIDown.md
+        summary: Target disappeared from Prometheus target discovery.
+      expr: |
+        absent(up{job="apiserver"} == 1)
+      for: 15m
+      labels:
+        severity: critical
+    - alert: KubeAPITerminatedRequests
+      annotations:
+        description: The kubernetes apiserver has terminated {{ $value | humanizePercentage
+          }} of its incoming requests.
+        summary: The kubernetes apiserver has terminated {{ $value | humanizePercentage
+          }} of its incoming requests.
+      expr: |
+        sum(rate(apiserver_request_terminations_total{job="apiserver"}[10m]))  / (  sum(rate(apiserver_request_total{job="apiserver"}[10m])) + sum(rate(apiserver_request_terminations_total{job="apiserver"}[10m])) ) > 0.20
+      for: 5m
+      labels:
+        severity: warning
+  - name: kubernetes-system-kubelet
+    rules:
+    - alert: KubeNodeNotReady
+      annotations:
+        description: '{{ $labels.node }} has been unready for more than 15 minutes.'
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-monitoring-operator/KubeNodeNotReady.md
+        summary: Node is not ready.
+      expr: |
+        kube_node_status_condition{job="kube-state-metrics",condition="Ready",status="true"} == 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeNodeUnreachable
+      annotations:
+        description: '{{ $labels.node }} is unreachable and some workloads may be
+          rescheduled.'
+        summary: Node is unreachable.
+      expr: |
+        (kube_node_spec_taint{job="kube-state-metrics",key="node.kubernetes.io/unreachable",effect="NoSchedule"} unless ignoring(key,value) kube_node_spec_taint{job="kube-state-metrics",key=~"ToBeDeletedByClusterAutoscaler|cloud.google.com/impending-node-termination|aws-node-termination-handler/spot-itn"}) == 1
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeletTooManyPods
+      annotations:
+        description: Kubelet '{{ $labels.node }}' is running at {{ $value | humanizePercentage
+          }} of its Pod capacity.
+        summary: Kubelet is running at capacity.
+      expr: |
+        count by(cluster, node) (
+          (kube_pod_status_phase{job="kube-state-metrics",phase="Running"} == 1) * on(instance,pod,namespace,cluster) group_left(node) topk by(instance,pod,namespace,cluster) (1, kube_pod_info{job="kube-state-metrics"})
+        )
+        /
+        max by(cluster, node) (
+          kube_node_status_capacity{job="kube-state-metrics",resource="pods"} != 1
+        ) > 0.95
+      for: 15m
+      labels:
+        namespace: kube-system
+        severity: info
+    - alert: KubeNodeReadinessFlapping
+      annotations:
+        description: The readiness status of node {{ $labels.node }} has changed {{
+          $value }} times in the last 15 minutes.
+        summary: Node readiness status is flapping.
+      expr: |
+        sum(changes(kube_node_status_condition{job="kube-state-metrics",status="true",condition="Ready"}[15m])) by (cluster, node) > 2
+      for: 15m
+      labels:
+        namespace: kube-system
+        severity: warning
+    - alert: KubeletPlegDurationHigh
+      annotations:
+        description: The Kubelet Pod Lifecycle Event Generator has a 99th percentile
+          duration of {{ $value }} seconds on node {{ $labels.node }}.
+        summary: Kubelet Pod Lifecycle Event Generator is taking too long to relist.
+      expr: |
+        node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile{quantile="0.99"} >= 10
+      for: 5m
+      labels:
+        namespace: kube-system
+        severity: warning
+    - alert: KubeletPodStartUpLatencyHigh
+      annotations:
+        description: Kubelet Pod startup 99th percentile latency is {{ $value }} seconds
+          on node {{ $labels.node }}.
+        summary: Kubelet Pod startup latency is too high.
+      expr: |
+        histogram_quantile(0.99, sum(rate(kubelet_pod_worker_duration_seconds_bucket{job="kubelet", metrics_path="/metrics"}[5m])) by (cluster, instance, le)) * on(cluster, instance) group_left(node) kubelet_node_name{job="kubelet", metrics_path="/metrics"} > 60
+      for: 15m
+      labels:
+        namespace: kube-system
+        severity: warning
+    - alert: KubeletClientCertificateRenewalErrors
+      annotations:
+        description: Kubelet on node {{ $labels.node }} has failed to renew its client
+          certificate ({{ $value | humanize }} errors in the last 5 minutes).
+        summary: Kubelet has failed to renew its client certificate.
+      expr: |
+        increase(kubelet_certificate_manager_client_expiration_renew_errors[5m]) > 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeletServerCertificateRenewalErrors
+      annotations:
+        description: Kubelet on node {{ $labels.node }} has failed to renew its server
+          certificate ({{ $value | humanize }} errors in the last 5 minutes).
+        summary: Kubelet has failed to renew its server certificate.
+      expr: |
+        increase(kubelet_server_expiration_renew_errors[5m]) > 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: KubeletDown
+      annotations:
+        description: Kubelet has disappeared from Prometheus target discovery.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-monitoring-operator/KubeletDown.md
+        summary: Target disappeared from Prometheus target discovery.
+      expr: |
+        absent(up{job="kubelet", metrics_path="/metrics"} == 1)
+      for: 15m
+      labels:
+        namespace: kube-system
+        severity: critical
+  - name: k8s.rules.container_cpu_usage_seconds_total
+    rules:
+    - expr: |
+        sum by (cluster, namespace, pod, container) (
+          irate(container_cpu_usage_seconds_total{job="kubelet", metrics_path="/metrics/cadvisor", image!=""}[5m])
+        ) * on (cluster, namespace, pod) group_left(node) topk by (cluster, namespace, pod) (
+          1, max by(cluster, namespace, pod, node) (kube_pod_info{node!=""})
+        )
+      record: node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate
+  - name: k8s.rules.container_memory_working_set_bytes
+    rules:
+    - expr: |
+        container_memory_working_set_bytes{job="kubelet", metrics_path="/metrics/cadvisor", image!=""}
+        * on (cluster, namespace, pod) group_left(node) topk by(cluster, namespace, pod) (1,
+          max by(cluster, namespace, pod, node) (kube_pod_info{node!=""})
+        )
+      record: node_namespace_pod_container:container_memory_working_set_bytes
+  - name: k8s.rules.container_memory_rss
+    rules:
+    - expr: |
+        container_memory_rss{job="kubelet", metrics_path="/metrics/cadvisor", image!=""}
+        * on (cluster, namespace, pod) group_left(node) topk by(cluster, namespace, pod) (1,
+          max by(cluster, namespace, pod, node) (kube_pod_info{node!=""})
+        )
+      record: node_namespace_pod_container:container_memory_rss
+  - name: k8s.rules.container_memory_cache
+    rules:
+    - expr: |
+        container_memory_cache{job="kubelet", metrics_path="/metrics/cadvisor", image!=""}
+        * on (cluster, namespace, pod) group_left(node) topk by(cluster, namespace, pod) (1,
+          max by(cluster, namespace, pod, node) (kube_pod_info{node!=""})
+        )
+      record: node_namespace_pod_container:container_memory_cache
+  - name: k8s.rules.container_memory_swap
+    rules:
+    - expr: |
+        container_memory_swap{job="kubelet", metrics_path="/metrics/cadvisor", image!=""}
+        * on (cluster, namespace, pod) group_left(node) topk by(cluster, namespace, pod) (1,
+          max by(cluster, namespace, pod, node) (kube_pod_info{node!=""})
+        )
+      record: node_namespace_pod_container:container_memory_swap
+  - name: k8s.rules.container_resource
+    rules:
+    - expr: |
+        kube_pod_container_resource_requests{resource="memory",job="kube-state-metrics"}  * on (namespace, pod, cluster)
+        group_left() max by (namespace, pod, cluster) (
+          (kube_pod_status_phase{phase=~"Pending|Running"} == 1)
+        )
+      record: cluster:namespace:pod_memory:active:kube_pod_container_resource_requests
+    - expr: |
+        sum by (namespace, cluster) (
+            sum by (namespace, pod, cluster) (
+                max by (namespace, pod, container, cluster) (
+                  kube_pod_container_resource_requests{resource="memory",job="kube-state-metrics"}
+                ) * on(namespace, pod, cluster) group_left() max by (namespace, pod, cluster) (
+                  kube_pod_status_phase{phase=~"Pending|Running"} == 1
+                )
+            )
+        )
+      record: namespace_memory:kube_pod_container_resource_requests:sum
+    - expr: |
+        kube_pod_container_resource_requests{resource="cpu",job="kube-state-metrics"}  * on (namespace, pod, cluster)
+        group_left() max by (namespace, pod, cluster) (
+          (kube_pod_status_phase{phase=~"Pending|Running"} == 1)
+        )
+      record: cluster:namespace:pod_cpu:active:kube_pod_container_resource_requests
+    - expr: |
+        sum by (namespace, cluster) (
+            sum by (namespace, pod, cluster) (
+                max by (namespace, pod, container, cluster) (
+                  kube_pod_container_resource_requests{resource="cpu",job="kube-state-metrics"}
+                ) * on(namespace, pod, cluster) group_left() max by (namespace, pod, cluster) (
+                  kube_pod_status_phase{phase=~"Pending|Running"} == 1
+                )
+            )
+        )
+      record: namespace_cpu:kube_pod_container_resource_requests:sum
+    - expr: |
+        kube_pod_container_resource_limits{resource="memory",job="kube-state-metrics"}  * on (namespace, pod, cluster)
+        group_left() max by (namespace, pod, cluster) (
+          (kube_pod_status_phase{phase=~"Pending|Running"} == 1)
+        )
+      record: cluster:namespace:pod_memory:active:kube_pod_container_resource_limits
+    - expr: |
+        sum by (namespace, cluster) (
+            sum by (namespace, pod, cluster) (
+                max by (namespace, pod, container, cluster) (
+                  kube_pod_container_resource_limits{resource="memory",job="kube-state-metrics"}
+                ) * on(namespace, pod, cluster) group_left() max by (namespace, pod, cluster) (
+                  kube_pod_status_phase{phase=~"Pending|Running"} == 1
+                )
+            )
+        )
+      record: namespace_memory:kube_pod_container_resource_limits:sum
+    - expr: |
+        kube_pod_container_resource_limits{resource="cpu",job="kube-state-metrics"}  * on (namespace, pod, cluster)
+        group_left() max by (namespace, pod, cluster) (
+         (kube_pod_status_phase{phase=~"Pending|Running"} == 1)
+         )
+      record: cluster:namespace:pod_cpu:active:kube_pod_container_resource_limits
+    - expr: |
+        sum by (namespace, cluster) (
+            sum by (namespace, pod, cluster) (
+                max by (namespace, pod, container, cluster) (
+                  kube_pod_container_resource_limits{resource="cpu",job="kube-state-metrics"}
+                ) * on(namespace, pod, cluster) group_left() max by (namespace, pod, cluster) (
+                  kube_pod_status_phase{phase=~"Pending|Running"} == 1
+                )
+            )
+        )
+      record: namespace_cpu:kube_pod_container_resource_limits:sum
+  - name: k8s.rules.pod_owner
+    rules:
+    - expr: |
+        max by (cluster, namespace, workload, pod) (
+          label_replace(
+            label_replace(
+              kube_pod_owner{job="kube-state-metrics", owner_kind="ReplicaSet"},
+              "replicaset", "$1", "owner_name", "(.*)"
+            ) * on(replicaset, namespace) group_left(owner_name) topk by(replicaset, namespace) (
+              1, max by (replicaset, namespace, owner_name) (
+                kube_replicaset_owner{job="kube-state-metrics"}
+              )
+            ),
+            "workload", "$1", "owner_name", "(.*)"
+          )
+        )
+      labels:
+        workload_type: deployment
+      record: namespace_workload_pod:kube_pod_owner:relabel
+    - expr: |
+        max by (cluster, namespace, workload, pod) (
+          label_replace(
+            kube_pod_owner{job="kube-state-metrics", owner_kind="DaemonSet"},
+            "workload", "$1", "owner_name", "(.*)"
+          )
+        )
+      labels:
+        workload_type: daemonset
+      record: namespace_workload_pod:kube_pod_owner:relabel
+    - expr: |
+        max by (cluster, namespace, workload, pod) (
+          label_replace(
+            kube_pod_owner{job="kube-state-metrics", owner_kind="StatefulSet"},
+            "workload", "$1", "owner_name", "(.*)"
+          )
+        )
+      labels:
+        workload_type: statefulset
+      record: namespace_workload_pod:kube_pod_owner:relabel
+    - expr: |
+        max by (cluster, namespace, workload, pod) (
+          label_replace(
+            kube_pod_owner{job="kube-state-metrics", owner_kind="Job"},
+            "workload", "$1", "owner_name", "(.*)"
+          )
+        )
+      labels:
+        workload_type: job
+      record: namespace_workload_pod:kube_pod_owner:relabel
+  - name: kube-scheduler.rules
+    rules:
+    - expr: |
+        histogram_quantile(0.99, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket{job="scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: "0.99"
+      record: cluster_quantile:scheduler_e2e_scheduling_duration_seconds:histogram_quantile
+    - expr: |
+        histogram_quantile(0.99, sum(rate(scheduler_scheduling_algorithm_duration_seconds_bucket{job="scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: "0.99"
+      record: cluster_quantile:scheduler_scheduling_algorithm_duration_seconds:histogram_quantile
+    - expr: |
+        histogram_quantile(0.99, sum(rate(scheduler_binding_duration_seconds_bucket{job="scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: "0.99"
+      record: cluster_quantile:scheduler_binding_duration_seconds:histogram_quantile
+    - expr: |
+        histogram_quantile(0.9, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket{job="scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: "0.9"
+      record: cluster_quantile:scheduler_e2e_scheduling_duration_seconds:histogram_quantile
+    - expr: |
+        histogram_quantile(0.9, sum(rate(scheduler_scheduling_algorithm_duration_seconds_bucket{job="scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: "0.9"
+      record: cluster_quantile:scheduler_scheduling_algorithm_duration_seconds:histogram_quantile
+    - expr: |
+        histogram_quantile(0.9, sum(rate(scheduler_binding_duration_seconds_bucket{job="scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: "0.9"
+      record: cluster_quantile:scheduler_binding_duration_seconds:histogram_quantile
+    - expr: |
+        histogram_quantile(0.5, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket{job="scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: "0.5"
+      record: cluster_quantile:scheduler_e2e_scheduling_duration_seconds:histogram_quantile
+    - expr: |
+        histogram_quantile(0.5, sum(rate(scheduler_scheduling_algorithm_duration_seconds_bucket{job="scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: "0.5"
+      record: cluster_quantile:scheduler_scheduling_algorithm_duration_seconds:histogram_quantile
+    - expr: |
+        histogram_quantile(0.5, sum(rate(scheduler_binding_duration_seconds_bucket{job="scheduler"}[5m])) without(instance, pod))
+      labels:
+        quantile: "0.5"
+      record: cluster_quantile:scheduler_binding_duration_seconds:histogram_quantile
+  - name: node.rules
+    rules:
+    - expr: |
+        topk by(cluster, namespace, pod) (1,
+          max by (cluster, node, namespace, pod) (
+            label_replace(kube_pod_info{job="kube-state-metrics",node!=""}, "pod", "$1", "pod", "(.*)")
+        ))
+      record: 'node_namespace_pod:kube_pod_info:'
+    - expr: |
+        sum(
+          node_memory_MemAvailable_bytes{job="node-exporter"} or
+          (
+            node_memory_Buffers_bytes{job="node-exporter"} +
+            node_memory_Cached_bytes{job="node-exporter"} +
+            node_memory_MemFree_bytes{job="node-exporter"} +
+            node_memory_Slab_bytes{job="node-exporter"}
+          )
+        ) by (cluster)
+      record: :node_memory_MemAvailable_bytes:sum
+    - expr: |
+        avg by (cluster, node) (
+          sum without (mode) (
+            rate(node_cpu_seconds_total{mode!="idle",mode!="iowait",mode!="steal",job="node-exporter"}[5m])
+          )
+        )
+      record: node:node_cpu_utilization:ratio_rate5m
+    - expr: |
+        avg by (cluster) (
+          node:node_cpu_utilization:ratio_rate5m
+        )
+      record: cluster:node_cpu:ratio_rate5m
+  - name: kubelet.rules
+    rules:
+    - expr: |
+        histogram_quantile(0.99, sum(rate(kubelet_pleg_relist_duration_seconds_bucket{job="kubelet", metrics_path="/metrics"}[5m])) by (cluster, instance, le) * on(cluster, instance) group_left(node) kubelet_node_name{job="kubelet", metrics_path="/metrics"})
+      labels:
+        quantile: "0.99"
+      record: node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile
+    - expr: |
+        histogram_quantile(0.9, sum(rate(kubelet_pleg_relist_duration_seconds_bucket{job="kubelet", metrics_path="/metrics"}[5m])) by (cluster, instance, le) * on(cluster, instance) group_left(node) kubelet_node_name{job="kubelet", metrics_path="/metrics"})
+      labels:
+        quantile: "0.9"
+      record: node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile
+    - expr: |
+        histogram_quantile(0.5, sum(rate(kubelet_pleg_relist_duration_seconds_bucket{job="kubelet", metrics_path="/metrics"}[5m])) by (cluster, instance, le) * on(cluster, instance) group_left(node) kubelet_node_name{job="kubelet", metrics_path="/metrics"})
+      labels:
+        quantile: "0.5"
+      record: node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile

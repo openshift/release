@@ -1,0 +1,231 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    capability.openshift.io/name: MachineAPI
+    exclude.release.openshift.io/internal-openshift-hosted: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+  creationTimestamp: "2024-06-11T10:40:57Z"
+  generation: 1
+  managedFields:
+  - apiVersion: apiextensions.k8s.io/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:capability.openshift.io/name: {}
+          f:exclude.release.openshift.io/internal-openshift-hosted: {}
+          f:include.release.openshift.io/self-managed-high-availability: {}
+          f:include.release.openshift.io/single-node-developer: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"7f5ed23b-8031-407e-bbf3-8850738c2d59"}: {}
+      f:spec:
+        f:conversion:
+          .: {}
+          f:strategy: {}
+        f:group: {}
+        f:names:
+          f:kind: {}
+          f:listKind: {}
+          f:plural: {}
+          f:shortNames: {}
+          f:singular: {}
+        f:scope: {}
+        f:versions: {}
+    manager: cluster-version-operator
+    operation: Update
+    time: "2024-06-11T10:40:57Z"
+  - apiVersion: apiextensions.k8s.io/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:acceptedNames:
+          f:kind: {}
+          f:listKind: {}
+          f:plural: {}
+          f:shortNames: {}
+          f:singular: {}
+        f:conditions:
+          k:{"type":"Established"}:
+            .: {}
+            f:lastTransitionTime: {}
+            f:message: {}
+            f:reason: {}
+            f:status: {}
+            f:type: {}
+          k:{"type":"NamesAccepted"}:
+            .: {}
+            f:lastTransitionTime: {}
+            f:message: {}
+            f:reason: {}
+            f:status: {}
+            f:type: {}
+    manager: kube-apiserver
+    operation: Update
+    subresource: status
+    time: "2024-06-11T10:40:57Z"
+  name: machineautoscalers.autoscaling.openshift.io
+  ownerReferences:
+  - apiVersion: config.openshift.io/v1
+    controller: true
+    kind: ClusterVersion
+    name: version
+    uid: 7f5ed23b-8031-407e-bbf3-8850738c2d59
+  resourceVersion: "1054"
+  uid: 7021961b-139d-4e89-bb63-ea14b79ad010
+spec:
+  conversion:
+    strategy: None
+  group: autoscaling.openshift.io
+  names:
+    kind: MachineAutoscaler
+    listKind: MachineAutoscalerList
+    plural: machineautoscalers
+    shortNames:
+    - ma
+    singular: machineautoscaler
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: Kind of object scaled
+      jsonPath: .spec.scaleTargetRef.kind
+      name: Ref Kind
+      type: string
+    - description: Name of object scaled
+      jsonPath: .spec.scaleTargetRef.name
+      name: Ref Name
+      type: string
+    - description: Min number of replicas
+      jsonPath: .spec.minReplicas
+      name: Min
+      type: integer
+    - description: Max number of replicas
+      jsonPath: .spec.maxReplicas
+      name: Max
+      type: integer
+    - description: MachineAutoscaler resoruce age
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: MachineAutoscaler is the Schema for the machineautoscalers API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Specification of constraints of a scalable resource
+            properties:
+              maxReplicas:
+                description: MaxReplicas constrains the maximal number of replicas
+                  of a scalable resource
+                format: int32
+                minimum: 1
+                type: integer
+              minReplicas:
+                description: MinReplicas constrains the minimal number of replicas
+                  of a scalable resource
+                format: int32
+                minimum: 0
+                type: integer
+              scaleTargetRef:
+                description: ScaleTargetRef holds reference to a scalable resource
+                properties:
+                  apiVersion:
+                    description: 'APIVersion defines the versioned schema of this
+                      representation of an object. Servers should convert recognized
+                      schemas to the latest internal value, and may reject unrecognized
+                      values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                    type: string
+                  kind:
+                    description: 'Kind is a string value representing the REST resource
+                      this object represents. Servers may infer this from the endpoint
+                      the client submits requests to. Cannot be updated. In CamelCase.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                    minLength: 1
+                    type: string
+                  name:
+                    description: Name specifies a name of an object, e.g. worker-us-east-1a.
+                      Scalable resources are expected to exist under a single namespace.
+                    minLength: 1
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+            required:
+            - maxReplicas
+            - minReplicas
+            - scaleTargetRef
+            type: object
+          status:
+            description: Most recently observed status of a scalable resource
+            properties:
+              lastTargetRef:
+                description: LastTargetRef holds reference to the recently observed
+                  scalable resource
+                properties:
+                  apiVersion:
+                    description: 'APIVersion defines the versioned schema of this
+                      representation of an object. Servers should convert recognized
+                      schemas to the latest internal value, and may reject unrecognized
+                      values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                    type: string
+                  kind:
+                    description: 'Kind is a string value representing the REST resource
+                      this object represents. Servers may infer this from the endpoint
+                      the client submits requests to. Cannot be updated. In CamelCase.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                    minLength: 1
+                    type: string
+                  name:
+                    description: Name specifies a name of an object, e.g. worker-us-east-1a.
+                      Scalable resources are expected to exist under a single namespace.
+                    minLength: 1
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: MachineAutoscaler
+    listKind: MachineAutoscalerList
+    plural: machineautoscalers
+    shortNames:
+    - ma
+    singular: machineautoscaler
+  conditions:
+  - lastTransitionTime: "2024-06-11T10:40:57Z"
+    message: no conflicts found
+    reason: NoConflicts
+    status: "True"
+    type: NamesAccepted
+  - lastTransitionTime: "2024-06-11T10:40:57Z"
+    message: the initial names have been accepted
+    reason: InitialNamesAccepted
+    status: "True"
+    type: Established
+  storedVersions:
+  - v1beta1

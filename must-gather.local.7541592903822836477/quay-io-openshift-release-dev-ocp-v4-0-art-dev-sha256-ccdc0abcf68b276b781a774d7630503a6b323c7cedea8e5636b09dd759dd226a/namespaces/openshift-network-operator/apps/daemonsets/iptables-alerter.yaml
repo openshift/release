@@ -1,0 +1,212 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    deprecated.daemonset.template.generation: "1"
+    kubernetes.io/description: |
+      This daemon set runs the iptables-alerter on each node
+    networkoperator.openshift.io/non-critical: ""
+    release.openshift.io/version: 4.16.0-0.nightly-2024-06-10-211334
+  creationTimestamp: "2024-06-11T10:47:12Z"
+  generation: 1
+  labels:
+    networkoperator.openshift.io/generates-operator-status: stand-alone
+  managedFields:
+  - apiVersion: apps/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          f:kubernetes.io/description: {}
+          f:networkoperator.openshift.io/non-critical: {}
+          f:release.openshift.io/version: {}
+        f:labels:
+          f:networkoperator.openshift.io/generates-operator-status: {}
+        f:ownerReferences:
+          k:{"uid":"62ee1ce2-90a7-43aa-95fc-751c249264a6"}: {}
+      f:spec:
+        f:selector: {}
+        f:template:
+          f:metadata:
+            f:annotations:
+              f:target.workload.openshift.io/management: {}
+            f:labels:
+              f:app: {}
+              f:component: {}
+              f:openshift.io/component: {}
+              f:type: {}
+          f:spec:
+            f:containers:
+              k:{"name":"iptables-alerter"}:
+                .: {}
+                f:command: {}
+                f:env:
+                  k:{"name":"ALERTER_POD_NAME"}:
+                    .: {}
+                    f:name: {}
+                    f:valueFrom:
+                      f:fieldRef: {}
+                  k:{"name":"CONTAINER_RUNTIME_ENDPOINT"}:
+                    .: {}
+                    f:name: {}
+                    f:value: {}
+                f:image: {}
+                f:name: {}
+                f:resources:
+                  f:limits:
+                    f:cpu: {}
+                  f:requests:
+                    f:cpu: {}
+                    f:memory: {}
+                f:securityContext:
+                  f:privileged: {}
+                f:terminationMessagePolicy: {}
+                f:volumeMounts:
+                  k:{"mountPath":"/host"}:
+                    .: {}
+                    f:mountPath: {}
+                    f:mountPropagation: {}
+                    f:name: {}
+                    f:readOnly: {}
+                  k:{"mountPath":"/iptables-alerter"}:
+                    .: {}
+                    f:mountPath: {}
+                    f:name: {}
+            f:hostNetwork: {}
+            f:hostPID: {}
+            f:nodeSelector: {}
+            f:priorityClassName: {}
+            f:serviceAccountName: {}
+            f:terminationGracePeriodSeconds: {}
+            f:tolerations: {}
+            f:volumes:
+              k:{"name":"host-slash"}:
+                .: {}
+                f:hostPath:
+                  f:path: {}
+                f:name: {}
+              k:{"name":"iptables-alerter-script"}:
+                .: {}
+                f:configMap:
+                  f:defaultMode: {}
+                  f:name: {}
+                f:name: {}
+        f:updateStrategy:
+          f:rollingUpdate:
+            f:maxUnavailable: {}
+          f:type: {}
+    manager: cluster-network-operator/operconfig
+    operation: Apply
+    time: "2024-06-11T10:47:12Z"
+  - apiVersion: apps/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:currentNumberScheduled: {}
+        f:desiredNumberScheduled: {}
+        f:numberAvailable: {}
+        f:numberMisscheduled: {}
+        f:numberReady: {}
+        f:observedGeneration: {}
+        f:updatedNumberScheduled: {}
+    manager: kube-controller-manager
+    operation: Update
+    subresource: status
+    time: "2024-06-11T11:04:46Z"
+  name: iptables-alerter
+  namespace: openshift-network-operator
+  ownerReferences:
+  - apiVersion: operator.openshift.io/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Network
+    name: cluster
+    uid: 62ee1ce2-90a7-43aa-95fc-751c249264a6
+  resourceVersion: "23969"
+  uid: 7899da51-e76b-428f-8f1c-e0e5d0bbe736
+spec:
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: iptables-alerter
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      creationTimestamp: null
+      labels:
+        app: iptables-alerter
+        component: network
+        openshift.io/component: network
+        type: infra
+    spec:
+      containers:
+      - command:
+        - /iptables-alerter/iptables-alerter.sh
+        env:
+        - name: CONTAINER_RUNTIME_ENDPOINT
+          value: unix:///run/crio/crio.sock
+        - name: ALERTER_POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:685c1ecb542461771adb7ed00ff73f21046cfacb3f65e656b4168cb6cc0e1dcd
+        imagePullPolicy: IfNotPresent
+        name: iptables-alerter
+        resources:
+          limits:
+            cpu: 10m
+          requests:
+            cpu: 10m
+            memory: 65Mi
+        securityContext:
+          privileged: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /iptables-alerter
+          name: iptables-alerter-script
+        - mountPath: /host
+          mountPropagation: HostToContainer
+          name: host-slash
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      hostNetwork: true
+      hostPID: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      priorityClassName: openshift-user-critical
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      serviceAccount: iptables-alerter
+      serviceAccountName: iptables-alerter
+      terminationGracePeriodSeconds: 10
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      volumes:
+      - configMap:
+          defaultMode: 484
+          name: iptables-alerter-script
+        name: iptables-alerter-script
+      - hostPath:
+          path: /
+          type: ""
+        name: host-slash
+  updateStrategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 10%
+    type: RollingUpdate
+status:
+  currentNumberScheduled: 6
+  desiredNumberScheduled: 6
+  numberAvailable: 6
+  numberMisscheduled: 0
+  numberReady: 6
+  observedGeneration: 1
+  updatedNumberScheduled: 6

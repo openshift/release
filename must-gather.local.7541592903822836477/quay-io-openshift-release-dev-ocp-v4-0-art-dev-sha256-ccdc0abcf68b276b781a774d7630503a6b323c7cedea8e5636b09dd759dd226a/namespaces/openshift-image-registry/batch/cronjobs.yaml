@@ -1,0 +1,162 @@
+---
+apiVersion: batch/v1
+items:
+- apiVersion: batch/v1
+  kind: CronJob
+  metadata:
+    annotations:
+      imageregistry.operator.openshift.io/checksum: sha256:23e0cc5e34ec48c6c46db7376e517523879b32ef1dda8e49c7764fd8949af477
+    creationTimestamp: "2024-06-11T10:49:24Z"
+    generation: 2
+    managedFields:
+    - apiVersion: batch/v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            .: {}
+            f:imageregistry.operator.openshift.io/checksum: {}
+        f:spec:
+          f:concurrencyPolicy: {}
+          f:failedJobsHistoryLimit: {}
+          f:jobTemplate:
+            f:metadata:
+              f:annotations:
+                .: {}
+                f:openshift.io/required-scc: {}
+              f:labels:
+                .: {}
+                f:created-by: {}
+            f:spec:
+              f:backoffLimit: {}
+              f:template:
+                f:spec:
+                  f:affinity: {}
+                  f:containers:
+                    k:{"name":"image-pruner"}:
+                      .: {}
+                      f:args: {}
+                      f:command: {}
+                      f:image: {}
+                      f:imagePullPolicy: {}
+                      f:name: {}
+                      f:resources:
+                        .: {}
+                        f:requests:
+                          .: {}
+                          f:cpu: {}
+                          f:memory: {}
+                      f:terminationMessagePath: {}
+                      f:terminationMessagePolicy: {}
+                      f:volumeMounts:
+                        .: {}
+                        k:{"mountPath":"/var/run/configmaps/serviceca"}:
+                          .: {}
+                          f:mountPath: {}
+                          f:name: {}
+                          f:readOnly: {}
+                  f:dnsPolicy: {}
+                  f:priorityClassName: {}
+                  f:restartPolicy: {}
+                  f:schedulerName: {}
+                  f:securityContext: {}
+                  f:serviceAccount: {}
+                  f:serviceAccountName: {}
+                  f:terminationGracePeriodSeconds: {}
+                  f:volumes:
+                    .: {}
+                    k:{"name":"serviceca"}:
+                      .: {}
+                      f:configMap:
+                        .: {}
+                        f:defaultMode: {}
+                        f:name: {}
+                      f:name: {}
+          f:schedule: {}
+          f:startingDeadlineSeconds: {}
+          f:successfulJobsHistoryLimit: {}
+          f:suspend: {}
+      manager: cluster-image-registry-operator
+      operation: Update
+      time: "2024-06-11T11:07:00Z"
+    name: image-pruner
+    namespace: openshift-image-registry
+    resourceVersion: "25390"
+    uid: 4f08071f-2aba-43a5-9621-b139558d1add
+  spec:
+    concurrencyPolicy: Forbid
+    failedJobsHistoryLimit: 3
+    jobTemplate:
+      metadata:
+        annotations:
+          openshift.io/required-scc: restricted-v2
+        creationTimestamp: null
+        labels:
+          created-by: image-pruner
+      spec:
+        backoffLimit: 0
+        template:
+          metadata:
+            creationTimestamp: null
+          spec:
+            affinity: {}
+            containers:
+            - args:
+              - -c
+              - |
+                set -eu
+                "$@" && exit
+                for i in 1 2 3 4 5; do
+                  echo "attempt #$i has failed (exit code $?), going to make another attempt..." >&2
+                  sleep $(($i * 30))
+                  "$@" && break  # this is the last command of the script, so its last failure will be exit code of the script
+                done
+              - arg0
+              - oc
+              - adm
+              - prune
+              - images
+              - --confirm=true
+              - --certificate-authority=/var/run/configmaps/serviceca/service-ca.crt
+              - --keep-tag-revisions=3
+              - --keep-younger-than=60m
+              - --ignore-invalid-refs=true
+              - --loglevel=1
+              - --prune-registry=true
+              - --registry-url=https://image-registry.openshift-image-registry.svc:5000
+              command:
+              - /bin/sh
+              image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:685c1ecb542461771adb7ed00ff73f21046cfacb3f65e656b4168cb6cc0e1dcd
+              imagePullPolicy: IfNotPresent
+              name: image-pruner
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: FallbackToLogsOnError
+              volumeMounts:
+              - mountPath: /var/run/configmaps/serviceca
+                name: serviceca
+                readOnly: true
+            dnsPolicy: ClusterFirst
+            priorityClassName: system-cluster-critical
+            restartPolicy: Never
+            schedulerName: default-scheduler
+            securityContext: {}
+            serviceAccount: pruner
+            serviceAccountName: pruner
+            terminationGracePeriodSeconds: 30
+            volumes:
+            - configMap:
+                defaultMode: 420
+                name: serviceca
+              name: serviceca
+    schedule: 0 0 * * *
+    startingDeadlineSeconds: 3600
+    successfulJobsHistoryLimit: 3
+    suspend: false
+  status: {}
+kind: CronJobList
+metadata:
+  resourceVersion: "39937"

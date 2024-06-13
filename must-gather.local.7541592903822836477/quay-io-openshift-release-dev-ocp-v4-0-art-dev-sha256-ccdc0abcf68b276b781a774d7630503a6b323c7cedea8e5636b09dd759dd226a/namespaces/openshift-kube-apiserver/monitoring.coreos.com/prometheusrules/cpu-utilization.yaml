@@ -1,0 +1,88 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  creationTimestamp: "2024-06-11T10:48:38Z"
+  generation: 1
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"control-plane-cpu-utilization"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: cluster-kube-apiserver-operator
+    operation: Update
+    time: "2024-06-11T10:48:38Z"
+  name: cpu-utilization
+  namespace: openshift-kube-apiserver
+  resourceVersion: "8659"
+  uid: 863bdcb8-e667-4ac9-976f-46a10817c01b
+spec:
+  groups:
+  - name: control-plane-cpu-utilization
+    rules:
+    - alert: HighOverallControlPlaneCPU
+      annotations:
+        description: |-
+          On a multi-node cluster with three control plane nodes, the overall CPU utilization may only be about 2/3 of all available capacity. This is because if a single control plane node fails, the remaining two must handle the load of the cluster in order to be HA. If the cluster is using more than 2/3 of all capacity, if one control plane node fails, the remaining two are likely to fail when they take the load. To fix this, increase the CPU and memory on your control plane nodes.
+          On a single node OpenShift (SNO) cluster, this alert will also fire if the 2/3 of the CPU cores of the node are in use by any workload. This level of CPU utlization of an SNO cluster is probably not a problem under most circumstances, but high levels of utilization may result in degraded performance. To manage this alert or silence it in case of false positives see the following link:  https://docs.openshift.com/container-platform/latest/monitoring/managing-alerts.html
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-kube-apiserver-operator/ExtremelyHighIndividualControlPlaneCPU.md
+        summary: CPU utilization across all control plane nodes is more than 60% of
+          the total available CPU. Control plane node outage may cause a cascading
+          failure; increase available CPU.
+      expr: |
+        sum(
+          100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100)
+          AND on (instance) label_replace( kube_node_role{role="master"}, "instance", "$1", "node", "(.+)" )
+        )
+        /
+        count(kube_node_role{role="master"})
+        > 60
+      for: 10m
+      labels:
+        namespace: openshift-kube-apiserver
+        severity: warning
+    - alert: ExtremelyHighIndividualControlPlaneCPU
+      annotations:
+        description: Extreme CPU pressure can cause slow serialization and poor performance
+          from the kube-apiserver and etcd. When this happens, there is a risk of
+          clients seeing non-responsive API requests which are issued again causing
+          even more CPU pressure. It can also cause failing liveness probes due to
+          slow etcd responsiveness on the backend. If one kube-apiserver fails under
+          this condition, chances are you will experience a cascade as the remaining
+          kube-apiservers are also under-provisioned. To fix this, increase the CPU
+          and memory on your control plane nodes.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-kube-apiserver-operator/ExtremelyHighIndividualControlPlaneCPU.md
+        summary: CPU utilization on a single control plane node is very high, more
+          CPU pressure is likely to cause a failover; increase available CPU.
+      expr: |
+        100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 90 AND on (instance) label_replace( kube_node_role{role="master"}, "instance", "$1", "node", "(.+)" )
+      for: 5m
+      labels:
+        namespace: openshift-kube-apiserver
+        severity: warning
+    - alert: ExtremelyHighIndividualControlPlaneCPU
+      annotations:
+        description: Extreme CPU pressure can cause slow serialization and poor performance
+          from the kube-apiserver and etcd. When this happens, there is a risk of
+          clients seeing non-responsive API requests which are issued again causing
+          even more CPU pressure. It can also cause failing liveness probes due to
+          slow etcd responsiveness on the backend. If one kube-apiserver fails under
+          this condition, chances are you will experience a cascade as the remaining
+          kube-apiservers are also under-provisioned. To fix this, increase the CPU
+          and memory on your control plane nodes.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-kube-apiserver-operator/ExtremelyHighIndividualControlPlaneCPU.md
+        summary: Sustained high CPU utilization on a single control plane node, more
+          CPU pressure is likely to cause a failover; increase available CPU.
+      expr: |
+        100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 90 AND on (instance) label_replace( kube_node_role{role="master"}, "instance", "$1", "node", "(.+)" )
+      for: 1h
+      labels:
+        namespace: openshift-kube-apiserver
+        severity: critical

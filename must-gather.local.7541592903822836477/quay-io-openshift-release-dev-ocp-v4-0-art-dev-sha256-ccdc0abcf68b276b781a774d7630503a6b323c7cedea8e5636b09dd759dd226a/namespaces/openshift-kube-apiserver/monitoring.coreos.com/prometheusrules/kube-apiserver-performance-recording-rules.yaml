@@ -1,0 +1,216 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  annotations:
+    capability.openshift.io/name: Console
+    include.release.openshift.io/self-managed-high-availability: "true"
+  creationTimestamp: "2024-06-11T10:41:17Z"
+  generation: 1
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:capability.openshift.io/name: {}
+          f:include.release.openshift.io/self-managed-high-availability: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"7f5ed23b-8031-407e-bbf3-8850738c2d59"}: {}
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"api-performance"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: cluster-version-operator
+    operation: Update
+    time: "2024-06-11T10:41:17Z"
+  name: kube-apiserver-performance-recording-rules
+  namespace: openshift-kube-apiserver
+  ownerReferences:
+  - apiVersion: config.openshift.io/v1
+    controller: true
+    kind: ClusterVersion
+    name: version
+    uid: 7f5ed23b-8031-407e-bbf3-8850738c2d59
+  resourceVersion: "1868"
+  uid: 46850fe1-dbe9-49ab-a7f2-e1a795d8db23
+spec:
+  groups:
+  - name: api-performance
+    rules:
+    - expr: sum(rate(apiserver_request_duration_seconds_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",subresource!~"proxy|attach|log|exec|portforward",verb!~"WATCH|WATCHLIST|PROXY"}[1m]))
+        by (apiserver, resource, verb, le)
+      record: resource_verb:apiserver_request_duration_seconds_bucket:rate:1m
+    - expr: sum(rate(apiserver_request_duration_seconds_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",subresource!~"proxy|attach|log|exec|portforward",verb!~"WATCH|WATCHLIST|PROXY"}[5m]))
+        by (apiserver, resource, verb, le)
+      record: resource_verb:apiserver_request_duration_seconds_bucket:rate:5m
+    - expr: sum(rate(apiserver_request_duration_seconds_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",verb=~"LIST|GET"}[1m]))
+        by (apiserver, le)
+      record: list:apiserver_request_duration_seconds_bucket:rate1m
+    - expr: sum(rate(apiserver_request_duration_seconds_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",verb=~"LIST|GET"}[5m]))
+        by (apiserver, le)
+      record: list:apiserver_request_duration_seconds_bucket:rate5m
+    - expr: sum(rate(apiserver_request_duration_seconds_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",verb=~"POST|PUT|PATCH|UPDATE|DELETE"}[1m]))
+        by (apiserver, le)
+      record: write:apiserver_request_duration_seconds_bucket:rate1m
+    - expr: sum(rate(apiserver_request_duration_seconds_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",verb=~"POST|PUT|PATCH|UPDATE|DELETE"}[5m]))
+        by (apiserver, le)
+      record: write:apiserver_request_duration_seconds_bucket:rate5m
+    - expr: sum(rate(apiserver_request_duration_seconds_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",subresource!~"proxy|attach|log|exec|portforward",verb!~"WATCH|WATCHLIST|PROXY"}[1m]))
+        by (apiserver, verb, le)
+      record: verb:apiserver_request_duration_seconds_bucket:rate1m
+    - expr: sum(rate(apiserver_request_duration_seconds_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",subresource!~"proxy|attach|log|exec|portforward",verb!~"WATCH|WATCHLIST|PROXY"}[5m]))
+        by (apiserver, verb, le)
+      record: verb:apiserver_request_duration_seconds_bucket:rate5m
+    - expr: sum(rate(etcd_request_duration_seconds_bucket[1m])) by (operation, le)
+      record: operation:etcd_request_duration_seconds_bucket:rate1m
+    - expr: sum(rate(etcd_request_duration_seconds_bucket[5m])) by (operation, le)
+      record: operation:etcd_request_duration_seconds_bucket:rate5m
+    - expr: sum(rate(apiserver_request_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[1m]))
+        by (apiserver, resource, verb)
+      record: resource_verb:apiserver_request_total:rate1m
+    - expr: sum(rate(apiserver_request_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[5m]))
+        by (apiserver, resource, verb)
+      record: resource_verb:apiserver_request_total:rate5m
+    - expr: sum(rate(apiserver_request_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",verb=~"LIST|GET"}[1m]))
+        by (apiserver)
+      record: read:apiserver_request_total:rate1m
+    - expr: sum(rate(apiserver_request_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",verb=~"LIST|GET"}[5m]))
+        by (apiserver)
+      record: read:apiserver_request_total:rate5m
+    - expr: sum(rate(apiserver_request_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",verb=~"POST|PUT|PATCH|UPDATE|DELETE"}[1m]))
+        by (apiserver)
+      record: write:apiserver_request_total:rate1m
+    - expr: sum(rate(apiserver_request_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",verb=~"POST|PUT|PATCH|UPDATE|DELETE"}[5m]))
+        by (apiserver)
+      record: write:apiserver_request_total:rate5m
+    - expr: sum(rate(apiserver_request_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",code="429"}[1m]))
+        by (apiserver, group, resource)
+      record: group_resource:apiserver_request_total:rate1m
+    - expr: sum(rate(apiserver_request_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",code="429"}[5m]))
+        by (apiserver, group, resource)
+      record: group_resource:apiserver_request_total:rate5m
+    - expr: sum(rate(apiserver_request_terminations_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[1m]))
+        by (apiserver, component, resource)
+      record: component_resource:apiserver_request_terminations_total:rate:1m
+    - expr: sum(rate(apiserver_request_terminations_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[5m]))
+        by (apiserver, component, resource)
+      record: component_resource:apiserver_request_terminations_total:rate:5m
+    - expr: sum(rate(apiserver_request_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[1m]))
+        by (apiserver, code)
+      record: code:apiserver_request_total:rate1m
+    - expr: sum(rate(apiserver_request_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[5m]))
+        by (apiserver, code)
+      record: code:apiserver_request_total:rate5m
+    - expr: sum(rate(apiserver_request_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[1m]))
+        by (apiserver, instance)
+      record: instance:apiserver_request_total:rate1m
+    - expr: sum(rate(apiserver_request_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[5m]))
+        by (apiserver, instance)
+      record: instance:apiserver_request_total:rate5m
+    - expr: sum(apiserver_longrunning_requests{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"})
+        by (apiserver, resource)
+      record: resource:apiserver_longrunning_requests:sum
+    - expr: sum(apiserver_longrunning_requests{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"})
+        by (apiserver, instance)
+      record: instance:apiserver_longrunning_requests:sum
+    - expr: sum(apiserver_current_inflight_requests{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"})
+        by (apiserver, instance, request_kind)
+      record: instance_request_kind:apiserver_current_inflight_requests:sum
+    - expr: sum(rate(apiserver_response_sizes_sum{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[1m]))
+        by (apiserver, instance)
+      record: instance:apiserver_response_sizes_sum:rate1m
+    - expr: sum(rate(apiserver_response_sizes_sum{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[5m]))
+        by (apiserver, instance)
+      record: instance:apiserver_response_sizes_sum:rate5m
+    - expr: sum(rate(apiserver_response_sizes_sum{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[1m]))
+        by (apiserver, resource, verb)
+      record: resource_verb:apiserver_response_sizes_sum:rate1m
+    - expr: sum(rate(apiserver_response_sizes_sum{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[5m]))
+        by (apiserver, resource, verb)
+      record: resource_verb:apiserver_response_sizes_sum:rate5m
+    - expr: sum(rate(apiserver_flowcontrol_request_queue_length_after_enqueue_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[1m]))
+        by (apiserver, flow_schema, priority_level, reason, le)
+      record: flow_schema_priority_reason:apiserver_flowcontrol_request_queue_length_after_enqueue_bucket:rate1m
+    - expr: sum(rate(apiserver_flowcontrol_request_queue_length_after_enqueue_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[5m]))
+        by (apiserver, flow_schema, priority_level, reason, le)
+      record: flow_schema_priority_reason:apiserver_flowcontrol_request_queue_length_after_enqueue_bucket:rate5m
+    - expr: sum(rate(apiserver_flowcontrol_request_wait_duration_seconds_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",
+        execute="true"}[1m])) by (apiserver, flow_schema, priority_level, le)
+      record: flow_schema_priority_level:apiserver_flowcontrol_request_wait_duration_seconds_bucket:rate1m
+    - expr: sum(rate(apiserver_flowcontrol_request_wait_duration_seconds_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver",
+        execute="true"}[5m])) by (apiserver, flow_schema, priority_level, le)
+      record: flow_schema_priority_level:apiserver_flowcontrol_request_wait_duration_seconds_bucket:rate5m
+    - expr: sum(rate(apiserver_flowcontrol_rejected_requests_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[1m]))
+        by (apiserver, flow_schema, priority_level, reason)
+      record: flow_schema_priority_level_reason:apiserver_flowcontrol_rejected_requests_total:rate1m
+    - expr: sum(rate(apiserver_flowcontrol_rejected_requests_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[5m]))
+        by (apiserver, flow_schema, priority_level, reason)
+      record: flow_schema_priority_level_reason:apiserver_flowcontrol_rejected_requests_total:rate5m
+    - expr: sum(rate(apiserver_flowcontrol_request_execution_seconds_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[1m]))
+        by (apiserver, flow_schema, priority_level, le)
+      record: flow_schema_priority_level_le:apiserver_flowcontrol_request_execution_seconds_bucket:rate1m
+    - expr: sum(rate(apiserver_flowcontrol_request_execution_seconds_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[5m]))
+        by (apiserver, flow_schema, priority_level, le)
+      record: flow_schema_priority_level_le:apiserver_flowcontrol_request_execution_seconds_bucket:rate5m
+    - expr: sum without (le) (flow_schema_priority_level_le:apiserver_flowcontrol_request_execution_seconds_bucket:rate1m)
+      record: flow_schema_priority_level:apiserver_flowcontrol_request_execution_seconds_bucket:rate1m
+    - expr: sum without (le) (flow_schema_priority_level_le:apiserver_flowcontrol_request_execution_seconds_bucket:rate5m)
+      record: flow_schema_priority_level:apiserver_flowcontrol_request_execution_seconds_bucket:rate5m
+    - expr: sum(apiserver_flowcontrol_current_executing_requests{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"})
+        by (apiserver, flow_schema, priority_level)
+      record: flow_schema_priority_level:apiserver_flowcontrol_current_executing_requests:sum
+    - expr: sum(apiserver_flowcontrol_request_concurrency_limit{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"})
+        by (apiserver, priority_level)
+      record: priority_level:apiserver_flowcontrol_request_concurrency_limit:sum
+    - expr: sum(apiserver_flowcontrol_current_inqueue_requests{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"})
+        by (apiserver, flow_schema, priority_level)
+      record: flow_schema_priority_level:apiserver_flowcontrol_current_inqueue_requests:sum
+    - expr: sum(rate(apiserver_selfrequest_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[1m]))
+        by (apiserver, resource, verb)
+      record: resource_verb:apiserver_selfrequest_total:rate1m
+    - expr: sum(rate(apiserver_selfrequest_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[5m]))
+        by (apiserver, resource, verb)
+      record: resource_verb:apiserver_selfrequest_total:rate5m
+    - expr: sum(rate(apiserver_request_aborts_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[1m]))
+        by (apiserver, resource, verb)
+      record: resource_verb:apiserver_request_aborts_total:rate1m
+    - expr: sum(rate(apiserver_request_aborts_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[5m]))
+        by (apiserver, resource, verb)
+      record: resource_verb:apiserver_request_aborts_total:rate5m
+    - expr: sum(rate(apiserver_request_filter_duration_seconds_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[1m]))
+        by (apiserver, filter, le)
+      record: filter:apiserver_request_filter_duration_seconds_bucket:rate1m
+    - expr: sum(rate(apiserver_request_filter_duration_seconds_bucket{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[5m]))
+        by (apiserver, filter, le)
+      record: filter:apiserver_request_filter_duration_seconds_bucket:rate5m
+    - expr: sum(rate(apiserver_watch_events_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[1m]))
+        by (apiserver, group, kind)
+      record: group_kind:apiserver_watch_events_total:rate1m
+    - expr: sum(rate(apiserver_watch_events_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[5m]))
+        by (apiserver, group, kind)
+      record: group_kind:apiserver_watch_events_total:rate5m
+    - expr: sum(rate(apiserver_watch_events_sizes_sum{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[1m]))
+        by (apiserver, group, kind)
+      record: group_kind:apiserver_watch_events_sizes_sum:rate1m
+    - expr: sum(rate(apiserver_watch_events_sizes_sum{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[5m]))
+        by (apiserver, group, kind)
+      record: group_kind:apiserver_watch_events_sizes_sum:rate5m
+    - expr: sum(apiserver_longrunning_requests{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"})
+        by (apiserver, group, resource)
+      record: group_resource:apiserver_longrunning_requests:sum
+    - expr: sum(rate(apiserver_tls_handshake_errors_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[1m]))
+        by (apiserver)
+      record: cluster:apiserver_tls_handshake_errors_total:rate1m
+    - expr: sum(rate(apiserver_tls_handshake_errors_total{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"}[5m]))
+        by (apiserver)
+      record: cluster:apiserver_tls_handshake_errors_total:rate5m
+    - expr: max(apiserver_storage_objects{apiserver=~"openshift-apiserver|kube-apiserver|openshift-oauth-apiserver"})
+        by (apiserver, resource)
+      record: resource:apiserver_storage_objects:max

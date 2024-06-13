@@ -1,0 +1,65 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  creationTimestamp: "2024-06-11T11:01:54Z"
+  generation: 1
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"insights"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: insights-operator
+    operation: Update
+    time: "2024-06-11T11:01:54Z"
+  name: insights-prometheus-rules
+  namespace: openshift-insights
+  resourceVersion: "23185"
+  uid: 9a517272-41e5-4ea6-b9e9-e0b180e85e26
+spec:
+  groups:
+  - name: insights
+    rules:
+    - alert: InsightsDisabled
+      annotations:
+        description: 'Insights operator is disabled. In order to enable Insights and
+          benefit from recommendations specific to your cluster, please follow steps
+          listed in the documentation: https://docs.openshift.com/container-platform/latest/support/remote_health_monitoring/enabling-remote-health-reporting.html'
+        summary: Insights operator is disabled.
+      expr: max without (job, pod, service, instance) (cluster_operator_conditions{name="insights",
+        condition="Disabled"} == 1)
+      for: 5m
+      labels:
+        namespace: openshift-insights
+        severity: info
+    - alert: SimpleContentAccessNotAvailable
+      annotations:
+        description: Simple content access (SCA) is not enabled. Once enabled, Insights
+          Operator can automatically import the SCA certificates from Red Hat OpenShift
+          Cluster Manager making it easier to use the content provided by your Red
+          Hat subscriptions when creating container images. See https://docs.openshift.com/container-platform/latest/cicd/builds/running-entitled-builds.html
+          for more information.
+        summary: Simple content access certificates are not available.
+      expr: ' max without (job, pod, service, instance) (max_over_time(cluster_operator_conditions{name="insights",
+        condition="SCAAvailable", reason="NotFound"}[5m]) == 0)'
+      for: 5m
+      labels:
+        namespace: openshift-insights
+        severity: info
+    - alert: InsightsRecommendationActive
+      annotations:
+        description: Insights recommendation "{{ $labels.description }}" with total
+          risk "{{ $labels.total_risk }}" was detected on the cluster. More information
+          is available at {{ $labels.info_link }}.
+        summary: An Insights recommendation is active for this cluster.
+      expr: insights_recommendation_active == 1
+      for: 5m
+      labels:
+        severity: info

@@ -1,0 +1,229 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    deprecated.daemonset.template.generation: "1"
+    kubernetes.io/description: |
+      This daemonset launches the network metrics daemon on each node
+    networkoperator.openshift.io/non-critical: ""
+    release.openshift.io/version: 4.16.0-0.nightly-2024-06-10-211334
+  creationTimestamp: "2024-06-11T10:46:55Z"
+  generation: 1
+  labels:
+    networkoperator.openshift.io/generates-operator-status: stand-alone
+  managedFields:
+  - apiVersion: apps/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          f:kubernetes.io/description: {}
+          f:networkoperator.openshift.io/non-critical: {}
+          f:release.openshift.io/version: {}
+        f:labels:
+          f:networkoperator.openshift.io/generates-operator-status: {}
+        f:ownerReferences:
+          k:{"uid":"62ee1ce2-90a7-43aa-95fc-751c249264a6"}: {}
+      f:spec:
+        f:selector: {}
+        f:template:
+          f:metadata:
+            f:annotations:
+              f:target.workload.openshift.io/management: {}
+            f:labels:
+              f:app: {}
+              f:component: {}
+              f:openshift.io/component: {}
+              f:type: {}
+          f:spec:
+            f:affinity:
+              f:nodeAffinity:
+                f:requiredDuringSchedulingIgnoredDuringExecution: {}
+            f:containers:
+              k:{"name":"kube-rbac-proxy"}:
+                .: {}
+                f:args: {}
+                f:image: {}
+                f:name: {}
+                f:ports:
+                  k:{"containerPort":8443,"protocol":"TCP"}:
+                    .: {}
+                    f:containerPort: {}
+                    f:name: {}
+                f:resources:
+                  f:requests:
+                    f:cpu: {}
+                    f:memory: {}
+                f:terminationMessagePolicy: {}
+                f:volumeMounts:
+                  k:{"mountPath":"/etc/metrics"}:
+                    .: {}
+                    f:mountPath: {}
+                    f:name: {}
+                    f:readOnly: {}
+              k:{"name":"network-metrics-daemon"}:
+                .: {}
+                f:args: {}
+                f:command: {}
+                f:env:
+                  k:{"name":"NODE_NAME"}:
+                    .: {}
+                    f:name: {}
+                    f:valueFrom:
+                      f:fieldRef: {}
+                f:image: {}
+                f:imagePullPolicy: {}
+                f:name: {}
+                f:resources:
+                  f:requests:
+                    f:cpu: {}
+                    f:memory: {}
+                f:terminationMessagePolicy: {}
+            f:nodeSelector: {}
+            f:priorityClassName: {}
+            f:securityContext:
+              f:runAsNonRoot: {}
+              f:runAsUser: {}
+            f:serviceAccountName: {}
+            f:tolerations: {}
+            f:volumes:
+              k:{"name":"metrics-certs"}:
+                .: {}
+                f:name: {}
+                f:secret:
+                  f:secretName: {}
+        f:updateStrategy:
+          f:rollingUpdate:
+            f:maxUnavailable: {}
+          f:type: {}
+    manager: cluster-network-operator/operconfig
+    operation: Apply
+    time: "2024-06-11T10:46:55Z"
+  - apiVersion: apps/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:currentNumberScheduled: {}
+        f:desiredNumberScheduled: {}
+        f:numberAvailable: {}
+        f:numberReady: {}
+        f:observedGeneration: {}
+        f:updatedNumberScheduled: {}
+    manager: kube-controller-manager
+    operation: Update
+    subresource: status
+    time: "2024-06-11T11:03:02Z"
+  name: network-metrics-daemon
+  namespace: openshift-multus
+  ownerReferences:
+  - apiVersion: operator.openshift.io/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Network
+    name: cluster
+    uid: 62ee1ce2-90a7-43aa-95fc-751c249264a6
+  resourceVersion: "23622"
+  uid: 8b14e658-4f8f-4d48-afd4-28fececf6fb0
+spec:
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: network-metrics-daemon
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      creationTimestamp: null
+      labels:
+        app: network-metrics-daemon
+        component: network
+        openshift.io/component: network
+        type: infra
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: network.operator.openshift.io/dpu-host
+                operator: DoesNotExist
+              - key: network.operator.openshift.io/dpu
+                operator: DoesNotExist
+      containers:
+      - args:
+        - --node-name
+        - $(NODE_NAME)
+        command:
+        - /usr/bin/network-metrics
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:20e7cc0c70dfe15e9bffb19cd84ad691a2f536c75032e323be137e932e06021a
+        imagePullPolicy: IfNotPresent
+        name: network-metrics-daemon
+        resources:
+          requests:
+            cpu: 10m
+            memory: 100Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: FallbackToLogsOnError
+      - args:
+        - --logtostderr
+        - --secure-listen-address=:8443
+        - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - --upstream=http://127.0.0.1:9091/
+        - --tls-private-key-file=/etc/metrics/tls.key
+        - --tls-cert-file=/etc/metrics/tls.crt
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:592ec166fee1aabf6b7dfd82cdd541e5cb608f99c7cc41c9ad3841dd1b854776
+        imagePullPolicy: IfNotPresent
+        name: kube-rbac-proxy
+        ports:
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /etc/metrics
+          name: metrics-certs
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        kubernetes.io/os: linux
+      priorityClassName: openshift-user-critical
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      serviceAccount: metrics-daemon-sa
+      serviceAccountName: metrics-daemon-sa
+      terminationGracePeriodSeconds: 30
+      tolerations:
+      - operator: Exists
+      volumes:
+      - name: metrics-certs
+        secret:
+          defaultMode: 420
+          secretName: metrics-daemon-secret
+  updateStrategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 33%
+    type: RollingUpdate
+status:
+  currentNumberScheduled: 6
+  desiredNumberScheduled: 6
+  numberAvailable: 6
+  numberMisscheduled: 0
+  numberReady: 6
+  observedGeneration: 1
+  updatedNumberScheduled: 6

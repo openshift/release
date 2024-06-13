@@ -1,0 +1,127 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  annotations:
+    networkoperator.openshift.io/ignore-errors: ""
+  creationTimestamp: "2024-06-11T10:47:03Z"
+  generation: 1
+  labels:
+    prometheus: k8s
+    role: alert-rules
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          f:networkoperator.openshift.io/ignore-errors: {}
+        f:labels:
+          f:prometheus: {}
+          f:role: {}
+        f:ownerReferences:
+          k:{"uid":"62ee1ce2-90a7-43aa-95fc-751c249264a6"}: {}
+      f:spec:
+        f:groups:
+          k:{"name":"cluster-network-operator-ovn.rules"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: cluster-network-operator/operconfig
+    operation: Apply
+    time: "2024-06-11T10:47:03Z"
+  name: networking-rules
+  namespace: openshift-ovn-kubernetes
+  ownerReferences:
+  - apiVersion: operator.openshift.io/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Network
+    name: cluster
+    uid: 62ee1ce2-90a7-43aa-95fc-751c249264a6
+  resourceVersion: "4748"
+  uid: 6498ef6d-64c2-41db-9634-718bd323bb9f
+spec:
+  groups:
+  - name: cluster-network-operator-ovn.rules
+    rules:
+    - alert: NodeWithoutOVNKubeNodePodRunning
+      annotations:
+        description: |
+          Networking is degraded on nodes that do not have a functioning ovnkube-node pod. Existing workloads on the
+          node may continue to have connectivity but any changes to the networking control plane will not be implemented.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NodeWithoutOVNKubeNodePodRunning.md
+        summary: All Linux nodes should be running an ovnkube-node pod, {{ $labels.node
+          }} is not.
+      expr: |
+        (kube_node_info unless on(node) (kube_pod_info{namespace="openshift-ovn-kubernetes",pod=~"ovnkube-node.*"}
+        or kube_node_labels{label_kubernetes_io_os="windows"})) > 0
+      for: 20m
+      labels:
+        severity: warning
+    - alert: OVNKubernetesControllerDisconnectedSouthboundDatabase
+      annotations:
+        description: |
+          Networking is degraded on nodes when OVN controller is not connected to OVN southbound database connection. No networking control plane updates will be applied to the node.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/OVNKubernetesControllerDisconnectedSouthboundDatabase.md
+        summary: Networking control plane is degraded on node {{ $labels.node }} because
+          OVN controller is not connected to OVN southbound database.
+      expr: |
+        max_over_time(ovn_controller_southbound_database_connected[5m]) == 0
+      for: 10m
+      labels:
+        severity: warning
+    - alert: OVNKubernetesNodePodAddError
+      annotations:
+        description: OVN Kubernetes experiences pod creation errors at an elevated
+          rate. The pods will be retried.
+        summary: OVN Kubernetes is experiencing pod creation errors at an elevated
+          rate.
+      expr: |
+        (sum by(instance, namespace) (rate(ovnkube_node_cni_request_duration_seconds_count{command="ADD",err="true"}[5m]))
+          /
+        sum by(instance, namespace) (rate(ovnkube_node_cni_request_duration_seconds_count{command="ADD"}[5m])))
+        > 0.1
+      for: 15m
+      labels:
+        severity: warning
+    - alert: OVNKubernetesNodePodDeleteError
+      annotations:
+        description: OVN Kubernetes experiences pod deletion errors at an elevated
+          rate. The pods will be retried.
+        summary: OVN Kubernetes experiencing pod deletion errors at an elevated rate.
+      expr: |
+        (sum by(instance, namespace) (rate(ovnkube_node_cni_request_duration_seconds_count{command="DEL",err="true"}[5m]))
+          /
+        sum by(instance, namespace) (rate(ovnkube_node_cni_request_duration_seconds_count{command="DEL"}[5m])))
+        > 0.1
+      for: 15m
+      labels:
+        severity: warning
+    - alert: OVNKubernetesResourceRetryFailure
+      annotations:
+        description: |
+          OVN Kubernetes failed to apply networking control plane configuration after several attempts. This might be because the configuration
+          provided by the user is invalid or because of an internal error. As a consequence, the cluster might have a degraded status.
+        summary: OVN Kubernetes failed to apply networking control plane configuration.
+      expr: increase(ovnkube_resource_retry_failures_total[10m]) > 0
+      labels:
+        severity: warning
+    - alert: OVNKubernetesNodeOVSOverflowUserspace
+      annotations:
+        description: Netlink messages dropped by OVS vSwitch daemon due to netlink
+          socket buffer overflow. This will result in packet loss.
+        summary: OVS vSwitch daemon drops packets due to buffer overflow.
+      expr: increase(ovs_vswitchd_netlink_overflow[5m]) > 0
+      for: 15m
+      labels:
+        severity: warning
+    - alert: OVNKubernetesNodeOVSOverflowKernel
+      annotations:
+        description: Netlink messages dropped by OVS kernel module due to netlink
+          socket buffer overflow. This will result in packet loss.
+        summary: OVS kernel module drops packets due to buffer overflow.
+      expr: increase(ovs_vswitchd_dp_flows_lookup_lost[5m]) > 0
+      for: 15m
+      labels:
+        severity: warning

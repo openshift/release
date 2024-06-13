@@ -1,0 +1,64 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  creationTimestamp: "2024-06-11T10:48:24Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/name: etcd
+    k8s-app: etcd
+    monitoring.openshift.io/collection-profile: minimal
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:labels:
+          .: {}
+          f:app.kubernetes.io/name: {}
+          f:k8s-app: {}
+          f:monitoring.openshift.io/collection-profile: {}
+      f:spec:
+        .: {}
+        f:endpoints: {}
+        f:jobLabel: {}
+        f:namespaceSelector:
+          .: {}
+          f:matchNames: {}
+        f:selector: {}
+    manager: cluster-etcd-operator
+    operation: Update
+    time: "2024-06-11T10:48:24Z"
+  name: etcd-minimal
+  namespace: openshift-etcd-operator
+  resourceVersion: "7187"
+  uid: a92d6766-90d9-4c49-b192-97e3481bce4e
+spec:
+  endpoints:
+  - interval: 30s
+    metricRelabelings:
+    - action: keep
+      regex: (etcd_disk_backend_commit_duration_seconds_bucket|etcd_disk_wal_fsync_duration_seconds_bucket|etcd_mvcc_db_total_size_in_bytes|etcd_mvcc_db_total_size_in_use_in_bytes|etcd_network_peer_round_trip_time_seconds_bucket|etcd_network_peer_sent_failures_total|etcd_server_has_leader|etcd_server_is_leader|etcd_server_proposals_failed_total|etcd_server_quota_backend_bytes|grpc_server_handled_total|grpc_server_handling_seconds_bucket|grpc_server_started_total|process_start_time_seconds)
+      sourceLabels:
+      - __name__
+    port: etcd-metrics
+    scheme: https
+    tlsConfig:
+      ca:
+        configMap:
+          key: ca-bundle.crt
+          name: etcd-metric-serving-ca
+      cert:
+        secret:
+          key: tls.crt
+          name: etcd-metric-client
+      keySecret:
+        key: tls.key
+        name: etcd-metric-client
+  jobLabel: k8s-app
+  namespaceSelector:
+    matchNames:
+    - openshift-etcd
+  selector:
+    matchLabels:
+      k8s-app: etcd

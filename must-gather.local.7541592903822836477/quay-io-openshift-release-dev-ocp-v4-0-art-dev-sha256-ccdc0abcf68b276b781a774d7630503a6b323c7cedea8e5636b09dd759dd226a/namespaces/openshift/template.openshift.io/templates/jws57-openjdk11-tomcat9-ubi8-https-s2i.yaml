@@ -1,0 +1,303 @@
+---
+apiVersion: template.openshift.io/v1
+kind: Template
+labels:
+  jws57jdk11ubi8: 5.7.3
+  template: jws57-openjdk11-tomcat9-ubi8-https-s2i
+message: A new JWS application for Apache Tomcat 9 has been created in your project.
+  Please be sure to create the secret named "${JWS_HTTPS_SECRET}" containing the ${JWS_HTTPS_CERTIFICATE}
+  file used for serving secure content.
+metadata:
+  annotations:
+    description: An example JBoss Web Server application. For more information about
+      using this template, see https://github.com/jboss-openshift/application-templates.
+    iconClass: icon-rh-tomcat
+    openshift.io/display-name: JBoss Web Server 5.7 Apache Tomcat 9 OpenJDK11 on UBI8
+      (with https)
+    openshift.io/provider-display-name: Red Hat, Inc.
+    samples.operator.openshift.io/version: 4.16.0-0.nightly-2024-06-10-211334
+    tags: tomcat,tomcat9,java,jboss,hidden
+    template.openshift.io/documentation-url: https://access.redhat.com/documentation/en/red-hat-jboss-web-server/
+    template.openshift.io/long-description: This template defines resources needed
+      to develop Red Hat JBoss Web Server 5.7 Apache Tomcat 9 based application, including
+      a build configuration, application deployment configuration, and secure communication
+      using https.
+    template.openshift.io/support-url: https://access.redhat.com
+    version: "5.7"
+  creationTimestamp: "2024-06-11T11:07:13Z"
+  labels:
+    samples.operator.openshift.io/managed: "true"
+  managedFields:
+  - apiVersion: template.openshift.io/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:labels:
+        .: {}
+        f:jws57jdk11ubi8: {}
+        f:template: {}
+      f:message: {}
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:description: {}
+          f:iconClass: {}
+          f:openshift.io/display-name: {}
+          f:openshift.io/provider-display-name: {}
+          f:samples.operator.openshift.io/version: {}
+          f:tags: {}
+          f:template.openshift.io/documentation-url: {}
+          f:template.openshift.io/long-description: {}
+          f:template.openshift.io/support-url: {}
+          f:version: {}
+        f:labels:
+          .: {}
+          f:samples.operator.openshift.io/managed: {}
+      f:objects: {}
+      f:parameters: {}
+    manager: cluster-samples-operator
+    operation: Update
+    time: "2024-06-11T11:07:13Z"
+  name: jws57-openjdk11-tomcat9-ubi8-https-s2i
+  namespace: openshift
+  resourceVersion: "27359"
+  uid: 3a1b3cf2-5c10-4021-a6ee-92438b4caf4d
+objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      description: The web server's http port.
+    labels:
+      application: ${APPLICATION_NAME}
+    name: ${APPLICATION_NAME}
+  spec:
+    ports:
+    - port: 8080
+      targetPort: 8080
+    selector:
+      deploymentConfig: ${APPLICATION_NAME}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      description: The web server's https port.
+    labels:
+      application: ${APPLICATION_NAME}
+    name: secure-${APPLICATION_NAME}
+  spec:
+    ports:
+    - port: 8443
+      targetPort: 8443
+    selector:
+      deploymentConfig: ${APPLICATION_NAME}
+- apiVersion: route.openshift.io/v1
+  id: ${APPLICATION_NAME}-http
+  kind: Route
+  metadata:
+    annotations:
+      description: Route for application's http service.
+    labels:
+      application: ${APPLICATION_NAME}
+    name: ${APPLICATION_NAME}
+  spec:
+    host: ${HOSTNAME_HTTP}
+    to:
+      name: ${APPLICATION_NAME}
+- apiVersion: route.openshift.io/v1
+  id: ${APPLICATION_NAME}-https
+  kind: Route
+  metadata:
+    annotations:
+      description: Route for application's https service.
+    labels:
+      application: ${APPLICATION_NAME}
+    name: secure-${APPLICATION_NAME}
+  spec:
+    host: ${HOSTNAME_HTTPS}
+    tls:
+      termination: passthrough
+    to:
+      name: secure-${APPLICATION_NAME}
+- apiVersion: image.openshift.io/v1
+  kind: ImageStream
+  metadata:
+    labels:
+      application: ${APPLICATION_NAME}
+    name: ${APPLICATION_NAME}
+- apiVersion: build.openshift.io/v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      application: ${APPLICATION_NAME}
+    name: ${APPLICATION_NAME}
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ${APPLICATION_NAME}:latest
+    source:
+      contextDir: ${CONTEXT_DIR}
+      git:
+        ref: ${SOURCE_REPOSITORY_REF}
+        uri: ${SOURCE_REPOSITORY_URL}
+      type: Git
+    strategy:
+      sourceStrategy:
+        env:
+        - name: MAVEN_MIRROR_URL
+          value: ${MAVEN_MIRROR_URL}
+        - name: ARTIFACT_DIR
+          value: ${ARTIFACT_DIR}
+        forcePull: true
+        from:
+          kind: ImageStreamTag
+          name: jboss-webserver57-openjdk11-tomcat9-openshift-ubi8:5.7.3
+          namespace: ${IMAGE_STREAM_NAMESPACE}
+      type: Source
+    triggers:
+    - github:
+        secret: ${GITHUB_WEBHOOK_SECRET}
+      type: GitHub
+    - generic:
+        secret: ${GENERIC_WEBHOOK_SECRET}
+      type: Generic
+    - imageChange: {}
+      type: ImageChange
+    - type: ConfigChange
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    labels:
+      application: ${APPLICATION_NAME}
+    name: ${APPLICATION_NAME}
+  spec:
+    replicas: 1
+    selector:
+      deploymentConfig: ${APPLICATION_NAME}
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          application: ${APPLICATION_NAME}
+          deploymentConfig: ${APPLICATION_NAME}
+        name: ${APPLICATION_NAME}
+      spec:
+        containers:
+        - env:
+          - name: JWS_HTTPS_CERTIFICATE_DIR
+            value: /etc/jws-secret-volume
+          - name: JWS_HTTPS_CERTIFICATE
+            value: ${JWS_HTTPS_CERTIFICATE}
+          - name: JWS_HTTPS_CERTIFICATE_KEY
+            value: ${JWS_HTTPS_CERTIFICATE_KEY}
+          - name: JWS_HTTPS_CERTIFICATE_PASSWORD
+            value: ${JWS_HTTPS_CERTIFICATE_PASSWORD}
+          image: ${APPLICATION_NAME}
+          imagePullPolicy: Always
+          name: ${APPLICATION_NAME}
+          ports:
+          - containerPort: 8778
+            name: jolokia
+            protocol: TCP
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+          - containerPort: 8443
+            name: https
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - /bin/bash
+              - -c
+              - 'curl --noproxy ''*'' -is ''http://localhost:8080/health'' | grep
+                -iq ''"status": "UP"'''
+          volumeMounts:
+          - mountPath: /etc/jws-secret-volume
+            name: jws-certificate-volume
+            readOnly: true
+        terminationGracePeriodSeconds: 60
+        volumes:
+        - name: jws-certificate-volume
+          secret:
+            secretName: ${JWS_HTTPS_SECRET}
+    triggers:
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - ${APPLICATION_NAME}
+        from:
+          kind: ImageStreamTag
+          name: ${APPLICATION_NAME}:latest
+      type: ImageChange
+    - type: ConfigChange
+parameters:
+- description: The name for the application.
+  displayName: Application Name
+  name: APPLICATION_NAME
+  required: true
+  value: jws-app
+- description: 'Custom hostname for http service route.  Leave blank for default hostname,
+    e.g.: <application-name>-<project>.<default-domain-suffix>'
+  displayName: Custom http Route Hostname
+  name: HOSTNAME_HTTP
+- description: 'Custom hostname for https service route.  Leave blank for default
+    hostname, e.g.: secure-<application-name>-<project>.<default-domain-suffix>'
+  displayName: Custom https Route Hostname
+  name: HOSTNAME_HTTPS
+- description: Git source URI for application
+  displayName: Git Repository URL
+  name: SOURCE_REPOSITORY_URL
+  required: true
+  value: https://github.com/jboss-openshift/openshift-quickstarts.git
+- description: Git branch/tag reference
+  displayName: Git Reference
+  name: SOURCE_REPOSITORY_REF
+  value: "1.2"
+- description: Path within Git project to build; empty for root project directory.
+  displayName: Context Directory
+  name: CONTEXT_DIR
+  value: tomcat-websocket-chat
+- description: The name of the secret containing the certificate files
+  displayName: Secret Name
+  name: JWS_HTTPS_SECRET
+  required: true
+  value: jws-app-secret
+- description: The name of the certificate file within the secret
+  displayName: Certificate Name
+  name: JWS_HTTPS_CERTIFICATE
+  value: server.crt
+- description: The name of the certificate key file within the secret
+  displayName: Certificate Key Name
+  name: JWS_HTTPS_CERTIFICATE_KEY
+  value: server.key
+- description: The certificate password
+  displayName: Certificate Password
+  name: JWS_HTTPS_CERTIFICATE_PASSWORD
+- description: GitHub trigger secret
+  displayName: Github Webhook Secret
+  from: '[a-zA-Z0-9]{8}'
+  generate: expression
+  name: GITHUB_WEBHOOK_SECRET
+  required: true
+- description: Generic build trigger secret
+  displayName: Generic Webhook Secret
+  from: '[a-zA-Z0-9]{8}'
+  generate: expression
+  name: GENERIC_WEBHOOK_SECRET
+  required: true
+- description: Namespace in which the ImageStreams for Red Hat Middleware images are
+    installed. These ImageStreams are normally installed in the openshift namespace.
+    You should only need to modify this if you've installed the ImageStreams in a
+    different namespace/project.
+  displayName: ImageStream Namespace
+  name: IMAGE_STREAM_NAMESPACE
+  required: true
+  value: openshift
+- description: Maven mirror to use for S2I builds
+  displayName: Maven mirror URL
+  name: MAVEN_MIRROR_URL
+- description: List of directories from which archives will be copied into the deployment
+    folder. If unspecified, all archives in /target will be copied.
+  name: ARTIFACT_DIR

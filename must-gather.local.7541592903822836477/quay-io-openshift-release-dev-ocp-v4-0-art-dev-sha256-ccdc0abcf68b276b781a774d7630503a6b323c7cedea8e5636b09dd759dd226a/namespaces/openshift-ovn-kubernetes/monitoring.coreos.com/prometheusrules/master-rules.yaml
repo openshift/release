@@ -1,0 +1,164 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  annotations:
+    networkoperator.openshift.io/ignore-errors: ""
+  creationTimestamp: "2024-06-11T10:47:03Z"
+  generation: 1
+  labels:
+    prometheus: k8s
+    role: alert-rules
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          f:networkoperator.openshift.io/ignore-errors: {}
+        f:labels:
+          f:prometheus: {}
+          f:role: {}
+        f:ownerReferences:
+          k:{"uid":"62ee1ce2-90a7-43aa-95fc-751c249264a6"}: {}
+      f:spec:
+        f:groups:
+          k:{"name":"cluster-network-operator-master.rules"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: cluster-network-operator/operconfig
+    operation: Apply
+    time: "2024-06-11T10:47:03Z"
+  name: master-rules
+  namespace: openshift-ovn-kubernetes
+  ownerReferences:
+  - apiVersion: operator.openshift.io/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Network
+    name: cluster
+    uid: 62ee1ce2-90a7-43aa-95fc-751c249264a6
+  resourceVersion: "4747"
+  uid: 5a4f80e9-bd65-4327-a0bf-8e9d44c79570
+spec:
+  groups:
+  - name: cluster-network-operator-master.rules
+    rules:
+    - expr: max(ovnkube_controller_egress_routing_via_host)
+      record: cluster:ovnkube_controller_egress_routing_via_host:max
+    - expr: max by(table_name)(ovnkube_controller_admin_network_policies_db_objects)
+      record: cluster:ovnkube_controller_admin_network_policies_db_objects:max
+    - expr: max by(table_name)(ovnkube_controller_baseline_admin_network_policies_db_objects)
+      record: cluster:ovnkube_controller_baseline_admin_network_policies_db_objects:max
+    - expr: max by(direction, action)(ovnkube_controller_admin_network_policies_rules)
+      record: cluster:ovnkube_controller_admin_network_policies_rules:max
+    - expr: max by(direction, action)(ovnkube_controller_baseline_admin_network_policies_rules)
+      record: cluster:ovnkube_controller_baseline_admin_network_policies_rules:max
+    - alert: V4SubnetAllocationThresholdExceeded
+      annotations:
+        description: More than 80% of IPv4 subnets are used. Insufficient IPv4 subnets
+          could degrade provisioning of workloads.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/V4SubnetAllocationThresholdExceeded.md
+        summary: More than 80% of v4 subnets available to assign to the nodes are
+          allocated. Current v4 subnet allocation percentage is {{ $value | humanizePercentage
+          }}.
+      expr: ovnkube_clustermanager_allocated_v4_host_subnets / ovnkube_clustermanager_num_v4_host_subnets
+        > 0.8
+      for: 10m
+      labels:
+        severity: warning
+    - alert: V6SubnetAllocationThresholdExceeded
+      annotations:
+        description: More than 80% of IPv6 subnets are used. Insufficient IPv6 subnets
+          could degrade provisioning of workloads.
+        summary: More than 80% of the v6 subnets available to assign to the nodes
+          are allocated. Current v6 subnet allocation percentage is {{ $value | humanizePercentage
+          }}.
+      expr: ovnkube_clustermanager_allocated_v6_host_subnets / ovnkube_clustermanager_num_v6_host_subnets
+        > 0.8
+      for: 10m
+      labels:
+        severity: warning
+    - alert: NoRunningOvnControlPlane
+      annotations:
+        description: |
+          Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
+          implemented while there are no OVN Kubernetes pods.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NoRunningOvnMaster.md
+        summary: There is no running ovn-kubernetes control plane.
+      expr: |
+        absent(up{job="ovnkube-control-plane", namespace="openshift-ovn-kubernetes"} == 1)
+      for: 5m
+      labels:
+        namespace: openshift-ovn-kubernetes
+        severity: critical
+    - alert: NoOvnClusterManagerLeader
+      annotations:
+        description: |
+          Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
+          implemented while there is no OVN Kubernetes leader. Existing workloads should continue to have connectivity.
+          OVN-Kubernetes control plane is not functional.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NoOvnMasterLeader.md
+        summary: There is no ovn-kubernetes cluster manager leader.
+      expr: |
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        max by (namespace) (max_over_time(ovnkube_clustermanager_leader[5m])) == 0
+      for: 5m
+      labels:
+        severity: critical
+    - alert: NorthboundStale
+      annotations:
+        description: |
+          Networking control plane is degraded. Networking configuration updates applied to the cluster will not be
+          implemented. Existing workloads should continue to have connectivity. OVN-Kubernetes control plane and/or
+          OVN northbound database may not be functional.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/NorthboundStaleAlert.md
+        summary: ovn-kubernetes has not written anything to the northbound database
+          for too long.
+      expr: |
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        time() - max_over_time(ovnkube_controller_nb_e2e_timestamp[5m]) > 120
+      for: 10m
+      labels:
+        severity: critical
+    - alert: SouthboundStale
+      annotations:
+        description: |
+          Networking control plane is degraded. Networking configuration updates may not be applied to the cluster or
+          taking a long time to apply. This usually means there is a large load on OVN component 'northd' or it is not
+          functioning.
+        runbook_url: https://github.com/openshift/runbooks/blob/master/alerts/cluster-network-operator/SouthboundStaleAlert.md
+        summary: ovn-northd has not successfully synced any changes to the southbound
+          DB for too long.
+      expr: |
+        # Without max_over_time, failed scrapes could create false negatives, see
+        # https://www.robustperception.io/alerting-on-gauges-in-prometheus-2-0 for details.
+        max_over_time(ovnkube_controller_nb_e2e_timestamp[5m]) - max_over_time(ovnkube_controller_sb_e2e_timestamp[5m]) > 120
+      for: 10m
+      labels:
+        severity: critical
+    - alert: OVNKubernetesNorthboundDatabaseCPUUsageHigh
+      annotations:
+        description: High OVN northbound CPU usage indicates high load on the networking
+          control plane.
+        summary: OVN northbound database {{ $labels.instance }} is greater than {{
+          $value | humanizePercentage }} percent CPU usage for a period of time.
+      expr: (sum(rate(container_cpu_usage_seconds_total{container="nbdb"}[5m])) BY
+        (instance, name, namespace)) > 0.8
+      for: 15m
+      labels:
+        severity: info
+    - alert: OVNKubernetesSouthboundDatabaseCPUUsageHigh
+      annotations:
+        description: High OVN southbound CPU usage indicates high load on the networking
+          control plane.
+        summary: OVN southbound database {{ $labels.instance }} is greater than {{
+          $value | humanizePercentage }} percent CPU usage for a period of time.
+      expr: (sum(rate(container_cpu_usage_seconds_total{container="sbdb"}[5m])) BY
+        (instance, name, namespace)) > 0.8
+      for: 15m
+      labels:
+        severity: info

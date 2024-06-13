@@ -1,0 +1,71 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+  creationTimestamp: "2024-06-11T10:41:14Z"
+  generation: 1
+  labels:
+    k8s-app: machine-config-daemon
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:include.release.openshift.io/self-managed-high-availability: {}
+          f:include.release.openshift.io/single-node-developer: {}
+        f:labels:
+          .: {}
+          f:k8s-app: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"7f5ed23b-8031-407e-bbf3-8850738c2d59"}: {}
+      f:spec:
+        .: {}
+        f:endpoints: {}
+        f:namespaceSelector:
+          .: {}
+          f:matchNames: {}
+        f:selector: {}
+    manager: cluster-version-operator
+    operation: Update
+    time: "2024-06-11T10:41:14Z"
+  name: machine-config-daemon
+  namespace: openshift-machine-config-operator
+  ownerReferences:
+  - apiVersion: config.openshift.io/v1
+    controller: true
+    kind: ClusterVersion
+    name: version
+    uid: 7f5ed23b-8031-407e-bbf3-8850738c2d59
+  resourceVersion: "1783"
+  uid: 4e694b87-4de1-4f19-a987-4214e44985f9
+spec:
+  endpoints:
+  - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    interval: 30s
+    path: /metrics
+    port: metrics
+    relabelings:
+    - action: replace
+      regex: ;(.*)
+      replacement: $1
+      separator: ;
+      sourceLabels:
+      - node
+      - __meta_kubernetes_pod_node_name
+      targetLabel: node
+    scheme: https
+    tlsConfig:
+      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+      serverName: machine-config-daemon.openshift-machine-config-operator.svc
+  namespaceSelector:
+    matchNames:
+    - openshift-machine-config-operator
+  selector:
+    matchLabels:
+      k8s-app: machine-config-daemon

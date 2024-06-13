@@ -1,0 +1,187 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    api-approved.kubernetes.io: https://github.com/kubernetes/enhancements/pull/747
+    include.release.openshift.io/hypershift: "true"
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+  creationTimestamp: "2024-06-11T10:40:57Z"
+  generation: 1
+  managedFields:
+  - apiVersion: apiextensions.k8s.io/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:api-approved.kubernetes.io: {}
+          f:include.release.openshift.io/hypershift: {}
+          f:include.release.openshift.io/ibm-cloud-managed: {}
+          f:include.release.openshift.io/self-managed-high-availability: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"7f5ed23b-8031-407e-bbf3-8850738c2d59"}: {}
+      f:spec:
+        f:conversion:
+          .: {}
+          f:strategy: {}
+        f:group: {}
+        f:names:
+          f:kind: {}
+          f:listKind: {}
+          f:plural: {}
+          f:singular: {}
+        f:scope: {}
+        f:versions: {}
+    manager: cluster-version-operator
+    operation: Update
+    time: "2024-06-11T10:40:57Z"
+  - apiVersion: apiextensions.k8s.io/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:acceptedNames:
+          f:kind: {}
+          f:listKind: {}
+          f:plural: {}
+          f:singular: {}
+        f:conditions:
+          k:{"type":"Established"}:
+            .: {}
+            f:lastTransitionTime: {}
+            f:message: {}
+            f:reason: {}
+            f:status: {}
+            f:type: {}
+          k:{"type":"KubernetesAPIApprovalPolicyConformant"}:
+            .: {}
+            f:lastTransitionTime: {}
+            f:message: {}
+            f:reason: {}
+            f:status: {}
+            f:type: {}
+          k:{"type":"NamesAccepted"}:
+            .: {}
+            f:lastTransitionTime: {}
+            f:message: {}
+            f:reason: {}
+            f:status: {}
+            f:type: {}
+    manager: kube-apiserver
+    operation: Update
+    subresource: status
+    time: "2024-06-11T10:40:57Z"
+  name: storagestates.migration.k8s.io
+  ownerReferences:
+  - apiVersion: config.openshift.io/v1
+    controller: true
+    kind: ClusterVersion
+    name: version
+    uid: 7f5ed23b-8031-407e-bbf3-8850738c2d59
+  resourceVersion: "1095"
+  uid: 33df671c-a40d-42d3-b0c6-8f75d0a11836
+spec:
+  conversion:
+    strategy: None
+  group: migration.k8s.io
+  names:
+    kind: StorageState
+    listKind: StorageStateList
+    plural: storagestates
+    singular: storagestate
+  scope: Cluster
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: The state of the storage of a specific resource.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            properties:
+              name:
+                description: name must be "<.spec.resource.resouce>.<.spec.resource.group>".
+                type: string
+            type: object
+          spec:
+            description: Specification of the storage state.
+            properties:
+              resource:
+                description: The resource this storageState is about.
+                properties:
+                  group:
+                    description: The name of the group.
+                    type: string
+                  resource:
+                    description: The name of the resource.
+                    type: string
+                type: object
+            type: object
+          status:
+            description: Status of the storage state.
+            properties:
+              currentStorageVersionHash:
+                description: The hash value of the current storage version, as shown
+                  in the discovery document served by the API server. Storage Version
+                  is the version to which objects are converted to before persisted.
+                type: string
+              lastHeartbeatTime:
+                description: LastHeartbeatTime is the last time the storage migration
+                  triggering controller checks the storage version hash of this resource
+                  in the discovery document and updates this field.
+                format: date-time
+                type: string
+              persistedStorageVersionHashes:
+                description: The hash values of storage versions that persisted instances
+                  of spec.resource might still be encoded in. "Unknown" is a valid
+                  value in the list, and is the default value. It is not safe to upgrade
+                  or downgrade to an apiserver binary that does not support all versions
+                  listed in this field, or if "Unknown" is listed. Once the storage
+                  version migration for this resource has completed, the value of
+                  this field is refined to only contain the currentStorageVersionHash.
+                  Once the apiserver has changed the storage version, the new storage
+                  version is appended to the list.
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: StorageState
+    listKind: StorageStateList
+    plural: storagestates
+    singular: storagestate
+  conditions:
+  - lastTransitionTime: "2024-06-11T10:40:57Z"
+    message: approved in https://github.com/kubernetes/enhancements/pull/747
+    reason: ApprovedAnnotation
+    status: "True"
+    type: KubernetesAPIApprovalPolicyConformant
+  - lastTransitionTime: "2024-06-11T10:40:57Z"
+    message: no conflicts found
+    reason: NoConflicts
+    status: "True"
+    type: NamesAccepted
+  - lastTransitionTime: "2024-06-11T10:40:57Z"
+    message: the initial names have been accepted
+    reason: InitialNamesAccepted
+    status: "True"
+    type: Established
+  storedVersions:
+  - v1alpha1

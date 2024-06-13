@@ -1,0 +1,246 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    capability.openshift.io/name: NodeTuning
+    include.release.openshift.io/hypershift: "true"
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+  creationTimestamp: "2024-06-11T10:41:00Z"
+  generation: 1
+  managedFields:
+  - apiVersion: apiextensions.k8s.io/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:capability.openshift.io/name: {}
+          f:include.release.openshift.io/hypershift: {}
+          f:include.release.openshift.io/ibm-cloud-managed: {}
+          f:include.release.openshift.io/self-managed-high-availability: {}
+          f:include.release.openshift.io/single-node-developer: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"7f5ed23b-8031-407e-bbf3-8850738c2d59"}: {}
+      f:spec:
+        f:conversion:
+          .: {}
+          f:strategy: {}
+        f:group: {}
+        f:names:
+          f:kind: {}
+          f:listKind: {}
+          f:plural: {}
+          f:singular: {}
+        f:scope: {}
+        f:versions: {}
+    manager: cluster-version-operator
+    operation: Update
+    time: "2024-06-11T10:41:00Z"
+  - apiVersion: apiextensions.k8s.io/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:status:
+        f:acceptedNames:
+          f:kind: {}
+          f:listKind: {}
+          f:plural: {}
+          f:singular: {}
+        f:conditions:
+          k:{"type":"Established"}:
+            .: {}
+            f:lastTransitionTime: {}
+            f:message: {}
+            f:reason: {}
+            f:status: {}
+            f:type: {}
+          k:{"type":"NamesAccepted"}:
+            .: {}
+            f:lastTransitionTime: {}
+            f:message: {}
+            f:reason: {}
+            f:status: {}
+            f:type: {}
+    manager: kube-apiserver
+    operation: Update
+    subresource: status
+    time: "2024-06-11T10:41:00Z"
+  name: tuneds.tuned.openshift.io
+  ownerReferences:
+  - apiVersion: config.openshift.io/v1
+    controller: true
+    kind: ClusterVersion
+    name: version
+    uid: 7f5ed23b-8031-407e-bbf3-8850738c2d59
+  resourceVersion: "1205"
+  uid: f14c6c55-7736-41c0-9deb-9250530e3582
+spec:
+  conversion:
+    strategy: None
+  group: tuned.openshift.io
+  names:
+    kind: Tuned
+    listKind: TunedList
+    plural: tuneds
+    singular: tuned
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: 'Tuned is a collection of rules that allows cluster-wide deployment
+          of node-level sysctls and more flexibility to add custom tuning specified
+          by user needs.  These rules are translated and passed to all containerized
+          Tuned daemons running in the cluster in the format that the daemons understand.
+          The responsibility for applying the node-level tuning then lies with the
+          containerized Tuned daemons. More info: https://github.com/openshift/cluster-node-tuning-operator'
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: 'spec is the specification of the desired behavior of Tuned.
+              More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status'
+            properties:
+              managementState:
+                description: managementState indicates whether the registry instance
+                  represented by this config instance is under operator management
+                  or not.  Valid values are Force, Managed, Unmanaged, and Removed.
+                pattern: ^(Managed|Unmanaged|Force|Removed)$
+                type: string
+              profile:
+                description: Tuned profiles.
+                items:
+                  description: A Tuned profile.
+                  properties:
+                    data:
+                      description: Specification of the Tuned profile to be consumed
+                        by the Tuned daemon.
+                      type: string
+                    name:
+                      description: Name of the Tuned profile to be used in the recommend
+                        section.
+                      minLength: 1
+                      type: string
+                  required:
+                  - data
+                  - name
+                  type: object
+                type: array
+              recommend:
+                description: Selection logic for all Tuned profiles.
+                items:
+                  description: Selection logic for a single Tuned profile.
+                  properties:
+                    machineConfigLabels:
+                      additionalProperties:
+                        type: string
+                      description: MachineConfigLabels specifies the labels for a
+                        MachineConfig. The MachineConfig is created automatically
+                        to apply additional host settings (e.g. kernel boot parameters)
+                        profile 'Profile' needs and can only be applied by creating
+                        a MachineConfig. This involves finding all MachineConfigPools
+                        with machineConfigSelector matching the MachineConfigLabels
+                        and setting the profile 'Profile' on all nodes that match
+                        the MachineConfigPools' nodeSelectors.
+                      type: object
+                    match:
+                      description: Rules governing application of a Tuned profile
+                        connected by logical OR operator.
+                      items:
+                        description: Rules governing application of a Tuned profile.
+                        properties:
+                          label:
+                            description: Node or Pod label name.
+                            type: string
+                          match:
+                            description: Additional rules governing application of
+                              the tuned profile connected by logical AND operator.
+                            items:
+                              type: object
+                              x-kubernetes-preserve-unknown-fields: true
+                            type: array
+                          type:
+                            description: 'Match type: [node/pod]. If omitted, "node"
+                              is assumed.'
+                            enum:
+                            - node
+                            - pod
+                            type: string
+                          value:
+                            description: Node or Pod label value. If omitted, the
+                              presence of label name is enough to match.
+                            type: string
+                        required:
+                        - label
+                        type: object
+                      type: array
+                    operand:
+                      description: Optional operand configuration.
+                      properties:
+                        debug:
+                          description: 'turn debugging on/off for the TuneD daemon:
+                            true/false (default is false)'
+                          type: boolean
+                        tunedConfig:
+                          description: Global configuration for the TuneD daemon as
+                            defined in tuned-main.conf
+                          properties:
+                            reapply_sysctl:
+                              description: 'turn reapply_sysctl functionality on/off
+                                for the TuneD daemon: true/false'
+                              type: boolean
+                          type: object
+                      type: object
+                    priority:
+                      description: Tuned profile priority. Highest priority is 0.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    profile:
+                      description: Name of the Tuned profile to recommend.
+                      minLength: 1
+                      type: string
+                  required:
+                  - priority
+                  - profile
+                  type: object
+                type: array
+            type: object
+          status:
+            description: TunedStatus is the status for a Tuned resource.
+            type: object
+        type: object
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: Tuned
+    listKind: TunedList
+    plural: tuneds
+    singular: tuned
+  conditions:
+  - lastTransitionTime: "2024-06-11T10:41:00Z"
+    message: no conflicts found
+    reason: NoConflicts
+    status: "True"
+    type: NamesAccepted
+  - lastTransitionTime: "2024-06-11T10:41:00Z"
+    message: the initial names have been accepted
+    reason: InitialNamesAccepted
+    status: "True"
+    type: Established
+  storedVersions:
+  - v1

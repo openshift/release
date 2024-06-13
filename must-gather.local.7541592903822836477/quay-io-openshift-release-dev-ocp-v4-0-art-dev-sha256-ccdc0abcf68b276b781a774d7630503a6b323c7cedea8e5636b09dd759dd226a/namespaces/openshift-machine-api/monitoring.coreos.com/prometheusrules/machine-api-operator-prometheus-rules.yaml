@@ -1,0 +1,139 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  annotations:
+    capability.openshift.io/name: MachineAPI
+    exclude.release.openshift.io/internal-openshift-hosted: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+  creationTimestamp: "2024-06-11T10:41:36Z"
+  generation: 1
+  labels:
+    prometheus: k8s
+    role: alert-rules
+  managedFields:
+  - apiVersion: monitoring.coreos.com/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:capability.openshift.io/name: {}
+          f:exclude.release.openshift.io/internal-openshift-hosted: {}
+          f:include.release.openshift.io/self-managed-high-availability: {}
+          f:include.release.openshift.io/single-node-developer: {}
+        f:labels:
+          .: {}
+          f:prometheus: {}
+          f:role: {}
+        f:ownerReferences:
+          .: {}
+          k:{"uid":"7f5ed23b-8031-407e-bbf3-8850738c2d59"}: {}
+      f:spec:
+        .: {}
+        f:groups:
+          .: {}
+          k:{"name":"machine-api-operator-metrics-collector-up"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"machine-health-check-unterminated-short-circuit"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"machine-not-yet-deleted"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"machine-with-no-running-phase"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+          k:{"name":"machine-without-valid-node-ref"}:
+            .: {}
+            f:name: {}
+            f:rules: {}
+    manager: cluster-version-operator
+    operation: Update
+    time: "2024-06-11T10:41:36Z"
+  name: machine-api-operator-prometheus-rules
+  namespace: openshift-machine-api
+  ownerReferences:
+  - apiVersion: config.openshift.io/v1
+    controller: true
+    kind: ClusterVersion
+    name: version
+    uid: 7f5ed23b-8031-407e-bbf3-8850738c2d59
+  resourceVersion: "2520"
+  uid: c3aaf725-fb73-44df-a553-fe3dd98f72eb
+spec:
+  groups:
+  - name: machine-without-valid-node-ref
+    rules:
+    - alert: MachineWithoutValidNode
+      annotations:
+        description: |
+          If the machine never became a node, you should diagnose the machine related failures.
+          If the node was deleted from the API, you may delete the machine if appropriate.
+        summary: machine {{ $labels.name }} does not have valid node reference
+      expr: |
+        sum by (name, namespace) (mapi_machine_created_timestamp_seconds unless on(node) kube_node_info) > 0
+      for: 60m
+      labels:
+        severity: warning
+  - name: machine-with-no-running-phase
+    rules:
+    - alert: MachineWithNoRunningPhase
+      annotations:
+        description: |
+          The machine has been without a Running or Deleting phase for more than 60 minutes.
+          The machine may not have been provisioned properly from the infrastructure provider, or
+          it might have issues with CertificateSigningRequests being approved.
+        summary: 'machine {{ $labels.name }} is in phase: {{ $labels.phase }}'
+      expr: |
+        sum by (name, namespace) (mapi_machine_created_timestamp_seconds{phase!~"Running|Deleting"}) > 0
+      for: 60m
+      labels:
+        severity: warning
+  - name: machine-not-yet-deleted
+    rules:
+    - alert: MachineNotYetDeleted
+      annotations:
+        description: |
+          The machine is not properly deleting, this may be due to a configuration issue with the
+          infrastructure provider, or because workloads on the node have PodDisruptionBudgets or
+          long termination periods which are preventing deletion.
+        summary: machine {{ $labels.name }} has been in Deleting phase for more than
+          6 hours
+      expr: |
+        sum by (name, namespace) (avg_over_time(mapi_machine_created_timestamp_seconds{phase="Deleting"}[15m])) > 0
+      for: 360m
+      labels:
+        severity: warning
+  - name: machine-api-operator-metrics-collector-up
+    rules:
+    - alert: MachineAPIOperatorMetricsCollectionFailing
+      annotations:
+        description: 'For more details:  oc logs <machine-api-operator-pod-name> -n
+          openshift-machine-api'
+        summary: machine api operator metrics collection is failing.
+      expr: |
+        mapi_mao_collector_up == 0
+      for: 5m
+      labels:
+        severity: warning
+  - name: machine-health-check-unterminated-short-circuit
+    rules:
+    - alert: MachineHealthCheckUnterminatedShortCircuit
+      annotations:
+        description: |
+          The number of unhealthy machines has exceeded the `maxUnhealthy` limit for the check, you should check
+          the status of machines in the cluster.
+        summary: machine health check {{ $labels.name }} has been disabled by short
+          circuit for more than 30 minutes
+      expr: |
+        mapi_machinehealthcheck_short_circuit == 1
+      for: 30m
+      labels:
+        severity: warning

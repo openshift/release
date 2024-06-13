@@ -1,0 +1,196 @@
+---
+apiVersion: template.openshift.io/v1
+kind: Template
+message: |-
+  The following service(s) have been created in your project: ${NAME}.
+
+  More message text here
+metadata:
+  annotations:
+    description: Build a basic React Web Application
+    iconClass: icon-js
+    openshift.io/display-name: React Web Application
+    samples.operator.openshift.io/version: 4.16.0-0.nightly-2024-06-10-211334
+    tags: nodejs, react, web app
+    template.openshift.io/provider-display-name: Red Hat, Inc.
+  creationTimestamp: "2024-06-11T11:07:13Z"
+  labels:
+    samples.operator.openshift.io/managed: "true"
+  managedFields:
+  - apiVersion: template.openshift.io/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:message: {}
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:description: {}
+          f:iconClass: {}
+          f:openshift.io/display-name: {}
+          f:samples.operator.openshift.io/version: {}
+          f:tags: {}
+          f:template.openshift.io/provider-display-name: {}
+        f:labels:
+          .: {}
+          f:samples.operator.openshift.io/managed: {}
+      f:objects: {}
+      f:parameters: {}
+    manager: cluster-samples-operator
+    operation: Update
+    time: "2024-06-11T11:07:13Z"
+  name: react-web-app-example
+  namespace: openshift
+  resourceVersion: "27416"
+  uid: cf59a31f-d5e6-446e-862f-2710d612a997
+objects:
+- apiVersion: image.openshift.io/v1
+  kind: ImageStream
+  metadata:
+    labels:
+      app: ${NAME}
+    name: ${NAME}
+  spec: {}
+- apiVersion: build.openshift.io/v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: ${NAME}
+    name: ${NAME}
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ${NAME}:latest
+    postCommit: {}
+    resources: {}
+    source:
+      git:
+        ref: ${SOURCE_REPOSITORY_REF}
+        uri: ${SOURCE_REPOSITORY_URL}
+      type: Git
+    strategy:
+      sourceStrategy:
+        env:
+        - name: NPM_MIRROR
+          value: ${NPM_MIRROR}
+        from:
+          kind: ImageStreamTag
+          name: nodejs:${NODEJS_VERSION}
+          namespace: ${NAMESPACE}
+      type: Source
+    triggers:
+    - github:
+        secret: ${GITHUB_WEBHOOK_SECRET}
+      type: GitHub
+    - type: ConfigChange
+    - imageChange: {}
+      type: ImageChange
+  status:
+    lastVersion: 0
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    labels:
+      app: ${NAME}
+    name: ${NAME}
+  spec:
+    replicas: 1
+    selector:
+      app: ${NAME}
+    template:
+      metadata:
+        labels:
+          app: ${NAME}
+      spec:
+        containers:
+        - image: ${NAME}:latest
+          name: ${NAME}
+          ports:
+          - containerPort: 3000
+            name: http
+            protocol: TCP
+          resources:
+            limits:
+              memory: ${MEMORY_LIMIT}
+          securityContext:
+            privileged: false
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - ${NAME}
+        from:
+          kind: ImageStreamTag
+          name: ${NAME}:latest
+      type: ImageChange
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: ${NAME}
+    name: ${NAME}
+  spec:
+    ports:
+    - name: http
+      port: 8080
+      targetPort: 3000
+    selector:
+      app: ${NAME}
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    labels:
+      app: ${NAME}
+    name: ${NAME}
+  spec:
+    port:
+      targetPort: 3000
+    to:
+      kind: Service
+      name: ${NAME}
+parameters:
+- description: The name assigned to all of the frontend objects defined in this template.
+  displayName: Name
+  name: NAME
+  required: true
+  value: react-web-app
+- description: The OpenShift Namespace where the ImageStream resides.
+  displayName: Namespace
+  name: NAMESPACE
+  required: true
+  value: openshift
+- description: Version of NodeJS image to be used (14-ubi8, 16-ubi8, or latest).
+  displayName: Version of NodeJS Image
+  name: NODEJS_VERSION
+  required: true
+  value: 16-ubi8
+- description: Maximum amount of memory the container can use.
+  displayName: Memory Limit
+  name: MEMORY_LIMIT
+  required: true
+  value: 512Mi
+- description: The source URL for the application
+  displayName: Source URL
+  name: SOURCE_REPOSITORY_URL
+  required: true
+  value: https://github.com/nodeshift-blog-examples/react-web-app
+- description: The branch name for the application
+  displayName: Source Branch
+  name: SOURCE_REPOSITORY_REF
+  required: true
+  value: main
+- description: The location within the source repo of the application
+  displayName: Source Directory
+  name: SOURCE_REPOSITORY_DIR
+  required: true
+  value: .
+- description: The custom NPM mirror URL
+  displayName: Custom NPM mirror URL
+  name: NPM_MIRROR
+- description: A secret string used to configure the GitHub webhook.
+  displayName: GitHub Webhook Secret
+  from: '[a-zA-Z0-9]{40}'
+  generate: expression
+  name: GITHUB_WEBHOOK_SECRET
+  required: true

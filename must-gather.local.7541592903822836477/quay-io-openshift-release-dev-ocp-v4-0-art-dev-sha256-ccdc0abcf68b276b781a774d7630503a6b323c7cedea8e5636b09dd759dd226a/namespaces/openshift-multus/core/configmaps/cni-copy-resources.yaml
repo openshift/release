@@ -1,0 +1,132 @@
+---
+apiVersion: v1
+data:
+  cnibincopy.sh: |-
+    #!/bin/bash
+    set -e
+
+    function log()
+    {
+        echo "$(date --iso-8601=seconds) [cnibincopy] ${1}"
+    }
+
+    DESTINATION_DIRECTORY=/host/opt/cni/bin/
+
+    # Perform validation of usage
+    if [ -z "$RHEL8_SOURCE_DIRECTORY" ] ||
+       [ -z "$RHEL9_SOURCE_DIRECTORY" ] ||
+       [ -z "$DEFAULT_SOURCE_DIRECTORY" ]; then
+      log "FATAL ERROR: You must set env variables: RHEL8_SOURCE_DIRECTORY, RHEL9_SOURCE_DIRECTORY, DEFAULT_SOURCE_DIRECTORY"
+      exit 1
+    fi
+
+    if [ ! -d "$DESTINATION_DIRECTORY" ]; then
+      log "FATAL ERROR: Destination directory ($DESTINATION_DIRECTORY) does not exist"
+      exit 1
+    fi
+
+    # Collect host OS information
+    . /host/etc/os-release
+    rhelmajor=
+    # detect which version we're using in order to copy the proper binaries
+    case "${ID}" in
+      rhcos|scos)
+        RHEL_VERSION=$(echo "${CPE_NAME}" | cut -f 5 -d :)
+        rhelmajor=$(echo $RHEL_VERSION | sed -E 's/([0-9]+)\.{1}[0-9]+(\.[0-9]+)?/\1/')
+      ;;
+      rhel) rhelmajor=$(echo "${VERSION_ID}" | cut -f 1 -d .)
+      ;;
+      fedora)
+        if [ "${VARIANT_ID}" == "coreos" ]; then
+          rhelmajor=8
+        else
+          log "FATAL ERROR: Unsupported Fedora variant=${VARIANT_ID}"
+          exit 1
+        fi
+      ;;
+      *) log "FATAL ERROR: Unsupported OS ID=${ID}"; exit 1
+      ;;
+    esac
+
+    # Set which directory we'll copy from, detect if it exists
+    sourcedir=
+    founddir=false
+    case "${rhelmajor}" in
+      8)
+        if [ -d "${RHEL8_SOURCE_DIRECTORY}" ]; then
+          sourcedir=${RHEL8_SOURCE_DIRECTORY}
+          founddir=true
+        fi
+      ;;
+      9)
+        if [ -d "${RHEL9_SOURCE_DIRECTORY}" ]; then
+          sourcedir=${RHEL9_SOURCE_DIRECTORY}
+          founddir=true
+        fi
+      ;;
+      *)
+        log "ERROR: RHEL Major Version Unsupported, rhelmajor=${rhelmajor}"
+      ;;
+    esac
+
+    # When it doesn't exist, fall back to the original directory.
+    if [ "$founddir" == false ]; then
+      log "Source directory unavailable for OS version: ${rhelmajor}"
+      sourcedir=$DEFAULT_SOURCE_DIRECTORY
+    fi
+
+    # Use a subdirectory called "upgrade" so we can atomically move fully copied files.
+    # We now use --remove-destination after running into an issue with -f not working over symlinks
+    UPGRADE_DIRECTORY=${DESTINATION_DIRECTORY}upgrade_$(uuidgen)
+    rm -Rf $UPGRADE_DIRECTORY
+    mkdir -p $UPGRADE_DIRECTORY
+    cp -r --remove-destination ${sourcedir}* $UPGRADE_DIRECTORY
+    if [ $? -eq 0 ]; then
+      log "Successfully copied files in ${sourcedir} to $UPGRADE_DIRECTORY"
+    else
+      log "Failed to copy files in ${sourcedir} to $UPGRADE_DIRECTORY"
+      rm -Rf $UPGRADE_DIRECTORY
+      exit 1
+    fi
+    mv -f $UPGRADE_DIRECTORY/* ${DESTINATION_DIRECTORY}/
+    if [ $? -eq 0 ]; then
+      log "Successfully moved files in $UPGRADE_DIRECTORY to ${DESTINATION_DIRECTORY}"
+    else
+      log "Failed to move files in $UPGRADE_DIRECTORY to ${DESTINATION_DIRECTORY}"
+      rm -Rf $UPGRADE_DIRECTORY
+      exit 1
+    fi
+    rm -Rf $UPGRADE_DIRECTORY
+kind: ConfigMap
+metadata:
+  annotations:
+    kubernetes.io/description: |
+      This is a script used to copy CNI binaries based on host OS
+    release.openshift.io/version: 4.16.0-0.nightly-2024-06-10-211334
+  creationTimestamp: "2024-06-11T10:46:53Z"
+  managedFields:
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:data:
+        f:cnibincopy.sh: {}
+      f:metadata:
+        f:annotations:
+          f:kubernetes.io/description: {}
+          f:release.openshift.io/version: {}
+        f:ownerReferences:
+          k:{"uid":"62ee1ce2-90a7-43aa-95fc-751c249264a6"}: {}
+    manager: cluster-network-operator/operconfig
+    operation: Apply
+    time: "2024-06-11T10:46:53Z"
+  name: cni-copy-resources
+  namespace: openshift-multus
+  ownerReferences:
+  - apiVersion: operator.openshift.io/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Network
+    name: cluster
+    uid: 62ee1ce2-90a7-43aa-95fc-751c249264a6
+  resourceVersion: "4504"
+  uid: a1c43bdd-8f52-4159-925b-54dc5c4a5c8f
