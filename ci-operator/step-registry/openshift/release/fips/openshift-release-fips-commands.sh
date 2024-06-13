@@ -10,6 +10,7 @@ function run_command() {
     eval "${CMD}"
 }
 
+
 pass=true
 
 # get a master node
