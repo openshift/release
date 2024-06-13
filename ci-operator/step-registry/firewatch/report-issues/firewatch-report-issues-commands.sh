@@ -20,13 +20,9 @@ if [ "${FIREWATCH_VERBOSE_TEST_FAILURE_REPORTING,,}" = "true" ]; then
     report_command+=" --verbose-test-failure-reporting-ticket-limit ${FIREWATCH_VERBOSE_TEST_FAILURE_REPORTING_LIMIT}"
 fi
 
-# If the user specified a platform to use in a basic configuration file
-if [ "${FIREWATCH_CONFIG_PLATFORM,,}" = "aws" ]; then
-    report_command+=" --firewatch-config-path=https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json"
-fi
-
-if [ "${FIREWATCH_CONFIG_PLATFORM,,}" = "rosa" ]; then
-    report_command+=" --firewatch-config-path=https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json"
+# If the user specified a configuration file path/url
+if [ -n "${FIREWATCH_CONFIG_FILE_PATH}" ]; then
+    report_command+=" --firewatch-config-path=${FIREWATCH_CONFIG_FILE_PATH}"
 fi
 
 eval "$report_command"
