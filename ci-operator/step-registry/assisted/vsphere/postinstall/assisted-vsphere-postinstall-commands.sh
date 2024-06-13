@@ -11,13 +11,16 @@ source ${SHARED_DIR}/platform-conf.sh
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 /usr/local/bin/fix_uid.sh
-ssh -F ${SHARED_DIR}/ssh_config "root@ci_machine" "find \${KUBECONFIG} -type f -exec cat {} \;" > ${KUBECONFIG}
+ssh -F "${SHARED_DIR}"/ssh_config "root@ci_machine" "find \${KUBECONFIG} -type f -exec cat {} \;" > "${KUBECONFIG}"
 oc get nodes
+
+
+CLOUD_CONFIG="cloud-provider-config.yaml"
 
 # Backup
 echo "Getting vsphere-creds and cloud-provider-config"
 oc get secret vsphere-creds -o yaml -n kube-system > vsphere-creds.yaml
-oc get cm cloud-provider-config -o yaml -n openshift-config > cloud-provider-config.yaml
+oc get cm cloud-provider-config -o yaml -n openshift-config > "${CLOUD_CONFIG}" 
 
 
 version=$(oc version | grep -oE 'Server Version: ([0-9]+\.[0-9]+)' | sed 's/Server Version: //')
@@ -36,12 +39,13 @@ stringData:
   "${VSPHERE_VCENTER}.username": "${VSPHERE_USERNAME}"
   "${VSPHERE_VCENTER}.password": "${VSPHERE_PASSWORD}"
 EOF
-
-oc patch kubecontrollermanager cluster -p='{"spec": {"forceRedeploymentReason": "recovery-'"$( date --rfc-3339=ns )"'"}}' --type=merge
-
-
 echo "Applying changes on cloud-provider-config"
-oc get cm cloud-provider-config -o yaml -n openshift-config > cloud-provider-config.yaml
+oc get cm cloud-provider-config -o yaml -n openshift-config > ${CLOUD_CONFIG} 
+
+cat ${CLOUD_CONFIG}
+
+echo "${VSPHERE_VCENTER} ${VSPHERE_DATACENTER} ${VSPHERE_CLUSTER} ${VSPHERE_CLUSTER} ${VSPHERE_DATASTORE} ${VSPHERE_NETWORK} ${VSPHERE_FOLDER}"
+
 sed -i -e "s/vcenterplaceholder/${VSPHERE_VCENTER}/g" \
        -e "s/datacenterplaceholder/${VSPHERE_DATACENTER}/g" \
        -e "s/clusterplaceholder\/\/Resources/${VSPHERE_CLUSTER}\/Resources/g" \
@@ -50,8 +54,10 @@ sed -i -e "s/vcenterplaceholder/${VSPHERE_VCENTER}/g" \
        -e "s/networkplaceholder/${VSPHERE_NETWORK}/g" \
        -e "s/folderplaceholder/${VSPHERE_FOLDER}/g" cloud-provider-config.yaml
 
-cat cloud-provider-config.yaml
+cat ${CLOUD_CONFIG} 
 oc apply -f cloud-provider-config.yaml
+
+oc patch kubecontrollermanager cluster -p='{"spec": {"forceRedeploymentReason": "recovery-'"$( date --rfc-3339=ns )"'"}}' --type=merge
 
 # Do the following if OCP version is >=4.13
 if [[ $(echo -e "4.13\n$version" | sort -V | tail -n 1) == "$version" ]]; then
