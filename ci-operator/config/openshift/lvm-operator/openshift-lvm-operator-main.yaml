@@ -181,6 +181,29 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws
+- as: lvm-operator-e2e-aws-upgrade
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-lvm-operator-bundle
+    env:
+      INITIAL_CHANNEL: "4.15"
+      INITIAL_CSV: lvms-operator.v4.15.4
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-storage
+      OO_LATEST_CSV: lvms-operator.v0.0.1
+      OO_PACKAGE: lvms-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test-upgrade
+      cli: latest
+      commands: DISK_INSTALL=true make e2e
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws-upgrade
 zz_generated_metadata:
   branch: main
   org: openshift
