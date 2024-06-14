@@ -33,7 +33,6 @@ export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
 if [[ "${USE_HORREUM_WEBHOOK}" == "true" ]]; then
-    export PROFILE_TYPE="reporting"
     EXTRA_FLAGS+=" --local-indexing"
 fi
 EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
