@@ -51,7 +51,7 @@ bn_vsphere_datacenter=$(basename "${VSPHERE_DATACENTER}")
 bn_vsphere_cluster=$(basename "${VSPHERE_CLUSTER}")
 bn_vsphere_datastore=$(basename "${VSPHERE_DATASTORE}")
 bn_vsphere_network=$(basename "${VSPHERE_NETWORK}")
-bn_vsphere_folder=$(basedomain "${VSPHERE_FOLDER}")
+bn_vsphere_folder=$(basename "${VSPHERE_FOLDER}")
 
 
 sed -i -e "s/vcenterplaceholder/${VSPHERE_VCENTER}/g" \
