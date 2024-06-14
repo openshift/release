@@ -1,8 +1,8 @@
 base_images:
-  installer:
+  openstack-installer:
     name: "4.17"
     namespace: ocp
-    tag: installer
+    tag: openstack-installer
 build_root:
   image_stream_tag:
     name: shellcheck
@@ -16,11 +16,17 @@ images:
     RUN python -m pip install yq
   from: src
   inputs:
-    installer:
+    openstack-installer:
       paths:
       - destination_dir: .
         source_path: /bin/openshift-install
-  to: openstack-installer
+  to: shiftstack-scripts-image
+promotion:
+  to:
+  - additional_images:
+      scripts: shiftstack-scripts-image
+    name: tooling
+    namespace: shiftstack
 resources:
   '*':
     limits:
@@ -32,7 +38,7 @@ tests:
 - as: shellcheck
   commands: find . -type f -name "*.sh" | xargs --verbose --no-run-if-empty shellcheck
   container:
-    from: src
+    from: shiftstack-scripts-image
 - as: quotas-vexxhost
   interval: 1h
   steps:
