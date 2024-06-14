@@ -7,13 +7,21 @@ chain:
     - name: HYPERSHIFT_AZURE_LOCATION
       default: "eastus"
       documentation: "The Azure location of the cluster."
+    - name: USE_HYPERSHIFT_AZURE_CREDS
+      default: "false"
+      documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters"
     commands: |-
       set -exuo pipefail
+      
+      AZURE_CREDS=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+      if [[ $USE_HYPERSHIFT_AZURE_CREDS == "true" ]]; then
+        AZURE_CREDS="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+      fi
 
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
       bin/hypershift destroy cluster azure \
-        --azure-creds=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json  \
+        --azure-creds=${AZURE_CREDS} \
         --name ${CLUSTER_NAME} \
         --location ${HYPERSHIFT_AZURE_LOCATION} \
         --cluster-grace-period 40m
@@ -26,3 +34,7 @@ chain:
         cpu: 100m
         memory: 100Mi
     timeout: 15m0s
+    credentials:
+    - mount_path: /etc/hypershift-ci-jobs-azurecreds
+      name: hypershift-ci-jobs-azurecreds
+      namespace: test-credentials

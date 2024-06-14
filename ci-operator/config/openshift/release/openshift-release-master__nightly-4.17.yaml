@@ -102,6 +102,16 @@ tests:
       enable:
       - observers-resource-watch
     workflow: assisted-baremetal
+- as: e2e-aws-ovn-single-node-csi
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node-csi
 - as: e2e-aws-ovn-single-node-workers
   interval: 168h
   steps:
@@ -133,6 +143,17 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node
+- as: e2e-aws-ovn-single-node-techpreview
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-ovn-single-node-serial
   interval: 168h
   steps:
@@ -144,10 +165,24 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node
+- as: e2e-aws-ovn-single-node-techpreview-serial
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node
 - as: e2e-metal-ovn-single-node-live-iso
   interval: 168h
   steps:
     cluster_profile: packet-sno
+    env:
+      PACKET_OS: rocky_9
     observers:
       enable:
       - observers-resource-watch
@@ -157,6 +192,7 @@ tests:
   steps:
     cluster_profile: packet-sno
     env:
+      PACKET_OS: rocky_9
       PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
     observers:
@@ -379,12 +415,12 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-csi
-- as: e2e-vsphere-zones
+- as: e2e-vsphere-ovn-zones
   interval: 168h
   steps:
     cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-zones
-- as: e2e-vsphere-upi-zones
+- as: e2e-vsphere-ovn-upi-zones
   interval: 168h
   steps:
     cluster_profile: vsphere-multizone-2
@@ -1147,6 +1183,28 @@ tests:
     test:
     - ref: openshift-release-fips
     workflow: ipi-aws
+- as: e2e-external-aws
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-external-aws
+  timeout: 6h0m0s
+- as: e2e-external-aws-ccm
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
+    workflow: openshift-e2e-external-aws
+  timeout: 6h0m0s
+- as: opct-external-aws-ccm
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
+    workflow: opct-conformance-external-aws
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift
