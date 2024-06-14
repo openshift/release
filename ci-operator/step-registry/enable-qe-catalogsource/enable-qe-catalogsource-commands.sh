@@ -54,7 +54,7 @@ function update_global_auth () {
   # replace all global auth with the QE's
   # new_dockerconfig="/var/run/vault/image-registry/qe_dockerconfigjson"
   oc adm catalog mirror quay.io/openshift-qe-optional-operators/aosqe-index:v4.16 brew.registry.redhat.io --manifests-only -a /tmp/new-dockerconfigjson --to-manifests=/tmp
-  icsp_num=$(oc get /imageContentSourcePolicy. 2>/dev/null|wc -l)
+  icsp_num=$(oc get /imageContentSourcePolicy 2>/dev/null|wc -l)
   if [[ $icsp_num -gt 0 ]] ; then
     oc create -f /tmp/imageContentSourcePolicy.yaml
   else
