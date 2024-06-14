@@ -53,7 +53,8 @@ function update_global_auth () {
 
   # replace all global auth with the QE's
   # new_dockerconfig="/var/run/vault/image-registry/qe_dockerconfigjson"
-  oc adm catalog mirror quay.io/openshift-qe-optional-operators/aosqe-index:v4.16 brew.registry.redhat.io --to-manifests=/write_dir/
+  oc adm catalog mirror quay.io/openshift-qe-optional-operators/aosqe-index:v4.16 brew.registry.redhat.io --manifests-only -a /tmp/new-dockerconfigjson --to-manifests=/tmp
+  oc create -f /tmp/imageContentSourcePolicy.yaml
   
   # add quay.io/openshift-qe-optional-operators and quay.io/openshifttest auth to the global auth
   new_dockerconfig="/tmp/new-dockerconfigjson"
