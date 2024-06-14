@@ -213,6 +213,10 @@ PULL_SECRET=$(cat ${CLUSTER_PULL_SECRET_FILE} ${LCA_PULL_SECRET_FILE} | jq -cs '
 BACKUP_SECRET_FILE="/var/run/ibu-backup-secret/.backup-secret"
 BACKUP_SECRET=$(jq -c . ${BACKUP_SECRET_FILE})
 
+# Save the pull secrets
+echo -n "${PULL_SECRET}" > ${SHARED_DIR}/.pull_secret.json
+echo -n "${BACKUP_SECRET}" > ${SHARED_DIR}/.backup_secret.json
+
 echo "Transferring pull secrets..."
 scp "${SSHOPTS[@]}" ${SHARED_DIR}/.pull_secret.json $ssh_host_ip:$remote_workdir
 scp "${SSHOPTS[@]}" ${SHARED_DIR}/.backup_secret.json $ssh_host_ip:$remote_workdir
