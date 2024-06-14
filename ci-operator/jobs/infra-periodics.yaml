@@ -2691,6 +2691,33 @@ periodics:
         requests:
           cpu: 500m
 - agent: kubernetes
+  cluster: app.ci
+  cron: '@daily'
+  decorate: true
+  name: periodic-openshift-release-qci-pruner
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed.
+  spec:
+    containers:
+    - command:
+      - ./qci_registry_pruner.py
+      env:
+      - name: QUAY_OAUTH_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: token
+            name: qci-pruner-credentials
+      image: registry.ci.openshift.org/ci/qci-pruner:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+- agent: kubernetes
   cluster: build10
   cron: '@daily'
   decorate: true
