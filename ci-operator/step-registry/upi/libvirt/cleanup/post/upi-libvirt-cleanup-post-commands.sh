@@ -22,7 +22,7 @@ fi
 REMOTE_LIBVIRT_URI="qemu+tcp://${HOSTNAME}/system"
 VIRSH="mock-nss.sh virsh --connect ${REMOTE_LIBVIRT_URI}"
 echo "Using libvirt connection for $REMOTE_LIBVIRT_URI"
-POOL_NAME="multiarch-ci-pool"
+POOL_NAME="${POOL_NAME_BASE}-${BRANCH}"
 
 # Test the remote connection
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list
@@ -51,14 +51,14 @@ fi
 #echo "Removing the source volume..."
 #${VIRSH} vol-delete --pool ${POOL_NAME} "$(${VIRSH} vol-list --pool ${POOL_NAME} | grep rhcos | awk '{ print $1 }' || true)"
 
-# Remove stale pools  # this is old behavior removal.  Can leave it for now, but its technically a noop
-echo "Removing stale pools..."
-for POOL in $(${VIRSH} pool-list --all --name | grep "${LEASED_RESOURCE}")
-do
-  ${VIRSH} pool-destroy "${POOL}"
-  ${VIRSH} pool-delete "${POOL}"
-  ${VIRSH} pool-undefine "${POOL}"
-done
+# DEBUG ONLY : Uncomment the following block to remove storage pools including the original `multiarch-ci-pool`
+# echo "Removing stale pools..."
+# for POOL in $(${VIRSH} pool-list --all --name | grep "${LEASED_RESOURCE}"), "${POOL_NAME_BASE}"
+# do
+#   ${VIRSH} pool-destroy "${POOL}"
+#   ${VIRSH} pool-delete "${POOL}"
+#   ${VIRSH} pool-undefine "${POOL}"
+# done
 
 # Remove conflicting networks
 echo "Removing stale networks..."
@@ -72,7 +72,6 @@ done
 CONFLICTING_DOMAINS=$(${VIRSH} list --all --name | grep "${LEASED_RESOURCE}")
 CONFLICTING_VOLUMES=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep -E "${LEASED_RESOURCE}-(bootstrap|master|worker|compute|control)" | awk '{ print $1 }' || true)
 STALE_IPI_VOLUMES=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep "${LEASED_RESOURCE}" | grep -Ev "(bootstrap|master|worker|compute|control)" | awk '{ print $1 }' || true)
-CONFLICTING_POOLS=$(${VIRSH} pool-list --all --name | grep "${LEASED_RESOURCE}")
 CONFLICTING_NETWORKS=$(${VIRSH} net-list --all --name | grep "${LEASED_RESOURCE}")
 
 set -e
@@ -80,10 +79,9 @@ set -e
 echo "Checking for remaining resource conflicts..."
 if [ ! -z "${CONFLICTING_DOMAINS}" ] || [ ! -z "${CONFLICTING_VOLUMES}" ] || [ ! -z "${CONFLICTING_POOLS}" ] || [ ! -z "${CONFLICTING_NETWORKS}" ]; then
   echo "Could not ensure clean state for lease ${LEASED_RESOURCE}"
-  echo "Conflicting domains: $CONFLICTING_DOMAINS"
-  echo "Conflicting volumes: $CONFLICTING_VOLUMES"
-  echo "Conflicting pools: $CONFLICTING_POOLS"
-  echo "Conflicting networks: $CONFLICTING_NETWORKS"
+  echo "Conflicting domains: ${CONFLICTING_DOMAINS}"
+  echo "Conflicting volumes: ${CONFLICTING_VOLUMES}"
+  echo "Conflicting networks: ${CONFLICTING_NETWORKS}"
   exit 1
 fi
 
