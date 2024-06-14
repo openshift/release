@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    namespace: ci
+    name: qci-pruner
+- kind: BuildConfig
+  apiVersion: build.openshift.io/v1
+  metadata:
+    namespace: ci
+    name: qci-pruner
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: qci-pruner:latest
+    source:
+      dockerfile: |
+        FROM registry.access.redhat.com/ubi9/python-312:latest
+        RUN wget https://raw.githubusercontent.com/openshift/release/master/hack/qci_registry_pruner.py && chmod +x ./qci_registry_pruner.py
+      type: Dockerfile
+    strategy:
+      type: Docker
