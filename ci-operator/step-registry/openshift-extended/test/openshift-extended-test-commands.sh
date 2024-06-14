@@ -276,7 +276,7 @@ function remove_kubeadmin_user() {
         echo '$KUBEADMIN_REMOVED not set to "true". Skipping deletion.'
     fi
 }
-sleep 36000
+sleep 7200
 # execute the cases
 function run {
     test_scenarios=""
