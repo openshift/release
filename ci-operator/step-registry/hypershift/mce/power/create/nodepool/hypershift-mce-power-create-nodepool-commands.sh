@@ -13,16 +13,13 @@ POWERVS_VSI_NAME="${HOSTED_CLUSTER_NAME}-worker"
 POWERVS_VSI_MEMORY=16
 POWERVS_VSI_PROCESSORS=0.5
 POWERVS_VSI_PROC_TYPE="shared"
-POWERVS_VSI_SYS_TYPE="e980"
-
-# MCE agentserviceconfig configs
-DB_VOLUME_SIZE="10Gi"
-FS_VOLUME_SIZE="10Gi"
+POWERVS_VSI_SYS_TYPE="s922"
 
 # InfraEnv configs
 SSH_PUB_KEY_FILE="${AGENT_POWER_CREDENTIALS}/ssh-publickey"
 SSH_PUB_KEY=$(cat ${SSH_PUB_KEY_FILE})
 export SSH_PUB_KEY
+export INFRAENV_NAME=${HOSTED_CLUSTER_NAME}-ppc64le
 
 # Installing required tools
 echo "$(date) Installing required tools"
@@ -32,7 +29,6 @@ tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
 export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
 mkdir /tmp/bin
 curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/bin/jq && chmod +x /tmp/bin/jq
-curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/bin/yq && chmod +x /tmp/bin/yq
 export PATH=$PATH:/tmp/bin
 
 MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
@@ -70,180 +66,37 @@ export IBMCLOUD_TRACE=true
 echo "$(date) Creating VSI in PowerVS instance"
 ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --subnets ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE} --replicants ${HYPERSHIFT_NODE_COUNT} --replicant-scheme suffix --replicant-affinity-policy affinity
 
-# Applying mirror config
-echo "$(date) Applying mirror config"
-cat <<EOF | oc apply -f -
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: mirror-config
-  namespace: multicluster-engine
-  labels:
-    app: assisted-service
-data:
-  registries.conf: |
-    unqualified-search-registries = ["registry.access.redhat.com", "docker.io"]
-
-    [[registry]]
-      location = "registry.stage.redhat.io"
-      insecure = false
-      blocked = false
-      mirror-by-digest-only = true
-      prefix = ""
-
-      [[registry.mirror]]
-        location = "brew.registry.redhat.io"
-        insecure = false
-
-    [[registry]]
-      location = "registry.redhat.io"
-      insecure = false
-      blocked = false
-      mirror-by-digest-only = true
-      prefix = ""
-
-      [[registry.mirror]]
-        location = "brew.registry.redhat.io"
-        insecure = false
-
-    [[registry]]
-      location = "registry.redhat.io/rhacm2"
-      insecure = false
-      blocked = false
-      mirror-by-digest-only = true
-      prefix = ""
-
-      [[registry.mirror]]
-        location = "brew.registry.redhat.io/rhacm2"
-        insecure = false
-
-    [[registry]]
-      location = "registry-proxy.engineering.redhat.com"
-      insecure = false
-      blocked = false
-      mirror-by-digest-only = true
-      prefix = ""
-
-      [[registry.mirror]]
-        location = "brew.registry.redhat.io"
-        insecure = false
-
-    [[registry]]
-      location = "registry.redhat.io/multicluster-engine"
-      insecure = false
-      blocked = false
-      mirror-by-digest-only = true
-      prefix = ""
-
-      [[registry.mirror]]
-        location = "brew.registry.redhat.io/multicluster-engine"
-        insecure = false
-EOF
-
-
-# Creating AgentServiceConfig
-CLUSTER_VERSION=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
-OS_IMAGES=$(jq --arg CLUSTER_VERSION "${CLUSTER_VERSION}" '[.[] | select(.openshift_version == $CLUSTER_VERSION)]' "${SHARED_DIR}/default_os_images.json")
-echo "$(date) Creating AgentServiceConfig"
-cat <<EOF | oc create -f -
-apiVersion: agent-install.openshift.io/v1beta1
-kind: AgentServiceConfig
-metadata:
-  name: agent
-spec:
-  databaseStorage:
-    accessModes:
-    - ReadWriteOnce
-    resources:
-      requests:
-        storage: ${DB_VOLUME_SIZE}
-  filesystemStorage:
-    accessModes:
-    - ReadWriteOnce
-    resources:
-      requests:
-        storage: ${FS_VOLUME_SIZE}
-  mirrorRegistryRef:
-    name: mirror-config
-  osImages:
-    - openshiftVersion: "${CLUSTER_VERSION}"
-      version: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "ppc64le").version')
-      url: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "ppc64le").url')
-      cpuArchitecture: ppc64le
-EOF
-
-oc wait --timeout=5m --for=condition=DeploymentsHealthy agentserviceconfig agent
-echo "$(date) AgentServiceConfig ready"
-
-set +x
-# Setting up pull secret with brew token
-oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-brewToken="${AGENT_POWER_CREDENTIALS}/brew-token"
-cat /tmp/.dockerconfigjson | jq --arg brew_token "$(cat ${brewToken})" '.auths += {"brew.registry.redhat.io": {"auth": $brew_token}}' > /tmp/pull-secret
-PULL_SECRET=/tmp/pull-secret
-set -x
-
-# Creating agent hosted cluster manifests
-echo "$(date) Creating agent hosted cluster manifests"
-oc create ns ${HOSTED_CONTROL_PLANE_NAMESPACE}
-mkdir /tmp/hc-manifests
-
-ICSP_COMMAND=""
-if [[ $ENABLE_ICSP == "true" ]]; then
-  ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml")
+MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
+ARCH="ppc64le"
+if (( $(echo "$MCE_VERSION < 2.6" | bc -l) )); then
+ # Support for using ppc64le arch added after MCE 2.6
+ ARCH="amd64"
 fi
 
-${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
-    --name=${HOSTED_CLUSTER_NAME} \
-    --namespace=${CLUSTERS_NAMESPACE} \
-    --pull-secret=${PULL_SECRET} \
-    --agent-namespace=${HOSTED_CONTROL_PLANE_NAMESPACE} \
-    --base-domain=${HYPERSHIFT_BASE_DOMAIN} \
-    --api-server-address=api.${HOSTED_CLUSTER_NAME}.${HYPERSHIFT_BASE_DOMAIN} \
-    --ssh-key=${SSH_PUB_KEY_FILE}\
-    --release-image=${OCP_IMAGE_MULTI} \
-    --control-plane-availability-policy=${CP_AVAILABILITY_POLICY} \
-    --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
-    --render > /tmp/hc-manifests/cluster-agent.yaml
-
-# Split the manifest to replace routing strategy of various services
-csplit -f /tmp/hc-manifests/manifest_ -k /tmp/hc-manifests/cluster-agent.yaml /---/ "{6}"
-
-# Service strategy to replace
-printf "  - service: APIServer
-    servicePublishingStrategy:
-      type: LoadBalancer
-  - service: OAuthServer
-    servicePublishingStrategy:
-      type: Route
-  - service: OIDC
-    servicePublishingStrategy:
-      type: None
-  - service: Konnectivity
-    servicePublishingStrategy:
-      type: Route
-  - service: Ignition
-    servicePublishingStrategy:
-      type: Route
-  - service: OVNSbDb
-    servicePublishingStrategy:
-      type: Route
-" > /tmp/hc-manifests/replacement.yaml
-
-for file in /tmp/hc-manifests/manifest_*
-do
-    if grep -q 'kind: HostedCluster' "$file"
-    then
-        yq eval-all -i 'select(fileIndex==0).spec.services = select(fileIndex==1) | select(fileIndex==0)' "$file" "/tmp/hc-manifests/replacement.yaml"
-    fi
-done
-
-# Applying agent cluster manifests
-echo "$(date) Applying agent cluster manifests"
-ls /tmp/hc-manifests/manifest_* | awk ' { print " -f " $1 } ' | xargs oc apply
-
-oc wait --timeout=15m --for=condition=Available --namespace=${CLUSTERS_NAMESPACE} hostedcluster/${HOSTED_CLUSTER_NAME}
-echo "$(date) Agent cluster is available"
+echo "$(date) Creating Nodepool"
+cat <<EOF | oc create -f -
+apiVersion: hypershift.openshift.io/v1beta1
+kind: NodePool
+metadata:
+  name: ${HOSTED_CLUSTER_NAME}-ppc64le
+  namespace: ${CLUSTERS_NAMESPACE}
+spec:
+  arch: ${ARCH}
+  clusterName: ${HOSTED_CLUSTER_NAME}
+  management:
+    autoRepair: false
+    upgradeType: InPlace
+  nodeDrainTimeout: 0s
+  platform:
+    agent:
+      agentLabelSelector:
+        matchLabels:
+          inventory.agent-install.openshift.io/cpu-architecture: ppc64le
+    type: Agent
+  release:
+    image: ${OCP_IMAGE_MULTI}
+  replicas: 0
+EOF
 
 # Applying InfraEnv
 echo "$(date) Applying InfraEnv"
@@ -251,7 +104,7 @@ envsubst <<"EOF" | oc apply -f -
 apiVersion: agent-install.openshift.io/v1beta1
 kind: InfraEnv
 metadata:
-  name: ${HOSTED_CLUSTER_NAME}
+  name: ${INFRAENV_NAME}
   namespace: ${HOSTED_CONTROL_PLANE_NAMESPACE}
 spec:
   cpuArchitecture: ppc64le
@@ -278,12 +131,18 @@ else
 fi
 INSTANCE_ID=()
 for instance in "${INSTANCE_NAMES[@]}"; do
-    instance_id=$(ibmcloud pi ins ls --json | jq -r --arg serverName $instance '.pvmInstances[] | select (.name == $serverName ) | .id')
-    if [ -z "$instance_id" ]; then
-        continue
-    fi
-    INSTANCE_ID+=("$instance_id")
+    for ((i=1; i<=20; i++)); do
+        instance_id=$(ibmcloud pi ins ls --json | jq -r --arg serverName $instance '.pvmInstances[] | select (.name == $serverName ) | .id')
+        if [ -z "$instance_id" ]; then
+            echo "$(date) Waiting for id to be populated for $instance"
+            sleep 60
+            continue
+        fi
+        INSTANCE_ID+=("$instance_id")
+        break
+    done
 done
+
 MAC_ADDRESSES=()
 IP_ADDRESSES=()
 origins=""
@@ -295,7 +154,7 @@ for instance in "${INSTANCE_ID[@]}"; do
         instance_name=$(echo "$instance_info" | jq -r '.serverName')
 
         if [ -z "$mac_address" ] || [ -z "$ip_address" ]; then
-            echo "$(date) Waiting for mac and ip to be populated in $instance"
+            echo "$(date) Waiting for mac and ip to be populated for $instance"
             sleep 60
             continue
         fi
@@ -313,26 +172,28 @@ if [ ${#MAC_ADDRESSES[@]} -ne ${HYPERSHIFT_NODE_COUNT} ] || [ ${#IP_ADDRESSES[@]
   exit 1
 fi
 
-origins="${origins%,}"
-origin_pools_json="{\"name\": \"${HOSTED_CLUSTER_NAME}\", \"origins\": [${origins}]}"
+if [ ${USE_GLB} == "yes" ]; then
+  origins="${origins%,}"
+  origin_pools_json="{\"name\": \"${HOSTED_CLUSTER_NAME}\", \"origins\": [${origins}]}"
 
-pool_id=$(ibmcloud cis glb-pool-create -i ${CIS_INSTANCE} --json "${origin_pools_json}" --output json | jq -r '.id')
+  pool_id=$(ibmcloud cis glb-pool-create -i ${CIS_INSTANCE} --json "${origin_pools_json}" --output json | jq -r '.id')
 
-lb_name="${HOSTED_CLUSTER_NAME}.${HYPERSHIFT_BASE_DOMAIN}"
-lb_payload="{\"name\": \"${lb_name}\",\"fallback_pool\": \"${pool_id}\",\"default_pools\": [\"${pool_id}\"]}"
+  lb_name="${HOSTED_CLUSTER_NAME}.${HYPERSHIFT_BASE_DOMAIN}"
+  lb_payload="{\"name\": \"${lb_name}\",\"fallback_pool\": \"${pool_id}\",\"default_pools\": [\"${pool_id}\"]}"
 
-ibmcloud cis glb-create ${CIS_DOMAIN_ID} -i ${CIS_INSTANCE} --json "${lb_payload}"
+  ibmcloud cis glb-create ${CIS_DOMAIN_ID} -i ${CIS_INSTANCE} --json "${lb_payload}"
 
-# Creating dns record for ingress
-echo "$(date) Creating dns record for ingress"
-ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type CNAME --name "*.apps.${HOSTED_CLUSTER_NAME}" --content "${lb_name}"
+  # Creating dns record for ingress
+  echo "$(date) Creating dns record for ingress"
+  ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type CNAME --name "*.apps.${HOSTED_CLUSTER_NAME}" --content "${lb_name}"
+fi
 
 # Waiting for discovery iso file to ready
-oc wait --timeout=10m --for=condition=ImageCreated --namespace=${HOSTED_CONTROL_PLANE_NAMESPACE} infraenv/${HOSTED_CLUSTER_NAME}
+oc wait --timeout=10m --for=condition=ImageCreated --namespace=${HOSTED_CONTROL_PLANE_NAMESPACE} infraenv/${INFRAENV_NAME}
 echo "$(date) ISO Download url ready"
 
 # Extracting iso download url
-DISCOVERY_ISO_URL=$(oc get infraenv/${HOSTED_CLUSTER_NAME} -n ${HOSTED_CONTROL_PLANE_NAMESPACE} -o json | jq -r '.status.isoDownloadURL')
+DISCOVERY_ISO_URL=$(oc get infraenv/${INFRAENV_NAME} -n ${HOSTED_CONTROL_PLANE_NAMESPACE} -o json | jq -r '.status.isoDownloadURL')
 DISCOVERY_ISO_DOWNLOAD_LINK_FILE="/tmp/${HOSTED_CLUSTER_NAME}-iso-download-link"
 echo ${DISCOVERY_ISO_URL} > ${DISCOVERY_ISO_DOWNLOAD_LINK_FILE}
 
@@ -383,7 +244,7 @@ for ((i=1; i<=20; i++)); do
             agentsApproved=$(($agentsApproved+1))
 
             # Once agent approved, scale the nodepool
-            oc -n ${CLUSTERS_NAMESPACE} scale nodepool ${HOSTED_CLUSTER_NAME} --replicas ${agentsApproved}
+            oc -n ${CLUSTERS_NAMESPACE} scale nodepool ${HOSTED_CLUSTER_NAME}-ppc64le --replicas ${agentsApproved}
         fi
     done< <(echo "$agents" | jq -c '.items[]')
 
