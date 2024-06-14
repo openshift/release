@@ -346,7 +346,7 @@ if [[ "$HOSTED_CP" == "true" ]]; then
     # ensure the SC is not for ibm usage so that it could support the latest version of the hosted cluster
     for ps in $psList ; do
       topology=$(ocm get /api/clusters_mgmt/v1/provision_shards/${ps} | jq -r '.hypershift_config.topology')
-      if [[ "$topology" == "*dedicated*" ]] ; then
+      if [[ "$topology" == "dedicated" ]] || [[ "$topology" == "dedicated-v2" ]] ; then
       	PROVISION_SHARD_ID=${ps}
       fi
     done
