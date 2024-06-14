@@ -13,7 +13,6 @@ for (( i = 0; i < 5; i++ )); do
       oc adm certificate approve "$csr"
     done
     echo "Pending CSRs approved. Checking for more..."
-    break
   fi
   echo "No more pending CSRs found. Waiting..."
   sleep 120
