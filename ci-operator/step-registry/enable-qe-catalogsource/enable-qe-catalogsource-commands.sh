@@ -55,8 +55,8 @@ function update_global_auth () {
   # new_dockerconfig="/var/run/vault/image-registry/qe_dockerconfigjson"
   oc adm catalog mirror quay.io/openshift-qe-optional-operators/aosqe-index:v4.16 brew.registry.redhat.io --manifests-only -a /tmp/new-dockerconfigjson --to-manifests=/tmp
   icsp_num=$(oc get /imageContentSourcePolicy. 2>/dev/null|wc -l)
-  if [[ $icsp_num > 0 ]] ; then
-    oc create -f /tmp/imageContentSourcePolicy
+  if [[ $icsp_num -gt 0 ]] ; then
+    oc create -f /tmp/imageContentSourcePolicy.yaml
   else
     oc create -f /tmp/imageDigestMirrorSet.yaml
   fi
