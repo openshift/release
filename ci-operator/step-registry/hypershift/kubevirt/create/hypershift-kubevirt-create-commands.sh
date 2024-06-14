@@ -89,7 +89,6 @@ fi
 oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p \
   '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
 
-
 RELEASE_IMAGE="${RELEASE_IMAGE_LATEST}"
 
 if [[ "${DISCONNECTED}" == "true" ]];
@@ -130,7 +129,6 @@ then
 
 fi
 
-
 echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
 # shellcheck disable=SC2086
 "${HCP_CLI}" create cluster kubevirt ${EXTRA_ARGS} ${ICSP_COMMAND} \
@@ -143,6 +141,38 @@ echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
   --release-image "${RELEASE_IMAGE}" \
   --pull-secret "${PULL_SECRET_PATH}" \
   --generate-ssh
+
+# Set Console Password for NodePool VMs so we can easily debug them even if network failures occur
+oc apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: set-core-user-password
+  namespace: clusters
+data:
+  config: |
+    apiVersion: machineconfiguration.openshift.io/v1
+    kind: MachineConfig
+    metadata:
+      labels:
+        machineconfiguration.openshift.io/role: worker
+      name: set-core-user-password
+    spec:
+      config:
+        ignition:
+          version: 3.2.0
+        passwd:
+          users:
+          - name: core
+            # password is core
+            passwordHash: \$6\$jzPb4LOXbVSL5ZA.\$uvohJQPV7yej8aJ6aD.nmJifBTuQVpy5KyQkmIOt6YVdQhC2O2CXJE1TVKeRm.ie6VVVa9YZqIUToROr7qDmX0
+EOF
+
+oc patch nodepool -n clusters $CLUSTER_NAME --type=merge --patch-file=/dev/stdin <<-EOF
+spec:
+  config:
+  - name: set-core-user-password
+EOF
 
 if [[ -n ${MCE} ]] ; then
   if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
