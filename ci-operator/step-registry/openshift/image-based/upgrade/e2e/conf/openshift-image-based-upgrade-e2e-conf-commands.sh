@@ -38,25 +38,7 @@ done
 
 date
 
-# Wait for operator rollouts
-echo "Waiting for operators to update after registry update"
-sleep 2m
-
-# Loop until all operators are healthy
-until [ -z "\$(oc get co -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Available" and .status!="True")) | .metadata.name')" ]; do
-  echo "Operators still rolling out. Checking again in 1 minute"
-  # Wait before checking again
-  sleep 1m
-done
-echo "All operators are healthy."
-
-date
-
-echo "Waiting for the cluster to stabilize"
-until oc wait --timeout=10m clusterversion version --for=condition=Failing=false; do
-  echo "Cluster not yet stabilized. Waiting a minute and then trying again..."
-  sleep 1m
-done
+oc adm wait-for-stable-cluster --minimum-stable-period 1m
 
 date
 
