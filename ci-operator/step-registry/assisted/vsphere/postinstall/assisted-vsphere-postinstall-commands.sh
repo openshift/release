@@ -46,13 +46,21 @@ cat ${CLOUD_CONFIG}
 
 echo "${VSPHERE_VCENTER} ${VSPHERE_DATACENTER} ${VSPHERE_CLUSTER} ${VSPHERE_CLUSTER} ${VSPHERE_DATASTORE} ${VSPHERE_NETWORK} ${VSPHERE_FOLDER}"
 
+# Since paths are being created below get the basename of each vCenter object if provided full path
+bn_vsphere_datacenter=$(basename "${VSPHERE_DATACENTER}")
+bn_vsphere_cluster=$(basename "${VSPHERE_CLUSTER}")
+bn_vsphere_datastore=$(basename "${VSPHERE_DATASTORE}")
+bn_vsphere_network=$(basename "${VSPHERE_NETWORK}")
+bn_vsphere_folder=$(basedomain "${VSPHERE_FOLDER}")
+
+
 sed -i -e "s/vcenterplaceholder/${VSPHERE_VCENTER}/g" \
-       -e "s/datacenterplaceholder/${VSPHERE_DATACENTER}/g" \
-       -e "s/clusterplaceholder\/\/Resources/${VSPHERE_CLUSTER}\/Resources/g" \
-       -e "s/clusterplaceholder/${VSPHERE_CLUSTER}/g" \
-       -e "s/defaultdatastoreplaceholder/${VSPHERE_DATASTORE}/g" \
-       -e "s/networkplaceholder/${VSPHERE_NETWORK}/g" \
-       -e "s/folderplaceholder/${VSPHERE_FOLDER}/g" cloud-provider-config.yaml
+       -e "s/datacenterplaceholder/${bn_vsphere_datacenter}/g" \
+       -e "s/clusterplaceholder\/\/Resources/${bn_vsphere_cluster}\/Resources/g" \
+       -e "s/clusterplaceholder/${bn_vsphere_cluster}/g" \
+       -e "s/defaultdatastoreplaceholder/${bn_vsphere_datastore}/g" \
+       -e "s/networkplaceholder/${bn_vsphere_network}/g" \
+       -e "s/folderplaceholder/${bn_vsphere_folder}/g" cloud-provider-config.yaml
 
 cat ${CLOUD_CONFIG} 
 oc apply -f cloud-provider-config.yaml
@@ -69,12 +77,12 @@ if [[ $(echo -e "4.13\n$version" | sort -V | tail -n 1) == "$version" ]]; then
     done
       oc get infrastructures.config.openshift.io -o yaml > infrastructures.config.openshift.io.yaml
       sed -i -e "s/vcenterplaceholder/${VSPHERE_VCENTER}/g" \
-       -e "s/datacenterplaceholder/${VSPHERE_DATACENTER}/g" \
-       -e "s/clusterplaceholder\/\/Resources/${VSPHERE_CLUSTER}\/Resources/g" \
-       -e "s/clusterplaceholder/${VSPHERE_CLUSTER}/g" \
-       -e "s/defaultdatastoreplaceholder/${VSPHERE_DATASTORE}/g" \
-       -e "s/networkplaceholder/${VSPHERE_NETWORK}/g" \
-       -e "s/folderplaceholder/${VSPHERE_FOLDER}/g" infrastructures.config.openshift.io.yaml
+       -e "s/datacenterplaceholder/${bn_vsphere_datacenter}/g" \
+       -e "s/clusterplaceholder\/\/Resources/${bn_vsphere_cluster}\/Resources/g" \
+       -e "s/clusterplaceholder/${bn_vsphere_cluster}/g" \
+       -e "s/defaultdatastoreplaceholder/${bn_vsphere_datastore}/g" \
+       -e "s/networkplaceholder/${bn_vsphere_network}/g" \
+       -e "s/folderplaceholder/${bn_vsphere_folder}/g" infrastructures.config.openshift.io.yaml
       oc apply -f infrastructures.config.openshift.io.yaml --overwrite=true
 fi
 
