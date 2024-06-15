@@ -307,7 +307,7 @@ function test_execution_ui_destructive {
     test_execution_cucumber 'uidestructive' '@console and @destructive'
 }
 function test_execution() {
-    pushd verification-tests
+    pushd /verification-tests
     case "$E2E_TEST_TYPE" in
         default)
             export E2E_RUN_TAGS="${E2E_RUN_TAGS} and not @destructive and not @long-duration"
