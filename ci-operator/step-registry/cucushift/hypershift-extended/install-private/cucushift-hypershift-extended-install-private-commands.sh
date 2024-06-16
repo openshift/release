@@ -1,8 +1,6 @@
 #!/bin/bash
 
 set -u
-# TODO: remove this
-set -x
 
 # Get HO image and Hypershift CLI
 HCP_CLI="bin/hypershift"
