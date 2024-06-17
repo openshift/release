@@ -132,9 +132,15 @@ backend ${EP_NAMES[$i]}
   default-server verify none inter 10s downinter 5s rise 2 fall 3 slowstart 60s maxconn 250 maxqueue 256 weight 100
 EOF
 
+  if [[ "${EP_NAMES[$i]}" = "router-http" ]]; then
+    health_check="check"
+  else
+    health_check="check check-ssl"
+  fi
+
   for ip in {10..127}; do
     ipaddress=$(jq -r --argjson N "$ip" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
-    echo "   "server ${EP_NAMES[$i]}-${ip} ${ipaddress}:${EP_PORTS[$i]} check check-ssl >>$HAPROXY_PATH
+    echo "   "server ${EP_NAMES[$i]}-${ip} ${ipaddress}:${EP_PORTS[$i]} ${health_check} >>$HAPROXY_PATH
     if [[ -n "${VSPHERE_EXTRA_LEASED_RESOURCE:-}" ]]; then
       for extra_leased_resource in ${VSPHERE_EXTRA_LEASED_RESOURCE}; do
           extra_router=$(awk -F. '{print $1}' <(echo "${extra_leased_resource}"))
@@ -142,7 +148,7 @@ EOF
 	  extra_vlanid=$(awk -F. '{print $3}' <(echo "${extra_leased_resource}"))
 	  extra_primaryrouterhostname="${extra_router}.${extra_phydc}"
 	  ipaddress=$(jq -r --argjson N "$ip" --arg PRH "$extra_primaryrouterhostname" --arg VLANID "$extra_vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")
-	  echo "   "server ${EP_NAMES[$i]}${extra_vlanid}-${ip} ${ipaddress}:${EP_PORTS[$i]} check check-ssl >>$HAPROXY_PATH
+	  echo "   "server ${EP_NAMES[$i]}${extra_vlanid}-${ip} ${ipaddress}:${EP_PORTS[$i]} ${health_check} >>$HAPROXY_PATH
       done 
     fi
   done
