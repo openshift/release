@@ -437,7 +437,7 @@ for i in range(10, 15):
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in [1197,1207,1225,1227,1229,1232,1233,1234,1235,1237,1238,1240,1243,1246,1249,1254,1255,1260,1271,1272,1274,1279,1284]:
+for i in [1197,1207,1225,1227,1229,1232,1233,1234,1235,1237,1238]:
     CONFIG['vsphere-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
 
 for i in [990,1169,1166,1164,1146]:
@@ -452,7 +452,7 @@ for i in [1287,1289,1296,1298,1300,1302]:
 for i in [1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274]:
     CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
 
-for i in range(0,10):
+for i in range(0,20):
     CONFIG['vsphere-elastic-quota-slice']['vsphere-elastic-{}'.format(i)] = 1
 
 for i in [1148]:
