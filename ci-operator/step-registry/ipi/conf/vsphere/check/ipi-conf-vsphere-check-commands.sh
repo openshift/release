@@ -175,3 +175,5 @@ if [[ "${multizone:-false}" == "true" ]]; then
 ${vc_info}
 EOF
 fi
+
+cp "${SUBNETS_CONFIG}" "${SHARED_DIR}/subnets.json"
