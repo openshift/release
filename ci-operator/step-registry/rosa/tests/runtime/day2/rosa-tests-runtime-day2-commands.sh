@@ -5,6 +5,13 @@ set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+source ./tests/prow_ci.sh
+
+if [[ ! -z $ROSACLI_BUILD ]]; then
+  override_rosacli_build
+fi
+
+# rosa version # comment it now in case anybody using old version which will trigger panic issue
 
 export TEST_PROFILE=${TEST_PROFILE:-}
 TEST_TIMEOUT=${TEST_TIMEOUT:-"4h"}

@@ -19,6 +19,12 @@ log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}"
 }
 
+source ./tests/prow_ci.sh
+
+if [[ ! -z $ROSACLI_BUILD ]]; then
+  override_rosacli_build
+fi
+
 # Configure aws
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
