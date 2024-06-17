@@ -3,7 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-
+set -x
 echo "vmc-ci.devcluster.openshift.com" > "${SHARED_DIR}"/basedomain.txt
 
 cluster_name=${NAMESPACE}-${UNIQUE_HASH}
@@ -48,7 +48,8 @@ if [[ -z "${cluster_hosted_zone_id}" ]]; then
     fi
 fi
 echo "${cluster_hosted_zone_id}" > "${SHARED_DIR}/cluster-hosted-zone.txt"
-
+sleep 7200 &
+wait
 dns_create_str=""
 dns_delete_str=""
 while read -r line; do
@@ -74,3 +75,4 @@ id=$(aws route53 change-resource-record-sets --hosted-zone-id "$cluster_hosted_z
 echo "Waiting for DNS records to sync..."
 aws route53 wait resource-record-sets-changed --id "$id"
 echo "DNS records created."
+
