@@ -19,7 +19,7 @@ function get_tp_operator(){
     tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
     ;;
     "4.16")
-    tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
+    tp_operator=("cluster-api" "olm")
     ;;
     *)
     tp_operator=()
