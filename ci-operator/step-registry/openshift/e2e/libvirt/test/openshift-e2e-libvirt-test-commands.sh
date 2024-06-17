@@ -353,7 +353,7 @@ function heavy_build() {
 }
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
-trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
+trap 'echo "$?" > "${SHARED_DIR}/e2e-status.txt"; echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
 declare -a WATCHERS
 
