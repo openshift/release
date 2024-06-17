@@ -31,6 +31,7 @@ import json
 import re
 import argparse
 import urllib.request
+import logging
 from typing import Optional
 from datetime import datetime
 
@@ -56,9 +57,9 @@ def delete_tag(repository: str, tag: str, token: str):
         with urllib.request.urlopen(request) as response:
             response_data = response.read()
             if response.status != 204:
-                print(f"Failed to delete tag '{tag}': {response.status} {response_data}")
-    except Exception as e:  # pylint: disable=broad-except
-        print(f'Failed to delete tag "{tag}": {e}')
+                logging.error("Failed to delete tag '%s': %d %s", tag, response.status, response_data)
+    except Exception:  # pylint: disable=broad-except
+        logging.exception('Failed to delete tag "%s"', tag)
 
 
 def fetch_tags(repository: str, token: str, page: int = 1, like: Optional[str] = None):
@@ -92,7 +93,7 @@ def run(args):
         token = os.getenv(QUAY_OAUTH_TOKEN_ENV_NAME)
 
     if not token:
-        print('OAuth token is required')
+        logging.error('OAuth token is required')
         sys.exit(1)
 
     confirm = args.confirm
@@ -112,11 +113,11 @@ def run(args):
             try:
                 tags, has_more = fetch_tags('openshift/ci', token, page, like='_prune_')
                 break
-            except Exception as e:  # pylint: disable=broad-except
-                print(f'Error retrieving tags: {e}')
+            except Exception:  # pylint: disable=broad-except
+                logging.exception("Error retrieving tags")
                 if retries == 0:
                     raise
-                print('Retrying in 1 minute..')
+                logging.info('Retrying in 1 minute..')
                 time.sleep(60)
                 retries -= 1
 
@@ -127,7 +128,7 @@ def run(args):
 
             if tag_count % mod_by == 0:
                 mod_by = min(mod_by * 2, 1000)
-                print(f'{tag_count} tags have been checked')
+                logging.info('%d tags have been checked', tag_count)
 
             match = prune_tag_match.match(image_tag)
             if match:
@@ -143,21 +144,22 @@ def run(args):
                     if confirm:
                         try:
                             delete_tag('openshift/ci', tag=image_tag, token=token)
-                            print(f'Removed {image_tag}')
+                            logging.debug('Removed %s', image_tag)
                             pruned_tags.add(image_tag)
-                        except Exception as e:  # pylint: disable=broad-except
-                            print(f'Error while trying to delete tag {image_tag}: {e}')
+                        except Exception:  # pylint: disable=broad-except
+                            logging.exception('Error while trying to delete tag %s', image_tag)
                     else:
-                        print(f'Would have removed {image_tag}')
+                        logging.debug('Would have removed %s', image_tag)
 
         page += 1
 
     finish_time = datetime.now()
-    print(f'Duration: {finish_time - start_time}')
-    print(f'Total tags scanned: {tag_count}')
-    print(f'Tags pruned (if --confirm): {len(prune_target_tags)}')
-    print(f'Tags actually pruned: {len(pruned_tags)}')
+    logging.info('Duration: %s', finish_time - start_time)
+    logging.info('Total tags scanned: %d', tag_count)
+    logging.info('Tags pruned (if --confirm): %d', len(prune_target_tags))
+    logging.info('Tags actually pruned: %d', len(pruned_tags))
 
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%dT%H:%M:%S')
 
 if __name__ == '__main__':
     start_time = datetime.now()
