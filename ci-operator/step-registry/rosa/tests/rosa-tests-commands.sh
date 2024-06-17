@@ -5,7 +5,6 @@ set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
 export TEST_PROFILE=${TEST_PROFILE:-}
 TEST_LABEL_FILTERS=${TEST_LABEL_FILTERS:-}
 TEST_TIMEOUT=${TEST_TIMEOUT:-"4h"}
@@ -17,6 +16,14 @@ export CLUSTER_ID # maybe we should get cluster_id by TEST_PROFILE
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}"
 }
+
+source ./tests/prow_ci.sh
+
+if [[ ! -z $ROSACLI_BUILD ]]; then
+  override_rosacli_build
+fi
+
+# rosa version # comment it now in case anybody using old version which will trigger panic issue
 
 # Configure aws
 if [[ -z "$REGION" ]]; then

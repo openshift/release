@@ -300,7 +300,7 @@ CONFIG = {
         'us-east': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
-        'wdc07': 3,
+        'us-east': 3,
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
