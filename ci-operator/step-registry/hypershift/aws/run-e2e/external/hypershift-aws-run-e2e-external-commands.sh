@@ -29,7 +29,7 @@ if [[ "${DISABLE_PKI_RECONCILIATION:-}" == "true" ]]; then
 fi
 
 AWS_OBJECT_PARAMS=""
-if bin/test-e2e -h 2>&1 | grep -q 'e2e.aws-oidc-s3-bucket-name'; then
+if grep -q 'e2e.aws-oidc-s3-bucket-name' <<<"$( bin/test-e2e -h 2>&1 )"; then
   AWS_OBJECT_PARAMS="--e2e.aws-oidc-s3-bucket-name=hypershift-ci-oidc --e2e.aws-kms-key-alias=alias/hypershift-ci"
 fi
 
