@@ -1,0 +1,145 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.16
+  origin_scos-4.16_base-stream9:
+    name: scos-4.16
+    namespace: origin
+    tag: base-stream9
+  origin_scos-4.16_etcd:
+    name: scos-4.16
+    namespace: origin
+    tag: etcd
+  origin_scos-4.16_hyperkube:
+    name: scos-4.16
+    namespace: origin
+    tag: hyperkube
+  origin_scos-4.16_installer-etcd-artifacts:
+    name: scos-4.16
+    namespace: origin
+    tag: installer-etcd-artifacts
+  origin_scos-4.16_installer-kube-apiserver-artifacts:
+    name: scos-4.16
+    namespace: origin
+    tag: installer-kube-apiserver-artifacts
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.21-openshift-4.16
+images:
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/baremetal/Dockerfile.ci
+  from: origin_scos-4.16_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+    origin_scos-4.16_etcd:
+      as:
+      - etcd
+      - registry.ci.openshift.org/ocp/4.16:etcd
+    origin_scos-4.16_hyperkube:
+      as:
+      - kas
+      - registry.ci.openshift.org/ocp/4.16:hyperkube
+  to: baremetal-installer
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/installer-altinfra/Dockerfile.ci
+  from: origin_scos-4.16_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+    origin_scos-4.16_installer-etcd-artifacts:
+      as:
+      - etcd-artifacts
+      - registry.ci.openshift.org/ocp/4.16:installer-etcd-artifacts
+    origin_scos-4.16_installer-kube-apiserver-artifacts:
+      as:
+      - kas-artifacts
+      - registry.ci.openshift.org/ocp/4.16:installer-kube-apiserver-artifacts
+  to: installer-altinfra
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+  from: origin_scos-4.16_base-stream9
+  inputs:
+    installer-terraform-providers:
+      as:
+      - providers
+      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+    origin_scos-4.16_installer-etcd-artifacts:
+      as:
+      - etcd-artifacts
+      - registry.ci.openshift.org/ocp/4.16:installer-etcd-artifacts
+    origin_scos-4.16_installer-kube-apiserver-artifacts:
+      as:
+      - kas-artifacts
+      - registry.ci.openshift.org/ocp/4.16:installer-kube-apiserver-artifacts
+  to: installer-artifacts
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/infrastructure-providers/Dockerfile
+  from: origin_scos-4.16_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - linuxarmbuilder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: installer-terraform-providers
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/installer/Dockerfile.ci
+  from: origin_scos-4.16_base-stream9
+  inputs:
+    installer-terraform-providers:
+      as:
+      - providers
+      - registry.ci.openshift.org/ocp/4.16:installer-terraform-providers
+    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+    origin_scos-4.16_installer-etcd-artifacts:
+      as:
+      - etcd-artifacts
+      - registry.ci.openshift.org/ocp/4.16:installer-etcd-artifacts
+    origin_scos-4.16_installer-kube-apiserver-artifacts:
+      as:
+      - kas-artifacts
+      - registry.ci.openshift.org/ocp/4.16:installer-kube-apiserver-artifacts
+  to: installer
+promotion:
+  to:
+  - name: scos-4.16
+    namespace: origin
+releases:
+  latest:
+    integration:
+      name: scos-4.16
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: installer
+  variant: okd-scos
