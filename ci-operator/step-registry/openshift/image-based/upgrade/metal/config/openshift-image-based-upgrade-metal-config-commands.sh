@@ -205,3 +205,23 @@ EOF
 scp "${SSHOPTS[@]}" ${SHARED_DIR}/nsswitch.conf $ssh_host_ip:${remote_workdir}/nsswitch.conf
 
 ssh "${SSHOPTS[@]}" $ssh_host_ip "sudo mv ${remote_workdir}/nsswitch.conf /etc/nsswitch.conf"
+
+# Upload the pull secrets
+LCA_PULL_SECRET_FILE="/var/run/pull-secret/.dockerconfigjson"
+CLUSTER_PULL_SECRET_FILE="${CLUSTER_PROFILE_DIR}/pull-secret"
+PULL_SECRET=$(cat ${CLUSTER_PULL_SECRET_FILE} ${LCA_PULL_SECRET_FILE} | jq -cs '.[0] * .[1]') # Merge the pull secrets to get everything we need
+BACKUP_SECRET_FILE="/var/run/ibu-backup-secret/.backup-secret"
+BACKUP_SECRET=$(jq -c . ${BACKUP_SECRET_FILE})
+
+# Save the pull secrets
+echo -n "${PULL_SECRET}" > ${SHARED_DIR}/.pull_secret.json
+echo -n "${BACKUP_SECRET}" > ${SHARED_DIR}/.backup_secret.json
+
+echo "Transferring pull secrets..."
+scp "${SSHOPTS[@]}" ${SHARED_DIR}/.pull_secret.json $ssh_host_ip:$remote_workdir
+scp "${SSHOPTS[@]}" ${SHARED_DIR}/.backup_secret.json $ssh_host_ip:$remote_workdir
+
+rm ${SHARED_DIR}/.pull_secret.json ${SHARED_DIR}/.backup_secret.json
+
+echo "${remote_workdir}/.pull_secret.json" >> "${SHARED_DIR}/pull_secret_file"
+echo "${remote_workdir}/.backup_secret.json" >> "${SHARED_DIR}/backup_secret_file"
