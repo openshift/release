@@ -689,6 +689,10 @@ case $JOB_NAME in
     # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
     max=1
     ;;
+  *aws)
+    # Do not retry because aws resources can collide when re-using installer assets
+    max=1
+    ;;
   *)
     max=3
     ;;

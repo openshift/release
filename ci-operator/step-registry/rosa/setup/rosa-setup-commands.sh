@@ -11,13 +11,18 @@ export TEST_PROFILE=${TEST_PROFILE}
 export COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
 export OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
 export CHANNEL_GROUP=${CHANNEL_GROUP:-"stable"}
-export AVAILABLE_UPGRADE=${AVAILABLE_UPGRADE:-"no"}
 export WAIT_SETUP_CLUSTER_READY=${WAIT_SETUP_CLUSTER_READY:-false}
 CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
 
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}"
 }
+
+source ./tests/prow_ci.sh
+
+if [[ ! -z $ROSACLI_BUILD ]]; then
+  override_rosacli_build
+fi
 
 # Configure aws
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
