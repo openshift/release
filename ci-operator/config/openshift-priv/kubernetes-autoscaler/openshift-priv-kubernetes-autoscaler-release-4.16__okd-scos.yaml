@@ -3,29 +3,32 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
-  origin_scos-4.16_base-stream9:
-    name: scos-4.16
-    namespace: origin
-    tag: base-stream9
-build_root:
-  image_stream_tag:
+  ocp_builder_stream9:
     name: builder
     namespace: ocp
+    tag: stream9
+build_root:
+  image_stream_tag:
+    name: builder-priv
+    namespace: ocp-private
     tag: rhel-9-golang-1.21-openshift-4.16
+canonical_go_repository: github.com/openshift/kubernetes-autoscaler
 images:
 - build_args:
   - name: TAGS
     value: scos
-  dockerfile_path: Dockerfile.openshift
-  from: origin_scos-4.16_base-stream9
+  dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
+  from: ocp_builder_stream9
   inputs:
     ocp_builder_rhel-9-golang-1.21-openshift-4.16:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
-  to: azure-kms-encryption-provider
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: cluster-autoscaler
 promotion:
   to:
-  - name: scos-4.16
+  - disabled: true
+    name: scos-4.16
     namespace: origin
 releases:
   latest:
@@ -39,6 +42,6 @@ resources:
       memory: 200Mi
 zz_generated_metadata:
   branch: release-4.16
-  org: openshift
-  repo: azure-kubernetes-kms
+  org: openshift-priv
+  repo: kubernetes-autoscaler
   variant: okd-scos
