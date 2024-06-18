@@ -428,7 +428,7 @@ function create_powervs_private_network() {
 function import_centos_image() {
   local CRN="${1}"
 
-  # The CentOS-Stream-8 image is stock-image on PowerVS.
+  # The CentOS-Stream-9 image is stock-image on PowerVS.
   # This image is available across all PowerVS workspaces.
   # The VMs created using this image are used in support of ignition on PowerVS.
   echo "Creating the Centos Stream Image"
@@ -437,7 +437,7 @@ function import_centos_image() {
   retry "ic pi image list"
 
   ##Import the Centos8 image
-  retry "ic pi image create CentOS-Stream-8 --json"
+  retry "ic pi image create CentOS-Stream-9 --json"
   echo "Import image status is: $?"
 }
 
