@@ -12,6 +12,7 @@ QUAY_AWS_S3_BUCKET="quayprowci$RANDOM"
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
 
+mkdir -p QUAY_AWS && cd QUAY_AWS
 cat >>variables.tf <<EOF
 variable "region" {
   default = "us-east-2"
@@ -52,7 +53,12 @@ EOF
 echo "quay aws s3 bucket name is ${QUAY_AWS_S3_BUCKET}"
 export TF_VAR_aws_bucket="${QUAY_AWS_S3_BUCKET}"
 terraform init
-terraform apply -auto-approve
+terraform apply -auto-approve || true
+
+#Share Terraform Var and Terraform Directory
+echo "${QUAY_AWS_S3_BUCKET}" > ${SHARED_DIR}/QUAY_AWS_S3_BUCKET
+tar -cvzf terraform.tgz --exclude=".terraform" *
+cp terraform.tgz ${SHARED_DIR}
 
 #Deploy Quay Operator to OCP namespace 'quay-enterprise'
 cat <<EOF | oc apply -f -
