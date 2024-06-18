@@ -28,6 +28,7 @@ else
     echo "Fail to create $namespace namespace."
 fi
 
+sleep 2h
 
 payload_pullspec=$(oc get clusterversion version -o json | jq -r .status.desired.image)
 
@@ -39,7 +40,7 @@ oc -n $namespace debug node/"$master_node_0" -- chroot /host bash -c "podman run
 out=$(oc -n $namespace debug node/"$master_node_0" -- chroot /host bash -c "cat /$report" || true)
 echo "The report is: $out"
 oc delete ns $namespace || true
-res=$(echo "$out" | grep -E 'Successful run' || true)
+res=$(echo "$out" | grep -iE 'Successful run' || true)
 echo "The result is: $res"
 if [[ -n $res ]];then
     pass=true
