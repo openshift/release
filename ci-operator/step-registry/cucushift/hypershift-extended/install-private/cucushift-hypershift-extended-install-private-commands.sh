@@ -79,7 +79,6 @@ case "${CLUSTER_TYPE,,}" in
             --external-dns-domain-filter="$HYPERSHIFT_EXTERNAL_DNS_DOMAIN"
         )
     fi
-    cat /etc/hypershift-ext-dns-app-azure/credentials
     ;;
 *)
     echo "Unsupported platform ${CLUSTER_TYPE}" >&2

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-# TODO
-set -euxo pipefail
+set -euo pipefail
 
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
