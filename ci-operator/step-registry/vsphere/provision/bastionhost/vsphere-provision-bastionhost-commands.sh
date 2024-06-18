@@ -30,6 +30,10 @@ echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
+
 #Get available ova template
 echo "$(date -u --rfc-3339=seconds) - Get avaiable ova template..."
 vm_template="${BASTION_OVA_URI##*/}"
