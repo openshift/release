@@ -5,13 +5,13 @@ set -o errexit
 set -o pipefail
 
 echo "************ vsphere assisted test-infra post-install ************"
-source ${SHARED_DIR}/platform-conf.sh
+source "${SHARED_DIR}"/platform-conf.sh
 
 # Debug
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 /usr/local/bin/fix_uid.sh
-ssh -F ${SHARED_DIR}/ssh_config "root@ci_machine" "find \${KUBECONFIG} -type f -exec cat {} \;" > ${KUBECONFIG}
+ssh -F "${SHARED_DIR}/ssh_config" "root@ci_machine" "find \${KUBECONFIG} -type f -exec cat {} \;" > "${KUBECONFIG}"
 oc get nodes
 
 # Backup
@@ -39,6 +39,7 @@ EOF
 
 oc patch kubecontrollermanager cluster -p='{"spec": {"forceRedeploymentReason": "recovery-'"$( date --rfc-3339=ns )"'"}}' --type=merge
 
+CLOUD_CONFIG="cloud-provider-config.yaml"
 
 oc get cm cloud-provider-config -o yaml -n openshift-config > ${CLOUD_CONFIG}
 
@@ -60,11 +61,11 @@ sed -i -e "s/vcenterplaceholder/${VSPHERE_VCENTER}/g" \
        -e "s/clusterplaceholder/${bn_vsphere_cluster}/g" \
        -e "s/defaultdatastoreplaceholder/${bn_vsphere_datastore}/g" \
        -e "s/networkplaceholder/${bn_vsphere_network}/g" \
-       -e "s/folderplaceholder/${bn_vsphere_folder}/g" cloud-provider-config.yaml
+       -e "s/folderplaceholder/${bn_vsphere_folder}/g" ${CLOUD_CONFIG}
 
-cat cloud-provider-config.yaml
+cat ${CLOUD_CONFIG}
 echo "Applying changes on cloud-provider-config"
-oc apply -f cloud-provider-config.yaml
+oc apply -f ${CLOUD_CONFIG}
 
 # Do the following if OCP version is >=4.13
 if [[ $(echo -e "4.13\n$version" | sort -V | tail -n 1) == "$version" ]]; then

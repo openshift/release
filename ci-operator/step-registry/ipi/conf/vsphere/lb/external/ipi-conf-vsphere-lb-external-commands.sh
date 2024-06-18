@@ -25,7 +25,6 @@ source "${SHARED_DIR}/govc.sh"
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
-
 cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
 echo "$(date -u --rfc-3339=seconds) - Setting up external load balancer"
