@@ -465,7 +465,5 @@ rm -rf "${workdir}"
 curl -L https://github.com/liqcui/wondershaper/archive/refs/tags/v1.tar.gz>/tmp/wondershap.tar.gz
 cd /tmp/
 tar xvf wondershap.tar.gz
-#git clone https://github.com/SachinNinganure/wondershaper
-#cd wondershaper
-#./wondershaper -a eth0 -u 4096 -d 8192
-./wondershaper-1/wondershaper -a eth0 -u 4096 -d 8192
+cd wondershaper-1
+./wondershaper -a eth0 -u 4096 -d 8192
