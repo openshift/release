@@ -75,14 +75,16 @@ bonfire deploy hac \
 B64_USER=$(oc get secret ${ENV_NAME}-keycloak -o json | jq '.data.username'| tr -d '"')
 B64_PASS=$(oc get secret ${ENV_NAME}-keycloak -o json | jq '.data.password' | tr -d '"')
 
+CYPRESS_USERNAME="e2e-hac-"`echo ${B64_USER} | base64 -d`
+ENCODED_CYPRESS_USERNAME=`echo -n ${CYPRESS_USERNAME} | base64 -w 0`
+
 # These ENVs are populated in the Jenkins job by Vault secrets
 curl -o keycloak.py https://raw.githubusercontent.com/openshift/hac-dev/main/tmp/keycloak.py
-python keycloak.py $HAC_KC_SSO_URL $HAC_KC_USERNAME $HAC_KC_PASSWORD $B64_USER $B64_PASS $HAC_KC_REGISTRATION
+python keycloak.py $HAC_KC_SSO_URL $HAC_KC_USERNAME $HAC_KC_PASSWORD $ENCODED_CYPRESS_USERNAME $B64_PASS $HAC_KC_REGISTRATION
 
 export CYPRESS_PERIODIC_RUN CYPRESS_HAC_BASE_URL CYPRESS_USERNAME CYPRESS_PASSWORD CYPRESS_RP_TOKEN CYPRESS_SSO_URL
 CYPRESS_PERIODIC_RUN=true
 CYPRESS_HAC_BASE_URL=https://${HOSTNAME}/preview/application-pipeline
-CYPRESS_USERNAME=`echo ${B64_USER} | base64 -d`
 CYPRESS_PASSWORD=`echo ${B64_PASS} | base64 -d`
 CYPRESS_RP_TOKEN=${CYPRESS_RP_HAC}
 CYPRESS_SSO_URL=${HAC_KC_SSO_URL}
