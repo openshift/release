@@ -298,10 +298,10 @@ EOF
 
   else
     vcenter_portgroups[$VCENTER]=${portgroup_name}
+    log "discovered portgroup ${vcenter_portgroups[$VCENTER]}"
   fi
 
   cp /tmp/lease.json "${SHARED_DIR}/LEASE_$LEASE.json"
-  log "discovered portgroup ${vcenter_portgroups[$VCENTER]}"
 done
 
 # debug, confirm correct subnets.json
