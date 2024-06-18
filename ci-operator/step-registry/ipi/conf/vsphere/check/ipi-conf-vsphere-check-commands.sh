@@ -3,6 +3,12 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+  echo "using VCM sibling of this step"
+  exit 0
+fi
+
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - failed to acquire lease"
@@ -169,3 +175,5 @@ if [[ "${multizone:-false}" == "true" ]]; then
 ${vc_info}
 EOF
 fi
+
+cp "${SUBNETS_CONFIG}" "${SHARED_DIR}/subnets.json"

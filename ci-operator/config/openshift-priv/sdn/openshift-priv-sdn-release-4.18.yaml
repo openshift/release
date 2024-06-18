@@ -1,55 +1,25 @@
 base_images:
-  ocp_4.16_base-rhel9:
-    name: 4.18-priv
-    namespace: ocp-private
-    tag: base-rhel9
   ocp_4.17_base-rhel9:
     name: 4.18-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
-  ocp_builder_rhel-9-golang-1.21-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.17
+    tag: rhel-9-golang-1.22-openshift-4.17
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/sdn
 images:
-- dockerfile_path: images/sdn/Dockerfile.rhel
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-  to: sdn
 - dockerfile_path: images/kube-proxy/Dockerfile.rhel
   inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
-    ocp_builder_rhel-9-golang-1.21-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: kube-proxy
 promotion:
   to:
@@ -88,30 +58,6 @@ tests:
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
-- as: e2e-aws-sdn
-  steps:
-    cluster_profile: aws
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    workflow: openshift-e2e-aws-sdn
-- as: e2e-gcp-sdn
-  steps:
-    cluster_profile: gcp-3
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    workflow: openshift-e2e-gcp-sdn
-- as: e2e-aws-sdn-multitenant
-  steps:
-    cluster_profile: aws
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    workflow: openshift-e2e-aws-sdn-multi
-- as: e2e-aws-sdn-serial
-  steps:
-    cluster_profile: aws
-    env:
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    workflow: openshift-e2e-aws-sdn-serial
 - as: security
   optional: true
   steps:

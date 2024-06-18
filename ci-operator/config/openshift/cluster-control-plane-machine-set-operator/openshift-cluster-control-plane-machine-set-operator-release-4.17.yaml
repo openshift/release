@@ -129,6 +129,21 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+- as: e2e-azure-periodic-pre
+  optional: true
+  run_if_changed: .*periodic.*|.*azure.*
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-azure
 - as: e2e-gcp-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*gcp.*
@@ -143,11 +158,26 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- as: e2e-gcp-periodic-pre
+  optional: true
+  run_if_changed: .*periodic.*|.*gcp.*
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-gcp
 - as: e2e-vsphere-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - as: test
       commands: |
@@ -161,7 +191,7 @@ tests:
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     test:
     - as: test
       commands: |
@@ -223,7 +253,7 @@ tests:
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-etcd-scaling
 - as: e2e-nutanix-ovn
   cluster: build01

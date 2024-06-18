@@ -1,61 +1,43 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
-  origin_scos-4.16_base-stream9:
-    name: scos-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
+  origin_scos-4.17_base-stream9:
+    name: scos-4.17
     namespace: origin
     tag: base-stream9
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
-canonical_go_repository: k8s.io/cloud-provider-aws
+    tag: rhel-9-golang-1.22-openshift-4.17
 images:
 - build_args:
   - name: TAGS
     value: scos
   dockerfile_path: Dockerfile.openshift
-  from: origin_scos-4.16_base-stream9
+  from: origin_scos-4.17_base-stream9
   inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - builder
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: aws-cloud-controller-manager
 promotion:
   to:
-  - additional_images:
-      cloud-provider-aws-rpms: rpms
-    excluded_images:
-    - base-with-rpms
-    name: scos-4.16
+  - name: scos-4.17
     namespace: origin
-raw_steps:
-- rpm_image_injection_step:
-    from: origin_scos-4.16_base-stream9
-    to: base-with-rpms
 releases:
-  initial:
-    integration:
-      name: scos-4.16
-      namespace: origin
   latest:
     integration:
-      include_built_images: true
-      name: scos-4.16
+      name: scos-4.17
       namespace: origin
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
-rpm_build_commands: openshift-hack/build-rpm.sh 4.16.0
-rpm_build_location: _output/RPMS/x86_64
 zz_generated_metadata:
   branch: master
   org: openshift

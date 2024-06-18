@@ -20,4 +20,9 @@ if [ "${FIREWATCH_VERBOSE_TEST_FAILURE_REPORTING,,}" = "true" ]; then
     report_command+=" --verbose-test-failure-reporting-ticket-limit ${FIREWATCH_VERBOSE_TEST_FAILURE_REPORTING_LIMIT}"
 fi
 
+# If the user specified a configuration file path/url
+if [ -n "${FIREWATCH_CONFIG_FILE_PATH}" ]; then
+    report_command+=" --firewatch-config-path=${FIREWATCH_CONFIG_FILE_PATH}"
+fi
+
 eval "$report_command"

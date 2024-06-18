@@ -15,14 +15,14 @@ function debug() {
         echo -e "Describing abnormal operators...\n"
         oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
         echo -e "Describing abnormal mcp...\n"
-        oc get mcp --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
+        oc get machineconfigpools --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
     fi
 }
 
 function pause() {
     echo "Pausing worker pool..."
     oc patch --type=merge --patch='{"spec":{"paused":true}}' machineconfigpool/worker
-    ret=$(oc get mcp worker -ojson | jq -r '.spec.paused')
+    ret=$(oc get machineconfigpools worker -ojson | jq -r '.spec.paused')
     if [[ "${ret}" != "true" ]]; then
         echo >&2 "Worker pool failed to pause, exiting" && return 1
     fi
