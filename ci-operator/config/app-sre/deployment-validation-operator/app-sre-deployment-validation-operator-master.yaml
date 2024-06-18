@@ -7,20 +7,14 @@ base_images:
     name: deployment-validation-operator-tests
     namespace: ci
     tag: latest
-  operator-sdk:
-    name: "4.12"
-    namespace: origin
-    tag: operator-sdk
   hypershift:
     name: "4.16"
     namespace: stable
     tag: hypershift
-releases:
-  latest:
-    release:
-      channel: stable
-      version: "4.16"
-      architecture: multi
+  operator-sdk:
+    name: "4.12"
+    namespace: origin
+    tag: operator-sdk
 build_root:
   from_repository: true
 images:
@@ -35,6 +29,12 @@ operator:
   substitutions:
   - pullspec: quay.io/deployment-validation-operator/dv-operator:latest
     with: pipeline:dvo-operator
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -185,12 +185,10 @@ tests:
           cpu: 100m
     workflow: generic-claim
 - as: dvo-e2e-tests-hypershift
-  cluster_profile: aws-observability
   cron: 0 0 * * *
   steps:
     test:
     - as: install
-      hypershift: 4.16
       commands: |
         operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout 10m0s
       dependencies:
