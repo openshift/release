@@ -1,0 +1,40 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: eco-ci-cd
+  cluster: build05
+  cron: 00 12 * * 1
+  steps:
+    env:
+      ANSIBLE_SKIP_TAGS: NOT_REQUIRED
+      CNF_IMAGE: NOT_REQUIRED
+      DCI_PIPELINE_FILES: du-deployment.yml
+      DEBUG_MODE: "true"
+      DU_PROFILE: lb
+      ECO_GOTESTS_CONTAINER: NOT_REQUIRED
+      EDU_CLUSTER: cloudransno-site3
+      EDU_PTP: NOT_REQUIRED
+      GITLAB_BRANCH: dev
+      OCP_VERSION: "4.12"
+      RUN_EDU_TESTS: "true"
+      SITE_NAME: cloudransno-site3
+      SPIRENT_PORT: "37"
+      STAMP: s614
+      TEST_ID: NOT_REQUIRED
+    test:
+    - ref: telcov10n-ipa-poc-tests
+    workflow: telcov10n-ipa-poc
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
