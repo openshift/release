@@ -466,4 +466,4 @@ curl -L https://github.com/liqcui/wondershaper/archive/refs/tags/v1.tar.gz>/tmp/
 cd /tmp/
 tar xvf wondershap.tar.gz
 cd wondershaper-1
-./wondershaper -a eth0 -u 4096 -d 8192
+#./wondershaper -a eth0 -u 4096 -d 8192
