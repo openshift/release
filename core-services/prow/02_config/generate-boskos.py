@@ -134,10 +134,10 @@ CONFIG = {
         'westus': 8
     },
     'azure-arm64-quota-slice': {
-        'centralus': 3,
-        'southcentralus': 3,
-        'eastus': 3,
-        'westus2': 3
+        'centralus': 33,
+        'southcentralus': 8,
+        'eastus': 8,
+        'westus2': 8
     },
     'azurestack-quota-slice': {
         'ppe3': 2
