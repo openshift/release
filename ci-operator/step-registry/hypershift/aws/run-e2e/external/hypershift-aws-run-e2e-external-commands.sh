@@ -16,7 +16,7 @@ trap cleanup EXIT
 REQUEST_SERVING_COMPONENT_TEST="${REQUEST_SERVING_COMPONENT_TEST:-}"
 REQUEST_SERVING_COMPONENT_PARAMS=""
 
-if [[ -n "${REQUEST_SERVING_COMPONENT_TEST}" ]]; then
+if [[ "${REQUEST_SERVING_COMPONENT_TEST:-}" == "true" ]]; then
    REQUEST_SERVING_COMPONENT_PARAMS="--e2e.test-request-serving-isolation \
   --e2e.management-parent-kubeconfig=${MGMT_PARENT_KUBECONFIG} \
   --e2e.management-cluster-namespace=$(cat "${SHARED_DIR}/management_cluster_namespace") \
