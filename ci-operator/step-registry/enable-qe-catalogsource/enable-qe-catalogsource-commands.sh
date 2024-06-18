@@ -52,15 +52,6 @@ function update_global_auth () {
  # run_command "cat /tmp/.dockerconfigjson | jq"
 
   # replace all global auth with the QE's
-  # new_dockerconfig="/var/run/vault/image-registry/qe_dockerconfigjson"
-  oc adm catalog mirror quay.io/openshift-qe-optional-operators/aosqe-index:v4.16 brew.registry.redhat.io --manifests-only -a /tmp/new-dockerconfigjson --to-manifests=/tmp
-  icsp_num=$(oc get /imageContentSourcePolicy 2>/dev/null|wc -l)
-  if [[ $icsp_num -gt 0 ]] ; then
-    oc create -f /tmp/imageContentSourcePolicy.yaml
-  else
-    oc create -f /tmp/imageDigestMirrorSet.yaml
-  fi
-  
   # add quay.io/openshift-qe-optional-operators and quay.io/openshifttest auth to the global auth
   new_dockerconfig="/tmp/new-dockerconfigjson"
   # qe_registry_auth=$(cat "/var/run/vault/mirror-registry/qe_optional.json" | jq -r '.auths."quay.io/openshift-qe-optional-operators".auth')
@@ -76,6 +67,16 @@ function update_global_auth () {
   reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
   brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
   jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${new_dockerconfig}
+
+  # new_dockerconfig="/var/run/vault/image-registry/qe_dockerconfigjson"
+  oc adm catalog mirror quay.io/openshift-qe-optional-operators/aosqe-index:v4.16 brew.registry.redhat.io --manifests-only -a /tmp/new-dockerconfigjson --to-manifests=/tmp
+  icsp_num=$(oc get /imageContentSourcePolicy 2>/dev/null|wc -l)
+  if [[ $icsp_num -gt 0 ]] ; then
+    oc create -f /tmp/imageContentSourcePolicy.yaml
+  else
+    oc create -f /tmp/imageDigestMirrorSet.yaml
+  fi
+  
 
  # run_command "cat ${new_dockerconfig} | jq"
 
