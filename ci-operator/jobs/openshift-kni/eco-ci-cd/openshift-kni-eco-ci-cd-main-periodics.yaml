@@ -1,26 +1,37 @@
 periodics:
 - agent: kubernetes
   cluster: build05
-  cron: 00 12 * * 1
+  cron: 00 15 * * 2
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
   - base_ref: main
     org: openshift-kni
-    repo: eco-gosystem
+    repo: eco-ci-cd
   labels:
     ci-operator.openshift.io/cluster: build05
+    ci-operator.openshift.io/variant: far-edge-vran-ptp-4.15
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-eco-gosystem-main-eco-gosystem
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-far-edge-vran-ptp-4.15-eco-ci-cd
+  reporter_config:
+    slack:
+      channel: '#eco-ci-cd-temp'
+      job_states_to_report:
+      - failure
+      - error
+      - success
+      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
+        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
-      - --target=eco-gosystem
+      - --target=eco-ci-cd
+      - --variant=far-edge-vran-ptp-4.15
       command:
       - ci-operator
       image: ci-operator:latest
