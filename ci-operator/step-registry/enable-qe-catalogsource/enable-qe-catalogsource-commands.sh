@@ -52,15 +52,6 @@ function update_global_auth () {
  # run_command "cat /tmp/.dockerconfigjson | jq"
 
   # replace all global auth with the QE's
-  # new_dockerconfig="/var/run/vault/image-registry/qe_dockerconfigjson"
-  
-  oc adm catalog mirror quay.io/openshift-qe-optional-operators/aosqe-index:v4.16 brew.registry.redhat.io --manifests-only -a /tmp/new-dockerconfigjson --to-manifests=/tmp
-  icsp_num=$(oc get /imageContentSourcePolicy 2>/dev/null|wc -l)
-  if [[ $icsp_num -gt 0 ]] ; then
-    oc create -f /tmp/imageContentSourcePolicy.yaml
-  else
-    oc create -f /tmp/imageDigestMirrorSet.yaml
-  fi
   # add quay.io/openshift-qe-optional-operators and quay.io/openshifttest auth to the global auth
   new_dockerconfig="/tmp/new-dockerconfigjson"
   # qe_registry_auth=$(cat "/var/run/vault/mirror-registry/qe_optional.json" | jq -r '.auths."quay.io/openshift-qe-optional-operators".auth')
@@ -76,6 +67,16 @@ function update_global_auth () {
   reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
   brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
   jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${new_dockerconfig}
+
+  # new_dockerconfig="/var/run/vault/image-registry/qe_dockerconfigjson"
+  oc adm catalog mirror quay.io/openshift-qe-optional-operators/aosqe-index:v4.16 brew.registry.redhat.io --manifests-only -a /tmp/new-dockerconfigjson --to-manifests=/tmp
+  icsp_num=$(oc get /imageContentSourcePolicy 2>/dev/null|wc -l)
+  if [[ $icsp_num -gt 0 ]] ; then
+    oc create -f /tmp/imageContentSourcePolicy.yaml
+  else
+    oc create -f /tmp/imageDigestMirrorSet.yaml
+  fi
+  
 
  # run_command "cat ${new_dockerconfig} | jq"
 
@@ -133,8 +134,8 @@ function create_catalog_sources()
     kube_minor=$(oc version -o json |jq -r '.serverVersion.minor')
     index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 
-    echo "Create QE catalogsource: $CATALOGSOURCE_NAME"
-    echo "Use $index_image in catalogsource/$CATALOGSOURCE_NAME"
+    echo "Create QE catalogsource: qe-app-registry"
+    echo "Use $index_image in catalogsource/qe-app-registry"
     # since OCP 4.15, the official catalogsource use this way. OCP4.14=K8s1.27
     # details: https://issues.redhat.com/browse/OCPBUGS-31427
     if [[ ${kube_major} -gt 1 || ${kube_minor} -gt 27 ]]; then
@@ -143,7 +144,7 @@ function create_catalog_sources()
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: $CATALOGSOURCE_NAME
+  name: qe-app-registry
   namespace: openshift-marketplace
   annotations:
     olm.catalogImageTemplate: "quay.io/openshift-qe-optional-operators/aosqe-index:v{kube_major_version}.{kube_minor_version}"
@@ -167,7 +168,7 @@ EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: $CATALOGSOURCE_NAME
+  name: qe-app-registry
   namespace: openshift-marketplace
   annotations:
     olm.catalogImageTemplate: "quay.io/openshift-qe-optional-operators/aosqe-index:v{kube_major_version}.{kube_minor_version}"
@@ -189,7 +190,7 @@ EOF
         sleep 20
         COUNTER=`expr $COUNTER + 20`
         echo "waiting ${COUNTER}s"
-        STATUS=`oc -n openshift-marketplace get catalogsource $CATALOGSOURCE_NAME -o=jsonpath="{.status.connectionState.lastObservedState}"`
+        STATUS=`oc -n openshift-marketplace get catalogsource qe-app-registry -o=jsonpath="{.status.connectionState.lastObservedState}"`
         if [[ $STATUS = "READY" ]]; then
             echo "create the QE CatalogSource successfully"
             break
@@ -203,9 +204,9 @@ EOF
         # run_command "oc -n openshift-marketplace get secret $(oc -n openshift-marketplace get sa qe-app-registry -o=jsonpath='{.secrets[0].name}') -o yaml"
         
         run_command "oc get pods -o wide -n openshift-marketplace"
-        run_command "oc -n openshift-marketplace get catalogsource $CATALOGSOURCE_NAME -o yaml"
-        run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=$CATALOGSOURCE_NAME -o yaml"
-        node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource=$CATALOGSOURCE_NAME -o=jsonpath='{.items[0].spec.nodeName}')
+        run_command "oc -n openshift-marketplace get catalogsource qe-app-registry -o yaml"
+        run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o yaml"
+        node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o=jsonpath='{.items[0].spec.nodeName}')
         run_command "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
         run_command "oc -n debug-qe debug node/${node_name} -- chroot /host podman pull --authfile /var/lib/kubelet/config.json ${index_image}"
         
