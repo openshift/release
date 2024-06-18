@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euxo pipefail
+set -euo pipefail
 
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
@@ -33,6 +33,7 @@ fi
 
 echo "Creating AKS cluster"
 eval "${AKE_CREATE_COMMAND[*]}"
+echo "$CLUSTER" > "${SHARED_DIR}/cluster-name"
 
 echo "Building up the aks get-credentials command"
 AKS_GET_CREDS_COMMAND=(
