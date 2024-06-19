@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if test -f "${SHARED_DIR}/api.login"; then
+    eval "$(cat "${SHARED_DIR}/api.login")"
+else
+    echo "No ${SHARED_DIR}/api.login present. This is not an HCP or ROSA cluster. Continue using \$KUBECONFIG env path."
+fi
+
 git clone https://github.com/open-telemetry/opentelemetry-operator.git /tmp/otel-tests
 cd /tmp/otel-tests 
 git checkout -b downstream-release "${INTEROP_TESTS_COMMIT}"
