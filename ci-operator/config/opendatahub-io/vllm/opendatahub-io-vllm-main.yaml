@@ -16,6 +16,19 @@ images:
   context_dir: .
   dockerfile_path: Dockerfile.ubi
   to: vllm-build-main-cuda
+- dockerfile_literal: |
+    FROM vllm-build-main-cuda
+
+    ENV VIRTUAL_ENV=/opt/vllm
+    ENV PATH=$VIRTUAL_ENV/bin/:$PATH
+
+    USER root
+    COPY requirements-dev.txt requirements-dev.txt
+    COPY requirements-lint.txt requirements-lint.txt
+    COPY requirements-test.txt requirements-test.txt
+    RUN pip install --no-cache-dir -r requirements-dev.txt
+  from: vllm-build-main-cuda
+  to: vllm-test
 promotion:
   to:
   - namespace: opendatahub-io
@@ -40,6 +53,15 @@ resources:
       cpu: "4"
       memory: 8Gi
       nvidia.com/gpu: "1"
+  unit-test:
+    limits:
+      cpu: "4"
+      memory: 24Gi
+      nvidia.com/gpu: "1"
+    requests:
+      cpu: "4"
+      memory: 8Gi
+      nvidia.com/gpu: "1"
   vllm-build-main-cuda:
     limits:
       cpu: "16"
@@ -48,6 +70,17 @@ resources:
       cpu: "16"
       memory: 24Gi
 tests:
+- always_run: true
+  as: unit-test
+  cluster: build05
+  commands: |
+    export VIRTUAL_ENV=/opt/vllm
+    export PATH=$VIRTUAL_ENV/bin/:$PATH
+
+    bash extras/unit-tests.sh
+  container:
+    clone: true
+    from: vllm-test
 - always_run: true
   as: smoke-test
   cluster: build05
