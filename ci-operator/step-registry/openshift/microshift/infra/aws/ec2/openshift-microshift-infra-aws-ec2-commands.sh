@@ -7,8 +7,6 @@ set -o pipefail
 export PS4='+ $(date "+%T.%N") \011'
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-#Save stacks events
-trap 'save_stack_events_to_shared' EXIT TERM INT
 
 # This map should be extended everytime AMIs from different regions/architectures/os versions
 # are added.
@@ -397,9 +395,12 @@ if aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack
         echo "Waited for stack-delete-complete ${stack_name}"
 fi
 
-echo -e "==== Start to create rhel host ===="
-echo "${stack_name}" >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
-aws --region "$REGION" cloudformation create-stack --stack-name "${stack_name}" \
+set +e
+retries=2
+while [[ $retries -gt 0 ]]; do
+  echo "Creating and waiting for stack ${stack_name}. ${retries} retries left"
+
+  if aws --region "$REGION" cloudformation create-stack --stack-name "${stack_name}" \
     --template-body "file://${cf_tpl_file}" \
     --capabilities CAPABILITY_NAMED_IAM \
     --parameters \
@@ -407,14 +408,31 @@ aws --region "$REGION" cloudformation create-stack --stack-name "${stack_name}" 
         ParameterKey=Machinename,ParameterValue="${stack_name}"  \
         ParameterKey=AmiId,ParameterValue="${ami_id}" \
         ParameterKey=EC2Type,ParameterValue="${ec2Type}" \
-        ParameterKey=PublicKeyString,ParameterValue="$(cat ${CLUSTER_PROFILE_DIR}/ssh-publickey)"
+        ParameterKey=PublicKeyString,ParameterValue="$(cat ${CLUSTER_PROFILE_DIR}/ssh-publickey)" && \
+  aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}"; then
+    echo "Creation successful"
+    echo "${stack_name}" >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
+    break
+  else
+    if aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
+        --query "Stacks[].Outputs[?OutputKey == 'InstanceId'].OutputValue" > /dev/null; then
+        echo "${stack_name} already exists. Saving events and deleting"
+        aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json > "${ARTIFACT_DIR}/stack-events-${stack_name}_retry-${retries}.json"
+        aws --region "${REGION}" cloudformation delete-stack --stack-name "${stack_name}"
+        aws --region "${REGION}" cloudformation wait stack-delete-complete --stack-name "${stack_name}"
+    fi
+    echo "Creation failed. Waiting a minute for next retry"
+    sleep 60
+    retries=$((retries - 1))
+  fi
+done
+set -e
 
-echo "Created stack"
+if [[ $retries -eq 0 ]]; then
+  echo "Failed after retrying"
+  exit 1
+fi
 
-aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}"
-echo "Waited for stack"
-
-echo "$stack_name" > "${SHARED_DIR}/rhel_host_stack_name"
 # shellcheck disable=SC2016
 INSTANCE_ID="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
 --query 'Stacks[].Outputs[?OutputKey == `InstanceId`].OutputValue' --output text)"
