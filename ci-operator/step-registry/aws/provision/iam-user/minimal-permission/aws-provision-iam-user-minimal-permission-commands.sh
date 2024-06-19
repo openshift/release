@@ -268,6 +268,8 @@ fi
 # additional permisions for 4.16+
 if (( ocp_minor_version >= 16 && ocp_major_version == 4 )); then
   echo "ec2:DisassociateAddress" >> "${PERMISION_LIST}"
+  echo "elasticloadbalancing:SetSecurityGroups" >> "${PERMISION_LIST}"
+  echo "s3:PutBucketPolicy" >> "${PERMISION_LIST}"
 fi
 
 # generte policy file

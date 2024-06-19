@@ -1,0 +1,119 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.59.0
+  ocp_4.17_base-rhel9:
+    name: "4.17"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_4.17_installer-etcd-artifacts:
+    name: "4.17"
+    namespace: ocp
+    tag: installer-etcd-artifacts
+  ocp_4.17_installer-kube-apiserver-artifacts:
+    name: "4.17"
+    namespace: ocp
+    tag: installer-kube-apiserver-artifacts
+  ocp_4.17_installer-terraform-providers:
+    name: "4.17"
+    namespace: ocp
+    tag: installer-terraform-providers
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+build_root:
+  from_repository: true
+  use_build_cache: true
+images:
+- dockerfile_path: images/installer/Dockerfile.ci
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.17_installer-etcd-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:installer-etcd-artifacts
+    ocp_4.17_installer-kube-apiserver-artifacts:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
+    ocp_4.17_installer-terraform-providers:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:installer-terraform-providers
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: installer
+releases:
+  initial:
+    integration:
+      name: "4.17"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.17"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  govet:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  unit:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+test_binary_build_commands: |
+  # Some image-based installer tests require nmstatectl
+  dnf install -y nmstate
+tests:
+- as: unit
+  commands: |
+    go test -coverprofile=/tmp/coverprofile.out ./pkg/...
+    go tool cover -o $ARTIFACT_DIR/cover.txt -func /tmp/coverprofile.out
+    go tool cover -o $ARTIFACT_DIR/cover.html -html /tmp/coverprofile.out
+  container:
+    from: test-bin
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: gofmt
+  commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: govet
+  commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: golint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run --verbose --print-resources-usage --new-from-rev=dcf8122
+  container:
+    clone: true
+    from: golangci-lint
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: verify-vendor
+  commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: verify-codegen
+  commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
+  container:
+    from: src
+zz_generated_metadata:
+  branch: image-based-installer
+  org: openshift
+  repo: installer

@@ -4,9 +4,13 @@ base_images:
     namespace: ocp
     tag: v1.31.0
   must-gather:
-    name: "4.16"
+    name: "4.17"
     namespace: ocp
     tag: must-gather
+  ocp_4.17_base-rhel9:
+    name: "4.17"
+    namespace: ocp
+    tag: base-rhel9
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
@@ -16,7 +20,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
 images:
 - dockerfile_literal: |-
     FROM ubi_minimal
@@ -46,6 +50,10 @@ images:
       - root:current
   to: lvms-pre-commit
 - dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - fedora:latest
   to: lvm-operator
 - context_dir: must-gather/
   dockerfile_path: Dockerfile
@@ -68,12 +76,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.16"
+      name: "4.17"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
+      name: "4.17"
       namespace: ocp
 resources:
   '*':
@@ -134,6 +142,8 @@ tests:
     mount_path: /tmp/secret
     name: lvms-snyk-token
 - as: lvm-operator-e2e-aws-sno
+  cron: '@daily'
+  presubmit: true
   steps:
     cluster_profile: aws
     dependencies:
@@ -152,6 +162,8 @@ tests:
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws-sno
 - as: lvm-operator-e2e-aws
+  cron: '@daily'
+  presubmit: true
   steps:
     cluster_profile: aws
     dependencies:
