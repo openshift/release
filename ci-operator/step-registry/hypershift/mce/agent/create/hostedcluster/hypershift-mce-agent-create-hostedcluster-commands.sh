@@ -59,6 +59,18 @@ cat /tmp/cluster.yaml
 oc apply -f /tmp/cluster.yaml
 ### workaround for https://issues.redhat.com/browse/DPTP-4024
 ### --release-image ${RELEASE_IMAGE} use default release-image
+oc create ns "${CLUSTER_NAMESPACE}-2"
+/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} ${IP_STACK_COMMAND} \
+  --name=${CLUSTER_NAME}-2 \
+  --pull-secret=/tmp/.dockerconfigjson \
+  --agent-namespace="${CLUSTER_NAMESPACE}" \
+  --namespace local-cluster \
+  --base-domain=${BASEDOMAIN} \
+  --image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml" \
+  --ssh-key="${SHARED_DIR}/id_rsa.pub" \
+  --render > /tmp/cluster2.yaml
+cat /tmp/cluster2.yaml
+oc apply -f /tmp/cluster2.yaml
 
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4"
