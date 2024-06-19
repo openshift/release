@@ -97,6 +97,13 @@ tests:
     env:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-cache
+- as: microshift-metal-cache-nightly
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-cache
 - as: microshift-metal-cache-arm
   run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
   steps:
@@ -105,6 +112,22 @@ tests:
       EC2_INSTANCE_TYPE: c7g.2xlarge
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-cache
+- as: microshift-metal-cache-nightly-arm
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: c7g.2xlarge
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-metal-cache
+- as: rebase-on-nightlies
+  cron: 0 4 * * 1-5
+  steps:
+    workflow: openshift-microshift-rebase
+- as: publish-release-notes
+  cron: 0 5 * * 1-5
+  steps:
+    workflow: openshift-microshift-publish-release-notes
 - as: metal-periodic-test
   run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
   steps:
