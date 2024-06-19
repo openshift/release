@@ -41,6 +41,16 @@ if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
   --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com \
   --wait-until-available \
   ${EXTRA_ARGS}
+elif [ "${CLOUD_PROVIDER}" == "Azure" ]; then
+  "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
+  --managed-service ARO-HCP \
+  --external-dns-provider=azure \
+  --external-dns-credentials=etc/hypershift-aks-e2e-dns-credentials/credentials.json \
+  --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com \
+  --platform-monitoring=All \
+  --enable-ci-debug-output \
+  --wait-until-available \
+  ${EXTRA_ARGS}
 else
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
   --platform-monitoring=All \
