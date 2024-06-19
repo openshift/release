@@ -145,6 +145,12 @@ Resources:
         - Key: Name
           Value: RHELVPC
 
+  RHELVPCIPv6Cidr:
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      AmazonProvidedIpv6CidrBlock: true
+      VpcId: !Ref RHELVPC
+
 ## Setup internet access
 
   RHELInternetGateway:
@@ -170,6 +176,19 @@ Resources:
         - Key: Name
           Value: RHELPublicSubnet
 
+  RHELPublicSubnet:
+    Type: AWS::EC2::Subnet
+    DependsOn: RHELVPCIPv6Cidr
+    Properties:
+      VpcId: !Ref RHELVPC
+      CidrBlock: !Ref PublicSubnetCidr
+      MapPublicIpOnLaunch: true
+      Ipv6CidrBlock: !Select [ 0, !Cidr [ !Select [ 0, !GetAtt RHELVPC.Ipv6CidrBlocks], 256, 64 ]]
+      AssignIpv6AddressOnCreation: true
+      Tags:
+        - Key: Name
+          Value: RHELPublicSubnet
+
   RHELRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -184,6 +203,14 @@ Resources:
     Properties:
       RouteTableId: !Ref RHELRouteTable
       DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref RHELInternetGateway
+
+  RHELPublicRouteIpv6:
+    Type: AWS::EC2::Route
+    DependsOn: RHELGatewayAttachment
+    Properties:
+      RouteTableId: !Ref RHELRouteTable
+      DestinationIpv6CidrBlock: "::/0"
       GatewayId: !Ref RHELInternetGateway
 
   RHELPublicSubnetRouteTableAssociation:
@@ -224,38 +251,74 @@ Resources:
         FromPort: -1
         ToPort: -1
         CidrIp: 0.0.0.0/0
+      - IpProtocol: icmpv6
+        FromPort: -1
+        ToPort: -1
+        CidrIpv6: ::/0
       - IpProtocol: tcp
         FromPort: 22
         ToPort: 22
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
         FromPort: 80
         ToPort: 80
         CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIpv6: ::/0
       - IpProtocol: tcp
         FromPort: 443
         ToPort: 443
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
         FromPort: 5353
         ToPort: 5353
         CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 5353
+        ToPort: 5353
+        CidrIpv6: ::/0
       - IpProtocol: tcp
         FromPort: 5678
         ToPort: 5678
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
+        FromPort: 5678
+        ToPort: 5678
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
         FromPort: 6443
         ToPort: 6443
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
+        FromPort: 6443
+        ToPort: 6443
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 30000
+        ToPort: 32767
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 30000
+        ToPort: 32767
+        CidrIpv6: ::/0
+      - IpProtocol: udp
         FromPort: 30000
         ToPort: 32767
         CidrIp: 0.0.0.0/0
       - IpProtocol: udp
         FromPort: 30000
         ToPort: 32767
-        CidrIp: 0.0.0.0/0
+        CidrIpv6: ::/0
       VpcId: !Ref RHELVPC
 
   rhelLaunchTemplate:
@@ -364,8 +427,11 @@ HOST_PUBLIC_IP="$(aws --region "${REGION}" cloudformation describe-stacks --stac
 HOST_PRIVATE_IP="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
   --query 'Stacks[].Outputs[?OutputKey == `PrivateIp`].OutputValue' --output text)"
 
+IPV6_ADDRESS=$(aws --region "${REGION}" ec2 describe-instances --instance-id "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].NetworkInterfaces[*].[Ipv6Addresses[*].Ipv6Address]' --output text)
+
 echo "${HOST_PUBLIC_IP}" > "${SHARED_DIR}/public_address"
 echo "${HOST_PRIVATE_IP}" > "${SHARED_DIR}/private_address"
+echo "${IPV6_ADDRESS}" > "${SHARED_DIR}/public_ipv6_address"
 
 echo "Waiting up to 5 min for RHEL host to be up."
 timeout 5m aws --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"
