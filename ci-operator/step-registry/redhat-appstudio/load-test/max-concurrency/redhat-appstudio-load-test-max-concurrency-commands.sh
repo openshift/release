@@ -18,9 +18,9 @@ GITHUB_TOKENS_LIST="$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/githu
 QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/quay-token)
 QUAY_OAUTH_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/quay-oauth-user)
 QUAY_OAUTH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-load-test/quay-oauth-token)
+OAUTH_REDIRECT_PROXY_URL=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/oauth-redirect-proxy-url)
 PYXIS_STAGE_KEY=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pyxis-stage-key)
 PYXIS_STAGE_CERT=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pyxis-stage-cert)
-OAUTH_REDIRECT_PROXY_URL=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/oauth-redirect-proxy-url)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 PREVIOUS_RATE_REMAINING=0
@@ -89,7 +89,8 @@ echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" >"${GIT_CREDS_PATH}"
 
 cd "$(mktemp -d)"
 
-git clone --origin upstream --branch main "https://${GITHUB_TOKEN}@github.com/konflux-ci/e2e-tests.git" .
+###git clone --origin upstream --branch main "https://${GITHUB_TOKEN}@github.com/konflux-ci/e2e-tests.git" .
+git clone --origin upstream --branch fix24 "https://${GITHUB_TOKEN}@github.com/jhutar/e2e-tests.git" .
 
 set -x
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
