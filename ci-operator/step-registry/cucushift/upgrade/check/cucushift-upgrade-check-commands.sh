@@ -171,11 +171,13 @@ function filter_test_by_capability() {
     declare -A tagmaps
     tagmaps=([baremetal]=xxx
              [Build]=workloads
+             [CloudControllerManager]=xxx
              [CloudCredential]=xxx
              [Console]=console
              [CSISnapshot]=storage
              [DeploymentConfig]=workloads
              [ImageRegistry]=xxx
+             [Ingress]=xxx
              [Insights]=xxx
              [MachineAPI]=xxx
              [marketplace]=xxx
