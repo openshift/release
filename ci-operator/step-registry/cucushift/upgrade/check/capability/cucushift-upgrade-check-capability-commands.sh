@@ -194,7 +194,14 @@ function extract_migrated_caps() {
 
             if [ "$source_cap" != "$target_cap" ]; then
                 echo "Migrated capability in $filename: $source_cap -> $target_cap"
-                migrated_caps["$source_cap"]=$target_cap
+                # Example:
+                # Migrated capability in 0000_26_cloud-controller-manager-operator_18_credentialsrequest-nutanix.yaml:  CloudCredential ->  CloudCredential+CloudControllerManager
+                # Migrated capability in 0000_50_cluster-ingress-operator_00-ingress-credentials-request.yaml:  CloudCredential ->  CloudCredential+Ingress
+                if [[ -n "${migrated_caps[${source_cap}]:-}" ]]; then
+                    migrated_caps["${source_cap}"]+="+${target_cap}"
+                else
+                    migrated_caps["${source_cap}"]="${target_cap}"
+                fi
             fi
         fi
     done
@@ -329,9 +336,30 @@ if [[ "${baselinecaps_from_cluster}" == "v4."* ]]; then
     else
         echo "migrated_caps is not empty."
         for key in "${!migrated_caps[@]}"; do
-            if [[ $source_enabled_caps == *$key* ]] && [[ $target_enabled_caps != *${migrated_caps[$key]}* ]]; then
-                expected_enabled_caps="${expected_enabled_caps} ${migrated_caps[$key]}"
-                expected_implicit_caps="${expected_implicit_caps} ${migrated_caps[$key]}"
+            # Handle the scenario of multiple caps in key
+            IFS='+' read -r -a key_caps <<< "$key"
+            all_key_caps_exist=true
+            for cap in "${key_caps[@]}"; do
+                #shellcheck disable=SC2076
+                if [[ ! " ${source_enabled_caps} " =~ " ${cap} " ]]; then
+                    all_key_caps_exist=false
+                    break
+                fi
+            done
+
+            # Handle the scenario of multiple caps in value
+            IFS='+' read -r -a value_caps <<< "${migrated_caps[$key]}"
+            value_caps_to_add=()
+            for cap in "${value_caps[@]}"; do
+                #shellcheck disable=SC2076
+                if [[ ! " ${target_enabled_caps} " =~ " ${cap} " ]]; then
+                    value_caps_to_add+=("$cap")
+                fi
+            done
+
+            if $all_key_caps_exist && [ ${#value_caps_to_add[@]} -ne 0 ]; then
+                expected_enabled_caps="${expected_enabled_caps} ${value_caps_to_add[*]}"
+                expected_implicit_caps="${expected_implicit_caps} ${value_caps_to_add[*]}"
             fi
         done
     fi
@@ -349,9 +377,30 @@ if [[ "${baselinecaps_from_cluster}" == "None" ]]; then
     else
         echo "migrated_caps is not empty."
         for key in "${!migrated_caps[@]}"; do
-            if [[ ${additionalcaps_from_cluster} == *$key* ]] && [[ ${additionalcaps_from_cluster} != *${migrated_caps[$key]}* ]]; then
-                expected_enabled_caps="${expected_enabled_caps} ${migrated_caps[$key]}"
-                expected_implicit_caps="${expected_implicit_caps} ${migrated_caps[$key]}"
+            # Handle the scenario of multiple caps in key
+            IFS='+' read -r -a key_caps <<< "$key"
+            all_key_caps_exist=true
+            for cap in "${key_caps[@]}"; do
+                #shellcheck disable=SC2076
+                if [[ ! " ${additionalcaps_from_cluster} " =~ " ${cap} " ]]; then
+                    all_key_caps_exist=false
+                    break
+                fi
+            done
+
+            # Handle the scenario of multiple caps in value
+            IFS='+' read -r -a value_caps <<< "${migrated_caps[$key]}"
+            value_caps_to_add=()
+            for cap in "${value_caps[@]}"; do
+                #shellcheck disable=SC2076
+                if [[ ! " ${additionalcaps_from_cluster} " =~ " ${cap} " ]]; then
+                    value_caps_to_add+=("$cap")
+                fi
+            done
+
+            if $all_key_caps_exist && [ ${#value_caps_to_add[@]} -ne 0 ]; then
+                expected_enabled_caps="${expected_enabled_caps} ${value_caps_to_add[*]}"
+                expected_implicit_caps="${expected_implicit_caps} ${value_caps_to_add[*]}"
             fi
         done
     fi
