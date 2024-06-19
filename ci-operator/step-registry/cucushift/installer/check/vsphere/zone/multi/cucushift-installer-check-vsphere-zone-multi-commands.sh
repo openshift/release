@@ -5,7 +5,9 @@ set -o errexit
 set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
 

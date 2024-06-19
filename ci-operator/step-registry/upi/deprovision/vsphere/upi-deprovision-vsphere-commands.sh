@@ -31,6 +31,10 @@ echo "{\"hw_version\":  \"vmx-${target_hw_version}\", \"cloud\": \"${cloud_where
 
 set +e
 source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE 
+unset GOVC_TLS_CA_CERTS
+
 vm_path="/${GOVC_DATACENTER}/vm/${cluster_name}"
 vcenter_state=${ARTIFACT_DIR}/vcenter_state
 mkdir ${vcenter_state}

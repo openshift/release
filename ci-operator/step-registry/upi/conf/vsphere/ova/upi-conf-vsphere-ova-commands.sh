@@ -23,7 +23,11 @@ source "${SHARED_DIR}/govc.sh"
 
 declare vsphere_cluster
 declare vsphere_portgroup
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+
+unset SSL_CERT_FILE 
+unset GOVC_TLS_CA_CERTS
 
 DATACENTERS=("$GOVC_DATACENTER")
 DATASTORES=("$GOVC_DATASTORE")

@@ -11,6 +11,9 @@ if [ "${TEST_SUITE:-full}" == "none" ]; then
     exit 0
 fi
 
+unset SSL_CERT_FILE 
+unset GOVC_TLS_CA_CERTS
+
 case "${CLUSTER_TYPE}" in
     vsphere)
         # shellcheck disable=SC1090
