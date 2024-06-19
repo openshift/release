@@ -421,8 +421,8 @@ while [[ $retries -gt 0 ]]; do
         aws --region "${REGION}" cloudformation delete-stack --stack-name "${stack_name}"
         aws --region "${REGION}" cloudformation wait stack-delete-complete --stack-name "${stack_name}"
     fi
-    echo "Creation failed. Waiting a minute for next retry"
-    sleep 60
+    echo "Creation failed. Waiting for next retry"
+    sleep 300
     retries=$((retries - 1))
   fi
 done
