@@ -148,6 +148,25 @@ EOF
   set +x
 }
 
+# enable_efa_pg_instance_config is an AWS specific option that enables one worker machineset in a placement group and with EFA Network Interface Type, other worker machinesets will be ENA Network Interface Type by default.....
+function enable_efa_pg_instance_config() {
+  local dir=${1}
+
+  PATCH="${SHARED_DIR}/machineset0-efa-pg.yaml.patch"
+  cat > "${PATCH}" << EOF
+spec:
+  template:
+    spec:
+      providerSpec:
+        value:
+          networkInterfaceType: EFA
+          instanceType: c5n.9xlarge
+          placementGroupName: pgcluster
+EOF
+  yq-go m -x -i "${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml" "${PATCH}"
+  echo 'Patched efa pg into 99_openshift-cluster-api_worker-machineset-0.yaml'
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM
 
@@ -243,6 +262,10 @@ if [ "${ENABLE_AWS_EDGE_ZONE}" == "yes" ]; then
     patch_public_ip_for_edge_node ${dir}
   fi
   
+fi
+
+if [[ "${ENABLE_AWS_EFA_PG_INSTANCE:-}"  == 'true' ]]; then
+  enable_efa_pg_instance_config ${dir}
 fi
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
