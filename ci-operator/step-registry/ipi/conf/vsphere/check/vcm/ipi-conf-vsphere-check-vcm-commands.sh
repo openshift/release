@@ -34,7 +34,8 @@ function networkToSubnetsJson() {
   .[.spec.primaryRouterHostname][.spec.vlanId] = .spec |
   .[.spec.primaryRouterHostname][.spec.vlanId].dnsServer = .spec.gateway |
   .[.spec.primaryRouterHostname][.spec.vlanId].mask = .spec.netmask |
-  .[.spec.primaryRouterHostname][.spec.vlanId].CidrIPv6 = .spec.cidrIPv6' "${NETWORK_CACHE_PATH}" > "${TMPSUBNETSJSON}" 
+  .[.spec.primaryRouterHostname][.spec.vlanId].StartIPv6Address= .spec.startIPv6Address |
+  .[.spec.primaryRouterHostname][.spec.vlanId].CidrIPv6 = .spec.cidrIPv6' "${NETWORK_CACHE_PATH}" > "${TMPSUBNETSJSON}"
 
 
   if [ -f "${SHARED_DIR}/subnets.json" ]; then
@@ -282,7 +283,7 @@ for LEASE in $LEASES; do
     oc get networks.vspherecapacitymanager.splat.io -n vsphere-infra-helpers --kubeconfig "${SA_KUBECONFIG}" "${NETWORK_RESOURCE}" -o json > "${NETWORK_CACHE_PATH}"
   fi
 
-  networkToSubnetsJson "${NETWORK_CACHE_PATH}" "${NETWORK_RESOURCE}" 
+  networkToSubnetsJson "${NETWORK_CACHE_PATH}" "${NETWORK_RESOURCE}"
 
   if [ "${bastion_leased_resource}" != "null" ]; then
     log "setting bastion portgroup ${portgroup_name} in vsphere_context.sh"
