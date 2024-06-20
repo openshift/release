@@ -7,8 +7,6 @@ set -o nounset
 
 echo "Creating manifests for br-ex configuration on masters and workers"
 
-BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
-echo "====BASE_DOMAIN: $BASE_DOMAIN"
 MASTER_MANIFEST="${SHARED_DIR}/manifest_nmstate-br-ex-master.yaml"
 WORKER_MANIFEST="${SHARED_DIR}/manifest_nmstate-br-ex-worker.yaml"
 
@@ -79,14 +77,13 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
       enabled: false
       dhcp: false"
   contents_source="$(echo "${br_ex_configuration}" | base64)"
-  node_name="${name}.${build_id}.${BASE_DOMAIN}"
   if [[ "$name" =~ master* ]]; then
     cat >> "${MASTER_MANIFEST}" <<EOF
           - contents:
               source: data:text/plain;charset=utf-8;base64,${contents_source}
             mode: 0644
             overwrite: true
-            path: /etc/nmstate/openshift/${node_name}.yml
+            path: /etc/nmstate/openshift/${name}.yml
 EOF
   fi
   if [[ "$name" =~ worker* ]]; then
@@ -95,7 +92,7 @@ EOF
               source: data:text/plain;charset=utf-8;base64,${contents_source}
             mode: 0644
             overwrite: true
-            path: /etc/nmstate/openshift/${node_name}.yml
+            path: /etc/nmstate/openshift/${name}.yml
 EOF
   fi
 done
