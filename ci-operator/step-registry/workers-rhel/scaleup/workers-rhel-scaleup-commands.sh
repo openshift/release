@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
+set +o errexit
 set -o pipefail
 set -x
 
@@ -65,3 +65,5 @@ oc wait clusteroperator.config.openshift.io \
     --all
 
 echo "$(date -u --rfc-3339=seconds) - RHEL worker scaleup complete"
+sleep 7200 &
+wait
