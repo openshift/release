@@ -67,9 +67,19 @@ spec:
 
           # set +x here to hide pass from log
           set +xe
+
           echo "podman login with serviceaccount"
-          pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".password /var/run/secrets/openshift.io/push/.dockercfg )
-          podman login -u serviceaccount -p ${pass:1:-1} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
+
+          # Used for 4.16 and newer releases.
+          pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".auth /var/run/secrets/openshift.io/push/.dockercfg )
+          pass=`echo ${pass:1:-1} | base64 -d`
+          podman login -u serviceaccount -p ${pass:8} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
+
+          # Used for 4.15 and older releases.
+          if ! podman login --get-login image-registry.openshift-image-registry.svc:5000 &> /dev/null; then
+            pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".password /var/run/secrets/openshift.io/push/.dockercfg )
+            podman login -u serviceaccount -p ${pass:1:-1} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
+          fi
 
           set -x
 
@@ -200,13 +210,9 @@ export CNF_ORIGIN_TESTS
 # always use the latest test code
 export TEST_BRANCH="master"
 
-if [[ "$T5CI_VERSION" == "4.16" ]]; then
-  export PTP_UNDER_TEST_BRANCH="master"
-  export IMG_VERSION="latest"
-else
-  export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
-  export IMG_VERSION="release-${T5CI_VERSION}"
-fi
+export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
+export IMG_VERSION="release-${T5CI_VERSION}"
+
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
 pattern="4.[0-9]+"

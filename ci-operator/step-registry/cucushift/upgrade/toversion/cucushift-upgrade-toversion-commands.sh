@@ -188,30 +188,6 @@ function run_command() {
     eval "${CMD}"
 }
 
-function run_command_oc() {
-    local try=0 max=40 ret_val
-
-    if [[ "$#" -lt 1 ]]; then
-        return 0
-    fi
-
-    while (( try < max )); do
-        if ret_val=$(oc "$@" 2>&1); then
-            break
-        fi
-        (( try += 1 ))
-        sleep 3
-    done
-
-    if (( try == max )); then
-        echo >&2 "Run:[oc $*]"
-        echo >&2 "Get:[$ret_val]"
-        return 255
-    fi
-
-    echo "${ret_val}"
-}
-
 # Check if a build is signed
 function check_signed() {
     local digest algorithm hash_value response try max_retries
@@ -224,17 +200,15 @@ function check_signed() {
     fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    set -x
     try=0
-    max_retries=2
-    response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+    max_retries=3
+    response=0
     while (( try < max_retries && response != 200 )); do
         echo "Trying #${try}"
-        response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+        response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
         (( try += 1 ))
         sleep 60
     done
-    set +x
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -444,7 +418,7 @@ fi
 if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
     update_cloud_credentials_oidc
 fi
-run_command "${upgrade_cmd}"
+run_command "${upgrade_cmd} --force=${FORCE_UPDATE}"
 echo "Upgrading cluster to ${TARGET_VERSION} gets started..."
 check_upgrade_status
 check_history
