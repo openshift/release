@@ -217,6 +217,8 @@ http_proxy=${proxy} https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${
   oinst create cluster &
 
 if ! wait $!; then
+  echo -e "\n[INFO] fail point 1..."
+  sleep 36000
   exit 1
 fi
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
@@ -226,6 +228,8 @@ echo -e "\n[INFO] Launching 'wait-for install-complete' installation step again.
 oinst wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
+  echo -e "\n[INFO] fail point 2..."
+  sleep 36000
   exit 1
 fi
 
