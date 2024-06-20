@@ -636,6 +636,8 @@ function upgrade() {
     local retry=3 unrecommened_conditional_updates
     while (( retry > 0 )); do
         unrecommened_conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True")) | .release.version' | xargs)
+        echo "Not recommended conditions: "
+        echo "${unrecommened_conditional_updates}"
         if [[ -z "${unrecommened_conditional_updates}" ]]; then
             retry=$((retry - 1))
             sleep 60
