@@ -10,13 +10,12 @@ function run_command() {
     eval "${CMD}"
 }
 
-pass=true
+pass=false
 
 # get a master node
 master_node_0=$(oc get node -l node-role.kubernetes.io/master= --no-headers | grep -Ev "NotReady|SchedulingDisabled"| awk '{print $1}' | awk 'NR==1{print}')
 if [[ -z $master_node_0 ]]; then
     echo "Error master node0 name is null!"
-    pass=false
 fi
 
 # create a ns
@@ -27,9 +26,7 @@ if [ $? == 0 ]; then
     echo "create $namespace namespace successfully"
 else
     echo "Fail to create $namespace namespace."
-    pass=false
 fi
-
 
 payload_pullspec=$(oc get clusterversion version -o json | jq -r .status.desired.image)
 
@@ -41,10 +38,10 @@ oc -n $namespace debug node/"$master_node_0" -- chroot /host bash -c "podman run
 out=$(oc -n $namespace debug node/"$master_node_0" -- chroot /host bash -c "cat /$report" || true)
 echo "The report is: $out"
 oc delete ns $namespace || true
-res=$(echo "$out" | grep -E 'Failure Report' || true)
+res=$(echo "$out" | grep -iE 'Successful run' || true)
 echo "The result is: $res"
 if [[ -n $res ]];then
-    pass=false
+    pass=true
 fi
 
 if $pass; then

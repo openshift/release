@@ -134,10 +134,10 @@ CONFIG = {
         'westus': 8
     },
     'azure-arm64-quota-slice': {
-        'centralus': 3,
-        'southcentralus': 3,
-        'eastus': 3,
-        'westus2': 3
+        'centralus': 33,
+        'southcentralus': 8,
+        'eastus': 8,
+        'westus2': 8
     },
     'azurestack-quota-slice': {
         'ppe3': 2
@@ -452,7 +452,7 @@ for i in [1287,1289,1296,1298,1300,1302]:
 for i in [1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274]:
     CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
 
-for i in range(0,20):
+for i in range(0,100):
     CONFIG['vsphere-elastic-quota-slice']['vsphere-elastic-{}'.format(i)] = 1
 
 for i in [1148]:
