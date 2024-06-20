@@ -15,9 +15,22 @@ oc config view --flatten > /tmp/config
 export KUBECONFIG=/tmp/config
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 
-mkdir -p $HOME/.aws
-cat "/secret/telemetry/.awscred" > $HOME/.aws/config
-cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
+if [[ "$CLOUD_TYPE" == "aws" ]]; then
+  mkdir -p $HOME/.aws
+  cat "/secret/telemetry/.awscred" > $HOME/.aws/config
+  cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
+  export AWS_DEFAULT_REGION=us-west-2
+elif [[ "$CLOUD_TYPE" == "azure" ]]; then
+  azure_tenant_id=$( cat "/secret/telemetry/azure_tenant_id")
+  azure_client_secret=$(cat "/secret/telemetry/azure_client_secret")
+  azure_client_id=$(cat "/secret/telemetry/azure_client_id")
+  export AZURE_TENANT_ID=$azure_tenant_id
+  export AZURE_CLIENT_SECRET=$azure_client_secret
+  export AZURE_CLIENT_ID=$azure_client_id
+else
+  echo "$CLOUD_TYPE is not supported, please check"
+fi
+
 ls -al /secret/telemetry/
 
 ES_PASSWORD=$(cat "/secret/es/password")

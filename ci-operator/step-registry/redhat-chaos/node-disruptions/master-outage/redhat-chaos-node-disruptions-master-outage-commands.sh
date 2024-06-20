@@ -22,21 +22,29 @@ echo "Using the flattened version of kubeconfig"
 oc config view --flatten > /tmp/config
 export KUBECONFIG=/tmp/config
 export KRKN_KUBE_CONFIG=$KUBECONFIG
+envsubst < /home/krkn/kraken/scenarios/plugin_node_scenario.yaml.template > /home/krkn/kraken/scenarios/node_scenario.yaml
+export SCENARIO_TYPE="plugin_scenarios"
+export ACTION=${ACTION:="$CLOUD_TYPE-node-reboot"}
 
-mkdir -p $HOME/.aws
-cat "/secret/telemetry/.awscred" > $HOME/.aws/config
-cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
+if [[ "$CLOUD_TYPE" == "aws" ]]; then
+  mkdir -p $HOME/.aws
+  cat "/secret/telemetry/.awscred" > $HOME/.aws/config
+  cat ${CLUSTER_PROFILE_DIR}/.awscred > $HOME/.aws/config
+  export AWS_DEFAULT_REGION=us-west-2
+elif [[ "$CLOUD_TYPE" == "azure" ]]; then
+  azure_tenant_id=$( cat "/secret/telemetry/azure_tenant_id")
+  azure_client_secret=$(cat "/secret/telemetry/azure_client_secret")
+  azure_client_id=$(cat "/secret/telemetry/azure_client_id")
+  export AZURE_TENANT_ID=$azure_tenant_id
+  export AZURE_CLIENT_SECRET=$azure_client_secret
+  export AZURE_CLIENT_ID=$azure_client_id
+else
+  echo "$CLOUD_TYPE is not supported, please check"
+fi 
 
-# read passwords from vault
+# read and export passwords from vault
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
-#aws_access_key_id=$(cat "/secret/telemetry/aws_access_key_id")
-#aws_secret_access_key=$(cat "/secret/telemetry/aws_secret_access_key")
-
-# set the secrets from the vault as env vars
 export TELEMETRY_PASSWORD=$telemetry_password
-export AWS_DEFAULT_REGION=us-west-2
-#export AWS_ACCESS_KEY_ID=$aws_access_key_id
-#export AWS_SECRET_ACCESS_KEY=$aws_secret_access_key
 
 ls node-disruptions
 
