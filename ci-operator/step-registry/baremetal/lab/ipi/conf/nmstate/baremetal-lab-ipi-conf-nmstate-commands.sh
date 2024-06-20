@@ -11,33 +11,33 @@ MASTER_MANIFEST="${SHARED_DIR}/manifest_nmstate-br-ex-master.yaml"
 WORKER_MANIFEST="${SHARED_DIR}/manifest_nmstate-br-ex-worker.yaml"
 
 cat > "${MASTER_MANIFEST}" <<EOF
-  apiVersion: machineconfiguration.openshift.io/v1
-  kind: MachineConfig
-  metadata:
-    labels:
-      machineconfiguration.openshift.io/role: master
-    name: 10-br-ex-master
-  spec:
-    config:
-      ignition:
-        version: 3.2.0
-      storage:
-        files:
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: 10-br-ex-master
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
 EOF
 
 cat > "${WORKER_MANIFEST}" <<EOF
-  apiVersion: machineconfiguration.openshift.io/v1
-  kind: MachineConfig
-  metadata:
-    labels:
-      machineconfiguration.openshift.io/role: worker
-    name: 10-br-ex-worker
-  spec:
-    config:
-      ignition:
-        version: 3.2.0
-      storage:
-        files:
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 10-br-ex-worker
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
 EOF
 
 # shellcheck disable=SC2154
@@ -79,20 +79,20 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   contents_source="$(echo "${br_ex_configuration}" | base64)"
   if [[ "$name" =~ master* ]]; then
     cat >> "${MASTER_MANIFEST}" <<EOF
-          - contents:
-              source: data:text/plain;charset=utf-8;base64,${contents_source}
-            mode: 0644
-            overwrite: true
-            path: /etc/nmstate/openshift/${name}.yml
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,${contents_source}
+        mode: 0644
+        overwrite: true
+        path: /etc/nmstate/openshift/${name}.yml
 EOF
   fi
   if [[ "$name" =~ worker* ]]; then
     cat >> "${WORKER_MANIFEST}" <<EOF
-          - contents:
-              source: data:text/plain;charset=utf-8;base64,${contents_source}
-            mode: 0644
-            overwrite: true
-            path: /etc/nmstate/openshift/${name}.yml
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,${contents_source}
+        mode: 0644
+        overwrite: true
+        path: /etc/nmstate/openshift/${name}.yml
 EOF
   fi
 done
