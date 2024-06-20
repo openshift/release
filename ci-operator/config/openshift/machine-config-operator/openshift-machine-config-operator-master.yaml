@@ -105,6 +105,25 @@ tests:
   container:
     from: src
 - always_run: false
+  as: e2e-gcp-fips-op
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: fips-check
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- always_run: false
   as: e2e-aws-ovn-fips-op-renamed
   optional: true
   steps:
