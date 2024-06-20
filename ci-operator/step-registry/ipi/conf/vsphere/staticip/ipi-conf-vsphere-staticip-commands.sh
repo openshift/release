@@ -21,7 +21,7 @@ echo "$(date -u --rfc-3339=seconds) - setting up static IP assignments"
 
 STATIC_IPS="${SHARED_DIR}"/static-ip-hosts.txt
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
 
 # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
 

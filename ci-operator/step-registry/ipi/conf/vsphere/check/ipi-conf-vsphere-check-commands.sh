@@ -3,6 +3,12 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+  echo "using VCM sibling of this step"
+  exit 0
+fi
+
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - failed to acquire lease"
@@ -30,7 +36,7 @@ declare vsphere_portgroup
 declare -a portgroup_list
 declare multizone
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
 declare vsphere_url
 
 # notes: jcallen: split the LEASED_RESOURCE e.g. bcr01a.dal10.1153
@@ -76,7 +82,7 @@ fi
 vc_info='{"vcenters":[]}'
 for vcenter in $vsphere_urls; do
   vsphere_url="${vcenter}"
-  source /var/run/vault/vsphere-config/load-vsphere-env-config.sh
+  source /var/run/vault/vsphere-ibmcloud-config/load-vsphere-env-config.sh
 
   declare vcenter_usernames
   declare vcenter_passwords
@@ -169,3 +175,5 @@ if [[ "${multizone:-false}" == "true" ]]; then
 ${vc_info}
 EOF
 fi
+
+cp "${SUBNETS_CONFIG}" "${SHARED_DIR}/subnets.json"

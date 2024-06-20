@@ -1,8 +1,10 @@
 periodics:
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: 25 00 */1 * 0-5
   decorate: true
+  decoration_config:
+    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -79,9 +81,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: 00 00 */1 * 0-5
   decorate: true
+  decoration_config:
+    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -158,9 +162,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: 25 00 */1 * 0-5
   decorate: true
+  decoration_config:
+    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -237,9 +243,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: 00 00 */1 * 0-5
   decorate: true
+  decoration_config:
+    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -316,9 +324,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: 50 00 */1 * 0,2
   decorate: true
+  decoration_config:
+    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -395,9 +405,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: 00 00 */1 * 0-5
   decorate: true
+  decoration_config:
+    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -474,9 +486,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: 45 02 */1 * 0-5
   decorate: true
+  decoration_config:
+    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -553,9 +567,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: 25 00 */1 * 0-5
   decorate: true
+  decoration_config:
+    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -632,9 +648,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: 05 00 */1 * 0-5
   decorate: true
+  decoration_config:
+    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -711,9 +729,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: 25 02 */1 * 0-5
   decorate: true
+  decoration_config:
+    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -790,7 +810,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: 42 22 * * *
   decorate: true
   extra_refs:
@@ -851,7 +871,68 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
+  cron: 24 22 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-service
+  labels:
+    ci-operator.openshift.io/variant: edge
+    ci.openshift.io/generator: prowgen
+    job-release: "4.16"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-service-master-edge-mirror-nightly-image-el8
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=mirror-nightly-image-el8
+      - --variant=edge
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
   cron: 00 00 */1 * 0-5
   decorate: true
   extra_refs:
@@ -919,7 +1000,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: 00 00 */1 * 0-5
   decorate: true
   extra_refs:

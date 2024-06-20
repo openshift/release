@@ -1504,6 +1504,199 @@ function test_serving_machine_pools () {
 
 ###### end of test serving machine_pools verification (OCPQE-18337) ######
 
+##################################################################
+
+###### test: HO based request-serving MachinePool autoscale (OCM-8200) ######
+
+function test_500_worker_nodes_support () {
+  echo "[OCM-8200] - 500 worker nodes verification"
+  TEST_PASSED=true
+  MC_CLUSTERS=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters)
+  MC_CLUSTERS_LENGTH=$(jq -n "$MC_CLUSTERS" | jq -r .size)
+  for ((i=0; i<"$MC_CLUSTERS_LENGTH"; i++)); do
+    MC_SECTOR=$(jq -n "$MC_CLUSTERS" | jq -r .items[$i].sector)
+    MC_STATUS=$(jq -n "$MC_CLUSTERS" | jq -r .items[$i].status)
+    if [ "$MC_STATUS" == "maintenance" ] || [ "$MC_STATUS" == "ready" ]; then
+      if [ "$MC_SECTOR" == "canary" ] || [ "$MC_SECTOR" == "main" ]; then
+        MC_OSD_CLUSTER_ID=$(jq -n "$MC_CLUSTERS" | jq -r .items[$i].cluster_management_reference.cluster_id)
+        echo "Obtaining MC: $MC_OSD_CLUSTER_ID kubeconfig"
+        ocm get /api/clusters_mgmt/v1/clusters/"$MC_OSD_CLUSTER_ID"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/mc.kubeconfig"
+        export KUBECONFIG="${SHARED_DIR}/mc.kubeconfig"
+        echo "CHeck: Enable FM to set the default placeholder warmup in clustersizingconfiguration"
+        EXPECTED_PLACEHOLDERS_VALUE=2
+
+        PLACEHOLDERS_VALUE=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("m5xl"))' | jq -r '.management.placeholders // empty' | xargs) || true
+        if [ "$EXPECTED_PLACEHOLDERS_VALUE" -ne "$PLACEHOLDERS_VALUE" ]; then
+          echo "[ERROR]. Expected placeholders value to be set for 'm5xl' csc config"
+          TEST_PASSED=false
+        fi
+        echo "Check: CSC config 'spec.sizing' range in int:$MC_SECTOR"
+        EXPECTED_M5XL_FROM=0
+        M5XL_FROM=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("m5xl"))' | jq -r '.criteria.from // empty' | xargs) || true
+        EXPECTED_M5XL_TO=90
+        M5XL_TO=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("m5xl"))' | jq -r '.criteria.to // empty' | xargs) || true
+
+        EXPECTED_M52XL_FROM=91
+        M52XL_FROM=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("m52xl"))' | jq -r '.criteria.from // empty' | xargs) || true
+        EXPECTED_M52XL_TO=150
+        M52XL_TO=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("m52xl"))' | jq -r '.criteria.to // empty' | xargs) || true
+
+        EXPECTED_M54XL_FROM=151
+        M54XL_FROM=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("m54xl"))' | jq -r '.criteria.from // empty' | xargs) || true
+        EXPECTED_M54XL_TO=221
+        M54XL_TO=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("m54xl"))' | jq -r '.criteria.to // empty' | xargs) || true
+
+        EXPECTED_R54XL_FROM=222
+        R54XL_FROM=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("r54xl"))' | jq -r '.criteria.from // empty' | xargs) || true
+        EXPECTED_R54XL_TO=321
+        R54XL_TO=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("r54xl"))' | jq -r '.criteria.to // empty' | xargs) || true
+
+        EXPECTED_R58XL_FROM=322
+        R58XL_FROM=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("r58xl"))' | jq -r '.criteria.from // empty' | xargs) || true
+
+        if [ "$EXPECTED_M5XL_FROM" -ne "$M5XL_FROM" ] || [ "$EXPECTED_M5XL_TO" -ne "$M5XL_TO" ]; then
+          echo "[ERROR]. Expected csc sizing config for m5xl (from:to) to match '0:90'. Got '$M5XL_FROM:$M5XL_TO'"
+          TEST_PASSED=false
+        fi
+
+        if [ "$EXPECTED_M52XL_FROM" -ne "$M52XL_FROM" ] || [ "$EXPECTED_M52XL_TO" -ne "$M52XL_TO" ]; then
+          echo "[ERROR]. Expected csc sizing config for m52xl (from:to) to match '91:150'. Got '$M5XL_FROM:$M5XL_TO'"
+          TEST_PASSED=false
+        fi
+
+        if [ "$EXPECTED_M54XL_FROM" -ne "$M54XL_FROM" ] || [ "$EXPECTED_M54XL_TO" -ne "$M54XL_TO" ]; then
+          echo "[ERROR]. Expected csc sizing config for m54xl (from:to) to match '151:221'. Got '$M54XL_FROM:$M54XL_TO'"
+          TEST_PASSED=false
+        fi
+
+        if [ "$EXPECTED_R54XL_FROM" -ne "$R54XL_FROM" ] || [ "$EXPECTED_R54XL_TO" -ne "$R54XL_TO" ]; then
+          echo "[ERROR]. Expected csc sizing config for r54xl (from:to) to match '222:321'. Got '$R54XL_FROM:$R54XL_TO'"
+          TEST_PASSED=false
+        fi
+
+        if [ "$EXPECTED_R58XL_FROM" -ne "$R58XL_FROM" ]; then
+          echo "[ERROR]. Expected csc sizing config for r58xl (from) to match '322'. Got '$R58XL_FROM'"
+          TEST_PASSED=false
+        fi
+
+        echo "Check: CSC 'nonRequestServingNodesPerZone' values"
+        M5XL_NON_REQUEST_SERVING_NODES_PER_ZONE=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("m5xl"))' | jq -r '.management.nonRequestServingNodesPerZone // empty' | xargs) || true
+        M52XL_NON_REQUEST_SERVING_NODES_PER_ZONE=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("m52xl"))' | jq -r '.management.nonRequestServingNodesPerZone // empty' | xargs) || true
+        M54XL_NON_REQUEST_SERVING_NODES_PER_ZONE=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("m54xl"))' | jq -r '.management.nonRequestServingNodesPerZone // empty' | xargs) || true
+        R54XL_NON_REQUEST_SERVING_NODES_PER_ZONE=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("r54xl"))' | jq -r '.management.nonRequestServingNodesPerZone // empty' | xargs) || true
+        R58XL_NON_REQUEST_SERVING_NODES_PER_ZONE=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("r58xl"))' | jq -r '.management.nonRequestServingNodesPerZone // empty' | xargs) || true
+
+
+        EXPECTED_M5XL_NON_REQUEST_SERVING_NODES_PER_ZONE=".11"
+        EXPECTED_M52XL_NON_REQUEST_SERVING_NODES_PER_ZONE=".25"
+        EXPECTED_M54XL_NON_REQUEST_SERVING_NODES_PER_ZONE=".33"
+        EXPECTED_R54XL_NON_REQUEST_SERVING_NODES_PER_ZONE=".5"
+        EXPECTED_R58XL_NON_REQUEST_SERVING_NODES_PER_ZONE=".8"
+
+        if [ "$M5XL_NON_REQUEST_SERVING_NODES_PER_ZONE" != "$EXPECTED_M5XL_NON_REQUEST_SERVING_NODES_PER_ZONE" ]; then
+          echo "[ERROR]. Expected csc 'nonRequestServingNodesPerZone' for 'm5xl' to be '$EXPECTED_M5XL_NON_REQUEST_SERVING_NODES_PER_ZONE'. Got '$M5XL_NON_REQUEST_SERVING_NODES_PER_ZONE'"
+          TEST_PASSED=false
+        fi
+
+        if [ "$M52XL_NON_REQUEST_SERVING_NODES_PER_ZONE" != "$EXPECTED_M52XL_NON_REQUEST_SERVING_NODES_PER_ZONE" ]; then
+          echo "[ERROR]. Expected csc 'nonRequestServingNodesPerZone' for 'm52xl' to be '$EXPECTED_M52XL_NON_REQUEST_SERVING_NODES_PER_ZONE'. Got '$M52XL_NON_REQUEST_SERVING_NODES_PER_ZONE'"
+          TEST_PASSED=false
+        fi
+
+        if [ "$M54XL_NON_REQUEST_SERVING_NODES_PER_ZONE" != "$EXPECTED_M54XL_NON_REQUEST_SERVING_NODES_PER_ZONE" ]; then
+          echo "[ERROR]. Expected csc 'nonRequestServingNodesPerZone' for 'm54xl' to be '$EXPECTED_M54XL_NON_REQUEST_SERVING_NODES_PER_ZONE'. Got '$M54XL_NON_REQUEST_SERVING_NODES_PER_ZONE'"
+          TEST_PASSED=false
+        fi
+
+        if [ "$R54XL_NON_REQUEST_SERVING_NODES_PER_ZONE" != "$EXPECTED_R54XL_NON_REQUEST_SERVING_NODES_PER_ZONE" ]; then
+          echo "[ERROR]. Expected csc 'nonRequestServingNodesPerZone' for 'r54xl' to be '$EXPECTED_R54XL_NON_REQUEST_SERVING_NODES_PER_ZONE'. Got '$R54XL_NON_REQUEST_SERVING_NODES_PER_ZONE'"
+          TEST_PASSED=false
+        fi
+
+        if [ "$R58XL_NON_REQUEST_SERVING_NODES_PER_ZONE" != "$EXPECTED_R58XL_NON_REQUEST_SERVING_NODES_PER_ZONE" ]; then
+          echo "[ERROR]. Expected csc 'nonRequestServingNodesPerZone' for 'r58xl' to be '$EXPECTED_R58XL_NON_REQUEST_SERVING_NODES_PER_ZONE'. Got '$R58XL_NON_REQUEST_SERVING_NODES_PER_ZONE'"
+          TEST_PASSED=false
+        fi
+        echo "Check: CSC config 'concurrency' values"
+        EXPECTED_CONCURRENCY_LIMIT="5"
+        EXPECTED_SLIDING_WINDOW="10m"
+        ACTUAL_CONCURRENCY_LIMIT=$(oc get clustersizingconfiguration cluster -o json  | jq -r '.spec.concurrency.limit // empty' | xargs) || true
+        ACTUAL_SLIDING_WINDOW=$(oc get clustersizingconfiguration cluster -o json  | jq -r '.spec.concurrency.slidingWindow // empty' | xargs) || true
+
+        if [ "$EXPECTED_CONCURRENCY_LIMIT" != "$ACTUAL_CONCURRENCY_LIMIT" ]; then
+          echo "[ERROR]. Expected csc 'concurrency.limit' to be '$EXPECTED_CONCURRENCY_LIMIT'. Got '$ACTUAL_CONCURRENCY_LIMIT'"
+          TEST_PASSED=false
+        fi
+
+        if [ "$EXPECTED_SLIDING_WINDOW" != "$ACTUAL_SLIDING_WINDOW" ]; then
+          echo "[ERROR]. Expected csc 'concurrency.slidingWindow' to be '$EXPECTED_SLIDING_WINDOW'. Got '$ACTUAL_SLIDING_WINDOW'"
+          TEST_PASSED=false
+        fi
+
+        echo "Check: CSC config 'transitionDelay' values"
+        EXPECTED_TRANSITION_DELAY_DECREASE="20m"
+        EXPECTED_TRANSITION_DELAY_INCREASE="0s"
+        ACTUAL_TRANSITION_DELAY_DECREASE=$(oc get clustersizingconfiguration cluster -o json  | jq -r '.spec.transitionDelay.decrease // empty' | xargs) || true
+        ACTUAL_TRANSITION_DELAY_INCREASE=$(oc get clustersizingconfiguration cluster -o json  | jq -r '.spec.transitionDelay.increase // empty' | xargs) || true
+
+        if [ "$EXPECTED_TRANSITION_DELAY_DECREASE" != "$ACTUAL_TRANSITION_DELAY_DECREASE" ]; then
+          echo "[ERROR]. Expected csc 'transitionDelay.decrease' to be '$EXPECTED_TRANSITION_DELAY_DECREASE'. Got '$ACTUAL_TRANSITION_DELAY_DECREASE'"
+          TEST_PASSED=false
+        fi
+
+        if [ "$EXPECTED_TRANSITION_DELAY_INCREASE" != "$ACTUAL_TRANSITION_DELAY_INCREASE" ]; then
+          echo "[ERROR]. Expected csc 'transitionDelay.increase' to be '$EXPECTED_TRANSITION_DELAY_INCREASE'. Got '$ACTUAL_TRANSITION_DELAY_INCREASE'"
+          TEST_PASSED=false
+        fi
+
+        ## OCM-8634 / OCM-8610
+        echo "Check: CSC config additional properties"
+        EXPECTED_R54XL_MHC_TIMEOUT="15m"
+        ACTUAL_R54XL_MHC_TIMEOUT=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("r54xl"))' | jq -r '.effects.machineHealthCheckTimeout // empty' | xargs) || true
+        EXPECTED_R58XL_MHC_TIMEOUT="30m"
+        ACTUAL_R58XL_MHC_TIMEOUT=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq 'select(.name == ("r58xl"))' | jq -r '.effects.machineHealthCheckTimeout // empty' | xargs) || true
+
+        if [ "$EXPECTED_R54XL_MHC_TIMEOUT" != "$ACTUAL_R54XL_MHC_TIMEOUT" ]; then
+          echo "[ERROR]. Expected csc 'effects.machineHealthCheckTimeout' for 'r54xl' to be '$EXPECTED_R54XL_MHC_TIMEOUT'. Got '$ACTUAL_R54XL_MHC_TIMEOUT'"
+          TEST_PASSED=false
+        fi
+
+        if [ "$EXPECTED_R58XL_MHC_TIMEOUT" != "$ACTUAL_R58XL_MHC_TIMEOUT" ]; then
+          echo "[ERROR]. Expected csc 'effects.machineHealthCheckTimeout' for 'r58xl' to be '$EXPECTED_R58XL_MHC_TIMEOUT'. Got '$ACTUAL_R58XL_MHC_TIMEOUT'"
+          TEST_PASSED=false
+        fi
+        
+        ## OCM-8516 / OCM-7994
+        echo "Check: CSC config 'resourceRequests' params"
+        declare -a sizes=("m52xl" "m54xl" "r54xl" "r58xl")
+        declare -a containers=("cluster-autoscaler" "kube-controller-manager" "cluster-policy-controller" "openshift-apiserver" "kube-scheduler" "csi-resizer" "openshift-controller-manager" "multus-admission-controller" "etcd" "ovnkube-control-plane" "route-controller-manager")
+
+        for s in "${sizes[@]}"
+        do
+          for c in "${containers[@]}"
+          do
+            CONTAINER_NAME=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq --arg s "$s" 'select(.name == $s)' | jq -r '.effects.resourceRequests[]' | jq --arg c "$c" 'select(.containerName == $c // empty) | .containerName' | xargs ) || true
+            if [ "$CONTAINER_NAME" != "" ]; then
+              echo "Checking resourceRequests values for size: '$s' and container name: '$c'"
+              DEPLOYMENT_NAME=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq --arg s "$s" 'select(.name == $s)' | jq -r '.effects.resourceRequests[]' | jq --arg c "$c" 'select(.containerName == $c // empty) | .deploymentName' | xargs ) || true
+              MEMORY=$(oc get clustersizingconfiguration cluster -o json  | jq -r .spec.sizes[] | jq --arg s "$s" 'select(.name == $s)' | jq -r '.effects.resourceRequests[]' | jq --arg c "$c" 'select(.containerName == $c // empty) | .memory' | xargs ) || true
+              if [ "$DEPLOYMENT_NAME" == "" ] || ! [[ "$MEMORY" =~ "Gi" ]]; then
+                echo "[ERROR] - resourceRequests value should be set for deploymentName (got: $DEPLOYMENT_NAME) AND memory (got: $MEMORY)"
+                TEST_PASSED=false
+              fi
+            fi
+          done
+        done
+      fi
+    fi
+  done
+  update_results "OCM-8200" $TEST_PASSED
+}
+
+###### end of test HO based request-serving MachinePool autoscale (OCM-8200) ######
+
+##################################################################
+
 function wait_for_cluster_status() {
   CLUSTER_ID=$1
   CLUSTER_TYPE=$2
@@ -1687,6 +1880,118 @@ function test_delete_mc () {
 
 ##################################################################
 
+###### test: OSDFM should patch shard with dedicated topology v2 (OCM-8225) ######
+
+function test_shard_topology () {
+  echo "[OCM-8225] - OSDFM should patch shard with dedicated topology v2"
+  TEST_PASSED=true
+  SCS=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters)
+  LENGTH=$(jq -n "$SCS" | jq -r .size)
+  echo "Number of SCs found: $LENGTH"
+  for ((i=0; i<"$LENGTH"; i++)); do
+    CLUSTER_ID=$(jq -n "$SCS" | jq -r .items[$i].id) || true
+    CLUSTER_STATUS=$(jq -n "$SCS" | jq -r .items[$i].status) || true
+    SECTOR=$(jq -n "$SCS" | jq -r .items[$i].sector)
+    if [[ "$CLUSTER_STATUS" == "ready" ]] || [[ "$CLUSTER_STATUS" == "maintenance" ]]; then
+      CHILD_MCS=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters -p search="parent.id='$CLUSTER_ID'")
+      SIZE=$(jq -n "$CHILD_MCS" | jq -r .size)
+      if [ "$SIZE" -ge 1 ]; then
+        for ((m=0; m<"$SIZE"; m++)); do
+          STATUS=$(jq -n "$CHILD_MCS" | jq -r ".items[$m].status") || true
+          MC_ID=$(jq -n "$CHILD_MCS" | jq -r ".items[$m].id") || true
+          echo "MC osd fm id: '$MC_ID', status: '$STATUS', sector: '$SECTOR'"
+          if [ "$STATUS" == "ready" ] || [ "$STATUS" == "maintenance" ]; then
+            MC_OSD_MGMT_HREF=$(jq -n "$CHILD_MCS" | jq -r ".items[$m].cluster_management_reference.href") || true
+            OLD_MP_NAME_FOUND_COUNT=$(ocm get "$MC_OSD_MGMT_HREF"/machine_pools | jq -r '.items[].id' | grep -c 'serving-1' | tr -d ' ') || true # (non-serving-1)
+            NEW_MP_NAME_FOUND_COUNT=$(ocm get "$MC_OSD_MGMT_HREF"/machine_pools | jq -r '.items[].id' | grep -c 'serving-m52xl-1' | tr -d ' ') || true
+            if [ "$NEW_MP_NAME_FOUND_COUNT" -ge 1 ] && [ "$OLD_MP_NAME_FOUND_COUNT" -le 1 ]; then
+              echo "Checking topology value for provision shard of SC for MC with new MPs config"
+              PROVISION_SHARD_HREF=$(jq -n "$SCS" | jq -r ".items[$i].provision_shard_reference.href // empty" | xargs) || true
+              if [ "$PROVISION_SHARD_HREF" != "" ]; then
+                TOPOLOGY=$(ocm get "$PROVISION_SHARD_HREF" | jq -r ".hypershift_config.topology // empty" | xargs) || true
+                if [ "$TOPOLOGY" != "dedicated-v2" ]; then
+                  echo "[ERROR] Expected topology to be 'dedicated-v2' for MC with osdfm ID: '$MC_ID'. Found: '$TOPOLOGY'"
+                  TEST_PASSED=false
+                fi
+              fi
+            else
+              echo "Old MPs config found. Skipping topology check"
+            fi
+          fi
+        done
+      fi
+    fi
+  done
+  update_results "OCM-8225" $TEST_PASSED
+}
+
+###### end of test: OSDFM should patch shard with dedicated topology v2 (OCM-8225) ######
+
+##################################################################
+
+function wait_for_managedcluster_available() {
+  MC_NAME=$1
+  STATUS_AVAILABLE=""
+  for ((i=0; i<10; i++)); do
+    echo "Checking if 'ManagedClusterAvailable' condition is 'True' for managedcluster: '$MC_NAME'"
+    STATUS_AVAILABLE=$(oc get managedcluster "$MC_NAME" -o json | jq -r .status.conditions[] | jq 'select(.reason == ("ManagedClusterAvailable"))' | jq -r .status) || true
+    if [ "$STATUS_AVAILABLE" != "True" ]; then
+      echo "managedcluster: '$MC_NAME' not available. Sleeping for 15 seconds"
+      sleep 15
+    else
+      echo "managedcluster: '$MC_NAME' available!"
+      break
+    fi
+  done
+  if [ "$STATUS_AVAILABLE" != "True" ]; then
+    echo "ERROR. managedcluster: '$MC_NAME' not available after 10 retries"
+  fi
+}
+
+###### test: ACM Hub repeatedly losing connection to managed cluster (OCP-74294) ######
+
+function check_managedcluster_connection() {
+  echo "[OCP-74294] - ACM Hub repeatedly losing connection to managed cluster"
+  TEST_PASSED=true
+  export KUBECONFIG="${SHARED_DIR}/hs-sc.kubeconfig"
+
+  MANAGEDCLUSTER_NAME=""
+  echo "Getting 'managedcluster' resource name from SC"
+  MANAGEDCLUSTER_NAME=$(oc get managedcluster -A -o json | jq -r .items[].metadata.name | grep "hs-mc" | head -n 1) || true
+  if [ "$MANAGEDCLUSTER_NAME" == "" ]; then
+    echo "ERROR. Unable to get 'managedcluster' resource name"
+    TEST_PASSED=false
+  else
+    echo "Getting hs-mc managedcluster import secret name"
+    IMPORT_SECRET_NAME=""
+    IMPORT_SECRET_NAME=$(oc get secret "$MANAGEDCLUSTER_NAME-import" -n "$MANAGEDCLUSTER_NAME" -o json | jq -r .metadata.name) || true
+    if [ "$IMPORT_SECRET_NAME" == "" ]; then
+      echo "ERROR. Unable to get '$MANAGEDCLUSTER_NAME-import' secret from $MANAGEDCLUSTER_NAME namespace"
+      TEST_PASSED=false
+    else
+      wait_for_managedcluster_available "$MANAGEDCLUSTER_NAME"
+      echo "Deleting '$MANAGEDCLUSTER_NAME-import' secret (should be automatically recreated)"
+      oc -n "$MANAGEDCLUSTER_NAME" delete secret "$MANAGEDCLUSTER_NAME"-import
+      echo "Sleeping for 30 seconds before checking if secret is recreated"
+      sleep 30
+      echo "Getting hs-mc managedcluster import secret name"
+      IMPORT_SECRET_NAME=""
+      IMPORT_SECRET_NAME=$(oc get secret "$MANAGEDCLUSTER_NAME-import" -n "$MANAGEDCLUSTER_NAME" -o json | jq -r .metadata.name) || true
+      if [ "$IMPORT_SECRET_NAME" == "" ]; then
+        echo "ERROR. Unable to get '$MANAGEDCLUSTER_NAME-import' secret from $MANAGEDCLUSTER_NAME namespace"
+        TEST_PASSED=false
+      else
+        wait_for_managedcluster_available "$MANAGEDCLUSTER_NAME"
+      fi
+    fi
+  fi
+  update_results "OCP-74294" $TEST_PASSED
+}
+
+###### end of test:  ACM Hub repeatedly losing connection to managed cluster (OCP-74294) ######
+
+##################################################################
+
 # Test all cases and print results
 
 test_monitoring_disabled
@@ -1731,6 +2036,11 @@ test_awsendpointservices_status_output_populated
 test_serving_machine_pools
 
 # test_mc_request_serving_pool_autoscaling
+test_500_worker_nodes_support
+
+test_shard_topology
+
+check_managedcluster_connection
 
 test_delete_sc
 

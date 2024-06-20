@@ -5,6 +5,7 @@ set -euox pipefail
 CLUSTER_NAME="cicd-$(printf $PROW_JOB_ID|sha256sum|cut -c-10)"
 POWERVS_VSI_NAME="${CLUSTER_NAME}-worker"
 BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
+CREDENTIALS_PATH="/etc/sno-power-credentials"
 
 setup_env() {
   set +x
@@ -20,7 +21,7 @@ setup_env() {
 
   # IBM cloud login
   ibmcloud config --check-version=false
-  echo | ibmcloud login --apikey @"/etc/sno-power-credentials/.powercreds" --no-region
+  echo | ibmcloud login --apikey @"${CREDENTIALS_PATH}/.powercreds" --no-region
 
   # Installing required ibmcloud plugins
   echo "$(date) Installing required ibmcloud plugins"
@@ -126,12 +127,13 @@ patch_image_registry() {
 
 # Create private key with 0600 permission for ssh purpose
 SSH_PRIVATE="/tmp/ssh-privatekey"
-cp "/etc/sno-power-credentials/ssh-privatekey" ${SSH_PRIVATE}
+cp "${CREDENTIALS_PATH}/ssh-privatekey" ${SSH_PRIVATE}
 chmod 0600 ${SSH_PRIVATE}
 SSH_OPTIONS=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'ServerAliveInterval=60' -o 'ServerAliveCountMax=60' -o 'UserKnownHostsFile=/dev/null' -i "${SSH_PRIVATE}")
 # Save private-key, pull-secret and offline-token to bastion
 ssh "${SSH_OPTIONS[@]}" root@${BASTION} "mkdir -p ~/.sno"
-scp "${SSH_OPTIONS[@]}" /etc/sno-power-credentials/{ssh-publickey,pull-secret,offline-token} root@${BASTION}:~/.sno/.
+scp "${SSH_OPTIONS[@]}" ${CREDENTIALS_PATH}/{ssh-publickey,pull-secret,pull-secret-ci,offline-token} root@${BASTION}:~/.sno/.
+scp "${SSH_OPTIONS[@]}" ${SSH_PRIVATE} root@${BASTION}:~/.sno/.
 # set the default INSTALL_TYPE to sno
 INSTALL_TYPE=${INSTALL_TYPE:-sno}
 
@@ -182,7 +184,7 @@ set +e
 API_URL="https://api.openshift.com/api/assisted-install/v2"
 OFFLINE_TOKEN_FILE="\${OFFLINE_TOKEN_FILE:-/root/.sno/offline-token}"
 PULL_SECRET_FILE="\${PULL_SECRET_FILE:-/root/.sno/pull-secret}"
-SSH_PUB_KEY_FILE="\${PUBLIC_KEY_FILE:-/root/.sno/id_rsa.pub}"
+SSH_PUB_KEY_FILE="\${PUBLIC_KEY_FILE:-/root/.sno/ssh-publickey}"
 OFFLINE_TOKEN=\$(cat \${OFFLINE_TOKEN_FILE})
 PULL_SECRET=\$(cat \${PULL_SECRET_FILE} | tr -d '\n' | jq -R .)
 SSH_PUB_KEY=\$(cat \${SSH_PUB_KEY_FILE})
@@ -391,8 +393,6 @@ metadata:
 rendezvousIP: \${IP_ADDRESS}
 hosts:
   - hostname: \${CLUSTER_NAME}
-    rootDeviceHints:
-      deviceName: \${INSTALLATION_DISK}
     role: master
     interfaces:
        - name: eth0
@@ -414,7 +414,7 @@ EOF
 
 cat > ${BASTION_CI_SCRIPTS_DIR}/grub-menu.template << EOF
     if [ \${GRUB_MAC_CONFIG} = "\${MAC_ADDRESS}" ]; then
-        linux \${KERNEL_PATH} ignition.firstboot ignition.platform.id=metal 'coreos.live.rootfs_url=\${ROOTFS_URL}' 'ignition.config.url=\${IGNITION_URL}'
+        linux \${KERNEL_PATH} ignition.firstboot ignition.platform.id=metal 'coreos.live.rootfs_url=\${BASTION_HTTP_URL}/\${ROOTFS_FILE}' 'ignition.config.url=\${BASTION_HTTP_URL}/\${IGNITION_FILE}'
         initrd \${INITRAMFS_PATH}
     fi
 EOF
@@ -462,7 +462,7 @@ export POWERVS_VSI_NAME="\${CLUSTER_NAME}-worker"
 set +x
 export PULL_SECRET_FILE=/root/.sno/pull-secret
 export PULL_SECRET="\$(cat \$PULL_SECRET_FILE)"
-SSH_PUB_KEY_FILE=/root/.sno/id_rsa.pub
+SSH_PUB_KEY_FILE=/root/.sno/ssh-publickey
 export SSH_PUB_KEY="\$(cat \$SSH_PUB_KEY_FILE)"
 export OFFLINE_TOKEN_FILE=/root/.sno/offline-token
 
@@ -473,11 +473,6 @@ IMAGES_DIR="/var/lib/tftpboot/images/\${CLUSTER_NAME}"
 WWW_DIR="/var/www/html/\${CLUSTER_NAME}"
 
 mkdir -p \$IMAGES_DIR \$WWW_DIR \$CONFIG_DIR
-
-if [[ \${INSTALL_TYPE} != "sno" ]]; then
-    # install required package for agent based installer
-    dnf install -y /usr/bin/nmstatectl coreos-installer jq
-fi
 
 download_installer() {
     echo "Dowmload openshift-install"
@@ -510,6 +505,12 @@ sno_prepare_cluster() {
 
     cp \${CONFIG_DIR}/bootstrap-in-place-for-live-iso.ign \${WWW_DIR}/bootstrap.ign
     chmod 644 \${WWW_DIR}/bootstrap.ign
+
+    coreos_pxe_files=\$(./openshift-install coreos print-stream-json | jq .architectures.ppc64le.artifacts.metal.formats.pxe)
+    ROOTFS_URL=\$(echo \$coreos_pxe_files | jq -r .rootfs.location)
+    INITRAMFS_URL=\$(echo \$coreos_pxe_files | jq -r .initramfs.location)
+    KERNEL_URL=\$(echo \$coreos_pxe_files | jq -r .kernel.location)
+
     curl -s \${ROOTFS_URL} -o \${WWW_DIR}/rootfs.img
 
     curl -s \${INITRAMFS_URL} -o \${IMAGES_DIR}/initramfs.img
@@ -550,8 +551,8 @@ else
 fi
 
 export GRUB_MAC_CONFIG="\\\${net_default_mac}"
-export ROOTFS_URL=\${BASTION_HTTP_URL}/\${CLUSTER_NAME}/rootfs.img
-export IGNITION_URL=\${BASTION_HTTP_URL}/\${CLUSTER_NAME}/bootstrap.ign
+export ROOTFS_FILE=\${CLUSTER_NAME}/rootfs.img
+export IGNITION_FILE=\${CLUSTER_NAME}/bootstrap.ign
 export KERNEL_PATH="images/\${CLUSTER_NAME}/kernel"
 export INITRAMFS_PATH="images/\${CLUSTER_NAME}/initramfs.img"
 
@@ -599,7 +600,7 @@ set +e
 IP_ADDRESS=\$1
 INSTALLATION_DISK=\$2
 
-SSH_OPTIONS=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i /root/.sno/id_rsa)
+SSH_OPTIONS=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i /root/.sno/ssh-privatekey)
 
 for _ in {1..20}; do
     echo "Set boot dev to disk in worker"
@@ -751,7 +752,7 @@ set +x
 ################################################################
 echo "If installation completed successfully Copying required artifacts to shared dir"
 # Powervs requires config.json
-IBMCLOUD_API_KEY=$(cat /etc/sno-power-credentials/.powercreds)
+IBMCLOUD_API_KEY=$(cat ${CREDENTIALS_PATH}/.powercreds)
 POWERVS_SERVICE_INSTANCE_ID=$(echo ${POWERVS_INSTANCE_CRN} | cut -f8 -d":")
 POWERVS_REGION=$(echo ${POWERVS_INSTANCE_CRN} | cut -f6 -d":")
 POWERVS_ZONE=$(echo ${POWERVS_REGION} | sed 's/-*[0-9].*//')
@@ -760,21 +761,19 @@ cat > /tmp/powervs-config.json << EOF
 {"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${POWERVS_RESOURCE_GROUP}"}
 EOF
 cp /tmp/powervs-config.json "${SHARED_DIR}/"
-cp /etc/sno-power-credentials/ssh-publickey "${SHARED_DIR}/"
-cp /etc/sno-power-credentials/ssh-privatekey "${SHARED_DIR}/"
-cp /etc/sno-power-credentials/pull-secret "${SHARED_DIR}/"
+cp ${CREDENTIALS_PATH}/{ssh-publickey,ssh-privatekey,pull-secret,pull-secret-ci} "${SHARED_DIR}/"
 #Copy the auth artifacts to shared dir for the next steps
 scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeadmin-password "${SHARED_DIR}/"
 scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeconfig "${SHARED_DIR}/"
 echo "Create proxy-conf.sh file"
 cat << EOF > "${SHARED_DIR}/proxy-conf.sh"
-echo "Setup proxy to ${BASTION}:2005"
-export HTTP_PROXY=http://${BASTION}:2005/
-export HTTPS_PROXY=http://${BASTION}:2005/
+echo "Setup proxy to ${BASTION_IP}:2005"
+export HTTP_PROXY=http://${BASTION_IP}:2005/
+export HTTPS_PROXY=http://${BASTION_IP}:2005/
 export NO_PROXY="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 
-export http_proxy=http://${BASTION}:2005/
-export https_proxy=http://${BASTION}:2005/
+export http_proxy=http://${BASTION_IP}:2005/
+export https_proxy=http://${BASTION_IP}:2005/
 export no_proxy="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 EOF
 echo "Finished prepare_next_steps"

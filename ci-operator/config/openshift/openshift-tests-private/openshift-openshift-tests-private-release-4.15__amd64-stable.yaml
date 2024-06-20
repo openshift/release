@@ -128,37 +128,6 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
-- as: aws-ipi-ovn-hypershift-arm-nodepool-guest-f14
-  cron: 49 18 5,21 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:multi-latest
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRA_ARGS: --arch=arm64
-      HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-arm-nodepool-mgmt-f14
-  cron: 13 21 12,26 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:multi-latest
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRA_ARGS: --arch=arm64
-      HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
-      TEST_ADDITIONAL: Hypershift|Network_Observability
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-mgmt
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
 - as: aws-ipi-ovn-ipsec-to-multiarch-f14
   cron: 55 7 4,18 * *
   steps:
@@ -422,6 +391,22 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-aws-sts-hcp-private-proxy
+- as: aws-rosa-hcp-sector-private-proxy-prod-stable-critical-f28
+  cron: 12 2 27 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: canary
+      E2E_RUN_TAGS: '@rosa and @critical'
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.15"
+      REGION: us-east-1
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hcp-private-proxy
 - as: aws-usgov-ipi-private-sts-f14
   cron: 44 17 13,29 * *
   steps:
@@ -643,7 +628,7 @@ tests:
 - as: vsphere-ipi-ovn-dualstack-f14
   cron: 12 21 4,18 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
@@ -662,10 +647,31 @@ tests:
 - as: vsphere-ipi-zones-f14
   cron: 15 14 10,24 * *
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones
+- as: telcov10n-hub-spoke-gitops-ztp-f360
+  cluster: build05
+  cron: 1 1 1 1 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "1"
+      ADDITIONAL_WORKERS_DAY2: "true"
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    test:
+    - ref: telcov10n-hub-spoke-gitops-ztp-debug
+    workflow: telcov10n-hub-spoke-gitops-ztp
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

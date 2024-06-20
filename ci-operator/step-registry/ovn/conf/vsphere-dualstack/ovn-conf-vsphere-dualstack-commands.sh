@@ -17,7 +17,7 @@ echo "removing networking config if already exists"
 
 echo "applying dual-stack networking config"
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
 source "${SHARED_DIR}/vsphere_context.sh"
 declare vlanid
 declare primaryrouterhostname

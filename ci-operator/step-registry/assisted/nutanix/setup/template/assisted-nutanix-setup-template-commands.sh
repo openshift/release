@@ -59,10 +59,10 @@ nutanix_endpoint = "${NUTANIX_ENDPOINT}"
 nutanix_port = "${NUTANIX_PORT}"
 nutanix_cluster = "${NUTANIX_CLUSTER_NAME}"
 nutanix_subnet = "${NUTANIX_SUBNET_NAME}"
-centos_iso_image_name = "CentOS-Stream-8-x86_64-20230830"
+centos_iso_image_name = "$(cat /var/run/vault/assisted-ci-vault/centos_iso_image_name)"
 image_name = "assisted-test-infra-machine-template"
-ssh_public_key = "/var/run/vault/sshkeys/public_key"
-ssh_private_key_file = "/var/run/vault/sshkeys/private_key"
+ssh_public_key = "/var/run/vault/assisted-ci-vault/ssh_public_key"
+ssh_private_key_file = "/var/run/vault/assisted-ci-vault/ssh_private_key"
 EOF
 
 
@@ -72,5 +72,8 @@ cat nutanix-params.hcl
 
 export PACKER_CONFIG_DIR=/home/assisted-test-infra/build/packer/config
 export PACKER_CACHE_DIR=$PACKER_CONFIG_DIR/cache
+
+sed -i "s#SSH_PUBLIC_KEY_PLACEHOLDER#$(cat /var/run/vault/assisted-ci-vault/ssh_public_key)#g" centos-config/ks.cfg
+
 packer.io init .
 packer.io build -on-error=cleanup -var-file=nutanix-params.hcl .

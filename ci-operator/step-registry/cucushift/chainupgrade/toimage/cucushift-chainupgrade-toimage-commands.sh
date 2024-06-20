@@ -30,7 +30,7 @@ function debug() {
         echo -e "\n# Describing abnormal operators...\n"
         oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
         echo -e "\n# Describing abnormal mcp...\n"
-        oc get mcp --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
+        oc get machineconfigpools --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
     fi
 }
 
@@ -263,6 +263,11 @@ function rhel_upgrade(){
     sed -i 's|^remote_tmp.*|remote_tmp = /tmp/.ansible|g' /usr/share/ansible/openshift-ansible/ansible.cfg
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv
 
+    if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "triggered" ]]; then
+        echo -e "RHEL worker upgrade completed, but the cluster upgrade hasn't been finished, check the cluster status again...\    n"
+        check_upgrade_status
+    fi
+
     echo "Check K8s version on the RHEL node"
     master_0=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
     rhel_0=$(oc get nodes -l node.openshift.io/os_id=rhel -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
@@ -276,7 +281,6 @@ function rhel_upgrade(){
         echo "RHEL worker has incorrect K8s version" && exit 1
     fi
     echo -e "oc get node -owide\n$(oc get node -owide)"
-    echo "RHEL worker upgrade complete"
 }
 
 # Extract oc binary which is supposed to be identical with target release
@@ -434,7 +438,7 @@ function check_mcp() {
     local updating_mcp unhealthy_mcp tmp_output
 
     tmp_output=$(mktemp)
-    oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status --no-headers > "${tmp_output}" || true
+    oc get machineconfigpools -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status --no-headers > "${tmp_output}" || true
     # using the size of output to determinate if oc command is executed successfully
     if [[ -s "${tmp_output}" ]]; then
         updating_mcp=$(cat "${tmp_output}" | grep -v "False")
@@ -444,12 +448,12 @@ function check_mcp() {
             return 1
         fi
     else
-        echo "Did not run "oc get mcp" successfully!"
+        echo "Did not run 'oc get machineconfigpools' successfully!"
         return 1
     fi
 
     # Do not check UPDATED on purpose, beause some paused mcp would not update itself until unpaused
-    oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount --no-headers > "${tmp_output}" || true
+    oc get machineconfigpools -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount --no-headers > "${tmp_output}" || true
     # using the size of output to determinate if oc command is executed successfully
     if [[ -s "${tmp_output}" ]]; then
         unhealthy_mcp=$(cat "${tmp_output}" | grep -v "False.*False.*0")
@@ -457,9 +461,9 @@ function check_mcp() {
             echo "Detected unhealthy mcp:"
             echo "${unhealthy_mcp}"
             echo "Real-time detected unhealthy mcp:"
-            oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount | grep -v "False.*False.*0"
+            oc get machineconfigpools -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount | grep -v "False.*False.*0"
             echo "Real-time full mcp output:"
-            oc get mcp
+            oc get machineconfigpools
             echo ""
             unhealthy_mcp_names=$(echo "${unhealthy_mcp}" | awk '{print $1}')
             echo "Using oc describe to check status of unhealthy mcp ..."
@@ -470,7 +474,7 @@ function check_mcp() {
             return 2
         fi
     else
-        echo "Did not run "oc get mcp" successfully!"
+        echo "Did not run 'oc get machineconfigpools' successfully!"
         return 1
     fi
     return 0
@@ -509,7 +513,7 @@ function wait_mcp_continous_success() {
     if (( continous_successful_check != passed_criteria )); then
         echo >&2 "Some mcp does not get ready or not stable"
         echo "Debug: current mcp output is:"
-        oc get mcp
+        oc get machineconfigpools
         return 1
     else
         echo "All mcp status check PASSED"
@@ -684,8 +688,8 @@ function check_upgrade_status() {
             echo -e "Upgrade succeed on $(date "+%F %T")\n\n"
             return 0
         fi
-	if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${TARGET_VERSION}"* ]]; then
-	    UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
+        if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${TARGET_VERSION}"* ]]; then
+            UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
             echo -e "Upgrade stuck at updating RHEL worker, run the RHEL worker upgrade now...\n\n"
             return 0
         fi
@@ -845,8 +849,7 @@ function summarize_test_results() {
     done < /tmp/zzz-tmp.log
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
-cucushift:
-  type: cucushift-e2e
+cucushift-chainupgrade-toimage:
   total: $tests
   failures: $failures
   errors: $errors
@@ -889,7 +892,7 @@ function run_upgrade_e2e() {
     #shellcheck source=${SHARED_DIR}/runtime_env
     source "${SHARED_DIR}/runtime_env"
 
-    pushd verification-tests
+    pushd /verification-tests
     # run normal tests
     export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-normal-${idx}"
     parallel_cucumber -n "${PARALLEL}" --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number --exec \
@@ -946,9 +949,8 @@ mkdir -p /tmp/client
 export OC_DIR="/tmp/client"
 export PATH=${OC_DIR}:$PATH
 index=0
-for target in "${TARGET_RELEASES[@]}"
-do
-
+for target in "${TARGET_RELEASES[@]}"; do
+    run_command "oc get machineconfigpools"
     run_command "oc get machineconfig"
 
     (( index += 1 ))
@@ -985,12 +987,13 @@ do
     check_upgrade_status
 
     if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
-        echo -e "oc get node -owide\n$(oc get node -owide)"
-        rhel_repo
-        rhel_upgrade
-	if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "triggered" ]]; then
-	    echo -e "RHEL worker upgrade completed, but the cluster upgrade hasn't been finished, check the cluster status again...\    n"
-	    check_upgrade_status
+        echo "Found rhel worker..."
+        run_command "oc get node -owide"
+        if [[ $(oc get machineconfigpools worker -ojson | jq -r '.spec.paused') == "true" ]]; then
+            echo "worker mcp are paused, it sounds eus upgrade, skip rhel worker upgrade here, should upgrade them after worker mcp unpaused"
+        else
+            rhel_repo
+            rhel_upgrade
         fi
     fi
     check_history

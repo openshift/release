@@ -386,12 +386,12 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-csi
-- as: e2e-vsphere-zones
+- as: e2e-vsphere-ovn-zones
   interval: 152h
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
-- as: e2e-vsphere-upi-zones
+- as: e2e-vsphere-ovn-upi-zones
   interval: 150h
   steps:
     cluster_profile: vsphere-multizone-2
@@ -850,7 +850,7 @@ tests:
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 0 4 * * 2,4,6
+  cron: 0 23 * * 2,4,6
   steps:
     env:
       T5CI_JOB_TYPE: ptp
@@ -1000,7 +1000,7 @@ tests:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
   timeout: 5h0m0s
-- as: e2e-agent-sno-ipv6
+- as: e2e-agent-single-node-ipv6
   cluster: build05
   cron: 0 */12 * * *
   steps:
@@ -1189,6 +1189,15 @@ tests:
       EDGE_ZONE_TYPES: local-zone
     workflow: openshift-e2e-aws-edge-zones
   timeout: 6h0m0s
+- as: fips-payload-scan
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws
+    env:
+      MAJOR_MINOR: "4.14"
+    test:
+    - ref: openshift-release-fips
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

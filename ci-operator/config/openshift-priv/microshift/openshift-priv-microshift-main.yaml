@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
+    tag: rhel-9-release-golang-1.22-openshift-4.17
 canonical_go_repository: github.com/openshift/microshift
 images:
 - dockerfile_literal: |
@@ -28,13 +28,13 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.17"
   nightly-arm64:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -103,7 +103,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      EC2_INSTANCE_TYPE: t4g.2xlarge
+      EC2_INSTANCE_TYPE: c7g.2xlarge
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-cache
 - as: metal-periodic-test
@@ -150,9 +150,16 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      EC2_INSTANCE_TYPE: t4g.2xlarge
+      EC2_INSTANCE_TYPE: c7g.2xlarge
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
+- as: ocp-full-conformance-rhel-eus
+  run_if_changed: ^(origin/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-origin-conformance
 zz_generated_metadata:
   branch: main
   org: openshift-priv

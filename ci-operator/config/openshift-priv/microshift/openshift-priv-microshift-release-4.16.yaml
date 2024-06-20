@@ -103,7 +103,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      EC2_INSTANCE_TYPE: t4g.2xlarge
+      EC2_INSTANCE_TYPE: c7g.2xlarge
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-cache
 - as: metal-periodic-test
@@ -122,22 +122,6 @@ tests:
       EC2_INSTANCE_TYPE: c6g.metal
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-metal-tests
-- as: metal-bootc-test
-  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/.*)$
-  steps:
-    cluster_profile: aws
-    env:
-      EC2_INSTANCE_TYPE: c5n.metal
-      MICROSHIFT_OS: rhel-9.4
-    workflow: openshift-microshift-e2e-metal-tests
-- as: metal-bootc-test-arm
-  run_if_changed: ^(test/bin/.*|test/scenarios-bootc/.*)$
-  steps:
-    cluster_profile: aws
-    env:
-      EC2_INSTANCE_TYPE: c6g.metal
-      MICROSHIFT_OS: rhel-9.4
-    workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-conformance-rhel-eus
   run_if_changed: ^(assets/.*|etcd/.*|vendor/.*)$
   steps:
@@ -150,9 +134,16 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      EC2_INSTANCE_TYPE: t4g.2xlarge
+      EC2_INSTANCE_TYPE: c7g.2xlarge
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
+- as: ocp-full-conformance-rhel-eus
+  run_if_changed: ^(origin/.*)$
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.4
+    workflow: openshift-microshift-e2e-origin-conformance
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

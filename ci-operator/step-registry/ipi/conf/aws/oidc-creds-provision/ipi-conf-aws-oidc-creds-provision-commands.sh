@@ -144,7 +144,7 @@ cd "/tmp/manifests"
 for FILE in *; do cp $FILE "${MPREFIX}_$FILE"; done
 
 # for Shared VPC install, same ingress role name, it will be used in trust policy
-ingress_role_arn=$(grep -hE "role_arn.*ingress" * | awk '{print $3}')
+ingress_role_arn=$(grep -hE "role_arn.*ingress" * | awk '{print $3}' || true)
 if [[ ${ingress_role_arn} != "" ]]; then
   echo "Saving ingress role: ${ingress_role_arn}"
   echo "${ingress_role_arn}" > ${SHARED_DIR}/sts_ingress_role_arn
