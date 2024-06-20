@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
+  echo "using legacy sibling of this step"
+  exit 0
+fi
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 HOME=/tmp
@@ -28,6 +33,9 @@ declare GOVC_RESOURCE_POOL
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 
+unset SSL_CERT_FILE 
+unset GOVC_TLS_CA_CERTS
+
 govc_version=$(govc version)
 
 echo "$(date -u --rfc-3339=seconds) - govc version: ${govc_version}"
@@ -45,10 +53,10 @@ while [[ $fd_idx -lt $FDS ]]; do
     FD=$(jq -c -r '.failureDomains['${fd_idx}']' "$SHARED_DIR"/platform.json)
             
     CLUSTER=${vsphere_cluster}
-    GOVC_DATASTORE=$(echo "${FD}" | jq -r .datastore)
-    GOVC_DATACENTER=$(echo "${FD}" | jq -r .datacenter)
-    GOVC_RESOURCE_POOL=$(echo "${FD}" | jq -r .resourcePool)
-    vsphere_portgroup=$(echo "${FD}" | jq -r .networks[0])
+    GOVC_DATASTORE=$(echo "${FD}" | jq -r .topology.datastore)
+    GOVC_DATACENTER=$(echo "${FD}" | jq -r .topology.datacenter)
+    GOVC_RESOURCE_POOL="${vsphere_cluster}/Resources"
+    vsphere_portgroup=$(echo "${FD}" | jq -r .topology.networks[0])
 
     OVA_NETWORK=""
     mapfile -t NETWORKS < <(govc find -i network -name "$vsphere_portgroup")
