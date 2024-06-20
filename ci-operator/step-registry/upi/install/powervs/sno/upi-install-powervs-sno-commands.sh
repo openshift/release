@@ -393,8 +393,6 @@ metadata:
 rendezvousIP: \${IP_ADDRESS}
 hosts:
   - hostname: \${CLUSTER_NAME}
-    rootDeviceHints:
-      deviceName: \${INSTALLATION_DISK}
     role: master
     interfaces:
        - name: eth0
@@ -475,11 +473,6 @@ IMAGES_DIR="/var/lib/tftpboot/images/\${CLUSTER_NAME}"
 WWW_DIR="/var/www/html/\${CLUSTER_NAME}"
 
 mkdir -p \$IMAGES_DIR \$WWW_DIR \$CONFIG_DIR
-
-if [[ \${INSTALL_TYPE} != "sno" ]]; then
-    # install required package for agent based installer
-    dnf install -y /usr/bin/nmstatectl coreos-installer jq
-fi
 
 download_installer() {
     echo "Dowmload openshift-install"
