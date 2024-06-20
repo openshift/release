@@ -9,9 +9,11 @@ export TEST_PROFILE=${TEST_PROFILE:-}
 TEST_LABEL_FILTERS=${TEST_LABEL_FILTERS:-}
 TEST_TIMEOUT=${TEST_TIMEOUT:-"4h"}
 
-CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
-echo "Working on the cluster: $CLUSTER_ID"
-export CLUSTER_ID # maybe we should get cluster_id by TEST_PROFILE
+if [[ "$TEST_PROFILE" != "null" ]]; then
+  CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
+  echo "Working on the cluster: $CLUSTER_ID"
+  export CLUSTER_ID # this is already enhanced in rosa repo. And will remove this in another PR
+fi
 
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}"
