@@ -3,6 +3,10 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: ansible
+  assisted-service-scripts:
+    name: ocm-2.11
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   cli:
     name: "4.16"
     namespace: ocp
@@ -151,6 +155,31 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
+- as: baremetalds-agent-hypershift-mce-inplace-f7
+  cluster: build05
+  cron: 52 15 3,10,17,24 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      EXTRA_ARGS: --node-upgrade-type=InPlace
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      MCE_VERSION: "2.6"
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+- as: baremetalds-kubevirt-hypershift-mce-replace-f14
+  cron: 53 15 1,17 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.16
+      MCE_VERSION: "2.6"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
 - as: baremetal-compact-agent-ipv4-static-connected-f28
   cluster: build05
   cron: 15 15 17 * *
