@@ -43,7 +43,7 @@ tests:
     test:
     - ref: trigger-jobs
 - as: rosa-sts-hypershift-layered-product-interop
-  cron: 0 10 * * 1
+  cron: 0 0 * * 5
   steps:
     cluster_profile: aws-cspi-qe
     env:
