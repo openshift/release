@@ -191,27 +191,54 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-network-mtu-edge-zone-sdn
-- as: aws-ipi-ovn-hypershift-inplace-f7
-  cron: 15 14 3,11,18,25 * *
+- as: aws-ipi-ovn-hypershift-mce-inplace-f28
+  cron: 53 18 13 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       EXTRA_ARGS: --node-upgrade-type=InPlace
+      MCE_VERSION: "2.5"
       TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
     test:
     - chain: openshift-upgrade-qe-test-hypershift
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-replace-f7
-  cron: 25 3 3,12,19,26 * *
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-replace-f28
+  cron: 17 18 20 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_VERSION: "2.5"
       TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
     test:
     - chain: openshift-upgrade-qe-test-hypershift
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-mceupgrade-replace-f28
+  cron: 55 21 15 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_TARGET_VERSION: "2.5"
+      MCE_VERSION: "2.4"
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - ref: hypershift-mce-upgrade
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-mceupgrade-full-replace-f28
+  cron: 14 0 7 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_TARGET_VERSION: "2.5"
+      MCE_VERSION: "2.4"
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift-full
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
 - as: aws-ipi-shared-vpc-phz-f14
   cron: 53 4 7,23 * *
   steps:
