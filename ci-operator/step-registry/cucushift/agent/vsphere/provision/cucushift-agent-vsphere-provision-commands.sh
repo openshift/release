@@ -20,6 +20,9 @@ declare vsphere_datacenter
 declare vsphere_datastore
 declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
+source "${SHARED_DIR}/govc.sh"
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 installer_dir=/tmp/installer
 
@@ -39,7 +42,6 @@ export KUBECONFIG="${installer_dir}/auth/kubeconfig"
 
 agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
 
-source "${SHARED_DIR}/govc.sh"
 
 total_host="$((MASTERS + WORKERS))"
 declare -a mac_addresses
