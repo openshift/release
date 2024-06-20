@@ -127,7 +127,8 @@ function populate_artifact_dir() {
   # Copy CAPI-generated artifacts if they exist
   if [ -d "${dir}/.clusterapi_output" ]; then
     echo "Copying Cluster API generated manifests..."
-    cp -rpv "${dir}/.clusterapi_output" "${ARTIFACT_DIR}/" 2>/dev/null
+    mkdir -p "${ARTIFACT_DIR}/clusterapi_output/"
+    cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output" 2>/dev/null
   fi
 }
 
