@@ -14,6 +14,8 @@ source "${SHARED_DIR}/govc.sh"
 
 declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
