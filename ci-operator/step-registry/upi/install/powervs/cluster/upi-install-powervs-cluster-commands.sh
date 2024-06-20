@@ -365,11 +365,11 @@ function create_powervs_workspace() {
     echo "Attempt: $i/5"
     ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_REGION}" -g "${RESOURCE_GROUP}" --allow-cleanup > /tmp/instance.id
     if [ $? = 0 ]; then
-        break
+      break
     elif [ "$i" == "5" ]; then
-        echo "All retry attempts failed! Please try running the script again after some time"
+      echo "All retry attempts failed! Please try running the script again after some time"
     else
-        sleep 30
+      sleep 30
     fi
     [ -f /tmp/instance.id ] && cat /tmp/instance.id && break
   done
