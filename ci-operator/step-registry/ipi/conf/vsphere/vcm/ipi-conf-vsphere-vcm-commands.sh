@@ -24,6 +24,8 @@ declare vsphere_cluster
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 declare -a vips
 mapfile -t vips < "${SHARED_DIR}/vips.txt"
@@ -167,7 +169,6 @@ fi
 if [ "${Z_VERSION}" -lt 13 ]; then
   cluster_name=$(echo "${vsphere_cluster}" | rev | cut -d '/' -f 1 | rev)
   datastore_name=$(echo "${vsphere_datastore}" | rev | cut -d '/' -f 1 | rev)
-
   cat >>"${CONFIG}" <<EOF
 baseDomain: $base_domain
 $MACHINE_POOL_OVERRIDES
