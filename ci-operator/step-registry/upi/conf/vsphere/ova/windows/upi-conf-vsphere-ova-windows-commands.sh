@@ -10,6 +10,9 @@ echo "$(date -u --rfc-3339=seconds) - Configuring govc exports."
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
 # TODO: read VM template information from environment variable
 VM_TEMPLATE="windows-golden-images/windows-server-2022-template-ipv6-disabled"
 VM_TEMPLATE_USERNAME="Administrator"
