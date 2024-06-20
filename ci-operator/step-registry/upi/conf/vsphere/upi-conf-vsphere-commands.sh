@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+  echo "using VCM sibling of this step"
+  exit 0
+fi
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
@@ -29,6 +34,8 @@ declare vlanid
 declare primaryrouterhostname
 declare vsphere_portgroup
 
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
@@ -145,7 +152,6 @@ echo "${ova_url}" >"${SHARED_DIR}"/ova_url.txt
 ova_url=$(<"${SHARED_DIR}"/ova_url.txt)
 
 vm_template="${ova_url##*/}"
-
 
 # select a hardware version for testing
 vsphere_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $1}')

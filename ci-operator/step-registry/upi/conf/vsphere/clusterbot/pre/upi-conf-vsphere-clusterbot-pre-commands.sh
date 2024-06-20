@@ -13,7 +13,10 @@ export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
 export HOME=/tmp
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+# subnets.json is no longer available in vault
+#SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+
+SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
 
 declare vlanid
 declare primaryrouterhostname

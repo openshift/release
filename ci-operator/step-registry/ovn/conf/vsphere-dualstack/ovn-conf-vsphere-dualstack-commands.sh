@@ -17,7 +17,11 @@ echo "removing networking config if already exists"
 
 echo "applying dual-stack networking config"
 
+# subnets.json is no longer available in vault
+#SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+
 SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+
 source "${SHARED_DIR}/vsphere_context.sh"
 declare vlanid
 declare primaryrouterhostname
