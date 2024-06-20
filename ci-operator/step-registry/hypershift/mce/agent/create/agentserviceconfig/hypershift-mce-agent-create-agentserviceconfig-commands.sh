@@ -163,7 +163,7 @@ fi
 
 cd "${REPO_DIR}/deploy/operator"
 
-CLUSTER_VERSION=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
+CLUSTER_VERSION="4.16"
 OS_IMAGES=$(jq --arg CLUSTER_VERSION "$CLUSTER_VERSION" '[.[] | select(.openshift_version == $CLUSTER_VERSION)]' ../../data/default_os_images.json)
 ASSISTED_NAMESPACE="multicluster-engine"
 STORAGE_CLASS_NAME=$(oc get storageclass -o=jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}')
