@@ -13,6 +13,8 @@ function cleanup() {
 }
 trap cleanup EXIT
 
+export EVENTUALLY_VERBOSE="false"
+
 hack/ci-test-e2e.sh -test.v \
   -test.run='^TestCreateCluster.*|^TestNodePool.*' \
   -test.parallel=20 \
