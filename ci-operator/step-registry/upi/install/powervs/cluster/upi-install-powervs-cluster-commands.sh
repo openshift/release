@@ -360,22 +360,19 @@ function create_powervs_workspace() {
 
   ##Create a Workspace on a Power Edge Router enabled PowerVS zone
   # Dev Note: uses a custom loop since we want to redirect errors
-  for retry in $(seq 1 "$NO_OF_RETRY"); do
-    echo "Attempt: $retry/$NO_OF_RETRY"
-    ret_code=0
-    ic pi workspace create "${workspace_name}" --datacenter "${POWERVS_ZONE}" --group "${RESOURCE_GROUP_ID}" --plan public 2>&1 || ret_code=$?
-    if [ $ret_code = 0 ]; then
+  for i in {1..5}
+  do
+    echo "Attempt: $i/5"
+    ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_REGION}" -g "${RESOURCE_GROUP}" --allow-cleanup > /tmp/instance.id
+    if [ $? = 0 ]; then
       break
-    elif [ "$retry" == "$NO_OF_RETRY" ]; then
-      error_handler "All retry attempts failed! Please try running the script again after some time" $ret_code
+    elif [ "$i" == "5" ]; then
+      echo "All retry attempts failed! Please try running the script again after some time"
     else
       sleep 30
     fi
+    [ -f /tmp/instance.id ] && cat /tmp/instance.id && break
   done
-
-  echo "Waiting for the workspace to come active"
-  sleep 120
-  ic pi workspace list 2>&1 | grep "${workspace_name}" | tee /tmp/instance.id
 
   ##Get the CRN
   CRN=$(cat /tmp/instance.id | grep crn | awk '{print $1}')
