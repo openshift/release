@@ -55,12 +55,8 @@ sudo mv /tmp/crc /usr/bin/crc
 
 function run-tests() {
   pushd crc
-  set +e
-  export PULL_SECRET_PATH="${HOME}"/pull-secret
-  set -e
-  export BUNDLE_PATH="${HOME}"/$(cat "${HOME}"/bundle)
    
-  /tmp/integration.test
+  /tmp/integration.test --pull-secret-path="${HOME}"/pull-secret
   if [[ $? -ne 0 ]]; then
     exit 1
     popd
