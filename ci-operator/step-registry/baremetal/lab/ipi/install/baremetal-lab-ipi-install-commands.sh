@@ -127,34 +127,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     address: ${bmc_scheme}://${bmc_address}${bmc_base_uri}
     username: ${bmc_user}
     password: ${bmc_pass}
-  networkConfig:
-    interfaces:
-    - name: ${baremetal_iface}
-      type: ethernet
-      state: up
-      ipv4:
-        enabled: true
-        dhcp: true
-      ipv6:
-        enabled: true
-        dhcp: true
 "
-  # split the ipi_disabled_ifaces semi-comma separated list into an array
-  IFS=';' read -r -a ipi_disabled_ifaces <<< "${ipi_disabled_ifaces}"
-  for iface in "${ipi_disabled_ifaces[@]}"; do
-    # Take care of the indentation when adding the disabled interfaces to the above yaml
-    ADAPTED_YAML+="
-    - name: ${iface}
-      type: ethernet
-      state: up
-      ipv4:
-        enabled: false
-        dhcp: false
-      ipv6:
-        enabled: false
-        dhcp: false
-    "
-  done
   # Patch the install-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
   yq --inplace eval-all 'select(fileIndex == 0).platform.baremetal.hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
     "$SHARED_DIR/install-config.yaml" - <<< "$ADAPTED_YAML"
