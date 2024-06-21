@@ -117,6 +117,19 @@ skip_if_unavailable=0
     fi
 
 	"${DNF_RETRY}" "install" "microshift*-${version}"
+
+	if [[ ! -f /etc/crio/crio.conf.d/00-crio-crun.conf ]]; then
+        sudo tee /etc/crio/crio.conf.d/00-crio-crun.conf >/dev/null <<2EOF2
+[crio.runtime.runtimes.crun]
+runtime_path = ""
+runtime_type = "oci"
+runtime_root = "/run/crun"
+runtime_config_path = ""
+monitor_path = ""
+2EOF2
+		sudo systemctl restart crio.service
+	fi
+
 	sudo systemctl enable --now microshift
 fi
 EOF
