@@ -45,6 +45,7 @@ function install_extra_tools {
 
   run_cmd export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
   run_cmd oc krew install operator
+  echo "See: https://github.com/operator-framework/kubectl-operator"
 
 }
 
@@ -69,10 +70,12 @@ function install_ztp_operators {
 
   echo "************ telcov10n install ZTP Operators ************"
 
-  install_ztp_operator local-storage-operator stable openshift-local-storage
-  install_ztp_operator advanced-cluster-management release-2.10 open-cluster-management
-  install_ztp_operator topology-aware-lifecycle-manager stable openshift-talm
-  install_ztp_operator openshift-gitops-operator latest openshift-gitops-operator
+  echo "$ZTP_OPERATORS" | jq -c '.[]' | while read operator; do
+    name=$(echo $operator | jq -r '.name')
+    namespace=$(echo $operator | jq -r '.namespace')
+    channel=$(echo $operator | jq -r '.channel')
+    install_ztp_operator $name $channel $namespace
+  done
 
   create_multiclusterhub
 
@@ -173,7 +176,9 @@ function main {
   wait_for_the_cluster_to_stabilize
 }
 
-main
+# main
+run_cmd oc get no,clusterversion,mcp,co,sc,pv
+run_cmd oc get subscriptions.operators,OperatorGroup,pvc -A
 
 set -x
 while sleep 10m; do
