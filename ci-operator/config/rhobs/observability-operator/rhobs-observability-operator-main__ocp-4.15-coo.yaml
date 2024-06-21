@@ -13,6 +13,12 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.15"
   latest:
     candidate:
       product: ocp
@@ -55,6 +61,24 @@ tests:
     - ref: install-operators
     - ref: rhobs-obo-test-harness
     workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
+- as: arm-stage
+  cron: 0 6 1 8 *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      OCP_ARCH: arm64
+      OPERATORS: |
+        [
+            {"name": "cluster-observability-operator", "source": "dt-catalogsource", "channel": "development", "install_namespace": "openshift-coo", "target_namespaces": "", "operator_group":"openshift-coo-og"}
+        ]
+    test:
+    - ref: enable-stage-catalogsource
+    - ref: install-operators
+    - ref: rhobs-obo-test-harness
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: main
   org: rhobs
