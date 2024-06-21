@@ -80,6 +80,7 @@ tests:
       cli: latest
       commands: |
         oc create namespace openshift-lightspeed
+        oc label namespaces openshift-lightspeed openshift.io/cluster-monitoring=true --overwrite=true
         operator-sdk run bundle --timeout=10m -n openshift-lightspeed "$OO_BUNDLE"
         oc wait --for condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager
       dependencies:
@@ -110,6 +111,8 @@ tests:
 - as: security
   optional: true
   steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main

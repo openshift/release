@@ -11,13 +11,14 @@ spec:
     spec:
       template:
         spec:
+          serviceAccountName: autoscaler-purge
           containers:
           - name: autoscaler-purge
             image: registry.ci.openshift.org/ocp/4.15:cli
             args:
             - -c
             - |
-              oc -n openshift-machine-api delete pods -l 'k8s-app==cluster-autoscaler-operator'
+              oc -n openshift-machine-api delete pods -l 'k8s-app==cluster-autoscaler'
             command:
             - /bin/bash
           restartPolicy: OnFailure
@@ -26,3 +27,37 @@ apiVersion: v1
 kind: Namespace
 metadata:
     name: autoscaler-purge
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: autoscaler-purge
+  namespace: autoscaler-purge
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: delete-pods
+  namespace: openshift-machine-api
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - list
+  - delete
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: autoscaler-purge-delete-pods-binding
+  namespace: openshift-machine-api
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: delete-pods
+subjects:
+- kind: ServiceAccount
+  name: autoscaler-purge
+  namespace: autoscaler-purge

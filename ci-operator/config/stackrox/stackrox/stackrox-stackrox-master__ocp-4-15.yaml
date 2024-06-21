@@ -71,7 +71,7 @@ tests:
   timeout: 5h0m0s
 - as: ui-e2e-tests
   optional: true
-  run_if_changed: ^ui/
+  run_if_changed: ^(ui|proto/(storage|api)|central/.+?/service|pkg/features/list.go|tests/e2e/lib.sh)/
   steps:
     env:
       COLLECTION_METHOD: core_bpf
@@ -100,7 +100,7 @@ tests:
       TEST_SUITE: ocp-compliance-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
-- always_run: false
+- always_run: true
   as: nongroovy-e2e-tests
   optional: true
   steps:
@@ -110,16 +110,6 @@ tests:
       TEST_SUITE: ocp-nongroovy-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
-- always_run: false
-  as: sensor-profiling
-  optional: true
-  steps:
-    env:
-      COLLECTION_METHOD: core_bpf
-      OCP_VERSION: ocp/fast-4.15
-      TEST_SUITE: ocp-sensor-profiling
-    workflow: stackrox-automation-flavors-ocp-4-e2e
-  timeout: 2h0m0s
 - as: merge-qa-e2e-tests
   postsubmit: true
   skip_if_only_changed: ^ui/
@@ -156,6 +146,15 @@ tests:
       COLLECTION_METHOD: core_bpf
       OCP_VERSION: ocp/fast-4.15
       TEST_SUITE: ocp-ui-e2e-tests
+    workflow: stackrox-automation-flavors-ocp-4-e2e
+  timeout: 5h0m0s
+- as: merge-nongroovy-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      OCP_VERSION: ocp/fast-4.15
+      TEST_SUITE: ocp-nongroovy-e2e-tests
     workflow: stackrox-automation-flavors-ocp-4-e2e
   timeout: 5h0m0s
 - as: merge-compliance-e2e-tests

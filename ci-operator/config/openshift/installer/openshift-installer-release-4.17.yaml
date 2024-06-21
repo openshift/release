@@ -35,18 +35,6 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: cli
-  ocp_4.16_base-rhel9:
-    name: "4.17"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_4.16_etcd:
-    name: "4.17"
-    namespace: ocp
-    tag: etcd
-  ocp_4.16_hyperkube:
-    name: "4.17"
-    namespace: ocp
-    tag: hyperkube
   ocp_4.17_base-rhel9:
     name: "4.17"
     namespace: ocp
@@ -85,9 +73,6 @@ build_root:
 images:
 - dockerfile_path: images/installer/Dockerfile.ci
   inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
@@ -106,9 +91,6 @@ images:
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
@@ -127,12 +109,6 @@ images:
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   inputs:
-    ocp_4.16_etcd:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:etcd
-    ocp_4.16_hyperkube:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:hyperkube
     ocp_4.17_cli:
       as:
       - registry.ci.openshift.org/ocp/4.17:cli
@@ -148,9 +124,6 @@ images:
   to: libvirt-installer
 - dockerfile_path: images/installer/Dockerfile.upi.ci
   inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
@@ -172,9 +145,6 @@ images:
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
   inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
     ocp_4.17_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.17:base-rhel9
@@ -196,15 +166,15 @@ images:
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_4.16_etcd:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.17_etcd:
       as:
-      - registry.ci.openshift.org/ocp/4.16:etcd
-    ocp_4.16_hyperkube:
+      - registry.ci.openshift.org/ocp/4.17:etcd
+    ocp_4.17_hyperkube:
       as:
-      - registry.ci.openshift.org/ocp/4.16:hyperkube
+      - registry.ci.openshift.org/ocp/4.17:hyperkube
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
@@ -650,7 +620,18 @@ tests:
 - as: e2e-vsphere-ovn
   run_if_changed: vsphere
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
+- as: e2e-vsphere-ovn-techpreview
+  optional: true
+  run_if_changed: vsphere
+  steps:
+    cluster_profile: vsphere-8-vpn
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
+        In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 - as: e2e-vsphere-static-ovn
@@ -676,7 +657,7 @@ tests:
   optional: true
   run_if_changed: vsphere
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-zones-techpreview
@@ -872,6 +853,22 @@ tests:
     - ref: ovn-conf
     - chain: ipi-install
     - ref: ipi-azure-rbac
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-external-aws
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-external-aws
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-external-aws-ccm
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
+    workflow: openshift-e2e-external-aws
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.17

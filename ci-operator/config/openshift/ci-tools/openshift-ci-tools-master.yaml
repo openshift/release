@@ -1,4 +1,8 @@
 base_images:
+  centos9:
+    name: centos
+    namespace: openshift
+    tag: stream9
   ci_nginx-unprivileged_stable:
     name: nginx-unprivileged
     namespace: ci
@@ -12,10 +16,6 @@ base_images:
     namespace: ci
     tag: latest
   os:
-    name: centos
-    namespace: openshift
-    tag: stream9
-  ubi_minimal:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
@@ -71,7 +71,7 @@ images:
       - registry.ci.openshift.org/ci/nginx-unprivileged:stable
   to: gh-pull-through-cache
 - context_dir: images/dptp-3312-hypershift-leaks-cleaner/
-  from: ubi_minimal
+  from: os
   inputs:
     bin:
       paths:
@@ -125,7 +125,7 @@ images:
         source_path: /usr/bin/manifest-tool
   to: ci-operator
 - context_dir: images/ci-operator-minimal/
-  from: ubi_minimal
+  from: os
   inputs:
     bin:
       paths:
@@ -201,7 +201,7 @@ images:
         source_path: /go/bin/dptp-controller-manager
   to: dptp-controller-manager
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD dptp-pools-cm /usr/bin/dptp-pools-cm
     ENTRYPOINT ["dptp-pools-cm"]
   from: os
@@ -212,8 +212,8 @@ images:
         source_path: /go/bin/dptp-pools-cm
   to: dptp-pools-cm
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
-    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+    RUN microdnf install -y git && microdnf clean all && rm -rf /var/cache/dnf
     ADD promoted-image-governor /usr/bin/promoted-image-governor
     ENTRYPOINT ["promoted-image-governor"]
   from: os
@@ -224,8 +224,8 @@ images:
         source_path: /go/bin/promoted-image-governor
   to: promoted-image-governor
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
-    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+    RUN microdnf install -y git && microdnf clean all && rm -rf /var/cache/dnf
     ADD ci-images-mirror /usr/bin/ci-images-mirror
     ADD usr/bin/oc /usr/bin/oc
     ENTRYPOINT ["ci-images-mirror"]
@@ -239,8 +239,8 @@ images:
         source_path: /usr/local/bin/oc
   to: ci-images-mirror
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
-    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+    RUN microdnf install -y git && microdnf clean all && rm -rf /var/cache/dnf
     ADD prcreator /usr/bin/prcreator
     ENTRYPOINT ["prcreator"]
   from: os
@@ -369,7 +369,7 @@ images:
         source_path: /go/bin/entrypoint-wrapper
   to: entrypoint-wrapper
 - context_dir: images/ci-operator-configresolver
-  from: os
+  from: centos9
   inputs:
     bin:
       paths:
@@ -515,8 +515,8 @@ images:
         source_path: /go/bin/serviceaccount-secret-rotation-trigger
   to: serviceaccount-secret-rotation-trigger
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
-    RUN dnf install -y git diffutils && dnf clean all && rm -rf /var/cache/dnf
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+    RUN microdnf install -y git diffutils && microdnf clean all && rm -rf /var/cache/dnf
     ADD sippy-config-generator /usr/bin/sippy-config-generator
     ADD prcreator /usr/bin/prcreator
     ENTRYPOINT ["/usr/bin/sippy-config-generator"]
@@ -538,7 +538,7 @@ images:
         source_path: /go/bin/ocp-build-data-enforcer
   to: ocp-build-data-enforcer
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD vault-subpath-proxy /usr/bin/vault-subpath-proxy
     ENTRYPOINT ["/usr/bin/vault-subpath-proxy"]
   from: os
@@ -549,7 +549,7 @@ images:
         source_path: /go/bin/vault-subpath-proxy
   to: vault-subpath-proxy
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD cluster-display /usr/bin/cluster-display
     ENTRYPOINT ["/usr/bin/cluster-display"]
   from: os
@@ -568,7 +568,7 @@ images:
         source_path: /go/bin/cluster-init
   to: cluster-init
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD vault-secret-collection-manager /usr/bin/vault-secret-collection-manager
     ENTRYPOINT ["/usr/bin/vault-secret-collection-manager"]
   from: os
@@ -579,7 +579,7 @@ images:
         source_path: /go/bin/vault-secret-collection-manager
   to: vault-secret-collection-manager
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD bugzilla-config-manager /usr/bin/bugzilla-config-manager
     ADD prcreator /usr/bin/prcreator
   from: os
@@ -592,8 +592,8 @@ images:
         source_path: /go/bin/prcreator
   to: bugzilla-config-manager
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
-    RUN  dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+    RUN microdnf install -y git && microdnf clean all && rm -rf /var/cache/dnf
     ADD ci-operator-yaml-creator /usr/bin/ci-operator-yaml-creator
     ENTRYPOINT ["ci-operator-yaml-creator"]
   from: os
@@ -612,7 +612,7 @@ images:
         source_path: /go/bin/clusterimageset-updater
   to: clusterimageset-updater
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD github-ldap-user-group-creator /usr/bin/github-ldap-user-group-creator
     ENTRYPOINT ["github-ldap-user-group-creator"]
   from: os
@@ -623,7 +623,7 @@ images:
         source_path: /go/bin/github-ldap-user-group-creator
   to: github-ldap-user-group-creator
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD qci-appci /usr/bin/qci-appci
     ENTRYPOINT ["qci-appci"]
   from: os
@@ -634,7 +634,7 @@ images:
         source_path: /go/bin/qci-appci
   to: qci-appci
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD payload-testing-prow-plugin /usr/bin/payload-testing-prow-plugin
     ENTRYPOINT ["/usr/bin/payload-testing-prow-plugin"]
   from: os
@@ -645,7 +645,7 @@ images:
         source_path: /go/bin/payload-testing-prow-plugin
   to: payload-testing-prow-plugin
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD job-trigger-controller-manager /usr/bin/job-trigger-controller-manager
     ENTRYPOINT ["/usr/bin/job-trigger-controller-manager"]
   from: os
@@ -670,10 +670,12 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/job-run-aggregator
+      - destination_dir: .
+        source_path: /go/bin/prcreator
   to: job-run-aggregator
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
-    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+    RUN microdnf install -y git && microdnf clean all && rm -rf /var/cache/dnf
     ADD sync-rover-groups /usr/bin/sync-rover-groups
     ADD usr/bin/oc /usr/bin/oc
     ENTRYPOINT ["sync-rover-groups"]
@@ -687,8 +689,8 @@ images:
         source_path: /usr/local/bin/oc
   to: sync-rover-groups
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
-    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+    RUN microdnf install -y git && microdnf clean all && rm -rf /var/cache/dnf
     ADD retester /usr/bin/retester
     ENTRYPOINT ["/usr/bin/retester"]
   from: os
@@ -699,7 +701,7 @@ images:
         source_path: /go/bin/retester
   to: retester
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD image-graph-generator /usr/bin/image-graph-generator
     ENTRYPOINT ["/usr/bin/image-graph-generator"]
   from: os
@@ -722,7 +724,7 @@ images:
         source_path: /usr/local/bin/oc
   to: multi-arch-builder-controller
 - dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream9
+    FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
     ADD ci-scheduling-webhook /usr/bin/ci-scheduling-webhook
     ENTRYPOINT ["/usr/bin/ci-scheduling-webhook"]
   from: os
