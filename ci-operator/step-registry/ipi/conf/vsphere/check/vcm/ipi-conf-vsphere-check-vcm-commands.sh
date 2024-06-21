@@ -434,6 +434,10 @@ for VCENTER in "${!pool_usernames[@]}"; do
   platformSpec=$(echo "${platformSpec}" | jq -r '.vcenters += [{"server": "'"${VCENTER}"'", "user": "'"${pool_usernames[$VCENTER]}"'", "password": "'"${pool_passwords[$VCENTER]}"'", "datacenters": ['"${joined%,}"']}]')
 done
 
+if [ -n "${POPULATE_LEGACY_SPEC}" ]; then
+  platformSpec=$(echo "${platformSpec}" | jq -r '. += {"vcenter": "'"${server}"'", "username": "'"${vsphere_user}"'", "password": "'"${vsphere_password}"'", "defaultDatastore": '"$(basename "${datastore}")"' ,"network": '"$(basename "${network}")"' , "cluster": '"$(basename "${cluster}")"', "datacenter": '"$(basename "${datacenter}")"'}')  
+fi
+
 # For most CI jobs, a single lease and single pool will be used. We'll initialize govc.sh and
 # vsphere_context.sh with the first lease we find. multi-zone and multi-vcenter will need to
 # parse topology, credentials, etc from $SHARED_DIR.

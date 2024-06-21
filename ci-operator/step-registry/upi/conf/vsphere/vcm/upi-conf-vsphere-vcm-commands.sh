@@ -68,7 +68,8 @@ function getFailureDomainsWithDSwitchForVCenter() {
       DVS_UUID=$(echo "$DVS" | jq -r '.cluster["'"${CLUSTER}"'"]')
 
       echo "DVS UUID ${DVS_UUID}"
-      
+
+      datastoreName=$(basename "${GOVC_DATACENTER}")
       {
         echo "        server = \"${GOVC_URL}\"" 
         echo "        datacenter = \"${GOVC_DATACENTER}\""
@@ -78,7 +79,7 @@ function getFailureDomainsWithDSwitchForVCenter() {
         echo "        distributed_virtual_switch_uuid = \"${DVS_UUID}\""
       } >> ${FAILURE_DOMAIN_PATH}
       
-      FAILURE_DOMAIN_OUT=$(echo "$FAILURE_DOMAIN_OUT" | jq --compact-output -r '. += [{"datacenter":"'"${GOVC_DATACENTER}"'","cluster":"'"${CLUSTER}"'","datastore":"'"${GOVC_DATASTORE}"'","network":"'"${GOVC_NETWORK}"'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]'); 
+      FAILURE_DOMAIN_OUT=$(echo "$FAILURE_DOMAIN_OUT" | jq --compact-output -r '. += [{"datacenter":"'"${GOVC_DATACENTER}"'","cluster":"'"${CLUSTER}"'","datastore":"'"${datastoreName}"'","network":"'"${GOVC_NETWORK}"'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]'); 
     done
     echo "    }" >> ${FAILURE_DOMAIN_PATH}  
     echo "]" >> ${FAILURE_DOMAIN_PATH}
@@ -94,6 +95,10 @@ declare GOVC_DATACENTER
 declare GOVC_DATASTORE
 declare GOVC_NETWORK
 declare gateway
+declare vsphere_portgroup
+declare vsphere_datastore
+declare vsphere_datacenter
+declare vsphere_cluster
 declare GOVC_USERNAME
 declare GOVC_PASSWORD
 declare GOVC_TLS_CA_CERTS
@@ -363,8 +368,12 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 
 \$machine_cidr = "${machine_cidr}"
 
-\$vm_template = "${vm_template}"
+\$vm_template = "$(basename "${vm_template}")"
 \$vcenter = "${vsphere_url}"
+\$portgroup = "$(basename "${vsphere_portgroup}")"
+\$datastore = "$(basename "${vsphere_datastore}")"
+\$datacenter = "$(basename "${vsphere_datacenter}")"
+\$cluster = "$(basename "${vsphere_cluster}")"
 \$vcentercredpath = "secrets/vcenter-creds.xml"
 \$storagepolicy = ""
 \$secureboot = \$false
