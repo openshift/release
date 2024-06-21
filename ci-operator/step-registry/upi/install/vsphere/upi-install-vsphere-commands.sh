@@ -176,7 +176,7 @@ if [ "${STORAGE_POLICY_ID}" != "" ]; then
     exit "$ret"
   fi
   sed -i "/guest_id/a\ storage_policy_id = \"${STORAGE_POLICY_ID}\"" ./vm/main.tf
-  sed -i "s/\$storagepolicy = \"\"/\$storagepolicy = \"${STORAGE_POLICY_ID}\"/" ./variables.ps1
+  sed -i "s/\$storagepolicy = \"\"/\$storagepolicy = \"Management Storage policy - Encryption\"/" ./variables.ps1
 fi
 
 date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
