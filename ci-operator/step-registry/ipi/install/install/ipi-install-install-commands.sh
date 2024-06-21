@@ -127,7 +127,8 @@ function populate_artifact_dir() {
   # Copy CAPI-generated artifacts if they exist
   if [ -d "${dir}/.clusterapi_output" ]; then
     echo "Copying Cluster API generated manifests..."
-    cp -rpv "${dir}/.clusterapi_output" "${ARTIFACT_DIR}/" 2>/dev/null
+    mkdir -p "${ARTIFACT_DIR}/clusterapi_output/"
+    cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output" 2>/dev/null
   fi
 }
 
@@ -478,30 +479,6 @@ EOF
   echo "Enabled AWS Spot instances for worker nodes"
 }
 
-# enable_efa_pg_instance_config is an AWS specific option that enables one worker machineset in a placement group and with EFA Network Interface Type, other worker machinesets will be ENA Network Interface Type by default.....
-function enable_efa_pg_instance_config() {
-  local dir=${1}
-  #sed -i 's/          instanceType: .*/          networkInterfaceType: EFA\n          placementGroupName: pgcluster\n          instanceType: c5n.9xlarge/' "$dir/openshift/99_openshift-cluster-api_worker-machineset-0.yaml"
-  pip3 install pyyaml==6.0  --user
-  pushd "${dir}/openshift"
-  python -c '
-import os
-import yaml
-
-for manifest_name in os.listdir("./"):
-    if "worker-machineset" in manifest_name:
-      data = yaml.safe_load(open(manifest_name))
-      data["spec"]["template"]["spec"]["providerSpec"]["value"]["networkInterfaceType"] = "EFA"
-      data["spec"]["template"]["spec"]["providerSpec"]["value"]["instanceType"] = "c5n.9xlarge"
-      data["spec"]["template"]["spec"]["providerSpec"]["value"]["placementGroupName"] = "pgcluster"
-      open(manifest_name, "w").write(yaml.dump(data, default_flow_style=False))
-      print("Patched efa pg into ",  manifest_name)
-      break
-' || return 1
-  popd
-
-}
-
 function get_arch() {
   ARCH=$(uname -m | sed -e 's/aarch64/arm64/' -e 's/x86_64/amd64/')
   echo "${ARCH}"
@@ -630,9 +607,6 @@ aws|aws-arm64|aws-usgov)
     if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
       inject_spot_instance_config ${dir}
     fi
-    if [[ "${ENABLE_AWS_EFA_PG_INSTANCE:-}"  == 'true' ]]; then
-      enable_efa_pg_instance_config ${dir}
-    fi
     ;;
 esac
 
@@ -687,6 +661,10 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 case $JOB_NAME in
   *vsphere)
     # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
+    max=1
+    ;;
+  *aws)
+    # Do not retry because aws resources can collide when re-using installer assets
     max=1
     ;;
   *)

@@ -16,8 +16,8 @@ if [[ "${OSTYPE}" == "darwin"* ]]; then
 fi
 
 now=$("${DATE_CMD}" +%Y-%m-%dT%H:%M:%S)
-cmd=(aws --profile openshift-ci-infra --region us-east-1)
-query_id="$( "${cmd[@]}" logs start-query --log-group-name app-ci-pod-logs --start-time "$( ${DATE_CMD} --date '1 day ago' '+%s' )" --end-time "$( ${DATE_CMD} '+%s' )" --query-string "${query}" --query queryId --output text )"
+cmd=(aws --profile openshift-ci-audit --region us-east-1)
+query_id="$( "${cmd[@]}" logs start-query --log-group-name ci-dv2np.application --start-time "$( ${DATE_CMD} --date '1 day ago' '+%s' )" --end-time "$( ${DATE_CMD} '+%s' )" --query-string "${query}" --query queryId --output text )"
 echo "[INFO] Log query id: ${query_id}"
 echo "[INFO] Fetching log query results..."
 out_dir=/tmp/aws-logs-${now}

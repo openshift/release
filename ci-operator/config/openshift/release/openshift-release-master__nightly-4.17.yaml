@@ -102,6 +102,16 @@ tests:
       enable:
       - observers-resource-watch
     workflow: assisted-baremetal
+- as: e2e-aws-ovn-single-node-csi
+  interval: 168h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node-csi
 - as: e2e-aws-ovn-single-node-workers
   interval: 168h
   steps:
@@ -405,12 +415,12 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-csi
-- as: e2e-vsphere-zones
+- as: e2e-vsphere-ovn-zones
   interval: 168h
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
-- as: e2e-vsphere-upi-zones
+- as: e2e-vsphere-ovn-upi-zones
   interval: 168h
   steps:
     cluster_profile: vsphere-multizone-2
@@ -767,11 +777,11 @@ tests:
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 0 18 */1 * *
+  cron: 0 4 */1 * *
   steps:
     env:
       T5CI_JOB_TYPE: ptp
-      T5CI_VERSION: "4.16"
+      T5CI_VERSION: "4.17"
     observers:
       enable:
       - observers-resource-watch
@@ -1171,8 +1181,30 @@ tests:
     env:
       MAJOR_MINOR: "4.17"
     test:
-    - ref: openshift-release-fips
+    - ref: fips-check-art-fips
     workflow: ipi-aws
+- as: e2e-external-aws
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-external-aws
+  timeout: 6h0m0s
+- as: e2e-external-aws-ccm
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
+    workflow: openshift-e2e-external-aws
+  timeout: 6h0m0s
+- as: opct-external-aws-ccm
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
+    workflow: opct-conformance-external-aws
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

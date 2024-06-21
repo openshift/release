@@ -15,13 +15,13 @@ function debug() {
         echo -e "Describing abnormal operators...\n"
         oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
         echo -e "Describing abnormal mcp...\n"
-        oc get mcp --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
+        oc get machineconfigpools --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
     fi
 }
 
 function unpause() {
     oc patch --type=merge --patch='{"spec":{"paused":false}}' machineconfigpool/worker
-    ret=$(oc get mcp worker -ojson| jq .spec.paused)
+    ret=$(oc get machineconfigpools worker -ojson| jq .spec.paused)
     if [[ "${ret}" != "false" ]]; then
         echo >&2 "Failed to resume worker pool, exiting..." && return 1
     fi
@@ -32,8 +32,8 @@ function check_mcp() {
     while (( try < max_retries )); 
     do
         echo "Checking worker pool status #${try}..."
-        run_command "oc get mcp"
-        out="$(oc get mcp worker --no-headers)"
+        run_command "oc get machineconfigpools"
+        out="$(oc get machineconfigpools worker --no-headers)"
         updated="$(echo "${out}" | awk '{print $3}')"
         updating="$(echo "${out}" | awk '{print $4}')"
         degraded="$(echo "${out}" | awk '{print $5}')"
@@ -63,7 +63,7 @@ fi
 unpause
 if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
     echo "Found rhel worker, this step is supposed to be used in eus upgrade, skipping mcp checking here, need to check it after rhel worker upgraded..."
-    run_command "oc get mcp"
+    run_command "oc get machineconfigpools"
     run_command "oc get node -owide"
 else
     check_mcp

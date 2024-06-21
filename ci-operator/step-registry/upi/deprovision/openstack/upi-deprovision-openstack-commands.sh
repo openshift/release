@@ -22,6 +22,10 @@ cp \
 	"${SHARED_DIR}/inventory.yaml" \
 	./
 
+if [[ -e "${SHARED_DIR}/netid.json" ]]; then
+    cp "${SHARED_DIR}/netid.json" .
+fi
+
 
 # UPI_DOCS is the Markdown documentation for UPI. We read it and copy its scripts to UPI_SCRIPT
 UPI_DOCS='/var/lib/openshift-install/docs/install_upi.md'

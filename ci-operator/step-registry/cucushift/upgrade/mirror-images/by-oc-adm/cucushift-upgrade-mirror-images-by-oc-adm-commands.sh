@@ -1,8 +1,12 @@
 #!/bin/bash
-
 set -o nounset
 set -o errexit
 set -o pipefail
+
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
 
 function run_command() {
     local CMD="$1"
@@ -30,17 +34,15 @@ function check_signed() {
     fi
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    set -x
     try=0
-    max_retries=2
-    response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+    max_retries=3
+    response=0
     while (( try < max_retries && response != 200 )); do
         echo "Trying #${try}"
-        response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1" -v)
+        response=$(https_proxy="" HTTPS_PROXY="" curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
         (( try += 1 ))
         sleep 60
     done
-    set +x
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -51,18 +53,26 @@ function check_signed() {
 function mirror_image(){
     local target_version cmd mirror_options
     local apply_sig_together="$1"
+    local mirror_crd_type="${2:-icsp}"
 
     target_version=$(oc adm release info "${TARGET}" --output=json | jq .metadata.version)
    
     echo "Mirroring ${target_version} (${TARGET}) to ${MIRROR_RELEASE_IMAGE_REPO}"
 
     mirror_options="--insecure=true"
-    # check whether the oc command supports the --keep-manifest-list and add it to the args array.
+    # check whether the oc command supports the extra options and add them to the args array.
     if oc adm release mirror -h | grep -q -- --keep-manifest-list; then
         echo "Adding --keep-manifest-list to the mirror command."
         mirror_options="${mirror_options} --keep-manifest-list=true"
     else
-        echo "This oc version does not support --keep-manifest-list, skip it."
+        echo "This verison of oc does not support --keep-manifest-list, skip it."
+    fi
+
+    if oc adm release mirror -h | grep -q -- --print-mirror-instructions; then
+        echo "Adding --print-mirror-instructions to the mirror command."
+        mirror_options="${mirror_options} --print-mirror-instructions=${mirror_crd_type}"
+    else
+        echo "This version of oc does not support --print-mirror-instructions, skip it."
     fi
 
     cmd="oc adm release mirror -a ${PULL_SECRET} ${mirror_options} --from=${TARGET} --to=${MIRROR_RELEASE_IMAGE_REPO}"
@@ -86,17 +96,18 @@ function apply_signature(){
 }
 
 function update_icsp(){
-    local source_release_image_repo
+    local source_release_image_repo mirror_crd_resource="${1:-ImageContentSourcePolicy}"
+
     source_release_image_repo="${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"
     source_release_image_repo="${source_release_image_repo%@sha256*}"
-    if [[ "${source_release_image_repo}" != "${MIRROR_RELEASE_IMAGE_REPO}" ]] && ! oc get ImageContentSourcePolicy example -oyaml; then
+    if [[ "${source_release_image_repo}" != "${MIRROR_RELEASE_IMAGE_REPO}" ]] && ! oc get ${mirror_crd_resource} example -oyaml; then
         echo "Target image has different repo with source image and icsp example is not present, creating icsp"
         if [[ ! -f "${MIRROR_OUT_FILE}" ]]; then
             echo >&2 "${MIRROR_OUT_FILE} not found" && return 1
         fi
-        sed -n '/To use the new mirrored repository for upgrades, use the following to create an ImageContentSourcePolicy:/,/configmap.*/{//!p;}' "${MIRROR_OUT_FILE}"  | grep -v '^$' > "${ICSP_FILE}"
-        run_command "cat ${ICSP_FILE}"
-        run_command "oc create -f ${ICSP_FILE}"
+        sed -n '/To use the new mirrored repository for upgrades, use the following to create an '${mirror_crd_resource}':/,/configmap.*/{//!p;}' "${MIRROR_OUT_FILE}"  | grep -v '^$' > "${CLUSTER_MIRROR_CONF_FILE}"
+        run_command "cat ${CLUSTER_MIRROR_CONF_FILE}"
+        run_command "oc create -f ${CLUSTER_MIRROR_CONF_FILE}"
     fi
 }
 
@@ -174,8 +185,15 @@ jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '
 
 trap 'rm -f "${PULL_SECRET}"' ERR EXIT TERM
 
+mirror_crd_type='icsp'
+mirror_crd_resource='ImageContentSourcePolicy'
+if [[ "${ENABLE_IDMS}" == "yes" ]]; then
+    mirror_crd_type="idms"
+    mirror_crd_resource="ImageDigestMirrorSet"
+fi
+
 export MIRROR_OUT_FILE="${SHARED_DIR}/mirror"
-export ICSP_FILE="${SHARED_DIR}/icsp.yaml"
+export CLUSTER_MIRROR_CONF_FILE="${SHARED_DIR}/cluster_mirror_conf.yaml"
 
 # Target version oc will be extract in the /tmp/client directory, use it first
 mkdir -p /tmp/client
@@ -213,12 +231,12 @@ do
         mirror_apply_sig_together="false"
     fi
     export MIRROR_RELEASE_IMAGE_REPO
-    mirror_image "${mirror_apply_sig_together}"
+    mirror_image "${mirror_apply_sig_together}" "${mirror_crd_type}"
     set_proxy_env
     # OCP-27986
     if [[ "${mirror_apply_sig_together}" == "false" ]]; then
         apply_signature
     fi
-    update_icsp
-    rm -f "${MIRROR_OUT_FILE}" "${ICSP_FILE}"
+    update_icsp "${mirror_crd_resource}"
+    rm -f "${MIRROR_OUT_FILE}" "${CLUSTER_MIRROR_CONF_FILE}"
 done

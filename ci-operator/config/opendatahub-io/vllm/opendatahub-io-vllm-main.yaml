@@ -5,14 +5,14 @@ build_root:
     tag: golang-1.13
 images:
 - build_args:
-  - name: DOCKER_BUILDKIT
-    value: "1"
-  - name: BUILDKIT_PROGRESS
-    value: plain
   - name: max_jobs
     value: "8"
   - name: nvcc_threads
     value: "2"
+  - name: TORCH_CUDA_ARCH_LIST
+    value: 7.0 7.5 8.0 8.6 8.9 9.0+PTX
+  - name: PYTHON_VERSION
+    value: "3.11"
   context_dir: .
   dockerfile_path: Dockerfile.ubi
   to: vllm-build-main-cuda
@@ -48,38 +48,17 @@ resources:
       cpu: "16"
       memory: 24Gi
 tests:
-- always_run: false
-  as: smoke-test
+- as: smoke-test
   cluster: build05
   commands: |
-    set -euxo pipefail
+    export VIRTUAL_ENV=/opt/vllm
+    export PATH=$VIRTUAL_ENV/bin/:$PATH
 
-    # we will need to download test models off HF hub
-    unset HF_HUB_OFFLINE
-    # spin up the server and run it in the background, allowing for images download
-    python -m vllm.entrypoints.openai.api_server &
-    server_pid=$!
+    cd extras
 
-    # wait for the server to be up
-    sleep 60
-
-    curl -v --no-progress-meter --fail-with-body \
-      localhost:8000/v1/models | python -m json.tool || \
-      (kill -9 $server_pid && exit 1)
-
-    curl -v --no-progress-meter --fail-with-body \
-      --header "Content-Type: application/json" \
-      --data '{
-        "prompt": "A red fedora symbolizes ",
-        "model": "facebook/opt-125m"
-    }' \
-      localhost:8000/v1/completions | python -m json.tool || \
-        (kill -9 $server_pid && exit 1)
-
-    echo "success"
-    kill -9 $server_pid
+    bash smoke-test.sh
   container:
-    clone: false
+    clone: true
     from: vllm-build-main-cuda
 - as: pr-image-mirror
   steps:

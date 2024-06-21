@@ -49,16 +49,16 @@ export REGISTRY_AUTH_FILE='${remote_workdir}/.pull_secret.json'
 export PULL_SECRET=\$(<\$REGISTRY_AUTH_FILE)
 export BACKUP_SECRET=\$(<${remote_workdir}/.backup_secret.json)
 
-sudo dnf -y install runc
+sudo dnf -y install runc gcc-c++ zip
 
 echo "Starting the IBI cluster"
 make ibi-iso ibi-vm ibi-logs
 
 echo "Attaching and configuring the cluster"
-make ibi-config.iso ibi-attach-config.iso
+make build-openshift-install imagebasedconfig.iso ibi-attach-config.iso
 
 echo "Rebooting the cluster"
-make ibi-reboot-wait
+make ibi-reboot wait-for-ibi
 
 EOF
 

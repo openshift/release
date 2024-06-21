@@ -11,6 +11,9 @@ if [[ -z "${HOSTNAME}" ]]; then
   exit 1
 fi
 
+trap 'prepare_next_steps' EXIT TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
 LEASE_CONF="${CLUSTER_PROFILE_DIR}/leases"
 function leaseLookup () {
   local lookup
@@ -29,6 +32,27 @@ function save_credentials () {
   cp /tmp/auth/kubeconfig ${SHARED_DIR}
   cp /tmp/auth/kubeadmin-password ${SHARED_DIR}
 }
+
+function prepare_next_steps () {
+  EXIT_CODE=$?
+  echo ${EXIT_CODE} > "${SHARED_DIR}/install-status.txt"
+  if [[ ${EXIT_CODE} != 0 ]]; then
+    exit ${EXIT_CODE}
+  fi
+  set +e
+  echo "Setup phase finished, prepare env for next steps"
+  # Password for the cluster gets leaked in the installer logs and hence removing them.
+  sed -i 's/password: .*/password: REDACTED"/g' /tmp/.openshift_install.log
+  cp /tmp/.openshift_install.log "${ARTIFACT_DIR}"/.openshift_install.log
+  save_credentials
+  set -e
+}
+
+echo "FIPS_ENABLED = $FIPS_ENABLED"  # Delete before merge
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+  echo "Ignoring host encryption validation for FIPS testing..."
+  export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 # download the correct openshift-install from the payload
 oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
@@ -59,14 +83,14 @@ fi
 
 # Check if we need to update the source volume
 CURRENT_SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep rhcos | awk '{ print $1 }' || true)
+echo "Current source volume name: ${CURRENT_SOURCE_VOLUME}"
+echo "New source volume name: ${VOLUME_NAME}"
 
 if [[ "${CURRENT_SOURCE_VOLUME}" != "${VOLUME_NAME}" ]]; then
   # Delete the old source volume
   if [[ ! -z "${CURRENT_SOURCE_VOLUME}" ]]; then
-    echo "Deleting old source volume..."
-    ${VIRSH} vol-delete \
-      --vol ${CURRENT_SOURCE_VOLUME} \
-      --pool ${POOL_NAME}
+    echo "Deleting old source volume: '${CURRENT_SOURCE_VOLUME}'"
+    ${VIRSH} vol-delete --pool ${POOL_NAME} ${CURRENT_SOURCE_VOLUME}
   fi
 
   # Download the new qcow image
@@ -87,6 +111,20 @@ if [[ "${CURRENT_SOURCE_VOLUME}" != "${VOLUME_NAME}" ]]; then
     --vol ${VOLUME_NAME} \
     --pool ${POOL_NAME} \
     /tmp/${VOLUME_NAME}
+fi
+
+# Check for the node tuning yaml config, and save it in the installation directory
+NODE_TUNING_YAML="${SHARED_DIR}/99-sysctl-worker.yaml"
+if [ -f "${NODE_TUNING_YAML}" ]; then
+  echo "Saving ${NODE_TUNING_YAML} to /tmp"
+  cp ${NODE_TUNING_YAML} /tmp
+fi
+
+# Check for the etcd on ramdisk yaml config, and save it in the installation directory
+ETCD_RAMDISK_YAML="${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml"
+if [ -f "${ETCD_RAMDISK_YAML}" ]; then
+  echo "Saving ${ETCD_RAMDISK_YAML} to /tmp"
+  cp ${ETCD_RAMDISK_YAML} /tmp
 fi
 
 # Generating ignition configs
@@ -233,12 +271,5 @@ for i in {1..30}; do
 done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
-
-# Password for the cluster gets leaked in the installer logs and hence removing them.
-sed -i 's/password: .*/password: REDACTED"/g' /tmp/.openshift_install.log
-cp /tmp/.openshift_install.log "${SHARED_DIR}"/.openshift_install.log
-
-# Save the kubeconfig again to make sure any changes during install are captured in future steps
-save_credentials
 
 touch /tmp/install-complete

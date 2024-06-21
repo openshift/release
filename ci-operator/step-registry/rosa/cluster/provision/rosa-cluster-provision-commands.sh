@@ -274,6 +274,15 @@ if [[ "$ENABLE_AUDIT_LOG" == "true" ]]; then
   record_cluster "audit_log_arn" $iam_role_arn
 fi
 
+BILLING_ACCOUNT_SWITCH=""
+if [[ "$ENABLE_BILLING_ACCOUNT" == "yes" ]]; then
+  BILLING_ACCOUNT=$(head -n 1 ${CLUSTER_PROFILE_DIR}/aws_billing_account)
+  BILLING_ACCOUNT_SWITCH="--billing-account ${BILLING_ACCOUNT}"
+  record_cluster "billing_account" ${BILLING_ACCOUNT}
+
+  BILLING_ACCOUNT_MASK=$(echo "${BILLING_ACCOUNT:0:4}***")
+fi
+
 # If the node count is >=24 we enable autoscaling with max replicas set to the replica count so we can bypass the day2 rollout.
 # This requires a second step in the waiting for nodes phase where we put the config back to the desired setup.
 COMPUTE_NODES_SWITCH=""
@@ -337,7 +346,7 @@ if [[ "$HOSTED_CP" == "true" ]]; then
     # ensure the SC is not for ibm usage so that it could support the latest version of the hosted cluster
     for ps in $psList ; do
       topology=$(ocm get /api/clusters_mgmt/v1/provision_shards/${ps} | jq -r '.hypershift_config.topology')
-      if [[ "$topology" == "dedicated"  ]] ; then
+      if [[ "$topology" == "dedicated" ]] || [[ "$topology" == "dedicated-v2" ]] ; then
       	PROVISION_SHARD_ID=${ps}
       fi
     done
@@ -569,6 +578,7 @@ ${SHARED_VPC_SWITCH} \
 ${SECURITY_GROUP_ID_SWITCH} \
 ${NO_CNI_SWITCH} \
 ${CONFIGURE_CLUSTER_AUTOSCALER_SWITCH} \
+${BILLING_ACCOUNT_SWITCH} \
 ${DRY_RUN_SWITCH}
 "
 echo "$cmd"| sed -E 's/\s{2,}/ /g' > "${SHARED_DIR}/create_cluster.sh"
@@ -578,6 +588,10 @@ cmdout=$(cat "${SHARED_DIR}/create_cluster.sh" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACC
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   cmdout=$(echo $cmdout | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g")
 fi
+if [[ "$ENABLE_BILLING_ACCOUNT" == "yes" ]]; then
+  cmdout=$(echo $cmdout | sed "s/${BILLING_ACCOUNT}/${BILLING_ACCOUNT_MASK}/g")
+fi
+
 echo "$cmdout"
 CLUSTER_INFO_WITHOUT_MASK="$(mktemp)"
 eval "${cmd}" > "${CLUSTER_INFO_WITHOUT_MASK}"

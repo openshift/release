@@ -65,12 +65,21 @@ tests:
         export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
         export OPENAI_PROVIDER_KEY_PATH=/var/run/openai/token
         export WATSONX_PROVIDER_KEY_PATH=/var/run/watsonx/token
+        export AWS_BUCKET_PATH=/var/run/aws-bucket
+        export AWS_ACCESS_KEY_ID_PATH=/var/run/aws-access-key-id
+        export AWS_REGION_PATH=/var/run/aws-region
+        export AWS_SECRET_ACCESS_KEY_PATH=/var/run/aws-secret-access-key
 
         export PROVIDER_KEY_PATH=/var/run/openai/token
         export PROVIDER=openai
         export MODEL=gpt-3.5-turbo-1106
 
         export CP_OFFLINE_TOKEN=$(cat /var/run/insights-stage-upload-offline-token/token)
+
+        dnf install -y jq && \
+        S3_UPLOADER_TAG=$(curl https://gitlab.cee.redhat.com/api/v4/projects/insights-qe%2Fupload-artifact-s3/repository/tags | jq '.[0].name' | tr -d '"') && \
+        curl -L https://gitlab.cee.redhat.com/api/v4/projects/insights-qe%2Fupload-artifact-s3/jobs/artifacts/$S3_UPLOADER_TAG/raw/upload-artifact-s3-latest?job=build -o /usr/bin/upload-artifact-s3 && \
+        chmod a+x /usr/bin/upload-artifact-s3
 
         tests/scripts/test-e2e-cluster.sh
       credentials:
@@ -88,6 +97,18 @@ tests:
         namespace: test-credentials
       - mount_path: /var/run/insights-stage-upload-offline-token
         name: insights-stage-upload-offline-token
+        namespace: test-credentials
+      - mount_path: /var/run/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - mount_path: /var/run/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - mount_path: /var/run/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - mount_path: /var/run/aws-secret-access-key
+        name: aws-secret-access-key
         namespace: test-credentials
       dependencies:
       - env: OLS_IMAGE

@@ -13,9 +13,9 @@ https://github.com/openshift/release/tree/master/clusters/hosted-mgmt/hive/pools
 **1. Add a new ClusterPool manifest to the directory:** 
 
 > Note:  
-`spec.imageSetRef`: A reference to a ClusterImageSet in the cluster that determines the exact version of clusters created in the pool.
-'ClusterImageSets' are cluster-scoped resources and their manifests are present in [clusters/hosted-mgmt/hive/pools](https://github.com/openshift/release/tree/master/clusters/hosted-mgmt/hive/pools) directory.
-
+`spec.imageSetRef`: A reference to an existing ClusterImageSet in the cluster that determines the exact version of clusters created in the pool.
+'ClusterImageSets' are cluster-scoped resources and their manifests are present in [clusters/hosted-mgmt/hive/pools](https://github.com/openshift/release/tree/master/clusters/hosted-mgmt/hive/pools) directory and are regularly bumped to most recent released OCP versions.
+The value will be updated automatically if `version_*` labels are set.
 
 Example ClusterPool manifest:
 ```yaml
@@ -23,12 +23,14 @@ apiVersion: hive.openshift.io/v1
 kind: ClusterPool
 metadata:
   labels:
-    architecture: amd64   # match the imageRef
-    cloud: aws    # match the imageRef
+    architecture: amd64   # set according to the imageRef used
+    cloud: aws    # set according to the imageRef used
     owner: obs-myteamname  # create your team name and add it here, ex: obs-logging
-    product: ocp    # match the imageRef
+    product: ocp    # set according to the imageRef used
     region: us-east-1   # match install-config file
-    version: "4.15"   # match the imageRef
+    version: "4.15"   # set according to the imageRef used
+    version_lower: "4.15.0-0" # lower bound for automatically updated imageset
+    version_upper: "4.16.0-0" # upper bound for automatically updated imageset
   name: obs-myteamname-ocp-4-15-amd64-aws-us-east-1   # must be unique and should describe your labels above
   namespace: openshift-observability-cluster-pool   # use this value 
 spec:
@@ -36,7 +38,7 @@ spec:
   hibernationConfig:
     resumeTimeout: 20m0s
   imageSetRef:
-    name: ocp-release-4.15.12-x86-64-for-4.15.0-0-to-4.16.0-0  # the name of the imageSet which determines the image to install the cluster
+    name: ocp-release-4.15.12-x86-64-for-4.15.0-0-to-4.16.0-0  # will be automatically updated if `version_*` labels are set
   installAttemptsLimit: 1
   installConfigSecretTemplateRef:
     name: install-config-aws-us-east-1  # ref install-config file located in this directory
