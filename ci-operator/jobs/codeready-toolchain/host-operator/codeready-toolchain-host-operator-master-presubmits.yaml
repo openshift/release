@@ -26,6 +26,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-cluster-profile
+        - --secret-dir=/usr/local/ci-secrets
         - --target=e2e
         command:
         - ci-operator
@@ -56,6 +57,9 @@ presubmits:
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
+        - mountPath: /usr/local/ci-secrets/sandbox/webhook_url
+          name: webhook_url
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: boskos
@@ -79,4 +83,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+      - name: webhook_url
+        secret:
+          secretName: webhook_url
     trigger: (?m)^/test( | .* )e2e,?($|\s.*)
