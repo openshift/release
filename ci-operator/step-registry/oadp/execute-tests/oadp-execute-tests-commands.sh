@@ -76,10 +76,24 @@ function archive-results() {
             cp -r "${LOGS_FOLDER}" "${ARTIFACT_DIR}/logs"
         fi
     fi
+
+    if [ -d "/alabama/cspi/e2e/kubevirt-plugin/logs" ]; then
+        echo "Copying /alabama/cspi/e2e/kubevirt-plugin/logs to ${ARTIFACT_DIR}..."
+        cp -r "/alabama/cspi/e2e/kubevirt-plugin/logs" "${ARTIFACT_DIR}/logs"
+    fi
 }
+
+# Install go modules
+cd $OADP_GIT_DIR
+go mod edit -replace=gitlab.cee.redhat.com/app-mig/oadp-e2e-qe=$OADP_GIT_DIR/e2e
+go mod tidy
 
 # Execute tests
 echo "Executing tests..."
 trap archive-results SIGINT SIGTERM ERR EXIT
-cd $OADP_GIT_DIR
+
 EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
+
+if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
+  TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" EXTRA_GINKGO_PARAMS="--ginkgo.skip=tc-id:OADP-555" && /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
+fi
