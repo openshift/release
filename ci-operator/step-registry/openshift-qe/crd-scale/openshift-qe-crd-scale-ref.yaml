@@ -1,0 +1,43 @@
+ref:
+  as: openshift-qe-crd-scale
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  env:
+  - name: E2E_VERSION
+    default: "v2.1.7"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: FLAGS
+    default: ""
+    documentation: |-
+      Default empty FLAGS
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: GC
+    default: "true"
+    documentation: |-
+      Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resource
+  - name: ITERATIONS
+    default: "2000"
+    documentation: |-
+      The number of iterations/crds
+  commands: openshift-qe-crd-scale-commands.sh
+  timeout: 6h
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale crd-scale workload in the deployed cluster
