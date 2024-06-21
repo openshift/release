@@ -96,4 +96,5 @@ EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS /bin/bash /alabama/cspi/test_settings/scrip
 
 if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
   TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" EXTRA_GINKGO_PARAMS="--ginkgo.skip=tc-id:OADP-555" && /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
+  sleep 7200
 fi
