@@ -227,7 +227,8 @@ tests:
       cli: latest
       commands: |
         wait_created() {
-          for _ in $(seq 1 10); do
+          # wait 10 mins
+          for _ in $(seq 1 60); do
             if oc get "${@}" | grep -v -q "No resources found"; then
               return 0
             fi
@@ -241,7 +242,17 @@ tests:
           apiVersion: kustomize.config.k8s.io/v1beta1
           kind: Kustomization
           resources:
-          - github.com/openshift/multiarch-tuning-operator/deploy/envs/prow?ref=fbc-4.16
+          - github.com/aleskandro/multiarch-manager-operator/deploy/envs/konflux?ref=deploy-manifests
+          patches:
+          - target:
+              group: operators.coreos.com
+              version: v1alpha1
+              kind: CatalogSource
+              name: multiarch-tuning-operator-catalog
+            patch: |-
+              - op: replace
+                path: /spec/image
+                value: quay.io/aleskandrox/asd:index
         EOF
         oc apply -k /tmp/kustomization
         #while ! [ -e /tmp/wait ]; do
