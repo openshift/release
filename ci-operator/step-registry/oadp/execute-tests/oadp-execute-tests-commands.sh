@@ -16,6 +16,7 @@ export ANSIBLE_REMOTE_TMP="/tmp/"
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 RESULTS_FILE="/alabama/cspi/e2e/junit_report.xml"
+KUBEVIRT_RESULTS_FILE="/alabama/cspi/e2e/kubevirt-plugin/junit_report.xml"
 LOGS_FOLDER="/alabama/cspi/e2e/logs"
 
 # Extract additional repository archives
@@ -77,9 +78,14 @@ function archive-results() {
         fi
     fi
 
-    if [ -d "/alabama/cspi/e2e/kubevirt-plugin/logs" ]; then
-        echo "Copying /alabama/cspi/e2e/kubevirt-plugin/logs to ${ARTIFACT_DIR}..."
-        cp -r "/alabama/cspi/e2e/kubevirt-plugin/logs" "${ARTIFACT_DIR}/logs"
+    if [[ -f "${KUBEVIRT_RESULTS_FILE}" ]] && [[ ! -f "${ARTIFACT_DIR}/junit_oadp_cnv_results.xml" ]]; then
+      echo "Copying ${KUBEVIRT_RESULTS_FILE} to ${ARTIFACT_DIR}/junit_oadp_cnv_results.xml..."
+      cp "${KUBEVIRT_RESULTS_FILE}" "${ARTIFACT_DIR}/junit_oadp_cnv_results.xml"
+
+      if [ -d "/alabama/cspi/e2e/kubevirt-plugin/logs" ]; then
+          echo "Copying /alabama/cspi/e2e/kubevirt-plugin/logs to ${ARTIFACT_DIR}..."
+          cp -r "/alabama/cspi/e2e/kubevirt-plugin/logs" "${ARTIFACT_DIR}/logs"
+      fi
     fi
 }
 
@@ -95,6 +101,9 @@ trap archive-results SIGINT SIGTERM ERR EXIT
 EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
 
 if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
+  # Set default storage class to ocs-storagecluster-ceph-rbd
+  oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class-
+  oc annotate storageclass ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class=true
+
   export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" && export EXTRA_GINKGO_PARAMS="--ginkgo.skip=tc-id:OADP-555" && /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
-  sleep 7200
 fi
