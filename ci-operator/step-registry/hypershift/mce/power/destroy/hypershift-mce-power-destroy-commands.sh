@@ -81,14 +81,16 @@ if [ -n "${idToDelete}" ]; then
   ibmcloud cis dns-record-delete ${CIS_DOMAIN_ID} ${idToDelete}
 fi
 
-idToDelete=$(ibmcloud cis glbs ${CIS_DOMAIN_ID} -i ${CIS_INSTANCE} | grep ${HOSTED_CLUSTER_NAME} | awk ' { print $1 }')
-if [ -n "${idToDelete}" ]; then
-  ibmcloud cis glb-delete ${CIS_DOMAIN_ID} -i ${CIS_INSTANCE} ${idToDelete}
-fi
+if [ ${USE_GLB} == "yes" ]; then
+  idToDelete=$(ibmcloud cis glbs ${CIS_DOMAIN_ID} -i ${CIS_INSTANCE} | grep ${HOSTED_CLUSTER_NAME} | awk ' { print $1 }')
+  if [ -n "${idToDelete}" ]; then
+    ibmcloud cis glb-delete ${CIS_DOMAIN_ID} -i ${CIS_INSTANCE} ${idToDelete}
+  fi
 
-idToDelete=$(ibmcloud cis glb-pools -i ${CIS_INSTANCE} | grep ${HOSTED_CLUSTER_NAME} | awk ' { print $1 }')
-if [ -n "${idToDelete}" ]; then
-  ibmcloud cis glb-pool-delete -i ${CIS_INSTANCE} ${idToDelete}
+  idToDelete=$(ibmcloud cis glb-pools -i ${CIS_INSTANCE} | grep ${HOSTED_CLUSTER_NAME} | awk ' { print $1 }')
+  if [ -n "${idToDelete}" ]; then
+    ibmcloud cis glb-pool-delete -i ${CIS_INSTANCE} ${idToDelete}
+  fi
 fi
 
 # Create private key with 0600 permission for ssh purpose

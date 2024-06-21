@@ -3,7 +3,6 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: cli
-binary_build_commands: make manager && make targetallocator && make operator-opamp-bridge
 build_root:
   image_stream_tag:
     name: release
@@ -14,24 +13,6 @@ images:
 - context_dir: .
   dockerfile_path: ./tests/e2e-openshift/Dockerfile
   to: opentelemetry-tests-runner
-- context_dir: ./cmd/otel-allocator/
-  dockerfile_path: Dockerfile
-  from: src
-  inputs:
-    bin:
-      paths:
-      - destination_dir: ./bin
-        source_path: /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/otel-allocator/bin/targetallocator_amd64
-  to: opentelemetry-target-allocator
-- context_dir: ./cmd/operator-opamp-bridge/
-  dockerfile_path: Dockerfile
-  from: src
-  inputs:
-    bin:
-      paths:
-      - destination_dir: ./bin
-        source_path: /go/src/github.com/open-telemetry/opentelemetry-operator/cmd/operator-opamp-bridge/bin/opampbridge_amd64
-  to: opentelemetry-opampbridge
 releases:
   latest:
     candidate:
@@ -50,7 +31,6 @@ tests:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      DOWNSTREAM_TESTS_COMMIT: 16c712c5a4fbbeb8e428f0af962277d762228961
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -78,12 +58,11 @@ tests:
             {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""}
         ]
-      SKIP_TESTS: tests/e2e-targetallocator/targetallocator-features tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
       USER_TAGS: |
         scenario opentelemetry
     test:
     - ref: install-operators
-    - ref: distributed-tracing-tests-opentelemetry
+    - ref: distributed-tracing-tests-opentelemetry-interop
     workflow: firewatch-ipi-aws
 zz_generated_metadata:
   branch: main

@@ -3,34 +3,31 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: "4.15"
-  ocp_4.16_base-rhel9:
+  ocp_4.17_base-rhel9:
     name: "4.17"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
   tests-private:
     name: tests-private
     namespace: ci
     tag: "4.16"
 binary_build_commands: go build -o cluster-api-provider-vsphere main.go
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
+  from_repository: true
 canonical_go_repository: sigs.k8s.io/cluster-api-provider-vsphere
 images:
 - dockerfile_path: openshift/Dockerfile.openshift
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: vsphere-cluster-api-controllers
 promotion:
   to:
@@ -58,25 +55,38 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-techpreview
-  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-capi-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: openshift/e2e-tests.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-serial
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-serial
 - as: regression-clusterinfra-vsphere-ipi-techpreview
   optional: true
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_FILTERS: CAPI

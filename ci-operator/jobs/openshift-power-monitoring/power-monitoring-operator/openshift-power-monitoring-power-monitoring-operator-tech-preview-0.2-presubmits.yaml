@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^tech-preview-0\.2$
     - ^tech-preview-0\.2-
-    cluster: build04
+    cluster: build02
     context: ci/prow/tech-preview-0.2-ocp4.14-periodic-ci-index-power-monitoring-operator-bundle
     decorate: true
     decoration_config:
@@ -62,7 +62,7 @@ presubmits:
     branches:
     - ^tech-preview-0\.2$
     - ^tech-preview-0\.2-
-    cluster: build04
+    cluster: build02
     context: ci/prow/tech-preview-0.2-ocp4.14-periodic-images
     decorate: true
     decoration_config:
@@ -119,7 +119,7 @@ presubmits:
     branches:
     - ^tech-preview-0\.2$
     - ^tech-preview-0\.2-
-    cluster: build04
+    cluster: build02
     context: ci/prow/tech-preview-0.2-ocp4.15-periodic-ci-index-power-monitoring-operator-bundle
     decorate: true
     decoration_config:
@@ -176,7 +176,7 @@ presubmits:
     branches:
     - ^tech-preview-0\.2$
     - ^tech-preview-0\.2-
-    cluster: build04
+    cluster: build02
     context: ci/prow/tech-preview-0.2-ocp4.15-periodic-images
     decorate: true
     decoration_config:
@@ -228,3 +228,61 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )tech-preview-0.2-ocp4.15-periodic-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^tech-preview-0\.2$
+    - ^tech-preview-0\.2-
+    cluster: build02
+    context: ci/prow/tech-preview-0.2-product-ocp-4.15-stage-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: tech-preview-0.2-product-ocp-4.15-stage
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-power-monitoring-power-monitoring-operator-tech-preview-0.2-tech-preview-0.2-product-ocp-4.15-stage-images
+    rerun_command: /test tech-preview-0.2-product-ocp-4.15-stage-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=tech-preview-0.2-product-ocp-4.15-stage
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )tech-preview-0.2-product-ocp-4.15-stage-images,?($|\s.*)

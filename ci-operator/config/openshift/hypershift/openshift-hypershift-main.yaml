@@ -22,6 +22,7 @@ base_images:
 binary_build_commands: make build
 build_root:
   from_repository: true
+  use_build_cache: true
 images:
 - inputs:
     openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
@@ -112,6 +113,7 @@ tests:
     cluster_profile: hypershift
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-nested
 - as: e2e-kubevirt-aws-ovn
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
@@ -157,6 +159,11 @@ tests:
       HYPERSHIFT_NODE_COUNT: "2"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.14
     workflow: hypershift-kubevirt-baremetalds-conformance
+- as: e2e-azure-ovn-conformance
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-azure-conformance
 - as: e2e-ibmcloud-iks
   optional: true
   run_if_changed: ^api/

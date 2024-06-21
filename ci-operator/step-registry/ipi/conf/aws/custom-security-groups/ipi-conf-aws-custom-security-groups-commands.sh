@@ -6,6 +6,11 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+if [[ ! -f ${SHARED_DIR}/security_groups_ids ]]; then
+    echo "No custom SG was created, skip now."
+    exit 0
+fi
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 custom_sg_ids=()
