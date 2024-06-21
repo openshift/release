@@ -98,12 +98,13 @@ go mod tidy
 echo "Executing tests..."
 trap archive-results SIGINT SIGTERM ERR EXIT
 
-EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
-
 if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
   # Set default storage class to ocs-storagecluster-ceph-rbd
-  oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class-
-  oc annotate storageclass ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class=true
-
-  export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" && export EXTRA_GINKGO_PARAMS="--ginkgo.skip=tc-id:OADP-555" && /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
+  oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class- &&\
+  oc annotate storageclass ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class=true &&\
+  export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" &&\
+  export EXTRA_GINKGO_PARAMS="--ginkgo.skip=tc-id:OADP-555" &&\
+  /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
 fi
+
+EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
