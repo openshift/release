@@ -32,4 +32,6 @@ cd "$(mktemp -d)"
 git clone https://github.com/redhat-appstudio/rhtap-e2e.git .
 
 NODE_TLS_REJECT_UNAUTHORIZED=0
+npm config set strict-ssl false
+
 yarn && yarn test
