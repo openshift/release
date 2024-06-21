@@ -33,6 +33,8 @@ if grep -q 'e2e.aws-oidc-s3-bucket-name' <<<"$( bin/test-e2e -h 2>&1 )"; then
   AWS_OBJECT_PARAMS="--e2e.aws-oidc-s3-bucket-name=hypershift-ci-oidc --e2e.aws-kms-key-alias=alias/hypershift-ci"
 fi
 
+export EVENTUALLY_VERBOSE="false"
+
 hack/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-''} \
   -test.parallel=20 \
