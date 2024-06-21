@@ -1,0 +1,81 @@
+binary_build_commands: |
+  # The CentOS 8 build root does not have golang package installed so that we
+  # use the golang installed by Kata Containers setup script. Here it is
+  # ensured the tools are searcheable.
+  export GOPATH=/go
+  export PATH="${GOPATH}/bin:/usr/local/go/bin/:$PATH"
+build_root:
+  project_image:
+    dockerfile_path: ci/openshift-ci/images/Dockerfile.buildroot
+images:
+- dockerfile_literal: |
+    FROM bin
+    RUN dnf install -y --nobest gettext
+  from: bin
+  to: with-deps
+releases:
+  initial:
+    integration:
+      name: "4.13"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.13"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 2Gi
+tests:
+- as: e2e-tests
+  cron: 2 7 * * 4-6
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: azure4
+    env:
+      TEST_ARGS: ' --max-parallel-tests 10 --run ^\[sig-node\].* '
+      TEST_SKIPS: \[sig-node\] Security Context should support seccomp runtime/default\|\[sig-node\]
+        Variable Expansion should allow substituting values in a volume subpath\|\[sig-node\]
+        Pods Extended Pod Container lifecycle evicted pods should be terminal\|\[sig-node\]
+        PodOSRejection \[NodeConformance\] Kubelet should reject pod when the node
+        OS doesn't match pod's OS
+    pre:
+    - chain: ipi-azure-pre
+    - as: kata-containers-e2e-pre
+      cli: latest
+      commands: |
+        # oc is made available to this script via cli configuration, but
+        # kubectl is not. Since kubectl is used by kata-webhook scripts,
+        # thus it is created a symlink to oc.
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then
+            ln -s oc kubectl
+        fi
+        popd
+        # TODO: The ipi-azure test step does not export AZURE_AUTH_LOCATION
+        # which causes openshift-tests to fail.
+        export AZURE_AUTH_LOCATION=${SHARED_DIR}/metadata.json
+
+        # Set environment variables for the ci test.sh script
+        export KATA_RUNTIME="kata-qemu"
+        export WORKAROUND_9206_CRIO=yes
+        # Install Kata Containers and run a smoke test.
+        ci/openshift-ci/test.sh
+
+        # Deploy the kata-webhook so that the tests ran on next step of the
+        # workflow will use the kata runtime.
+        ci/openshift-ci/cluster/deploy_webhook.sh
+      from: with-deps
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-azure
+zz_generated_metadata:
+  branch: main
+  org: kata-containers
+  repo: kata-containers
+  variant: minus3
