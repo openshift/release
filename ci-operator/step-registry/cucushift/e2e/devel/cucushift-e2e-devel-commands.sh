@@ -171,11 +171,13 @@ function filter_test_by_capability() {
     declare -A tagmaps
     tagmaps=([baremetal]=xxx
              [Build]=workloads
+             [CloudControllerManager]=xxx
              [CloudCredential]=xxx
              [Console]=console
              [CSISnapshot]=storage
              [DeploymentConfig]=workloads
              [ImageRegistry]=xxx
+             [Ingress]=xxx
              [Insights]=xxx
              [MachineAPI]=xxx
              [marketplace]=xxx
@@ -237,7 +239,7 @@ function filter_tests() {
     echo_e2e_tags
 }
 function test_execution() {
-    pushd verification-tests
+    pushd /verification-tests
     # run normal tests in parallel
     export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-normal"
     SECONDS=0

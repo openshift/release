@@ -892,7 +892,7 @@ function run_upgrade_e2e() {
     #shellcheck source=${SHARED_DIR}/runtime_env
     source "${SHARED_DIR}/runtime_env"
 
-    pushd verification-tests
+    pushd /verification-tests
     # run normal tests
     export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-normal-${idx}"
     parallel_cucumber -n "${PARALLEL}" --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number --exec \

@@ -19,7 +19,7 @@ function get_tp_operator(){
     tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
     ;;
     "4.16")
-    tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
+    tp_operator=("cluster-api" "olm")
     ;;
     *)
     tp_operator=()
@@ -78,7 +78,7 @@ function post-OCP-66839(){
     fi
     # New gained cap annotation should be in extracted creds 
     newCap=$(grep -rh "capability.openshift.io/name:" "${credsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-    expectedCapCR=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST} | sort -u|xargs)
+    expectedCapCR=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_POST} | tr ' ' '\n'|sort -u|xargs)
     if [[ "${newCap}" != "${expectedCapCR}" ]]; then
         echo "CRs with cap annotation: ${newCap}, but expected: ${expectedCapCR}"
         return 1

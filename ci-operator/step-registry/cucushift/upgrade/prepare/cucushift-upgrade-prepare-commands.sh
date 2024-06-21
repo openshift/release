@@ -171,11 +171,13 @@ function filter_test_by_capability() {
     declare -A tagmaps
     tagmaps=([baremetal]=xxx
              [Build]=workloads
+             [CloudControllerManager]=xxx
              [CloudCredential]=xxx
              [Console]=console
              [CSISnapshot]=storage
              [DeploymentConfig]=workloads
              [ImageRegistry]=xxx
+             [Ingress]=xxx
              [Insights]=xxx
              [MachineAPI]=xxx
              [marketplace]=xxx
@@ -238,7 +240,7 @@ function filter_tests() {
     echo_upgrade_tags
 }
 function test_execution() {
-    pushd verification-tests
+    pushd /verification-tests
     export OPENSHIFT_ENV_OCP4_USER_MANAGER=UpgradeUserManager
     export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=${USERS}
     export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}"

@@ -444,6 +444,18 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: aws-ipi-ovn-hypershift-guest-critical-f28
+  cron: 7 4 7 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@critical'
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: aws-ipi-ovn-hypershift-guest-ext-oidc-f7
   cron: 3 13 7,14,22,30 * *
   steps:
@@ -456,36 +468,20 @@ tests:
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-hypershift-extended-external-oidc-guest
-- as: aws-ipi-ovn-hypershift-guest-f7
-  cron: 16 13 4,11,18,25 * *
+- as: aws-ipi-ovn-hypershift-install-f28
+  cron: 3 12 6 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      HYPERSHIFT_AWS_REGION: us-east-1
-      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
-      HYPERSHIFT_NODE_COUNT: "1"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftINSTALL&
+      TEST_SCENARIOS: Hypershift
     test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-guest-f14-destructive
-  cron: 25 16 9,23 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      HYPERSHIFT_AWS_REGION: us-east-1
-      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
-      HYPERSHIFT_NODE_COUNT: "1"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-mgmt-critical-f7
-  cron: 1 13 7,14,21,28 * *
+    - ref: idp-htpasswd
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
+- as: aws-ipi-ovn-hypershift-mgmt-critical-f28
+  cron: 17 17 29 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -494,21 +490,6 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
       TEST_IMPORTANCE: Critical
       TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-mgmt
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
-- as: aws-ipi-ovn-hypershift-mgmt-f7
-  cron: 32 14 9,16,23,30 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      HYPERSHIFT_AWS_REGION: us-east-1
-      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
-      HYPERSHIFT_NODE_COUNT: "1"
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "35"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
@@ -536,6 +517,18 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-guest-f28-longduration
+  cron: 32 3 12 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_VERSION: "2.5"
+      TEST_FILTERS: ~ChkUpgrade&;NonPreRelease&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+      TEST_TIMEOUT: "90"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
 - as: aws-ipi-ovn-hypershift-mce-mgmt-f7
   cron: 11 6 5,12,19,28 * *
   steps:
@@ -548,6 +541,19 @@ tests:
       TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce
+- as: aws-ipi-ovn-hypershift-mce-mgmt-f28-longduration
+  cron: 14 15 22 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_VERSION: "2.5"
+      TEST_ADDITIONAL: Hypershift|Network_Observability
+      TEST_FILTERS: ~ChkUpgrade&;NonPreRelease&;~DisconnectedOnly&;HyperShiftMGMT&;~MicroShiftOnly&
+      TEST_TIMEOUT: "90"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt-longduration
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce
 - as: aws-ipi-ovn-hypershift-mce-ibmz-guest-critical-f7
   cron: 6 20 2,11,18,25 * *
@@ -1795,6 +1801,46 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
+- as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-guest-f7
+  cron: 17 14 7,14,23,30 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
+      MCE_VERSION: "2.5"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
+- as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-guest-f14-des
+  cron: 12 17 13,29 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
+      MCE_VERSION: "2.5"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-destructive
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
+- as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-mgmt-f7
+  cron: 35 20 6,13,20,27 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
+      MCE_VERSION: "2.5"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.15
+      TEST_ADDITIONAL: Hypershift
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce
 - as: baremetal-3-plus-1-agent-ipv4-static-f14
   cluster: build05
   cron: 6 13 10,26 * *
@@ -2451,7 +2497,7 @@ tests:
 - as: vsphere-agent-compact-fips-f14
   cron: 48 16 10,26 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       FIPS_ENABLED: "true"
     test:
@@ -2499,21 +2545,21 @@ tests:
 - as: vsphere-agent-ha-f14
   cron: 52 17 5,21 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-agent-vsphere-install-ha
 - as: vsphere-agent-sno-f14
   cron: 44 1 15,29 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-agent-vsphere-install-sno
 - as: vsphere-agent-dualstack-sno-f14
   cron: 4 18 4,18 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       IP_FAMILIES: DualStack
     test:
@@ -2522,7 +2568,7 @@ tests:
 - as: vsphere-agent-dualstack-compact-f14
   cron: 15 18 1,17 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       IP_FAMILIES: DualStack
     test:
@@ -2531,7 +2577,7 @@ tests:
 - as: vsphere-agent-dualstack-ha-f14
   cron: 22 11 10,26 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       IP_FAMILIES: DualStack
     test:
@@ -2585,7 +2631,7 @@ tests:
 - as: vsphere-ipi-disk-encryption-tang-fips-f28
   cron: 48 17 10 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       FIPS_ENABLED: "true"
     test:
@@ -2601,7 +2647,7 @@ tests:
 - as: vsphere-ipi-disk-encryption-tang-fips-f28-destructive
   cron: 37 15 28 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       FIPS_ENABLED: "true"
     test:
@@ -2617,7 +2663,7 @@ tests:
 - as: vsphere-ipi-f28-longduration-hive
   cron: 22 11 5 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       TEST_SCENARIOS: Cluster_Operator
       TEST_TIMEOUT: "90"
@@ -2627,21 +2673,21 @@ tests:
 - as: vsphere-ipi-ovn-dualstack-f28
   cron: 28 21 15 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
 - as: vsphere-ipi-ovn-dualstack-f28-destructive
   cron: 32 0 12 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
 - as: vsphere-ipi-ovn-dualstack-privmaryv6-f28
   cron: 33 5 8 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       IP_FAMILIES: DualStackIPv6Primary
     test:
@@ -2650,7 +2696,7 @@ tests:
 - as: vsphere-ipi-ovn-dualstack-privmaryv6-f28-destructive
   cron: 26 0 4 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       IP_FAMILIES: DualStackIPv6Primary
     test:
@@ -2673,21 +2719,21 @@ tests:
 - as: vsphere-ipi-ovn-local-to-shared-gateway-mode-migration-f14
   cron: 32 15 1,17 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-local-to-shared-gateway-mode-migration
 - as: vsphere-ipi-ovn-shared-to-local-gw-migration-f28
   cron: 1 11 5 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-shared-to-local-gateway-mode-migration
 - as: vsphere-ipi-ovn-shared-to-local-gw-migration-f28-destructive
   cron: 56 21 14 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-shared-to-local-gateway-mode-migration
@@ -2784,7 +2830,7 @@ tests:
 - as: vsphere-ipi-sdn-migration-ovn-f14
   cron: 36 19 13,28 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     test:
@@ -2825,21 +2871,21 @@ tests:
 - as: vsphere-ipi-zones-f28
   cron: 24 2 11 * *
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones
 - as: vsphere-ipi-zones-f28-destructive
   cron: 36 17 11 * *
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones
 - as: vsphere-ipi-zones-f28-longduration-cloud
   cron: 4 16 2 * *
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     env:
       TEST_SCENARIOS: Cluster_Infrastructure
       TEST_TIMEOUT: "90"
@@ -2871,7 +2917,7 @@ tests:
 - as: vsphere-ipi-zones-tp-f28
   cron: 33 12 4 * *
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -2880,7 +2926,7 @@ tests:
 - as: vsphere-ipi-zones-tp-f28-destructive
   cron: 36 9 5 * *
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:

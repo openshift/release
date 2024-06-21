@@ -6,18 +6,22 @@ workflow:
     post:
     - chain: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-deprovision
     env:
-      ODF_OPERATOR_SUB_CHANNEL: stable-4.13
       HYPERSHIFT_NAMESPACE: "local-cluster"
       METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
       LOCAL_STORAGE_OPERATOR_SUB_SOURCE: qe-app-registry
+      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
+      LVM_SUB_TARGET_NAMESPACES: openshift-lvm-storage
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      ETCD_STORAGE_CLASS: lvms-vg1
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         NETWORK_TYPE=OVNKubernetes
-        NUM_WORKERS=4
-        WORKER_VCPU=16
-        WORKER_MEMORY=65536
+        NUM_WORKERS=0
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=81920
         VM_EXTRADISKS=true
-        VM_EXTRADISKS_LIST=vda
-        VM_EXTRADISKS_SIZE=1024G
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=250G
   documentation: |-
     This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow
