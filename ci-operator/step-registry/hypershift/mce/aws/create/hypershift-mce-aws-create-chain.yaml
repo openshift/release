@@ -19,10 +19,13 @@ chain:
         - name: ENABLE_ICSP
           default: "false"
           documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
-        - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
-          name: BREW_IMAGE_REGISTRY_USERNAME
-        - default: /var/run/brew-pull-secret/token
-          name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+        - name: BREW_IMAGE_REGISTRY_USERNAME
+          default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+        - name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+          default: /var/run/brew-pull-secret/token
+        - name: EXTRA_ARGS
+          default: ""
+          documentation: "Extra args to pass to the create cluster aws command"
       commands: |-
         set -exuo pipefail
 
@@ -81,7 +84,7 @@ chain:
           sleep 60
         fi
       
-        /tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} ${CRED_COMMAND} \
+        /tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} ${CRED_COMMAND} ${EXTRA_ARGS} \
         --name ${CLUSTER_NAME} \
         --infra-id ${CLUSTER_NAME} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
