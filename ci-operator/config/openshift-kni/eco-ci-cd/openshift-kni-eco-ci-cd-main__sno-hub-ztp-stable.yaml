@@ -8,10 +8,10 @@ base_images:
     namespace: ocp
     tag: cli
 build_root:
-  image_stream_tag:
-    name: telco-runner
-    namespace: ci
-    tag: latest
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ci/telco-runner
+      RUN dnf -y install rsync
 releases:
   latest:
     release:
@@ -38,6 +38,8 @@ tests:
       AGENT_PLATFORM_TYPE: none
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       DISCONNECTED: "false"
+      EXPIRATION_TIME: +5 hours
+      EXPIRATION_TIME_FILE: /var/builds/ztp-hub-preserved-prod
       MCH_NAMESPACE: open-cluster-management
       OPERATORS: |
         [
@@ -47,6 +49,7 @@ tests:
           {"name": "openshift-gitops-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-gitops-operator", "target_namespaces": "", "operator_group": "gitops-operator-group"}
         ]
       RESERVE_BOOTSTRAP: "false"
+      SHARED_HUB_CLUSTER_PROFILE: /var/builds/ztp-hub-preserved-prod-cluster_profile_dir
       architecture: amd64
       ipv4_enabled: "true"
       ipv6_enabled: "true"
@@ -54,7 +57,7 @@ tests:
       workers: "0"
     test:
     - ref: install-operators-verify
-    - ref: telcov10n-sno-hub-ztp-deploy-ztp-operators
+    - ref: telcov10n-sno-hub-ztp-set-hub-preserved
     workflow: telcov10n-sno-hub-ztp
 zz_generated_metadata:
   branch: main
