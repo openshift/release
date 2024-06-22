@@ -101,6 +101,7 @@ if [ $? -ne 0 ]; then
 fi
 
 clone_repo(){
+  echo "jobname=${JOB_NAME}"
   if [[ "${JOB_NAME}" == *"redhat-appstudio-rhtap-installer"* ]]; then
     echo "[INFO]Skip cloning rhtap-installer repo..."
     return
@@ -178,3 +179,4 @@ clone_repo
 verify_template
 install_rhtap
 e2e_test
+echo "debug...."
