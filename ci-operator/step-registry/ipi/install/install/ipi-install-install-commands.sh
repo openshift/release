@@ -668,7 +668,7 @@ case $JOB_NAME in
     max=1
     ;;
   *)
-    max=3
+    max=1
     ;;
 esac
 ret=4
@@ -714,6 +714,9 @@ set -o errexit
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
+
+echo "(jiwei-debug) Saving kubeconfig..."
+cp "${dir}/auth/kubeconfig" "${ARTIFACT_DIR}/"
 
 if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
