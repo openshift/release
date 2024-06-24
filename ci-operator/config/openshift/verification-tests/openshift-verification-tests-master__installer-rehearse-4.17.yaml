@@ -1,0 +1,97 @@
+base_images:
+  ansible:
+    name: "4.17"
+    namespace: ocp
+    tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.17"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: openstack-installer
+  upi-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.17"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: installer-rehearse-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "0"
+      CONTROL_PLANE_REPLICAS: "1"
+      SLEEP_DURATION: 10m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-provision
+- as: installer-rehearse-aws
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      RHEL_VM_TYPE: m5.xlarge
+      RHEL_WORKER_COUNT_PER_ZONE: "3"
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-workers-rhel8
+- as: installer-rehearse-azure
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    workflow: cucushift-installer-rehearse-azure-upi
+- as: installer-rehearse-ibmcloud
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-with-ep-cos
+- as: installer-rehearse-gcp
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-qe
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.17
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: cucushift-installer-rehearse-gcp-ipi-user-labels-tags-filestore-csi
+- as: installer-rehearse-ibmcloud-disconnected
+  cron: '@yearly'
+  steps:
+    cluster_profile: ibmcloud-qe-2
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+- as: installer-rehearse-vsphere
+  cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-connected-2
+    workflow: cucushift-installer-rehearse-vsphere-ipi-customized-resource
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: verification-tests
+  variant: installer-rehearse-4.17
