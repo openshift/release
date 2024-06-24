@@ -47,9 +47,11 @@ if [[ ! -z "$(${VIRSH} pool-list | grep ${POOL_NAME})" ]]; then
   done
 fi
 
-# DEBUG ONLY : Uncomment the following line to always remove the source volume.
+# DEBUG ONLY : Uncomment the following line to always remove the source volume regardless of its naming format.
 #echo "Removing the source volume..."
 #${VIRSH} vol-delete --pool ${POOL_NAME} "$(${VIRSH} vol-list --pool ${POOL_NAME} | grep rhcos | awk '{ print $1 }' || true)"
+echo "Removing the now obsolete source volume..."
+${VIRSH} vol-delete --pool ${POOL_NAME} "$(${VIRSH} vol-list --pool ${POOL_NAME} | awk '{ print $1 }' | grep -E '^rhcos' || true)"
 
 # Remove stale pools  # this is old behavior removal.  Can leave it for now, but its technically a noop
 echo "Removing stale pools..."
