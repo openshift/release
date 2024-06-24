@@ -62,7 +62,7 @@ CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 OCPINSTALL='/tmp/openshift-install'
 RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
 QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
-VOLUME_NAME="rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
+VOLUME_NAME="ocp-${BRANCH}-rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
 # All virsh commands need to be run on the hypervisor
 LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
 # Simplify the virsh command
@@ -82,7 +82,7 @@ else
 fi
 
 # Check if we need to update the source volume
-CURRENT_SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep rhcos | awk '{ print $1 }' || true)
+CURRENT_SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep "ocp-${BRANCH}-rhcos" | awk '{ print $1 }' || true)
 echo "Current source volume name: ${CURRENT_SOURCE_VOLUME}"
 echo "New source volume name: ${VOLUME_NAME}"
 
