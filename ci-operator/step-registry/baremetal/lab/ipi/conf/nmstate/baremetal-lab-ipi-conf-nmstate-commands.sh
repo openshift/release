@@ -74,8 +74,8 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
       enabled: true
       dhcp: true
     ipv6:
-      enabled: true
-      dhcp: true"
+      enabled: false
+      dhcp: false"
   contents_source="$(echo "${br_ex_configuration}" | base64 -w0)"
   if [[ "$name" =~ master* ]]; then
     cat >> "${MASTER_MANIFEST}" <<EOF
