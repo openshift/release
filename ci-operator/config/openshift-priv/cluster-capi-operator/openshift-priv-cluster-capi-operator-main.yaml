@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.16"
 binary_build_commands: go build -o bin/cluster-capi-operator cmd/cluster-capi-operator
 build_root:
   from_repository: true
@@ -148,6 +152,20 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-vsphere
+- as: regression-clusterinfra-cucushift-rehearse-capi-aws-ipi
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_FILTERS: NonHyperShiftHOST&;capi;CAPI
+      TEST_SCENARIOS: Cluster_Infrastructure
+      TEST_TIMEOUT: "1200"
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+  timeout: 7h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-priv
