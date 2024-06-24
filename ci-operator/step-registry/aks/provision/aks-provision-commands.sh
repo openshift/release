@@ -3,12 +3,30 @@
 set -euo pipefail
 
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then
+    AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+fi
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 
 CLUSTER="${NAMESPACE}-${UNIQUE_HASH}"
 RESOURCEGROUP="$(<"${SHARED_DIR}/resourcegroup")"
+
+AKS_LOCATION="${HYPERSHIFT_AZURE_LOCATION:-${LEASED_RESOURCE}}"
+
+CLUSTER_AUTOSCALER_ARGS=""
+if [[ "${ENABLE_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
+    CLUSTER_AUTOSCALER_ARGS="--enable-cluster-autoscaler"
+fi
+
+if [[ "${AKS_CLUSTER_AUTOSCALER_MIN_NODES:-}" != "" ]]; then
+    CLUSTER_AUTOSCALER_ARGS+=" --min-count ${AKS_CLUSTER_AUTOSCALER_MIN_NODES}"
+fi
+
+if [[ "${AKS_CLUSTER_AUTOSCALER_MAX_NODES:-}" != "" ]]; then
+    CLUSTER_AUTOSCALER_ARGS+=" --max-count ${AKS_CLUSTER_AUTOSCALER_MAX_NODES}"
+fi
 
 az --version
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
@@ -21,7 +39,8 @@ AKE_CREATE_COMMAND=(
     --node-count "$AKS_NODE_COUNT"
     --load-balancer-sku "$AKS_LB_SKU"
     --os-sku "$AKS_OS_SKU"
-    --location "$LEASED_RESOURCE"
+    ${CLUSTER_AUTOSCALER_ARGS:-} \
+    --location "$AKS_LOCATION"
 )
 
 if [[ "$AKS_GENERATE_SSH_KEYS" == "true" ]]; then
