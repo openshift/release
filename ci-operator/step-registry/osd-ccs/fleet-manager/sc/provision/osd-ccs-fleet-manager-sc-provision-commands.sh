@@ -33,6 +33,7 @@ function wait_for_provision_shard() {
   return 0
 }
 
+
 #Set up region
 OSDFM_REGION=${LEASED_RESOURCE}
 echo "region: ${LEASED_RESOURCE}"
