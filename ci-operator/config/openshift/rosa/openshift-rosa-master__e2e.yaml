@@ -30,6 +30,18 @@ tests:
     test:
     - chain: rosa-tests-e2e-fullcycle
     workflow: rosa-lifecycle
+- as: rosa-sts-advanced-prod-critical-high-f3
+  cron: 37 0 2,5,8,11,14,17,20,23,26,29 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: stable
+      IMPORTANCE: (Critical,High)
+      OCM_LOGIN_ENV: production
+      TEST_PROFILE: rosa-advanced
+    test:
+    - chain: rosa-tests-e2e-fullcycle
+    workflow: rosa-lifecycle
 - as: rosa-sts-advanced-medium-low-f7
   cron: 46 2 3,10,17,26 * *
   steps:
@@ -107,6 +119,18 @@ tests:
     test:
     - chain: rosa-tests-e2e-fullcycle
     workflow: rosa-lifecycle
+- as: rosa-hcp-advanced-prod-critical-high-f3
+  cron: 0 7 1,4,7,10,13,16,19,22,25,28 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: stable
+      IMPORTANCE: (Critical,High)
+      OCM_LOGIN_ENV: production
+      TEST_PROFILE: rosa-hcp-advanced
+    test:
+    - chain: rosa-tests-e2e-fullcycle
+    workflow: rosa-lifecycle
 - as: rosa-hcp-advanced-medium-low-f7
   cron: 12 0 9,16,23,30 * *
   steps:
@@ -180,6 +204,19 @@ tests:
     cluster_profile: aws-qe
     env:
       CHANNEL_GROUP: stable
+      TEST_LABEL_FILTERS: (upgrade)&&!Exclude
+      TEST_PROFILE: rosa-upgrade-y-stream
+    test:
+    - ref: rosa-tests
+    - ref: rosa-tests-report
+    workflow: rosa-lifecycle
+- as: rosa-sts-upgrade-y-stream-prod-f3
+  cron: 16 8 1,4,7,10,13,16,19,22,25,28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: stable
+      OCM_LOGIN_ENV: production
       TEST_LABEL_FILTERS: (upgrade)&&!Exclude
       TEST_PROFILE: rosa-upgrade-y-stream
     test:
