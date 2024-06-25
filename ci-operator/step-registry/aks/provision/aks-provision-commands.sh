@@ -21,6 +21,7 @@ AKE_CREATE_COMMAND=(
     --node-count "$AKS_NODE_COUNT"
     --load-balancer-sku "$AKS_LB_SKU"
     --os-sku "$AKS_OS_SKU"
+    --location "$LEASED_RESOURCE"
 )
 
 if [[ "$AKS_GENERATE_SSH_KEYS" == "true" ]]; then

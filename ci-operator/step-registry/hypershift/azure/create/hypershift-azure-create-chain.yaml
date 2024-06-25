@@ -15,7 +15,9 @@ chain:
       documentation: "Release image used for the HostedCluster. Empty by default it will use release:latest"
     - name: HYPERSHIFT_AZURE_LOCATION
       default: "eastus"
-      documentation: "The Azure location of the cluster."
+      documentation: |-
+        Specifies the Azure location of the cluster. If intentionally left as an empty string, 
+        it defaults to that of the management cluster.
     - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
       default: ""
       documentation: "Specifies the external DNS domain. If left empty, external DNS is assumed to be disabled."
@@ -42,6 +44,7 @@ chain:
       if [[ $USE_HYPERSHIFT_AZURE_CREDS == "true" ]]; then
         AZURE_CREDS="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
       fi
+      HC_LOCATION=${HYPERSHIFT_AZURE_LOCATION:-$LEASED_RESOURCE}
       
       PULL_SECRET_PATH="/etc/ci-pull-credentials/.dockerconfigjson"
       ICSP_COMMAND=""
@@ -74,7 +77,7 @@ chain:
         --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
         --pull-secret ${PULL_SECRET_PATH} \
         --azure-creds ${AZURE_CREDS} \
-        --location ${HYPERSHIFT_AZURE_LOCATION} \
+        --location ${HC_LOCATION} \
         --release-image ${RELEASE_IMAGE} \
         --encryption-key-id=${ENCRYPTION_KEY_ID}
 
