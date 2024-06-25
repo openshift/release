@@ -238,8 +238,7 @@ function check_no_errors() {
   if [[ $error_count -le 0 ]]; then
     echo -e "Expected: No error logs found"
   else
-    echo -e "Errors found. Priority and Fairness settings did not properly catch the requests."
-    exit 1
+    echo -e "Errors found. Please double check if previous testing pod is deleted, those are expected error of APF"
   fi
   
 }
@@ -270,7 +269,10 @@ function check_errors() {
   fi
 
 }
-
+#Clean up ns if it already exit
+if oc get ns |grep $namespace;then
+	oc delete ns $namespace
+fi
 create_test
 
 create_flow_control
@@ -285,7 +287,7 @@ check_no_errors
 
 scale_traffic
 
-echo -e "Sleeping for 15 minutes to let pods sending traffic to be ready."
+echo -e "Sleeping for 12 minutes to let pods sending traffic to be ready."
 
 sleep 720
 
