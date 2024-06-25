@@ -23,31 +23,40 @@ DISK_SCRIPT="/tmp/disk.sh"
 cat <<EOF >"${DISK_SCRIPT}"
 #!/bin/sh
 set -xeuo pipefail
-VG_NAME="ssd"
-LV_NAME="ssd"
-MOUNT_DIR="\${HOME}/microshift"
+
+create_lv() {
+  devices=\$1
+  vg_name=\$2
+  lv_name=\$3
+  vg_mount=\$4
+  device_paths=""
+
+  for device in \$devices; do
+    sudo pvcreate /dev/\$device
+    device_paths="\$(sudo pvdisplay /dev/\$device | grep "PV Name" | awk '{print \$3}') \$device_paths"
+  done
+  sudo vgcreate "\${vg_name}" \${device_paths}
+  sudo vgdisplay "\${vg_name}"
+  lv_size=\$(sudo vgdisplay "\${vg_name}" | grep "VG Size" | egrep -o "[[:digit:]]+\.[[:digit:]]+.*$" | awk '{print \$1\$2}' | sed 's/\.[0-9]\+//g')
+  sudo lvcreate -L "\${lv_size}" -n "\${lv_name}" "\${vg_name}"
+  sudo mkfs.xfs /dev/"\${vg_name}"/"\${lv_name}"
+  sudo mkdir -p "\${vg_mount}"
+  sudo mount /dev/"\${vg_name}"/"\${lv_name}" "\${vg_mount}"
+}
 
 sudo dnf install -y jq lvm2
-devices=\$(lsblk -J | jq -r '.blockdevices[] | select(.children | length == 0) | .name')
-device_paths=""
+tmp_device=\$(lsblk -J | jq -r '[.blockdevices[] | select(.children | length == 0)][0].name')
+ushift_devices=\$(lsblk -J | jq -r '[.blockdevices[] | select(.children | length == 0)][1:] | map(.name) | join(" ")')
 
-for device in \$devices; do
-    sudo pvcreate /dev/\$device
-    sudo pvdisplay /dev/\$device
-    device_paths="\$(sudo pvdisplay /dev/\$device | grep "PV Name" | awk '{print \$3}') \$device_paths"
-done
-
-sudo vgcreate "\${VG_NAME}" \${device_paths}
-sudo vgdisplay "\${VG_NAME}"
-
-lv_size=\$(sudo vgdisplay "\${VG_NAME}" | grep "VG Size" | awk '{print \$3\$4}')
-sudo lvcreate -L "\${lv_size}" -n "\${LV_NAME}" "\${VG_NAME}"
-sudo lvdisplay /dev/"\${VG_NAME}"/"\${LV_NAME}"
-sudo mkfs.xfs /dev/"\${VG_NAME}"/"\${LV_NAME}"
-
-mkdir -p "\${MOUNT_DIR}"
-sudo mount /dev/"\${VG_NAME}"/"\${LV_NAME}" "\${MOUNT_DIR}"
-sudo chown -R \$(id -u):\$(id -g) "\${MOUNT_DIR}"
+create_lv "\${tmp_device}" tmp tmp /tmp
+sudo chmod 1777 /tmp
+mv "\${HOME}"/.ssh /tmp
+create_lv "\${ushift_devices}" ssd ssd "\${HOME}"
+sudo chown -R \$(id -u):\$(id -g) "\${HOME}"
+mv /tmp/.ssh "\${HOME}"
+df -h
+ls -l /
+ls -l /home/
 EOF
 chmod +x "${DISK_SCRIPT}"
 scp "${DISK_SCRIPT}" "${INSTANCE_PREFIX}:${DISK_SCRIPT}"
