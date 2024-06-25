@@ -22,7 +22,10 @@ oc projects
 
 # Label the nodes
 if [ ${LABEL} ]; then
-  oc label node "$(oc get node -oname -l node-role.kubernetes.io/worker | head -n ${LABEL_NUM_NODES} | grep -oP "^node/\K.*")" ${LABEL}="" --overwrite
+  for node in $(oc get node -oname -l node-role.kubernetes.io/worker | head -n ${LABEL_NUM_NODES} | grep -oP "^node/\K.*")
+  do
+    oc label node $node ${LABEL}="" --overwrite
+  done
 fi
 
 # Install the SRIOV operator
