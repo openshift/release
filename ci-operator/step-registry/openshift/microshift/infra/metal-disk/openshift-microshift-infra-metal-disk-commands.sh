@@ -23,31 +23,50 @@ DISK_SCRIPT="/tmp/disk.sh"
 cat <<EOF >"${DISK_SCRIPT}"
 #!/bin/sh
 set -xeuo pipefail
-VG_NAME="ssd"
-LV_NAME="ssd"
-MOUNT_DIR="\${HOME}/microshift"
 
-sudo dnf install -y jq lvm2
-devices=\$(lsblk -J | jq -r '.blockdevices[] | select(.children | length == 0) | .name')
+create_lv() {
+  device=\$1
+
+  sudo pvcreate /dev/\$device
+  sudo vgcreate "vg\${device}" /dev/\$device
+  lv_size=\$(sudo vgdisplay "vg\${device}" | grep "VG Size" | egrep -o "[[:digit:]]+\.[[:digit:]]+.*$" | awk '{print \$1\$2}' | sed 's/\.[0-9]\+//g')
+  sudo lvcreate -L "\${lv_size}" -n "lv\${device}" "vg\${device}"
+}
+
+sudo dnf install -y jq lvm2 mdadm
+tmp_device=\$(lsblk -J | jq -r '[.blockdevices[] | select(.children | length == 0)][0].name')
+ushift_devices=\$(lsblk -J | jq -r '[.blockdevices[] | select(.children | length == 0)][1:] | map(.name) | join(" ")')
+
+# Setup the /tmp directory
+create_lv "\${tmp_device}"
+sudo mkfs.xfs /dev/vg\${tmp_device}/lv\${tmp_device}
+sudo mount /dev/vg\${tmp_device}/lv\${tmp_device} /tmp
+sudo chmod 1777 /tmp
+mv "\${HOME}"/.ssh /tmp
+
+# Setup each of the volumes for the rest of the disks.
+arr=(\$ushift_devices)
+ndisks=\${#arr[@]}
 device_paths=""
-
-for device in \$devices; do
-    sudo pvcreate /dev/\$device
-    sudo pvdisplay /dev/\$device
-    device_paths="\$(sudo pvdisplay /dev/\$device | grep "PV Name" | awk '{print \$3}') \$device_paths"
+for device in \${ushift_devices}; do
+  create_lv \$device
+  device_paths="/dev/vg\$device/lv\$device \$device_paths"
+  ndisks=\$((ndisks++))
 done
+sudo mdadm -C /dev/md0 -l raid0 -n \$ndisks \$device_paths
+sudo mkfs.xfs /dev/md0
+sudo mount /dev/md0 \${HOME}
+sudo chown -R \$(id -u):\$(id -g) "\${HOME}"
+mv /tmp/.ssh "\${HOME}"
+df -h
+ls -l /
+ls -l /home/
+sudo lsblk
+sudo setenforce 0 || true
+setenforce 0 || true
 
-sudo vgcreate "\${VG_NAME}" \${device_paths}
-sudo vgdisplay "\${VG_NAME}"
-
-lv_size=\$(sudo vgdisplay "\${VG_NAME}" | grep "VG Size" | awk '{print \$3\$4}')
-sudo lvcreate -L "\${lv_size}" -n "\${LV_NAME}" "\${VG_NAME}"
-sudo lvdisplay /dev/"\${VG_NAME}"/"\${LV_NAME}"
-sudo mkfs.xfs /dev/"\${VG_NAME}"/"\${LV_NAME}"
-
-mkdir -p "\${MOUNT_DIR}"
-sudo mount /dev/"\${VG_NAME}"/"\${LV_NAME}" "\${MOUNT_DIR}"
-sudo chown -R \$(id -u):\$(id -g) "\${MOUNT_DIR}"
+time sh -c "dd if=/dev/zero of=/home/ec2-user/testfile bs=1M count=2k conv=fdatasync && sync"
+time sh -c "dd if=/dev/zero of=/tmp/testfile bs=1M count=2k conv=fdatasync && sync"
 EOF
 chmod +x "${DISK_SCRIPT}"
 scp "${DISK_SCRIPT}" "${INSTANCE_PREFIX}:${DISK_SCRIPT}"
