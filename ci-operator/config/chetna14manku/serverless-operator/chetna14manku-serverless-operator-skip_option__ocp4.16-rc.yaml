@@ -132,6 +132,7 @@ tests:
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
+      ADDONS_OPERATORS_RUN_IN_PARALLEL: "false"
       CHANNEL_GROUP: candidate
       FIREWATCH_CONFIG: |
         {
@@ -157,13 +158,17 @@ tests:
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.16"
+      OPERATOR1_CONFIG: name=jaeger-product;namespace=openshift-operators
+      OPERATOR2_CONFIG: name=kiali-ossm;namespace=openshift-operators
+      OPERATOR3_CONFIG: name=servicemeshoperator;namespace=openshift-operators
       REGION: us-west-2
-      SLEEP_DURATION: 30m
+      SLEEP_DURATION: 20m
     test:
+    - ref: operator-install
     - ref: wait
     - as: mesh-e2e
       cli: latest
-      commands: SKIP_OPERATOR_SUBSCRIPTION=true ROSA=true make mesh-e2e
+      commands: SKIP_OPERATOR_SUBSCRIPTION=true make mesh-e2e
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
