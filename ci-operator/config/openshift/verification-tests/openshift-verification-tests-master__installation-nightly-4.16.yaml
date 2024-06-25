@@ -56,20 +56,6 @@ resources:
       cpu: 400m
       memory: 800Mi
 tests:
-- as: aws-ipi-preserve-ign-arm-f14
-  cron: 4 21 5,19 * *
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      OCP_ARCH: arm64
-    test:
-    - ref: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-aws-ipi-preserve-bootstrap-ign
 - as: aws-ipi-proxy-whitelist-arm-f14
   cron: 28 6 12,26 * *
   steps:
@@ -102,12 +88,23 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-shared-phz-sts
-- as: azure-ipi-disc-fullyprivate-firewall-f28
+- as: azure-ipi-custom-nsg-f28
+  cron: 20 20 23 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_CUSTOM_NSG: "true"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork
+- as: azure-ipi-disc-fullyprivate-firewall-idms-f28
   cron: 56 8 7 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_IDMS: "yes"
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate-firewall
@@ -255,6 +252,15 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
+- as: azure-upi-custom-nsg-f28
+  cron: 25 17 12 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-upi-custom-nsg
 - as: azure-upi-disconnected-f14
   cron: 47 13 4,20 * *
   steps:

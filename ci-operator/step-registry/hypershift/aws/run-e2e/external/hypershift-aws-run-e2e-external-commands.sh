@@ -16,7 +16,7 @@ trap cleanup EXIT
 REQUEST_SERVING_COMPONENT_TEST="${REQUEST_SERVING_COMPONENT_TEST:-}"
 REQUEST_SERVING_COMPONENT_PARAMS=""
 
-if [[ -n "${REQUEST_SERVING_COMPONENT_TEST}" ]]; then
+if [[ "${REQUEST_SERVING_COMPONENT_TEST:-}" == "true" ]]; then
    REQUEST_SERVING_COMPONENT_PARAMS="--e2e.test-request-serving-isolation \
   --e2e.management-parent-kubeconfig=${MGMT_PARENT_KUBECONFIG} \
   --e2e.management-cluster-namespace=$(cat "${SHARED_DIR}/management_cluster_namespace") \
@@ -32,6 +32,8 @@ AWS_OBJECT_PARAMS=""
 if grep -q 'e2e.aws-oidc-s3-bucket-name' <<<"$( bin/test-e2e -h 2>&1 )"; then
   AWS_OBJECT_PARAMS="--e2e.aws-oidc-s3-bucket-name=hypershift-ci-oidc --e2e.aws-kms-key-alias=alias/hypershift-ci"
 fi
+
+export EVENTUALLY_VERBOSE="false"
 
 hack/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-''} \

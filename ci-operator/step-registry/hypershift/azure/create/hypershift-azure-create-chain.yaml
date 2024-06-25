@@ -16,6 +16,9 @@ chain:
     - name: HYPERSHIFT_AZURE_LOCATION
       default: "eastus"
       documentation: "The Azure location of the cluster."
+    - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
+      default: ""
+      documentation: "Specifies the external DNS domain. If left empty, external DNS is assumed to be disabled."
     - name: ENABLE_ICSP
       default: "false"
       documentation: "If true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
@@ -54,10 +57,21 @@ chain:
         ENCRYPTION_KEY_ID="$(cat "${SHARED_DIR}/azure_active_key_url")"
       fi
       
-      /usr/bin/hypershift create cluster azure ${ICSP_COMMAND} \
+      EXTRA_ARGS=""
+      HC_ANNOTATIONS_FILE="${SHARED_DIR}/hypershift_hc_annotations"
+      if [[ -f "$HC_ANNOTATIONS_FILE" ]]; then
+        while read -r line; do
+          if [[ -n "$line" ]]; then
+            EXTRA_ARGS+="--annotations=${line} "
+          fi
+        done < "$HC_ANNOTATIONS_FILE"
+      fi
+      
+      /usr/bin/hypershift create cluster azure ${EXTRA_ARGS} ${ICSP_COMMAND} \
         --name ${CLUSTER_NAME} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
         --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
+        --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
         --pull-secret ${PULL_SECRET_PATH} \
         --azure-creds ${AZURE_CREDS} \
         --location ${HYPERSHIFT_AZURE_LOCATION} \

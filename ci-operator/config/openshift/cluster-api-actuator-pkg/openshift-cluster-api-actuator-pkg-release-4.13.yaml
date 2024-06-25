@@ -132,6 +132,20 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- always_run: false
+  as: e2e-vsphere-operator-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-operator-periodic
   cron: 55 9 * * 6
   steps:
@@ -145,6 +159,20 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-vsphere
+- always_run: false
+  as: e2e-azure-operator-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
 - as: e2e-azure-operator-periodic
   cron: 39 2 * * 6
   steps:
@@ -158,6 +186,20 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+- always_run: false
+  as: e2e-gcp-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - as: e2e-gcp-operator-periodic
   cron: 36 12 * * 6
   steps:
@@ -171,13 +213,29 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- always_run: false
+  as: e2e-openstack-operator-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      USE_RAMFS: "false"
+      WORKER_REPLICAS: "0"
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-operator-periodic
   minimum_interval: 72h
   steps:
     cluster_profile: openstack-vexxhost
     env:
       USE_RAMFS: "false"
-      WORKER_REPLICAS: "0"
     test:
     - as: test
       cli: latest
