@@ -1,0 +1,31 @@
+ref:
+  as: telcov10n-sno-spoke-tests
+  commands: telcov10n-sno-spoke-tests-commands.sh
+  from: src
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  env:
+  - name: EXPIRATION_TIME_FILE
+    default: "/var/builds/ztp-hub-preserved-prod"
+    documentation: |-
+      If a file named preserve exists in /var/build/${NAMESPACE} the pruner will ignore it so that it would be preserved
+      until the date contained in the file is later than the current date and time.
+      This ENV var will be the symbolic link that points to such a file so that it can be known from another later job
+      during Spoke deployment.
+  - name: SHARED_HUB_CLUSTER_PROFILE
+    default: "/var/builds/ztp-hub-preserved-prod-cluster_profile_dir"
+    documentation: |-
+      This ENV var will be the symbolic link that points to the folder that contains all relevant Hub cluster files
+      so that it can be known from another later job during Spoke deployment.
+      You will be able to consume the content of that folder from a later job, by ssh-ing or rsyncing from the
+      shared file located at AUX_HOST host
+  - name: AUX_HOST
+    default: ""
+  # credentials:
+  # - namespace: test-credentials
+  #   name: telcov10n-ztp-left-shifting
+  #   mount_path: /var/run/telcov10n/ztp-left-shifting
+  documentation: |-
+    This step allows to set the expiration time for the OCP Hub clusters
