@@ -6,12 +6,12 @@ set -o pipefail
 ###############################################
 ## Auth=fbledsoe@redhat.com, liqcui@redhat.com
 ## Description: Test building new PriorityLevelConfiguration and FlowSchemas, and queueing and dropping excess requests. 
-## Polarion test case: OCP-41643 - Load cluster to test bad actor resilience	
-## https://polarion.engineering.redhat.com/polarion/#/project/OSE/workitem?id=OCP-41643
-## Bug related: https://issues.redhat.com/browse/OCPBUGS-12266
-## Cluster config: 3 master (m5.4xlarge or equivalent)
+## Polarion test case: OCP-69945 - Load cluster to test bad actor resilience	
+## https://polarion.engineering.redhat.com/polarion/#/project/OSE/workitem?id=OCP-69945
+## Cluster config: 3 master (m5.xlarge or equivalent)
 ## The machine running the test should have at least 4 cores.
-## Example test run: ./api_pf.sh 270 (pass in at least 90 replicas for each master node e.g 1: 90, 2:180)
+## Example test run: ./openshift-qe-run-api-apf-customized-flowcontrol-commands.sh
+## Most of conditions, We can use default REPLICAS=3, if your cluster with more cpu cores/ram size, please increase more REPLICAS
 ################################################ 
 
 REPLICAS=${REPLICAS:=3}
