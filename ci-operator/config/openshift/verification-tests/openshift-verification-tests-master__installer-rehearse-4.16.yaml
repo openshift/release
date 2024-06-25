@@ -40,16 +40,19 @@ tests:
 - as: installer-rehearse-debug
   cron: '@yearly'
   steps:
-    cluster_profile: gcp-qe
+    cluster_profile: vsphere-multizone-2
     env:
-      COMPUTE_NODE_REPLICAS: "0"
-      CONTROL_PLANE_REPLICAS: "1"
-      SLEEP_DURATION: 10m
+      LB_TYPE: UserManaged
+      SLEEP_DURATION: 3h
+    leases:
+    - count: 2
+      env: VSPHERE_EXTRA_LEASED_RESOURCE
+      resource_type: vsphere-multizone-2-quota-slice
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-deprovision
+    - chain: cucushift-installer-rehearse-vsphere-ipi-external-lb-pre-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-provision
+    - chain: cucushift-installer-rehearse-vsphere-ipi-zones-multisubnets-external-lb-provision
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
