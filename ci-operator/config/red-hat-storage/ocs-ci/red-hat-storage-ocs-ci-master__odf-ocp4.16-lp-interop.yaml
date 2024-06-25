@@ -25,7 +25,7 @@ resources:
       memory: 200Mi
 tests:
 - as: odf-interop-aws
-  cron: 0 6 25 10 *
+  cron: 0 1 8-31 * MON
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -51,6 +51,50 @@ tests:
             ]
         }
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","odf-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      ODF_VERSION_MAJOR_MINOR: "4.15"
+      OPERATORS: |
+        [
+            {"name": "odf-operator", "install_namespace": "openshift-storage", "target_namespaces": "!install", "operator_group": "openshift-storage-operator-group"}
+        ]
+      USER_TAGS: |
+        scenario odf
+      ZONES_COUNT: "3"
+    test:
+    - ref: odf-prepare-cluster
+    - ref: install-operators
+    - ref: odf-apply-storage-cluster
+    - ref: interop-tests-ocs-tests
+    workflow: firewatch-ipi-aws
+- as: odf-interop-aws-fips
+  cron: 0 1 1-7 * MON
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+        "failure_rules":
+        [
+          {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+          {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+          {"step": "odf-prepare-cluster", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default"]},
+          {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default"]},
+          {"step": "odf-apply-storage-cluster", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 3}, "jira_additional_labels": ["!default"]},
+          {"step": "interop-tests-ocs-tests", "failure_type": "pod_failure", "classification": "Test Execution",  "group": {"name": "lp-tests", "priority": 4}, "jira_additional_labels": ["!default","interop-tests"]},
+          {"step": "interop-tests-ocs-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "OCSQE", "group": {"name": "lp-tests", "priority": 4},"jira_additional_labels": ["!default","interop-tests"]}
+            ],
+          "success_rules":
+            [
+              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
+            ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.16-lp","self-managed-lp","fips","odf-lp"]'
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       ODF_VERSION_MAJOR_MINOR: "4.15"
