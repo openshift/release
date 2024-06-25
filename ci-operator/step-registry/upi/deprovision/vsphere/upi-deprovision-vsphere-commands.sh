@@ -18,10 +18,16 @@ installer_dir=/tmp/installer
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
-# shellcheck source=/dev/null
 declare cloud_where_run
 declare target_hw_version
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
 
 echo Deprovisioning $cluster_name
 
@@ -30,7 +36,6 @@ echo "$(date -u --rfc-3339=seconds) - Collecting vCenter performance data and al
 echo "{\"hw_version\":  \"vmx-${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
 
 set +e
-source "${SHARED_DIR}/govc.sh"
 vm_path="/${GOVC_DATACENTER}/vm/${cluster_name}"
 vcenter_state=${ARTIFACT_DIR}/vcenter_state
 mkdir ${vcenter_state}

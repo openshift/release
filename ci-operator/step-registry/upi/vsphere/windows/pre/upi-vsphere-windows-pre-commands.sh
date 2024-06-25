@@ -43,6 +43,9 @@ echo "$(date -u --rfc-3339=seconds) - configuring govc exports..."
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
 # get information from shared dir
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 vm_template=$(<"${SHARED_DIR}"/windows_vm_template.txt)
