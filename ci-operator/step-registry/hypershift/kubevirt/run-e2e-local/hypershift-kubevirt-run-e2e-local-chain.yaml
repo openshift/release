@@ -4,6 +4,12 @@ chain:
   - as: run-e2e-local
     cli: latest
     commands: |-
+
+        if [ "$SKIP_E2E_LOCAL" == "true" ]; then
+            echo "Skipping e2e local"
+            exit 0
+        fi
+
         function cleanup() {
           for child in $( jobs -p ); do
             kill "${child}"
@@ -52,6 +58,8 @@ chain:
         name: KUBECONFIG
       - default: ""
         name: ETCD_STORAGE_CLASS
+      - default: "false"
+        name: SKIP_E2E_LOCAL
     from: test-bin
     grace_period: 30m0s
     resources:
