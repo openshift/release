@@ -29,7 +29,7 @@ export EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE} --iterati
 echo $EXTRA_FLAGS
 
 rm -f ${SHARED_DIR}/index.json
-./run.sh
+#./run.sh
 
-folder_name=$(ls -t -d /tmp/*/ | head -1)
-jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
+#folder_name=$(ls -t -d /tmp/*/ | head -1)
+#jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
