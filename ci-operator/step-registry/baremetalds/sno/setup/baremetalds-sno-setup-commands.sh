@@ -136,6 +136,9 @@ if [[ -e /root/sno-additional-manifests ]]
 then
   TEST_ARGS="\${TEST_ARGS} ADDITIONAL_MANIFEST_DIR=/root/sno-additional-manifests"
 fi
+
+echo ${NO_MINIKUBE}
+
 timeout -s 9 105m make setup deploy_ibip \${TEST_ARGS}
 
 EOF
