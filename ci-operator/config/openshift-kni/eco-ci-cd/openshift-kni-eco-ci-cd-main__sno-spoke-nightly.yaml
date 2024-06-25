@@ -1,0 +1,65 @@
+base_images:
+  base:
+    name: "4.15"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ci/telco-runner
+      RUN \
+        curl -fsSL -o /tmp/get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && \
+        chmod 700 /tmp/get_helm.sh && \
+        /tmp/get_helm.sh && \
+        rm -f /tmp/get_helm.sh
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.15"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: telcov10n-sno-spoke-f360
+  cluster: build05
+  cron: 1 1 1 1 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      BOOT_MAC: 40:A6:B7:A0:F1:90
+      CLUSTER_IMG_SET_REF: "4.14"
+      DU_PROFILE: v4.14
+      EXPIRATION_TIME_FILE: /var/builds/ztp-hub-preserved-prod
+      GLOBAL_IGNITION_CONF_OVERRIDE: '{"ignition": {"version": "3.2.0"}, "storage":
+        {"files": [{"overwrite": true, "path": "/etc/containers/policy.json", "contents":
+        {"source":"data:text/plain;base64,ewogICAgImRlZmF1bHQiOiBbCiAgICAgICAgewogICAgICAgICAgICAidHlwZSI6ICJpbnNlY3VyZUFjY2VwdEFueXRoaW5nIgogICAgICAgIH0KICAgIF0sCiAgICAidHJhbnNwb3J0cyI6CiAgICAgICAgewogICAgICAgICAgICAiZG9ja2VyLWRhZW1vbiI6CiAgICAgICAgICAgICAgICB7CiAgICAgICAgICAgICAgICAgICAgIiI6IFt7InR5cGUiOiJpbnNlY3VyZUFjY2VwdEFueXRoaW5nIn1dCiAgICAgICAgICAgICAgICB9CiAgICAgICAgfQp9Cgo="}}]}}'
+      INSTALL_CONFIG_OVERRIDES: '{"capabilities":{"baselineCapabilitySet": "None",
+        "additionalEnabledCapabilities": [ "marketplace", "NodeTuning" ] }}'
+      NODE_IGNITION_CONF_OVERRIDE: '{"ignition":{"version":"3.2.0"},"storage":{"disks":[{"device":"/dev/nvme1n1","wipeTable":true,
+        "partitions": []}, {"device":"/dev/nvme2n1","wipeTable":true, "partitions":
+        []}]}}'
+      NODE_MAC: 40:A6:B7:A0:F1:90
+      NODE_NIC: ens2f0
+      NTP_SRC: registry.kni-qe-55.telco5gran.eng.rdu2.redhat.com
+      PR_DEBUG_MODE_TIMEOUT: 10 hours
+      SHARED_HUB_CLUSTER_PROFILE: ztp-hub-preserved-prod-cluster_profile_dir
+      SPOKE_BASE_DOMAIN: lab.eng.rdu2.redhat.com
+      SPOKE_CLUSTER_NAME: kni-qe-66
+      SSH_PUB_KEY: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDm9hb6iTZJypEmzg4IZ767ze60UGhBWnjPXhovWVB7uKputdLzZhmlo36ifkXr/DTk8NGm47r6kXmz9NAF0pDHa5jX6yJFnhS4z5NY/mzsUX41gwiqBKYHgdp/KE1ylE8mbNon5ZpaaGvb876myjjPjPwWsD8hvXZirA5Q8TfDb/Pvgy1dhVH/uN05Ip1vVsp+bFGMPUJVWVUy/Eby5xW6OJv+FBOQq4nu6tslDZlHYXX2TSGrlW4x0i/oQMpKu/Y8ygAdjWqmAy6UBcho1nNWy15cp0jI5Fhjze171vSWZLAqJY+eFcL2kt/09RnY+MXyY/tIf+qNMyBE2Qltigah
+    workflow: telcov10n-sno-spoke
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: sno-spoke-nightly
