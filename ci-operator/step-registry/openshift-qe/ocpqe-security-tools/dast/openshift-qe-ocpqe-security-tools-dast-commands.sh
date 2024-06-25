@@ -18,7 +18,7 @@ git clone https://github.com/paigerube14/ocp-qe-perfscale-ci.git --branch ssml -
 
 ls
 
-DAST_PATH=$(pwd)/rapidast
+export DAST_PATH=$(pwd)/rapidast
 
 oc login -u kubeadmin -p $KUBEADMIN_PASSWORD_FILE
 
