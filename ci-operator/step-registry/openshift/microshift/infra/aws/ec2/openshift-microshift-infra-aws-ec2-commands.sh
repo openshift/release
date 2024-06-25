@@ -72,7 +72,7 @@ cat > "${cf_tpl_file}" << EOF
 AWSTemplateFormatVersion: 2010-09-09
 Description: Template for RHEL machine Launch
 Conditions:
-  AddSecondaryVolume: !Not [!Equals [!Ref EC2Type, 'MetalMachine']]
+  AddVolumes: !Not [!Equals [!Ref EC2Type, 'MetalMachine']]
 Mappings:
  VolumeSize:
    MetalMachine:
@@ -332,21 +332,21 @@ Resources:
             VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, PrimaryVolumeSize]
             VolumeType: gp3
             Throughput: !FindInMap [VolumeSize, !Ref EC2Type, Throughput]
-        - !If
-          - AddSecondaryVolume
-          - DeviceName: /dev/sdc
-            Ebs:
-              VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, SecondaryVolumeSize]
-              VolumeType: gp3
-          - !Ref AWS::NoValue
+        - DeviceName: /dev/sdc
+          Ebs:
+            VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, SecondaryVolumeSize]
+            VolumeType: gp3
 
   RHELInstance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Ref AmiId
       LaunchTemplate:
-        LaunchTemplateName: ${stack_name}-launch-template
-        Version: !GetAtt rhelLaunchTemplate.LatestVersionNumber
+        !If
+        - AddVolumes
+        - LaunchTemplateName: ${stack_name}-launch-template
+          Version: !GetAtt rhelLaunchTemplate.LatestVersionNumber
+        - !Ref AWS::NoValue
       IamInstanceProfile: !Ref RHELInstanceProfile
       InstanceType: !Ref HostInstanceType
       NetworkInterfaces:
