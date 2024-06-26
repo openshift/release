@@ -130,6 +130,34 @@ then
 
 fi
 
+oc create ns "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+if [[ -n "${ATTACH_DEFAULT_NETWORK}" ]]; then
+  oc apply -f - <<EOF
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: macvlan-bridge-whereabouts
+  namespace: ${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "name": "whereabouts",
+      "type": "macvlan",
+      "master": "enp3s0",
+      "mode": "bridge",
+      "ipam": {
+        "type": "whereabouts",
+        "range": "192.168.221.0/24"
+      }
+  }'
+EOF
+  if [[ "${ATTACH_DEFAULT_NETWORK}" == "true" ]]; then
+    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network true --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+  else
+    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network false --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+  fi
+fi
+
 
 echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
 # shellcheck disable=SC2086
