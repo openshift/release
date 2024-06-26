@@ -29,6 +29,19 @@ provisioner.${CLUSTER_NAME} IN A ${INTERNAL_NET_IP}
 api-int.${CLUSTER_NAME} IN A ${api_vip}
 *.apps.${CLUSTER_NAME} IN A ${ingress_vip}"
 
+if [ "${ipv6_enabled:-}" == "true" ]; then
+  # shellcheck disable=SC2154
+  if [ ${#api_vip_v6} -eq 0 ] || [ ${#ingress_vip_v6} -eq 0 ]; then
+    echo "Unable to parse IPv6 VIPs"
+    exit 1
+  fi
+
+DNS_FORWARD="${DNS_FORWARD}
+api.${CLUSTER_NAME} IN AAAA ${api_vip_v6}
+*.apps.${CLUSTER_NAME} IN AAAA ${ingress_vip_v6}"
+
+fi
+
 DNS_REVERSE_INTERNAL=";DO NOT EDIT; BEGIN $CLUSTER_NAME"
 
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
