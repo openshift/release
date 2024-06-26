@@ -18,7 +18,7 @@ BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 # shellcheck disable=SC1090
 . <(yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")' < "${SHARED_DIR}"/external_vips.yaml)
 # shellcheck disable=SC2154
-if [ ${#api_vip} -eq 0 ] || [ ${#ingress_vip} -eq 0 ]; then
+if [ ${#api_vip} -eq 0 ] || [ ${#ingress_vip} -eq 0 ] || [ ${#api_vip_v6} -eq 0 ] || [ ${#ingress_vip_v6} -eq 0 ]; then
   echo "Unable to parse VIPs"
   exit 1
 fi
@@ -45,6 +45,19 @@ provisioner.${CLUSTER_NAME} IN AAAA ${INTERNAL_NET_IPV6}
 api.${CLUSTER_NAME} IN AAAA ${api_vip_v6}
 api-int.${CLUSTER_NAME} IN AAAA ${api_vip_v6}
 *.apps.${CLUSTER_NAME} IN AAAA ${ingress_vip_v6}"
+fi
+
+if [ "${ipv6_enabled:-}" == "true" ]; then
+  # shellcheck disable=SC2154
+  if [ ${#api_vip_v6} -eq 0 ] || [ ${#ingress_vip_v6} -eq 0 ]; then
+    echo "Unable to parse IPv6 VIPs"
+    exit 1
+  fi
+
+DNS_FORWARD="${DNS_FORWARD}
+api.${CLUSTER_NAME} IN AAAA ${api_vip_v6}
+*.apps.${CLUSTER_NAME} IN AAAA ${ingress_vip_v6}"
+
 fi
 
 DNS_REVERSE_INTERNAL=";DO NOT EDIT; BEGIN $CLUSTER_NAME"
