@@ -220,7 +220,7 @@ export KUBECONFIG=$SHARED_DIR/kubeconfig
 #[dev-ci] use dev branch for test code if needed
 #export TEST_BRANCH="dev-branch-for-ci-fix"
 #[dev-ci] use dev branch for product code
-export PTP_UNDER_TEST_BRANCH="remove-amq"
+export PTP_UNDER_TEST_BRANCH="oran-api-sub2"
 
 pattern="4.[0-9]+"
 if [[ "$T5CI_VERSION" =~ $pattern ]]; then
