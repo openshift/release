@@ -85,7 +85,7 @@ while (( retry_count < MAX_RETRIES )); do
     break
   else
     echo "Status is not success or failed, checking again..."
-    ((retry_count++))
+    retry_count=$((retry_count + 1))
     echo "Retry count: $retry_count/$MAX_RETRIES"
     # Wait for 10 seconds before making the next API call
     sleep 10
