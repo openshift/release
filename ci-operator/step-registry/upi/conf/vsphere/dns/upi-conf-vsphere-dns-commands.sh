@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 declare base_domain="vmc-ci.devcluster.openshift.com"
-
+echo
 if ! command -v pwsh &> /dev/null
 then
   echo "Skipping DNS setting due to falling back to Terraform."
