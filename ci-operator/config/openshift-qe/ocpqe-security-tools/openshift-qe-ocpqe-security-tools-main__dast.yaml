@@ -6,19 +6,30 @@ build_root:
 images:
 - dockerfile_path: dast/Dockerfile
   to: ocp-qe-ci-dast
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: dast
+- as: security-first-half
+  always_run: false
   steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      API_URL_LIST: admissionregistration.k8s.io/v1 apiextensions.k8s.io/v1 apiregistration.k8s.io/v1 apiserver.openshift.io/v1 apps.openshift.io/v1 apps/v1 authentication.k8s.io/v1 authorization.k8s.io/v1 authorization.openshift.io/v1 autoscaling.openshift.io/v1 autoscaling.openshift.io/v1beta1 autoscaling/v1 autoscaling/v2
     test:
     - ref: openshift-qe-ocpqe-security-tools-dast
+    workflow: openshift-qe-installer-aws
+  timeout: 3h0m0s    
 zz_generated_metadata:
   branch: main
   org: openshift-qe
