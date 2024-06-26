@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "************ telcov10n cluster setup via agent command ************"
+echo "************ Fix container user ************"
 # Fix user IDs in a container
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
@@ -23,42 +23,7 @@ function setup_aux_host_ssh_access {
 
 }
 
-function set_expiration_time {
-
-  echo "************ telcov10n Set Hub cluster expiration time ************"
-
-  echo
-  set -x
-  b64_exp_time=$(echo "${EXPIRATION_TIME}" | base64 -w 0)
-  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s --  \
-  "${NAMESPACE}" "${b64_exp_time}" "${EXPIRATION_TIME_FILE}" "${SHARED_HUB_CLUSTER_PROFILE}" << 'EOF'
-set -o nounset
-set -o errexit
-set -o pipefail
-
-exp_time_ns_file=/var/builds/${1}
-exp_time=$(echo ${2} | base64 -d)
-shared_exp_time_ns_file_sym_link=${3}
-cluster_profile_folder=$(dirname ${exp_time_ns_file})/${1}-cluster_profile_dir
-shared_cluster_profile_folder=${4}
-
-mkdir -pv $(dirname ${exp_time_ns_file})
-mkdir -pv ${cluster_profile_folder}
-
-TZ=UTC date --iso-8601=seconds -d "${exp_time}" > ${exp_time_ns_file}
-
-ln -sf ${exp_time_ns_file} ${shared_exp_time_ns_file_sym_link}
-ln -sf ${cluster_profile_folder} ${shared_cluster_profile_folder}
-
-echo "Now       : $(TZ=UTC date --iso-8601=seconds)"
-echo "Expire at : $(cat ${3}) [save at ${3} file]"
-EOF
-
-  set +x
-  echo
-}
-
-function save_cluster_profile_artifacts {
+function save_hub_cluster_profile_artifacts {
 
   echo "************ telcov10n Save those artifacts that will be used during Spoke deployments ************"
 
@@ -68,31 +33,44 @@ function save_cluster_profile_artifacts {
     "${CLUSTER_PROFILE_DIR}"
   )
 
+  cluster_profile_shared_folder=/var/builds/${NAMESPACE}/${SHARED_HUB_CLUSTER_PROFILE}
+
   echo
   set -x
-  rsync -avP \
+  rsync -avP --delete-before \
     -e "ssh $(echo "${SSHOPTS[@]}")" \
     "${hub_to_spoke_artifacts[@]}" \
-    "root@${AUX_HOST}":${SHARED_HUB_CLUSTER_PROFILE}/
+    "root@${AUX_HOST}":${cluster_profile_shared_folder}
   set +x
   echo
 }
 
-function main {
-  setup_aux_host_ssh_access
-  set_expiration_time
-  save_cluster_profile_artifacts
+function create_symbolic_link_to_shared_hub_cluster_profile_artifacts_folder {
+  
+  echo "************ telcov10n Create a symbolic link to the shared artifacts folder that would be used during Spoke deployments ************"
+
+  cluster_profile_symbolic_link=/var/telco-qe-preserved/${SHARED_HUB_CLUSTER_PROFILE}
+
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s --  \
+  "${cluster_profile_shared_folder}" "${cluster_profile_symbolic_link}" << 'EOF'
+set -o nounset
+set -o errexit
+set -o pipefail
+
+mkdir -p $(dirname ${2})
+link -sf ${$1} ${2}
+EOF
 }
 
 function pull_request_debug {
 
-  echo "Using pull request ${PULL_NUMBER}... DO NOT preserve the hub cluster"
+  echo "Using pull request ${PULL_NUMBER}, so this Hub cluster won't be preserved"
 
   echo "######################################################################"
   echo "# From here WIP changes"
   echo "######################################################################"
   echo " To quit, run the following command from POD shell: "
-  echo " $ touch debug.done"
+  echo " $ touch ${HOME}/debug.done"
   echo "######################################################################"
   echo
 
@@ -106,13 +84,19 @@ function pull_request_debug {
   set -x
   while sleep 1m; do
     date
-    test -f debug.done && exit 0
+    test -f ${HOME}/debug.done && break
   done
 
 }
 
+function main {
+  setup_aux_host_ssh_access
+  save_hub_cluster_profile_artifacts
+  create_symbolic_link_to_shared_hub_cluster_profile_artifacts_folder
+}
+
+main
+
 if [ -n "${PULL_NUMBER:-}" ]; then
   pull_request_debug
-else
-  main
 fi
