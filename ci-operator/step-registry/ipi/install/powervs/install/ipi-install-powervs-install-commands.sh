@@ -230,110 +230,32 @@ function install_required_tools() {
 
   export HOME=/tmp
 
-  if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.24.0/IBM_Cloud_CLI_2.24.0_amd64.tar.gz
-    tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
+  hash ibmcloud || exit 1
+  echo "Checking ibmcloud version..."
+  if ! ibmcloud --version; then
+    echo "Error: ibmcloud is not working?"
+    exit 1
+  fi
 
-    if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]; then
-      echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud does not exist?"
-      exit 1
-    fi
+  #
+  # NOTE: This should be covered by images/installer/Dockerfile.upi.ci in the installer repo
+  #
+  for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns tg-cli; do
+    ibmcloud plugin install ${I}
+  done
+  ibmcloud plugin list
 
-    curl --output /tmp/ibmcloud-cli.pub https://ibmcloud-cli-installer-public-keys.s3.us.cloud-object-storage.appdomain.cloud/ibmcloud-cli.pub
-    pushd /tmp/Bluemix_CLI/bin/
-    if ! openssl dgst -sha256 -verify /tmp/ibmcloud-cli.pub -signature ibmcloud.sig ibmcloud
-    then
-      echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud fails signature test!"
-      exit 1
-    fi
-    popd
-
-    PATH=${PATH}:/tmp/Bluemix_CLI/bin
-
-    hash file 2>/dev/null && file /tmp/Bluemix_CLI/bin/ibmcloud
-    echo "Checking ibmcloud version..."
-    if ! ibmcloud --version; then
-      echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud is not working?"
-      exit 1
-    fi
-
-    for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns tg-cli; do
-      ibmcloud plugin install ${I}
-    done
-    ibmcloud plugin list
-
-    for PLUGIN in cis pi; do
-      if ! ibmcloud ${PLUGIN} > /dev/null 2>&1; then
-        echo "Error: ibmcloud's ${PLUGIN} plugin is not installed?"
-        ls -la ${HOME}/.bluemix/
-        ls -la ${HOME}/.bluemix/plugins/
-        exit 1
-      fi
-    done
-
-    # Handle the following:
-    #   $ ibmcloud tg
-    #   FAILED
-    #   Not logged in. Use 'ibmcloud login' to log in.
-    if [ ! -d ${HOME}/.bluemix/plugins/tg-cli ]; then
-      echo "Error: ibmcloud's tg-cli plugin dir is not installed?"
+  for PLUGIN in cis pi; do
+    if ! ibmcloud ${PLUGIN} > /dev/null 2>&1; then
+      echo "Error: ibmcloud's ${PLUGIN} plugin is not installed?"
       ls -la ${HOME}/.bluemix/
       ls -la ${HOME}/.bluemix/plugins/
       exit 1
     fi
-  fi
+  done
 
-  if [ ! -f /tmp/jq ]; then
-
-    for I in $(seq 1 10)
-    do
-      curl -L --output /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /tmp/jq
-
-      hash file 2>/dev/null && file /tmp/jq
-      echo "Checking jq version..."
-      if /tmp/jq --version; then
-        break
-      else
-        echo "Error: /tmp/jq is not working?"
-        /bin/rm /tmp/jq
-        sleep 30s
-      fi
-    done
-
-    if [ ! -f /tmp/jq ]; then
-      echo "Error: Could not successfully download jq!"
-      exit 1
-    fi
-
-    #PATH=${PATH}:/tmp/:/tmp/jq
-    PATH=${PATH}:/tmp
-  fi
-
-  if [ ! -f /tmp/yq ] || [ ! -f /bin/yq-go ]; then
-
-    uname -m
-    ARCH=$(uname -m | sed -e 's/aarch64/arm64/' -e 's/x86_64/amd64/')
-    echo "ARCH=${ARCH}"
-    if [ -z "${ARCH}" ]; then
-      echo "Error: ARCH is empty!"
-      exit 1
-    fi
-
-    for I in $(seq 1 10)
-    do
-      curl -L "https://github.com/mikefarah/yq/releases/download/v4.25.3/yq_linux_${ARCH}" -o /tmp/yq && chmod +x /tmp/yq
-
-      hash file 2>/dev/null && file /tmp/yq
-      echo "Checking yq version..."
-      if /tmp/yq --version; then
-        break
-      else
-        echo "Error: /tmp/yq is not working?"
-        /bin/rm /tmp/yq
-        sleep 30s
-      fi
-    done
-  fi
+  hash jq || exit 1
+  hash yq-v4 || exit 1
 
   PATH=${PATH}:$(pwd)/bin
   export PATH
@@ -723,13 +645,13 @@ function dump_resources() {
   echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud Cluster 8<-------8<--------8<--------"
   (
     if [ -d "${dir}/.clusterapi_output" ]; then
-      /tmp/yq eval .status.conditions ${dir}/.clusterapi_output/IBMPowerVSCluster-openshift-cluster-api-guests-*yaml
+      /tmp/yq-v4 eval .status.conditions ${dir}/.clusterapi_output/IBMPowerVSCluster-openshift-cluster-api-guests-*yaml
 
       echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud Cluster 8<-------8<--------8<--------"
       for FILE in ${dir}/.clusterapi_output/IBMPowerVSMachine-openshift-cluster-api-guests-*.yaml
       do
 	echo ${FILE}
-        /tmp/yq eval .status.conditions ${FILE}
+        /tmp/yq-v4 eval .status.conditions ${FILE}
 	echo
       done
     fi
@@ -776,11 +698,11 @@ IBMCLOUD_APIKEY_CSI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds
 IBMCLOUD_REGISTRY_INSTALLER_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_REGISTRY_INSTALLER_CREDS")
 POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
 POWERVS_USER_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_USER_ID")
-POWERVS_SERVICE_INSTANCE_ID=$(yq eval '.POWERVS_SERVICE_INSTANCE_ID' "${SHARED_DIR}/powervs-conf.yaml")
-POWERVS_REGION=$(yq eval '.POWERVS_REGION' "${SHARED_DIR}/powervs-conf.yaml")
-POWERVS_ZONE=$(yq eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
-VPCREGION=$(yq eval '.VPCREGION' "${SHARED_DIR}/powervs-conf.yaml")
-CLUSTER_NAME=$(yq eval '.CLUSTER_NAME' "${SHARED_DIR}/powervs-conf.yaml")
+POWERVS_SERVICE_INSTANCE_ID=$(yq-v4 eval '.POWERVS_SERVICE_INSTANCE_ID' "${SHARED_DIR}/powervs-conf.yaml")
+POWERVS_REGION=$(yq-v4 eval '.POWERVS_REGION' "${SHARED_DIR}/powervs-conf.yaml")
+POWERVS_ZONE=$(yq-v4 eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
+VPCREGION=$(yq-v4 eval '.VPCREGION' "${SHARED_DIR}/powervs-conf.yaml")
+CLUSTER_NAME=$(yq-v4 eval '.CLUSTER_NAME' "${SHARED_DIR}/powervs-conf.yaml")
 
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
@@ -961,7 +883,7 @@ if [ ${ret} -gt 0 ]; then
   ls -l ${SFILE} || true
   if [ -f ${SFILE} ]; then
     # How many statuses are False?
-    SLINES=$(/tmp/yq eval .status.conditions ${SFILE} -o json | /tmp/jq -r '.[] | select(.status|test("False")) | .type' | wc -l)
+    SLINES=$(/tmp/yq-v4 eval .status.conditions ${SFILE} -o json | /tmp/jq -r '.[] | select(.status|test("False")) | .type' | wc -l)
     echo "Skip? SLINES=${SLINES}"
     if [ ${SLINES} -gt 0 ]; then
       echo "Skipping wait-for install-complete since detected CAPI problem"
