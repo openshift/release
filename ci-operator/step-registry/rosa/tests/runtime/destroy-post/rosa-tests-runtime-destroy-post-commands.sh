@@ -6,9 +6,16 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+source ./tests/prow_ci.sh
+
+if [[ ! -z $ROSACLI_BUILD ]]; then
+  override_rosacli_build
+fi
+
+# rosa version # comment it now in case anybody using old version which will trigger panic issue
+
 export TEST_PROFILE=${TEST_PROFILE:-}
 TEST_TIMEOUT=${TEST_TIMEOUT:-"4h"}
-
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 echo "Working on the cluster: $CLUSTER_ID"
 export CLUSTER_ID # maybe we should get cluster_id by TEST_PROFILE

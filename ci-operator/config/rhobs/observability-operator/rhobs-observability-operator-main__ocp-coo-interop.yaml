@@ -27,11 +27,18 @@ resources:
       memory: 200Mi
 tests:
 - as: production
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs-coo
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.15"
   cron: 0 6 1 7 *
   steps:
-    cluster_profile: aws-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "development", "install_namespace": "openshift-coo", "target_namespaces": "", "operator_group":"openshift-coo-og"}
@@ -39,7 +46,7 @@ tests:
     test:
     - ref: install-operators
     - ref: rhobs-obo-test-harness
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: rhobs

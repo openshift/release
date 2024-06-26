@@ -375,6 +375,29 @@ tests:
           memory: 100Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-profile
+- as: istio-update-operator-2-6
+  commands: |
+    # load test-infra automator.sh script
+    git clone https://github.com/maistra/test-infra.git
+    cd test-infra
+    export BUILD_WITH_CONTAINER="0"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    ./tools/automator.sh \
+      -o maistra \
+      -r istio-operator \
+      -f /creds-github/token \
+      '-c make clean update-charts-2.6' \
+      '-t [maistra-2.6] Automator: Update charts from maistra/istio' \
+      -m update_charts_istio_2.6 \
+      -b maistra-2.6
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /creds-github
+    name: ossm-github-simple-job
 zz_generated_metadata:
   branch: maistra-2.6
   org: maistra

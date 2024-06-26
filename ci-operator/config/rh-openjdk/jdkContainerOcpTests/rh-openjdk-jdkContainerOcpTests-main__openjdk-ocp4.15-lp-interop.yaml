@@ -14,10 +14,12 @@ build_root:
     tag: golang-1.19
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.15"
+      version_bounds:
+        lower: 4.15.0-0
+        stream: 4-stable
+        upper: 4.16.0-0
 resources:
   '*':
     requests:
@@ -57,6 +59,36 @@ tests:
     test:
     - ref: rh-openjdk-test
     workflow: firewatch-ipi-aws
+- as: openjdk-interop-ibmcloud
+  cron: 0 6 16 6 *
+  steps:
+    cluster_profile: ibmcloud-cspi-qe
+    env:
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "ipi-conf*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "ipi-install*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "ipi-deprovision*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
+              {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+              {"step": "openshift-*", "failure_type": "all", "classification": "Other", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
+              {"step": "rh-openjdk-test", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "rh-openjdk-test", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "OPENJDK", "group": {"name": "lp-tests", "priority": 1}, "jira_component": ["container_qe"], "jira_additional_labels": ["!default","interop-tests"]}
+            ],
+          "success_rules":
+            [
+              {"jira_project": "CSPIT", "jira_additional_labels": ["!default"]}
+            ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.15-lp","self-managed-lp","openjdk-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      OPENJDK_VERSION: 8 11 17 21
+    test:
+    - ref: rh-openjdk-test
+    workflow: firewatch-ipi-ibmcloud
 zz_generated_metadata:
   branch: main
   org: rh-openjdk
