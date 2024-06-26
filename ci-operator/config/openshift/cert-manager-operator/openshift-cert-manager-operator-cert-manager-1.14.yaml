@@ -1,4 +1,8 @@
 base_images:
+  base-rhel9:
+    name: "4.16"
+    namespace: ocp
+    tag: base-rhel9
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
@@ -11,23 +15,19 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
-  ubi:
-    name: ubi
-    namespace: ocp
-    tag: "9"
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: images/ci/Dockerfile
-  from: ubi
+  from: base-rhel9
   inputs:
     ocp-golang-builder:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cert-manager-operator
 - dockerfile_path: images/ci/operand.Dockerfile
-  from: ubi
+  from: base-rhel9
   inputs:
     ocp-golang-builder:
       as:
