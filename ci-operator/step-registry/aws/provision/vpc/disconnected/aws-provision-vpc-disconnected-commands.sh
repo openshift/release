@@ -309,9 +309,9 @@ Resources:
     Type: AWS::EC2::DHCPOptions
     Condition: DoDhcp
     Properties: 
-        DomainName: example.com
+        DomainName: zhsun.com
         DomainNameServers: 
-          - AmazonProvidedDNS
+          - 5.104.83.43
   VPCDHCPOptionsAssociation:
     Type: AWS::EC2::VPCDHCPOptionsAssociation
     Condition: DoDhcp
