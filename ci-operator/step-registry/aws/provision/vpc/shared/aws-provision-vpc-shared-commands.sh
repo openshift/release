@@ -63,7 +63,7 @@ Parameters:
     Description: "Size of each subnet to create within the availability zones. (Min: 5 = /27, Max: 13 = /19)"
     Type: Number
   DhcpOptionSet:
-    Default: "no"
+    Default: "yes"
     AllowedValues:
     - "yes"
     - "no"
@@ -351,7 +351,7 @@ Resources:
     Type: AWS::EC2::DHCPOptions
     Condition: DoDhcp
     Properties:
-        DomainName: zhsun.com
+        DomainName: vmi1386712.contaboserver.net
         DomainNameServers:
           - 5.104.83.43
   VPCDHCPOptionsAssociation:
