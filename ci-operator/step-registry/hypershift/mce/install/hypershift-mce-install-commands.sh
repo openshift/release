@@ -219,3 +219,5 @@ oc wait --timeout=5m --for=condition=Available -n local-cluster ManagedClusterAd
 oc wait --timeout=5m --for=condition=Degraded=False -n local-cluster ManagedClusterAddOn/hypershift-addon
 echo "Disable HIVE component in MCE"
 oc patch mce multiclusterengine-sample --type=merge -p '{"spec":{"overrides":{"components":[{"name":"hive","enabled": false}]}}}'
+echo "echo MCE version"
+oc get multiclusterengines multiclusterengine-sample -ojsonpath="{.status.currentVersion}"
