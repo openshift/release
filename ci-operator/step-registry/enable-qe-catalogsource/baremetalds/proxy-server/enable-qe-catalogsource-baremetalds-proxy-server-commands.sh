@@ -61,3 +61,7 @@ sudo firewall-cmd --permanent --zone=libvirt --add-port=6001/tcp
 sudo firewall-cmd --permanent --zone=libvirt --add-port=6002/tcp
 sudo firewall-cmd --reload
 EOF
+
+if [ ! -f "${SHARED_DIR}/mirror_registry_url" ] ; then
+  oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]' | head -n 1 | cut -d '/' -f 1 > "${SHARED_DIR}/mirror_registry_url"
+fi
