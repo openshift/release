@@ -84,29 +84,9 @@ function getCIR(){
     PORTFILE=$SHARED_DIR/server-sshport
     CIRFILE=$SHARED_DIR/cir
 
-    # ofcir may be unavailable in the cluster(or the ingress machinery), retry once incase we get unlucky,
-    # we don't want to overdo it on the retries incase we start leaking CIR's
-    if ! timeout 70s curl --retry-all-errors --retry-delay 60 --retry 1 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o $CIRFILE ; then
-        BODY=$(cat "$CIRFILE")
-        set +x
-        echo "<==== OFCIR ERROR RESPONSE BODY ====="
-        echo "$BODY"
-        echo ">===================================="
-        set -x
-        exit_with_failure "Could not acquire CI resource: $BODY"
-    fi
+    NAME=cir-9999
+    echo '{"ip": "10.10.129.98","type": "cluster","extra": "{\"nodes\": [{\"bmcip\": \"10.10.128.77\",\"mac\": \"F8:F2:1E:B2:E0:A1\"},{\"bmcip\": \"10.10.128.78\",\"mac\": \"F8:F2:1E:A8:2B:71\"},{\"bmcip\": \"10.10.128.79\",\"mac\": \"F8:F2:1E:B3:14:51\"},{\"bmcip\": \"10.10.128.80\",\"mac\": \"F8:F2:1E:A8:2B:81\"},{\"bmcip\": \"10.10.128.81\",\"mac\": \"F8:F2:1E:A8:2B:C1\"}]}"}' > $CIRFILE
 
-    NAME=$(jq -r .name < $CIRFILE)
-
-    # If the node is being provisioned on demand it may take some time to be provisioned
-    # wait upto 30 minutes to allow this to happen
-    for _ in $(seq 60) ; do
-        curl --retry-all-errors --retry-delay 60 --retry 1 -kfs -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL/$NAME" -o $CIRFILE
-        if [ "$(jq -r 'select(.status == "in use" and .ip != "")' < $CIRFILE)" ] ; then
-            break
-        fi
-        sleep 30
-    done
 
     jq -r .ip < $CIRFILE > $IPFILE
     jq -r ".extra | select( . != \"\") // {}" < $CIRFILE | jq ".ofcir_port_ssh // 22" -r > $PORTFILE
