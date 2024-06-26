@@ -5,6 +5,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ "$IDP_TYPE" != "htpasswd" ] ; then
+    echo "Skipping addition of new htpasswd IDP because IDP type to be configured is intended to be: $IDP_TYPE."
+    exit 0
+fi
+
 MC_KUBECONFIG_FILE="${SHARED_DIR}/hs-mc.kubeconfig"
 if [ -f "${MC_KUBECONFIG_FILE}" ]; then
   export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
