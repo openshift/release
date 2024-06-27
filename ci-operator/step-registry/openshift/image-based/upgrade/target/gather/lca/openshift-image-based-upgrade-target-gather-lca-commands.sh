@@ -32,7 +32,7 @@ mkdir -p \$gather_dir_extra
 export KUBECONFIG=${target_kubeconfig}
 
 # Inspect the namespace
-oc adm inspect ns/openshift-lifecycle-agent --dest-dir=\$gather_dir
+oc adm must-gather --image=${LCA_PULL_REF} --dest-dir=\$gather_dir
 
 # Get installation service logs and recert summary files
 node="\$(oc get nodes -oname)"
