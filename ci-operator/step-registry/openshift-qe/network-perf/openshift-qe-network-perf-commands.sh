@@ -10,7 +10,7 @@ cat /etc/os-release
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
 # environment variables, as well as their lowercase equivalents (note
 # that libcurl doesn't recognize the uppercase variables).
-if [ ${DISCONNECTED_PROXY} == "false" ] && [ test -f "${SHARED_DIR}/proxy-conf.sh" ]
+if [ ${DISCONNECTED_PROXY} == "false" ] && test -f "${SHARED_DIR}/proxy-conf.sh"
 then
 	# shellcheck disable=SC1090
 	source "${SHARED_DIR}/proxy-conf.sh"
