@@ -28,7 +28,7 @@ URL=$(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "x86_64").url
 echo "$(date) Updating AgentServiceConfig"
 oc patch AgentServiceConfig agent --type=json -p='[{"op": "add", "path": "/spec/osImages/-", "value": {"openshiftVersion": "${CLUSTER_VERSION}", "version": "${VERSION}", "url": "${URL}",  "cpuArchitecture": "x86_64"}}]'
 
-oc wait --timeout=5m --for=condition=DeploymentsHealthy agentserviceconfig agent
+oc wait --timeout=35m --for=condition=DeploymentsHealthy agentserviceconfig agent
 echo "$(date) AgentServiceConfig updated"
 
 # Creating nodepool for x86
