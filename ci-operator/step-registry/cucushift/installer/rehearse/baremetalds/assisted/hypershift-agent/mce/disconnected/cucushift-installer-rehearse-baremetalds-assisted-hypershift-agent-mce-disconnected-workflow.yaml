@@ -1,0 +1,26 @@
+workflow:
+  as: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-disconnected
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-disconnected-provision
+    post:
+    - ref: wait
+    - chain: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-deprovision
+    env:
+      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
+      METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
+      MCE_QE_CATALOG: "true"
+      DISCONNECTED: "true"
+      IP_STACK: v4v6
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+        WORKER_MEMORY=14336
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+  documentation: |-
+    This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow
