@@ -1,4 +1,5 @@
 #!/bin/bash
+set -x
 
 SNYK_TOKEN="$(cat $SNYK_TOKEN_PATH)"
 export SNYK_TOKEN
@@ -84,6 +85,14 @@ snyk_code() {
     fi
     PARAMS+=(--target-reference="${TARGET_REFERENCE}")
 
+    pwd
+    ls -altr
+    echo "SNYK_TOKEN: $SNYK_TOKEN"
+    echo "checking if we should ignore some files with SNYC_IGNORE_FILE_PATH: ${SNYC_IGNORE_FILE_PATH}"
+    if [ -n "$SNYC_IGNORE_FILE_PATH" ]; then
+      ${SNYK_DIR}/snyk auth
+      ${SNYK_DIR}/snyk ignore --file-path="$SNYC_IGNORE_FILE_PATH"
+    fi
     ${SNYK_DIR}/snyk code test "${PARAMS[@]}"
     local rc=$?
     echo Full vulnerabilities report is available at ${ARTIFACT_DIR}/snyk.sarif.json
