@@ -217,5 +217,6 @@ govc vm.change -vm "${LB_VMNAME}" -e "guestinfo.afterburn.initrd.network-kargs=$
 govc vm.change -vm "${LB_VMNAME}" -e guestinfo.ignition.config.data=$IGN
 govc vm.change -vm "${LB_VMNAME}" -e guestinfo.ignition.config.data.encoding=gzip+base64
 govc vm.power -on "${LB_VMNAME}"
+
 touch $SHARED_DIR/external_lb
-sleep 4h
+sleep 5
