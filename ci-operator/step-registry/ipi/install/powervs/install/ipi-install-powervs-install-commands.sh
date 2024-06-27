@@ -228,7 +228,7 @@ function install_required_tools() {
   #install the tools required
   cd /tmp || exit 1
 
-  export HOME=/tmp
+  export HOME=/output
 
   hash ibmcloud || exit 1
   echo "Checking ibmcloud version..."
@@ -241,7 +241,10 @@ function install_required_tools() {
   # NOTE: This should be covered by images/installer/Dockerfile.upi.ci in the installer repo
   #
   for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns tg-cli; do
-    ibmcloud plugin install ${I}
+    #
+    # NOTE: If a plugin is already installed then don't do another install. If not, then install it.
+    # 
+    yes N | ibmcloud plugin install ${I}
   done
   ibmcloud plugin list
 
@@ -645,13 +648,13 @@ function dump_resources() {
   echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud Cluster 8<-------8<--------8<--------"
   (
     if [ -d "${dir}/.clusterapi_output" ]; then
-      /tmp/yq-v4 eval .status.conditions ${dir}/.clusterapi_output/IBMPowerVSCluster-openshift-cluster-api-guests-*yaml
+      yq-v4 eval .status.conditions ${dir}/.clusterapi_output/IBMPowerVSCluster-openshift-cluster-api-guests-*yaml
 
       echo "8<--------8<--------8<------- CAPI cluster-api-provider-ibmcloud Cluster 8<-------8<--------8<--------"
       for FILE in ${dir}/.clusterapi_output/IBMPowerVSMachine-openshift-cluster-api-guests-*.yaml
       do
 	echo ${FILE}
-        /tmp/yq-v4 eval .status.conditions ${FILE}
+        yq-v4 eval .status.conditions ${FILE}
 	echo
       done
     fi
@@ -883,7 +886,7 @@ if [ ${ret} -gt 0 ]; then
   ls -l ${SFILE} || true
   if [ -f ${SFILE} ]; then
     # How many statuses are False?
-    SLINES=$(/tmp/yq-v4 eval .status.conditions ${SFILE} -o json | /tmp/jq -r '.[] | select(.status|test("False")) | .type' | wc -l)
+    SLINES=$(yq-v4 eval .status.conditions ${SFILE} -o json | jq -r '.[] | select(.status|test("False")) | .type' | wc -l)
     echo "Skip? SLINES=${SLINES}"
     if [ ${SLINES} -gt 0 ]; then
       echo "Skipping wait-for install-complete since detected CAPI problem"
