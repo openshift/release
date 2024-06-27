@@ -47,21 +47,24 @@ listen api-server-6443
     bind *:6443
     mode tcp
     server api_vip $API_VIP:6443 check inter 1s
+    server api_vip_v6 [fd99:2222:3456::1:0004]:6443 check inter 1s
 listen machine-config-server-22623
     bind *:22623
     mode tcp
     server api_vip $API_VIP:22623 check inter 1s
-
+    server api_vip_v6 [fd99:2222:3456::1:0004]:22623 check inter 1s
 listen ingress-router-80
     bind *:80
     mode tcp
     balance source
     server api_vip $INGRESS_VIP:80 check inter 1s
+    server api_vip_v6 [fd99:2222:3456::2:0005]:80 check inter 1s
 listen ingress-router-443
     bind *:443
     mode tcp
     balance source
     server api_vip $INGRESS_VIP:443 check inter 1s
+    server api_vip_v6 [fd99:2222:3456::2:0005]:443 check inter 1s
 EOF
 
 echo "Templating for HAProxy done..."
