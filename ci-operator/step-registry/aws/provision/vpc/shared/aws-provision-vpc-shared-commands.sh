@@ -351,9 +351,9 @@ Resources:
     Type: AWS::EC2::DHCPOptions
     Condition: DoDhcp
     Properties:
-        DomainName: vmi1386712.contaboserver.net
+        DomainName: zhsun.com
         DomainNameServers:
-          - 5.104.83.43
+          - 3.15.192.2
   VPCDHCPOptionsAssociation:
     Type: AWS::EC2::VPCDHCPOptionsAssociation
     Condition: DoDhcp
