@@ -3,7 +3,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+ -o /tmp/yq && chmod +x /tmp/yq
 
 touch "${SHARED_DIR}/install-config.yaml"
 /tmp/yq w -i "${SHARED_DIR}/install-config.yaml" 'networking.networkType' OVNKubernetes
