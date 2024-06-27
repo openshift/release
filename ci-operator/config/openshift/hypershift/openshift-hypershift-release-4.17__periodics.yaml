@@ -59,6 +59,13 @@ releases:
       product: ocp
       stream: ci
       version: "4.17"
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.17"
   multi-latest:
     candidate:
       architecture: multi
@@ -73,6 +80,16 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-aws-multi
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
+    env:
+      AWS_MULTI_ARCH: "true"
+    workflow: hypershift-aws-e2e-external
 - as: e2e-aws-ovn
   cron: 0 */6 * * *
   steps:
