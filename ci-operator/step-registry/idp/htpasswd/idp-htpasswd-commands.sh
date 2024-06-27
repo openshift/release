@@ -3,6 +3,7 @@
 set -e
 set -u
 set -o pipefail
+set -x
 
 function check_if_hypershift_env () {
     if [ -f "${SHARED_DIR}/nested_kubeconfig" ]; then
@@ -84,6 +85,7 @@ function set_users () {
     for i in $(seq 1 50);
     do
         username="testuser-${i}"
+        set +x
         password=$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 12 | head -n 1 || true)
         users+="${username}:${password},"
         if [ -f "${htpass_file}" ]; then
@@ -91,6 +93,7 @@ function set_users () {
         else
             htpasswd -c -B -b ${htpass_file} "${username}" "${password}"
         fi
+        set -x
     done
 
     # current generation
@@ -123,12 +126,14 @@ function set_users () {
         source "${SHARED_DIR}/runtime_env"
     fi
     runtime_env=${SHARED_DIR}/runtime_env
+    set +x
     users=${users::-1}
 
 
     cat <<EOF >>"${runtime_env}"
 export USERS=${users}
 EOF
+    set -x
 }
 
 if [ -f "${SHARED_DIR}/cluster-type" ] ; then
@@ -138,6 +143,7 @@ if [ -f "${SHARED_DIR}/cluster-type" ] ; then
         exit 0
     fi
 fi
+
 set_proxy
 check_if_hypershift_env
 set_common_variables
