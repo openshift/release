@@ -4,6 +4,14 @@ chain:
   - as: csi-conformance-tests
     from: tests
     commands: |-
+      function cleanup() {
+        for child in $( jobs -p ); do
+          kill "${child}"
+        done
+        wait
+      }
+      trap cleanup EXIT
+      
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(echo -n clusters-${CLUSTER_NAME}|sed 's#\.#-#g')"
@@ -104,6 +112,7 @@ chain:
 
       exit ${csi_exit_code_rwx}
     timeout: 14400s
+    grace_period: 30m0s
     env:
     - name: TEST_ARGS
       default: ""

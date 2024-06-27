@@ -148,16 +148,14 @@ tests:
     fi
   container:
     from: src
-  optional: true
 - as: code-check
   commands: |
     unset GOFLAGS
-    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1 2> /dev/null
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2 2> /dev/null
     which golangci-lint
     make check-code
   container:
     from: src
-  optional: true
 - as: e2e-aws
   optional: true
   skip_if_only_changed: (frontend/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata|cluster_operator/hive|ocm_terraform|rosacli|util)/)|include\.go$
@@ -288,6 +286,20 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
+- as: debug-winc-azure-ipi
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-winc
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

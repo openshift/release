@@ -8,7 +8,7 @@ export GITHUB_TOKEN
 GITHUB_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github-token)
 
 cd "$(mktemp -d)"
-git clone --branch main https://github.com/redhat-appstudio/qe-tools .
+git clone --branch main https://github.com/konflux-ci/qe-tools .
 make install
 
 command=(qe-tools prowjob health-check --fail-if-unhealthy=false)

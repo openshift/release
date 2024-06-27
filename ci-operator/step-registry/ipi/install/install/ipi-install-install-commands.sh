@@ -123,6 +123,13 @@ function populate_artifact_dir() {
       awk -F'id=' '/alicloud_instance.*Creation complete/ && /master/{ print $2 }' "${dir}/.openshift_install.log" | tr -d ']"' > "${SHARED_DIR}/alibaba-instance-ids.txt";;
   *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
   esac
+
+  # Copy CAPI-generated artifacts if they exist
+  if [ -d "${dir}/.clusterapi_output" ]; then
+    echo "Copying Cluster API generated manifests..."
+    mkdir -p "${ARTIFACT_DIR}/clusterapi_output/"
+    cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output" 2>/dev/null
+  fi
 }
 
 
@@ -472,30 +479,6 @@ EOF
   echo "Enabled AWS Spot instances for worker nodes"
 }
 
-# enable_efa_pg_instance_config is an AWS specific option that enables one worker machineset in a placement group and with EFA Network Interface Type, other worker machinesets will be ENA Network Interface Type by default.....
-function enable_efa_pg_instance_config() {
-  local dir=${1}
-  #sed -i 's/          instanceType: .*/          networkInterfaceType: EFA\n          placementGroupName: pgcluster\n          instanceType: c5n.9xlarge/' "$dir/openshift/99_openshift-cluster-api_worker-machineset-0.yaml"
-  pip3 install pyyaml==6.0  --user
-  pushd "${dir}/openshift"
-  python -c '
-import os
-import yaml
-
-for manifest_name in os.listdir("./"):
-    if "worker-machineset" in manifest_name:
-      data = yaml.safe_load(open(manifest_name))
-      data["spec"]["template"]["spec"]["providerSpec"]["value"]["networkInterfaceType"] = "EFA"
-      data["spec"]["template"]["spec"]["providerSpec"]["value"]["instanceType"] = "c5n.9xlarge"
-      data["spec"]["template"]["spec"]["providerSpec"]["value"]["placementGroupName"] = "pgcluster"
-      open(manifest_name, "w").write(yaml.dump(data, default_flow_style=False))
-      print("Patched efa pg into ",  manifest_name)
-      break
-' || return 1
-  popd
-
-}
-
 function get_arch() {
   ARCH=$(uname -m | sed -e 's/aarch64/arm64/' -e 's/x86_64/amd64/')
   echo "${ARCH}"
@@ -577,7 +560,7 @@ alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.i
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
 vsphere*)
     export VSPHERE_PERSIST_SESSION=true
-    export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
+    export SSL_CERT_FILE=/var/run/vsphere-ibmcloud-ci/vcenter-certificate
     ;;
 openstack-osuosl) ;;
 openstack-ppc64le) ;;
@@ -623,9 +606,6 @@ azure4|azure-arm64) inject_boot_diagnostics ${dir} ;;
 aws|aws-arm64|aws-usgov)
     if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
       inject_spot_instance_config ${dir}
-    fi
-    if [[ "${ENABLE_AWS_EFA_PG_INSTANCE:-}"  == 'true' ]]; then
-      enable_efa_pg_instance_config ${dir}
     fi
     ;;
 esac
@@ -681,6 +661,10 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 case $JOB_NAME in
   *vsphere)
     # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
+    max=1
+    ;;
+  *aws)
+    # Do not retry because aws resources can collide when re-using installer assets
     max=1
     ;;
   *)

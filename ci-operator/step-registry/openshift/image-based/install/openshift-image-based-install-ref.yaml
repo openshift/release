@@ -1,0 +1,28 @@
+ref:
+  as: openshift-image-based-install
+  grace_period: 10m
+  commands: openshift-image-based-install-commands.sh
+  from_image:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.16
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - name: ibu-backup-secret
+    namespace: test-credentials
+    mount_path: /var/run/ibu-backup-secret
+  - name: registry-pull-credentials
+    mount_path: /var/run/pull-secret
+    namespace: test-credentials
+  env:
+  - name: SEED_IMAGE
+    default: quay.io/openshift-kni/image-based-seeds
+    documentation: The repo where the seed image is pulled from. The backup secret needs to have access to this repo
+  dependencies:
+  - name: lca-operator
+    env: LCA_PULL_REF
+  documentation: |-
+    This will run an Image Based Install using the supplied LCA operator and the generated seed image.

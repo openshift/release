@@ -54,9 +54,9 @@ tests:
   presubmit: true
   run_if_changed: ^(Containerfile.*|Makefile|manifests/.*|ols/.*|pyproject.toml|pdm.lock|scripts/.*|tests/.*)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-observability
     env:
-      HYPERSHIFT_BASE_DOMAIN: hypershift.aws-2.ci.openshift.org
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
     test:
     - as: e2e
       cli: latest
@@ -65,12 +65,21 @@ tests:
         export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
         export OPENAI_PROVIDER_KEY_PATH=/var/run/openai/token
         export WATSONX_PROVIDER_KEY_PATH=/var/run/watsonx/token
+        export AWS_BUCKET_PATH=/var/run/aws-bucket
+        export AWS_ACCESS_KEY_ID_PATH=/var/run/aws-access-key-id
+        export AWS_REGION_PATH=/var/run/aws-region
+        export AWS_SECRET_ACCESS_KEY_PATH=/var/run/aws-secret-access-key
 
         export PROVIDER_KEY_PATH=/var/run/openai/token
         export PROVIDER=openai
         export MODEL=gpt-3.5-turbo-1106
 
         export CP_OFFLINE_TOKEN=$(cat /var/run/insights-stage-upload-offline-token/token)
+
+        dnf install -y jq && \
+        S3_UPLOADER_TAG=$(curl https://gitlab.cee.redhat.com/api/v4/projects/insights-qe%2Fupload-artifact-s3/repository/tags | jq '.[0].name' | tr -d '"') && \
+        curl -L https://gitlab.cee.redhat.com/api/v4/projects/insights-qe%2Fupload-artifact-s3/jobs/artifacts/$S3_UPLOADER_TAG/raw/upload-artifact-s3-latest?job=build -o /usr/bin/upload-artifact-s3 && \
+        chmod a+x /usr/bin/upload-artifact-s3
 
         tests/scripts/test-e2e-cluster.sh
       credentials:
@@ -89,6 +98,18 @@ tests:
       - mount_path: /var/run/insights-stage-upload-offline-token
         name: insights-stage-upload-offline-token
         namespace: test-credentials
+      - mount_path: /var/run/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - mount_path: /var/run/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - mount_path: /var/run/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - mount_path: /var/run/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
       dependencies:
       - env: OLS_IMAGE
         name: lightspeed-service-api
@@ -97,54 +118,10 @@ tests:
         requests:
           cpu: 100m
     workflow: hypershift-hostedcluster-workflow
-- always_run: false
-  as: response-sanity-check
-  cron: 30 10 * * 1
+- as: security
+  optional: true
   steps:
-    cluster_profile: aws-2
-    env:
-      HYPERSHIFT_BASE_DOMAIN: hypershift.aws-2.ci.openshift.org
-    test:
-    - as: e2e
-      cli: latest
-      commands: |
-        export BAM_PROVIDER_KEY_PATH=/var/run/bam/token
-        export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
-        export OPENAI_PROVIDER_KEY_PATH=/var/run/openai/token
-        export WATSONX_PROVIDER_KEY_PATH=/var/run/watsonx/token
-
-        export PROVIDER_KEY_PATH=/var/run/openai/token
-        export PROVIDER=openai
-        export MODEL=gpt-3.5-turbo-1106
-        export RESPONSE_EVALUATION=true
-
-        export CP_OFFLINE_TOKEN=$(cat /var/run/insights-stage-upload-offline-token/token)
-
-        tests/scripts/test-e2e-cluster.sh
-      credentials:
-      - mount_path: /var/run/azure_openai
-        name: azureopenai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/bam
-        name: bam-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/openai
-        name: openai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/watsonx
-        name: watsonx-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/insights-stage-upload-offline-token
-        name: insights-stage-upload-offline-token
-        namespace: test-credentials
-      dependencies:
-      - env: OLS_IMAGE
-        name: lightspeed-service-api
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: hypershift-hostedcluster-workflow
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: openshift

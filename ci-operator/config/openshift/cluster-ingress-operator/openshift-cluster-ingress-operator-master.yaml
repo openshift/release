@@ -7,24 +7,24 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: hypershift-tests
-  ocp_4.16_base-rhel9:
+  ocp_4.17_base-rhel9:
     name: "4.17"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
 build_root:
   from_repository: true
 images:
 - inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cluster-ingress-operator
 promotion:
   to:
@@ -132,12 +132,34 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      FEATURE_GATES: '[GatewayAPIEnabled=true]'
+      FEATURE_GATES: '[GatewayAPI=true,ClusterAPIInstallAWS=true]'
       FEATURE_SET: CustomNoUpgrade
     test:
     - as: test
       cli: latest
       commands: make TEST=TestGatewayAPI test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws
+- as: e2e-aws-operator-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
       from: src
       resources:
         requests:

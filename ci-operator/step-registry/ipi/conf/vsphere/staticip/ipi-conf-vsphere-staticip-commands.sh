@@ -15,27 +15,28 @@ echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..
 declare dns_server
 declare vlanid
 declare primaryrouterhostname
+# # shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 echo "$(date -u --rfc-3339=seconds) - setting up static IP assignments"
 
 STATIC_IPS="${SHARED_DIR}"/static-ip-hosts.txt
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+echo "$(date -u --rfc-3339=seconds) - Setting up external load balancer"
 
-# ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
-
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+    SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+fi
 
 echo "$(date -u --rfc-3339=seconds) - ${vlanid} ${primaryrouterhostname} "
-
 
 if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
   echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
   exit 1
 fi
-
-
-
 
 dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
 gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")

@@ -3,22 +3,22 @@ base_images:
     name: 4.17-priv
     namespace: ocp-private
     tag: cli
-  ocp_4.16_base-rhel9:
+  ocp_4.17_base-rhel9:
     name: 4.17-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_4.16_installer-etcd-artifacts:
+  ocp_4.17_installer-etcd-artifacts:
     name: 4.17-priv
     namespace: ocp-private
     tag: installer-etcd-artifacts
-  ocp_4.16_installer-kube-apiserver-artifacts:
+  ocp_4.17_installer-kube-apiserver-artifacts:
     name: 4.17-priv
     namespace: ocp-private
     tag: installer-kube-apiserver-artifacts
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/installer
@@ -28,18 +28,18 @@ images:
     value: "true"
   dockerfile_path: images/installer-altinfra/Dockerfile.ci
   inputs:
-    ocp_4.16_base-rhel9:
+    ocp_4.17_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_4.16_installer-etcd-artifacts:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_4.17_installer-etcd-artifacts:
       as:
-      - registry.ci.openshift.org/ocp/4.16:installer-etcd-artifacts
-    ocp_4.16_installer-kube-apiserver-artifacts:
+      - registry.ci.openshift.org/ocp/4.17:installer-etcd-artifacts
+    ocp_4.17_installer-kube-apiserver-artifacts:
       as:
-      - registry.ci.openshift.org/ocp/4.16:installer-kube-apiserver-artifacts
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: installer
 - dockerfile_literal: |
     FROM src
@@ -97,7 +97,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-custom-security-groups
@@ -109,7 +108,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       USER_TAGS: |
@@ -124,7 +122,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
       FIPS_ENABLED: "true"
@@ -143,7 +140,6 @@ tests:
     cluster_profile: aws
     env:
       AWS_METADATA_SERVICE_AUTH: Required
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws
@@ -181,7 +177,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-sharednetwork
@@ -192,7 +187,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-single-node
@@ -203,7 +197,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: local-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -215,7 +208,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: wavelength-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -227,7 +219,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: local-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -239,7 +230,6 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      AWS_PUBLIC_IPV4_POOL_ID: none
       EDGE_ZONE_TYPES: wavelength-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
@@ -462,17 +452,6 @@ tests:
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
 - always_run: false
-  as: openstack-capi-manifests
-  optional: true
-  run_if_changed: openstack
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      FEATURE_GATES: ClusterAPIInstall=true
-      FEATURE_SET: CustomNoUpgrade
-    workflow: openshift-manifests-openstack
-  timeout: 6h0m0s
-- always_run: false
   as: e2e-vsphere-capi-ovn
   optional: true
   steps:
@@ -496,7 +475,7 @@ tests:
   as: e2e-vsphere-capi-static-ovn
   optional: true
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true","VSphereStaticIPs=true"]'
       FEATURE_SET: CustomNoUpgrade

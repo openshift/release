@@ -2,11 +2,7 @@ base_images:
   base:
     name: ubi
     namespace: ocp
-    tag: "8"
-  operator-sdk:
-    name: "4.13"
-    namespace: origin
-    tag: operator-sdk
+    tag: "9"
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -18,6 +14,7 @@ operator:
   bundles:
   - as: self-node-remediation-bundle
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/medik8s/self-node-remediation-operator:.*
     with: pipeline:self-node-remediation-operator
@@ -45,33 +42,47 @@ tests:
     cluster_profile: medik8s-aws
     env:
       BASE_DOMAIN: medik8s-ci.projects.ecosystem.sysdeseng.com
-      INSTALL_NAMESPACE: self-node-remediation
+      OPERATOR_NAMESPACE: self-node-remediation
+      OPERATOR_RELEASED_VERSION: 0.8.0
     test:
-    - as: install
+    - as: e2e-install-operator-last-version
       cli: latest
       commands: |
-        oc create namespace "$INSTALL_NAMESPACE"
-        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
-        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment self-node-remediation-controller-manager
-      dependencies:
-      - env: OO_BUNDLE
-        name: self-node-remediation-bundle
+        make create-ns
+        # workaround for OLM pod not running with restricted PSA
+        oc label --overwrite ns "$OPERATOR_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "$OPERATOR_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+
+        # OPERATOR_NAMESPACE variable is used by bundle-run and bundle-run-update
+        BUNDLE_IMG=quay.io/medik8s/self-node-remediation-operator-bundle:v"$OPERATOR_RELEASED_VERSION" make bundle-run
       env:
-      - name: INSTALL_NAMESPACE
-      from: operator-sdk
+      - name: OPERATOR_NAMESPACE
+      - name: OPERATOR_RELEASED_VERSION
+      from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: test
+    - as: e2e-upgrade-operator-latest
+      cli: latest
+      commands: BUNDLE_IMG="$OO_BUNDLE" make bundle-run-update
+      dependencies:
+      - env: OO_BUNDLE
+        name: self-node-remediation-bundle
+      env:
+      - name: OPERATOR_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
       cli: latest
       commands: |
-        export SKIP_LOG_VERIFICATION="true"
-        export SKIP_OOST_REMEDIATION_VERIFICATION="true"
-        export INSTALL_NAMESPACE="$INSTALL_NAMESPACE"
+        export SKIP_LOG_VERIFICATION="true" SKIP_OOST_REMEDIATION_VERIFICATION="true" INSTALL_NAMESPACE="$OPERATOR_NAMESPACE"
         make e2e-test
       env:
-      - name: INSTALL_NAMESPACE
+      - name: OPERATOR_NAMESPACE
       from: src
       resources:
         requests:

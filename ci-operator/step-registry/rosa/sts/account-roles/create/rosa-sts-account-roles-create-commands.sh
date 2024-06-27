@@ -6,12 +6,12 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-ACCOUNT_ROLES_PREFIX=${ACCOUNT_ROLES_PREFIX:-$NAMESPACE}
 HOSTED_CP=${HOSTED_CP:-false}
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
 CHANNEL_GROUP=${CHANNEL_GROUP}
 PERMISSIONS_BOUNDARY=${PERMISSIONS_BOUNDARY:-}
+ACCOUNT_ROLES_PREFIX=$(head -n 1 "${SHARED_DIR}/cluster-prefix")
 
 # Configure aws
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -89,8 +89,8 @@ rosa create account-roles -y --mode auto \
                           | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
 
 # Store the account-role-prefix for the next pre steps and the account roles deletion
-echo "Store the account-role-prefix and the account-roles-arns ..."
 echo -n "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-prefix"
+echo "Store the account-role-prefix and the account-roles-arns ..."
 ret=0
 rosa list account-roles -o json | jq -r '.[].RoleARN' | grep "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-arns" || ret=$?
 if [[ "$ret" != 0 ]]; then

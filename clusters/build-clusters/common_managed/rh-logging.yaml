@@ -54,6 +54,17 @@ metadata:
   name: splunk-forwarder
   namespace: rh-corp-logging
 spec:
+  inputs:
+    - name: ci-service-pod-logs
+      application:
+        selector:
+          matchExpressions:
+          - key: created-by-prow
+            operator: DoesNotExist # We don't want to store the logs for test jobs
+          - key: created-by-ci
+            operator: DoesNotExist # We don't want to store the logs for ci-operator pods
+        namespaces:
+        - ci
   outputs:
     - name: splunk-receiver
       type: splunk
@@ -68,18 +79,22 @@ spec:
       secret:
         name: cloudwatch-receiver-token
   pipelines:
+  - name: app-ci-pod-logs
+    inputRefs:
+    - ci-service-pod-logs
+    outputRefs:
+    - cloudwatch-receiver
+    parse: json
   - name: container-logs
     inputRefs:
     - application
     outputRefs:
     - splunk-receiver
-    - cloudwatch-receiver
   - name: infra-logs
     inputRefs:
     - infrastructure
     outputRefs:
     - splunk-receiver
-    - cloudwatch-receiver
   - name: audit-logs
     inputRefs:
     - audit

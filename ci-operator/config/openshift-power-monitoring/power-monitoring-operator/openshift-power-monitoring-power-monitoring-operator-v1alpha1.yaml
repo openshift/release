@@ -16,7 +16,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
+    tag: rhel-8-golang-1.21-openshift-4.16
 images:
 - build_args:
   - name: TARGETOS
@@ -61,10 +61,16 @@ tests:
       SNYK_PRE_EXECUTION_HOOK_CMD: go mod vendor && go mod tidy
     workflow: openshift-ci-security
 - as: power-monitoring-operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs-powermon
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
   steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
     test:
     - as: install
       cli: latest
@@ -79,7 +85,7 @@ tests:
           cpu: 200m
           memory: 400Mi
     - ref: openshift-power-monitoring-tests-power-monitoring-operator
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: v1alpha1
   org: openshift-power-monitoring

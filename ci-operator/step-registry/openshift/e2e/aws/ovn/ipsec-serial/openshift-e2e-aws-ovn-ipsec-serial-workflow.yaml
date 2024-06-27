@@ -1,0 +1,24 @@
+workflow:
+  as: openshift-e2e-aws-ovn-ipsec-serial
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - ref: ovn-conf-ipsec-manifest
+    - chain: ipi-install
+    - ref: enable-qe-catalogsource
+    - ref: operatorhub-subscribe-nmstate-operator
+    test:
+    - ref: openshift-e2e-test
+    post:
+      - chain: gather-network
+      - chain: gather-core-dump
+      - chain: ipi-deprovision
+    env:
+      NMSTATE_OPERATOR_SUB_SOURCE: qe-app-registry
+      TEST_SUITE: openshift/network/ipsec
+      TEST_ARGS: --cluster-stability Disruptive --disable-monitor="additional-events-collector,alert-summary-serializer,apiserver-availability,apiserver-new-disruption-invariant,audit-log-analyzer,azure-metrics-collector,cluster-info-serializer,clusteroperator-collector,disruption-summary-serializer,e2e-test-analyzer,etcd-log-analyzer,event-collector,external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability,external-service-availability,graceful-shutdown-analyzer,image-registry-availability,ingress-availability,interval-serializer,known-image-checker,kubelet-log-collector,legacy-authentication-invariants,legacy-cvo-invariants,legacy-etcd-invariants,legacy-kube-apiserver-invariants,legacy-networking-invariants,legacy-node-invariants,legacy-storage-invariants,legacy-test-framework-invariants,monitoring-statefulsets-recreation,node-lifecycle,node-state-analyzer,operator-state-analyzer,pathological-event-analyzer,pod-lifecycle,pod-network-avalibility,required-scc-annotation-checker,service-type-load-balancer-availability,termination-message-policy,timeline-serializer,tracked-resources-serializer,watch-request-counts-collector" --run \[sig-network\]\[Feature:IPsec\]
+  documentation: |-
+    The Openshift E2E AWS `ipsec serial` workflow executes the `openshift/network/ipsec` end-to-end
+    IPsec test suite on AWS with the OVNKubernetes network plugin.

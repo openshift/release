@@ -4,12 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export GITHUB_USER GITHUB_TOKEN GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING CLEAN_REPOS_STATUS CLEAN_WEBHOOK_STATUS DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN QE_SPRAYPROXY_HOST QE_SPRAYPROXY_TOKEN
+export GITHUB_USER GITHUB_TOKEN GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING CLEAN_REPOS_STATUS CLEAN_WEBHOOK_STATUS CLEAN_GITLAB_WEBHOOK_STATUS DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN QE_SPRAYPROXY_HOST QE_SPRAYPROXY_TOKEN PAC_GITLAB_TOKEN PAC_GITLAB_URL PAC_PROJECT_ID
 
 GITHUB_USER=""
 GITHUB_TOKEN=""
 CLEAN_REPOS_STATUS=0
 CLEAN_WEBHOOK_STATUS=0
+CLEAN_GITLAB_WEBHOOK_STATUS=0
 CLEAN_QUAY_REPOS_AND_ROBOTS_STATUS=0
 CLEAN_QUAY_TAGS_STATUS=0
 CLEAN_PRIVATE_REPO_STATUS=0
@@ -19,6 +20,9 @@ DEFAULT_QUAY_ORG=redhat-appstudio-qe
 DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/default-quay-org-token)
 QE_SPRAYPROXY_HOST=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qe-sprayproxy-host)
 QE_SPRAYPROXY_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/qe-sprayproxy-token)
+PAC_GITLAB_TOKEN=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pac-gitlab-token)
+PAC_GITLAB_URL=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pac-gitlab-url)
+PAC_PROJECT_ID=$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/pac-project-id)
 
 # user stored: username:token,username:token
 IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<<"$(cat /usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/github_accounts)"
@@ -43,18 +47,17 @@ echo -e "[INFO] Start cleanup with user: ${GITHUB_USER}"
 
 cd "$(mktemp -d)"
 
-git clone --origin upstream --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
-# TODO this change is needed only for backwards compatibility, remove after https://github.com/redhat-appstudio/e2e-tests is merged
-git remote add origin https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git
+git clone --origin upstream --branch main "https://${GITHUB_TOKEN}@github.com/konflux-ci/e2e-tests.git" .
 
 make clean-gitops-repositories || CLEAN_REPOS_STATUS=$?
 make clean-github-webhooks || CLEAN_WEBHOOK_STATUS=$?
+make clean-gitlab-webhooks || CLEAN_GITLAB_WEBHOOK_STATUS=$?
 make clean-quay-repos-and-robots || CLEAN_QUAY_REPOS_AND_ROBOTS_STATUS=$?
 make clean-quay-tags || CLEAN_QUAY_TAGS_STATUS=$?
 make clean-private-repos || CLEAN_PRIVATE_REPO_STATUS=$?
 make clean-registered-servers || CLEAN_REGISTERED_SERVERS_STATUS=$?
 
 
-if [[ "${CLEAN_REPOS_STATUS}" -ne 0 || "${CLEAN_WEBHOOK_STATUS}" -ne 0 || "${CLEAN_QUAY_REPOS_AND_ROBOTS_STATUS}" -ne 0 || "${CLEAN_QUAY_TAGS_STATUS}" -ne 0 || "${CLEAN_PRIVATE_REPO_STATUS}" -ne 0 || "${CLEAN_REGISTERED_SERVERS_STATUS}" -ne 0 ]]; then
+if [[ "${CLEAN_REPOS_STATUS}" -ne 0 || "${CLEAN_WEBHOOK_STATUS}" -ne 0 || "${CLEAN_GITLAB_WEBHOOK_STATUS}" -ne 0 || "${CLEAN_QUAY_REPOS_AND_ROBOTS_STATUS}" -ne 0 || "${CLEAN_QUAY_TAGS_STATUS}" -ne 0 || "${CLEAN_PRIVATE_REPO_STATUS}" -ne 0 || "${CLEAN_REGISTERED_SERVERS_STATUS}" -ne 0 ]]; then
     exit 1
 fi

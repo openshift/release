@@ -1,0 +1,49 @@
+ref:
+  as: ipi-conf-vsphere-vcm
+  from: tools
+  commands: ipi-conf-vsphere-vcm-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: CONTROL_PLANE_REPLICAS
+    default: "3"
+    documentation: |-
+      the number of the master nodes for ipi on vsphere cluster.
+  - name: COMPUTE_NODE_REPLICAS
+    default: "3"
+    documentation: |-
+      the number of the worker nodes for ipi on vsphere cluster.
+  - name: PULL_THROUGH_CACHE
+    default: "enabled"
+    documentation: |-
+      Cluster images are pulled through a cache located in the CI environment when enabled.
+  - name: SIZE_VARIANT
+    default: ""
+    documentation: |-
+      The size of the cluster in one of our supported t-shirt values that is standard across all CI environments.
+
+      The sizes are:
+      * "" (default) - 4 vCPU, 16GB control plane nodes, default workers
+      * "compact" - 8 vCPU, 32GB control plane nodes, no workers
+
+      These sizes are roughly consistent across all cloud providers, but we may not be able to instantiate some sizes
+      in some regions or accounts due to quota issues.
+  credentials:
+  - namespace: test-credentials
+    name: vsphere-vmc
+    mount_path: /var/run/vault/vsphere
+  - namespace: test-credentials
+    name: vsphere-ibmcloud-config
+    mount_path: /var/run/vault/vsphere-ibmcloud-config
+  - namespace: test-credentials
+    name: ci-ibmcloud
+    mount_path: /var/run/vault/ibmcloud
+  dependencies:
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST_FROM_BUILD_FARM
+  documentation: >-
+    The IPI vSphere configure step generates the vSphere-specific
+    install-config.yaml contents based on the cluster profile,
+    $SHARED_DIR/vips.txt, $SHARED_DIR/basedomain.txt, and optional input files.

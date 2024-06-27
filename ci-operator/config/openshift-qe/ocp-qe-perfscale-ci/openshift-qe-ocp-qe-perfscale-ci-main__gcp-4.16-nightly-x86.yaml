@@ -22,37 +22,31 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: control-plane-private-24nodes
+- as: control-plane-etcd-fips-24nodes
+  cron: 0 4 2,16 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_REPLICAS: "24"
+      PROFILE_TYPE: reporting
     test:
     - chain: openshift-qe-control-plane
-    workflow: openshift-qe-installer-gcp-ipi-ovn-private
+    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
   timeout: 5h0m0s
-- always_run: false
-  as: control-plane-private-3nodes
+- as: data-path-etcd-fips-9nodes
+  cron: 0 2 1,15 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: n1-standard-8
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: n1-standard-16
+      SET_ENV_BY_PLATFORM: custom
     test:
-    - chain: openshift-qe-control-plane
-    workflow: openshift-qe-installer-gcp-ipi-ovn-private
-  timeout: 5h0m0s
-- always_run: false
-  as: control-plane-etcd-fips-120nodes
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: gcp-qe
-    env:
-      COMPUTE_NODE_REPLICAS: "120"
-    test:
-    - chain: openshift-qe-control-plane
+    - ref: openshift-qe-perfscale-gcp-data-path-fw
+    - chain: openshift-qe-data-path-tests
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
   timeout: 5h0m0s
 - always_run: false
@@ -62,10 +56,56 @@ tests:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_REPLICAS: "24"
+      PROFILE_TYPE: reporting
     test:
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
   timeout: 5h0m0s
+- always_run: false
+  as: control-plane-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "24"
+      PROFILE_TYPE: reporting
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-gcp
+- always_run: false
+  as: data-path-9nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "9"
+    test:
+    - ref: openshift-qe-perfscale-gcp-data-path-fw
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-gcp
+  timeout: 6h0m0s
+- always_run: false
+  as: node-density-heavy-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "24"
+      PROFILE_TYPE: reporting
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-gcp
+- always_run: false
+  as: node-density-cni-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "24"
+      PROFILE_TYPE: reporting
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-gcp
 zz_generated_metadata:
   branch: main
   org: openshift-qe

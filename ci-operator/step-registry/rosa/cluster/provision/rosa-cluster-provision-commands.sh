@@ -32,6 +32,7 @@ CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
 ADDITIONAL_SECURITY_GROUP=${ADDITIONAL_SECURITY_GROUP:-false}
 NO_CNI=${NO_CNI:-false}
 CONFIGURE_CLUSTER_AUTOSCALER=${CONFIGURE_CLUSTER_AUTOSCALER:-false}
+CLUSTER_PREFIX=$(head -n 1 "${SHARED_DIR}/cluster-prefix")
 
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
@@ -71,22 +72,15 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]] && [[ -e "${SHARED_DIR}/cluster-name" ]];
   #   as Private Hosted Zone needs to be ready before installing Shared VPC cluster
   CLUSTER_NAME=$(head -n 1 "${SHARED_DIR}/cluster-name")
 else
-  prefix="ci-rosa"
-  if [[ "$HOSTED_CP" == "true" ]]; then
-    prefix="ci-rosa-h"
-  elif [[ "$STS" == "true" ]]; then
-    prefix="ci-rosa-s"
-  fi
-  subfix=$(openssl rand -hex 2)
-  CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
+  CLUSTER_NAME=${CLUSTER_NAME:-$CLUSTER_PREFIX}
   # For long cluster name enabled, append a "long_name_prefix_len" chars long random string to cluster name
-  # Max possible prefix length is 9, max possible subfix length is 4, hyppen is used 2 times, random string of length "long_name_prefix_len"
-  # (9 + 4 + 2 + "long_name_prefix_len" = 54 )
+  # Max possible prefix length is 14, hyppen is used 1 times, random string of length "long_name_prefix_len"
+  # (14 + 1 + "long_name_prefix_len" = 54 )
   MAX_CLUSTER_NAME_LENGTH=54
   if [[ "$LONG_CLUSTER_NAME_ENABLED" == "true" ]]; then
     long_name_prefix_len=$(( MAX_CLUSTER_NAME_LENGTH - $(echo -n "$CLUSTER_NAME" | wc -c) - 1 ))
     long_name_prefix=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c $long_name_prefix_len)
-    CLUSTER_NAME="$prefix-$subfix-$long_name_prefix"
+    CLUSTER_NAME="$CLUSTER_PREFIX-$long_name_prefix"
   fi
   
   #set the domain prefix of length (<=15)
@@ -280,6 +274,15 @@ if [[ "$ENABLE_AUDIT_LOG" == "true" ]]; then
   record_cluster "audit_log_arn" $iam_role_arn
 fi
 
+BILLING_ACCOUNT_SWITCH=""
+if [[ "$ENABLE_BILLING_ACCOUNT" == "yes" ]]; then
+  BILLING_ACCOUNT=$(head -n 1 ${CLUSTER_PROFILE_DIR}/aws_billing_account)
+  BILLING_ACCOUNT_SWITCH="--billing-account ${BILLING_ACCOUNT}"
+  record_cluster "billing_account" ${BILLING_ACCOUNT}
+
+  BILLING_ACCOUNT_MASK=$(echo "${BILLING_ACCOUNT:0:4}***")
+fi
+
 # If the node count is >=24 we enable autoscaling with max replicas set to the replica count so we can bypass the day2 rollout.
 # This requires a second step in the waiting for nodes phase where we put the config back to the desired setup.
 COMPUTE_NODES_SWITCH=""
@@ -338,7 +341,20 @@ if [[ "$HOSTED_CP" == "true" ]]; then
         exit 1
       fi
     fi
-    PROVISION_SHARD_ID=$(echo "$psList" | head -n 1)
+
+    PROVISION_SHARD_ID=""
+    # ensure the SC is not for ibm usage so that it could support the latest version of the hosted cluster
+    for ps in $psList ; do
+      topology=$(ocm get /api/clusters_mgmt/v1/provision_shards/${ps} | jq -r '.hypershift_config.topology')
+      if [[ "$topology" == "dedicated" ]] || [[ "$topology" == "dedicated-v2" ]] ; then
+      	PROVISION_SHARD_ID=${ps}
+      fi
+    done
+
+    if [[ -z "$PROVISION_SHARD_ID" ]]; then
+        echo "No available provision shard found! psList: $psList"
+        exit 1
+    fi
 
     HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
     record_cluster "properties" "provision_shard_id" ${PROVISION_SHARD_ID}
@@ -427,7 +443,7 @@ if [[ "$STS" == "true" ]]; then
   STS_SWITCH="--sts"
 
   # Account roles
-  ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
+  ACCOUNT_ROLES_PREFIX=$CLUSTER_PREFIX
   echo -e "Get the ARNs of the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
 
   roleARNFile="${SHARED_DIR}/account-roles-arns"
@@ -455,7 +471,7 @@ if [[ "$STS" == "true" ]]; then
 
   if [[ "$BYO_OIDC" == "true" ]]; then
     oidc_config_id=$(cat "${SHARED_DIR}/oidc-config" | jq -r '.id')
-    operator_roles_prefix=$(cat "${SHARED_DIR}/operator-roles-prefix")
+    operator_roles_prefix=$CLUSTER_PREFIX
     BYO_OIDC_SWITCH="--oidc-config-id ${oidc_config_id} --operator-roles-prefix ${operator_roles_prefix}"
     record_cluster "aws.sts" "oidc_config_id" $oidc_config_id
     record_cluster "aws.sts" "operator_roles_prefix" $operator_roles_prefix
@@ -562,6 +578,7 @@ ${SHARED_VPC_SWITCH} \
 ${SECURITY_GROUP_ID_SWITCH} \
 ${NO_CNI_SWITCH} \
 ${CONFIGURE_CLUSTER_AUTOSCALER_SWITCH} \
+${BILLING_ACCOUNT_SWITCH} \
 ${DRY_RUN_SWITCH}
 "
 echo "$cmd"| sed -E 's/\s{2,}/ /g' > "${SHARED_DIR}/create_cluster.sh"
@@ -571,6 +588,10 @@ cmdout=$(cat "${SHARED_DIR}/create_cluster.sh" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACC
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   cmdout=$(echo $cmdout | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g")
 fi
+if [[ "$ENABLE_BILLING_ACCOUNT" == "yes" ]]; then
+  cmdout=$(echo $cmdout | sed "s/${BILLING_ACCOUNT}/${BILLING_ACCOUNT_MASK}/g")
+fi
+
 echo "$cmdout"
 CLUSTER_INFO_WITHOUT_MASK="$(mktemp)"
 eval "${cmd}" > "${CLUSTER_INFO_WITHOUT_MASK}"

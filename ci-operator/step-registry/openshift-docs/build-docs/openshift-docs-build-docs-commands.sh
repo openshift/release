@@ -5,6 +5,8 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
+curl https://raw.githubusercontent.com/openshift/openshift-docs/main/scripts/get-updated-preview-urls.sh > scripts/get-updated-preview-urls.sh
+
 NETLIFY_AUTH_TOKEN=$(cat /tmp/vault/ocp-docs-netlify-secret/NETLIFY_AUTH_TOKEN)
 
 export NETLIFY_AUTH_TOKEN

@@ -15,10 +15,26 @@ chain:
       documentation: "Release image used for the HostedCluster. Empty by default it will use release:latest"
     - name: HYPERSHIFT_AZURE_LOCATION
       default: "eastus"
-      documentation: "The Azure location of the cluster."
+      documentation: |-
+        Specifies the Azure location of the cluster. If intentionally left as an empty string, 
+        it defaults to that of the management cluster.
+    - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
+      default: ""
+      documentation: "Specifies the external DNS domain. If left empty, external DNS is assumed to be disabled."
     - name: ENABLE_ICSP
       default: "false"
-      documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
+      documentation: "If true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
+    - name: USE_HYPERSHIFT_AZURE_CREDS
+      default: "false"
+      documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters"
+    - name: HYPERSHIFT_ETCD_ENCRYPTION
+      default: "false"
+      documentation: |-
+        If true, enable ETCD encryption by specifying 
+        --encryption-key-id="$(cat "${SHARED_DIR}/azure_active_key_url")".
+    - name: EXTRA_ARGS
+      default: ""
+      documentation: "Extra arguments to pass to the hypershift create cluster azure command."
     commands: |-
       set -exuo pipefail
 
@@ -26,6 +42,12 @@ chain:
       echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
       
       RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
+      
+      AZURE_CREDS=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+      if [[ $USE_HYPERSHIFT_AZURE_CREDS == "true" ]]; then
+        AZURE_CREDS="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+      fi
+      HC_LOCATION=${HYPERSHIFT_AZURE_LOCATION:-$LEASED_RESOURCE}
       
       PULL_SECRET_PATH="/etc/ci-pull-credentials/.dockerconfigjson"
       ICSP_COMMAND=""
@@ -36,14 +58,30 @@ chain:
         PULL_SECRET_PATH="/tmp/.dockerconfigjson"
       fi
       
-      /usr/bin/hypershift create cluster azure ${ICSP_COMMAND} \
+      ENCRYPTION_KEY_ID=""
+      if [[ $HYPERSHIFT_ETCD_ENCRYPTION == "true" ]]; then
+        ENCRYPTION_KEY_ID="$(cat "${SHARED_DIR}/azure_active_key_url")"
+      fi
+      
+      HC_ANNOTATIONS_FILE="${SHARED_DIR}/hypershift_hc_annotations"
+      if [[ -f "$HC_ANNOTATIONS_FILE" ]]; then
+        while read -r line; do
+          if [[ -n "$line" ]]; then
+            EXTRA_ARGS+=" --annotations=${line}"
+          fi
+        done < "$HC_ANNOTATIONS_FILE"
+      fi
+      
+      /usr/bin/hypershift create cluster azure ${EXTRA_ARGS} ${ICSP_COMMAND} \
         --name ${CLUSTER_NAME} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
         --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
+        --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
         --pull-secret ${PULL_SECRET_PATH} \
-        --azure-creds ${CLUSTER_PROFILE_DIR}/osServicePrincipal.json \
-        --location ${HYPERSHIFT_AZURE_LOCATION} \
-        --release-image ${RELEASE_IMAGE}
+        --azure-creds ${AZURE_CREDS} \
+        --location ${HC_LOCATION} \
+        --release-image ${RELEASE_IMAGE} \
+        --encryption-key-id=${ENCRYPTION_KEY_ID}
 
       # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
       echo "Waiting for cluster to become available"
@@ -68,6 +106,9 @@ chain:
     credentials:
     - mount_path: /etc/ci-pull-credentials
       name: ci-pull-credentials
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-ci-jobs-azurecreds
+      name: hypershift-ci-jobs-azurecreds
       namespace: test-credentials
     dependencies:
     - name: "release:latest"

@@ -6,7 +6,7 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-OPERATOR_ROLES_PREFIX=${OPERATOR_ROLES_PREFIX:-$NAMESPACE}
+OPERATOR_ROLES_PREFIX=$(head -n 1 "${SHARED_DIR}/cluster-prefix")
 OIDC_CONFIG_MANAGED=${OIDC_CONFIG_MANAGED:-true}
 CHANNEL_GROUP=${CHANNEL_GROUP:-"stable"}
 
@@ -70,8 +70,6 @@ rosa create operator-roles -y --mode auto \
                            ${HOSTED_CP_SWITCH} \
                            ${SHARED_VPC_SWITCH} \
                            | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
-# Store the operator-roles for the post steps and the operator roles deletion
-echo -n "${OPERATOR_ROLES_PREFIX}" > "${SHARED_DIR}/operator-roles-prefix"
 # rosa list operator-roles --prefix ${OPERATOR_ROLES_PREFIX} --output json > "${SHARED_DIR}/operator-roles-arns"
 ret=0
 rosa list operator-roles --prefix ${OPERATOR_ROLES_PREFIX} |grep -v OPERATOR | awk '{print $4}' > "${SHARED_DIR}/operator-roles-arns" || ret=$?

@@ -5,14 +5,10 @@ build_root:
     tag: golang-1.13
 images:
 - build_args:
-  - name: DOCKER_BUILDKIT
-    value: "1"
-  - name: BUILDKIT_PROGRESS
-    value: plain
   - name: max_jobs
-    value: "10"
+    value: "8"
   - name: nvcc_threads
-    value: "18"
+    value: "2"
   - name: TORCH_CUDA_ARCH_LIST
     value: 7.0 7.5 8.0 8.6 8.9 9.0+PTX
   - name: PYTHON_VERSION
@@ -35,6 +31,15 @@ resources:
     requests:
       cpu: 200m
       memory: 200Mi
+  smoke-test:
+    limits:
+      cpu: "4"
+      memory: 24Gi
+      nvidia.com/gpu: "1"
+    requests:
+      cpu: "4"
+      memory: 8Gi
+      nvidia.com/gpu: "1"
   vllm-build-release-cuda:
     limits:
       cpu: "16"
@@ -43,6 +48,19 @@ resources:
       cpu: "16"
       memory: 24Gi
 tests:
+- always_run: true
+  as: smoke-test
+  cluster: build05
+  commands: |
+    export VIRTUAL_ENV=/opt/vllm
+    export PATH=$VIRTUAL_ENV/bin/:$PATH
+
+    cd extras
+
+    bash smoke-test.sh
+  container:
+    clone: true
+    from: vllm-build-release-cuda
 - as: pr-image-mirror
   steps:
     dependencies:

@@ -1,5 +1,6 @@
 ref:
   as: cucushift-hypershift-extended-install-private
+  cli: latest
   from: hypershift-operator
   dependencies:
   - env: HYPERSHIFT_RELEASE_LATEST
@@ -10,14 +11,28 @@ ref:
     documentation: |
       Specifies the AWS region for the cluster. If left as an empty string, 
       the region defaults to that of the management cluster.
-  - name: OCP_ARCH
-    default: "amd64"
-    documentation: "The architecture of the control plane nodes (e.g., amd64, arm64)."
+  - name: HYPERSHIFT_ENABLE_CONVERSION_WEBHOOK
+    default: "true"
+    documentation: Whether to enable webhook for converting hypershift API types.
+  - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
+    default: "hypershift-ext.qe.devcluster.openshift.com"
+    documentation: Specifies the external DNS domain. If left empty, external DNS is assumed to be disabled.
+  - name: HYPERSHIFT_MANAGED_SERVICE
+    default: ""
+    documentation: The type of managed service the HyperShift Operator is installed on.
+  - name: HYPERSHIFT_OPERATOR_PULL_SECRET
+    default: "false"
+    documentation: If true, adds --pull-secret="${CLUSTER_PROFILE_DIR}/pull-secret" to hypershift install.
+  - name: HO_MULTI
+    default: "false"
+    documentation: "If true, HyperShift Operator image will be multi"
   - name: ENABLE_PRIVATE
     default: "true"
-    documentation: "Whether to enable the private or not (due to https://issues:redhat.com/browse/NE-1298 only supporting amd64)."
+    documentation: |
+      Whether to enable the private or not (due to https://issues:redhat.com/browse/NE-1298 only supporting amd64)
   commands: cucushift-hypershift-extended-install-private-commands.sh
   grace_period: 10m0s
+  timeout: 20m0s
   resources:
     requests:
       cpu: 100m
@@ -25,5 +40,8 @@ ref:
   - mount_path: /etc/hypershift-pool-aws-credentials
     name: hypershift-qe-aws-privatecred
     namespace: test-credentials
+  - mount_path: /etc/hypershift-ext-dns-app-azure
+    name: hypershift-ext-dns-app-azure
+    namespace: test-credentials
   documentation: |-
-    Install HyperShift Operator on an AWS cluster.
+    Install HyperShift Operator.

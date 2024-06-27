@@ -3,15 +3,11 @@ base_images:
     name: builder
     namespace: stolostron
     tag: go1.19-linux
-  stolostron_builder_go1.20-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.20-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.20-linux
+    tag: go1.19-linux
 images:
 - dockerfile_path: Dockerfile
   inputs:
@@ -26,16 +22,6 @@ promotion:
   - disabled: true
     name: "2.5"
     namespace: stolostron
-releases:
-  initial:
-    integration:
-      name: "4.13"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.13"
-      namespace: ocp
 resources:
   '*':
     requests:
@@ -46,31 +32,6 @@ tests:
   commands: make test
   container:
     from: src
-- as: e2e
-  cluster_claim:
-    architecture: amd64
-    as: custom
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.13"
-  steps:
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        KUBECTL=oc
-        export KUBECTL
-        make test-e2e
-      dependencies:
-      - env: IMG
-        name: hypershift-addon-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: generic-claim
 - as: sonar
   commands: |
     export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/e2e/ {printf $0" "}')"

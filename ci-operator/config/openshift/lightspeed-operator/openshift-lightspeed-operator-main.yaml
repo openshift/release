@@ -29,9 +29,9 @@ operator:
   - as: lightspeed-bundle-test
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/openshift/lightspeed-operator:latest
+  - pullspec: quay.io/openshift-lightspeed/lightspeed-operator:latest
     with: pipeline:lightspeed-operator
-  - pullspec: quay.io/openshift/lightspeed-service-api:latest
+  - pullspec: quay.io/openshift-lightspeed/lightspeed-service-api:latest
     with: pipeline:lightspeed-service-api
 promotion:
   to:
@@ -80,6 +80,7 @@ tests:
       cli: latest
       commands: |
         oc create namespace openshift-lightspeed
+        oc label namespaces openshift-lightspeed openshift.io/cluster-monitoring=true --overwrite=true
         operator-sdk run bundle --timeout=10m -n openshift-lightspeed "$OO_BUNDLE"
         oc wait --for condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager
       dependencies:
@@ -107,6 +108,12 @@ tests:
         requests:
           cpu: 100m
     workflow: hypershift-hostedcluster-workflow
+- as: security
+  optional: true
+  steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main
   org: openshift

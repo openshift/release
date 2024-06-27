@@ -6,7 +6,7 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-OIDC_CONFIG_PREFIX=${OIDC_CONFIG_PREFIX:-$NAMESPACE}
+OIDC_CONFIG_PREFIX=$(head -n 1 "${SHARED_DIR}/cluster-prefix")
 OIDC_CONFIG_MANAGED=${OIDC_CONFIG_MANAGED:-true}
 
 # Configure aws
@@ -48,18 +48,12 @@ AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 # Switches
 MANAGED_SWITCH="--managed=${OIDC_CONFIG_MANAGED}"
 if [[ "$OIDC_CONFIG_MANAGED" == "false" ]]; then
-  # ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
-  # account_installer_role_name="${ACCOUNT_ROLES_PREFIX}-Installer-Role"
-  # if [[ "$HOSTED_CP" == "true" ]]; then
-  #   account_installer_role_name="${ACCOUNT_ROLES_PREFIX}-HCP-ROSA-Installer-Role"
-  # fi
-  # account_installer_role_arn=$(cat "${SHARED_DIR}/account-roles-arns" | { grep "${account_installer_role_name}" || true; })
   account_installer_role_arn=$(cat "${SHARED_DIR}/account-roles-arns" | { grep "Installer-Role" || true; })  
   MANAGED_SWITCH="${MANAGED_SWITCH} --prefix ${OIDC_CONFIG_PREFIX} --installer-role-arn ${account_installer_role_arn}"
 fi
 
 # Create oidc config
-echo "Create the managed=${OIDC_CONFIG_MANAGED} oidc config ..."
+echo "Create the managed=${OIDC_CONFIG_MANAGED} oidc config ${OIDC_CONFIG_PREFIX} ..."
 rosa create oidc-config -y --mode auto --output json\
                         ${MANAGED_SWITCH} \
                         > "${SHARED_DIR}/oidc-config"

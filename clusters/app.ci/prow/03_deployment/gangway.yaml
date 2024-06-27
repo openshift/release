@@ -80,7 +80,7 @@ objects:
           env:
           - name: GIT_SYNC_DEST
             value: release
-          image: registry.k8s.io/git-sync/git-sync:v3.6.2
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
@@ -97,7 +97,7 @@ objects:
           env:
           - name: GIT_SYNC_DEST
             value: release
-          image: registry.k8s.io/git-sync/git-sync:v3.6.2
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.2.3
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
@@ -120,8 +120,8 @@ objects:
           - -client-id=system:serviceaccount:ci:gangway
           - -openshift-ca=/etc/pki/tls/cert.pem
           - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-          - '-openshift-sar={"resource": "namespaces", "verb": "get"}'
-          - '-openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}}'
+          - '-openshift-sar=[{"resource": "namespaces", "verb": "get"},{"resource": "systemusers", "verb": "impersonate"}]'
+          - '-openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}, "/bulk-job-status-update": {"resource": "systemusers", "verb": "impersonate"}}'
           - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
           - -cookie-secret-file=/etc/proxy/secrets/session_secret
           - -cookie-samesite=none
@@ -134,9 +134,9 @@ objects:
             name: session-secret
         - name: envoyproxy
           imagePullPolicy: IfNotPresent
-          image: registry.ci.openshift.org/ci/tp-envoyproxy:1.26.4
+          image: registry.ci.openshift.org/ci/tp-envoyproxy:1.26.4-stable
         - name: gangway
-          image: gcr.io/k8s-prow/gangway:v20240515-dd5d0eeaa
+          image: gcr.io/k8s-prow/gangway:v20240625-266ce07da
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config

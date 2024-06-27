@@ -1,8 +1,4 @@
 base_images:
-  stolostron_builder_go1.20-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.20-linux
   stolostron_builder_go1.21-linux:
     name: builder
     namespace: stolostron
@@ -37,6 +33,14 @@ tests:
   commands: |
     export SONAR_GO_TEST_ARGS="-short ./..."
     export SELF="make -f /opt/build-harness/Makefile.prow"
+    export KUBEBUILDER_VERSION="1.27.1"
+    export os=$(go env GOOS)
+    export arch=$(go env GOARCH)
+    export KB_TOOLS_ARCHIVE_NAME="kubebuilder-tools-${KUBEBUILDER_VERSION}-${os}-${arch}.tar.gz"
+    curl -s -f -L https://storage.googleapis.com/kubebuilder-tools/${KB_TOOLS_ARCHIVE_NAME} -o ${KB_TOOLS_ARCHIVE_NAME}
+    tar -zxvf ${KB_TOOLS_ARCHIVE_NAME}
+    export PATH=$PATH:$(pwd)/kubebuilder/bin
+    export KUBEBUILDER_ASSETS=$(pwd)/kubebuilder/bin
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -47,6 +51,14 @@ tests:
   commands: |
     export SONAR_GO_TEST_ARGS="-short ./..."
     export SELF="make -f /opt/build-harness/Makefile.prow"
+    export KUBEBUILDER_VERSION="1.27.1"
+    export os=$(go env GOOS)
+    export arch=$(go env GOARCH)
+    export KB_TOOLS_ARCHIVE_NAME="kubebuilder-tools-${KUBEBUILDER_VERSION}-${os}-${arch}.tar.gz"
+    curl -s -f -L https://storage.googleapis.com/kubebuilder-tools/${KB_TOOLS_ARCHIVE_NAME} -o ${KB_TOOLS_ARCHIVE_NAME}
+    tar -zxvf ${KB_TOOLS_ARCHIVE_NAME}
+    export PATH=$PATH:$(pwd)/kubebuilder/bin
+    export KUBEBUILDER_ASSETS=$(pwd)/kubebuilder/bin
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src

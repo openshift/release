@@ -1648,11 +1648,11 @@ postsubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
-      ci-operator.openshift.io/variant: ibmcloud-4.15-nightly-x86
+      ci-operator.openshift.io/variant: ibmcloud-4.16-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.15"
+      job-release: "4.16"
     max_concurrency: 1
-    name: branch-ci-openshift-qe-ocp-qe-perfscale-ci-main-ibmcloud-4.15-nightly-x86-images
+    name: branch-ci-openshift-qe-ocp-qe-perfscale-ci-main-ibmcloud-4.16-nightly-x86-images
     spec:
       containers:
       - args:
@@ -1662,7 +1662,7 @@ postsubmits:
         - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=ibmcloud-4.15-nightly-x86
+        - --variant=ibmcloud-4.16-nightly-x86
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1711,11 +1711,11 @@ postsubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
-      ci-operator.openshift.io/variant: ibmcloud-4.16-nightly-x86
+      ci-operator.openshift.io/variant: ibmcloud-4.16-nightly-x86-loaded-upgrade-from-4.15
       ci.openshift.io/generator: prowgen
       job-release: "4.16"
     max_concurrency: 1
-    name: branch-ci-openshift-qe-ocp-qe-perfscale-ci-main-ibmcloud-4.16-nightly-x86-images
+    name: branch-ci-openshift-qe-ocp-qe-perfscale-ci-main-ibmcloud-4.16-nightly-x86-loaded-upgrade-from-4.15-images
     spec:
       containers:
       - args:
@@ -1725,7 +1725,70 @@ postsubmits:
         - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=ibmcloud-4.16-nightly-x86
+        - --variant=ibmcloud-4.16-nightly-x86-loaded-upgrade-from-4.15
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build03
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/variant: ibmcloud-4.17-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+    max_concurrency: 1
+    name: branch-ci-openshift-qe-ocp-qe-perfscale-ci-main-ibmcloud-4.17-nightly-x86-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=ibmcloud-4.17-nightly-x86
         command:
         - ci-operator
         image: ci-operator:latest
@@ -2542,6 +2605,69 @@ postsubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --variant=vsphere-4.15-nightly-x86
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: vsphere02
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/variant: vsphere-4.16-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.16"
+    max_concurrency: 1
+    name: branch-ci-openshift-qe-ocp-qe-perfscale-ci-main-vsphere-4.16-nightly-x86-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=vsphere-4.16-nightly-x86
         command:
         - ci-operator
         image: ci-operator:latest

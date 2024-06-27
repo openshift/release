@@ -4,7 +4,7 @@ postsubmits:
     always_run: true
     branches:
     - ^master$
-    cluster: build04
+    cluster: build02
     decorate: true
     labels:
       ci-operator.openshift.io/variant: edge
@@ -63,7 +63,7 @@ postsubmits:
     always_run: true
     branches:
     - ^master$
-    cluster: build04
+    cluster: build02
     decorate: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
@@ -124,7 +124,7 @@ postsubmits:
     always_run: true
     branches:
     - ^master$
-    cluster: build04
+    cluster: build02
     decorate: true
     labels:
       ci-operator.openshift.io/variant: edge
@@ -183,7 +183,66 @@ postsubmits:
     always_run: true
     branches:
     - ^master$
-    cluster: build04
+    cluster: build02
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: edge
+      ci.openshift.io/generator: prowgen
+      job-release: "4.16"
+    max_concurrency: 1
+    name: branch-ci-openshift-assisted-service-master-edge-mirror-vcsref-image-el8
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=mirror-vcsref-image-el8
+        - --variant=edge
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    cluster: build02
     decorate: true
     labels:
       ci-operator.openshift.io/variant: edge
@@ -242,7 +301,7 @@ postsubmits:
     always_run: true
     branches:
     - ^master$
-    cluster: build04
+    cluster: build02
     decorate: true
     labels:
       ci-operator.openshift.io/variant: edge
@@ -301,7 +360,7 @@ postsubmits:
     always_run: true
     branches:
     - ^master$
-    cluster: build04
+    cluster: build02
     decorate: true
     labels:
       ci-operator.openshift.io/variant: edge
@@ -360,7 +419,7 @@ postsubmits:
     always_run: true
     branches:
     - ^master$
-    cluster: build04
+    cluster: build02
     decorate: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
@@ -418,7 +477,7 @@ postsubmits:
     always_run: true
     branches:
     - ^master$
-    cluster: build04
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -480,7 +539,7 @@ postsubmits:
     always_run: true
     branches:
     - ^master$
-    cluster: build04
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -540,7 +599,67 @@ postsubmits:
     always_run: true
     branches:
     - ^master$
-    cluster: build04
+    cluster: build02
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: mce
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-openshift-assisted-service-master-mce-publish-el8
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=publish-el8
+        - --variant=mce
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true

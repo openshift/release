@@ -5,12 +5,14 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
+curl https://raw.githubusercontent.com/openshift/openshift-docs/main/scripts/get-updated-distros.sh > scripts/get-updated-distros.sh
+
 IFS=' ' read -r -a DISTROS <<< "${DISTROS}"
 
 for DISTRO in "${DISTROS[@]}"; do
 
     case "${DISTRO}" in
-        "openshift-enterprise"|"openshift-acs"|"openshift-pipelines"|"openshift-serverless"|"openshift-gitops"|"openshift-builds"|"openshift-service-mesh"|"openshift-opp"|"openshift-rhde")
+        "openshift-enterprise"|"openshift-acs"|"openshift-pipelines"|"openshift-serverless"|"openshift-gitops"|"openshift-builds"|"openshift-service-mesh"|"openshift-opp"|"openshift-rhde"|"openshift-lightspeed")
             TOPICMAP="_topic_maps/_topic_map.yml"
             ;;
         "openshift-rosa")

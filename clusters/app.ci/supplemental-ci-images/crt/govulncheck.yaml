@@ -20,35 +20,25 @@ spec:
       namespace: ci
   source:
     dockerfile: |
-      FROM registry.ci.openshift.org/origin/ubi-minimal:8
-      ENV VERSION=1.22.3 \
-        GOCACHE=/go/.cache \
-        GOPATH=/go \
-        GOROOT=/usr/local/go \
-        LOGNAME=deadbeef
-      ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
-      RUN \
-        set -x &&  \
-        microdnf install -y tar gzip gcc && \
-        microdnf clean all && \
-        curl --fail --retry 3 -L https://golang.org/dl/go$VERSION.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
-        go install golang.org/x/vuln/cmd/govulncheck@latest && \
-        mv $GOPATH/bin/* /usr/bin/ && \
-        rm -rf $GOPATH/* $GOPATH/.cache
-      ENTRYPOINT ["/usr/bin/govulncheck"]
+      FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
+      # GOFLAGS must be unset as this image uses mod=vendor by default, which is incompatible with `go install`
+      RUN GOFLAGS="" go install golang.org/x/vuln/cmd/govulncheck@latest
+      # Setting GOVERSION to v0.0.0 prevents vulnerabilities in stdlib with upstream patches from being reported
+      ENV GOVERSION=v0.0.0
+      ENTRYPOINT ["/go/bin/govulncheck"]
     type: Dockerfile
   strategy:
     dockerStrategy:
       from:
         kind: ImageStreamTag
-        name: "ubi-minimal:8"
-        namespace: origin
+        name: "release:rhel-9-release-golang-1.21-openshift-4.16"
+        namespace: openshift
     type: Docker
   triggers:
   - type: ConfigChange
   - imageChange:
       from:
         kind: ImageStreamTag
-        name: "ubi-minimal:8"
-        namespace: origin
+        name: "release:rhel-9-release-golang-1.21-openshift-4.16"
+        namespace: openshift
     type: ImageChange

@@ -26,28 +26,24 @@ resources:
       memory: 200Mi
 tests:
 - as: tempo-stage-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 3h0m0s
-    version: "4.12"
   cron: 0 6 1 10 *
   steps:
+    cluster_profile: aws-qe
     env:
-      DOWNSTREAM_TESTS_COMMIT: c19aa1cd60741748256d7f8c7c05a2f9c8e30239
+      BASE_DOMAIN: qe.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
-            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"}
+            {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""}
         ]
-      SKIP_TESTS: tests/e2e-openshift/red-metrics tests/e2e-openshift/monitoring
+      SKIP_TESTS: tests/e2e-openshift/monitoring tests/e2e-openshift/red-metrics tests/e2e-openshift-ossm/*
     test:
     - ref: enable-stage-catalogsource
     - ref: install-operators
-    - ref: distributed-tracing-tests-tempo
-    workflow: generic-claim
+    - ref: distributed-tracing-tests-tempo-downstream
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -38,6 +38,7 @@ BASE_DOMAIN="${LEASED_RESOURCE}.ci"
 CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
+echo "Creating the libvirt network.xml file..."
 cat >> "${SHARED_DIR}/network.xml" << EOF
 <network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>
   <name>${CLUSTER_NAME}</name>
@@ -49,6 +50,10 @@ cat >> "${SHARED_DIR}/network.xml" << EOF
   <bridge name='ocp$(leaseLookup "subnet")' stp='on' delay='0'/>
   <domain name='${BASE_URL}' localOnly='yes'/>
   <dns enable='yes'>
+    <host ip='$(leaseLookup '"bootstrap"[0].ip')'>
+      <hostname>api.${BASE_URL}</hostname>
+      <hostname>api-int.${BASE_URL}</hostname>
+    </host>
     <host ip='$(leaseLookup '"control-plane"[0].ip')'>
       <hostname>api.${BASE_URL}</hostname>
       <hostname>api-int.${BASE_URL}</hostname>

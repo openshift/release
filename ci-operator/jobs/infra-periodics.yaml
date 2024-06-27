@@ -886,7 +886,7 @@ periodics:
       - --config=core-services/prow/02_config/_bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: gcr.io/k8s-prow/generic-autobumper:v20240515-dd5d0eeaa
+      image: gcr.io/k8s-prow/generic-autobumper:v20240625-266ce07da
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -927,7 +927,7 @@ periodics:
       - --target-dir=.
       - --config-dir=./ci-operator/config
       - --current-release=4.17
-      - --future-release=4.17
+      - --future-release=4.18
       - --self-approve=true
       - --assign=openshift/test-platform
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
@@ -993,7 +993,7 @@ periodics:
     - name: prometheus
       secret:
         items:
-        - key: sa.prometheus-user-workload.app.ci.token.txt
+        - key: sa.ci-monitoring.app.ci.token.txt
           path: token
         secretName: app-ci-openshift-user-workload-monitoring-credentials
     - name: token
@@ -1141,54 +1141,32 @@ periodics:
       - --self-approve=true
       - --assign=openshift/test-platform
       - --plugin-config=core-services/prow/02_config/_plugins.yaml
-      - --ignore-repo=ci-operator/config/openshift/jenkins
-      - --ignore-repo=ci-operator/config/redhat-developer/helm
-      - --ignore-repo=ci-operator/config/redhat-developer/odo
-      - --ignore-repo=ci-operator/config/redhat-developer/service-binding-operator
-      - --ignore-repo=ci-operator/config/redhat-developer/gitops-operator
-      - --ignore-repo=ci-operator/config/stolostron/acmqe-autotest
-      - --ignore-repo=ci-operator/jobs/openshift/jenkins
-      - --ignore-repo=ci-operator/jobs/redhat-developer/helm
-      - --ignore-repo=ci-operator/jobs/redhat-developer/odo
-      - --ignore-repo=ci-operator/jobs/redhat-developer/service-binding-operator
-      - --ignore-repo=ci-operator/jobs/redhat-developer/gitops-operator
-      - --ignore-repo=ci-operator/jobs/stolostron/acmqe-autotest
-      - --ignore-repo=ci-operator/config/openshift/kubernetes-metrics-server
-      - --ignore-repo=ci-operator/jobs/openshift/kubernetes-metrics-server
-      - --ignore-repo=ci-operator/config/openshift/origin-metrics
-      - --ignore-repo=ci-operator/jobs/openshift/origin-metrics
-      - --ignore-repo=ci-operator/config/openshift/origin-web-console
-      - --ignore-repo=ci-operator/jobs/openshift/origin-web-console
-      - --ignore-repo=ci-operator/config/openshift/origin-web-console-server
-      - --ignore-repo=ci-operator/jobs/openshift/origin-web-console-server
-      - --ignore-repo=ci-operator/templates/openshift/installer
-      - --ignore-repo=ci-operator/config/openshift/csi-driver-registrar
-      - --ignore-repo=ci-operator/config/openshift/csi-external-resizer
-      - --ignore-repo=ci-operator/config/openshift/csi-external-snapshotter
-      - --ignore-repo=ci-operator/config/openshift/csi-livenessprobe
-      - --ignore-repo=ci-operator/config/openshift/sig-storage-local-static-provisioner
-      - --ignore-repo=ci-operator/jobs/openshift/csi-driver-registrar
-      - --ignore-repo=ci-operator/jobs/openshift/csi-external-resizer
-      - --ignore-repo=ci-operator/jobs/openshift/csi-external-snapshotter
-      - --ignore-repo=ci-operator/jobs/openshift/csi-livenessprobe
-      - --ignore-repo=ci-operator/jobs/openshift/sig-storage-local-static-provisioner
-      - --ignore-repo=ci-operator/config/openshift/oauth-apiserver
-      - --ignore-repo=ci-operator/jobs/openshift/oauth-apiserver
-      - --ignore-repo=ci-operator/config/openshift/build-machinery-go
-      - --ignore-repo=ci-operator/jobs/openshift/build-machinery-go
-      - --ignore-repo=ci-operator/config/openshift/etcd
-      - --ignore-repo=ci-operator/jobs/openshift/etcd
-      - --ignore-repo=ci-operator/config/opendatahub-io/manifests
-      - --ignore-repo=ci-operator/jobs/opendatahub-io/manifests
-      - --ignore-repo=ci-operator/config/openshift/cluster-api-provider-kubevirt
-      - --ignore-repo=ci-operator/jobs/openshift/cluster-api-provider-kubevirt
+      - --ignore-repo=openshift/jenkins
+      - --ignore-repo=redhat-developer/helm
+      - --ignore-repo=redhat-developer/odo
+      - --ignore-repo=redhat-developer/service-binding-operator
+      - --ignore-repo=redhat-developer/gitops-operator
+      - --ignore-repo=stolostron/acmqe-autotest
+      - --ignore-repo=openshift/kubernetes-metrics-server
+      - --ignore-repo=openshift/origin-metrics
+      - --ignore-repo=openshift/origin-web-console
+      - --ignore-repo=origin-web-console-server
+      - --ignore-repo=openshift/csi-driver-registrar
+      - --ignore-repo=openshift/csi-external-resizer
+      - --ignore-repo=openshift/csi-external-snapshotter
+      - --ignore-repo=openshift/csi-livenessprobe
+      - --ignore-repo=openshift/sig-storage-local-static-provisioner
+      - --ignore-repo=openshift/oauth-apiserver
+      - --ignore-repo=openshift/build-machinery-go
+      - --ignore-repo=openshift/etcd
+      - --ignore-repo=opendatahub-io/manifests
+      - --ignore-repo=openshift/cluster-api-provider-kubevirt
+      - --ignore-repo=serverless-operator
+      - --ignore-repo=ci-operator/config/openshift/velero
+      - --ignore-repo=openshift/velero
       - --ignore-org=openshift-priv
       - --ignore-org=kubernetes-sigs
       - --ignore-org=CSPI-QE
-      - --ignore-repo=ci-operator/config/CSPI-QE/amq-streams
-      - --ignore-repo=ci-operator/jobs/CSPI-QE/amq-streams
-      - --ignore-repo=ci-operator/config/openshift-knative/serverless-operator
-      - --ignore-repo=ci-operator/jobs/openshift-knative/serverless-operator
       - --extra-config-dir=core-services/prow/02_config/
       command:
       - /usr/bin/autoowners
@@ -1239,7 +1217,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: gcr.io/k8s-prow/branchprotector:v20240515-dd5d0eeaa
+      image: gcr.io/k8s-prow/branchprotector:v20240625-266ce07da
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1293,7 +1271,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/branchprotector:v20240515-dd5d0eeaa
+      image: gcr.io/k8s-prow/branchprotector:v20240625-266ce07da
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1351,7 +1329,7 @@ periodics:
       - --github-allowed-burst=600
       command:
       - /ko-app/peribolos
-      image: gcr.io/k8s-prow/peribolos:v20240515-dd5d0eeaa
+      image: gcr.io/k8s-prow/peribolos:v20240625-266ce07da
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1420,7 +1398,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: gcr.io/k8s-prow/config-bootstrapper:v20240515-dd5d0eeaa
+      image: gcr.io/k8s-prow/config-bootstrapper:v20240625-266ce07da
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1451,7 +1429,7 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/
       - --current-release=4.17
-      - --future-release=4.17
+      - --future-release=4.18
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -1536,7 +1514,7 @@ periodics:
       - --dry-run=false
       - --config-dir=./ci-operator/config/
       - --current-release=4.17
-      - --future-release=4.17
+      - --future-release=4.18
       command:
       - blocking-issue-creator
       image: blocking-issue-creator:latest
@@ -1912,7 +1890,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20240515-dd5d0eeaa
+      image: gcr.io/k8s-prow/invitations-accepter:v20240625-266ce07da
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1944,7 +1922,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20240515-dd5d0eeaa
+      image: gcr.io/k8s-prow/invitations-accepter:v20240625-266ce07da
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1976,7 +1954,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20240515-dd5d0eeaa
+      image: gcr.io/k8s-prow/invitations-accepter:v20240625-266ce07da
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2062,8 +2040,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-image-service
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.11
-      - --future-release=ocm-2.11
+      - --current-release=ocm-2.12
+      - --future-release=ocm-2.12
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2107,8 +2085,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/cluster-api-provider-agent
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.11
-      - --future-release=ocm-2.11
+      - --current-release=ocm-2.12
+      - --future-release=ocm-2.12
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2152,8 +2130,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-installer
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.11
-      - --future-release=ocm-2.11
+      - --current-release=ocm-2.12
+      - --future-release=ocm-2.12
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2197,8 +2175,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-installer-agent
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.11
-      - --future-release=ocm-2.11
+      - --current-release=ocm-2.12
+      - --future-release=ocm-2.12
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2242,8 +2220,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-service
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.11
-      - --future-release=ocm-2.11
+      - --current-release=ocm-2.12
+      - --future-release=ocm-2.12
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2287,8 +2265,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-test-infra
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.11
-      - --future-release=ocm-2.11
+      - --current-release=ocm-2.12
+      - --future-release=ocm-2.12
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2432,6 +2410,7 @@ periodics:
       - --ignore=rh-openjdk/jdkContainerOcpTests
       - --ignore=ran-telco5g/kpi-results
       - --ignore=jws-qe/interop-ocp-ci
+      - --ignore=openshift-logging/interop-ocp-ci
       command:
       - ./hack/check-gh-automation.sh
       env:
@@ -2648,9 +2627,9 @@ periodics:
         $extra_flag
       command:
       - /bin/bash
-      image: registry.ci.openshift.org/ci/auto-aggregator-job-names:latest
+      image: registry.ci.openshift.org/ci/job-run-aggregator:latest
       imagePullPolicy: Always
-      name: auto-aggregator-job-names
+      name: job-run-aggregator
       resources:
         requests:
           cpu: 500m
@@ -2685,6 +2664,35 @@ periodics:
       command:
       - image-graph-generator
       image: image-graph-generator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@daily'
+  decorate: true
+  name: periodic-openshift-release-qci-pruner
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed.
+  spec:
+    containers:
+    - args:
+      - --confirm
+      command:
+      - ./qci_registry_pruner.py
+      env:
+      - name: QUAY_OAUTH_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: token
+            name: qci-pruner-credentials
+      image: registry.ci.openshift.org/ci/qci-pruner:latest
       imagePullPolicy: Always
       name: ""
       resources:

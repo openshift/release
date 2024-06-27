@@ -18,7 +18,7 @@ fi
 
 openshift_install_path="/var/lib/openshift-install"
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
 
 # shellcheck source=/dev/null
 declare vsphere_datacenter

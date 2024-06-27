@@ -1,18 +1,18 @@
 base_images:
-  openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
+  openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.21-openshift-4.16
+    tag: rhel-9-release-golang-1.22-openshift-4.17
   operator-sdk:
     name: "4.17"
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: windows-machine-config-operator-bundle
   previous-wmco:
-    name: "4.15"
+    name: "4.16"
     namespace: ocp
     tag: windows-machine-config-operator-test
 binary_build_commands: make build
@@ -22,9 +22,9 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile.ci
   inputs:
-    openshift_release_rhel-9-release-golang-1.21-openshift-4.16:
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
   to: windows-machine-config-operator-test
 operator:
   bundles:
@@ -98,7 +98,6 @@ tests:
     workflow: ipi-aws-ovn-hybrid
 - always_run: false
   as: vsphere-disconnected-e2e-operator
-  optional: true
   steps:
     cluster_profile: vsphere-dis-2
     leases:
@@ -126,7 +125,7 @@ tests:
 - always_run: false
   as: vsphere-e2e-operator
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
@@ -255,27 +254,28 @@ tests:
 - always_run: false
   as: platform-none-vsphere-e2e-operator
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - ref: windows-e2e-operator-test-byoh
     workflow: windows-e2e-operator-test-platform-none-vsphere
 - always_run: false
   as: vsphere-proxy-e2e-operator
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
 - always_run: false
   as: wicd-unit-vsphere
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     post:
     - chain: upi-vsphere-windows-post
     pre:
     - ref: ipi-install-rbac
     - ref: ipi-conf
     - ref: ipi-conf-vsphere-check
+    - ref: ipi-conf-vsphere-check-vcm
     - ref: upi-conf-vsphere
     - ref: upi-conf-vsphere-dns
     - chain: upi-vsphere-windows-pre
@@ -285,8 +285,8 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: community-4.16
-      SOURCE_BRANCH: master
+      DESTINATION_BRANCH: community-4.17
+      SOURCE_BRANCH: release-4.17
     workflow: windows-ci-fastforward
 - always_run: false
   as: nutanix-e2e-operator

@@ -18,6 +18,15 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.15-image-based-upgrade-e2e-parallel-conformance
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: Job {{.Spec.Job}} finished with state {{.Status.State}}
   spec:
     containers:
     - args:
@@ -100,6 +109,15 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.15-image-based-upgrade-e2e-serial-conformance
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: Job {{.Spec.Job}} finished with state {{.Status.State}}
   spec:
     containers:
     - args:
@@ -181,6 +199,15 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.15-seedgen-aws-ocp-4-15
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: Job {{.Spec.Job}} finished with state {{.Status.State}}
   spec:
     containers:
     - args:
@@ -249,6 +276,97 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
+    timeout: 3h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: lifecycle-agent
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cluster: build02
+    ci-operator.openshift.io/variant: nightly-4.16
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.16-image-based-install
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: Job {{.Spec.Job}} finished with state {{.Status.State}}
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/image-based-install-cluster-profile
+      - --target=image-based-install
+      - --variant=nightly-4.16
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/image-based-install-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
     timeout: 4h0m0s
   extra_refs:
   - base_ref: main
@@ -263,6 +381,15 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.16-image-based-upgrade-e2e-parallel-conformance
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: Job {{.Spec.Job}} finished with state {{.Status.State}}
   spec:
     containers:
     - args:
@@ -345,6 +472,15 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.16-image-based-upgrade-e2e-serial-conformance
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: Job {{.Spec.Job}} finished with state {{.Status.State}}
   spec:
     containers:
     - args:
@@ -426,6 +562,15 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kni-lifecycle-agent-main-nightly-4.16-seedgen-aws-ocp-4-16
+  reporter_config:
+    slack:
+      channel: '#image-based-ci'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      - aborted
+      report_template: Job {{.Spec.Job}} finished with state {{.Status.State}}
   spec:
     containers:
     - args:

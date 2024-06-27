@@ -42,31 +42,6 @@ tests:
   commands: make test
   container:
     from: src
-- as: e2e
-  cluster_claim:
-    architecture: amd64
-    as: custom
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.11"
-  steps:
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        KUBECTL=oc
-        export KUBECTL
-        make test-e2e
-      dependencies:
-      - env: IMG
-        name: hypershift-addon-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: generic-claim
 - as: sonar
   commands: |
     export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/e2e/ {printf $0" "}')"

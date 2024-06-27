@@ -17,6 +17,7 @@ workflow:
       DEFAULT_MP_MAX_REPLICAS: 6
       DEFAULT_MP_MIN_REPLICAS: 3
       NODE_DRAIN_GRACE_PERIOD: "10m"
+      ENABLE_EXTERNAL_OIDC: "true"
     pre:
     - chain: cucushift-installer-rehearse-aws-ipi-ovn-provision
     - ref: aws-provision-vpc-shared
@@ -30,12 +31,14 @@ workflow:
     - ref: cucushift-hypershift-extended-capi-init
     - ref: cucushift-hypershift-extended-capi-provision
     - ref: cucushift-hypershift-extended-capi-vpc-peering
+    - ref: cucushift-hypershift-extended-capi-enable-hc
     - ref: cucushift-hypershift-extended-cilium
-    - ref: rosa-cluster-notify-error
+    # - ref: rosa-cluster-notify-error
     - ref: rosa-cluster-wait-ready-operators
     - ref: aws-provision-tags-for-byo-vpc
-    - ref: osd-ccs-conf-idp-htpasswd-multi-users
     - ref: rosa-cluster-wait-ready-nodes
+    - ref: openshift-extended-web-tests-ext-oidc-cli-login
+    - ref: cucushift-hypershift-extended-external-oidc-grant-user-role
     - ref: cucushift-hypershift-extended-capi-health-check
     post:
       - ref: cucushift-hypershift-extended-capi-deprovision
@@ -45,7 +48,7 @@ workflow:
       - chain: rosa-sts-oidc-config-delete
       - ref: aws-deprovision-security-group
       - ref: aws-deprovision-stacks
-      - chain: ipi-deprovision
+      - ref: ipi-deprovision-deprovision
   documentation: |-
     This workflow installs a rosa private hcp cluster by capi. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
     After finish testing, the cluster will be deprovsioned.
