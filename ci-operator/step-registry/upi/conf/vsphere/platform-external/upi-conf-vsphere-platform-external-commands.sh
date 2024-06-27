@@ -19,9 +19,10 @@ fi
 openshift_install_path="/var/lib/openshift-install"
 
 # subnets.json is no longer available in vault
-#SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
-
-SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+    SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+fi
 
 # shellcheck source=/dev/null
 declare vsphere_datacenter

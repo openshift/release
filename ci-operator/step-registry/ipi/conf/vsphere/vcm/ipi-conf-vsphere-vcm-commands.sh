@@ -81,6 +81,7 @@ declare vsphere_datastore
 declare vsphere_url
 declare vsphere_cluster
 declare vsphere_portgroup
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
@@ -112,8 +113,8 @@ set -o errexit
 
 Z_VERSION=1000
 
-if [ ! -z ${VERSION} ]; then
-  Z_VERSION=$(echo ${VERSION} | cut -d'.' -f2)
+if [ ! -z "${VERSION}" ]; then
+  Z_VERSION=$(echo "${VERSION}" | cut -d'.' -f2)
   echo "$(date -u --rfc-3339=seconds) - determined version is 4.${Z_VERSION}"
 else
   echo "$(date -u --rfc-3339=seconds) - unable to determine y stream, assuming this is master"

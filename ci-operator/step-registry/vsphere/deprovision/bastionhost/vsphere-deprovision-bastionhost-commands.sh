@@ -11,9 +11,6 @@ source "${SHARED_DIR}/govc.sh"
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
-unset SSL_CERT_FILE
-unset GOVC_TLS_CA_CERTS
-
 bastion_path=$(< ${SHARED_DIR}/bastion_host_path)
 echo "$(date -u --rfc-3339=seconds) - Deprovisioning bastion host ${bastion_path}"
 destroy_ret=0

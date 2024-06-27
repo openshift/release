@@ -17,9 +17,6 @@ source "${SHARED_DIR}/vsphere_context.sh"
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
-unset SSL_CERT_FILE
-unset GOVC_TLS_CA_CERTS
-
 echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${vsphere_portgroup} and destroy"
 
 govc ls -json "/${GOVC_DATACENTER}/network/${vsphere_portgroup}" |

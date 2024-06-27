@@ -21,6 +21,42 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+set +o errexit
+# release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
+# RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is pointed to the same image as RELEASE_IMAGE_LATEST,
+# but for some ci jobs triggerred by remote api, RELEASE_IMAGE_LATEST might be overridden with
+# user specified image pullspec, to avoid auth error when accessing it, always use build farm
+# registry pullspec.
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines
+# release:initial image, once that, use 'oc get istag release:inital' to workaround it.
+echo "RELEASE_IMAGE_INITIAL: ${RELEASE_IMAGE_INITIAL:-}"
+if [[ -n ${RELEASE_IMAGE_INITIAL:-} ]]; then
+    tmp_release_image_initial=${RELEASE_IMAGE_INITIAL}
+    echo "Getting inital release image from RELEASE_IMAGE_INITIAL..."
+elif oc get istag "release:initial" -n ${NAMESPACE} &>/dev/null; then
+    tmp_release_image_initial=$(oc -n ${NAMESPACE} get istag "release:initial" -o jsonpath='{.tag.from.name}')
+    echo "Getting inital release image from build farm imagestream: ${tmp_release_image_initial}"
+fi
+# For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and
+# RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has
+# higher priority than RELEASE_IMAGE_LATEST
+TESTING_RELEASE_IMAGE=""
+if [[ -n ${tmp_release_image_initial:-} ]]; then
+    TESTING_RELEASE_IMAGE=${tmp_release_image_initial}
+else
+    TESTING_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}
+fi
+echo "TESTING_RELEASE_IMAGE: ${TESTING_RELEASE_IMAGE}"
+dir=$(mktemp -d)
+pushd "${dir}"
+cp "${CLUSTER_PROFILE_DIR}/pull-secret" pull-secret
+oc registry login --to pull-secret
+VERSION=$(oc adm release info --registry-config pull-secret "${TESTING_RELEASE_IMAGE}" --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+rm pull-secret
+popd
+
 FAILURE_DOMAIN_PATH=$SHARED_DIR/fds.txt
 FAILURE_DOMAIN_JSON=$SHARED_DIR/fds.json
 FIRST=1
@@ -69,7 +105,8 @@ function getFailureDomainsWithDSwitchForVCenter() {
 
       echo "DVS UUID ${DVS_UUID}"
 
-      datastoreName=$(basename "${GOVC_DATACENTER}")
+      datastoreName=$(basename "${GOVC_DATASTORE}")
+
       {
         echo "        server = \"${GOVC_URL}\"" 
         echo "        datacenter = \"${GOVC_DATACENTER}\""
@@ -77,14 +114,14 @@ function getFailureDomainsWithDSwitchForVCenter() {
         echo "        datastore = \"$(echo "${GOVC_DATASTORE}" | rev | cut -d '/' -f 1 | rev)\""
         echo "        network = \"${GOVC_NETWORK}\"" 
         echo "        distributed_virtual_switch_uuid = \"${DVS_UUID}\""
-      } >> ${FAILURE_DOMAIN_PATH}
+      } >> "${FAILURE_DOMAIN_PATH}"
       
       FAILURE_DOMAIN_OUT=$(echo "$FAILURE_DOMAIN_OUT" | jq --compact-output -r '. += [{"datacenter":"'"${GOVC_DATACENTER}"'","cluster":"'"${CLUSTER}"'","datastore":"'"${datastoreName}"'","network":"'"${GOVC_NETWORK}"'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]'); 
     done
-    echo "    }" >> ${FAILURE_DOMAIN_PATH}  
-    echo "]" >> ${FAILURE_DOMAIN_PATH}
+    echo "    }" >> "${FAILURE_DOMAIN_PATH}"  
+    echo "]" >> "${FAILURE_DOMAIN_PATH}"
 
-    echo "${FAILURE_DOMAIN_OUT}" | jq . > ${FAILURE_DOMAIN_JSON}
+    echo "${FAILURE_DOMAIN_OUT}" | jq . > "${FAILURE_DOMAIN_JSON}"
     cat "${FAILURE_DOMAIN_JSON}"
     echo "-getFailureDomainsWithDSwitchForVCenter"
 }
@@ -303,6 +340,19 @@ then
   echo "${ROUTE53_DELETE_JSON}" > "${SHARED_DIR}"/dns-nodes-delete.json
 fi
 
+VERSION=$(oc adm release info "${TESTING_RELEASE_IMAGE}" --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+
+set -o errexit
+
+Z_VERSION=1000
+
+if [ ! -z "${VERSION}" ]; then
+  Z_VERSION=$(echo "${VERSION}" | cut -d'.' -f2)
+  echo "$(date -u --rfc-3339=seconds) - determined version is 4.${Z_VERSION}"
+else
+  echo "$(date -u --rfc-3339=seconds) - unable to determine y stream, assuming this is master"
+fi
+
 ${platform_required} && cat >>"${install_config}" <<EOF
 baseDomain: $base_domain
 controlPlane:
@@ -313,14 +363,36 @@ compute:
 - name: "worker"
   replicas: ${COMPUTE_NODE_REPLICAS}
 
-platform:
-  vsphere:
-$(cat $SHARED_DIR/platform.yaml)
-
 networking:
   machineNetwork:
   - cidr: "${machine_cidr}"
 EOF
+
+
+
+
+
+if [ "${Z_VERSION}" -lt 13 ]; then
+  #vsphere_cluster_name=$(echo "${vsphere_cluster}" | rev | cut -d '/' -f 1 | rev)
+  #datastore_name=$(echo "${vsphere_datastore}" | rev | cut -d '/' -f 1 | rev)
+${platform_required} && cat >>"${install_config}" <<EOF
+platform:
+  vsphere:
+    vcenter: "${vsphere_url}"
+    datacenter: "${vsphere_datacenter}"
+    defaultDatastore: "$(basename "${vsphere_datastore}")"
+    cluster: "$(basename "${vsphere_cluster}")"
+    network: "${vsphere_portgroup}"
+    password: "${GOVC_PASSWORD}"
+    username: "${GOVC_USERNAME}"
+EOF
+else
+${platform_required} && cat >>"${install_config}" <<EOF
+platform:
+  vsphere:
+$(cat "$SHARED_DIR"/platform.yaml)
+EOF
+fi
 
 #set machine cidr if proxy is enabled
 if grep 'httpProxy' "${install_config}"; then
@@ -341,8 +413,14 @@ cat >"${SHARED_DIR}/terraform.tfvars" <<-EOF
 machine_cidr = "${machine_cidr}"
 vm_template = "${vm_template}"
 vsphere_server = "${vsphere_url}"
+vsphere_cluster = "${vsphere_cluster}"
+vsphere_datacenter = "${vsphere_datacenter}"
+vsphere_datastore = "${vsphere_datastore}"
 ipam = "ipam.vmc.ci.openshift.org"
+
 cluster_id = "${cluster_name}"
+vm_network = "${vsphere_portgroup}"
+
 base_domain = "${base_domain}"
 cluster_domain = "${cluster_domain}"
 ssh_public_key_path = "${ssh_pub_key_path}"

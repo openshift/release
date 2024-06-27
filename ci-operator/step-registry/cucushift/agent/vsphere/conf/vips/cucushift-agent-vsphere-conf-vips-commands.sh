@@ -22,9 +22,6 @@ source "${SHARED_DIR}/vsphere_context.sh"
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
-unset SSL_CERT_FILE
-unset GOVC_TLS_CA_CERTS
-
 if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
   echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
   exit 1

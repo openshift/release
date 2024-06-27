@@ -16,6 +16,7 @@ export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere-aws/.awscred
 export AWS_DEFAULT_REGION=us-east-1
 
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 
 unset SSL_CERT_FILE
@@ -202,7 +203,7 @@ then
   wait "$!"
 else
   echo "$(date -u --rfc-3339=seconds) - pwsh upi.ps1..."
-  pwsh -f powercli/upi.ps1 &
+  NO_COLOR=true pwsh -f powercli/upi.ps1 &
   wait "$!"
 fi
 
