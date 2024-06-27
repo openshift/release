@@ -18,7 +18,8 @@ az group show --name "$RESOURCE_GROUP"
 
 echo "Creating KeyVault"
 KEYVAULT_NAME="${KV_BASE_NAME}-kv"
-az keyvault create -n "$KEYVAULT_NAME" -g "$RESOURCE_GROUP" -l "$LOCATION" --enable-purge-protection true --enable-rbac-authorization false
+# Set soft delete data retention to 7 days (minimum) instead of the default 90 days to reduce the risk of Key Vault name collisions
+az keyvault create -n "$KEYVAULT_NAME" -g "$RESOURCE_GROUP" -l "$LOCATION" --enable-purge-protection true --enable-rbac-authorization false --retention-days 7
 
 echo "Granting ServicePrincipal permissions to the KeyVault"
 az keyvault set-policy -n "$KEYVAULT_NAME" --key-permissions create decrypt encrypt get --spn "$AZURE_AUTH_CLIENT_ID"

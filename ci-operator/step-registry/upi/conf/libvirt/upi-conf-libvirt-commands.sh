@@ -42,6 +42,7 @@ BASE_DOMAIN="${LEASED_RESOURCE}.ci"
 CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 
 # Default UPI installation
+echo "Create the install-config.yaml file..."
 cat >> "${SHARED_DIR}/install-config.yaml" << EOF
 apiVersion: v1
 baseDomain: "${BASE_DOMAIN}"
@@ -75,14 +76,14 @@ sshKey: |
 EOF
 
 if [ ${FIPS_ENABLED} = "true" ]; then
-	echo "Adding 'fips: true' to install-config.yaml"
+	echo "Adding 'fips: true' to the install config..."
 	cat >> "${SHARED_DIR}/install-config.yaml" << EOF
 fips: true
 EOF
 fi
 
 if [ ${NODE_TUNING} = "true" ]; then
-  echo "Saving node tuning yaml config"
+  echo "Saving node tuning yaml config..."
   cat >> ${SHARED_DIR}/99-sysctl-worker.yaml << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
