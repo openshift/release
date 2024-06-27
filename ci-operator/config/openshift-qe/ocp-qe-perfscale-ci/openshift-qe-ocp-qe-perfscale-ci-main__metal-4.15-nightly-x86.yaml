@@ -31,14 +31,36 @@ tests:
       BAREMETAL: "true"
       NUM_WORKER_NODES: "6"
       RUN_CERBERUS: "false"
-    post:
-    - chain: openshift-qe-installer-bm-post
     test:
     - chain: openshift-qe-installer-bm-ping
     - chain: openshift-qe-installer-bm-deploy
-    - chain: openshift-qe-installer-bm-day2
     - chain: openshift-qe-node-density-heavy
   timeout: 7h0m0s
+- always_run: false
+  as: web-burner-node-density-6nodes
+  cluster: build05
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      BAREMETAL: "true"
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-day2
+    - chain: openshift-qe-web-burner
+- always_run: false
+  as: web-burner-cluster-density-6nodes
+  cluster: build05
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      BAREMETAL: "true"
+      KUBE_BURNER_VERSION: 1.2.9
+      LIMIT_COUNT: "1"
+      WORKLOAD: web-burner-cluster-density
+    test:
+    - chain: openshift-qe-installer-bm-ping
+    - chain: openshift-qe-installer-bm-day2
+    - chain: openshift-qe-web-burner
 zz_generated_metadata:
   branch: main
   org: openshift-qe

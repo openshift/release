@@ -38,27 +38,29 @@ do
   ${VIRSH} undefine "${DOMAIN}"
 done
 
+# Remove stale volumes
+echo "Removing stale volumes..."
 if [[ ! -z "$(${VIRSH} pool-list | grep ${POOL_NAME})" ]]; then
-  # Remove stale volumes
-  echo "Removing stale volumes..."
   for VOLUME in $(${VIRSH} vol-list --pool ${POOL_NAME} | grep "${LEASED_RESOURCE}" | awk '{ print $1 }')
   do
     ${VIRSH} vol-delete --pool ${POOL_NAME} ${VOLUME}
   done
 fi
 
-# DEBUG ONLY : Uncomment the following line to always remove the source volume.
+# Old behavior; Uncomment the following line to always remove the source volume regardless of its naming format.
 #echo "Removing the source volume..."
 #${VIRSH} vol-delete --pool ${POOL_NAME} "$(${VIRSH} vol-list --pool ${POOL_NAME} | grep rhcos | awk '{ print $1 }' || true)"
+echo "Removing the now obsolete source volume..."
+${VIRSH} vol-delete --pool ${POOL_NAME} "$(${VIRSH} vol-list --pool ${POOL_NAME} | awk '{ print $1 }' | grep -E '^rhcos' || true)"
 
-# Remove stale pools  # this is old behavior removal.  Can leave it for now, but its technically a noop
-echo "Removing stale pools..."
-for POOL in $(${VIRSH} pool-list --all --name | grep "${LEASED_RESOURCE}")
-do
-  ${VIRSH} pool-destroy "${POOL}"
-  ${VIRSH} pool-delete "${POOL}"
-  ${VIRSH} pool-undefine "${POOL}"
-done
+# Old behavior; Uncomment the following lines if for some reason a pool is created with the lease in the name
+# echo "Removing stale pools..."
+# for POOL in $(${VIRSH} pool-list --all --name | grep "${LEASED_RESOURCE}")
+# do
+#   ${VIRSH} pool-destroy "${POOL}"
+#   ${VIRSH} pool-delete "${POOL}"
+#   ${VIRSH} pool-undefine "${POOL}"
+# done
 
 # Remove conflicting networks
 echo "Removing stale networks..."
