@@ -15,6 +15,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: hypershift-tests
+  test-bin:
+    name: "4.15"
+    namespace: ocp
+    tag: hypershift-tests
   upi-installer:
     name: "4.15"
     namespace: ocp
@@ -155,7 +159,7 @@ tests:
       LVM_OPERATOR_SUB_CHANNEL: stable-4.15
       MCE_VERSION: "2.5"
     workflow: hypershift-mce-agent-metal3-conformance
-- as: e2e-kubevirt-metal-ovn-mce
+- as: e2e-kubevirt-metal-ovn
   cron: 0 4 * * *
   steps:
     cluster_profile: equinix-ocp-metal
@@ -172,7 +176,6 @@ tests:
     env:
       HYPERSHIFT_NODE_COUNT: "2"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.15
-      MCE_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:716901
       MCE_VERSION: "2.5"
       MIRROR_OLM_REMOTE_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.15
       ODF_OPERATOR_SUB_CHANNEL: stable-4.15
@@ -182,6 +185,18 @@ tests:
   steps:
     cluster_profile: aws
     workflow: hypershift-kubevirt-csi-e2e
+- as: e2e-kubevirt-aws-ovn
+  cron: 0 2,8,14,20 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: c5n.metal
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
+      ETCD_STORAGE_CLASS: gp3-csi
+      KUBEVIRT_CSI_INFRA: gp3-csi
+    workflow: hypershift-kubevirt-e2e-aws
 - as: e2e-mce-ibmz-ovn-conformance
   cron: 0 4 * * *
   steps:

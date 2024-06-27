@@ -1,22 +1,22 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
@@ -24,7 +24,7 @@ base_images:
     namespace: edge-infrastructure
     tag: latest
   assisted-service-scripts:
-    name: ocm-2.11
+    name: ocm-2.12
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   dev-scripts:
@@ -36,6 +36,10 @@ base_images:
     namespace: ocp
     tag: hypershift-operator
   hypershift-tests:
+    name: "4.17"
+    namespace: ocp
+    tag: hypershift-tests
+  test-bin:
     name: "4.17"
     namespace: ocp
     tag: hypershift-tests
@@ -55,6 +59,13 @@ releases:
       product: ocp
       stream: ci
       version: "4.17"
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.17"
   multi-latest:
     candidate:
       architecture: multi
@@ -69,6 +80,16 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-aws-multi
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_LATEST: release:multi-latest
+      OCP_IMAGE_PREVIOUS: release:multi-initial
+    env:
+      AWS_MULTI_ARCH: "true"
+    workflow: hypershift-aws-e2e-external
 - as: e2e-aws-ovn
   cron: 0 */6 * * *
   steps:
@@ -161,6 +182,18 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-azure-conformance
+- as: e2e-kubevirt-aws-ovn
+  cron: 0 0,6,12,18 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: c5n.metal
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
+      ETCD_STORAGE_CLASS: gp3-csi
+      KUBEVIRT_CSI_INFRA: gp3-csi
+    workflow: hypershift-kubevirt-e2e-aws
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

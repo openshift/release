@@ -17,7 +17,6 @@ podman run -it --entrypoint=/bin/sh --network minio-net quay.io/minio/mc \
   -c 'mc alias set myminio http://minio:9000 admin admin123 --api s3v4 && mc mb myminio/oadp-backup'
 
 echo "update firewall"
-sudo firewall-cmd --permanent --zone=libvirt --add-port=9000/tcp
-sudo firewall-cmd --permanent --zone=libvirt --add-port=9001/tcp
-sudo firewall-cmd --reload
+sudo firewall-cmd --zone=libvirt --add-port=9000/tcp
+sudo firewall-cmd --zone=libvirt --add-port=9001/tcp
 EOF
