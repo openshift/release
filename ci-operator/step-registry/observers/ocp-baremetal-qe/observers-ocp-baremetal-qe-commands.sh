@@ -1,8 +1,11 @@
 #!/bin/bash
+
 # shellcheck disable=SC2154
 # shellcheck disable=SC1090
 # shellcheck disable=SC2034
 # shellcheck disable=SC2046
+# shellcheck disable=SC2254
+# shellcheck disable=SC2027
 
 set -o nounset
 
