@@ -254,6 +254,35 @@ EOF
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/repo.yaml -vvv
 }
 
+# Do sdn migration to ovn since sdn is not supported from 4.17 version
+function sdn2ovn(){
+    oc patch network.operator.openshift.io cluster --type='merge'  -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipv4":{"internalJoinSubnet": "100.65.0.0/16"}}}}}' 
+    oc patch network.operator.openshift.io cluster --type='merge'  -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipv4":{"internalTransitSwitchSubnet": "100.85.0.0/16"}}}}}' 
+    oc patch Network.config.openshift.io cluster --type='merge' --patch '{"metadata":{"annotations":{"network.openshift.io/network-type-migration":""}},"spec":{"networkType":"OVNKubernetes"}}'
+    timeout 300s bash <<EOT
+    until 
+       oc get network -o yaml | grep NetworkTypeMigrationInProgress > /dev/null
+    do
+       echo "Migration is not started yet"
+       sleep 10
+    done
+EOT
+    echo "Start Live Migration process now"
+    # Wait for the live migration to fully complete
+    timeout 3600s bash <<EOT
+    until 
+       oc get network -o yaml | grep NetworkTypeMigrationCompleted > /dev/null && \
+       for NODE in \$(oc get nodes -o custom-columns=NAME:.metadata.name --no-headers); do oc get node \$NODE -o yaml | grep "k8s.ovn.org/node-transit-switch-port-ifaddr:" | grep "100.85";  done > /dev/null && \
+       for NODE in \$(oc get nodes -o custom-columns=NAME:.metadata.name --no-headers); do oc get node \$NODE -o yaml | grep "k8s.ovn.org/node-gateway-router-lrp-ifaddr:" | grep "100.65";  done > /dev/null && \
+       oc get network.config/cluster -o jsonpath='{.status.networkType}' | grep OVNKubernetes > /dev/null;
+    do
+       echo "Live migration is still in progress"
+       sleep 300
+    done
+EOT
+    echo "The Migration is completed"
+}
+
 # Upgrade RHEL node
 function rhel_upgrade(){
     echo "Upgrading RHEL nodes"
@@ -998,6 +1027,13 @@ for target in "${TARGET_RELEASES[@]}"; do
     fi
     check_history
     health_check
+    currentPlugin=$(oc get network.config.openshift.io cluster -o jsonpath='{.status.networkType}')
+    if [[ ${TARGET_MINOR_VERSION} == "16" && ${currentPlugin} == "OpenShiftSDN" ]]; then
+	echo "The cluster is running version 4.16 with OpenShift SDN, and it needs to be migrated to OVN before upgrading"
+	sdn2ovn
+	health_check
+    fi
+
     if [[ -n "${E2E_RUN_TAGS}" ]]; then
         run_upgrade_e2e "${index}"
     fi
