@@ -21,7 +21,7 @@ ls
 DAST_PATH=$(pwd)/rapidast
 
 export DAST_PATH
-oc login -u kubeadmin -p $KUBEADMIN_PASSWORD_FILE
+oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)"
 
 pushd ocpqe-security-tools/dast
 ./deploy_ssml_api.sh
