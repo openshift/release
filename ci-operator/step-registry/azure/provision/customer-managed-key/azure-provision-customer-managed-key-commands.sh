@@ -91,7 +91,8 @@ keyvault_name="${KV_BASE_NAME}-kv"
 key_name="${KV_BASE_NAME}-key"
 user_assinged_identity_name="${KV_BASE_NAME}-identity"
 # create keyvault
-run_command "az keyvault create --name ${keyvault_name} --resource-group ${RESOURCE_GROUP} --enable-purge-protection --enable-rbac-authorization"
+# set soft delete data retention to 7 days (minimum) instead of the default 90 days to reduce the risk of Key Vault name collisions
+run_command "az keyvault create --name ${keyvault_name} --resource-group ${RESOURCE_GROUP} --enable-purge-protection --enable-rbac-authorization --retention-days 7"
 kv_id=$(az keyvault show --resource-group ${RESOURCE_GROUP} --name ${keyvault_name} --query id --output tsv)
 sp_id=$(az ad sp show --id ${AZURE_AUTH_CLIENT_ID} --query id -o tsv)
 #assign role for sp on scope keyvault
