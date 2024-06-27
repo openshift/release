@@ -1,4 +1,8 @@
 #!/bin/bash
+# shellcheck disable=SC2154
+# shellcheck disable=SC1090
+# shellcheck disable=SC2034
+# shellcheck disable=SC2046
 
 set -o nounset
 
@@ -250,7 +254,6 @@ function isNodeReachable(){
 
 function isNodeAlive(){
   local bmhost="${1}"
-  # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   echo "Starting isNodeAlive for ${host}"
   for i in $(seq 1 $MAX_RETRY); do
@@ -310,7 +313,6 @@ EOF
 
 function recordJournalctl(){
   echo "recordJournalctl"
-  # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[]' "${HOSTS_FILE}"); do
     journalRecord $bmhost &
   done
@@ -320,7 +322,6 @@ function recordJournalctl(){
 function checkBootedImage(){
   local whatToCheck="${1:-boot}"
   local bmhost="${2}"
-  # shellcheck disable=SC2154
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   ssh_port=$((12000 + $host))
   cmdline=$(timeout -s 9 5m ssh -q "${SSHOPTS[@]}" -t -p "${ssh_port}" "core@${AUX_HOST}" "cat /proc/cmdline" || true;)
@@ -367,7 +368,6 @@ function checkBootedImage(){
 }
 
 function checkNodes(){
-  # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[]' "${HOSTS_FILE}"); do
     isNodeAlive "${bmhost}" &
   done
@@ -397,7 +397,6 @@ function ipmiRecord(){
 
 function recordIPMILog(){
   echo "recordIPMILog"
-  # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[]' "${HOSTS_FILE}"); do
     ipmiRecord $bmhost
   done
