@@ -56,9 +56,6 @@ sleep 5
 # URL of the API endpoint
 API_URL="$GITLAB_URL/api/v4/projects/$CI_PROJECT_ID/pipelines/$PIPELINE_ID"
 
-# Maximum number of retries (18 hours)
-MAX_RETRIES=6480
-
 # Function to check the status field in the JSON response
 check_status() {
   response=$(curl -s --header "PRIVATE-TOKEN:$GITLAB_API_TOKEN" $API_URL)
@@ -75,11 +72,14 @@ check_status() {
   fi
 }
 
+# Maximum number of retries (18 hours)
+MAX_RETRIES=6480
+
 # Initialize retry counter
 retry_count=0
 
 # Loop until the status is success or failed, or until retries are exhausted
-while (( retry_count < MAX_RETRIES )); do
+while [[ "$retry_count" -lt  "$MAX_RETRIES" ]]; do
   if check_status; then
     echo "Exiting loop. Status is $status."
     break
@@ -94,7 +94,7 @@ done
 
 return_code=0
 
-if (( retry_count == MAX_RETRIES )); then
+if [[ "$retry_count" -eq "$MAX_RETRIES" ]]; then
   echo "Maximum retries reached. Exiting loop."
   return_code=1
 fi
