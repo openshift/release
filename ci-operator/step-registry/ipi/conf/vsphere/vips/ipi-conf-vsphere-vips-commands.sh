@@ -18,9 +18,10 @@ fi
 echo "Reserved the following IP addresses..."
 
 # subnets.json is no longer available in vault
-#SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
-
-SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+    SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+fi
 
 declare vlanid
 declare primaryrouterhostname
