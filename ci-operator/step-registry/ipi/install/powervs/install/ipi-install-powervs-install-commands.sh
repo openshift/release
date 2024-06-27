@@ -228,7 +228,7 @@ function install_required_tools() {
   #install the tools required
   cd /tmp || exit 1
 
-  export HOME=/tmp
+  export HOME=/output
 
   hash ibmcloud || exit 1
   echo "Checking ibmcloud version..."
@@ -240,6 +240,10 @@ function install_required_tools() {
   #
   # NOTE: This should be covered by images/installer/Dockerfile.upi.ci in the installer repo
   #
+  echo "HAMZY TEST"
+  ls -la ${HOME} || true
+  ls -la ${HOME}/.bluemix/ || true
+  ibmcloud plugin list
   for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns tg-cli; do
     ibmcloud plugin install ${I}
   done
