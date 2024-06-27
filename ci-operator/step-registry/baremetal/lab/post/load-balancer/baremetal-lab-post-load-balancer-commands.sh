@@ -11,6 +11,11 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
+[ -z "${PULL_NUMBER:-}" ] && \
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+    test -f /var/builds/${NAMESPACE}/preserve && \
+  exit 0
+
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 echo 'Deprovisioning HAProxy'
 
