@@ -15,7 +15,7 @@ Example of a chain using this step
 
 ```
 chain:
-  as: openshift-e2e-test-mco-qe
+  as: openshift-e2e-test-mco-qe-longduration
   steps:
   - chain: cucushift-installer-check-cluster-health
   - ref: idp-htpasswd
