@@ -23,9 +23,13 @@ then
   OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
   export OCP_CRED_PSW
   oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
+  echo $(cat "oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true")
 else #login for ROSA & Hypershift platforms
   eval "$(cat "${SHARED_DIR}/api.login")"
+  echo $(cat "${SHARED_DIR}/api.login")
 fi
+
+sleep 18000 && echo "Waiting"
 
 echo "Running gauge specs"
 IFS=';' read -r -a specs <<< "$PIPELINES_TEST_SPECS"
