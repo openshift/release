@@ -226,10 +226,10 @@ echo "${PRODUCT_ID}" > "${SHARED_DIR}/cluster-type"
 
 INFRA_ID=$(cat $cluster_info_json | jq -r '.infra_id')
 if [[ "$HOSTED_CP" == "true" ]]; then
-  # Record Hosted clusters Provision shard id to trace the SC and MC details ir required
-  PROV_SHARD_ID=$(cat $cluster_info_json | jq -r '.properties.provision_shard_id')
-  echo "ROSA HCP Prov Shard ID: ${PROV_SHARD_ID}"
-  echo "${PROV_SHARD_ID}" > "${SHARED_DIR}/prov_shard_id"
+  # Record Hosted clusters Provision shard id to trace the SC and MC details if required
+  PROVISION_SHARD_ID=$(cat $cluster_info_json | jq -r '.properties.provision_shard_id')
+  echo "ROSA HCP Prov Shard ID: ${PROVISION_SHARD_ID}"
+  echo "${PROVISION_SHARD_ID}" > "${SHARED_DIR}/provision_shard_id"
   if [[ "${INFRA_ID}" == "null" ]]; then
     # Currently, there is no infra_id for rosa hypershift cluster, use a fake one instead of null
     INFRA_ID=$(cat $cluster_info_json | jq -r '.name')
