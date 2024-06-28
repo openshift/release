@@ -9,7 +9,6 @@ oc projects
 python3 --version
 ls
 
-ls -la /root/kraken
 
 ES_PASSWORD=$(cat "/secret/es/password")
 ES_USERNAME=$(cat "/secret/es/username")

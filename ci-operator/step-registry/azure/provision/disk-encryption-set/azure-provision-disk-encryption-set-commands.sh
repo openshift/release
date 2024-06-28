@@ -37,7 +37,7 @@ function create_disk_encryption_set() {
     
     echo "Creating keyvault ${kv_name} in ${rg}"
     kv_output=$(mktemp)
-    run_command "az keyvault create -n ${kv_name} -g ${rg} --enable-purge-protection true | tee '${kv_output}'" || return 1
+    run_command "az keyvault create -n ${kv_name} -g ${rg} --enable-purge-protection true --retention-days 7 | tee '${kv_output}'" || return 1
     kv_key_output=$(mktemp)
     run_command "az keyvault key create --vault-name ${kv_name} -n ${kv_key_name} --protection software | tee '${kv_key_output}'" || return 1
     #sleep for a while to wait for azure api return correct id
@@ -91,7 +91,7 @@ if [ X"$ret" != X"0" ]; then
 fi
 
 # create disk encryption set
-# We must randomize the name of the keyvault as they do not get fully deleted for 90 days.
+# The Key Vault name must be randomized because deleted Key Vaults remain in a soft-deleted state for 7 days.
 # A vault's name must be between 3-24 alphanumeric characters
 # The vault name must begin with a letter, end with a letter or digit, and not contain consecutive hyphens.
 cluster_sp_id=$(cat "${AZURE_AUTH_LOCATION}" | jq -r ".clientId")

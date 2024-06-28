@@ -319,12 +319,14 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv4
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ovn-ipv6
   cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv6
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-single-node
   optional: true
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
@@ -404,22 +406,31 @@ tests:
 - as: e2e-vsphere-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-etcd-scaling
 - as: e2e-vsphere-ovn-dualstack-primaryv6
   optional: true
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
       IP_FAMILIES: DualStackIPv6Primary
     workflow: openshift-e2e-vsphere-ovn-dualstack
-- as: e2e-aws-etcd-recovery
+- always_run: false
+  as: e2e-aws-etcd-recovery
   optional: true
   steps:
     cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-etcd-recovery
+- always_run: false
+  as: e2e-aws-etcd-certrotation
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws-etcd-certrotation
 - always_run: false
   as: e2e-gcp-ovn-techpreview
   optional: true

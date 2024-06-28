@@ -6,6 +6,12 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+source ./tests/prow_ci.sh
+
+if [[ ! -z $ROSACLI_BUILD ]]; then
+  override_rosacli_build
+fi
+
 export TEST_PROFILE=${TEST_PROFILE:-}
 TEST_TIMEOUT=${TEST_TIMEOUT:-"4h"}
 

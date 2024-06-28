@@ -154,7 +154,7 @@ tests:
         and configmaps into the build pod
     workflow: openshift-e2e-ibmcloud-heterogeneous
 - as: ocp-e2e-powervs-ovn-multi-ppc64le
-  cron: 20 6 * * *
+  cron: 20 13 * * *
   steps:
     cluster_profile: powervs-multi-1
     dependencies:
@@ -706,6 +706,28 @@ tests:
       INSTALL_TYPE: sno
       OCP_VERSION: "4.16"
     workflow: upi-powervs-sno
+- as: ocp-e2e-agent-sno-power
+  cron: 0 1 * * 1
+  steps:
+    cluster_profile: powervs-1
+    env:
+      INSTALL_TYPE: agent
+      OCP_VERSION: "4.16"
+    workflow: upi-powervs-sno
+- as: install-analysis-all-ppc64le
+  cluster: build01
+  cron: '@yearly'
+  steps:
+    cluster_profile: libvirt-ppc64le
+    env:
+      GOOGLE_SA_CREDENTIAL_FILE: /var/run/secrets/google-serviceaccount-credentials.json
+      JOB_CONFIGURATION: |
+        ppc64le-libvirt,1,--platform=libvirt --include-job-names=libvirt-ppc64le --include-job-names=4.16
+      JOB_START_TIME: $(JOB_START_TIME)
+      PAYLOAD_TAG: $(PAYLOAD_TAG)
+      WORKING_DIR: $(ARTIFACT_DIR)/release-payload-install-analysis-ppc64le
+    test:
+    - ref: openshift-release-analysis-test-case-analysis
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -72,19 +72,19 @@ tests:
   commands: make lint
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: build
   commands: make build
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: make unit
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: security
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
       PROJECT_NAME: windows-machine-config-operator
@@ -125,7 +125,7 @@ tests:
 - always_run: false
   as: vsphere-e2e-operator
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
@@ -254,27 +254,28 @@ tests:
 - always_run: false
   as: platform-none-vsphere-e2e-operator
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - ref: windows-e2e-operator-test-byoh
     workflow: windows-e2e-operator-test-platform-none-vsphere
 - always_run: false
   as: vsphere-proxy-e2e-operator
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
 - always_run: false
   as: wicd-unit-vsphere
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     post:
     - chain: upi-vsphere-windows-post
     pre:
     - ref: ipi-install-rbac
     - ref: ipi-conf
     - ref: ipi-conf-vsphere-check
+    - ref: ipi-conf-vsphere-check-vcm
     - ref: upi-conf-vsphere
     - ref: upi-conf-vsphere-dns
     - chain: upi-vsphere-windows-pre
