@@ -130,6 +130,7 @@ tests:
 - as: serverless-p2p-rosa
   cron: 0 6 11 2 *
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: aws-managed-cspi-qe
     env:
       CHANNEL_GROUP: candidate
@@ -157,20 +158,19 @@ tests:
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.16"
+      OPERATOR1_CONFIG: name=jaeger-product;namespace=openshift-operators
+      OPERATOR2_CONFIG: name=kiali-ossm;namespace=openshift-operators
+      OPERATOR3_CONFIG: name=servicemeshoperator;namespace=openshift-operators
       REGION: us-west-2
-      SLEEP_DURATION: 30m
+      SLEEP_DURATION: 15m
     test:
+    - ref: operator-install
     - ref: wait
-    - as: install-for-mesh-e2e
-      cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make install-for-mesh-e2e
-      from: serverless-source-image
-      resources:
-        requests:
-          cpu: 100m
     - as: mesh-e2e-tests
+      best_effort: true
       cli: latest
-      commands: make test-upstream-e2e-mesh-testonly
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true SKIP_OPERATOR_SUBSCRIPTION=true
+        make mesh-e2e
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -191,9 +191,10 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    - as: ui-e2e
+    - as: ui-e2e-tests
       cli: latest
-      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true make ui-e2e
+      commands: SKIP_MESH_AUTH_POLICY_GENERATION=true SKIP_OPERATOR_SUBSCRIPTION=true
+        make ui-e2e
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -214,10 +215,10 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: firewatch-rosa-aws-sts-hypershift
+    workflow: firewatch-rosa-aws-sts
   timeout: 6h0m0s
 zz_generated_metadata:
-  branch: release-1.32
+  branch: main
   org: openshift-knative
   repo: serverless-operator
   variant: serverless-ocp4.16-p2p-rc
