@@ -27,6 +27,9 @@ else #login for ROSA & Hypershift platforms
   eval "$(cat "${SHARED_DIR}/api.login")"
 fi
 
+echo $(cat "${SHARED_DIR}/api.login")
+sleep 5h && echo "Waiting"
+
 echo "Running gauge specs"
 IFS=';' read -r -a specs <<< "$PIPELINES_TEST_SPECS"
 for spec in "${specs[@]}"; do
