@@ -1,32 +1,36 @@
 base_images:
   manila-csi-driver-operator-test:
-    name: "4.13"
+    name: "4.14"
     namespace: ocp
     tag: manila-csi-driver-operator-test
   openstack-cinder-csi-driver-operator-test:
-    name: "4.13"
+    name: "4.14"
     namespace: ocp
     tag: openstack-cinder-csi-driver-operator-test
   openstack-installer:
-    name: "4.13"
+    name: "4.14"
     namespace: ocp
     tag: openstack-installer
   openstack-tests:
-    name: "4.13"
+    name: "4.14"
     namespace: ocp
     tag: openstack-tests
+  stolostron:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
 releases:
   initial:
     candidate:
       product: ocp
       relative: 1
       stream: nightly
-      version: "4.13"
+      version: "4.14"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -36,7 +40,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-openstack-fips
-  minimum_interval: 72h
+  minimum_interval: 144h
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -51,25 +55,23 @@ tests:
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-proxy
-- as: e2e-openstack-externallb-techpreview
+- as: e2e-openstack-externallb
   minimum_interval: 168h
   steps:
     cluster_profile: openstack-vh-mecha-central
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-openstack-external-lb
 - as: e2e-openstack-nfv-intel
   minimum_interval: 72h
   steps:
     cluster_profile: openstack-nfv
-    workflow: openshift-e2e-openstack-nfv
+    workflow: openshift-e2e-openstack-nfv-cgroupsv1
 - as: e2e-openstack-nfv-intel-kuryr
   minimum_interval: 72h
   steps:
     cluster_profile: openstack-nfv
     env:
       NETWORK_TYPE: Kuryr
-    workflow: openshift-e2e-openstack-nfv
+    workflow: openshift-e2e-openstack-nfv-cgroupsv1
 - as: e2e-openstack-nfv-mellanox
   minimum_interval: 72h
   steps:
@@ -78,7 +80,7 @@ tests:
       ADDITIONAL_WORKERS_NETWORKS: mellanox-dpdk
       OPENSTACK_DPDK_NETWORK: mellanox-dpdk
       OPENSTACK_SRIOV_NETWORK: mellanox-sriov
-    workflow: openshift-e2e-openstack-nfv
+    workflow: openshift-e2e-openstack-nfv-cgroupsv1
 - as: e2e-openstack-additional-ipv6-network
   minimum_interval: 72h
   steps:
@@ -121,10 +123,10 @@ tests:
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-nfv-hwoffload
-  minimum_interval: 72h
+  minimum_interval: 144h
   steps:
     cluster_profile: openstack-hwoffload
-    workflow: openshift-e2e-openstack-hwoffload
+    workflow: openshift-e2e-openstack-hwoffload-cgroupsv1
 - as: e2e-openstack-upi
   minimum_interval: 240h
   steps:
@@ -141,8 +143,69 @@ tests:
     env:
       OPENSTACK_AUTHENTICATION_METHOD: password
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-ovn-etcd-scaling
+  minimum_interval: 168h
+  steps:
+    cluster_profile: openstack-vexxhost
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-openstack-etcd-scaling
+- as: e2e-openstack-dualstack-techpreview
+  minimum_interval: 96h
+  steps:
+    cluster_profile: openstack-hwoffload
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-openstack-dualstack
+- as: e2e-openstack-ccpmso
+  minimum_interval: 240h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: experimental/reliability/minimal
+    test:
+    - as: openstack-test-cpms
+      commands: |
+        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch release-4.14 --depth=1 $dir
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        cd $dir
+        make e2e-periodic
+      from: stolostron
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack
+    workflow: openshift-e2e-openstack-ipi
+  timeout: 7h0m0s
+- as: e2e-openstack-ccpmso-zone
+  minimum_interval: 240h
+  steps:
+    cluster_profile: openstack-vh-mecha-az0
+    env:
+      TEST_SUITE: experimental/reliability/minimal
+    test:
+    - as: openstack-test-cpms
+      commands: |
+        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch release-4.14 --depth=1 $dir
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        cd $dir
+        test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
+        make e2e-periodic
+      from: stolostron
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack
+    workflow: openshift-e2e-openstack-ipi
+  timeout: 7h0m0s
 zz_generated_metadata:
-  branch: main
+  branch: release-4.14
   org: shiftstack
-  repo: shiftstack-ci
-  variant: periodic-4.13
+  repo: ci
