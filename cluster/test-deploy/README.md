@@ -12,7 +12,6 @@ Prerequisites:
 
 * `gcp-dev` (default) - 1 master, 3 node cluster with bootstrapping (uses the `openshift-gce-devel` project, suitable for developers)
 * `gcp` - 1 master, 3 node cluster with bootstrapping (uses the `openshift-gce-devel-ci` project, suitable for CI)
-* `gcp-ha` - 3 master, 3 node cluster with bootstrapping (uses the `openshift-gce-devel-ci` project, suitable for CI)
 
 In each profile, see `vars-origin.yaml` for the default settings (which is common across all profiles) and `vars.yaml` for the variables that differ.
 
@@ -58,7 +57,7 @@ $ make WHAT=mycluster down
 $ make WHAT=mycluster sh
 
 # launch a different profile
-$ make WHAT=mycluster PROFILE=gcp-ha
+$ make WHAT=mycluster PROFILE=gcp
 ```
 
 ## Advanced configuration

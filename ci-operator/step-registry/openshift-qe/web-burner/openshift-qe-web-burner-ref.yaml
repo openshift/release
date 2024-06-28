@@ -1,0 +1,74 @@
+ref:
+  as: openshift-qe-web-burner
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  env:
+  - name: BAREMETAL
+    default: "true"
+    documentation: |-
+      Set to true if the job is for baremetal
+  - name: BFD
+    default: "false"
+    documentation: |-
+      Enable BFD
+  - name: CHURN
+    default: "false"
+    documentation: |-
+      Default is false, which means the workload will not delete and recreate a set number of namespaces
+  - name: CRD
+    default: "false"
+    documentation: |-
+      Enable the new AdminPolicyBasedExternalRoute CR
+  - name: E2E_VERSION
+    default: "v2.1.8"
+    documentation: |-
+      Override the e2e version
+  - name: EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Extra flags to pass to kube-burner-ocp
+  - name: GC
+    default: "false"
+    documentation: |-
+      GC will clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resouce
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: LIMIT_COUNT
+    default: "18"
+    documentation:  |-
+      Number of namespaces
+  - name: PROBE
+    default: "true"
+    documentation: |-
+      Enable probes
+  - name: PROFILE_TYPE
+    default: "reporting"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: SCALE
+    default: "1"
+    documentation:  |-
+      Scale of the testing
+  - name: WORKLOAD
+    default: "web-burner-node-density"
+    documentation:  |-
+      Either web-burner-node-density or web-burner-cluster-density
+  commands: openshift-qe-web-burner-commands.sh
+  timeout: 6h
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: perfscale-metal-bastion
+    mount_path: /bm
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale web-burner workload in the deployed cluster
