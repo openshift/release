@@ -28,19 +28,22 @@ function save_hub_cluster_profile_artifacts {
   echo "************ telcov10n Save those artifacts that will be used during Spoke deployments ************"
 
   hub_to_spoke_artifacts=(
-    "${KUBECONFIG}"
-    "${KUBEADMIN_PASSWORD_FILE}"
-    "${CLUSTER_PROFILE_DIR}"
+    "$(readlink -f ${KUBECONFIG})"
+    "$(readlink -f ${KUBEADMIN_PASSWORD_FILE})"
+    "$(readlink -f ${CLUSTER_PROFILE_DIR}/pull-secret)"
+    "$(readlink -f ${CLUSTER_PROFILE_DIR}/base_domain)"
   )
 
-  cluster_profile_shared_folder=/var/builds/${NAMESPACE}/${SHARED_HUB_CLUSTER_PROFILE}
+  local_cluster_profile_shared_folder=$(mktemp -d --dry-run)/${SHARED_HUB_CLUSTER_PROFILE}
+  mkdir -pv ${local_cluster_profile_shared_folder}
+  cp -av "${hub_to_spoke_artifacts[@]}" ${local_cluster_profile_shared_folder}/
 
   echo
   set -x
   rsync -avP --delete-before \
     -e "ssh $(echo "${SSHOPTS[@]}")" \
-    "${hub_to_spoke_artifacts[@]}" \
-    "root@${AUX_HOST}":${cluster_profile_shared_folder}
+    "${local_cluster_profile_shared_folder}" \
+    "root@${AUX_HOST}":/var/builds/${NAMESPACE}
   set +x
   echo
 }
@@ -49,17 +52,16 @@ function create_symbolic_link_to_shared_hub_cluster_profile_artifacts_folder {
   
   echo "************ telcov10n Create a symbolic link to the shared artifacts folder that would be used during Spoke deployments ************"
 
-  cluster_profile_symbolic_link=/var/telco-qe-preserved/${SHARED_HUB_CLUSTER_PROFILE}
+  ln -s /var/builds/${NAMESPACE}/${SHARED_HUB_CLUSTER_PROFILE} ${SHARED_HUB_CLUSTER_PROFILE}
 
-  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s --  \
-  "${cluster_profile_shared_folder}" "${cluster_profile_symbolic_link}" << 'EOF'
-set -o nounset
-set -o errexit
-set -o pipefail
-
-mkdir -p $(dirname ${2})
-link -sf ${$1} ${2}
-EOF
+  echo
+  set -x
+  rsync -avP \
+    -e "ssh $(echo "${SSHOPTS[@]}")" \
+    "${SHARED_HUB_CLUSTER_PROFILE}" \
+    "root@${AUX_HOST}":/var/telco-qe-preserved/
+  set +x
+  echo
 }
 
 function pull_request_debug {
