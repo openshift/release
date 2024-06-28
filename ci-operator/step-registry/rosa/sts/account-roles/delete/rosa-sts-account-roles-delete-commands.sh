@@ -40,6 +40,7 @@ else
   exit 1
 fi
 
+sleep 3600
 # If the account roles exist, do deletion.
 ACCOUNT_ROLES_PREFIX_FILE="${SHARED_DIR}/cluster-prefix"
 if [[ -e "${ACCOUNT_ROLES_PREFIX_FILE}" ]]; then
