@@ -1,18 +1,18 @@
 base_images:
   manila-csi-driver-operator-test:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: manila-csi-driver-operator-test
   openstack-cinder-csi-driver-operator-test:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: openstack-cinder-csi-driver-operator-test
   openstack-installer:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: openstack-installer
   openstack-tests:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: openstack-tests
 releases:
@@ -21,12 +21,12 @@ releases:
       product: ocp
       relative: 1
       stream: nightly
-      version: "4.12"
+      version: "4.13"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -51,6 +51,13 @@ tests:
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-proxy
+- as: e2e-openstack-externallb-techpreview
+  minimum_interval: 168h
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-openstack-external-lb
 - as: e2e-openstack-nfv-intel
   minimum_interval: 72h
   steps:
@@ -86,6 +93,9 @@ tests:
   minimum_interval: 72h
   steps:
     cluster_profile: openstack-vh-mecha-central
+    env:
+      TEST_SKIPS: should concurrently access the volume and restored snapshot from
+        pods on the same node
     workflow: openshift-e2e-openstack-csi-cinder
 - as: e2e-openstack-sdn
   minimum_interval: 72h
@@ -99,6 +109,7 @@ tests:
   steps:
     cluster_profile: openstack-vexxhost
     env:
+      ROTATE_CLOUD_CREDENTIALS: "true"
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-ovn-serial
@@ -106,6 +117,7 @@ tests:
   steps:
     cluster_profile: openstack-vexxhost
     env:
+      ROTATE_CLOUD_CREDENTIALS: "true"
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-nfv-hwoffload
@@ -122,17 +134,14 @@ tests:
         group\|The OpenStack platform creates Control plane nodes in a server group
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-upi
-- as: e2e-openstack-ovn-appcreds
+- as: e2e-openstack-ovn-password
   minimum_interval: 72h
   steps:
     cluster_profile: openstack-vexxhost
     env:
-      OPENSTACK_AUTHENTICATION_METHOD: application-credentials
-      ROTATE_CLOUD_CREDENTIALS: "true"
-      TEST_SKIPS: 'In-tree Volumes \[Driver: cinder\]'
+      OPENSTACK_AUTHENTICATION_METHOD: password
     workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
-  branch: main
+  branch: release-4.13
   org: shiftstack
-  repo: shiftstack-ci
-  variant: periodic-4.12
+  repo: ci
