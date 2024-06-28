@@ -52,9 +52,9 @@ SSH_OPTIONS=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=n
 boot_vm() {
     # shellcheck disable=SC2034
     WORKER_IP=$1
-    sleep 1h
+    #sleep 1h
     # Log into workers via Bastion
-    ssh "${SSH_OPTIONS[@]}" root@${BASTION} << 'EOF'
+    ssh "${SSH_OPTIONS[@]}" root@${BASTION} << EOF
     cd /var/www/html && curl -k -L -o rootfs.img '${ROOTFS_URL}'
     timeout 120 ssh -o 'StrictHostKeyChecking=no' -i ${BASTION_KEY} root@${WORKER_IP} << WEOF
     echo "Logged into the worker.."
