@@ -55,8 +55,8 @@ boot_vm() {
     #sleep 1h
     # Log into workers via Bastion
     ssh "${SSH_OPTIONS[@]}" root@${BASTION} << EOF
-    cd /var/www/html && curl -k -L -o rootfs.img '${ROOTFS_URL}'
-    timeout 120 ssh -o 'StrictHostKeyChecking=no' -i ${BASTION_KEY} root@${WORKER_IP} << WEOF
+    cd /var/www/html && curl -k -L -o rootfs.img "${ROOTFS_URL}"
+    timeout 120 ssh -o 'StrictHostKeyChecking=no' -i "${BASTION_KEY}" root@${WORKER_IP} << WEOF
     echo "Logged into the worker.."
     cd /var && mkdir -p home && cd /var/home && mkdir core && cd /var/home/core
     touch boot.sh
@@ -64,8 +64,8 @@ boot_vm() {
     #!/bin/bash
     set -x 
 
-    curl -k -L -o /var/home/core/initrd.img '${INITRD_URL}'
-    curl -k -L -o /var/home/core/kernel.img '${KERNEL_URL}'
+    curl -k -L -o /var/home/core/initrd.img "${INITRD_URL}"
+    curl -k -L -o /var/home/core/kernel.img "${KERNEL_URL}"
     sudo kexec -l /var/home/core/kernel.img --initrd=/var/home/core/initrd.img --append="rd.neednet=1 coreos.live.rootfs_url=http://${BASTION}:80/rootfs.img random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal console=tty1 console=ttyS1,115200n8"
     sudo kexec -e &
     echo "Initiated agent bootup"
