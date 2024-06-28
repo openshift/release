@@ -103,6 +103,7 @@ if [[ "${ENABLE_MIN_PERMISSION_FOR_DES}" == "true" ]]; then
     fi
 fi
 azure_des_json="{}"
+des_id=""
 kv_prefix="ci-${NAMESPACE: -6}-${UNIQUE_HASH}"
 if [[ "${ENABLE_DES_DEFAULT_MACHINE}" == "true" ]]; then
     echo "Creating keyvault and disk encryption set in ${RESOURCE_GROUP} for defaultMachinePlatform"
@@ -113,6 +114,7 @@ if [[ "${ENABLE_DES_DEFAULT_MACHINE}" == "true" ]]; then
     
     echo "Granting service principal reader permissions to the DiskEncryptionSet: ${des_default}"
     des_default_id=$(az disk-encryption-set show -n "${des_default}" -g "${RESOURCE_GROUP}" --query "[id]" -o tsv)
+    des_id="$des_default_id"
     run_command_with_retries "az role assignment create --assignee ${cluster_sp_id} --role ${role_name} --scope ${des_default_id} -o jsonc" 5
 
     #save default des information to ${SHARED_DIR} for reference
@@ -128,6 +130,7 @@ if [[ "${ENABLE_DES_CONTROL_PLANE}" == "true" ]]; then
 
     echo "Granting service principal reader permissions to the DiskEncryptionSet: ${des_master}"
     des_master_id=$(az disk-encryption-set show -n "${des_master}" -g "${RESOURCE_GROUP}" --query "[id]" -o tsv)
+    des_id="$des_master_id"
     run_command_with_retries "az role assignment create --assignee ${cluster_sp_id} --role ${role_name} --scope ${des_master_id} -o jsonc" 5
 
     #save control plane des information to ${SHARED_DIR} for reference
@@ -143,6 +146,7 @@ if [[ "${ENABLE_DES_COMPUTE}" == "true" ]]; then
 
     echo "Granting service principal reader permissions to the DiskEncryptionSet: ${des_worker}"
     des_worker_id=$(az disk-encryption-set show -n "${des_worker}" -g "${RESOURCE_GROUP}" --query "[id]" -o tsv)
+    des_id="$des_worker_id"
     run_command_with_retries "az role assignment create --assignee ${cluster_sp_id} --role ${role_name} --scope ${des_worker_id} -o jsonc" 5
 
     #save compute des information to ${SHARED_DIR} for reference
@@ -151,6 +155,7 @@ fi
 
 # save disk encryption set information to ${SHARED_DIR} for reference
 echo "${azure_des_json}" > "${SHARED_DIR}/azure_des.json"
+echo "${des_id}" > "${SHARED_DIR}/azure_des_id"
 
 #for debug
 cat "${SHARED_DIR}/azure_des.json"
