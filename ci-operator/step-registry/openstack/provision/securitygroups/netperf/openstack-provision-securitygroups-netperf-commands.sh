@@ -15,13 +15,9 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# Deleting the network-perf security group
-NETWORK_PERF_SG=${NETWORK_PERF_SG:-"network-perf-sg"}
+export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
-if ! openstack security group show "${NETWORK_PERF_SG}" >/dev/null; then
-	echo "ERROR: The network-perf security group does not exist: ${NETWORK_PERF_SG}. Nothing to delete"
-    exit 0
-fi
+sg_id="$(openstack security group create netperf --description "Security group for running network-perf test on the Worker Nodes" -f value -c id)"
+openstack security group rule create "$sg_id" --protocol tcp --dst-port 12865:12865 --remote-ip 0.0.0.0/0
 
-echo "Deleting the Security Group $NETWORK_PERF_SG"
-openstack security group delete $NETWORK_PERF_SG
+printf '%s' "$sg_id" > "${SHARED_DIR}/securitygroups/netperf"
