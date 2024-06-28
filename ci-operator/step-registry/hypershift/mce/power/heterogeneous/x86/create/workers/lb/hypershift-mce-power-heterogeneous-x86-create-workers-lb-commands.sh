@@ -102,7 +102,5 @@ ibmcloud plugin install vpc-infrastructure
 # Creating LB and attaching targets
 provision_lb
 
-sleep 20m
-
 # Creating dns record for ingress
 dns_entry "${LB_ID}"
