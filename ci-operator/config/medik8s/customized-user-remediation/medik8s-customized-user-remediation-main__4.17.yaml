@@ -1,4 +1,8 @@
 base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.30.0
   os:
     name: centos
     namespace: origin
@@ -9,19 +13,21 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: os
-  to: fence-agents-remediation
+  to: customized-user-remediation
 operator:
   bundles:
-  - dockerfile_path: bundle.Dockerfile
+  - as: my-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
-  - pullspec: quay.io/medik8s/fence-agents-remediation-operator:.*
-    with: pipeline:fence-agents-remediation
+  - pullspec: quay.io/medik8s/customized-user-remediation-operator:.*
+    with: pipeline:customized-user-remediation
 releases:
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "4.13"
+      version: "4.17"
 resources:
   '*':
     requests:
@@ -29,27 +35,28 @@ resources:
       memory: 1000Mi
 tests:
 - as: openshift-e2e
+  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: medik8s-aws
+    dependencies:
+      OO_BUNDLE: my-bundle
     env:
       BASE_DOMAIN: medik8s-ci.projects.ecosystem.sysdeseng.com
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: far-install
-      OO_PACKAGE: fence-agents-remediation
-      OO_TARGET_NAMESPACES: '!all'
+      OO_INSTALL_NAMESPACE: customized-user-remediation-e2e
     test:
-    - as: e2e
-      cli: latest
-      commands: export OPERATOR_NS="far-install" && make ocp-aws-credentials test-e2e
+    - as: e2e-test
+      commands: export OPERATOR_NS="$OO_INSTALL_NAMESPACE" && make e2e-test
+      env:
+      - name: OO_INSTALL_NAMESPACE
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
-  branch: release-0.2
+  branch: main
   org: medik8s
-  repo: fence-agents-remediation
-  variant: "4.13"
+  repo: customized-user-remediation
+  variant: "4.17"
