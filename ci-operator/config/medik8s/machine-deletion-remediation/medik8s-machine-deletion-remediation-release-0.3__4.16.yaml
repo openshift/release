@@ -1,8 +1,8 @@
 base_images:
-  base:
+  operator-base:
     name: ubi
     namespace: ocp
-    tag: "8"
+    tag: "9"
   operator-sdk:
     name: "4.13"
     namespace: origin
@@ -12,23 +12,22 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: base
-  to: node-healthcheck-operator
+  from: operator-base
+  to: machine-deletion-remediation-operator
 operator:
   bundles:
-  - as: my-bundle
+  - as: machine-deletion-remediation-bundle
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
   substitutions:
-  - pullspec: quay.io/medik8s/node-healthcheck-operator:.*
-    with: pipeline:node-healthcheck-operator
+  - pullspec: quay.io/medik8s/machine-deletion-remediation-operator:latest
+    with: pipeline:machine-deletion-remediation-operator
 releases:
   latest:
     candidate:
-      architecture: amd64
       product: ocp
-      stream: nightly
-      version: "4.13"
+      stream: ci
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -41,25 +40,31 @@ tests:
   commands: make test
   container:
     from: src
+  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: openshift-e2e
+  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: medik8s-aws
     env:
       BASE_DOMAIN: medik8s-ci.projects.ecosystem.sysdeseng.com
-      INSTALL_NAMESPACE: nhc-install
+      INSTALL_NAMESPACE: mdr-install
     test:
     - as: e2e-install
       cli: latest
       commands: |
         oc create namespace "$INSTALL_NAMESPACE"
-        operator-sdk run bundle -n "$INSTALL_NAMESPACE" quay.io/medik8s/self-node-remediation-operator-bundle:latest
+
+        # workaround for OLM pod not running with restricted PSA
+        oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+
         operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
-        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment node-healthcheck-controller-manager
+        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment machine-deletion-remediation-controller-manager
       dependencies:
       - env: OO_BUNDLE
-        name: my-bundle
+        name: machine-deletion-remediation-bundle
       env:
       - name: INSTALL_NAMESPACE
       from: operator-sdk
@@ -78,7 +83,7 @@ tests:
           memory: 200Mi
     workflow: ipi-aws
 zz_generated_metadata:
-  branch: release-0.6
+  branch: release-0.3
   org: medik8s
-  repo: node-healthcheck-operator
-  variant: "4.13"
+  repo: machine-deletion-remediation
+  variant: "4.16"
