@@ -28,7 +28,6 @@ function save_hub_cluster_profile_artifacts {
   echo "************ telcov10n Save those artifacts that will be used during Spoke deployments ************"
 
   hub_to_spoke_artifacts=(
-    "$(readlink -f ${KUBECONFIG})"
     "$(readlink -f ${KUBEADMIN_PASSWORD_FILE})"
     "$(readlink -f ${CLUSTER_PROFILE_DIR}/pull-secret)"
     "$(readlink -f ${CLUSTER_PROFILE_DIR}/base_domain)"
@@ -37,6 +36,7 @@ function save_hub_cluster_profile_artifacts {
   local_cluster_profile_shared_folder=$(mktemp -d --dry-run)/${SHARED_HUB_CLUSTER_PROFILE}
   mkdir -pv ${local_cluster_profile_shared_folder}
   cp -av "${hub_to_spoke_artifacts[@]}" ${local_cluster_profile_shared_folder}/
+  cp -v  "$(readlink -f ${KUBECONFIG})" ${local_cluster_profile_shared_folder}/hub-kubeconfig
 
   echo
   set -x
@@ -64,33 +64,6 @@ function create_symbolic_link_to_shared_hub_cluster_profile_artifacts_folder {
   echo
 }
 
-function pull_request_debug {
-
-  echo "Using pull request ${PULL_NUMBER}, so this Hub cluster won't be preserved"
-
-  echo "######################################################################"
-  echo "# From here WIP changes"
-  echo "######################################################################"
-  echo " To quit, run the following command from POD shell: "
-  echo " $ touch ${HOME}/debug.done"
-  echo "######################################################################"
-  echo
-
-  set -x
-  oc get no,clusterversion,mcp,co,sc,pv
-  oc get subscriptions.operators,OperatorGroup,pvc -A
-  oc whoami --show-console
-  set +x
-  echo "Current OCP Hub cluster namespace is ${NAMESPACE}"
-
-  set -x
-  while sleep 1m; do
-    date
-    test -f ${HOME}/debug.done && break
-  done
-
-}
-
 function main {
   setup_aux_host_ssh_access
   save_hub_cluster_profile_artifacts
@@ -98,7 +71,3 @@ function main {
 }
 
 main
-
-if [ -n "${PULL_NUMBER:-}" ]; then
-  pull_request_debug
-fi
