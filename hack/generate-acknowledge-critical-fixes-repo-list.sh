@@ -8,7 +8,7 @@ set -eo pipefail
 echo "Generating updated list of repos for acknowledge-critical-fixes-only..."
 
 # Manually added repos (space-separated list)
-MANUALLY_ADDED_REPOS="openshift/os openshift-eng/ocp-build-data openshift-eng/art-tools"
+MANUALLY_ADDED_REPOS="openshift/os openshift-eng/art-tools"
 
 # Function to display usage
 usage() {
