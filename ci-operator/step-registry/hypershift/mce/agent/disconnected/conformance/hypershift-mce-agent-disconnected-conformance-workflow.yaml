@@ -1,18 +1,19 @@
 workflow:
   as: hypershift-mce-agent-disconnected-conformance
   documentation: |-
-    The HyperShift agent conformance workflow executes tests against a new ephemeral
+    The HyperShift agent conformance workflow executes tests against a new ephemeral x
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
     post:
+    - ref: wait
     - chain: hypershift-mce-agent-destroy
-    - chain: baremetalds-ofcir-post
+    - chain: baremetalds-ipi-post
     test:
     - ref: hypershift-mce-agent-info
     - chain: hypershift-conformance
     pre:
-    - chain: baremetalds-ofcir-pre
+    - chain: baremetalds-ipi-pre
     - ref: enable-qe-catalogsource-baremetalds-proxy-server
     - ref: enable-qe-catalogsource-disconnected
     - ref: hypershift-mce-install
@@ -24,6 +25,7 @@ workflow:
       METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
       MCE_QE_CATALOG: "true"
       IP_STACK: v6
+      PACKET_OS: rocky_9
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
         MIRROR_IMAGES=true
