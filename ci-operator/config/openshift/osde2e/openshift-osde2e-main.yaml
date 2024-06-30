@@ -25,7 +25,7 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
-- as: rosa-pr-check
+- as: rosa-e2e
   commands: |
     export GOFLAGS=""
     export REPORT_DIR="$ARTIFACT_DIR"
@@ -43,6 +43,7 @@ tests:
     out/osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
   container:
     from: src
+  run_if_changed: ^(?:pkg\/e2e\/e2e.go)$
   secrets:
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
@@ -50,7 +51,30 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-dev
     name: osde2e-dev
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+- as: rosa-provision
+  commands: |
+    export GOFLAGS=""
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="rosa,stage"
+    export SKIP_MUST_GATHER="true"
+    export CHANNEL="candidate"
+    export INSTALL_LATEST_XY="4.15"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-dev"
+
+    go mod tidy
+    make build
+
+    out/osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --provision-only
+  container:
+    from: src
+  run_if_changed: ^(?:pkg\/common)o$
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+  - mount_path: /usr/local/osde2e-dev
+    name: osde2e-dev
 - as: hypershift-pr-check
   commands: |
     export GOFLAGS=""
