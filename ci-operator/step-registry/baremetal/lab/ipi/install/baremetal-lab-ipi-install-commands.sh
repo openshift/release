@@ -108,6 +108,9 @@ platform:
     hosts: []
 "
 
+# Copy provisioning-host-ssh-port-${architecture} to bastion host for use in cleanup
+scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
+
 echo "[INFO] Processing the platform.baremetal.hosts list in the install-config.yaml..."
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
