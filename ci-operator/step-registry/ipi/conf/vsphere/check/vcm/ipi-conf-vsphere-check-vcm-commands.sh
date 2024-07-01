@@ -254,6 +254,24 @@ spec:
 done
 
 log "waiting for lease to be fulfilled..."
+
+n=0
+until [ "$n" -ge 5 ]
+do
+  if oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}" -o json | jq -e '.items[].status?'; then 
+    break
+  fi
+
+  n=$((n+1)) 
+  sleep 15
+done
+
+if [ "$n" -ge 5 ]; then
+  log "status was never available for lease, exit 1"
+  oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}" -o yaml 
+  exit 1
+fi
+
 oc wait leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" --timeout=120m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}"
 
 declare -A vcenter_portgroups
