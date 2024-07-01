@@ -90,6 +90,9 @@ do
     sleep $INTERVAL
 done
 
+echo "Sleeping 3h for debug"
+sleep 10800
+
 echo "Creating the hello-openshift app and exposing a route from it"
 oc new-app quay.io/openshifttest/hello-openshift@sha256:4200f438cf2e9446f6bcff9d67ceea1f69ed07a2f83363b7fb52529f7ddd8a83
 # Wait for the hello-openshift pod to be running
