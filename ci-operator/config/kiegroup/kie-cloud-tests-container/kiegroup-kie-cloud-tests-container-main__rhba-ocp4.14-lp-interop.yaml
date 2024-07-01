@@ -9,6 +9,11 @@ build_root:
     namespace: openshift
     tag: golang-1.19
 images:
+- dockerfile_literal: |-
+    FROM cli
+    RUN dnf update -y && dnf install httpd-tools -y && dnf install rsync -y && dnf clean all
+  from: cli
+  to: htpasswd-cli
 - context_dir: .
   dockerfile_path: Dockerfile
   to: rhba-runner
@@ -38,12 +43,14 @@ tests:
               {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other"},
               {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
               {"step": "openshift-*", "failure_type": "all", "classification": "Other"},
+              {"step": "rhba-setup-interop-tests", "failure_type": "all", "classification": "Other"},
               {"step": "rhba-interop-tests", "failure_type": "pod_failure", "classification": "Test Execution"},
               {"step": "rhba-interop-tests", "failure_type": "test_failure", "classification": "OCP Interop Test Failure", "jira_project": "RHPAM", "jira_component": ["Cloud"], "jira_additional_labels": ["ocp-interop"]}
             ]
         }
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
     test:
+    - ref: rhba-setup-interop-tests
     - ref: rhba-interop-tests
     workflow: firewatch-ipi-aws
 zz_generated_metadata:
