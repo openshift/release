@@ -90,7 +90,7 @@ metadata:
   name: $CLUSTERISSUER_NAME
 spec:
   acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
       name: acme-dns01-account-key
     solvers:
