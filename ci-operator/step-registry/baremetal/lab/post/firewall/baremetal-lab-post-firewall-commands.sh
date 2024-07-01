@@ -11,6 +11,11 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
+[ -z "${PULL_NUMBER:-}" ] && \
+  timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+    test -f /var/builds/${NAMESPACE}/preserve && \
+  exit 0
+
 if [ x"${DISCONNECTED}" != x"true" ]; then
   echo 'Skipping firewall configuration deprovisioning as not in a disconnected environment'
   exit 0
