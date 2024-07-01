@@ -75,9 +75,9 @@ provision_lb(){
     wait_lb_active 300
     echo "Load Balancer created!"
     # Create Backend pools
-    provision_backend_pool "http" "80"
-    wait_lb_active 30
-    provision_backend_pool "https" "443"
+    #provision_backend_pool "http" "80"
+    #wait_lb_active 30
+    #provision_backend_pool "https" "443"
 }
 
 # Installing required tools
@@ -103,4 +103,4 @@ ibmcloud plugin install vpc-infrastructure
 provision_lb
 
 # Creating dns record for ingress
-dns_entry "${LB_ID}"
+#dns_entry "${LB_ID}"
