@@ -65,3 +65,5 @@ else
   record_cluster "timers" "co_wait_time" $(( "${end_time}" - "${start_time}" ))
   echo "All cluster operators ready after $(( ${end_time} - ${start_time} )) seconds"
 fi
+
+sleep 30000
