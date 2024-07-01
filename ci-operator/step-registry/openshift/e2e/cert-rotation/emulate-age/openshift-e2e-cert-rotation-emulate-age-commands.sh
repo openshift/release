@@ -59,16 +59,32 @@ function emulate-cluster-age {
   oc get nodes
 }
 
+function rotate-etcd-signer {
+  oc delete secret -n openshift-etcd etcd-signer
+  wait-for-operators-to-stabilize
+}
+
 full_steps=$((${CLUSTER_AGE_DAYS}/${CLUSTER_AGE_STEP}))
 modulo=$((${CLUSTER_AGE_DAYS}%${CLUSTER_AGE_STEP}))
+cluster_age=0
 
 if [[ ${full_steps} -gt 0 ]]; then
   for i in $(seq 1 ${full_steps}); do
     emulate-cluster-age ${CLUSTER_AGE_STEP}
+    cluster_age=$((${cluster_age} + ${CLUSTER_AGE_STEP}))
+    # Rotate etcd signer at 4 years
+    if [[ ${cluster_age} -ge 1460 ]]; then
+      rotate-etcd-signer
+    fi
   done
 fi
 if [[ ${modulo} -gt 0 ]]; then
   emulate-cluster-age ${modulo}
+  cluster_age=$((${cluster_age} + ${CLUSTER_AGE_STEP}))
+  # Rotate etcd signer at 4 years
+  if [[ ${cluster_age} -ge 1460 ]]; then
+    rotate-etcd-signer
+  fi
 fi
 exit 0
 
