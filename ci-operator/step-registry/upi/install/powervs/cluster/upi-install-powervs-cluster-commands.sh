@@ -357,13 +357,17 @@ function create_powervs_workspace() {
   RESOURCE_GROUP_ID=$(ic resource group "${RESOURCE_GROUP}" --id)
   export RESOURCE_GROUP_ID
   echo "${RESOURCE_GROUP_ID}" > "${SHARED_DIR}"/RESOURCE_GROUP_ID
+  SERVICE_NAME=power-iaas
+  SERVICE_PLAN_NAME=power-virtual-server-group
 
   ##Create a Workspace on a Power Edge Router enabled PowerVS zone
   # Dev Note: uses a custom loop since we want to redirect errors
   for i in {1..5}
   do
     echo "Attempt: $i/5"
-    ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_REGION}" -g "${RESOURCE_GROUP}" --allow-cleanup > /tmp/instance.id
+    echo "Creating powervs workspace"
+    ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_ZONE}" -g "${RESOURCE_GROUP}" --allow-cleanup > /tmp/instance.id
+    cat /tmp/instance.id
     if [ $? = 0 ]; then
       break
     elif [ "$i" == "5" ]; then
@@ -375,16 +379,17 @@ function create_powervs_workspace() {
   done
 
   ##Get the CRN
-  CRN=$(cat /tmp/instance.id | grep crn | awk '{print $1}')
+  CRN=$(cat /tmp/instance.id | grep crn | awk '{print $NF}')
   export CRN
   echo "${CRN}" > "${SHARED_DIR}"/POWERVS_SERVICE_CRN
 
   ##Get the ID
-  POWERVS_SERVICE_INSTANCE_ID=$(cat /tmp/instance.id | grep crn | awk '{print $2}')
+  POWERVS_SERVICE_INSTANCE_ID=$(echo "${CRN}" | sed 's|:| |g' | awk '{print $NF}')
   export POWERVS_SERVICE_INSTANCE_ID
   echo "${POWERVS_SERVICE_INSTANCE_ID}" > "${SHARED_DIR}"/POWERVS_SERVICE_INSTANCE_ID
 
   ##Target the workspace
+  echo "Retry workspace target crn: ${CRN}"
   retry "ic pi workspace target ${CRN}"
 
   ##Check the status it should be active
@@ -392,22 +397,22 @@ function create_powervs_workspace() {
   WS_STATE=""
   while [ -z "${WS_STATE}" ]
   do
-  WS_COUNTER=$((WS_COUNTER+1)) 
-  TEMP_STATE="$(ic pi workspace get "${POWERVS_SERVICE_INSTANCE_ID}" --json 2> /dev/null | jq -r '.status')"
-  echo "pvs workspace state: ${TEMP_STATE}"
-  echo ""
-  if [ "${TEMP_STATE}" == "active" ]
-  then
-    WS_STATE="active"
-  elif [[ $WS_COUNTER -ge 20 ]]
-  then
-    WS_STATE="pending"
-    echo "Workspace has not come up in active state... login and verify"
-    exit 2
-  else
-    echo "Waiting for Workspace to become active... [30 seconds]"
-    sleep 30
-  fi
+    WS_COUNTER=$((WS_COUNTER+1))
+    TEMP_STATE="$(ic pi workspace get "${POWERVS_SERVICE_INSTANCE_ID}" --json 2> /dev/null | jq -r '.status')"
+    echo "pvs workspace state: ${TEMP_STATE}"
+    echo ""
+    if [ "${TEMP_STATE}" == "active" ]
+    then
+      WS_STATE="active"
+    elif [[ $WS_COUNTER -ge 20 ]]
+    then
+      WS_STATE="pending"
+      echo "Workspace has not come up in active state... login and verify"
+      exit 2
+    else
+      echo "Waiting for Workspace to become active... [30 seconds]"
+      sleep 30
+    fi
   done
 }
 
