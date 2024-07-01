@@ -10,5 +10,6 @@ set -o pipefail
 unset KUBECONFIG
 
 # We want the test cluster to be able to access these images on the build farm
+echo "Add policies to allow the test cluster access to images on the build farm..."
 oc adm policy add-role-to-group system:image-puller system:authenticated --namespace "${NAMESPACE}"
 oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"

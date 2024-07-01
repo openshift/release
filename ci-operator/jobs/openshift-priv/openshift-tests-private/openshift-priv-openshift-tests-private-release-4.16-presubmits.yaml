@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build03
     context: ci/prow/bindata-check
     decorate: true
     decoration_config:
@@ -70,7 +70,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build03
     context: ci/prow/code-check
     decorate: true
     decoration_config:
@@ -411,6 +411,98 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
+    cluster: build03
+    context: ci/prow/debug-winc-azure-ipi
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+      ci.openshift.io/generator: prowgen
+      job-release: "4.16"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-openshift-tests-private-release-4.16-debug-winc-azure-ipi
+    optional: true
+    path_alias: github.com/openshift/openshift-tests-private
+    rerun_command: /test debug-winc-azure-ipi
+    run_if_changed: test/extended/winc/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/debug-winc-azure-ipi-cluster-profile
+        - --target=debug-winc-azure-ipi
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/debug-winc-azure-ipi-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-azure-qe
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )debug-winc-azure-ipi,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.16$
+    - ^release-4\.16-
     cluster: build04
     context: ci/prow/debug-winc-gcp-ipi
     decorate: true
@@ -691,7 +783,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -756,7 +848,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build02
+    cluster: build03
     context: ci/prow/title-check
     decorate: true
     decoration_config:

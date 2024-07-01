@@ -54,6 +54,7 @@ releases:
       version: "4.17"
   latest:
     release:
+      architecture: amd64
       channel: candidate
       version: "4.16"
   target:
@@ -154,6 +155,25 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
+- as: aws-sc2s-ipi-disc-priv-fips-f28
+  cron: 4 4 7 * *
+  steps:
+    cluster_profile: aws-sc2s-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-sc2s-ipi-disconnected-private
+- as: aws-usgov-ipi-disc-priv-f28
+  cron: 30 0 14 * *
+  steps:
+    cluster_profile: aws-usgov-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-disconnected-private
 - as: azure-ipi-disc-fullyprivate-f14
   cron: 3 0 7,23 * *
   steps:
@@ -172,6 +192,27 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
+- as: baremetalds-ipi-ovn-ipv4-f28
+  cron: 14 23 23 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ARCHITECTURE: arm64
+      NVME_DEVICE: /dev/nvme1n1
+      PACKET_METRO: dc
+      PACKET_PLAN: c3.large.arm64
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: vsphere-upi-disconnecting-network-f28
+  cron: 34 20 7 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    test:
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-vsphere-upi-disconnecting-network
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

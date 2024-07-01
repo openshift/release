@@ -5,14 +5,14 @@ build_root:
     tag: golang-1.13
 images:
 - build_args:
-  - name: DOCKER_BUILDKIT
-    value: "1"
-  - name: BUILDKIT_PROGRESS
-    value: plain
   - name: max_jobs
     value: "8"
   - name: nvcc_threads
     value: "2"
+  - name: TORCH_CUDA_ARCH_LIST
+    value: 7.0 7.5 8.0 8.6 8.9 9.0+PTX
+  - name: PYTHON_VERSION
+    value: "3.11"
   context_dir: .
   dockerfile_path: Dockerfile.ubi
   to: vllm-build-main-cuda
@@ -48,68 +48,18 @@ resources:
       cpu: "16"
       memory: 24Gi
 tests:
-- always_run: false
+- always_run: true
   as: smoke-test
   cluster: build05
   commands: |
-    set -euxo pipefail
+    export VIRTUAL_ENV=/opt/vllm
+    export PATH=$VIRTUAL_ENV/bin/:$PATH
 
-    # we will need to download test models off HF hub
-    unset HF_HUB_OFFLINE
+    cd extras
 
-    # spin up the OpenAPI server in the background
-    python -m vllm.entrypoints.openai.api_server &
-    server_pid=$!
-
-    # wait for the server to be up
-    sleep 60
-
-    # OpenAI API tests
-    curl -v --no-progress-meter --fail-with-body \
-      localhost:8000/v1/models | python -m json.tool || \
-      (kill -9 $server_pid && exit 1)
-
-    curl -v --no-progress-meter --fail-with-body \
-      --header "Content-Type: application/json" \
-      --data '{
-        "prompt": "A red fedora symbolizes ",
-        "model": "facebook/opt-125m"
-    }' \
-      localhost:8000/v1/completions | python -m json.tool || \
-        (kill -9 $server_pid && exit 1)
-
-    echo "OpenAI API success"
-    kill -9 $server_pid
-
-    # spin up the grpc server in the background
-    python -m vllm_tgis_adapter &
-    server_pid=$!
-
-    # wait for the server to be up
-    sleep 60
-
-
-    # get grpcurl
-    curl --no-progress-meter --location --output grpcurl.tar.gz \
-      https://github.com/fullstorydev/grpcurl/releases/download/v1.9.1/grpcurl_1.9.1_linux_x86_64.tar.gz
-    tar -xf grpcurl.tar.gz
-
-    # get grpc proto
-    curl --no-progress-meter --location --remote-name \
-      https://github.com/opendatahub-io/text-generation-inference/raw/main/proto/generation.proto
-
-    # GRPC API test
-    ./grpcurl -v \
-        -plaintext \
-        -proto generation.proto \
-        -d '{ "requests": [{"text": "A red fedora symbolizes "}]}' \
-        localhost:8033 \
-        fmaas.GenerationService/Generate || (kill -9 $server_pid && exit 1)
-
-    echo "GRPC API success"
-    kill -9 $server_pid
+    bash smoke-test.sh
   container:
-    clone: false
+    clone: true
     from: vllm-build-main-cuda
 - as: pr-image-mirror
   steps:

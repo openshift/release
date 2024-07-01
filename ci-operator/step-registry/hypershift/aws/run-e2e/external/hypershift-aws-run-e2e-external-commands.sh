@@ -33,6 +33,11 @@ if grep -q 'e2e.aws-oidc-s3-bucket-name' <<<"$( bin/test-e2e -h 2>&1 )"; then
   AWS_OBJECT_PARAMS="--e2e.aws-oidc-s3-bucket-name=hypershift-ci-oidc --e2e.aws-kms-key-alias=alias/hypershift-ci"
 fi
 
+AWS_MULTI_ARCH_PARAMS=""
+if [[ "${AWS_MULTI_ARCH:-}" == "true" ]]; then
+  AWS_MULTI_ARCH_PARAMS="--e2e.aws-multi-arch=true"
+fi
+
 export EVENTUALLY_VERBOSE="false"
 
 hack/ci-test-e2e.sh -test.v \
@@ -49,5 +54,6 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
   --e2e.aws-endpoint-access=PublicAndPrivate \
   --e2e.external-dns-domain=service.ci.hypershift.devcluster.openshift.com \
+  ${AWS_MULTI_ARCH_PARAMS:-} \
   ${REQUEST_SERVING_COMPONENT_PARAMS:-} &
 wait $!
