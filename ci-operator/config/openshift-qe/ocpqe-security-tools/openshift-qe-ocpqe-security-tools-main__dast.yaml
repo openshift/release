@@ -1,7 +1,33 @@
+base_images:
+  base:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
 build_root:
   from_repository: true
 images:
-- dockerfile_path: dast/Dockerfile
+- dockerfile_literal: |
+    FROM src
+    RUN export VERSION="stable" && \
+        URL="https://github.com/koalaman/shellcheck/releases/download" && \
+        export URL="${URL}/${VERSION}/shellcheck-${VERSION}.linux.x86_64.tar.xz" && \
+        wget -q -O - "${URL}" | tar -xJv && \
+        cp "shellcheck-${VERSION}/shellcheck" /usr/local/bin/ && \
+        rm -rf "shellcheck-${VERSION}"
+    RUN mkdir /tmp/helm && \
+        cd /tmp/helm && \
+        curl https://get.helm.sh/helm-v3.6.0-linux-amd64.tar.gz -o helm.tar.gz && \
+        tar xvfpz helm.tar.gz && \
+        mv linux-amd64/helm /usr/local/bin && \
+        chmod +x /usr/local/bin/helm && \
+        rm -rf /tmp/helm
+    RUN mkdir /tmp/oc && \
+        cd /tmp/oc && \
+        curl -L https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && \
+        tar xzvf oc.tar.gz && \
+        mv kubectl /usr/local/bin/ && \
+        cd - && \
+        rm -rf /tmp/oc
   to: ocp-qe-ci-dast
 releases:
   latest:
