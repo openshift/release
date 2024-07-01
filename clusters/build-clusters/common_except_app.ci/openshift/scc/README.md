@@ -9,7 +9,3 @@ which request a VPN connection.  It is based on the `restricted` SCC (divergent
 fields have the original value in comments) with looser permissions for host
 path mounts, capabilities, SELinux contexts, and UIDs.  Details are described in
 the [design document](https://docs.google.com/document/d/1mPjrHVS1EvmLdq4kGhRazTpGu6xVZDyGpVAphVZhX4w/edit?resourcekey=0-KA-qXXq1J2bTR7o6Kit9Vw).
-
-The SCC is currently deployed only in `build01` to limit the potential impact
-and will be moved to the `common` directory once we've had time to observe the
-effects.
