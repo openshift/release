@@ -167,6 +167,8 @@ function installCamgi() {
     popd
 }
 
+createInstallJunit
+
 if test ! -f "${KUBECONFIG}"
 then
 	echo "No kubeconfig, so no point in calling must-gather."
@@ -193,8 +195,6 @@ then
 else
 	MUST_GATHER_IMAGE=${MUST_GATHER_IMAGE:-""}
 fi
-
-createInstallJunit
 
 MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
 

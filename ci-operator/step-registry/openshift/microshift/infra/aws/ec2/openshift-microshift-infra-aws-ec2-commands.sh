@@ -12,11 +12,15 @@ trap 'save_stack_events_to_shared' EXIT TERM INT
 
 # This map should be extended everytime AMIs from different regions/architectures/os versions
 # are added.
+# Command to get AMIs without using WebUI/AWS console:
+# aws ec2 describe-images --region us-west-2 --filters 'Name=name,Values=RHEL-9.*' --query 'Images[*].[Name,ImageId,Architecture]' --output text | sort --reverse
 declare -A ami_map=(
-  [us-west-2,x86_64,rhel-9.2]=ami-0d5b3039c1132e1b2
-  [us-west-2,x86_64,rhel-9.3]=ami-04b4d3355a2e2a403
-  [us-west-2,arm64,rhel-9.2]=ami-0addfb94c944af1cc
-  [us-west-2,arm64,rhel-9.3]=ami-0086e25ab5453b65e
+  [us-west-2,x86_64,rhel-9.2]=ami-0378fd0689802d015    # RHEL-9.2.0_HVM-20240229-x86_64-33-Hourly2-GP3
+  [us-west-2,x86_64,rhel-9.3]=ami-0c2f1f1137a85327e    # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
+  [us-west-2,x86_64,rhel-9.4]=ami-0a8e177878538c9c3    # RHEL-9.4.0_HVM-20240423-x86_64-62-Hourly2-GP3
+  [us-west-2,arm64,rhel-9.2]=ami-0cb125bb261a63f52     # RHEL-9.2.0_HVM-20240229-arm64-33-Hourly2-GP3
+  [us-west-2,arm64,rhel-9.3]=ami-04379fa947a959c92     # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
+  [us-west-2,arm64,rhel-9.4]=ami-0603ba823214bd8dc     # RHEL-9.4.0_HVM-20240423-arm64-62-Hourly2-GP3
 )
 
 MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
@@ -45,7 +49,7 @@ if [[ "${EC2_AMI}" == "" ]]; then
 fi
 
 ec2Type="VirtualMachine"
-if [[ "$EC2_INSTANCE_TYPE" =~ c[0-9]+[gn].metal ]]; then
+if [[ "$EC2_INSTANCE_TYPE" =~ metal ]]; then
   ec2Type="MetalMachine"
 fi
 
@@ -141,6 +145,12 @@ Resources:
         - Key: Name
           Value: RHELVPC
 
+  RHELVPCIPv6Cidr:
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      AmazonProvidedIpv6CidrBlock: true
+      VpcId: !Ref RHELVPC
+
 ## Setup internet access
 
   RHELInternetGateway:
@@ -166,6 +176,19 @@ Resources:
         - Key: Name
           Value: RHELPublicSubnet
 
+  RHELPublicSubnet:
+    Type: AWS::EC2::Subnet
+    DependsOn: RHELVPCIPv6Cidr
+    Properties:
+      VpcId: !Ref RHELVPC
+      CidrBlock: !Ref PublicSubnetCidr
+      MapPublicIpOnLaunch: true
+      Ipv6CidrBlock: !Select [ 0, !Cidr [ !Select [ 0, !GetAtt RHELVPC.Ipv6CidrBlocks], 256, 64 ]]
+      AssignIpv6AddressOnCreation: true
+      Tags:
+        - Key: Name
+          Value: RHELPublicSubnet
+
   RHELRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -180,6 +203,14 @@ Resources:
     Properties:
       RouteTableId: !Ref RHELRouteTable
       DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref RHELInternetGateway
+
+  RHELPublicRouteIpv6:
+    Type: AWS::EC2::Route
+    DependsOn: RHELGatewayAttachment
+    Properties:
+      RouteTableId: !Ref RHELRouteTable
+      DestinationIpv6CidrBlock: "::/0"
       GatewayId: !Ref RHELInternetGateway
 
   RHELPublicSubnetRouteTableAssociation:
@@ -220,38 +251,74 @@ Resources:
         FromPort: -1
         ToPort: -1
         CidrIp: 0.0.0.0/0
+      - IpProtocol: icmpv6
+        FromPort: -1
+        ToPort: -1
+        CidrIpv6: ::/0
       - IpProtocol: tcp
         FromPort: 22
         ToPort: 22
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
         FromPort: 80
         ToPort: 80
         CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIpv6: ::/0
       - IpProtocol: tcp
         FromPort: 443
         ToPort: 443
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
         FromPort: 5353
         ToPort: 5353
         CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 5353
+        ToPort: 5353
+        CidrIpv6: ::/0
       - IpProtocol: tcp
         FromPort: 5678
         ToPort: 5678
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
+        FromPort: 5678
+        ToPort: 5678
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
         FromPort: 6443
         ToPort: 6443
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
+        FromPort: 6443
+        ToPort: 6443
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 30000
+        ToPort: 32767
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 30000
+        ToPort: 32767
+        CidrIpv6: ::/0
+      - IpProtocol: udp
         FromPort: 30000
         ToPort: 32767
         CidrIp: 0.0.0.0/0
       - IpProtocol: udp
         FromPort: 30000
         ToPort: 32767
-        CidrIp: 0.0.0.0/0
+        CidrIpv6: ::/0
       VpcId: !Ref RHELVPC
 
   rhelLaunchTemplate:
@@ -360,8 +427,11 @@ HOST_PUBLIC_IP="$(aws --region "${REGION}" cloudformation describe-stacks --stac
 HOST_PRIVATE_IP="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
   --query 'Stacks[].Outputs[?OutputKey == `PrivateIp`].OutputValue' --output text)"
 
+IPV6_ADDRESS=$(aws --region "${REGION}" ec2 describe-instances --instance-id "${INSTANCE_ID}" --query 'Reservations[*].Instances[*].NetworkInterfaces[*].[Ipv6Addresses[*].Ipv6Address]' --output text)
+
 echo "${HOST_PUBLIC_IP}" > "${SHARED_DIR}/public_address"
 echo "${HOST_PRIVATE_IP}" > "${SHARED_DIR}/private_address"
+echo "${IPV6_ADDRESS}" > "${SHARED_DIR}/public_ipv6_address"
 
 echo "Waiting up to 5 min for RHEL host to be up."
 timeout 5m aws --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"

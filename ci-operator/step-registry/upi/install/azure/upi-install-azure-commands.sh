@@ -2,8 +2,7 @@
 set -euo pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 #Save exit code for must-gather to generate junit
-trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
-trap 'cp "${ARTIFACT_DIR}/installer/metadata.json" "${SHARED_DIR}"' EXIT TERM
+trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"; cp -t "${SHARED_DIR}" "${ARTIFACT_DIR}/installer/metadata.json" "${ARTIFACT_DIR}/installer/auth/kubeconfig"' EXIT TERM
 
 # The oc binary is placed in the shared-tmp by the test container and we want to use
 # that oc for all actions.
@@ -64,6 +63,10 @@ if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
   AZURE_AUTH_LOCATION="${SHARED_DIR}/azure_minimal_permission"
 fi
 export AZURE_AUTH_LOCATION
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 pushd ${ARTIFACT_DIR}/installer
 
@@ -188,7 +191,7 @@ done
 
 status="pending"
 cmd_result=1
-while [[ ${cmd_result} -eq 1 ]]
+while [[ ${cmd_result} -eq 1 ]] || [[ "$status" == "pending" ]]
 do
   cmd_result=0
   status=$(az storage blob show --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY --container-name vhd --name "rhcos.vhd" -o tsv --query properties.copy.status) || cmd_result=1
@@ -363,6 +366,4 @@ wait "$!"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 # Password for the cluster gets leaked in the installer logs and hence removing them.
 sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
-#cp "${ARTIFACT_DIR}/installer/metadata.json" "${SHARED_DIR}"
-cp "${ARTIFACT_DIR}/installer/auth/kubeconfig" "${SHARED_DIR}"
 touch /tmp/install-complete

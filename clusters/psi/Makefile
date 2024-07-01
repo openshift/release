@@ -24,7 +24,7 @@ $(serviceaccounts):
 
 apply_credentials: $(serviceaccounts)
 
-cronjobs = release-schedules-update sync-rover-groups-update
+cronjobs = sync-rover-groups-update
 
 $(cronjobs):
 	oc --context psi apply -f $@_cronjob.yaml

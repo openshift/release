@@ -33,7 +33,7 @@ fi
 if [ -z "${PROMTOKEN_TEMPLATE+x}" ]; then PROMTOKEN=$(mktemp); else PROMTOKEN=$(mktemp "${PROMTOKEN_TEMPLATE}"); fi
 trap 'rm -f "${PROMTOKEN}"' EXIT
 
-oc --context app.ci -n ci extract secret/app-ci-openshift-user-workload-monitoring-credentials --to=- --keys=sa.prometheus-user-workload.app.ci.token.txt > "${PROMTOKEN}"
+oc --context app.ci -n ci extract secret/app-ci-openshift-user-workload-monitoring-credentials --to=- --keys=sa.ci-monitoring.app.ci.token.txt > "${PROMTOKEN}"
 
 set -x
 ${CONTAINER_ENGINE} pull ${CONTAINER_ENGINE_OPTS} registry.ci.openshift.org/ci/prow-job-dispatcher:latest

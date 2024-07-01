@@ -2,8 +2,7 @@
 
 set -eu -o pipefail
 # Define the paths to the JSON files
-declare -r MASTER_JSON="/var/run/vault/dt-secrets/99-master-it-ca.json"
-declare -r WORKER_JSON="/var/run/vault/dt-secrets/99-worker-it-ca.json"
+declare -r STAGE_CA_BUNDLE="/var/run/vault/dt-secrets/stage-registry-cert.pem"
 declare -r STAGE_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.json"
 
 declare ICSP_NAME=${ICSP_NAME:-"dt-registry"}
@@ -25,34 +24,26 @@ run() {
 	eval "$cmd"
 }
 
-apply_mcp_config() {
-	# Create the machineconfigs from the JSON files
-	oc create -f "$MASTER_JSON"
-	oc create -f "$WORKER_JSON"
+apply_image_config() {
+    # Check if the configmap already exists
+    if oc get configmap registry-config -n openshift-config > /dev/null 2>&1; then
+        echo "Configmap registry-config already exists, continuing with the script..."
+    else
+        # Create a registry configmap to hold the Stage registry CA bundle.
+        oc create configmap registry-config  -n openshift-config
+    fi
+	
+    oc set data configmap/registry-config --from-file=registry.stage.redhat.io=${STAGE_CA_BUNDLE} -n openshift-config && \
+    oc patch image.config.openshift.io/cluster --patch '{"spec":{"additionalTrustedCA":{"name":"registry-config"}}}' --type=merge
 
-	echo "sleeping for 10s"
-	sleep 10
-
-	local machineCount=0
-	local counter=0
-	local updatedMachineCount=0
-	machineCount=$(oc get mcp worker -o=jsonpath='{.status.machineCount}')
-	while [ "$counter" -lt 1200 ]; do
-		sleep 20
-		counter+=20
-		echo "waiting ${counter}s"
-		updatedMachineCount=$(oc get mcp worker -o=jsonpath='{.status.updatedMachineCount}')
-		[[ "$updatedMachineCount" -eq "$machineCount" ]] && {
-			echo "MCP updated successfully"
-			break
-		}
-	done
-	[[ "$updatedMachineCount" != "$machineCount" ]] && {
-		run "oc get mcp,node"
-		run "oc get mcp worker -o yaml"
-		return 1
-	}
-	return 0
+    if [ $? -eq 0 ]; then
+        echo "All commands executed successfully, sleeping for 30s for the resources to reconcile"
+        sleep 30
+        return 0
+    else
+        echo "Some commands failed to execute."
+        return 1
+    fi
 }
 
 update_global_auth() {
@@ -80,7 +71,7 @@ update_global_auth() {
 	local -i ret=0
 	run "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=$new_dockerconfig" || ret=$?
 	if [[ $ret -eq 0 ]]; then
-		apply_mcp_config
+		apply_image_config
 		echo "update the cluster global auth successfully."
 	else
 		echo "failed to add QE optional registry auth, retry and enable log..."
@@ -110,7 +101,7 @@ create_icsp_connected() {
 		return 1
 	}
 
-	cat <<EOF | oc create -f - || {
+	cat <<EOF | oc apply -f - || {
   apiVersion: operator.openshift.io/v1alpha1
   kind: ImageContentSourcePolicy
   metadata:
@@ -140,7 +131,7 @@ create_catalog_sources() {
 
 	echo "creating catalogsource: $CATALOG_SOURCE"
 
-	cat <<EOF | oc create -f -
+	cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -199,7 +190,7 @@ check_marketplace() {
 		return 0
 	}
 
-	cat <<EOF | oc create -f -
+	cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Namespace
 metadata:

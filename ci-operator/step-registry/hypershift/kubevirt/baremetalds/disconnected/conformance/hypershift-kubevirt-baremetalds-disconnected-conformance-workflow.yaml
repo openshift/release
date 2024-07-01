@@ -1,0 +1,76 @@
+workflow:
+  as: hypershift-kubevirt-baremetalds-disconnected-conformance
+  documentation: |-
+    The HyperShift KubeVirt conformance workflow executes tests against a new ephemeral
+    HyperShift cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+    This is executed in a fully disconencted cluster with
+    mirrored images.
+
+    Note that tests will execute once the control plane is ready, regardless of
+    whether nodes have been requested, have joined, or are available.
+
+    The control plane is hosted on a dedicated standalone OCP cluster running
+    HyperShift in Azure account and is destroyed after tests complete.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team.
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    post:
+    - chain: gather-core-dump
+    - chain: hypershift-kubevirt-destroy
+    - chain: baremetalds-ipi-post
+    test:
+    - chain: hypershift-conformance
+    pre:
+    - ref: hypershift-kubevirt-baremetalds-conf-devscripts
+    - chain: baremetalds-ipi-pre
+    - chain: hypershift-kubevirt-baremetalds-lvm
+    - chain: hypershift-kubevirt-baremetalds-metallb
+    - chain: hypershift-kubevirt-baremetalds-odf
+    - ref: hypershift-kubevirt-install-disconnected
+    - ref: hypershift-install
+    - ref: hypershift-kubevirt-create-disconnected-workarounds
+    - ref: hypershift-kubevirt-create
+    - ref: hypershift-kubevirt-baremetalds-proxy
+    - ref: hypershift-kubevirt-health-check
+    env:
+      TEST_SKIPS: etcd leader changes are not excessive \|
+        StatefulSet Basic \|
+        StatefulSet Non-retain\|
+        Image policy should update OpenShift object image fields when local names are on\|
+        Image policy should update standard Kube object image fields when local names are on\|oc tag should preserve image reference for external images\|
+        Image policy should perform lookup when the Deployment gets the resolve-names annotation later\|
+        Image policy should perform lookup when the object has the resolve-names annotation\|
+        PersistentVolumes NFS when invoking the Recycle reclaim policy should test that a PV becomes Available and is clean after the PVC is deleted.
+      METALLB_OPERATOR_SUB_SOURCE: mirror-catalog-for-olm
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: mirror-catalog-for-olm
+      ODF_OPERATOR_SUB_SOURCE: cs-ccs-local-catalog
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.14
+      LVM_OPERATOR_SUB_SOURCE: mirror-catalog-for-olm
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      CCS_OPERATOR_PACKAGES: odf-operator,ocs-operator,mcg-operator,odf-csi-addons-operator
+      CCS_OPERATOR_CHANNELS: stable-4.14,stable-4.14,stable-4.14,stable-4.14
+      ETCD_STORAGE_CLASS: lvms-vg1
+      DISCONNECTED: "true"
+      ENABLE_ICSP: "true"
+      CLOUD_PROVIDER: "kubevirt"
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        MIRROR_OLM="local-storage-operator,metallb-operator,lvms-operator"
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=0
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=81920
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=250G

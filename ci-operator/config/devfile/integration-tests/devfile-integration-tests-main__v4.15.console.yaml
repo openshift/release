@@ -1,0 +1,66 @@
+base_images:
+  base:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.6
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder-v24
+images:
+- dockerfile_path: openshift-ci/build-root/console/Dockerfile
+  from: base
+  to: console
+promotion:
+  to:
+  - additional_images:
+      console-tests: src
+    disabled: true
+    name: "4.15"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.15"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.15"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  console:
+    requests:
+      cpu: "1"
+      memory: 8Gi
+tests:
+- as: e2e-aws-console-periodic
+  cron: 12 0 3,19 * *
+  steps:
+    cluster_profile: aws-devfile
+    env:
+      BASE_DOMAIN: devfile-ci.com
+    test:
+    - as: e2e-aws-console-periodic-steps
+      cli: latest
+      commands: |
+        # Clone source from console repository and run test
+        ./scripts/openshiftci-presubmit-devfiles-console-tests.sh
+        cd /go/src/github.com/openshift/console
+        ./test-prow-e2e.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h30m0s
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: devfile
+  repo: integration-tests
+  variant: v4.15.console

@@ -8,7 +8,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 REGION=${REGION:-$LEASED_RESOURCE}
-subfix=$(date +%m%d%H%M%S)
+IAM_PREFIX=$(head -n 1 "${SHARED_DIR}/cluster-prefix")
 
 # Create IAM policy
 iam_policy_payload="${ARTIFACT_DIR}/iam-policy.json"
@@ -31,7 +31,7 @@ cat > ${iam_policy_payload} << EOF
   ]
 }
 EOF
-iam_policy_name="${NAMESPACE}-${subfix}"
+iam_policy_name="${IAM_PREFIX}-policy"
 iam_policy_output=${ARTIFACT_DIR}/iam_policy_output.json
 aws --region $REGION iam create-policy --description "Prow CI rosa" \
   --output json \
@@ -65,7 +65,7 @@ cat > ${trust_relationship_payload} << EOF
   ]
 }
 EOF
-iam_role_name="${NAMESPACE}-${subfix}"
+iam_role_name="${IAM_PREFIX}-role"
 iam_role_output=${ARTIFACT_DIR}/iam_role_output.json
 aws --region $REGION iam create-role --description "Prow CI rosa" \
   --output json \

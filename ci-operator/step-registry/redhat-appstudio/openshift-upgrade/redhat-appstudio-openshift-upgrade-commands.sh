@@ -35,5 +35,5 @@ EOF
 
 cd "$(mktemp -d)"
 
-git clone --branch main "https://github.com/redhat-appstudio/e2e-tests.git" .
+git clone --branch main "https://github.com/konflux-ci/e2e-tests.git" .
 make ci/test/openshift-upgrade

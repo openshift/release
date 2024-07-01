@@ -11,7 +11,7 @@ source "${SHARED_DIR}/packet-conf.sh" && scp "${SSHOPTS[@]}" "${SHARED_DIR}/nest
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOF' |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 set -x
 
-API_SERVER=$(cat nested_kubeconfig | yq ".clusters[0].cluster.server" | sed 's|^http[s]*://||' | sed 's|:[0-9]*$||')
+API_SERVER=$(cat nested_kubeconfig | yq -r ".clusters[0].cluster.server" | sed 's|^http[s]*://||' | sed 's|:[0-9]*$||')
 if [[ ! $API_SERVER =~ \[ && ! $API_SERVER =~ \] && ! $API_SERVER =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     API_SERVER=".${API_SERVER}"
 fi

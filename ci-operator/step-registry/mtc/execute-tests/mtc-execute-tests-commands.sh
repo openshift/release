@@ -25,15 +25,23 @@ python3 -m pip install $MTC_APPS_DEPLOYER_DIR
 python3 -m pip install $MTC_PYTHON_CLIENT_DIR
 
 TARGET_CLUSTER_DIR=$(find tmp/clusters-data/${TEST_PLATFORM} -type d -name "${TARGET_CLUSTER_PREFIX}*")
-TARGET_KUBEADMIN_PASSWORD_FILE="/${TARGET_CLUSTER_DIR}/auth/kubeadmin-password"
+if [ -f "${TARGET_CLUSTER_DIR}/auth/rosa-admin-password" ]; then
+  TARGET_KUBEADMIN_PASSWORD_FILE="/${TARGET_CLUSTER_DIR}/auth/rosa-admin-password"
+  TEST_USER="rosa-admin"
+else
+  TARGET_KUBEADMIN_PASSWORD_FILE="/${TARGET_CLUSTER_DIR}/auth/kubeadmin-password"
+  TEST_USER="kubeadmin"
+fi
 TARGET_KUBECONFIG="/${TARGET_CLUSTER_DIR}/auth/kubeconfig"
 RESULTS_FILE="${TEST_REPOSITORY_DIR}/junit-report.xml"
 
 # Login to the cluster
-echo "Logging into source cluster."
-TARGET_KUBEADMIN_PASSWORD=$(cat $TARGET_KUBEADMIN_PASSWORD_FILE)
+echo "Logging into target cluster."
 export KUBECONFIG=$TARGET_KUBECONFIG
-oc login -u kubeadmin -p $TARGET_KUBEADMIN_PASSWORD
+TARGET_KUBEADMIN_PASSWORD=$(cat $TARGET_KUBEADMIN_PASSWORD_FILE)
+
+API_URL=$(oc whoami --show-server)
+oc login ${API_URL} -u ${TEST_USER} -p ${TARGET_KUBEADMIN_PASSWORD}
 
 # Define archive-results function
 function archive-results() {

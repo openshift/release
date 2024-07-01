@@ -1,0 +1,32 @@
+ref:
+  as: cucushift-hypershift-extended-external-oidc-enable
+  from_image:
+    namespace: ocp
+    name: "4.16"
+    tag: upi-installer
+  commands: cucushift-hypershift-extended-external-oidc-enable-commands.sh
+  timeout: 10m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+  env:
+  - name: EXT_OIDC_INCLUDE_CLI_CLIENT
+    default: "true"
+    documentation: |-
+      If true, include the CLI OIDC client along with the console client in 
+      hc.spec.configuration.authentication.oidcProviders[0].oidcClients.
+      Note that the CLI component is synced to authentication/cluster.status.oidcClients[?(@.componentName=="cli")]
+      within the hosted cluster by the CLIOIDCClientStatus controller in the console operator. This controller was
+      introduced in OpenShift 4.16 (https://issues.redhat.com//browse/CONSOLE-3902).
+      Set this environment variable to false only for OpenShift 4.15.
+  credentials:
+  - mount_path: /var/run/hypershift-ext-oidc-app-cli
+    name: hypershift-ext-oidc-app-cli
+    namespace: test-credentials
+  - mount_path: /var/run/hypershift-ext-oidc-app-console
+    name: hypershift-ext-oidc-app-console
+    namespace: test-credentials
+  documentation: |-
+    This step patches the rendered Hypershift artifacts (`${SHARED_DIR}/hypershift_create_cluster_render.yaml`) 
+    to enable external OIDC, then applies them without waiting for the hosted cluster to be ready and healthy.

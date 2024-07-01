@@ -60,6 +60,30 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: azure-ipi-workers-rhel8-f28
+  cron: 35 2 6 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FILTERS_ADDITIONAL: ~TELCO&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @azure-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @azure-ipi'
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-eus
+    workflow: cucushift-installer-rehearse-azure-ipi-workers-rhel8
 - as: baremetalds-ipi-ovn-ipv4-fips-f14
   cron: 11 18 2,17 * *
   steps:
@@ -69,6 +93,7 @@ tests:
         FIPS_MODE=true
         IP_STACK=v4
         NETWORK_TYPE=OVNKubernetes
+      FILTERS_ADDITIONAL: ~TELCO&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @baremetal-ipi'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @baremetal-ipi'
     test:
@@ -91,6 +116,7 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
+      FILTERS_ADDITIONAL: ~TELCO&
       FIPS_ENABLED: "true"
       RT_ENABLED: "true"
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @gcp-ipi'
@@ -115,6 +141,7 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe
     env:
+      FILTERS_ADDITIONAL: ~TELCO&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @ibmcloud-ipi and not
         @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @ibmcloud-ipi and not
@@ -140,6 +167,7 @@ tests:
   steps:
     cluster_profile: nutanix-qe-dis
     env:
+      FILTERS_ADDITIONAL: ~TELCO&
       FIPS_ENABLED: "true"
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @nutanix-ipi'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @nutanix-ipi'
@@ -162,8 +190,9 @@ tests:
 - as: vsphere-ipi-f14
   cron: 18 7 6,21 * *
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     env:
+      FILTERS_ADDITIONAL: ~TELCO&
       UPGRADE_CHECK_RUN_TAGS: '@4.12 and @vsphere-ipi and @upgrade-check and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@4.12 and @vsphere-ipi and @upgrade-prepare and not @fips'
     test:

@@ -68,68 +68,11 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: rhtap-installer-shellcheck
-  commands: |
-    #!/usr/bin/env bash
-    set -o errexit
-    set -o nounset
-    set -o pipefail
-    find . -type f -name "*.sh" -print0 | xargs -r -0 shellcheck
-  container:
-    from: rhtap-installer
-- as: rhtap-installer-yamllint
-  commands: |
-    #!/usr/bin/env bash
-    set -o errexit
-    set -o nounset
-    set -o pipefail
-
-    CONFIG_FILE="ci/config/yamllint.yaml"
-
-    yamllint -c "$CONFIG_FILE" .
-  container:
-    from: rhtap-installer
-  optional: true
 - as: rhtap-dump-external-resources
   cron: 0 */24 * * *
   steps:
     test:
     - ref: redhat-appstudio-rhtap-installer-sprayproxy-cleanup
-- as: rhtap-installer-e2e
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: rhtap
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^tests/release/pipelines/|^tests/load-tests/|^cmd/loadTests.go$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-  steps:
-    env:
-      RHTAP_ENABLE_TPA: "false"
-    test:
-    - ref: redhat-appstudio-rhtap-installer-e2e-test
-    workflow: redhat-appstudio-rhtap-installer
-- as: rhtap-installer-e2e-postsubmit
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: rhtap
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  postsubmit: true
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^tests/release/pipelines/|^tests/load-tests/|^cmd/loadTests.go$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-  steps:
-    env:
-      RHTAP_ENABLE_TPA: "false"
-    test:
-    - ref: redhat-appstudio-rhtap-installer-e2e-test
-    workflow: redhat-appstudio-rhtap-installer
 - as: rhtap-installer-e2e-nightly
   cluster_claim:
     architecture: amd64

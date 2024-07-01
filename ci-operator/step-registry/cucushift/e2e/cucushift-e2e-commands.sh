@@ -89,7 +89,7 @@ function filter_test_by_platform() {
     extrainfoCmd="oc get infrastructure cluster -o yaml | yq '.status'"
     if [[ -n "$platform" ]] ; then
         case "$platform" in
-            external|none|powervs)
+            external|kubevirt|none|powervs)
                 export E2E_RUN_TAGS="@baremetal-upi and ${E2E_RUN_TAGS}"
                 eval "$extrainfoCmd"
                 ;;
@@ -117,8 +117,11 @@ function filter_test_by_network() {
         ovnkubernetes)
 	    networktag='@network-ovnkubernetes'
 	    ;;
+        other)
+	    networktag=''
+	    ;;
         *)
-	    echo "######Expected network to be SDN/OVN, but got: $networktype"
+	    echo "######Expected network to be SDN/OVN/Other, but got: $networktype"
 	    ;;
     esac
     if [[ -n $networktag ]] ; then
@@ -176,11 +179,13 @@ function filter_test_by_capability() {
     declare -A tagmaps
     tagmaps=([baremetal]=xxx
              [Build]=workloads
+             [CloudControllerManager]=xxx
              [CloudCredential]=xxx
              [Console]=console
              [CSISnapshot]=storage
              [DeploymentConfig]=workloads
              [ImageRegistry]=xxx
+             [Ingress]=xxx
              [Insights]=xxx
              [MachineAPI]=xxx
              [marketplace]=xxx
@@ -253,23 +258,35 @@ function test_execution_cucumber() {
     set +x
 }
 function test_execution_default() {
-    # run normal tests in parallel
-    export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-normal"
-    SECONDS=0
-    parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
-        'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
-         export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
-         parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and not @serial and not @console and not @admin\" -p junit"' || true
-    show_test_execution_time 'normal'
+    if [[ "${PARALLEL}" = '0' ]] || [[ "${PARALLEL}" = '1' ]] ; then
+        # run normal tests in serial
+        SECONDS=0
+        test_execution_cucumber 'normal' 'not @serial and not @console and not @admin'
+        show_test_execution_time 'normal'
 
-    # run admin tests in parallel
-    export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-admin"
-    SECONDS=0
-    parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
-        'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
-         export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
-         parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and not @serial and not @console and @admin\" -p junit"' || true
-    show_test_execution_time 'admin'
+        # run admin tests in serial
+        SECONDS=0
+        test_execution_cucumber 'admin' 'not @serial and not @console and @admin'
+        show_test_execution_time 'admin'
+    else
+        # run normal tests in parallel
+        SECONDS=0
+        export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-normal"
+        parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
+            'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
+             export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
+             parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and not @serial and not @console and not @admin\" -p junit"' || true
+        show_test_execution_time 'normal'
+
+        # run admin tests in parallel
+        SECONDS=0
+        export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel-admin"
+        parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
+            'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
+             export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
+             parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and not @serial and not @console and @admin\" -p junit"' || true
+        show_test_execution_time 'admin'
+    fi
 
     # run the rest tests in serial
     SECONDS=0
@@ -288,8 +305,11 @@ function test_execution_ui() {
     test_execution_cucumber 'ui1' 'not @destructive'
     test_execution_cucumber 'ui2' '@destructive'
 }
+function test_execution_ui_destructive {
+    test_execution_cucumber 'uidestructive' '@console and @destructive'
+}
 function test_execution() {
-    pushd verification-tests
+    pushd /verification-tests
     case "$E2E_TEST_TYPE" in
         default)
             export E2E_RUN_TAGS="${E2E_RUN_TAGS} and not @destructive and not @long-duration"
@@ -306,6 +326,9 @@ function test_execution() {
         ui)
             export E2E_RUN_TAGS="${E2E_RUN_TAGS} and @console"
             test_execution_ui
+            ;;
+        ui_destructive)
+            test_execution_ui_destructive
             ;;
         *)
             echo "Got unexpected test type: $E2E_TEST_TYPE"
@@ -325,8 +348,7 @@ function summarize_test_results() {
     done < /tmp/zzz-tmp.log
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
-cucushift:
-  type: cucushift-e2e
+cucushift-e2e:
   total: $tests
   failures: $failures
   errors: $errors

@@ -10,7 +10,6 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
     exit 1
 fi
 
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 # shellcheck source=/dev/null
 # shellcheck disable=SC2034
@@ -21,10 +20,19 @@ declare gateway
 declare cidr
 declare image_version
 source "${SHARED_DIR}/vsphere_context.sh"
+source "${SHARED_DIR}/vsphere_context.sh"
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+    SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+fi
 
 dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
 gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
 cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].cidr' "${SUBNETS_CONFIG}")
+machine_network_cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
 
 image_version="latest"
 if [[ -n "${IPAM_VERSION}" ]]; then
@@ -43,7 +51,11 @@ oc project openshift-machine-api
 
 # Generate the address-cidr to not use the same range as the api and ingress vips
 # start at the 24th ip address entry to generate a /29 address pool
-address_cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[24]' "${SUBNETS_CONFIG}")
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+    address_cidr=$(python -c "import ipaddress;print(ipaddress.IPv4Network('${machine_network_cidr}')[24])")
+else
+    address_cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[24]' "${SUBNETS_CONFIG}")
+fi
 
 # We are ignoring unknown parameters for now due to sync between repo and ci
 curl -k https://raw.githubusercontent.com/openshift-splat-team/machine-ipam-controller/main/hack/ci-resources.yaml | oc process -p GATEWAY="${gateway}" -p PREFIX="${cidr}" -p ADDRESS_CIDR="${address_cidr}/29" -p IPAM_VERSION="${image_version}" --local=true --ignore-unknown-parameters=true -f - | oc create -f -
@@ -70,7 +82,12 @@ echo "$(date -u --rfc-3339=seconds) - scaling up machineset with ippool configur
 MACHINESET_NAME=$(oc get machineset.machine.openshift.io -n openshift-machine-api -o json | jq -r '.items[0].metadata.name')
 oc scale machineset.machine.openshift.io --replicas=2 ${MACHINESET_NAME} -n openshift-machine-api
 
-readarray -t VALID_STATIC_IP < <(jq -r -c --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[]' "${SUBNETS_CONFIG}")
+
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+    readarray -t  VALID_STATIC_IP < <(python -c "import ipaddress;print(*[str(ip) for ip in ipaddress.IPv4Network('${machine_network_cidr}')], sep='\n')")
+else
+    readarray -t VALID_STATIC_IP < <(jq -r -c --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[]' "${SUBNETS_CONFIG}")
+fi
 
 echo "$(date -u --rfc-3339=seconds) - validating static IPs are applied to applicable nodes"
 for retries in {1..40}; do

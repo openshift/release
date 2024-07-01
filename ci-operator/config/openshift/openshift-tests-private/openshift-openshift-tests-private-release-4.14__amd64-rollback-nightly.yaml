@@ -64,8 +64,8 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: aws-ipi-byo-route53-f14
-  cron: 49 20 11,25 * *
+- as: aws-ipi-byo-route53-f360
+  cron: 49 9 2 2 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -85,8 +85,8 @@ tests:
           memory: 200Mi
     - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
-- as: azure-upi-f14
-  cron: 0 0 7,23 * *
+- as: azure-upi-f360
+  cron: 15 22 4 4 *
   steps:
     cluster_profile: azure-qe
     env:
@@ -106,8 +106,35 @@ tests:
           memory: 200Mi
     - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-azure-upi
-- as: gcp-ipi-ovn-ipsec-f14
-  cron: 39 19 12,26 * *
+- as: baremetal-ipi-ovn-ipv4-f360
+  cluster: build05
+  cron: 41 14 6 6 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_TARGET},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: cucushift-chainupgrade-toimage
+    workflow: baremetal-lab-ipi
+- as: gcp-ipi-ovn-ipsec-f360
+  cron: 39 4 8 8 *
   steps:
     cluster_profile: gcp-qe
     test:
@@ -125,8 +152,8 @@ tests:
           memory: 200Mi
     - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
-- as: ibmcloud-ipi-f14
-  cron: 31 22 7,21 * *
+- as: ibmcloud-ipi-f360
+  cron: 32 18 10 10 *
   steps:
     cluster_profile: ibmcloud-qe
     test:
@@ -144,9 +171,9 @@ tests:
           memory: 200Mi
     - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-ibmcloud-ipi
-- as: nutanix-ipi-f14
+- as: nutanix-ipi-boot-categories-project-f360
   cluster: build01
-  cron: 51 11 9,23 * *
+  cron: 26 17 12 12 *
   steps:
     cluster_profile: nutanix-qe
     test:
@@ -165,8 +192,8 @@ tests:
     - ref: nutanix-upgrade-pre-config
     - ref: cucushift-chainupgrade-toimage
     workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
-- as: vsphere-upi-f14
-  cron: 24 8 14,28 * *
+- as: vsphere-upi-f360
+  cron: 28 23 14 11 *
   steps:
     cluster_profile: vsphere-2
     test:

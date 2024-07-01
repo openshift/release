@@ -26,13 +26,20 @@ fi
 }
 
 export HOME=/tmp
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+    SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+fi
 
 declare vlanid
 declare primaryrouterhostname
 declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 declare vsphere_url
 declare GOVC_USERNAME
@@ -247,6 +254,10 @@ dir=/tmp/installer
 mkdir "${dir}/"
 pushd ${dir}
 cp -t "${dir}" "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 /tmp/openshift-install agent create image --dir="${dir}" --log-level debug &
 

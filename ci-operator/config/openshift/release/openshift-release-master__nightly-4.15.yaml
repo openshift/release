@@ -285,7 +285,7 @@ tests:
 - as: e2e-vsphere-sdn
   interval: 168h
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
@@ -295,7 +295,7 @@ tests:
 - as: e2e-vsphere-static-ovn
   interval: 168h
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       IPAM_VERSION: v1alpha1
@@ -307,7 +307,7 @@ tests:
 - as: e2e-vsphere-ovn-techpreview
   interval: 168h
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
@@ -330,7 +330,7 @@ tests:
 - as: e2e-vsphere-ovn
   interval: 168h
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -341,7 +341,7 @@ tests:
 - as: e2e-vsphere-externallb-ovn
   interval: 168h
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     observers:
       enable:
       - observers-resource-watch
@@ -349,7 +349,7 @@ tests:
 - as: e2e-vsphere-ovn-serial
   interval: 168h
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -360,7 +360,7 @@ tests:
 - as: e2e-vsphere-ovn-techpreview-serial
   interval: 168h
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -392,7 +392,7 @@ tests:
 - as: e2e-vsphere-ovn-csi
   interval: 168h
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -400,12 +400,12 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-csi
-- as: e2e-vsphere-zones
+- as: e2e-vsphere-ovn-zones
   interval: 168h
   steps:
-    cluster_profile: vsphere-multizone-2
+    cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
-- as: e2e-vsphere-upi-zones
+- as: e2e-vsphere-ovn-upi-zones
   interval: 168h
   steps:
     cluster_profile: vsphere-multizone-2
@@ -413,7 +413,7 @@ tests:
 - as: e2e-vsphere-ipi-ovn-cgroupsv1
   interval: 168h
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     observers:
       enable:
       - observers-resource-watch
@@ -885,7 +885,7 @@ tests:
     workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 0 4 * * 1,3,5
+  cron: 0 23 * * 1,3,5
   steps:
     env:
       T5CI_JOB_TYPE: ptp
@@ -1008,7 +1008,7 @@ tests:
 - as: e2e-vsphere-ovn-etcd-scaling
   interval: 168h
   steps:
-    cluster_profile: vsphere-8-vpn
+    cluster_profile: vsphere-elastic
     observers:
       enable:
       - observers-resource-watch
@@ -1046,7 +1046,7 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: agent-e2e-generic-conformance
   timeout: 5h0m0s
-- as: e2e-agent-sno-ipv6
+- as: e2e-agent-single-node-ipv6
   cluster: build05
   cron: 0 */12 * * *
   steps:
@@ -1257,6 +1257,15 @@ tests:
       CLUSTER_NETWORK_MTU: "1100"
     workflow: openshift-e2e-aws-network-mtu-edge-zones
   timeout: 6h0m0s
+- as: fips-payload-scan
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws
+    env:
+      MAJOR_MINOR: "4.15"
+    test:
+    - ref: fips-check-art-fips
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -37,7 +37,7 @@ CONFIG = {
         'ap-northeast-1': 5,
     },
     'aws-autorelease-qe-quota-slice': {
-        'us-east-1': 2,
+        'us-east-1': 4,
     },
     'aws-terraform-qe-quota-slice': {
         'ap-northeast-1': 2,
@@ -77,6 +77,9 @@ CONFIG = {
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 10,
     },
+    'metal-perscale-cpt-quota-slice': {
+        'rdu3': 1,
+    },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
@@ -86,6 +89,9 @@ CONFIG = {
     },
     'aws-rhtap-qe-quota-slice': {
         'us-east-1': 10
+    },
+    'aws-konflux-qe-quota-slice': {
+        'us-west-2': 10
     },
     'aws-rhtap-performance-quota-slice': {
         'eu-west-1': 10
@@ -128,10 +134,10 @@ CONFIG = {
         'westus': 8
     },
     'azure-arm64-quota-slice': {
-        'centralus': 3,
-        'southcentralus': 3,
-        'eastus': 3,
-        'westus2': 3
+        'centralus': 33,
+        'southcentralus': 8,
+        'eastus': 8,
+        'westus2': 8
     },
     'azurestack-quota-slice': {
         'ppe3': 2
@@ -146,6 +152,9 @@ CONFIG = {
         'northcentralus': 10,
         'southcentralus': 10,
         'centralus': 10
+    },
+    'azure-autorelease-qe-quota-slice': {
+        'eastus2': 4
     },
     'azure-arm64-qe-quota-slice': {
         'centralus': 6,
@@ -168,6 +177,9 @@ CONFIG = {
     },
     'gcp-qe-quota-slice': {
         'us-central1': 30,
+    },
+    'gcp-autorelease-qe-quota-slice': {
+        'us-central1': 4,
     },
     'gcp-quota-slice': {
         'us-central1': 80,
@@ -240,6 +252,7 @@ CONFIG = {
     'vsphere-multizone-2-quota-slice':{},
     'vsphere-8-vpn-quota-slice':{},
     'vsphere-multi-vcenter-quota-slice':{},
+    'vsphere-elastic-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
     },
@@ -287,7 +300,7 @@ CONFIG = {
         'us-east': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
-        'us-south': 3,
+        'us-east': 3,
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
@@ -384,6 +397,9 @@ CONFIG = {
     },
     'aws-ip-pools-us-east-1': {
         'default': 256,
+    },
+    'observability-aws-quota-slice': {
+        'default': 50,
     }
 }
 
@@ -421,7 +437,7 @@ for i in range(10, 15):
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in [1148,1197,1207,1225,1227,1229,1232,1233,1234,1235,1237,1238,1240,1243,1246,1249,1254,1255,1260,1271,1272,1274,1279,1284]:
+for i in [1197,1207,1225,1227,1229,1232,1233,1234,1235,1237,1238]:
     CONFIG['vsphere-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
 
 for i in [990,1169,1166,1164,1146]:
@@ -433,10 +449,13 @@ for i in [871,991,1165,1154,1148,1140]:
 for i in [1287,1289,1296,1298,1300,1302]:
     CONFIG['vsphere-multizone-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
 
-for i in [1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274,1283,1285,1305,1309]:
+for i in [1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274]:
     CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
 
-for i in [956]:
+for i in range(0,100):
+    CONFIG['vsphere-elastic-quota-slice']['vsphere-elastic-{}'.format(i)] = 1
+
+for i in [1148]:
     CONFIG['vsphere-multi-vcenter-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
 
 for i in range(4):

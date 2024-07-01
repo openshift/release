@@ -30,7 +30,9 @@ images:
 promotion:
   to:
   - disabled: true
-    name: 4.16-priv
+    name: sriov-4.16
+    namespace: origin
+  - name: 4.16-priv
     namespace: ocp-private
 releases:
   initial:
@@ -52,6 +54,17 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: unit-test
+  commands: make test
+  container:
+    from: src
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: ib-sriov-cni
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

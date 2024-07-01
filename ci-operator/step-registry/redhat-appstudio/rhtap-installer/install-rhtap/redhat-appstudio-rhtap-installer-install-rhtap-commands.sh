@@ -8,10 +8,10 @@ DEBUG_OUTPUT=/tmp/log.txt
 export ACS__API_TOKEN \
   ACS__CENTRAL_ENDPOINT \
   DEVELOPER_HUB__CATALOG__URL \
-  GITHUB__APP__APP_ID GITHUB__APP__CLIENT_ID \
-  GITHUB__APP__CLIENT_SECRET \
-  GITHUB__APP__WEBHOOK_SECRET \
-  GITHUB__APP__WEBHOOK_URL \
+  GITHUB__APP__ID \
+  GITHUB__APP__CLIENT__ID \
+  GITHUB__APP__CLIENT__SECRET \
+  GITHUB__APP__WEBHOOK__SECRET \
   GITHUB__APP__PRIVATE_KEY \
   GITOPS__GIT_TOKEN \
   QUAY__DOCKERCONFIGJSON \
@@ -37,27 +37,38 @@ export ACS__API_TOKEN \
   RHTAP_ENABLE_DEVELOPER_HUB \
   RHTAP_ENABLE_TAS \
   RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES \
-  RHTAP_ENABLE_TPA
+  RHTAP_ENABLE_TPA \
+  GITLAB__APP__CLIENT__ID \
+  GITLAB__APP__CLIENT__SECRET \
+  GITLAB__TOKEN \
+  QUAY__API_TOKEN
 
-RHTAP_ENABLE_GITHUB=${RHTAP_ENABLE_GITHUB:-'true'} 
-RHTAP_ENABLE_GITLAB=${RHTAP_ENABLE_GITLAB:-'false'}
+RHTAP_ENABLE_GITHUB=${RHTAP_ENABLE_GITHUB:-'true'}
+RHTAP_ENABLE_GITLAB=${RHTAP_ENABLE_GITLAB:-'true'}
 RHTAP_ENABLE_DEVELOPER_HUB=${RHTAP_ENABLE_DEVELOPER_HUB:-'true'}
 RHTAP_ENABLE_TAS=${RHTAP_ENABLE_TAS:-'true'}
 RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES=${RHTAP_ENABLE_TAS_FULCIO_OIDC_DEFAULT_VALUES:-'true'}
 RHTAP_ENABLE_TPA=${RHTAP_ENABLE_TPA:-'true'}
 
+echo "Enabled Components....."
+env | grep '^RHTAP_ENABLE'
+
 ACS__API_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-api-token)
 ACS__CENTRAL_ENDPOINT=$(cat /usr/local/rhtap-ci-secrets/rhtap/acs-central-endpoint)
 DEVELOPER_HUB__CATALOG__URL=https://github.com/redhat-appstudio/tssc-sample-templates/blob/main/all.yaml
-GITHUB__APP__APP_ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-app-id)
-GITHUB__APP__CLIENT_ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-id)
-GITHUB__APP__CLIENT_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-secret)
-GITHUB__APP__WEBHOOK_SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-webhook-secret)
+GITHUB__APP__ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-app-id)
+GITHUB__APP__CLIENT__ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-id)
+GITHUB__APP__CLIENT__SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-client-secret)
+GITHUB__APP__WEBHOOK__SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-webhook-secret)
 GITHUB__APP__PRIVATE_KEY=$(base64 -d < /usr/local/rhtap-ci-secrets/rhtap/rhdh-github-private-key)
 GITOPS__GIT_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gihtub_token)
 QUAY__DOCKERCONFIGJSON=$(cat /usr/local/rhtap-ci-secrets/rhtap/rhtap_quay_ci_token)
 SPRAYPROXY_SERVER_URL=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-url)
 SPRAYPROXY_SERVER_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/sprayproxy-server-token)
+GITLAB__APP__CLIENT__ID=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_oauth_client_id)
+GITLAB__APP__CLIENT__SECRET=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_oauth_client_secret)
+GITLAB__TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/gitlab_token)
+QUAY__API_TOKEN=$(cat /usr/local/rhtap-ci-secrets/rhtap/quay_api_token)
 
 TPA__GUAC__PASSWORD="guac1234" # notsecret
 TPA__KEYCLOAK__ADMIN_PASSWORD="admin123456" # notsecret
@@ -111,6 +122,9 @@ install_rhtap(){
   echo "[INFO]Generate private-values.yaml file ..."
   ./bin/make.sh values
   
+  echo "Disabling the default auth policy"
+  yq e -i '.debug.ci=true' private-values.yaml
+
   echo "[INFO]Install RHTAP ..."
   ./bin/make.sh apply -d -n $NAMESPACE -- --values private-values.yaml
 
@@ -141,9 +155,9 @@ EOF
   wait_for_pipeline "pipelineruns/$pipeline_name" "$NAMESPACE"
   tkn -n "$NAMESPACE" pipelinerun logs "$pipeline_name" -f >"$DEBUG_OUTPUT"
 
-  homepage_url=$(grep "homepage-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
-  callback_url=$(grep "callback-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
-  webhook_url=$(grep "webhook-url" < "$DEBUG_OUTPUT"  | sed 's/.*: //g') 
+  homepage_url=$(grep --max-count 1 "homepage-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
+  callback_url=$(grep --max-count 1 "callback-url" < "$DEBUG_OUTPUT" | sed 's/.*: //g')
+  webhook_url=$(grep --max-count 1 "webhook-url" < "$DEBUG_OUTPUT"  | head -1 | sed 's/.*: //g') 
 
   echo "$homepage_url" | tee "${SHARED_DIR}/homepage_url"
   echo "$callback_url" | tee "${SHARED_DIR}/callback_url"
@@ -155,6 +169,12 @@ e2e_test(){
   ./bin/make.sh -n "$NAMESPACE" test
 }
 
+verify_template(){
+  echo "[INFO]Verify the template..."
+  ./test/e2e.sh -t template
+}
+
 clone_repo
+verify_template
 install_rhtap
 e2e_test

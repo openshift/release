@@ -19,6 +19,13 @@ chain:
         - name: ENABLE_ICSP
           default: "false"
           documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
+        - name: BREW_IMAGE_REGISTRY_USERNAME
+          default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+        - name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+          default: /var/run/brew-pull-secret/token
+        - name: EXTRA_ARGS
+          default: ""
+          documentation: "Extra args to pass to the create cluster aws command"
       commands: |-
         set -exuo pipefail
 
@@ -27,6 +34,17 @@ chain:
         if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
           echo "MCE version is less than 2.4, use hypershift command"
           HYPERSHIFT_NAME=hypershift
+        else
+          set +x
+          echo "MCE version is greater than or equal to 2.4, need to extract HyperShift cli"
+          oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+          HO_IMAGE=$(oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}')
+          mkdir /tmp/hs-cli
+          brew_registry_auth=$(echo -n "${BREW_IMAGE_REGISTRY_USERNAME}:$(<$BREW_IMAGE_REGISTRY_TOKEN_PATH)" | base64 -w 0)
+          echo '{}' | jq --arg auth "$brew_registry_auth" '.auths += {"brew.registry.redhat.io": {"auth": $auth}}' > /tmp/brew_configjson
+          oc image extract "brew.${HO_IMAGE}" --path /usr/bin/hypershift-no-cgo:/tmp/hs-cli --registry-config=/tmp/brew_configjson
+          chmod +x /tmp/hs-cli/hypershift-no-cgo
+          set -x
         fi
 
         arch=$(arch)
@@ -48,18 +66,33 @@ chain:
           oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
           PULL_SECRET_PATH="/tmp/.dockerconfigjson"
         fi
+        
+        CRED_COMMAND=""
+        if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.6)}') )); then
+          echo "MCE version is less than 2.6, use --aws-creds command"
+          CRED_COMMAND=$(echo "--aws-creds ${CLUSTER_PROFILE_DIR}/.awscred")
+        else
+          set +x
+          export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+          export AWS_REGION=${HYPERSHIFT_AWS_REGION}
+          /tmp/hs-cli/hypershift-no-cgo create iam cli-role --name ${CLUSTER_NAME} --aws-creds ${AWS_SHARED_CREDENTIALS_FILE}
+          aws sts get-session-token --output json > ${SHARED_DIR}/sts-creds.json
+          ACCOUNT=$(aws sts get-caller-identity | jq -r '.Account')
+          echo "arn:aws:iam::$ACCOUNT:role/$CLUSTER_NAME" > ${SHARED_DIR}/hcp-role-arn
+          set -x
+          CRED_COMMAND=$(echo "--role-arn $(cat ${SHARED_DIR}/hcp-role-arn) --sts-creds ${SHARED_DIR}/sts-creds.json")  
+          sleep 60
+        fi
       
-        /tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} \
+        /tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} ${CRED_COMMAND} ${EXTRA_ARGS} \
         --name ${CLUSTER_NAME} \
         --infra-id ${CLUSTER_NAME} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
         --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
         --region ${HYPERSHIFT_AWS_REGION} \
         --pull-secret ${PULL_SECRET_PATH} \
-        --aws-creds ${CLUSTER_PROFILE_DIR}/.awscred \
         --namespace local-cluster \
-        --release-image ${RELEASE_IMAGE_LATEST} \
-        --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
+        --release-image ${RELEASE_IMAGE_LATEST}
         
         if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
           echo "MCE version is less than 2.4"
@@ -118,6 +151,9 @@ chain:
       credentials:
         - mount_path: /etc/ci-pull-credentials
           name: ci-pull-credentials
+          namespace: test-credentials
+        - mount_path: /var/run/brew-pull-secret
+          name: cnv-ci-brew-pull-secret
           namespace: test-credentials
       dependencies:
         - name: "release:latest"

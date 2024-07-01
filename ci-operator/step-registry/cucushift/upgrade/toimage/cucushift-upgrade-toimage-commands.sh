@@ -19,20 +19,24 @@ KUBECONFIG="" oc --loglevel=8 registry login
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
     if (( FRC != 0 )); then
-        echo -e "oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
-        echo -e "oc get machineconfig\n$(oc get machineconfig)"
-        echo -e "Describing abnormal nodes...\n"
+        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+            echo -e "\n# oc adm upgrade status\n"
+            env OC_ENABLE_CMD_UPGRADE_STATUS='true' oc adm upgrade status --details=all || true 
+        fi
+        echo -e "\n# oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
+        echo -e "\n# oc get machineconfig\n$(oc get machineconfig)"
+        echo -e "\n# Describing abnormal nodes...\n"
         oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
-        echo -e "Describing abnormal operators...\n"
+        echo -e "\n# Describing abnormal operators...\n"
         oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
-        echo -e "Describing abnormal mcp...\n"
-        oc get mcp --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
+        echo -e "\n# Describing abnormal mcp...\n"
+        oc get machineconfigpools --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
     fi
 }
 
 # Generate the Junit for upgrade
 function createUpgradeJunit() {
-    echo "Generating the Junit for upgrade"
+    echo -e "\n# Generating the Junit for upgrade"
     if (( FRC == 0 )); then
       cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -181,117 +185,6 @@ function cco_annotation(){
     if (( wait_time_loop_var >= 5 )); then
         echo >&2 "Timed out waiting for CCO annotation completing, exiting" && return 1
     fi
-}
-
-# Update RHEL repo before upgrade
-function rhel_repo(){
-    echo "Updating RHEL node repo"
-    # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
-    # to be able to SSH.
-    if ! whoami &> /dev/null; then
-        if [[ -w /etc/passwd ]]; then
-            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-        else
-            echo "/etc/passwd is not writeable, and user matching this uid is not found."
-            exit 1
-        fi
-    fi
-    SOURCE_REPO_VERSION=$(echo "${SOURCE_VERSION}" | cut -d'.' -f1,2)
-    TARGET_REPO_VERSION=$(echo "${TARGET_VERSION}" | cut -d'.' -f1,2)
-    export SOURCE_REPO_VERSION
-    export TARGET_REPO_VERSION
-
-    cat > /tmp/repo.yaml <<-'EOF'
----
-- name: Update repo Playbook
-  hosts: workers
-  any_errors_fatal: true
-  gather_facts: false
-  vars:
-    source_repo_version: "{{ lookup('env', 'SOURCE_REPO_VERSION') }}"
-    target_repo_version: "{{ lookup('env', 'TARGET_REPO_VERSION') }}"
-    platform_version: "{{ lookup('env', 'PLATFORM_VERSION') }}"
-    major_platform_version: "{{ platform_version[:1] }}"
-  tasks:
-  - name: Wait for host connection to ensure SSH has started
-    wait_for_connection:
-      timeout: 600
-  - name: Replace source release version with target release version in the files
-    replace:
-      path: "/etc/yum.repos.d/rhel-{{ major_platform_version }}-server-ose-rpms.repo"
-      regexp: "{{ source_repo_version }}"
-      replace: "{{ target_repo_version }}"
-  - name: Clean up yum cache
-    command: yum clean all
-EOF
-
-    # current Server version may not be the expected branch when cluster is not fully upgraded 
-    # using TARGET_REPO_VERSION instead directly
-    version_info="${TARGET_REPO_VERSION}"
-    openshift_ansible_branch='master'
-    if [[ "$version_info" =~ [4-9].[0-9]+ ]] ; then
-        openshift_ansible_branch="release-${version_info}"
-        minor_version="${version_info##*.}"
-        if [[ -n "$minor_version" ]] && [[ $minor_version -le 10 ]] ; then
-            source /opt/python-env/ansible2.9/bin/activate
-        else
-            source /opt/python-env/ansible-core/bin/activate
-        fi
-        ansible --version
-    else
-        echo "WARNING: version_info is $version_info"
-    fi
-    echo -e "Using openshift-ansible branch $openshift_ansible_branch\n"
-    cd /usr/share/ansible/openshift-ansible
-    git stash || true
-    git checkout "$openshift_ansible_branch"
-    git pull || true
-    ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
-    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/repo.yaml -vvv
-}
-
-# Upgrade RHEL node
-function rhel_upgrade(){
-    echo "Upgrading RHEL nodes"
-    echo "Validating parsed Ansible inventory"
-    ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
-    echo -e "\nRunning RHEL worker upgrade"
-    sed -i 's|^remote_tmp.*|remote_tmp = /tmp/.ansible|g' /usr/share/ansible/openshift-ansible/ansible.cfg
-    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv
-
-    echo "Check K8s version on the RHEL node"
-    master_0=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
-    rhel_0=$(oc get nodes -l node.openshift.io/os_id=rhel -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
-    exp_version=$(oc get node ${master_0} --output=jsonpath='{.status.nodeInfo.kubeletVersion}' | cut -d '.' -f 1,2)
-    act_version=$(oc get node ${rhel_0} --output=jsonpath='{.status.nodeInfo.kubeletVersion}' | cut -d '.' -f 1,2)
-
-    echo -e "Expected K8s version is: ${exp_version}\nActual K8s version is: ${act_version}"
-    if [[ ${exp_version} == "${act_version}" ]]; then
-        echo "RHEL worker has correct K8s version"
-    else
-        echo "RHEL worker has incorrect K8s version" && exit 1
-    fi
-    echo -e "oc get node -owide\n$(oc get node -owide)"
-    echo "RHEL worker upgrade complete"
-}
-
-# Extract oc binary which is supposed to be identical with target release
-function extract_oc(){
-    echo -e "Extracting oc\n"
-    local retry=5 tmp_oc="/tmp/client-2"
-    mkdir -p ${tmp_oc}
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
-    do
-        echo >&2 "Failed to extract oc binary, retry..."
-        (( retry -= 1 ))
-        if (( retry < 0 )); then return 1; fi
-        sleep 60
-    done
-    mv ${tmp_oc}/oc ${OC_DIR} -f
-    export PATH="$PATH"
-    which oc
-    oc version --client
-    return 0
 }
 
 function run_command() {
@@ -447,6 +340,19 @@ function upgrade() {
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
+# Log abnormal cluster status
+function dump_status_if_unexpected() {
+    # expecting oc to equal TARGET_MINOR_VERSION, skip if less than .16
+        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+            local out; out="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 || true)"
+            # if upgrading, and not progressing well, dump status to log
+            # "resource name may not be empty" is a known issue, remove once OCPBUGS-32682 is fixed
+            if ! grep -qE 'The cluster version is not updating|Upgrade is proceeding well|resource name may not be empty' <<< "${out}" ; then
+                echo "${out}"
+            fi
+        fi
+}
+
 # Monitor the upgrade status
 function check_upgrade_status() {
     local wait_upgrade="${TIMEOUT}" out avail progress cluster_version
@@ -473,10 +379,11 @@ function check_upgrade_status() {
             return 0
         fi
         if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "true" && ${avail} == "True" && ${progress} == "True" && ${out} == *"Unable to apply ${cluster_version}"* ]]; then
-	    UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
-            echo -e "Upgrade stuck at updating RHEL worker, run the RHEL worker upgrade now...\n\n"
+            UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
+            echo -e "Upgrade stuck at updating RHEL worker, need to run the RHEL worker upgrade later...\n\n"
             return 0
         fi
+        dump_status_if_unexpected
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
         echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
@@ -513,33 +420,35 @@ if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
 
+#support HyperShift upgrade
+if [[ -f "${SHARED_DIR}/mgmt_kubeconfig" ]]; then
+    export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
+fi
+
 # Setup proxy if it's present in the shared dir
 if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     # shellcheck disable=SC1091
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# Target version oc will be extract in the /tmp/client directory, use it first
-mkdir -p /tmp/client
-export OC_DIR="/tmp/client"
-export PATH=${OC_DIR}:$PATH
-
+# oc cli is injected from release:target
+run_command "which oc"
+run_command "oc version --client"
+run_command "oc get machineconfigpools"
 run_command "oc get machineconfig"
 
 export TARGET="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
 TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
-extract_oc
+TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
+export TARGET_VERSION
+export TARGET_MINOR_VERSION
+echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
 
 SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
 SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
 export SOURCE_VERSION
 export SOURCE_MINOR_VERSION
 echo -e "Source release version is: ${SOURCE_VERSION}\nSource minor version is: ${SOURCE_MINOR_VERSION}"
-
-TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
-export TARGET_VERSION
-export TARGET_MINOR_VERSION
-echo -e "Target release version is: ${TARGET_VERSION}\nTarget minor version is: ${TARGET_MINOR_VERSION}"
 
 export FORCE_UPDATE="false"
 if ! check_signed; then
@@ -562,13 +471,6 @@ fi
 upgrade
 check_upgrade_status
 
-if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
-    echo -e "oc get node -owide\n$(oc get node -owide)"
-    rhel_repo
-    rhel_upgrade
-    if [[ "${UPGRADE_RHEL_WORKER_BEFOREHAND}" == "triggered" ]]; then
-	echo -e "RHEL worker upgrade completed, but the cluster upgrade hasn't been finished, check the cluster status again...\    n"
-	check_upgrade_status
-    fi
+if [[ "$UPGRADE_RHEL_WORKER_BEFOREHAND" != "triggered" ]]; then
+    check_history
 fi
-check_history
