@@ -178,7 +178,7 @@ function create_upi_powervs_cluster() {
         OUTPUT="yes"
         fi
     done || true
-  cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate "${SHARED_DIR}"/terraform-mac-upi.tfstate
+  cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform.tfstate "${SHARED_DIR}"/terraform-mac-upi.tfstate
   ./openshift-install-powervs output -ignore-os-checks > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
   ./openshift-install-powervs access-info -ignore-os-checks > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
   # Dev Note: the following two lines may be causing the redaction routine to remove the log

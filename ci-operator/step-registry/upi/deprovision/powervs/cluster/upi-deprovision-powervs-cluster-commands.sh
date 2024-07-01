@@ -112,7 +112,7 @@ function clone_upi_artifacts(){
 
   if [ -f "${SHARED_DIR}"/terraform-mac-upi.tfstate ]
   then
-    cp "${SHARED_DIR}"/terraform-mac-upi.tfstate "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate
+    cp "${SHARED_DIR}"/terraform-mac-upi.tfstate "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform.tfstate
   fi
 }
 
@@ -269,7 +269,7 @@ ic login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -g "${RESOURCE_GROU
 retry "ic plugin install -f power-iaas tg-cli vpc-infrastructure cis"
 
 # Delete the UPI PowerVS cluster created
-if [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate ] && [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-mac-upi.tfvars ]
+if [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform.tfstate ] && [ -f "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/var-mac-upi.tfvars ]
 then
   echo "Starting the delete on the UPI PowerVS cluster resources"
   destroy_upi_powervs_cluster
