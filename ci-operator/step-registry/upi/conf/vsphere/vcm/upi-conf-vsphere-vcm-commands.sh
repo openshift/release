@@ -69,7 +69,8 @@ function getFailureDomainsWithDSwitchForVCenter() {
 
       echo "DVS UUID ${DVS_UUID}"
 
-      datastoreName=$(basename "${GOVC_DATACENTER}")
+      datastoreName=$(basename "${GOVC_DATASTORE}")
+
       {
         echo "        server = \"${GOVC_URL}\"" 
         echo "        datacenter = \"${GOVC_DATACENTER}\""
@@ -77,14 +78,14 @@ function getFailureDomainsWithDSwitchForVCenter() {
         echo "        datastore = \"$(echo "${GOVC_DATASTORE}" | rev | cut -d '/' -f 1 | rev)\""
         echo "        network = \"${GOVC_NETWORK}\"" 
         echo "        distributed_virtual_switch_uuid = \"${DVS_UUID}\""
-      } >> ${FAILURE_DOMAIN_PATH}
+      } >> "${FAILURE_DOMAIN_PATH}"
       
       FAILURE_DOMAIN_OUT=$(echo "$FAILURE_DOMAIN_OUT" | jq --compact-output -r '. += [{"datacenter":"'"${GOVC_DATACENTER}"'","cluster":"'"${CLUSTER}"'","datastore":"'"${datastoreName}"'","network":"'"${GOVC_NETWORK}"'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]'); 
     done
-    echo "    }" >> ${FAILURE_DOMAIN_PATH}  
-    echo "]" >> ${FAILURE_DOMAIN_PATH}
+    echo "    }" >> "${FAILURE_DOMAIN_PATH}"  
+    echo "]" >> "${FAILURE_DOMAIN_PATH}"
 
-    echo "${FAILURE_DOMAIN_OUT}" | jq . > ${FAILURE_DOMAIN_JSON}
+    echo "${FAILURE_DOMAIN_OUT}" | jq . > "${FAILURE_DOMAIN_JSON}"
     cat "${FAILURE_DOMAIN_JSON}"
     echo "-getFailureDomainsWithDSwitchForVCenter"
 }
