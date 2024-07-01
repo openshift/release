@@ -181,6 +181,22 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
+- as: aws-upi-basecap-none-arm-f28
+  cron: 31 17 18 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager Ingress
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
+      BOOTSTRAP_INSTANCE_TYPE: m6g.large
+      MASTER_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
+      WORKER_INSTANCE_TYPE: m6g.xlarge
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-upi
 - as: azure-ipi-arm-mixarch-disc-fullypriv-f28-day2-64k-pagesize
   cron: 15 16 11 * *
   steps:
@@ -201,6 +217,19 @@ tests:
     - chain: ipi-install-heterogeneous-day2-kerneltype
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
+- as: azure-ipi-basecap-vset-arm-f28
+  cron: 31 9 10 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: CloudCredential CloudControllerManager Ingress
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-ipi-capability-baselinecaps-vset
 - as: azure-ipi-des-mini-perm-fips-amd-f28
   cron: 34 12 25 * *
   steps:
@@ -298,6 +327,22 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: baremetal-lab-agent-install-network-dynamic-disconnected-day2
+- as: baremetal-ipi-ovn-ipv4-basecap-none-f28
+  cron: 31 12 14 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: baremetal MachineAPI Ingress
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      BASELINE_CAPABILITY_SET: None
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-upgrade-qe-test
+    workflow: baremetal-lab-ipi
 - as: baremetal-upi-ovn-dual-stack-arm-f28
   cluster: build05
   cron: 45 13 14 * *

@@ -154,7 +154,7 @@ tests:
         and configmaps into the build pod
     workflow: openshift-e2e-ibmcloud-heterogeneous
 - as: ocp-e2e-powervs-ovn-multi-ppc64le
-  cron: 20 6 * * *
+  cron: 20 10 * * *
   steps:
     cluster_profile: powervs-multi-1
     dependencies:
@@ -386,17 +386,17 @@ tests:
     workflow: openshift-upgrade-azure
 - as: ocp-e2e-ovn-remote-libvirt-s390x
   cluster: build01
-  cron: 0 5,17 * * 1-5
+  cron: 0 5 * * 1-5
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:s390x-latest
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
       ARCH: s390x
       BRANCH: "4.17"
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-libvirt
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-libvirt-s390x-heterogeneous
   cluster: build01
   cron: 0 8,20 * * 1-5
@@ -416,177 +416,172 @@ tests:
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:s390x-latest
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
       ARCH: s390x
       BRANCH: "4.17"
       NODE_TUNING: "true"
       TEST_TYPE: heavy-build
-    workflow: openshift-e2e-libvirt
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-image-ecosystem-ovn-remote-libvirt-s390x
   cluster: build01
   cron: 0 18 * * 0
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_TARGET: release:multi-latest
     env:
       ARCH: s390x
       BRANCH: "4.17"
       TEST_TYPE: image-ecosystem
-    workflow: openshift-e2e-libvirt
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-jenkins-e2e-ovn-remote-libvirt-s390x
   cluster: build01
   cron: 0 19 * * 0
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_TARGET: release:multi-latest
     env:
       ARCH: s390x
       BRANCH: "4.17"
       TEST_TYPE: jenkins-e2e-rhel-only
-    workflow: openshift-e2e-libvirt
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-serial-ovn-remote-libvirt-s390x
   cluster: build01
   cron: 0 18 * * 6
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:s390x-latest
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
       ARCH: s390x
       BRANCH: "4.17"
       TEST_TYPE: conformance-serial
-    workflow: openshift-e2e-libvirt
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-fips-ovn-remote-libvirt-s390x
   cluster: build01
   cron: 0 19 * * 6
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:s390x-latest
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
       ARCH: s390x
       BRANCH: "4.17"
       FIPS_ENABLED: "true"
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-libvirt-fips
+    workflow: openshift-e2e-libvirt-upi-fips
 - as: ocp-e2e-compact-ovn-remote-libvirt-s390x
   cluster: build01
   cron: 0 20 * * 6
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:s390x-latest
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
     env:
       ARCH: s390x
       BRANCH: "4.17"
-      MASTER_DISK: "64424509440"
-      MASTER_MEMORY: "32768"
+      COMPUTE_COUNT: "0"
+      DOMAIN_MEMORY: "32768"
       TEST_TYPE: conformance-parallel
-      WORKER_DISK: "64424509440"
-      WORKER_MEMORY: "32768"
-      WORKER_REPLICAS: "0"
-    workflow: openshift-e2e-libvirt
+      VOLUME_CAPACITY: 64GB
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-remote-libvirt-ppc64le
   cluster: build01
-  cron: 0 5,17 * * 1-5
+  cron: 0 5 * * 1-5
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+      OPENSHIFT_INSTALL_TARGET: release:ppc64le-latest
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
-      MASTER_MEMORY: "34816"
+      DOMAIN_MEMORY: "34816"
       TEST_TYPE: conformance-parallel
       USE_RAMFS: "true"
-    workflow: openshift-e2e-libvirt
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-heavy-build-ovn-remote-libvirt-ppc64le
   cluster: build01
   cron: 0 13 * * 1-5
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+      OPENSHIFT_INSTALL_TARGET: release:ppc64le-latest
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
-      NODE_TUNING: "true"
       TEST_TYPE: heavy-build
       USE_RAMFS: "true"
-    workflow: openshift-e2e-libvirt
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-image-ecosystem-ovn-remote-libvirt-ppc64le
   cluster: build01
   cron: 0 18 * * 0
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_TARGET: release:multi-latest
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
       TEST_TYPE: image-ecosystem
-    workflow: openshift-e2e-libvirt
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-jenkins-e2e-ovn-remote-libvirt-ppc64le
   cluster: build01
   cron: 0 19 * * 0
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      OPENSHIFT_INSTALL_TARGET: release:multi-latest
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
       TEST_TYPE: jenkins-e2e-rhel-only
-    workflow: openshift-e2e-libvirt
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-serial-ovn-remote-libvirt-ppc64le
   cluster: build01
   cron: 0 18 * * 6
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+      OPENSHIFT_INSTALL_TARGET: release:ppc64le-latest
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
       TEST_TYPE: conformance-serial
-    workflow: openshift-e2e-libvirt
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-fips-ovn-remote-libvirt-ppc64le
   cluster: build01
   cron: 0 19 * * 6
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+      OPENSHIFT_INSTALL_TARGET: release:ppc64le-latest
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
       FIPS_ENABLED: "true"
       TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-libvirt-fips
+    workflow: openshift-e2e-libvirt-upi-fips
 - as: ocp-e2e-compact-ovn-remote-libvirt-ppc64le
   cluster: build01
   cron: 0 20 * * 6
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+      OPENSHIFT_INSTALL_TARGET: release:ppc64le-latest
     env:
       ARCH: ppc64le
       BRANCH: "4.17"
-      MASTER_DISK: "64424509440"
-      MASTER_MEMORY: "32768"
+      COMPUTE_COUNT: "0"
+      DOMAIN_MEMORY: "32768"
       TEST_TYPE: conformance-parallel
-      WORKER_DISK: "64424509440"
-      WORKER_MEMORY: "32768"
-      WORKER_REPLICAS: "0"
-    workflow: openshift-e2e-libvirt
+      VOLUME_CAPACITY: 64GB
+    workflow: openshift-e2e-libvirt-upi
 - as: ocp-e2e-ovn-ppc64le-powervs-original
   cluster: build01
-  cron: 0 0,6,12,18 * * *
+  cron: 0 17 * * *
   steps:
     cluster_profile: powervs-4
     dependencies:
@@ -595,6 +590,22 @@ tests:
       ARCH: ppc64le
       BRANCH: "4.17"
       CLUSTER_NAME_MODIFIER: par-orig-416
+      INSTALLER: powervs
+      TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-powervs-ipi
+- as: ocp-e2e-ovn-ppc64le-powervs-capi
+  cluster: build01
+  cron: 0 9,21 * * *
+  steps:
+    cluster_profile: powervs-5
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.17"
+      CLUSTER_NAME_MODIFIER: capi-417
+      FEATURE_GATES: '["ClusterAPIInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
       INSTALLER: powervs
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-powervs-ipi

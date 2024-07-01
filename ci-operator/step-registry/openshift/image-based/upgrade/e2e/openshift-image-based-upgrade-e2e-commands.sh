@@ -1,5 +1,4 @@
 #!/bin/bash
-set -x
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -16,8 +15,7 @@ remote_workdir=$(cat ${SHARED_DIR}/remote_workdir)
 instance_ip=$(cat ${SHARED_DIR}/public_address)
 host=$(cat ${SHARED_DIR}/ssh_user)
 ssh_host_ip="$host@$instance_ip"
-PULL_SECRET_FILE="/var/run/pull-secret/.dockerconfigjson"
-PULL_SECRET=$(cat ${PULL_SECRET_FILE})
+PULL_SECRET_FILE=$(cat ${SHARED_DIR}/pull_secret_file)
 
 TARGET_VM_NAME=$(cat ${SHARED_DIR}/target_vm_name)
 target_kubeconfig=${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/workdir-${TARGET_VM_NAME}/auth/kubeconfig
@@ -25,17 +23,12 @@ remote_artifacts_dir=${remote_workdir}/artifacts
 
 cat <<EOF > ${SHARED_DIR}/e2e_test.sh
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
 export KUBECONFIG='${target_kubeconfig}'
-export PULL_SECRET='${PULL_SECRET}'
+export PULL_SECRET=\$(<${PULL_SECRET_FILE})
 export TESTS_PULL_REF='${TESTS_PULL_REF}'
-
-echo '${PULL_SECRET}' > ${remote_workdir}/.dockerconfig.json
-export REGISTRY_AUTH_FILE='${remote_workdir}/.dockerconfig.json'
-
-# Configure the local image registry since the tests need it
-oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed", "storage":{"emptyDir":{}}}}'
+export REGISTRY_AUTH_FILE='${PULL_SECRET_FILE}'
 
 mkdir tmp
 
@@ -48,6 +41,7 @@ mkdir ${remote_artifacts_dir}
 
 # Run the conformance suite
 openshift-tests run ${CONFORMANCE_SUITE} \
+  --max-parallel-tests 15 \
   -o "${remote_artifacts_dir}/e2e.log" \
   --junit-dir "${remote_artifacts_dir}/junit" &
 wait "\$!"

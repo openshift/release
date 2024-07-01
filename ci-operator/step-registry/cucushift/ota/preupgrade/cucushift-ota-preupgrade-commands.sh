@@ -19,7 +19,7 @@ function get_tp_operator(){
     tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
     ;;
     "4.16")
-    tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
+    tp_operator=("cluster-api" "olm")
     ;;
     *)
     tp_operator=()
@@ -107,7 +107,7 @@ function pre-OCP-66839(){
 
     # There should be only enabled cap annotaion in all extracted manifests
     curCap=$(grep -rh "capability.openshift.io/name:" "${manifestsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-    expectedCap=$(echo ${ADDITIONAL_ENABLED_CAPABILITIES} | sort -u|xargs)
+    expectedCap=$(echo ${EXPECTED_CAPABILITIES_IN_MANIFEST} | tr ' ' '\n'|sort -u|xargs)
     if [[ "${curCap}" != "${expectedCap}" ]]; then
         echo "Caps in extracted manifests found: ${curCap}, but expected ${expectedCap}"
         return 1
@@ -137,17 +137,11 @@ function pre-OCP-66839(){
         return 1
     fi
 
-    if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "" ]]; then
-        curCapInCR=$(grep -rh "capability.openshift.io/name:" "${preCredsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-        if [[ "${curCapInCR}" != "${expectedCap}" ]]; then
-            echo "Extracted CRs has cap annotation: ${curCapInCR}, but expected ${expectedCap}"
-            return 1
-        fi
-    else
-        if grep -r "capability.openshift.io/name:" "${preCredsDir}"; then
-            echo "Extracted CRs has cap annotation, but expected nothing"
-            return 1
-        fi
+    curCapInCR=$(grep -rh "capability.openshift.io/name:" "${preCredsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
+    expectedCapCRPre=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_PRE} | tr ' ' '\n'|sort -u|xargs)
+    if [[ "${curCapInCR}" != "${expectedCapCRPre}" ]]; then
+        echo "Extracted CRs has cap annotation: ${curCapInCR}, but expected ${expectedCapCRPre}"
+        return 1
     fi
 
     # Extract all CRs from tobe upgrade release payload with --included
@@ -156,9 +150,9 @@ function pre-OCP-66839(){
         return 1
     fi
     tobecap=$(grep -rh "capability.openshift.io/name:" "${tobeCredsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-    expectedCapCR=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST} | sort -u|xargs)
-    if [[ "${tobecap}" != "${expectedCapCR}" ]]; then
-        echo "CRs with cap annotation: ${tobecap}, but expected: ${expectedCapCR}"
+    expectedCapCRPost=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_POST} | tr ' ' '\n'|sort -u|xargs)
+    if [[ "${tobecap}" != "${expectedCapCRPost}" ]]; then
+        echo "CRs with cap annotation: ${tobecap}, but expected: ${expectedCapCRPost}"
         return 1
     fi
     echo "Test Passed: ${FUNCNAME[0]}"

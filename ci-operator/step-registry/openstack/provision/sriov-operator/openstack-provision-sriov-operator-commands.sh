@@ -28,7 +28,7 @@ function wait_for_sriov_pods() {
 
     if [ -n "${FOUND_SNO:-}" ] ; then
         # Wait for the pods to be started from the operator
-        for _ in $(seq 1 8); do
+        for _ in $(seq 1 20); do
             NOT_RUNNING_PODS=$(oc get pods --no-headers -n openshift-sriov-network-operator -o jsonpath='{.items[*].status.containerStatuses[*].ready}' | grep false | wc -l || true)
             if [ "${NOT_RUNNING_PODS}" == "0" ]; then
                 OPERATOR_READY=true
@@ -40,7 +40,7 @@ function wait_for_sriov_pods() {
         if [ -n "${OPERATOR_READY:-}" ] ; then
             echo "sriov-network-operator pods were installed successfully"
         else
-            echo "sriov-network-operator pods were not installed after 4 minutes"
+            echo "sriov-network-operator pods were not installed after 10 minutes"
             oc get pods -n openshift-sriov-network-operator
             exit 1
         fi
@@ -108,6 +108,17 @@ if [ -n "${is_dev_version:-}" ]; then
         pod-security.kubernetes.io/enforce=privileged \
         pod-security.kubernetes.io/warn=privileged \
         security.openshift.io/scc.podSecurityLabelSync=false
+
+    # Use private credentials to pull CNF images
+    # See in our vault: shiftstack-secrets/quay-openshift-credentials
+    QUAY_USERNAME=$(cat /var/run/quay-openshift-credentials/quay_username)
+    QUAY_PASSWORD=$(cat /var/run/quay-openshift-credentials/quay_password)
+    oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/global-pull-secret.json
+    QUAY_AUTH=$(echo -n "${QUAY_USERNAME}:${QUAY_PASSWORD}" | base64 -w 0)
+    jq --arg QUAY_AUTH "$QUAY_AUTH" '.auths += {"quay.io/openshift": {"auth":$QUAY_AUTH}}' /tmp/global-pull-secret.json > /tmp/global-pull-secret.json.tmp
+    mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
+    oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
+    rm /tmp/global-pull-secret.json
 
     make deploy-setup
     popd

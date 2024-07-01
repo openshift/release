@@ -164,6 +164,6 @@ openshift-install wait-for install-complete 2>&1 | grep --line-buffered -v 'pass
 # Save console URL in `console.url` file so that ci-chat-bot could report success
 echo "https://$(env KUBECONFIG=${PWD}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
 
-if [[ -e "netid.yaml" ]]; then
-    cp netid.yaml "${SHARED_DIR}/"
+if [[ -e "netid.json" ]]; then
+    cp netid.json "${SHARED_DIR}/"
 fi

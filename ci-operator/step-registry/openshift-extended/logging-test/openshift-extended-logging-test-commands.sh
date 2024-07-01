@@ -311,8 +311,7 @@ function run {
 
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
-ginkgo:
-  type: openshift-extended-logging-test
+openshift-extended-logging-test:
   total: $tests
   failures: $failures
   errors: $errors
@@ -496,6 +495,15 @@ function handle_result {
     fi
     cp -fr import-*.xml "${ARTIFACT_DIR}/junit/"
     rm -fr ${newresultfile}
+
+    for file in "${ARTIFACT_DIR}/junit/"*.xml;
+    do
+       if [ -e "$file" ]; then
+           new_file="${file%.xml}-junit.xml"
+           mv "$file" "$new_file"
+           echo "renamed $file to $new_file"
+       fi
+    done
 }
 function check_case_selected {
     found_ok=$1

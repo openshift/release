@@ -7,6 +7,7 @@ trap 'FRC=$?; [[ $FRC != 0 ]] && debug' EXIT TERM
 debug() {
   oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} -o yaml
   oc get pod -n local-cluster-${CLUSTER_NAME} -oyaml
+  oc logs -n hypershift -lapp=operator --tail=-1 -c operator | grep -v "info" > $ARTIFACT_DIR/hypershift-errorlog.txt
 }
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
@@ -43,6 +44,7 @@ if [[ "${IP_STACK}" == "v4v6" ]]; then
   IP_STACK_COMMAND="--default-dual"
 fi
 
+/tmp/${HYPERSHIFT_NAME} --version
 /tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} ${IP_STACK_COMMAND} \
   --name=${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \

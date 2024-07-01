@@ -129,7 +129,10 @@ fi
 echo "check mgmt cluster's HyperShift part"
 if test -s "${SHARED_DIR}/mgmt_kubeconfig" ; then
   export KUBECONFIG=${SHARED_DIR}/mgmt_kubeconfig
-  print_clusterversion
+  # Print clusterversion only if the management cluster is an OpenShift cluster
+  if oc get ns openshift; then
+      print_clusterversion
+  fi
   retry check_control_plane_pod_status || exit 1
 fi
 

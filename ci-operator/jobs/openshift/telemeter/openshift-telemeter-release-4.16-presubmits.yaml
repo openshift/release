@@ -239,7 +239,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build03
+    cluster: build05
     context: ci/prow/images
     decorate: true
     labels:
@@ -293,7 +293,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build03
+    cluster: build05
     context: ci/prow/integration
     decorate: true
     labels:
@@ -346,7 +346,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build03
+    cluster: build05
     context: ci/prow/lint
     decorate: true
     labels:
@@ -395,44 +395,70 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^release-4.16$
-    - ^release-4.16-
-    cluster: build03
-    context: ci/prow/generate
+    - ^release-4\.16$
+    - ^release-4\.16-
+    cluster: build05
+    context: ci/prow/okd-scos-images
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      ci.openshift.io/manually-branched: "true"
-    name: pull-ci-openshift-telemeter-release-4.16-master-generate
-    rerun_command: /test generate
+      ci-operator.openshift.io/variant: okd-scos
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-telemeter-release-4.16-okd-scos-images
+    optional: true
+    rerun_command: /test okd-scos-images
     spec:
       containers:
       - args:
-        - -c
-        - make generate && git diff --exit-code
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=[release:latest]
+        - --variant=okd-scos
         command:
-        - sh
-        env:
-        - name: GO111MODULE
-          value: "on"
-        - name: GOPATH
-          value: /go:/home/prow/go
-        - name: USER
-          value: deadbeef
-        image: quay.io/coreos/jsonnet-ci
+        - ci-operator
+        image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
-            cpu: 500m
-    trigger: (?m)^/test generate
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )okd-scos-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build03
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     labels:
@@ -485,7 +511,7 @@ presubmits:
     branches:
     - ^release-4\.16$
     - ^release-4\.16-
-    cluster: build03
+    cluster: build05
     context: ci/prow/vendor
     decorate: true
     labels:

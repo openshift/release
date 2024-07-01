@@ -29,10 +29,16 @@ chain:
         fi
 
         CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        
+        CRED_COMMAND=""
+        if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.6)}') )); then
+          CRED_COMMAND=$(echo "--aws-creds ${CLUSTER_PROFILE_DIR}/.awscred")
+        else
+          CRED_COMMAND=$(echo "--role-arn $(cat ${SHARED_DIR}/hcp-role-arn) --sts-creds ${SHARED_DIR}/sts-creds.json")  
+        fi
       
         echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
-        /tmp/${HYPERSHIFT_NAME} destroy cluster aws \
-          --aws-creds=${CLUSTER_PROFILE_DIR}/.awscred  \
+        /tmp/${HYPERSHIFT_NAME} destroy cluster aws ${CRED_COMMAND} \
           --name ${CLUSTER_NAME} \
           --region ${HYPERSHIFT_AWS_REGION} \
           --base-domain ${HYPERSHIFT_BASE_DOMAIN} \

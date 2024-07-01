@@ -48,5 +48,5 @@ cp terraform.tgz ${SHARED_DIR}
 
 cat >> "${SHARED_DIR}/ci-machine-config.sh" << EOF
 export IP="${IP}"
-export SSH_KEY_FILE=/var/run/vault/sshkeys/ssh_private_key
+export SSH_KEY_FILE=/var/run/vault/assisted-ci-vault/ssh_private_key
 EOF

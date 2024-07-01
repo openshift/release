@@ -16,9 +16,6 @@ images:
     RUN curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64 && chmod +x /usr/local/bin/yq
     RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
     RUN yum clean packages && yum install -y httpd-tools graphviz
-    RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh
-    RUN curl -L -o vcluster "https://github.com/loft-sh/vcluster/releases/download/v0.15.0/vcluster-linux-amd64" && install -c -m 0755 vcluster /usr/local/bin && rm -f vcluster
-    RUN vcluster --version && helm version
   from: src
   to: e2e-test-runner
 promotion:
@@ -81,6 +78,14 @@ tests:
     cluster_profile: aws-rhtap-performance
     env:
       SCENARIO: ci-20u-5t
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-jhutar
+  steps:
+    cluster_profile: aws-rhtap-performance
+    env:
+      SCENARIO: jhutar
     workflow: redhat-appstudio-load-test
   timeout: 8h0m0s
 - always_run: false
@@ -153,6 +158,14 @@ tests:
     cluster_profile: aws-rhtap-performance
     env:
       SCENARIO: ci-daily-max-concurrency-advanced
+    workflow: redhat-appstudio-load-test-max-concurrency
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-jhutar
+  steps:
+    cluster_profile: aws-rhtap-performance
+    env:
+      SCENARIO: max-concurrency-jhutar
     workflow: redhat-appstudio-load-test-max-concurrency
   timeout: 8h0m0s
 - always_run: false

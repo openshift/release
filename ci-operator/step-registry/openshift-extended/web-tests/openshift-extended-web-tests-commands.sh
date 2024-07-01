@@ -61,8 +61,7 @@ done < /tmp/zzz-tmp.log
 
 TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
 cat > "${TEST_RESULT_FILE}" <<- EOF
-cypress:
-  type: openshift-extended-web-tests
+openshift-extended-web-tests:
   total: $tests
   failures: $failures
   errors: $errors

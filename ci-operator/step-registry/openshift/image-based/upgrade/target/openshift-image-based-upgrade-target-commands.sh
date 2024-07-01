@@ -12,11 +12,8 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey")
 
-LCA_PULL_SECRET_FILE="/var/run/pull-secret/.dockerconfigjson"
-CLUSTER_PULL_SECRET_FILE="${CLUSTER_PROFILE_DIR}/pull-secret"
-PULL_SECRET=$(cat ${CLUSTER_PULL_SECRET_FILE} ${LCA_PULL_SECRET_FILE} | jq -cs '.[0] * .[1]') # Merge the pull secrets to get everything we need
-BACKUP_SECRET_FILE="/var/run/ibu-backup-secret/.backup-secret"
-BACKUP_SECRET=$(jq -c . ${BACKUP_SECRET_FILE})
+PULL_SECRET_FILE=$(cat ${SHARED_DIR}/pull_secret_file)
+BACKUP_SECRET_FILE=$(cat ${SHARED_DIR}/backup_secret_file)
 TARGET_VM_NAME="target"
 remote_workdir=$(cat ${SHARED_DIR}/remote_workdir)
 instance_ip=$(cat ${SHARED_DIR}/public_address)
@@ -34,8 +31,8 @@ cat <<EOF > ${SHARED_DIR}/upgrade_from_seed.sh
 #!/bin/bash
 set -euo pipefail
 
-export PULL_SECRET='${PULL_SECRET}'
-export BACKUP_SECRET='${BACKUP_SECRET}'
+export PULL_SECRET=\$(<${PULL_SECRET_FILE})
+export BACKUP_SECRET=\$(<${BACKUP_SECRET_FILE})
 export TARGET_VM_NAME="${TARGET_VM_NAME}"
 export TARGET_VERSION="${TARGET_VERSION}"
 export RELEASE_IMAGE="${TARGET_IMAGE}"

@@ -23,14 +23,9 @@ metadata:
   name: "${ODF_INSTALL_NAMESPACE}"
 EOF
 
-# TODO remove this override once https://issues.redhat.com/browse/CLOUDDST-18990 is resolved
-# ODF isn't in the 4.14 catalog, which causes the install to fail. This workaround
-# should work for both 4.13 and 4.14, which are the only two versions being tested
-# at this point in time.
-#
 # Override the subscription source
-ODF_SUBSCRIPTION_SOURCE="redhat-operators-4-13"
-# create the custom catalog source that points to 4.13 regardless of the OCP version
+ODF_SUBSCRIPTION_SOURCE="redhat-operators-4-15"
+# create the custom catalog source that points to 4.15 regardless of the OCP version
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -39,7 +34,7 @@ metadata:
     operatorframework.io/managed-by: marketplace-operator
     target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
   generation: 5
-  name: redhat-operators-4-13
+  name: redhat-operators-4-15
   namespace: openshift-marketplace
 spec:
   displayName: Red Hat Operators
@@ -64,7 +59,7 @@ spec:
   icon:
     base64data: ""
     mediatype: ""
-  image: registry.redhat.io/redhat/redhat-operator-index:v4.13
+  image: registry.redhat.io/redhat/redhat-operator-index:v4.15
   priority: -100
   publisher: Red Hat
   sourceType: grpc
