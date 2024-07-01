@@ -108,6 +108,9 @@ platform:
     hosts: []
 "
 
+# Copy provisioning-host-ssh-port-${architecture} to bastion host for use in cleanup
+scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
+
 echo "[INFO] Processing the platform.baremetal.hosts list in the install-config.yaml..."
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
@@ -172,6 +175,10 @@ mkdir -p "${INSTALL_DIR}"
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 # From now on, we assume no more patches to the install-config.yaml are needed.
 # We can create the installation dir with the manifests and, finally, the ignition configs
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
 
 # Also get a sanitized copy of the install-config.yaml as an artifact for debugging purposes
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml"
