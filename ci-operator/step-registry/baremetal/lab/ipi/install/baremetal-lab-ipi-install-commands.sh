@@ -173,6 +173,10 @@ cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 # From now on, we assume no more patches to the install-config.yaml are needed.
 # We can create the installation dir with the manifests and, finally, the ignition configs
 
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
+
 # Also get a sanitized copy of the install-config.yaml as an artifact for debugging purposes
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml"
 
