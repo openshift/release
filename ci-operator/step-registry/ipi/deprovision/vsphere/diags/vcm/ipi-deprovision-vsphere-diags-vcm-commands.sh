@@ -14,6 +14,7 @@ echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..
 # shellcheck source=/dev/null
 declare cloud_where_run
 declare vsphere_portgroup
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
