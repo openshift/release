@@ -24,4 +24,6 @@ export DAST_PATH
 oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)"
 
 pushd ocpqe-security-tools/dast
+
+export NAMESPACE=default 
 ./deploy_ssml_api.sh
