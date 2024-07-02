@@ -43,6 +43,11 @@ export KUBECONFIG="${installer_dir}/auth/kubeconfig"
 agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
 
 
+# These two environment variables are coming from vsphere_context.sh 
+# and govc.sh. The file they are assigned to is not available in this step.
+unset SSL_CERT_FILE 
+unset GOVC_TLS_CA_CERTS
+
 total_host="$((MASTERS + WORKERS))"
 declare -a mac_addresses
 mapfile -t mac_addresses <"${SHARED_DIR}"/mac-addresses.txt

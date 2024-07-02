@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
+  echo "using legacy sibling of this step"
+  exit 0
+fi
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
@@ -16,10 +21,12 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-FAILURE_DOMAIN_PATH=/tmp/fds.txt
-FAILURE_DOMAIN_JSON=/tmp/fds.json
+FAILURE_DOMAIN_PATH=$SHARED_DIR/fds.txt
+FAILURE_DOMAIN_JSON=$SHARED_DIR/fds.json
 FIRST=1
-function getFailureDomainsWithDSwitchForVCenter() {  
+function getFailureDomainsWithDSwitchForVCenter() {
+    echo "+getFailureDomainsWithDSwitchForVCenter"
+
     vcenter=$1
 
     FAILURE_DOMAIN_OUT="[]"
@@ -31,10 +38,14 @@ function getFailureDomainsWithDSwitchForVCenter() {
         continue
       fi
 
+      echo "checking lease ${LEASE} for failure domains"
+
       server=$(jq -r .status.server "$LEASE")
       if [ "$server" != "$vcenter" ]; then
         continue
       fi      
+
+      echo "server is ${server}"
 
       if [ ${FIRST} == 0 ]; then
       echo "    }," >> ${FAILURE_DOMAIN_PATH}  
@@ -42,30 +53,41 @@ function getFailureDomainsWithDSwitchForVCenter() {
       echo "    {" >> ${FAILURE_DOMAIN_PATH}
       FIRST=0
 
-      DVS=$(jq --compact-output -r '."'"$GOVC_NETWORK"'"' "${SHARED_DIR}"/dvs.json)
       jq -r .status.envVars "${LEASE}" > /tmp/envvars
       
       # shellcheck source=/dev/null
       source /tmp/envvars
 
       CLUSTER=$(jq -r .status.topology.computeCluster "${LEASE}" | cut -d '/' -f 4)
-      DVS_UUID=$(echo "$DVS" | jq -r .cluster."$CLUSTER")
+
+      DVS=$(jq --compact-output -r '."'"/${GOVC_DATACENTER}/network/$GOVC_NETWORK"'"' "${SHARED_DIR}"/dvs.json)
+      echo "DVS: ${DVS}"
+
+      echo "getting DVS UUID for cluster ${CLUSTER}"
+
+      DVS_UUID=$(echo "$DVS" | jq -r '.cluster["'"${CLUSTER}"'"]')
+
+      echo "DVS UUID ${DVS_UUID}"
+
+      datastoreName=$(basename "${GOVC_DATASTORE}")
 
       {
-        echo "        server = ${GOVC_URL}" 
-        echo "        datacenter = ${GOVC_DATACENTER}"
-        echo "        cluster = ${CLUSTER}"
-        echo "        datastore = ${GOVC_DATASTORE}" 
-        echo "        network = ${GOVC_NETWORK}" 
-        echo "        distributed_virtual_switch_uuid = ${DVS_UUID}" 
-      } >> ${FAILURE_DOMAIN_PATH}
+        echo "        server = \"${GOVC_URL}\"" 
+        echo "        datacenter = \"${GOVC_DATACENTER}\""
+        echo "        cluster = \"${CLUSTER}\""
+        echo "        datastore = \"$(echo "${GOVC_DATASTORE}" | rev | cut -d '/' -f 1 | rev)\""
+        echo "        network = \"${GOVC_NETWORK}\"" 
+        echo "        distributed_virtual_switch_uuid = \"${DVS_UUID}\""
+      } >> "${FAILURE_DOMAIN_PATH}"
       
-      FAILURE_DOMAIN_OUT=$(echo "$FAILURE_DOMAIN_OUT" | jq --compact-output -r '. += [{"datacenter":"'"${GOVC_DATACENTER}"'","cluster":"'"${CLUSTER}"'","datastore":"'"${GOVC_DATASTORE}"'","network":"'"${GOVC_NETWORK}"'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]'); 
+      FAILURE_DOMAIN_OUT=$(echo "$FAILURE_DOMAIN_OUT" | jq --compact-output -r '. += [{"datacenter":"'"${GOVC_DATACENTER}"'","cluster":"'"${CLUSTER}"'","datastore":"'"${datastoreName}"'","network":"'"${GOVC_NETWORK}"'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]'); 
     done
-    echo "    }" >> ${FAILURE_DOMAIN_PATH}  
-    echo "]" >> ${FAILURE_DOMAIN_PATH}
+    echo "    }" >> "${FAILURE_DOMAIN_PATH}"  
+    echo "]" >> "${FAILURE_DOMAIN_PATH}"
 
-    echo "${FAILURE_DOMAIN_OUT}" | jq . > ${FAILURE_DOMAIN_JSON}
+    echo "${FAILURE_DOMAIN_OUT}" | jq . > "${FAILURE_DOMAIN_JSON}"
+    cat "${FAILURE_DOMAIN_JSON}"
+    echo "-getFailureDomainsWithDSwitchForVCenter"
 }
 
 declare vsphere_url
@@ -74,6 +96,10 @@ declare GOVC_DATACENTER
 declare GOVC_DATASTORE
 declare GOVC_NETWORK
 declare gateway
+declare vsphere_portgroup
+declare vsphere_datastore
+declare vsphere_datacenter
+declare vsphere_cluster
 declare GOVC_USERNAME
 declare GOVC_PASSWORD
 declare GOVC_TLS_CA_CERTS
@@ -93,9 +119,9 @@ end_worker_num=$((start_worker_num + COMPUTE_NODE_REPLICAS - 1))
 
 NETWORK_CONFIG=${SHARED_DIR}/NETWORK_single.json
 
-dns_server=$(jq -r '.status.gateway' "${NETWORK_CONFIG}")
+dns_server=$(jq -r '.spec.gateway' "${NETWORK_CONFIG}")
 gateway=${dns_server}
-netmask=$(jq -r '.status.netmask' "${NETWORK_CONFIG}")
+netmask=$(jq -r '.spec.netmask' "${NETWORK_CONFIG}")
 
 lb_ip_address=$(jq -r '.spec.ipAddresses[2]' "${NETWORK_CONFIG}")
 bootstrap_ip_address=$(jq -r '.spec.ipAddresses[3]' "${NETWORK_CONFIG}")
@@ -107,7 +133,7 @@ control_plane_idx=0
 control_plane_addrs=()
 control_plane_hostnames=()
 for n in $(seq "$start_master_num" "$end_master_num"); do
-  control_plane_addrs+=("$(jq -r --argjson N "$n" '.status.ipAddresses[$N]' "${NETWORK_CONFIG}")")
+  control_plane_addrs+=("$(jq -r --argjson N "$n" '.spec.ipAddresses[$N]' "${NETWORK_CONFIG}")")
   control_plane_hostnames+=("control-plane-$((control_plane_idx++))")
 done
 printf "**** controlplane DEBUG %s ******\n" "${control_plane_addrs[@]}"
@@ -122,7 +148,7 @@ compute_idx=0
 compute_addrs=()
 compute_hostnames=()
 for n in $(seq "$start_worker_num" "$end_worker_num"); do
-  compute_addrs+=("$(jq -r --argjson N "$n" '.status.ipAddresses[$N]' "${NETWORK_CONFIG}")")
+  compute_addrs+=("$(jq -r --argjson N "$n" '.spec.ipAddresses[$N]' "${NETWORK_CONFIG}")")
   compute_hostnames+=("compute-$((compute_idx++))")
 done
 
@@ -186,7 +212,17 @@ ova_url=$(<"${SHARED_DIR}"/ova_url.txt)
 vm_template="${ova_url##*/}"
 
 # select a hardware version for testing
-hw_versions=(15 17 19)
+vsphere_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $1}')
+vsphere_minor_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $3}')
+
+hw_versions=(15 17 18 19)
+if [[ ${vsphere_version} -eq 8 ]]; then
+    hw_versions=(20)
+  if [[ ${vsphere_minor_version} -ge 2 ]]; then
+    hw_versions=(20 21)
+  fi
+fi
+
 hw_available_versions=${#hw_versions[@]}
 selected_hw_version_index=$((RANDOM % hw_available_versions))
 target_hw_version=${hw_versions[$selected_hw_version_index]}
@@ -333,8 +369,12 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 
 \$machine_cidr = "${machine_cidr}"
 
-\$vm_template = "${vm_template}"
+\$vm_template = "$(basename "${vm_template}")"
 \$vcenter = "${vsphere_url}"
+\$portgroup = "$(basename "${vsphere_portgroup}")"
+\$datastore = "$(basename "${vsphere_datastore}")"
+\$datacenter = "$(basename "${vsphere_datacenter}")"
+\$cluster = "$(basename "${vsphere_cluster}")"
 \$vcentercredpath = "secrets/vcenter-creds.xml"
 \$storagepolicy = ""
 \$secureboot = \$false
