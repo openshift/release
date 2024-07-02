@@ -1,0 +1,56 @@
+base_images:
+  rhtap-installer:
+    name: redhat-appstudio
+    namespace: ci
+    tag: rhtap-installer
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/openshift/release:golang-1.19
+      RUN yum -y install make wget gcc git httpd-tools
+images:
+- context_dir: .ibm/images
+  dockerfile_path: Dockerfile
+  to: showcase-e2e-runner
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rhtap-rhdp-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  cron: 0 1 * * 1
+  steps:
+    env:
+      RHTAP_ENABLE_TPA: "false"
+    post:
+    - ref: redhat-appstudio-rhtap-installer-unregister-pac
+    - ref: redhat-appstudio-rhtap-gather
+    pre:
+    - ref: redhat-appstudio-openshift-trusted-ca
+    - ref: janus-idp-backstage-showcase-nightly
+    - ref: redhat-appstudio-rhtap-installer-install-rhtap
+    - ref: redhat-appstudio-rhtap-installer-register-pac
+    test:
+    - ref: redhat-appstudio-rhtap-installer-e2e-test
+zz_generated_metadata:
+  branch: main
+  org: ascerra
+  repo: backstage-showcase
