@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# save the status into install-status.txt
+# for junit xml file generated
+EXIT_CODE_CONFIG=3
+trap 'if [[ "$?" != 0 ]]; then echo "${EXIT_CODE_CONFIG}" > "${SHARED_DIR}/install-status.txt"; fi' EXIT TERM
+
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
