@@ -25,4 +25,9 @@ if [ -n "${FIREWATCH_CONFIG_FILE_PATH}" ]; then
     report_command+=" --firewatch-config-path=${FIREWATCH_CONFIG_FILE_PATH}"
 fi
 
+# If the additional labels file exists, add it to the report command
+if [ -f "${FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE}" ]; then
+    report_command+=" --additional-labels-file=${FIREWATCH_JIRA_ADDITIONAL_LABELS_FILE}"
+fi
+
 eval "$report_command"
