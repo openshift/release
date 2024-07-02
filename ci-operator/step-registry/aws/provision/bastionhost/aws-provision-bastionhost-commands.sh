@@ -62,6 +62,7 @@ if [[ "${BASTION_HOST_AMI}" == "" ]]; then
   aws --region $REGION s3 mb "s3://${s3_bucket_name}"
   echo "s3://${s3_bucket_name}" > "$SHARED_DIR/to_be_removed_s3_bucket_list"
   aws --region $REGION s3 cp ${bastion_ignition_file} "${ign_location}"
+  echo ${ign_location} > "${SHARED_DIR}/bastion_ign_location"
   echo "core" > "${SHARED_DIR}/bastion_ssh_user"
 else
   # use BYO bastion host
@@ -281,11 +282,11 @@ aws --region $REGION cloudformation create-stack --stack-name ${stack_name} \
 wait "$!"
 echo "Created stack"
 
+echo "$stack_name" > "${SHARED_DIR}/bastion_host_stack_name"
+
 aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}" &
 wait "$!"
 echo "Waited for stack"
-
-echo "$stack_name" > "${SHARED_DIR}/bastion_host_stack_name"
 
 INSTANCE_ID="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
 --query 'Stacks[].Outputs[?OutputKey == `BastionInstanceId`].OutputValue' --output text)"
