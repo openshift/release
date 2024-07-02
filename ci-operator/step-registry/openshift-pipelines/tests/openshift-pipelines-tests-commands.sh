@@ -11,7 +11,7 @@ export API_URL
 export gauge_reports_dir=${ARTIFACT_DIR}
 export overwrite_reports=false
 export KUBECONFIG=$SHARED_DIR/kubeconfig
-
+sleep 7200
 # Add timeout to ignore runner connection error
 gauge config runner_connection_timeout 600000 && gauge config runner_request_timeout 300000
 
