@@ -6,6 +6,87 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build04
+    context: ci/prow/amd-notebooks-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-opendatahub
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-opendatahub-io-notebooks-main-amd-notebooks-e2e-tests
+    rerun_command: /test amd-notebooks-e2e-tests
+    run_if_changed: (amd\/c9s-python-3.9\/*)||(jupyter\/datascience\/ubi9-python-3.9\/*)|(jupyter\/amd\/pytorch\/ubi9-python-3.9\/*)||(jupyter\/amd\/tensorflow\/ubi9-python-3.9\/*)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/amd-notebooks-e2e-tests-cluster-profile
+        - --target=amd-notebooks-e2e-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/amd-notebooks-e2e-tests-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-gcp-opendatahub
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )amd-notebooks-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build04
     context: ci/prow/anaconda-ubi8-e2e-tests
     decorate: true
     decoration_config:
@@ -511,16 +592,16 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build04
-    context: ci/prow/notebook-amd-jupyter-minimal-c9s-python-3-9-pr-image-mirror
+    context: ci/prow/notebook-amd-jupyter-pyt-c9s-python-3-9-pr-image-mirror
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-notebooks-main-notebook-amd-jupyter-minimal-c9s-python-3-9-pr-image-mirror
-    rerun_command: /test notebook-amd-jupyter-minimal-c9s-python-3-9-pr-image-mirror
-    run_if_changed: (amd\/c9s-python-3.9\/*)|(base\/c9s-python-3.9\/*)|(jupyter\/minimal\/ubi9-python-3.9\/*)
+    name: pull-ci-opendatahub-io-notebooks-main-notebook-amd-jupyter-pyt-c9s-python-3-9-pr-image-mirror
+    rerun_command: /test notebook-amd-jupyter-pyt-c9s-python-3-9-pr-image-mirror
+    run_if_changed: (amd\/c9s-python-3.9\/*)|(jupyter\/datascience\/ubi9-python-3.9\/*)|(jupyter\/amd\/pytorch\/ubi9-python-3.9\/*)
     spec:
       containers:
       - args:
@@ -528,7 +609,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=notebook-amd-jupyter-minimal-c9s-python-3-9-pr-image-mirror
+        - --target=notebook-amd-jupyter-pyt-c9s-python-3-9-pr-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -567,7 +648,70 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )notebook-amd-jupyter-minimal-c9s-python-3-9-pr-image-mirror,?($|\s.*)
+    trigger: (?m)^/test( | .* )notebook-amd-jupyter-pyt-c9s-python-3-9-pr-image-mirror,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build04
+    context: ci/prow/notebook-amd-jupyter-tf-c9s-python-3-9-pr-image-mirror
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-opendatahub-io-notebooks-main-notebook-amd-jupyter-tf-c9s-python-3-9-pr-image-mirror
+    rerun_command: /test notebook-amd-jupyter-tf-c9s-python-3-9-pr-image-mirror
+    run_if_changed: (amd\/c9s-python-3.9\/*)|(jupyter\/datascience\/ubi9-python-3.9\/*)|(jupyter\/amd\/tensorflow\/ubi9-python-3.9\/*)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=notebook-amd-jupyter-tf-c9s-python-3-9-pr-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )notebook-amd-jupyter-tf-c9s-python-3-9-pr-image-mirror,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
