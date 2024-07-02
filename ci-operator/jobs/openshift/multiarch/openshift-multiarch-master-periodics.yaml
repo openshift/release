@@ -19020,40 +19020,55 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: multiarch
-  labels:
-    ci-operator.openshift.io/cloud: libvirt-ppc64le
-    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
-    ci-operator.openshift.io/cluster: build01
-    ci-operator.openshift.io/variant: nightly-4.16
-    ci.openshift.io/generator: prowgen
-    job-release: "4.16"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    timeout: 6h0m0s
   name: periodic-ci-openshift-multiarch-master-nightly-4.16-install-analysis-all-ppc64le
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --give-pr-author-access-to-namespace=true
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/install-analysis-all-ppc64le-cluster-profile
-      - --target=install-analysis-all-ppc64le
-      - --variant=nightly-4.16
+      - --secret-dir=/usr/local/pull-secret
+      - --target=release-payload-install-analysis
       command:
       - ci-operator
+      env:
+      - name: GOOGLE_SA_CREDENTIAL_FILE
+        value: /var/run/secrets/google-serviceaccount-credentials.json
+      - name: JOB_START_TIME
+      - name: PAYLOAD_TAG
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: release-payload-install-analysis
+            steps:
+              env:
+                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
+                JOB_START_TIME: "$(JOB_START_TIME)"
+                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
+                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
+                JOB_CONFIGURATION: |
+                  ppc64le-libvirt,1,--platform=libvirt --include-job-names=libvirt-ppc64le --include-job-names=4.16
+              test:
+              - ref: openshift-release-analysis-test-case-analysis
       image: ci-operator:latest
       imagePullPolicy: Always
-      name: ""
+      name: aggregator-check-install
       resources:
         requests:
           cpu: 10m
@@ -19061,10 +19076,7 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/install-analysis-all-ppc64le-cluster-profile
+      - mountPath: /usr/local/ocp-remote-libvirt-ppc64le-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -19075,6 +19087,8 @@ periodics:
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
       - mountPath: /etc/report
         name: result-aggregator
         readOnly: true
@@ -19086,18 +19100,20 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-libvirt-ppc64le
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-libvirt-ppc64le
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
