@@ -19,6 +19,19 @@ tests:
   commands: make test
   container:
     from: src
+- as: verify-generated-code
+  commands: |
+    set -o errexit
+    set -o pipefail
+    export GOCACHE=/tmp/
+    git config core.filemode false
+    git add . && git commit -m "initial commit after prow's substitutions & rebases"
+    make generate && make manifests && make build-installer
+    cp dist/bootstrap_install.yaml bootstrap-components.yaml
+    cp dist/controlplane_install.yaml controlplane-components.yaml
+    git diff --exit-code
+  container:
+    from: src
 zz_generated_metadata:
   branch: master
   org: openshift-assisted
