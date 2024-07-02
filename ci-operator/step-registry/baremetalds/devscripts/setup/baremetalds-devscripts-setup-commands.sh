@@ -417,6 +417,8 @@ if [ -e /root/bm.json ] ; then
     # Allow cluster nodes to use provising node as a ntp server (4.12 and above are more likely to use it vs. the dhcp set server)
     sudo firewall-cmd --add-service=ntp --zone libvirt
     sudo firewall-cmd --add-service=ntp --zone public
+    sudo firewall-cmd --add-port=5000/tcp --zone libvirt
+    sudo firewall-cmd --add-port=5000/tcp --zone public
 fi
 
 exit \$rv
