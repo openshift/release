@@ -1,0 +1,51 @@
+base_images:
+  e2e-test-runner:
+    name: redhat-appstudio
+    namespace: ci
+    tag: e2e-test-runner
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+images:
+- dockerfile_path: Dockerfile
+  to: redhat-appstudio-multi-platform-controller-image
+- dockerfile_path: Dockerfile.otp
+  to: redhat-appstudio-multi-platform-controller-otp-server
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: multi-platform-controller-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: rhtap
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  skip_if_only_changed: ^docs/|^\.github/|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    dependencies:
+      OTP_SERVER_IMAGE: redhat-appstudio-multi-platform-controller-otp-server
+      COMPONENT_IMAGE: redhat-appstudio-multi-platform-controller-image
+    test:
+    - ref: redhat-appstudio-e2e
+    workflow: redhat-appstudio-claim
+zz_generated_metadata:
+  branch: main
+  org: redhat-appstudio
+  repo: multi-platform-controller
