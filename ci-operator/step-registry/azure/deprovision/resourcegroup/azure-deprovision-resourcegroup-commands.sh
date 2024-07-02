@@ -26,6 +26,8 @@ else
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
+set -x
+
 list_vnet_tags="${SHARED_DIR}/list_azure_existing_vnet_tags.sh"
 if [ -f "${list_vnet_tags}" ]; then
     sh -x "${list_vnet_tags}"
@@ -36,8 +38,15 @@ if [ -f "${remove_resources_by_cli}" ]; then
     sh -x "${remove_resources_by_cli}"
 fi
 
-rg_files="${SHARED_DIR}/resourcegroup ${SHARED_DIR}/resourcegroup_cluster ${SHARED_DIR}/RESOURCE_GROUP_NAME"
-for rg_file in ${rg_files}; do
+rg_files=(
+    "${SHARED_DIR}/resourcegroup"
+    "${SHARED_DIR}/resourcegroup_cluster"
+    "${SHARED_DIR}/resourcegroup_vnet"
+    "${SHARED_DIR}/resourcegroup_nsg"
+    "${SHARED_DIR}/resourcegroup_aks"
+    "${SHARED_DIR}/RESOURCE_GROUP_NAME"
+)
+for rg_file in "${rg_files[@]}"; do
     if [ -f "${rg_file}" ]; then
         existing_rg=$(cat "${rg_file}")
         if [ "$(az group exists -n "${existing_rg}")" == "true" ]; then
