@@ -6,7 +6,7 @@ set -o pipefail
 
 # Waits up to 5 minutes for InstallPlan to be created
 wait_for_installplan () {
-    echo "Waiting for installPlan to be created"
+    echo "[$(date --utc +%FT%T.%3NZ)] Waiting for installPlan to be created"
     # store subscription name and install namespace to shared directory for upgrade step
     echo "${OO_INSTALL_NAMESPACE}" > "${SHARED_DIR}"/oo-install-namespace
     echo "${SUB}" > "${SHARED_DIR}"/oo-subscription
@@ -31,10 +31,10 @@ wait_for_csv () {
         CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
         if [[ -n "$CSV" ]]; then
             if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-                echo "ClusterServiceVersion \"$CSV\" ready"
+                echo "[$(date --utc +%FT%T.%3NZ)] ClusterServiceVersion \"$CSV\" ready"
 
                 DEPLOYMENT_ART="oo_deployment_details.yaml"
-                echo "Saving deployment details in ${DEPLOYMENT_ART} as a shared artifact"
+                echo "[$(date --utc +%FT%T.%3NZ)] Saving deployment details in ${DEPLOYMENT_ART} as a shared artifact"
                 cat > "${ARTIFACT_DIR}/${DEPLOYMENT_ART}" <<EOF
 ---
 csv: "${CSV}"
@@ -46,12 +46,13 @@ target_namespaces: "${OO_TARGET_NAMESPACES}"
 deployment_start_time: "${DEPLOYMENT_START_TIME}"
 EOF
                 cp "${ARTIFACT_DIR}/${DEPLOYMENT_ART}" "${SHARED_DIR}/${DEPLOYMENT_ART}"
+                echo "[$(date --utc +%FT%T.%3NZ)] Script Completed Execution Successfully !"
                 exit 0
             fi
         fi
         sleep 10
     done
-    echo "Timed out waiting for csv to become ready"
+    echo "[$(date --utc +%FT%T.%3NZ)] Timed out waiting for csv to become ready"
 }
 
 # Waits up to 10 minutes until the Catalog source state is 'READY'
@@ -60,8 +61,8 @@ wait_for_catalogsource () {
         CATSRC_STATE=$(oc get catalogsources/"$CATSRC" -n "$CS_NAMESPACE" -o jsonpath='{.status.connectionState.lastObservedState}')
         echo $CATSRC_STATE
         if [ "$CATSRC_STATE" = "READY" ] ; then
-            echo "Catalogsource created successfully after waiting $((5*i)) seconds"
-            echo "current state of catalogsource is \"$CATSRC_STATE\""
+            echo "[$(date --utc +%FT%T.%3NZ)] Catalogsource created successfully after waiting $((5*i)) seconds"
+            echo "[$(date --utc +%FT%T.%3NZ)] current state of catalogsource is \"$CATSRC_STATE\""
             IS_CATSRC_CREATED=true
             break
         fi
@@ -87,9 +88,9 @@ $CS_PODCONFIG
 EOF
 )
 
-        echo "Creating CatalogSource: $CS_MANIFEST"
+        echo "[$(date --utc +%FT%T.%3NZ)] Creating CatalogSource: $CS_MANIFEST"
         CATSRC=$(oc create -f - -o jsonpath='{.metadata.name}' <<< "${CS_MANIFEST}" )
-        echo "CatalogSource name is \"$CATSRC\""
+        echo "[$(date --utc +%FT%T.%3NZ)] CatalogSource name is \"$CATSRC\""
 
     else
         echo "$CS_NAMESTANZA"
@@ -102,12 +103,12 @@ EOF
 # Retries Subscription creation
 # Deletes current Subscription in the namespace before retrying creating a new one
 retry_subscription_creation () {
-    echo "Deleting subscription $SUB in the namespace $OO_INSTALL_NAMESPACE"
+    echo "[$(date --utc +%FT%T.%3NZ)] Deleting subscription $SUB in the namespace $OO_INSTALL_NAMESPACE"
     oc delete subscription $SUB -n $OO_INSTALL_NAMESPACE
 
-    echo "Creating subscription"
+    echo "[$(date --utc +%FT%T.%3NZ)] Creating subscription"
     SUB=$(oc create -f - -o jsonpath='{.metadata.name}' <<< "${SUB_MANIFEST}" )
-    echo "Subscription name is \"$SUB\""
+    echo "[$(date --utc +%FT%T.%3NZ)] Subscription name is \"$SUB\""
 }
 
 # Re-tries InstallPlan creation which includes deleting Subscription, creating it again, and waiting for InstallPlan to come up
@@ -115,8 +116,8 @@ retry_installplan_creation () {
     retry_attempts=2
 
     while [[ "$FOUND_INSTALLPLAN" = false && "$retry_attempts" -ne 0 ]]; do
-        echo "Failed to find installPlan for subscription"
-        echo "Retrying subscription creation...${retry_attempts} attempts left"
+        echo "[$(date --utc +%FT%T.%3NZ)] Failed to find installPlan for subscription"
+        echo "[$(date --utc +%FT%T.%3NZ)] Retrying subscription creation...${retry_attempts} attempts left"
 
         retry_subscription_creation
         wait_for_installplan
@@ -136,6 +137,7 @@ enable_hybrid_overlay () {
     while [ -z "$(oc get network.operator.openshift.io -o jsonpath="{.items[0].spec.defaultNetwork.ovnKubernetesConfig.hybridOverlayConfig}")" ]; do
         if [ $(($(date +%s) - $start_time)) -gt 300 ]; then
             echo "Timeout waiting for the ovnKubernetesConfig to update"
+            echo "[$(date --utc +%FT%T.%3NZ)] Script Completed Execution With Failures !"
             exit 1
         fi
     done
@@ -143,7 +145,7 @@ enable_hybrid_overlay () {
 
 # Enable hybrid overlay
 if [[ "${ENABLE_HYBRID_OVERLAY}" == "true" ]]; then
-    echo "Enabling hybrid overlay feature on a running cluster"
+    echo "[$(date --utc +%FT%T.%3NZ)] Enabling hybrid overlay feature on a running cluster"
     enable_hybrid_overlay
 fi
 
@@ -166,33 +168,34 @@ fi
 
 if [[ $JOB_NAME != rehearse-* ]]; then
     if [[ -z ${OO_INDEX:-} ]] || [[ -z ${OO_PACKAGE:-} ]] || [[ -z ${OO_CHANNEL:-} ]]; then
-        echo "At least of required variables OO_INDEX=${OO_INDEX:-} OO_PACKAGE=${OO_PACKAGE:-} OO_CHANNEL=${OO_CHANNEL:-} is unset"
-        echo "Variables are only allowed to be unset in rehearsals"
+        echo "[$(date --utc +%FT%T.%3NZ)] At least of required variables OO_INDEX=${OO_INDEX:-} OO_PACKAGE=${OO_PACKAGE:-} OO_CHANNEL=${OO_CHANNEL:-} is unset"
+        echo "[$(date --utc +%FT%T.%3NZ)] Variables are only allowed to be unset in rehearsals"
+        echo "[$(date --utc +%FT%T.%3NZ)] Script Completed Execution With Failures !"
         exit 1
     fi
 fi
 
-echo "== Parameters:"
-echo "OO_INDEX:             $OO_INDEX"
-echo "OO_PACKAGE:           $OO_PACKAGE"
-echo "OO_CHANNEL:           $OO_CHANNEL"
-echo "OO_INSTALL_NAMESPACE: $OO_INSTALL_NAMESPACE"
-echo "OO_TARGET_NAMESPACES: $OO_TARGET_NAMESPACES"
-echo "OO_CONFIG_ENVVARS:    $OO_CONFIG_ENVVARS"
-echo "TEST_MODE:            $TEST_MODE"
-echo "EVAL_CONFIG_ENVVARS:  $EVAL_CONFIG_ENVVARS"
-echo "ENABLE_HYBRID_OVERLAY:$ENABLE_HYBRID_OVERLAY"
+echo "[$(date --utc +%FT%T.%3NZ)] == Parameters:"
+echo "[$(date --utc +%FT%T.%3NZ)] OO_INDEX:             $OO_INDEX"
+echo "[$(date --utc +%FT%T.%3NZ)] OO_PACKAGE:           $OO_PACKAGE"
+echo "[$(date --utc +%FT%T.%3NZ)] OO_CHANNEL:           $OO_CHANNEL"
+echo "[$(date --utc +%FT%T.%3NZ)] OO_INSTALL_NAMESPACE: $OO_INSTALL_NAMESPACE"
+echo "[$(date --utc +%FT%T.%3NZ)] OO_TARGET_NAMESPACES: $OO_TARGET_NAMESPACES"
+echo "[$(date --utc +%FT%T.%3NZ)] OO_CONFIG_ENVVARS:    $OO_CONFIG_ENVVARS"
+echo "[$(date --utc +%FT%T.%3NZ)] TEST_MODE:            $TEST_MODE"
+echo "[$(date --utc +%FT%T.%3NZ)] EVAL_CONFIG_ENVVARS:  $EVAL_CONFIG_ENVVARS"
+echo "[$(date --utc +%FT%T.%3NZ)] ENABLE_HYBRID_OVERLAY:$ENABLE_HYBRID_OVERLAY"
 
 if [[ -f "${SHARED_DIR}/operator-install-namespace.txt" ]]; then
     OO_INSTALL_NAMESPACE=$(cat "$SHARED_DIR"/operator-install-namespace.txt)
 elif [[ "$OO_INSTALL_NAMESPACE" == "!create" ]]; then
-    echo "OO_INSTALL_NAMESPACE is '!create': creating new namespace"
+    echo "[$(date --utc +%FT%T.%3NZ)] OO_INSTALL_NAMESPACE is '!create': creating new namespace"
     NS_NAMESTANZA="generateName: oo-"
 elif ! oc get namespace "$OO_INSTALL_NAMESPACE"; then
-    echo "OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE' which does not exist: creating"
+    echo "[$(date --utc +%FT%T.%3NZ)] OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE' which does not exist: creating"
     NS_NAMESTANZA="name: $OO_INSTALL_NAMESPACE"
 else
-    echo "OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE'"
+    echo "[$(date --utc +%FT%T.%3NZ)] OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE'"
 fi
 
 if [[ -n "${NS_NAMESTANZA:-}" ]]; then
@@ -207,33 +210,34 @@ EOF
 fi
 
 if [[ "${OO_INSTALL_NAMESPACE}" =~ ^openshift- ]]; then
-    echo "Setting label security.openshift.io/scc.podSecurityLabelSync value to true on the namespace \"$OO_INSTALL_NAMESPACE\""
+    echo "[$(date --utc +%FT%T.%3NZ)] Setting label security.openshift.io/scc.podSecurityLabelSync value to true on the namespace \"$OO_INSTALL_NAMESPACE\""
     oc label --overwrite ns "${OO_INSTALL_NAMESPACE}" security.openshift.io/scc.podSecurityLabelSync=true
 fi
 
 echo "Installing \"$OO_PACKAGE\" in namespace \"$OO_INSTALL_NAMESPACE\""
 
 if [[ "$OO_TARGET_NAMESPACES" == "!install" ]]; then
-    echo "OO_TARGET_NAMESPACES is '!install': targeting operator installation namespace ($OO_INSTALL_NAMESPACE)"
+    echo "[$(date --utc +%FT%T.%3NZ)] OO_TARGET_NAMESPACES is '!install': targeting operator installation namespace ($OO_INSTALL_NAMESPACE)"
     OO_TARGET_NAMESPACES="$OO_INSTALL_NAMESPACE"
 elif [[ "$OO_TARGET_NAMESPACES" == "!all" ]]; then
-    echo "OO_TARGET_NAMESPACES is '!all': all namespaces will be targeted"
+    echo "[$(date --utc +%FT%T.%3NZ)] OO_TARGET_NAMESPACES is '!all': all namespaces will be targeted"
     OO_TARGET_NAMESPACES=""
 fi
 
 OPERATORGROUP=$(oc -n "$OO_INSTALL_NAMESPACE" get operatorgroup -o jsonpath="{.items[*].metadata.name}" || true)
 
 if [[ $(echo "$OPERATORGROUP" | wc -w) -gt 1 ]]; then
-    echo "Error: multiple OperatorGroups in namespace \"$OO_INSTALL_NAMESPACE\": $OPERATORGROUP" 1>&2
+    echo "[$(date --utc +%FT%T.%3NZ)] Error: multiple OperatorGroups in namespace \"$OO_INSTALL_NAMESPACE\": $OPERATORGROUP" 1>&2
     oc -n "$OO_INSTALL_NAMESPACE" get operatorgroup -o yaml >"$ARTIFACT_DIR/operatorgroups-$OO_INSTALL_NAMESPACE.yaml"
+    echo "[$(date --utc +%FT%T.%3NZ)] Script Completed Execution With Failures !"
     exit 1
 elif [[ -n "$OPERATORGROUP" ]]; then
-    echo "OperatorGroup \"$OPERATORGROUP\" exists: modifying it"
+    echo "[$(date --utc +%FT%T.%3NZ)] OperatorGroup \"$OPERATORGROUP\" exists: modifying it"
     oc -n "$OO_INSTALL_NAMESPACE" get operatorgroup "$OPERATORGROUP" -o yaml >"$ARTIFACT_DIR/og-$OPERATORGROUP-orig.yaml"
     OG_OPERATION=apply
     OG_NAMESTANZA="name: $OPERATORGROUP"
 else
-    echo "OperatorGroup does not exist: creating it"
+    echo "[$(date --utc +%FT%T.%3NZ)] OperatorGroup does not exist: creating it"
     OG_OPERATION=create
     if [[ "${TEST_MODE}" == "msp" ]]; then
       OG_NAMESTANZA="name: redhat-layered-product-og"
@@ -256,8 +260,8 @@ spec:
 EOF
 )
 
-echo "OperatorGroup name is \"$OPERATORGROUP\""
-echo "Creating CatalogSource"
+echo "[$(date --utc +%FT%T.%3NZ)] OperatorGroup name is \"$OPERATORGROUP\""
+echo "[$(date --utc +%FT%T.%3NZ)] Creating CatalogSource"
 
 if [[ "${TEST_MODE}" == "msp" ]]; then
   CS_NAMESTANZA="name: addon-$OO_PACKAGE-catalog"
@@ -293,7 +297,7 @@ fi
 # qe-ci test mode using enable-qe-catalogsource create the catalogsource then no need to create extra catalogsource again
 if [[ "${TEST_MODE}" == "qe-ci" ]]; then
   IS_CATSRC_CREATED=true
-  echo "TEST_MODE is qe-ci, using the exist qe-app-registry catalog install the optional operator, skipped create catalogSource"  
+  echo "[$(date --utc +%FT%T.%3NZ)] TEST_MODE is qe-ci, using the exist qe-app-registry catalog install the optional operator, skipped create catalogSource"  
 else
   create_catalogsource
   wait_for_catalogsource
@@ -301,10 +305,10 @@ fi
 
 retry_attempts_catalogsource=2
 while [[ "$IS_CATSRC_CREATED" = false && "$retry_attempts_catalogsource" -ne 0 ]]; do
-    echo "Timed out waiting for the catalog source $CATSRC to become ready after 10 minutes."
+    echo "[$(date --utc +%FT%T.%3NZ)] Timed out waiting for the catalog source $CATSRC to become ready after 10 minutes."
 
-    echo "Retrying catalogsource creation...${retry_attempts_catalogsource} attempts left"
-    echo "Deleting catalogsource $CATSRC in the namespace $CS_NAMESPACE"
+    echo "[$(date --utc +%FT%T.%3NZ)] Retrying catalogsource creation...${retry_attempts_catalogsource} attempts left"
+    echo "[$(date --utc +%FT%T.%3NZ)] Deleting catalogsource $CATSRC in the namespace $CS_NAMESPACE"
     oc delete catalogsource $CATSRC -n $CS_NAMESPACE
     
     create_catalogsource
@@ -314,10 +318,11 @@ while [[ "$IS_CATSRC_CREATED" = false && "$retry_attempts_catalogsource" -ne 0 ]
 done
 
 if [ $IS_CATSRC_CREATED = false ] ; then
-    echo "Timed out waiting for the catalog source $CATSRC to become ready after 10 minutes."
-    echo "Catalogsource state at timeout is \"$CATSRC_STATE\""
-    echo "Catalogsource image used is \"$OO_INDEX\""
-    echo "All retry attempts failed"
+    echo "[$(date --utc +%FT%T.%3NZ)] Timed out waiting for the catalog source $CATSRC to become ready after 10 minutes."
+    echo "[$(date --utc +%FT%T.%3NZ)] Catalogsource state at timeout is \"$CATSRC_STATE\""
+    echo "[$(date --utc +%FT%T.%3NZ)] Catalogsource image used is \"$OO_INDEX\""
+    echo "[$(date --utc +%FT%T.%3NZ)] All retry attempts failed"
+    echo "[$(date --utc +%FT%T.%3NZ)] Script Completed Execution With Failures !"
     exit 1
 fi
 
@@ -325,8 +330,8 @@ fi
 sleep 10
 
 DEPLOYMENT_START_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-echo "Set the deployment start time: ${DEPLOYMENT_START_TIME}"
-echo "Creating Subscription"
+echo "[$(date --utc +%FT%T.%3NZ)] Set the deployment start time: ${DEPLOYMENT_START_TIME}"
+echo "[$(date --utc +%FT%T.%3NZ)] Creating Subscription"
 
 if [[ "${TEST_MODE}" == "msp" ]]; then
   SUB_NAMESTANZA="name: addon-$OO_PACKAGE"
@@ -381,11 +386,11 @@ if [ -n "${CONFIG_ENVVARS}" ]; then
     SUB_MANIFEST="${SUB_MANIFEST}"$'\n'"${CONFIG_ENVVARS}"
 fi
 
-echo "SUB_MANIFEST : ${SUB_MANIFEST} "
+echo "[$(date --utc +%FT%T.%3NZ)] SUB_MANIFEST : ${SUB_MANIFEST} "
 
 SUB=$(oc create -f - -o jsonpath='{.metadata.name}' <<< "${SUB_MANIFEST}" )
 
-echo "Subscription name is \"$SUB\""
+echo "[$(date --utc +%FT%T.%3NZ)] Subscription name is \"$SUB\""
 
 wait_for_installplan
 
@@ -394,19 +399,19 @@ if [ "$FOUND_INSTALLPLAN" = false ] ; then
 fi
 
 if [ "$FOUND_INSTALLPLAN" = true ] ; then
-    echo "Install Plan approved"
-    echo "Waiting for ClusterServiceVersion to become ready..."
+    echo "[$(date --utc +%FT%T.%3NZ)] Install Plan approved"
+    echo "[$(date --utc +%FT%T.%3NZ)] Waiting for ClusterServiceVersion to become ready..."
     wait_for_csv
     retry_attempts_csv=2
     while [[ "$retry_attempts_csv" -ne 0 ]]; do
-        echo "Retrying CSV creation...${retry_attempts_csv} attempts left"
+        echo "[$(date --utc +%FT%T.%3NZ)] Retrying CSV creation...${retry_attempts_csv} attempts left"
 
         # Delete CSV if it exists
         if [[ -n "${CSV:-}" ]]; then
-            echo "CSV \"${CSV}\" was created but never became ready. Deleting CSV \"${CSV}\"..."
+            echo "[$(date --utc +%FT%T.%3NZ)] CSV \"${CSV}\" was created but never became ready. Deleting CSV \"${CSV}\"..."
             oc delete csv $CSV -n $OO_INSTALL_NAMESPACE
         else
-            echo "There is no CSV in the namespace \"${OO_INSTALL_NAMESPACE}\""
+            echo "[$(date --utc +%FT%T.%3NZ)] There is no CSV in the namespace \"${OO_INSTALL_NAMESPACE}\""
         fi
 
         echo "Re-creating Subscription and InstallPlan"
@@ -418,69 +423,70 @@ if [ "$FOUND_INSTALLPLAN" = true ] ; then
         fi
         
         if [ "$FOUND_INSTALLPLAN" = true ]; then
-            echo "Install Plan approved"
-            echo "Waiting for ClusterServiceVersion to become ready..."
+            echo "[$(date --utc +%FT%T.%3NZ)] Install Plan approved"
+            echo "[$(date --utc +%FT%T.%3NZ)] Waiting for ClusterServiceVersion to become ready..."
             wait_for_csv
         else
-            echo "Failed to find installPlan for subscription"
+            echo "[$(date --utc +%FT%T.%3NZ)] Failed to find installPlan for subscription"
         fi
 
         retry_attempts_csv=$((retry_attempts_csv-1))
     done
-    echo "All retry attempts failed"
+    echo "[$(date --utc +%FT%T.%3NZ)] All retry attempts failed"
 else
-    echo "Failed to find installPlan for subscription"
-    echo "All retry attempts failed"
+    echo "[$(date --utc +%FT%T.%3NZ)] Failed to find installPlan for subscription"
+    echo "[$(date --utc +%FT%T.%3NZ)] All retry attempts failed"
 fi
 
 NS_ART="$ARTIFACT_DIR/ns-$OO_INSTALL_NAMESPACE.yaml"
-echo "Dumping Namespace $OO_INSTALL_NAMESPACE as $NS_ART"
+echo "[$(date --utc +%FT%T.%3NZ)] Dumping Namespace $OO_INSTALL_NAMESPACE as $NS_ART"
 oc get namespace "$OO_INSTALL_NAMESPACE" -o yaml >"$NS_ART"
 
 OG_ART="$ARTIFACT_DIR/og-$OPERATORGROUP.yaml"
-echo "Dumping OperatorGroup $OPERATORGROUP as $OG_ART"
+echo "[$(date --utc +%FT%T.%3NZ)] Dumping OperatorGroup $OPERATORGROUP as $OG_ART"
 oc get -n "$OO_INSTALL_NAMESPACE" operatorgroup "$OPERATORGROUP" -o yaml >"$OG_ART"
 
 CS_ART="$ARTIFACT_DIR/cs-$CATSRC.yaml"
-echo "Dumping CatalogSource $CATSRC as $CS_ART"
+echo "[$(date --utc +%FT%T.%3NZ)] Dumping CatalogSource $CATSRC as $CS_ART"
 oc get -n "$CS_NAMESPACE" catalogsource "$CATSRC" -o yaml >"$CS_ART"
 for field in message reason; do
     VALUE="$(oc get -n "$OO_INSTALL_NAMESPACE" catalogsource "$CATSRC" -o jsonpath="{.status.$field}" || true)"
     if [[ -n "$VALUE" ]]; then
-        echo "  CatalogSource $CATSRC status $field: $VALUE"
+        echo "[$(date --utc +%FT%T.%3NZ)] CatalogSource $CATSRC status $field: $VALUE"
     fi
 done
 
 SUB_ART="$ARTIFACT_DIR/sub-$SUB.yaml"
-echo "Dumping Subscription $SUB as $SUB_ART"
+echo "[$(date --utc +%FT%T.%3NZ)] Dumping Subscription $SUB as $SUB_ART"
 oc get -n "$OO_INSTALL_NAMESPACE" subscription "$SUB" -o yaml >"$SUB_ART"
 for field in state reason; do
     VALUE="$(oc get -n "$OO_INSTALL_NAMESPACE" subscription "$SUB" -o jsonpath="{.status.$field}" || true)"
     if [[ -n "$VALUE" ]]; then
-        echo "  Subscription $SUB status $field: $VALUE"
+        echo "[$(date --utc +%FT%T.%3NZ)] Subscription $SUB status $field: $VALUE"
     fi
 done
 
 if [[ -n "${CSV:-}" ]]; then
     CSV_ART="$ARTIFACT_DIR/csv-$CSV.yaml"
-    echo "ClusterServiceVersion $CSV was created but never became ready"
-    echo "Dumping ClusterServiceVersion $CSV as $CSV_ART"
+    echo "[$(date --utc +%FT%T.%3NZ)] ClusterServiceVersion $CSV was created but never became ready"
+    echo "[$(date --utc +%FT%T.%3NZ)] Dumping ClusterServiceVersion $CSV as $CSV_ART"
     oc get -n "$OO_INSTALL_NAMESPACE" csv "$CSV" -o yaml >"$CSV_ART"
     for field in phase message reason; do
         VALUE="$(oc get -n "$OO_INSTALL_NAMESPACE" csv "$CSV" -o jsonpath="{.status.$field}" || true)"
         if [[ -n "$VALUE" ]]; then
-            echo "  ClusterServiceVersion $CSV status $field: $VALUE"
+            echo "[$(date --utc +%FT%T.%3NZ)] ClusterServiceVersion $CSV status $field: $VALUE"
         fi
     done
 else
     CSV_ART="$ARTIFACT_DIR/$OO_INSTALL_NAMESPACE-all-csvs.yaml"
-    echo "ClusterServiceVersion was never created"
-    echo "Dumping all ClusterServiceVersions in namespace $OO_INSTALL_NAMESPACE to $CSV_ART"
+    echo "[$(date --utc +%FT%T.%3NZ)] ClusterServiceVersion was never created"
+    echo "[$(date --utc +%FT%T.%3NZ)] Dumping all ClusterServiceVersions in namespace $OO_INSTALL_NAMESPACE to $CSV_ART"
     oc get -n "$OO_INSTALL_NAMESPACE" csv -o yaml >"$CSV_ART"
 fi
 
 INSTALLPLANS_ART="$ARTIFACT_DIR/installPlans.yaml"
-echo "Dumping all installPlans in namespace $OO_INSTALL_NAMESPACE as $INSTALLPLANS_ART"
+echo "[$(date --utc +%FT%T.%3NZ)] Dumping all installPlans in namespace $OO_INSTALL_NAMESPACE as $INSTALLPLANS_ART"
 oc get -n "$OO_INSTALL_NAMESPACE" installplans -o yaml >"$INSTALLPLANS_ART"
 
+echo "[$(date --utc +%FT%T.%3NZ)] Script Completed Execution With Failures !"
 exit 1
