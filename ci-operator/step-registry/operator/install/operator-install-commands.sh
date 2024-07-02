@@ -7,43 +7,45 @@ set -o verbose
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py --action install --kubeconfig ${KUBECONFIG} "
+sleep 7200
 
-OPERATORS_CMD=""
-for operator_value in $(env | grep -E '^OPERATOR[0-9]+_CONFIG' | sort  --version-sort); do
-    operator_value=$(echo "$operator_value" | sed -E  's/^OPERATOR[0-9]+_CONFIG=//')
-    if  [ "${operator_value}" ]; then
-      OPERATORS_CMD+=" --operator ${operator_value} "
-    fi
-done
+# RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py --action install --kubeconfig ${KUBECONFIG} "
 
-RUN_COMMAND="${RUN_COMMAND} ${OPERATORS_CMD}"
+# OPERATORS_CMD=""
+# for operator_value in $(env | grep -E '^OPERATOR[0-9]+_CONFIG' | sort  --version-sort); do
+#     operator_value=$(echo "$operator_value" | sed -E  's/^OPERATOR[0-9]+_CONFIG=//')
+#     if  [ "${operator_value}" ]; then
+#       OPERATORS_CMD+=" --operator ${operator_value} "
+#     fi
+# done
 
-if [ "${ADDONS_OPERATORS_RUN_IN_PARALLEL}" = "true" ]; then
-    RUN_COMMAND+=" --parallel"
-fi
+# RUN_COMMAND="${RUN_COMMAND} ${OPERATORS_CMD}"
 
-echo "$RUN_COMMAND" | sed -r "s/token [=A-Za-z0-9\.\-]+/token hashed-token /g"
+# if [ "${ADDONS_OPERATORS_RUN_IN_PARALLEL}" = "true" ]; then
+#     RUN_COMMAND+=" --parallel"
+# fi
 
-if [ "${INSTALL_FROM_IIB}" = "true" ]; then
-  if [ -z "$S3_BUCKET_OPERATORS_LATEST_IIB_PATH" ]; then
-    echo "S3_BUCKET_OPERATORS_LATEST_IIB_PATH is mandatory for iib installation"
-    exit 1
-  fi
+# echo "$RUN_COMMAND" | sed -r "s/token [=A-Za-z0-9\.\-]+/token hashed-token /g"
 
-  if [ -z "$AWS_REGION" ]; then
-    echo "AWS_REGION is mandatory for iib installation"
-    exit 1
-  fi
+# if [ "${INSTALL_FROM_IIB}" = "true" ]; then
+#   if [ -z "$S3_BUCKET_OPERATORS_LATEST_IIB_PATH" ]; then
+#     echo "S3_BUCKET_OPERATORS_LATEST_IIB_PATH is mandatory for iib installation"
+#     exit 1
+#   fi
 
-  AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
-  AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
+#   if [ -z "$AWS_REGION" ]; then
+#     echo "AWS_REGION is mandatory for iib installation"
+#     exit 1
+#   fi
 
-  export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-  export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+#   AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
+#   AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 
-  RUN_COMMAND+=" --s3-bucket-operators-latest-iib-path ${S3_BUCKET_OPERATORS_LATEST_IIB_PATH} --aws-region ${AWS_REGION} "
+#   export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+#   export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 
-fi
+#   RUN_COMMAND+=" --s3-bucket-operators-latest-iib-path ${S3_BUCKET_OPERATORS_LATEST_IIB_PATH} --aws-region ${AWS_REGION} "
 
-${RUN_COMMAND}
+# fi
+
+# ${RUN_COMMAND}
