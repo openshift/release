@@ -340,22 +340,9 @@ function upgrade() {
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
-# Log abnormal cluster status
-function dump_status_if_unexpected() {
-    # expecting oc to equal TARGET_MINOR_VERSION, skip if less than .16
-        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
-            local out; out="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 || true)"
-            # if upgrading, and not progressing well, dump status to log
-            # "resource name may not be empty" is a known issue, remove once OCPBUGS-32682 is fixed
-            if ! grep -qE 'The cluster version is not updating|Upgrade is proceeding well|resource name may not be empty' <<< "${out}" ; then
-                echo "${out}"
-            fi
-        fi
-}
-
 # Monitor the upgrade status
 function check_upgrade_status() {
-    local wait_upgrade="${TIMEOUT}" out avail progress cluster_version
+    local wait_upgrade="${TIMEOUT}" out avail progress cluster_version stat oldstat filter='[0-9]+h|[0-9]+m|[0-9]+s|\s+|\n'
     if [[ -n "${1:-}" ]]; then
         cluster_version="$1"
     else
@@ -365,7 +352,7 @@ function check_upgrade_status() {
     while (( wait_upgrade > 0 )); do
         sleep 5m
         wait_upgrade=$(( wait_upgrade - 5 ))
-        if ! ( run_command "oc get clusterversion" ); then
+        if ! ( run_command "oc adm upgrade" ); then
             continue
         fi
         if ! out="$(oc get clusterversion --no-headers || false)"; then
@@ -383,7 +370,18 @@ function check_upgrade_status() {
             echo -e "Upgrade stuck at updating RHEL worker, need to run the RHEL worker upgrade later...\n\n"
             return 0
         fi
-        dump_status_if_unexpected
+        # assuming oc to equal TARGET_MINOR_VERSION, log abnormal "upgrade status" if available (version 4.16+)
+        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+            # capture "update health" section of status, ignoring the title and the last line
+            # whenever an error is present, "Run with --details=health" is the last line we should remove.
+            # with no error, it'll remove "Update is proceeding well" resulting in empty $stat that we simply ignore
+            stat="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 | sed -ne "/= Update Health =/,$ p" | sed '1d;2d;$d' || true)"
+            # if update health messages exist, and the mesage is different from previous (ignoring time difference using $filter), dump "Update Health" to log
+            if [ -n "$stat" ] && ! diff -qw <(sed -zE "s/${filter}//g" <<< "${stat}") <(sed -zE "s/${filter}//g" <<< "${oldstat}") >/dev/null ; then
+                echo "${stat}"
+                oldstat=${stat}
+            fi
+        fi
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
         echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
