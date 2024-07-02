@@ -256,12 +256,19 @@ function install_required_tools() {
       exit 1
     fi
   done
+  echo "Installing yq-v4"
+  # Install yq manually if its not found in installer image
+  cmd_yq="$(which yq-v4 2>/dev/null || true)"
+  mkdir -p /tmp/bin
+  if [ ! -x "${cmd_yq}" ]; then
+    curl -L "https://github.com/mikefarah/yq/releases/download/v4.30.5/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+      -o /tmp/bin/yq-v4 && chmod +x /tmp/bin/yq-v4
+  fi
+  PATH=${PATH}:/tmp/bin
+  export PATH
 
   hash jq || exit 1
   hash yq-v4 || exit 1
-
-  PATH=${PATH}:$(pwd)/bin
-  export PATH
 }
 
 function init_ibmcloud() {
