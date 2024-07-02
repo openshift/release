@@ -137,13 +137,13 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build03
-    context: ci/prow/fips-image-scan
+    context: ci/prow/fips-image-scan-cert-manager
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cert-manager-operator-master-fips-image-scan
-    rerun_command: /test fips-image-scan
+    name: pull-ci-openshift-cert-manager-operator-master-fips-image-scan-cert-manager
+    rerun_command: /test fips-image-scan-cert-manager
     spec:
       containers:
       - args:
@@ -151,7 +151,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=fips-image-scan
+        - --target=fips-image-scan-cert-manager
         command:
         - ci-operator
         image: ci-operator:latest
@@ -190,7 +190,67 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )fips-image-scan,?($|\s.*)
+    trigger: (?m)^/test( | .* )fips-image-scan-cert-manager,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build03
+    context: ci/prow/fips-image-scan-operator
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cert-manager-operator-master-fips-image-scan-operator
+    rerun_command: /test fips-image-scan-operator
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=fips-image-scan-operator
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )fips-image-scan-operator,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
