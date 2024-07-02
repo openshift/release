@@ -70,3 +70,4 @@ elif [[ "$JOB_TYPE" == "presubmit" ]] || [[ "$JOB_NAME" == *"rehears"* ]]; then
 fi
 
 cp "$MAINENV" "$ARTIFACT_DIR/main.env"
+echo "test"
