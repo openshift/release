@@ -1,0 +1,44 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test-step
+  cron: 0 6 11 2 *
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: test-a
+      best_effort: true
+      commands: |
+        echo "dummy command"
+        exit 1
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 5m0s
+    - as: test-b
+      commands: |
+        echo "dummy command"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+zz_generated_metadata:
+  branch: main
+  org: rhpit
+  repo: interop-tests
+  variant: test-best-effort-option
