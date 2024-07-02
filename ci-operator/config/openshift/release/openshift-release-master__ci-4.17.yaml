@@ -21,17 +21,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-sdn
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-sdn
 - as: e2e-aws-ovn-techpreview
   interval: 168h
   steps:
@@ -78,17 +67,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-proxy
-- as: e2e-aws-sdn-serial
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-sdn-serial
 - as: e2e-aws-ovn-serial
   interval: 168h
   steps:
@@ -110,44 +88,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-serial
-- as: e2e-aws-sdn-multitenant
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-sdn-multi
-- as: e2e-aws-sdn-upgrade
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-aws-sdn
-- as: e2e-aws-sdn-upgrade-out-of-change
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_TYPE: upgrade-conformance
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-aws-sdn
 - as: e2e-aws-ovn-upgrade
   interval: 168h
   steps:
@@ -185,29 +125,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-cilium
-- as: e2e-aws-sdn-imdsv2
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      AWS_METADATA_SERVICE_AUTH: Required
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-sdn
-- as: e2e-azure-sdn
-  interval: 168h
-  steps:
-    cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-azure-sdn
 - as: e2e-azure-ovn-techpreview
   interval: 168h
   steps:
@@ -446,19 +363,6 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-secureboot
   timeout: 6h0m0s
-- as: e2e-aws-sdn-upgrade-rollback
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_TYPE: upgrade-conformance
-      TEST_UPGRADE_OPTIONS: abort-at=random
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-aws-sdn
 - as: e2e-aws-upgrade-ovn-single-node
   interval: 168h
   steps:
@@ -470,75 +374,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-single-node
-- as: e2e-aws-ovn-network-migration
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
-        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
-        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
-    observers:
-      enable:
-      - observers-resource-watch
-    test:
-    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-config-multicast
-    - ref: ovn-sdn-migration
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-validate-multicast
-    - ref: openshift-e2e-test
-    workflow: openshift-e2e-aws-sdn
-- as: e2e-network-migration-rollback
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
-        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
-        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
-    observers:
-      enable:
-      - observers-resource-watch
-    test:
-    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-config-multicast
-    - ref: ovn-sdn-migration
-    - ref: ovn-sdn-migration-rollback
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
-    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
-    - ref: ovn-sdn-migration-feature-migration-validate-multicast
-    - ref: openshift-e2e-test
-    workflow: openshift-e2e-aws-sdn
-- as: e2e-aws-sdn-cgroupsv2
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-sdn-cgroupsv2
-- as: e2e-aws-sdn-crun
-  interval: 168h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-aws-sdn-crun
 - as: e2e-vsphere-ovn-upgrade
   interval: 24h
   steps:
