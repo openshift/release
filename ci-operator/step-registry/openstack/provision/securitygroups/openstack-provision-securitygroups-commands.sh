@@ -17,6 +17,8 @@ fi
 
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
+mkdir -p "${SHARED_DIR}/securitygroups"
+
 case ${ADDITIONAL_SECURITY_GROUP_RULES} in
 
 	netperf)
@@ -29,5 +31,5 @@ case ${ADDITIONAL_SECURITY_GROUP_RULES} in
     	echo "None security group was set"
 		exit 1
     ;;
-	
+
 esac
