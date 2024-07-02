@@ -100,7 +100,7 @@ metadata:
   name: ${CLUSTER_NAME}
 networking:
   machineNetwork:
-  - cidr: ${INTERNAL_NET_CIDR}
+  - cidr: ${INTERNAL_NET_CIDR_V6}
 controlPlane:
    architecture: ${architecture}
    hyperthreading: Enabled
@@ -141,9 +141,9 @@ compute:
 platform:
   baremetal:
     apiVIPs:
-    - ${API_VIP}
+    - fd99:2222:3456::1:0006
     ingressVIPs:
-    - ${INGRESS_VIP}
+    - fd99:2222:3456::2:0007
 "
   fi
 fi

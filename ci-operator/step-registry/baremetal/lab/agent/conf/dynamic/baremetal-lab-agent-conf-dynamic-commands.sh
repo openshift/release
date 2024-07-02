@@ -3,7 +3,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-RENDEZVOUS_IP="$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")"
+RENDEZVOUS_IP="$(yq -r e -o=j -I=0 ".[0].ipv6" "${SHARED_DIR}/hosts.yaml")"
 
 # Create an agent-config file containing only the minimum required configuration
 
@@ -52,6 +52,10 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         dhcp: ${ipv4_enabled}
       ipv6:
         enabled: ${ipv6_enabled}
+        dhcp: ${ipv6_enabled}
+        auto-gateway: true
+        auto-routes: true
+        autoconf: true
 "
 
 # Workaround: Comment out this code until OCPBUGS-34849 is fixed
