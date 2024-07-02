@@ -14,7 +14,7 @@ source ./venv_qe/bin/activate
 git clone $DAST_TOOL_URL --branch $DAST_TOOL_BRANCH --depth 1
 
 
-git clone https://github.com/openshift-qe/ocpqe-security-tools.git --branch main --depth 1
+git clone https://github.com/paigerube14/ocpqe-security-tools.git --branch main --depth 1
 
 ls
 
