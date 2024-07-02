@@ -23,10 +23,6 @@ collect_artifacts() {
 }
 trap collect_artifacts EXIT TERM
 
-# Copy test binaries on packet server
-echo "### Copying test binaries"
-scp "${SSHOPTS[@]}" /usr/bin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/local/bin"
-
 # Tests execution
 set +e
 
@@ -34,8 +30,20 @@ echo "### Copying test-list file"
 scp "${SSHOPTS[@]}" "${SHARED_DIR}/test-list" "root@${IP}:/tmp/test-list"
 
 echo "### Running tests"
-timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF"
+timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash -s "${OPENSHIFT_TESTS_IMAGE}" << "EOF"
     set -x
+
+    function get_test_list() {
+        podman run --network host --rm -i -e KUBECONFIG=/tmp/kubeconfig -v ${kubeconfig}:/tmp/kubeconfig $1 \
+            openshift-tests run "openshift/conformance/parallel" --dry-run | \
+            grep -Ff /tmp/test-list
+    }
+
+    function run_tests() {
+        podman run --network host --rm -i -v /tmp:/tmp -e KUBECONFIG=/tmp/kubeconfig -v ${kubeconfig}:/tmp/kubeconfig $1 \
+            openshift-tests run -o /tmp/artifacts/e2e_${name}.log --junit-dir /tmp/artifacts/reports -f -
+    }
+    
     # prepending each printed line with a timestamp
     exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }') 2>&1
 
@@ -43,9 +51,7 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF"
         export KUBECONFIG=${kubeconfig}
         name=$(basename ${kubeconfig})
 
-        stderr=$( { openshift-tests run "openshift/conformance/parallel" --dry-run | \
-            grep -Ff /tmp/test-list | \
-            openshift-tests run -o /tmp/artifacts/e2e_${name}.log --junit-dir /tmp/artifacts/reports -f - ;} 2>&1)
+        stderr=$( { get_test_list $1 | run_tests $1; } 2>&1 )
         exit_code=$?
         
         # TODO: remove this part once we fully handle the problem described at
