@@ -49,7 +49,7 @@ export REGISTRY_AUTH_FILE='${remote_workdir}/.pull_secret.json'
 export PULL_SECRET=\$(<\$REGISTRY_AUTH_FILE)
 export BACKUP_SECRET=\$(<${remote_workdir}/.backup_secret.json)
 
-sudo dnf -y install runc gcc-c++ zip
+sudo dnf -y install runc crun gcc-c++ zip
 
 echo "Starting the IBI cluster"
 make ibi-iso ibi-vm ibi-logs
