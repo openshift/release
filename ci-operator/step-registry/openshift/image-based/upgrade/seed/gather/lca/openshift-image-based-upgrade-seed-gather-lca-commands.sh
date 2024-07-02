@@ -24,7 +24,7 @@ cat <<EOF > ${SHARED_DIR}/gather_seed_lca.sh
 set -euo pipefail
 
 cd ${remote_workdir}
-oc --kubeconfig ${seed_kubeconfig} adm inspect ns/openshift-lifecycle-agent --dest-dir=./must-gather-lca-${SEED_VM_NAME}
+oc --kubeconfig ${seed_kubeconfig} adm must-gather --image=${LCA_PULL_REF} --dest-dir=./must-gather-lca-${SEED_VM_NAME}
 
 tar cvaf must-gather-lca-${SEED_VM_NAME}.tar.gz ./must-gather-lca-${SEED_VM_NAME}
 EOF
