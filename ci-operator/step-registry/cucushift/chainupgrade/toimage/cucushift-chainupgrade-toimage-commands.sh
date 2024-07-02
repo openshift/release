@@ -662,7 +662,7 @@ function admin_ack() {
 # Upgrade the cluster to target release
 function upgrade() {
     set_channel $TARGET_VERSION
-    local retry=3 unrecommened_conditional_updates
+    local retry=5 unrecommened_conditional_updates
     while (( retry > 0 )); do
         unrecommened_conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True")) | .release.version' | xargs)
         if [[ -z "${unrecommened_conditional_updates}" ]]; then
