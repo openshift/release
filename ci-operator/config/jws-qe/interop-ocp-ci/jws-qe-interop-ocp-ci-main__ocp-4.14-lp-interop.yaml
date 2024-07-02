@@ -10,10 +10,12 @@ build_root:
     tag: golang-1.21
 releases:
   latest:
-    candidate:
+    prerelease:
       product: ocp
-      stream: nightly
-      version: "4.14"
+      version_bounds:
+        lower: 4.14.0-0
+        stream: 4-stable
+        upper: 4.15.0-0
 resources:
   '*':
     requests:
@@ -31,8 +33,8 @@ tests:
           "failure_rules":
             [
               {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure provisioning", "group": {"name": "cluster", "priority": 1}, "jira_additional_labels": ["!default"]},
-              {"step": "install-operators-*", "failure_type": "pod_failure", "classification": "operator install", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "install-operators-*", "failure_type": "test_failure", "classification": "operator install", "jira_project": "TRACING", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "install-operators*", "failure_type": "pod_failure", "classification": "operator install", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "install-operators*", "failure_type": "test_failure", "classification": "operator install", "jira_project": "TRACING", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "group": {"name": "cluster", "priority": 2}, "jira_additional_labels": ["!default"]},
               {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
               {"step": "jboss-web-server-lp-interop-tests-*", "failure_type": "pod_failure", "classification": "test failure", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]},
@@ -56,6 +58,43 @@ tests:
     - ref: install-operators
     - ref: jboss-web-server-lp-interop-tests
     workflow: firewatch-ipi-aws
+- as: jws-interop-ibmcloud
+  cron: 0 6 24 6 *
+  steps:
+    cluster_profile: ibmcloud-cspi-qe
+    env:
+      BASE_DOMAIN: zstream.interop.ccitredhat.com
+      FIREWATCH_CONFIG: "{ \n  \"failure_rules\": \n    [ \n      {\"step\": \"ipi-*\",
+        \"failure_type\": \"all\", \"classification\": \"Infrastructure provisioning\",
+        \"group\": {\"name\": \"cluster\", \"priority\": 1}, \"jira_additional_labels\":
+        [\"!default\"]}, \n      {\"step\": \"install-operators*\", \"failure_type\":
+        \"pod_failure\", \"classification\": \"operator install\", \"group\": {\"name\":
+        \"lp-tests\", \"priority\": 1}, \"jira_additional_labels\": [\"!default\",\"interop-tests\"]},
+        \n      {\"step\": \"install-operators*\", \"failure_type\": \"test_failure\",
+        \"classification\": \"operator install\", \"jira_project\": \"TRACING\", \"group\":
+        {\"name\": \"lp-tests\", \"priority\": 1}, \"jira_additional_labels\": [\"!default\",\"interop-tests\"]},
+        \n      {\"step\": \"gather-*\", \"failure_type\": \"pod_failure\", \"classification\":
+        \"Other\", \"group\": {\"name\": \"cluster\", \"priority\": 2}, \"jira_additional_labels\":
+        [\"!default\"]}, \n      {\"step\": \"gather-*\", \"failure_type\": \"test_failure\",
+        \"classification\": \"NONE\", \"jira_project\": \"NONE\", \"ignore\": \"true\"},
+        \n      {\"step\": \"jboss-web-server-lp-interop-tests-*\", \"failure_type\":
+        \"pod_failure\", \"classification\": \"test failure\", \"group\": {\"name\":
+        \"lp-tests\", \"priority\": 2}, \"jira_additional_labels\": [\"!default\",\"interop-tests\"]},
+        \n      {\"step\": \"jboss-web-server-lp-interop-tests-*\", \"failure_type\":
+        \"test_failure\", \"classification\": \"test failure\", \"jira_project\":
+        \"JWS\", \"group\": {\"name\": \"lp-tests\", \"priority\": 2}, \"jira_additional_labels\":
+        [\"!default\",\"interop-tests\"]} \n    ], \n    \"success_rules\": \n    [
+        \n      {\"jira_project\": \"CSPIT\", \"jira_additional_labels\": [\"!default\"]}
+        \n    ] \n} \n"
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.14-lp","self-managed-lp","jws-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      OPERATORS: "[ \n    {\"name\": \"jws-operator\", \"source\": \"redhat-operators\",
+        \"channel\": \"alpha\", \"install_namespace\": \"openshift-operators\", \"target_namespaces\":
+        \"\"} \n] \n"
+    test:
+    - ref: install-operators
+    - ref: jboss-web-server-lp-interop-tests
+    workflow: firewatch-ipi-ibmcloud
 zz_generated_metadata:
   branch: main
   org: jws-qe
