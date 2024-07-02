@@ -27,11 +27,11 @@ items:
             GOFLAGS='-mod=vendor' \
             LOGNAME=deadbeef \
             HOME=/output
-        RUN dnf install -y ansible-core python3 python3-pip python3-devel wget gcc make jq which iputils nmap-ncat vim && \
+        RUN dnf install -y ansible-core python3 python3-pip python3-devel python3-libvirt wget gcc make jq which iputils nmap-ncat vim rsync procps-ng && \
             dnf remove ansible-core --noautoremove -y && \
             dnf clean all && \
-            pip3 install --no-cache-dir "ansible==8.7.0" && \
-            wget https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/4.11.9/openshift-client-linux.tar.gz && \
+            pip3 install --no-cache-dir "ansible==8.7.0" jmespath jsonpatch openshift kubernetes kcli && \
+            wget https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/4.12.29/openshift-client-linux.tar.gz && \
             tar -zxvf openshift-client-linux.tar.gz && \
             mv oc /usr/local/bin/ && \
             mv kubectl /usr/local/bin/ && \
@@ -43,7 +43,7 @@ items:
             chmod g+w /etc/passwd && \
             echo 'echo default:x:$(id -u):$(id -g):Default Application User:/output:/sbin/nologin\ >> /etc/passwd' > /output/fix_uid.sh && \
             chmod g+rwx /output/fix_uid.sh
-        RUN for version in 1.19 1.20 1.21.6; do \
+        RUN for version in 1.19 1.20 1.21.11 1.22.4; do \
             mkdir -p /usr/local/${version} && \
             wget https://golang.org/dl/go${version}.linux-amd64.tar.gz && \
             tar -C /usr/local/${version} -xzf go${version}.linux-amd64.tar.gz && \
