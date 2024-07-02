@@ -1,14 +1,18 @@
 base_images:
   cli:
-    name: "4.12"
+    name: "4.15"
     namespace: ocp
     tag: cli
   dvo-tests:
     name: deployment-validation-operator-tests
     namespace: ci
     tag: latest
+  hypershift:
+    name: "4.15"
+    namespace: stable
+    tag: hypershift
   operator-sdk:
-    name: "4.12"
+    name: "4.15"
     namespace: origin
     tag: operator-sdk
 build_root:
@@ -25,6 +29,12 @@ operator:
   substitutions:
   - pullspec: quay.io/deployment-validation-operator/dv-operator:latest
     with: pipeline:dvo-operator
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -65,16 +75,10 @@ tests:
   container:
     from: src
 - as: deployment-validation-operator-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obsint-dvo
-    product: ocp
-    timeout: 2h0m0s
-    version: "4.12"
   steps:
+    cluster_profile: aws-observability
+    env:
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
     test:
     - as: install
       cli: latest
@@ -117,19 +121,13 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: generic-claim
+    workflow: hypershift-hostedcluster-workflow
 - as: dvo-e2e-tests-periodic
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: obsint-dvo
-    product: ocp
-    timeout: 2h0m0s
-    version: "4.12"
   cron: 0 0 * * *
   steps:
+    cluster_profile: aws-observability
+    env:
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
     test:
     - as: install
       cli: latest
@@ -173,7 +171,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: generic-claim
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: master
   org: app-sre
