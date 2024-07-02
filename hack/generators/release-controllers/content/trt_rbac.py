@@ -29,3 +29,21 @@ def generate_trt_rbac(config):
             for arch in config.arches:
                 context = Context(config, arch, private)
                 _add_trt_admin_cluster_role_bindings(gendoc, context.is_namespace)
+
+        gendoc.append({
+            'apiVersion': 'rbac.authorization.k8s.io/v1',
+            'kind': 'ClusterRoleBinding',
+            'metadata': {
+                'name': 'trt-cluster-admin-binding',
+            },
+            'roleRef': {
+                'apiGroup': 'rbac.authorization.k8s.io',
+                'kind': 'ClusterRole',
+                'name': 'cluster-admin'
+            },
+            'subjects': [{
+                'apiGroup': 'rbac.authorization.k8s.io',
+                'kind': 'Group',
+                'name': 'trt-admins'
+            }]
+        })
