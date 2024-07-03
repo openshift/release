@@ -402,7 +402,7 @@ EOF
 
 
 
-for aws_region in ${regions[@]}; do
+for aws_region in "${regions[@]}"; do
   REGION="${aws_region}"
   echo "Current region: ${REGION}"
   ami_id="${ami_map[$REGION,$ARCH,$MICROSHIFT_OS]}"
