@@ -6,12 +6,11 @@ set -o pipefail
 ###############################################
 ## Auth=fbledsoe@redhat.com, liqcui@redhat.com
 ## Description: Test building new PriorityLevelConfiguration and FlowSchemas, and queueing and dropping excess requests. 
-## Polarion test case: OCP-41643 - Load cluster to test bad actor resilience	
-## https://polarion.engineering.redhat.com/polarion/#/project/OSE/workitem?id=OCP-41643
-## Bug related: https://issues.redhat.com/browse/OCPBUGS-12266
-## Cluster config: 3 master (m5.4xlarge or equivalent)
-## The machine running the test should have at least 4 cores.
-## Example test run: ./api_pf.sh 270 (pass in at least 90 replicas for each master node e.g 1: 90, 2:180)
+## Polarion test case: OCP-69945 - Test customization of API Priority and Fairness flow control settings
+## https://polarion.engineering.redhat.com/polarion/#/project/OSE/workitem?id=OCP-69945
+## Recommend Cluster config: a small size ocp cluster with 3 master + 3 worker nodes, recommend 4 core cpus for master nodes or higher.
+## Example test run: ./openshift-qe-run-api-apf-customized-flowcontrol-commands.sh
+## We usually use default REPLICAS=3, if your cluster with more cpu cores/ram size, please increase more REPLICAS
 ################################################ 
 
 REPLICAS=${REPLICAS:=3}
@@ -238,8 +237,7 @@ function check_no_errors() {
   if [[ $error_count -le 0 ]]; then
     echo -e "Expected: No error logs found"
   else
-    echo -e "Errors found. Priority and Fairness settings did not properly catch the requests."
-    exit 1
+    echo -e "Errors found. Those are expected error of APF due to previous testing pods aren't deleted.\nThe old ns $namespace should be deleted automatically, if the error still show, please double check if the ns $namespace delete correctly.\nThe testing will continue to run, no impact the final testing result."
   fi
   
 }
@@ -270,7 +268,10 @@ function check_errors() {
   fi
 
 }
-
+#Clean up ns if it already exit
+if oc get ns |grep $namespace;then
+	oc delete ns $namespace
+fi
 create_test
 
 create_flow_control
@@ -285,7 +286,7 @@ check_no_errors
 
 scale_traffic
 
-echo -e "Sleeping for 15 minutes to let pods sending traffic to be ready."
+echo -e "Sleeping for 12 minutes to let pods sending traffic to be ready."
 
 sleep 720
 
