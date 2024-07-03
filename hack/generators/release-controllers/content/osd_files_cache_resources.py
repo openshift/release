@@ -151,7 +151,7 @@ instance.
                                      '-cookie-secret-file=/etc/proxy/secrets/session_secret',
                                      '-tls-cert=/etc/tls/private/tls.crt',
                                      '-tls-key=/etc/tls/private/tls.key'],
-                            'image': 'quay.io/openshift/origin-oauth-proxy:4.9',
+                            'image': 'quay.io/openshift/origin-oauth-proxy:4.16',
                             'imagePullPolicy': 'IfNotPresent',
                             'name': 'oauth-proxy',
                             'ports': [{
