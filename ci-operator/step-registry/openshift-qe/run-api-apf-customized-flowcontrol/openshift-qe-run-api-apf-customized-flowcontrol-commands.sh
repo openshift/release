@@ -237,7 +237,7 @@ function check_no_errors() {
   if [[ $error_count -le 0 ]]; then
     echo -e "Expected: No error logs found"
   else
-    echo -e "Errors found. Please double check if previous testing pod is deleted, those are expected error of APF"
+    echo -e "Errors found. Those are expected error of APF due to previous testing pods aren't deleted.\nThe old ns $namespace should be deleted automatically, if the error still show, please double check if the ns $namespace delete correctly.\nThe testing will continue to run, no impact the final testing result."
   fi
   
 }
