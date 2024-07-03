@@ -143,4 +143,3 @@ check_node_status || exit 1
 retry check_cluster_operators || exit 1
 retry check_pod_status || exit 1
 oc get pod -A > "${ARTIFACT_DIR}/guest-pods"
-oc get pod -A yaml > "${ARTIFACT_DIR}/guestpod.yaml"
