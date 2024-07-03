@@ -11,7 +11,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 trap 'save_stack_events_to_shared' EXIT TERM INT
 
 # Available regions to create the stack. These are ordered by price per instance per hour as of 07/2024.
-declare regions=(us-west-2 us-east-1 us-east-2 eu-central-1 us-west-1)
+declare regions=(us-west-2 us-east-1 eu-central-1)
 # Use the first region in the list, as it should be the most stable, as the one where to push/pull caching
 # results. This is done because of costs as cross-region traffic is expensive.
 CACHE_REGION="${regions[0]}"
@@ -27,18 +27,6 @@ declare -A ami_map=(
   [us-east-1,arm64,rhel-9.3]=ami-0677a1dd1ad031d74   # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
   [us-east-1,x86_64,rhel-9.4]=ami-0583d8c7a9c35822c  # RHEL-9.4.0_HVM-20240605-x86_64-82-Hourly2-GP3
   [us-east-1,arm64,rhel-9.4]=ami-07472131ec292b5da   # RHEL-9.4.0_HVM-20240605-arm64-82-Hourly2-GP3
-  [us-east-2,x86_64,rhel-9.2]=ami-078cb4217e3046abf  # RHEL-9.2.0_HVM-20240521-x86_64-93-Hourly2-GP3
-  [us-east-2,arm64,rhel-9.2]=ami-04c1dfc4f324c64b2   # RHEL-9.2.0_HVM-20240521-arm64-93-Hourly2-GP3
-  [us-east-2,x86_64,rhel-9.3]=ami-0fc8883cbe9d895c8  # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
-  [us-east-2,arm64,rhel-9.3]=ami-0677a1dd1ad031d74   # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
-  [us-east-2,x86_64,rhel-9.4]=ami-0583d8c7a9c35822c  # RHEL-9.4.0_HVM-20240605-x86_64-82-Hourly2-GP3
-  [us-east-2,arm64,rhel-9.4]=ami-07472131ec292b5da   # RHEL-9.4.0_HVM-20240605-arm64-82-Hourly2-GP3
-  [us-west-1,x86_64,rhel-9.2]=ami-0dec3d1229df2697d  # RHEL-9.2.0_HVM-20240521-x86_64-93-Hourly2-GP3
-  [us-west-1,arm64,rhel-9.2]=ami-0991df988365e4019   # RHEL-9.2.0_HVM-20240521-arm64-93-Hourly2-GP3
-  [us-west-1,x86_64,rhel-9.3]=ami-0449c60bfdb76e0f0  # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
-  [us-west-1,arm64,rhel-9.3]=ami-0aab7cc073aa90e60   # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
-  [us-west-1,x86_64,rhel-9.4]=ami-0c5ebd68eb61ff68d  # RHEL-9.4.0_HVM-20240605-x86_64-82-Hourly2-GP3
-  [us-west-1,arm64,rhel-9.4]=ami-0b6f040dfefb8e690   # RHEL-9.4.0_HVM-20240605-arm64-82-Hourly2-GP3
   [us-west-2,x86_64,rhel-9.2]=ami-0e4e5e5727c2a7a33  # RHEL-9.2.0_HVM-20240521-x86_64-93-Hourly2-GP3
   [us-west-2,arm64,rhel-9.2]=ami-0538b6fddb813b795   # RHEL-9.2.0_HVM-20240521-arm64-93-Hourly2-GP3
   [us-west-2,x86_64,rhel-9.3]=ami-0c2f1f1137a85327e  # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
