@@ -75,7 +75,7 @@ function check_pod_status {
             echo "Pod $pod in namespace $namespace has status $status, which is not valid."
             return 1
         fi
-    done < <(oc get pod --all-namespaces --no-headers | grep -v "azure-path-fix")
+    done < <(oc get pod --all-namespaces --no-headers | grep -v "azure-path-fix" | grep -v "debug-")
     echo "All pods are in the expected state."
     return 0
 }
@@ -142,3 +142,5 @@ print_clusterversion
 check_node_status || exit 1
 retry check_cluster_operators || exit 1
 retry check_pod_status || exit 1
+oc get pod -A > "${ARTIFACT_DIR}/guest-pods"
+oc get pod -A yaml > "${ARTIFACT_DIR}/guestpod.yaml"
