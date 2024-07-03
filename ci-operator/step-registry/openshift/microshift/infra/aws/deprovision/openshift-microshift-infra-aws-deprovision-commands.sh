@@ -9,16 +9,19 @@ function delete_stacks()
     while read -r line; do
         region=$(echo $line | cut -f1 -d " ")
         name=$(echo $line | cut -f2 -d " ")
-        echo "Deleting stack ${name} in region ${region}..."
-        aws --region $region cloudformation delete-stack --stack-name "${name}" &
-        wait "$!"
-        echo "Deleted stack ${name}"
 
-        aws --region $region cloudformation wait stack-delete-complete --stack-name "${name}" &
-        wait "$!"
-        echo "Waited for stack ${name}"
-
-        aws --region $region cloudformation describe-stacks --stack-name "${name}" || true
+        if aws --region "${region}" cloudformation describe-stacks --stack-name "${name}" \
+          --query 'Stacks[].Outputs[?OutputKey == `InstanceId`].OutputValue' --output text; then
+            echo "Deleting stack ${name} in region ${region}..."
+            aws --region "${region}" cloudformation delete-stack --stack-name "${name}" &
+            wait "$!"
+            aws --region "${region}" cloudformation wait stack-delete-complete --stack-name "${name}" &
+            wait "$!"
+            echo "Deleted stack ${name} in region ${region}"
+            aws --region "${region}" cloudformation describe-stacks --stack-name "${name}" || true
+        else
+            echo "Stack ${name} in region ${region} does not exist"
+        fi
     done < $stack_list
 }
 
