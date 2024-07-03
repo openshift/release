@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# enable for debug
+# exec &> >(tee -i -a ${ARTIFACT_DIR}/_job.log )
+# set -x
+
 echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
 ~/fix_uid.sh
@@ -16,12 +20,9 @@ cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
-HYPERV_IP=10.1.104.1 # "$(cat /var/run/up-hv-ip/uphvip)"
+HYPERV_IP=10.1.104.3 # "$(cat /var/run/up-hv-ip/uphvip)"
+HYPERV_HOST=cnfdr3
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
-
-# Clusters to use for cnf-tests, and to exclude from selection in other jobs
-# HCP_CLUSTER=("cnfdr5")
-# ACM_CLUSTER="cnfdr4"
 
 source $SHARED_DIR/main.env
 echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
@@ -54,89 +55,16 @@ cat << EOF > $SHARED_DIR/bastion_inventory
 ${BASTION_IP} ansible_ssh_user=${BASTION_USER} ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
 
-# ADDITIONAL_ARG=""
-# # default to the first cluster in the array, unless 4.17
-# if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
-#     ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force"
-#     if [[ "$T5CI_VERSION" == "4.17" ]]; then
-#         ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[1]} --force"
-#     fi
-# else
-    # ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]}"
-# fi
-
-# Choose topology for different job types:
-# Run cnftests job with either 1 baremetal and 1 virtual node or 2 baremetal nodes.
-# Periodic cnftests job will use 2b(as we hardcoded to cnfdu1 and cnfdu3)
-# PR against release repo will i.e use i.e of 1b1v or 2b whichever is available
-# Any Pr against openshift-kni repo or rehersal job for openshift-kni repo to use 1b1v
-# Run nightly periodic jobs with 1 baremetal and 1 virtual node (with origin tests)
-# Run sno job with SNO topology
-
-
-# if [ "$REPO_OWNER" == "openshift-kni" ]; then
-#   # Run PR job on openshift-kni repo with 1b1v topology and exclude cnfdu5, cnfdu6, cnfdu7, cnfdu8
-#   # as they are used for nightly jobs
-#   TOPOLOGY_SELECTION="--topology 1b1v --exclude cnfdu5 --exclude cnfdu6 --exclude cnfdu7 --exclude cnfdu8"
-# else
-#   TOPOLOGY_SELECTION="--topology 1b1v --topology 2b"
-# fi
-
-# if [[ "$T5CI_JOB_TYPE"  == "cnftests" ]]; then
-#     ADDITIONAL_ARG="$ADDITIONAL_ARG $TOPOLOGY_SELECTION"
-# elif [[ "$T5CI_JOB_TYPE"  == "origintests" ]]; then
-#     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v"
-# elif [[ "$T5CI_JOB_TYPE"  == "sno" ]]; then
-#     ADDITIONAL_ARG="$ADDITIONAL_ARG --topology sno"
-# fi
-
-# cat << EOF > $SHARED_DIR/get-cluster-name.yml
-# ---
-# - name: Grab and run kcli to install openshift cluster
-#   hosts: bastion
-#   gather_facts: false
-#   tasks:
-#   - name: Wait 300 seconds, but only start checking after 10 seconds
-#     wait_for_connection:
-#       timeout: 125
-#       connect_timeout: 90
-#     register: sshresult
-#     until: sshresult is success
-#     retries: 15
-#     delay: 2
-#   - name: Discover cluster to run job
-#     command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $ADDITIONAL_ARG
-#     register: cluster
-#     environment:
-#       JOB_NAME: ${JOB_NAME:-'unknown'}
-#   - name: Create a file with cluster name
-#     shell: echo "{{ cluster.stdout }}" > $SHARED_DIR/cluster_name
-#     delegate_to: localhost
-# EOF
-
 # Check connectivity
 ping ${BASTION_IP} -c 10 || true
 echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
-# ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
-# Get all required variables - cluster name, API IP, port, environment
-# shellcheck disable=SC2046,SC2034
-# IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
-# PLAN_NAME="${CLUSTER_NAME}_ci"
-CLUSTER_NAME="cnfdr5"
+MGMT_CLUSTER="cnfdr15"
+CLUSTER_NAME="cnfdr16"
+MGMT_CLUSTER_API_IP="10.1.104.33"
+CLUSTER_API_PORT=6443
 CLUSTER_ENV="internalbos"
 echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
-
-# cat << EOF > $SHARED_DIR/release-cluster.yml
-# ---
-# - name: Release cluster $CLUSTER_NAME
-#   hosts: bastion
-#   gather_facts: false
-#   tasks:
-
-#   - name: Release cluster from job
-#     command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
-# EOF
 
 if [[ "$CLUSTER_ENV" != "upstreambil" ]]; then
     BASTION_ENV=false
@@ -148,100 +76,144 @@ cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
 ${HYPERV_IP} ansible_host=${HYPERV_IP} ansible_user=kni ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_common_args='${COMMON_SSH_ARGS} -o ProxyCommand="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -p 22 -W %h:%p -q ${BASTION_USER}@${BASTION_IP}"'
 EOF
-
 else
-# Run on downstream cnfdc1 without bastion
+# Run on downstream HV without bastion
 cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
-${CLUSTER_HV_IP} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}"
+${HYPERV_IP} ansible_host=${HYPERV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
-
 fi
-echo "#############################################################################..."
-echo "========  Deploying HCP cluster $CLUSTER_NAME $(if $BASTION_ENV; then echo "with a bastion"; fi)  ========"
-echo "#############################################################################..."
-
-# Start the deployment
-cat << EOF > ~/ocp-install.yml
----
-- name: Grab and run kcli to install openshift cluster
-  hosts: hypervisor
-  gather_facts: false
-  tasks:
-
-  - name: Wait 300 seconds, but only start checking after 10 seconds
-    wait_for_connection:
-      delay: 10
-      timeout: 300
-
-EOF
 
 cat << EOF > ~/fetch-kubeconfig.yml
 ---
-- name: Fetch kubeconfig for cluster
+- name: Fetch kubeconfigs for cluster
   hosts: hypervisor
   gather_facts: false
   tasks:
 
   - name: Copy kubeconfig from installer vm
-    shell: kcli scp root@${CLUSTER_NAME}-installer:/root/ocp/auth/kubeconfig /home/kni/.kube/config_${CLUSTER_NAME}
+    shell: kcli scp root@${MGMT_CLUSTER}-installer:/root/ocp/auth/kubeconfig /home/kni/.kube/config_${MGMT_CLUSTER}
 
-  - name: Add skip-tls-verify to kubeconfig
+  - name: Copy kubeconfig from Hypershift directory
+    shell: cp /home/kni/hcp-jobs/${CLUSTER_NAME}/out/${CLUSTER_NAME}-kubeadmin-kubeconfig /home/kni/.kube/hcp_config_${CLUSTER_NAME}
+
+  - name: Add skip-tls-verify to mgmt kubeconfig
     replace:
-      path: /home/kni/.kube/config_${CLUSTER_NAME}
+      path: /home/kni/.kube/config_${MGMT_CLUSTER}
       regexp: '    certificate-authority-data:.*'
       replace: '    insecure-skip-tls-verify: true'
 
-  - name: Grab the kubeconfig
+  - name: Add skip-tls-verify to HCP kubeconfig
+    replace:
+      path: /home/kni/.kube/hcp_config_${CLUSTER_NAME}
+      regexp: '    certificate-authority-data:.*'
+      replace: '    insecure-skip-tls-verify: true'
+
+  - name: Grab the kubeconfig of management cluster
     fetch:
-      src: /home/kni/.kube/config_${CLUSTER_NAME}
+      src: /home/kni/.kube/config_${MGMT_CLUSTER}
+      dest: $SHARED_DIR/mgmt-kubeconfig
+      flat: yes
+
+  - name: Grab the Hypershift kubeconfig
+    fetch:
+      src: /home/kni/.kube/hcp_config_${CLUSTER_NAME}
       dest: $SHARED_DIR/kubeconfig
       flat: yes
 
-  - name: Modify local copy of kubeconfig
+  - name: Modify local copy of mgmt kubeconfig
     replace:
-      path: $SHARED_DIR/kubeconfig
+      path: $SHARED_DIR/mgmt-kubeconfig
       regexp: '    server: https://api.*'
-      replace: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
+      replace: "    server: https://${MGMT_CLUSTER_API_IP}:${CLUSTER_API_PORT}"
     delegate_to: localhost
 
   - name: Add docker auth to enable pulling containers from CI registry
     shell: >-
-      kcli ssh root@${CLUSTER_NAME}-installer
-      'oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/root/openshift_pull.json'
+      oc --kubeconfig=/home/kni/.kube/config_${MGMT_CLUSTER} set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/home/kni/pull-secret.txt
+
+  - name: Add docker auth to enable pulling containers from CI registry for HCP cluster
+    shell: >-
+      oc --kubeconfig=/home/kni/.kube/hcp_config_${CLUSTER_NAME} set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/home/kni/pull-secret.txt
+
 EOF
 
 cat << EOF > ~/fetch-information.yml
 ---
-- name: Fetch information about cluster
+- name: Fetch information about HCP cluster
   hosts: hypervisor
   gather_facts: false
   tasks:
 
+  - name: Get cluster version
+    shell: oc --kubeconfig=/home/kni/.kube/hcp_config_${CLUSTER_NAME} get clusterversion
+
+  - name: Get cluster operators objects
+    shell: oc --kubeconfig=/home/kni/.kube/hcp_config_${CLUSTER_NAME} get co
+
+  - name: Get nodes
+    shell: oc --kubeconfig=/home/kni/.kube/hcp_config_${CLUSTER_NAME} get node
 
 EOF
 
+# Copy kubeconfig to hypervisor
+echo "Copy kubeconfig to hypervisor"
+ssh -i $SSH_PKEY $COMMON_SSH_ARGS kni@${HYPERV_IP} "kcli scp root@${MGMT_CLUSTER}-installer:/root/ocp/auth/kubeconfig /home/kni/${MGMT_CLUSTER}-kubeconfig"
 
-cat << EOF > $SHARED_DIR/detach-cluster.yml
----
-- name: Delete cluster
-  hosts: hypervisor
-  gather_facts: false
-  tasks:
+# Copy automation repo to local SHARED_DIR
+echo "Copy automation repo to local $SHARED_DIR"
+mkdir $SHARED_DIR/repos
+ssh -i $SSH_PKEY $COMMON_SSH_ARGS ${BASTION_USER}@${BASTION_IP} \
+    "tar --exclude='.git' -czf - -C /home/${BASTION_USER} ansible-automation" | tar -xzf - -C $SHARED_DIR/repos/
 
+# Change the host to hypervisor
+echo "Change the host to hypervisor to ${HYPERV_HOST}"
+cd $SHARED_DIR/repos/ansible-automation
+sed -i "s/- hosts: localhost/- hosts: ${HYPERV_HOST}/g" playbooks/hosted_bm_cluster.yaml
+sed -i "s/- hosts: localhost/- hosts: ${HYPERV_HOST}/g" playbooks/remove_bm_cluster.yaml
 
-EOF
+# Until new image is coming
+pip3 install -U jmespath jsonpatch openshift kubernetes
+
+# Run the playbook to remove any cluster that exists now
+echo "Run the playbook to remove any cluster that exists now"
+ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
+    playbooks/remove_bm_cluster.yaml \
+    -e kubeconfig=/home/kni/${MGMT_CLUSTER}-kubeconfig \
+    -e cluster_name=$CLUSTER_NAME \
+    -e ansible_host=${HYPERV_IP} -e ansible_ssh_user=kni -e ansible_ssh_private_key_file="${SSH_PKEY}" \
+    -e virtual_cluster_deletion=true || true
+
+# Run the playbook to install the cluster
+echo "Run the playbook to install the cluster"
+status=0
+ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
+    playbooks/hosted_bm_cluster.yaml \
+    -e kubeconfig=/home/kni/${MGMT_CLUSTER}-kubeconfig \
+    -e pre_step_mgmt_cluster=false \
+    -e hcphost=$CLUSTER_NAME \
+    -e virtual_worker_count=2 \
+    -e hostedbm_working_root_dir=/home/kni/hcp-jobs \
+    -e tag=$T5CI_VERSION \
+    -e ansible_host=${HYPERV_IP} -e ansible_ssh_user=kni -e ansible_ssh_private_key_file="${SSH_PKEY}" \
+    -e release=nightly || status=$?
 
 # PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.
 # CNF tests do not require this extra gathering and thus should fail immdiately if the cluster is not available.
 # It is intentionally set to a string so that it can be evaluated as a command (either /bin/true or /bin/false)
 # in order to provide the desired return code later.
 PROCEED_AFTER_FAILURES="false"
-status=0
-if [[ "$T5_JOB_DESC" != "periodic-cnftests" ]]; then
+if [[ "$T5_JOB_DESC" != "periodic-hcp-cnftests" ]]; then
     PROCEED_AFTER_FAILURES="true"
 fi
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
+
+echo "Run fetch kubeconfig playbook"
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || eval $PROCEED_AFTER_FAILURES
+
+echo "Run fetching information for clusters"
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
+echo "Exiting with status ${status}"
+# enable for debug, copy raw logs to HV
+# scp -i $SSH_PKEY $COMMON_SSH_ARGS $ARTIFACT_DIR/ansible.log kni@${HYPERV_IP}:/tmp/ansible_job-"$(date +%Y-%m-%d-%H-%M)".log
+# scp -i $SSH_PKEY $COMMON_SSH_ARGS ${ARTIFACT_DIR}/_job.log kni@${HYPERV_IP}:/tmp/build_job-"$(date +%Y-%m-%d-%H-%M)".log
 exit ${status}
