@@ -32,6 +32,10 @@ if [[ "$AKS_ENABLE_FIPS_IMAGE" == "true" ]]; then
     AKE_CREATE_COMMAND+=(--enable-fips-image)
 fi
 
+if [[ -n "$AKS_NODE_VM_SIZE" ]]; then
+    AKE_CREATE_COMMAND+=(--node-vm-size "$AKS_NODE_VM_SIZE")
+fi
+
 echo "Creating AKS cluster"
 eval "${AKE_CREATE_COMMAND[*]}"
 echo "$CLUSTER" > "${SHARED_DIR}/cluster-name"
