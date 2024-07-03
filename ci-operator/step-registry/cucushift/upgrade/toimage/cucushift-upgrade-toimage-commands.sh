@@ -342,7 +342,7 @@ function upgrade() {
 
 # Monitor the upgrade status
 function check_upgrade_status() {
-    local wait_upgrade="${TIMEOUT}" out avail progress cluster_version stat oldstat filter='[0-9]+h|[0-9]+m|[0-9]+s|\s+|\n'
+    local wait_upgrade="${TIMEOUT}" out avail progress cluster_version stat oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|\s+|\n'
     if [[ -n "${1:-}" ]]; then
         cluster_version="$1"
     else
@@ -375,7 +375,7 @@ function check_upgrade_status() {
             # capture "update health" section of status, ignoring the title and the last line
             # whenever an error is present, "Run with --details=health" is the last line we should remove.
             # with no error, it'll remove "Update is proceeding well" resulting in empty $stat that we simply ignore
-            stat="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 | sed -ne "/= Update Health =/,$ p" | sed '1d;2d;$d' || true)"
+            stat="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 | sed -ne "/= Update Health =/,$ p" | sed '2d;$d' || true)"
             # if update health messages exist, and the mesage is different from previous (ignoring time difference using $filter), dump "Update Health" to log
             if [ -n "$stat" ] && ! diff -qw <(sed -zE "s/${filter}//g" <<< "${stat}") <(sed -zE "s/${filter}//g" <<< "${oldstat}") >/dev/null ; then
                 echo "${stat}"
