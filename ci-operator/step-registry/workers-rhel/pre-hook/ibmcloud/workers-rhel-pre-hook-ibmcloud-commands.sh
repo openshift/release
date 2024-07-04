@@ -1,8 +1,8 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
-set -o pipefail
+#set -o errexit
+#set -o pipefail
 
 # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
 # to be able to SSH.
@@ -38,3 +38,5 @@ EOF
 
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
 ansible-playbook -i "${SHARED_DIR}/ansible-hosts" scaleup-pre-hook-ibmcloud.yaml -vvv
+echo "debug...."
+sleep 3h
