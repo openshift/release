@@ -215,9 +215,15 @@ export IMG_VERSION="release-${T5CI_VERSION}"
 
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
-pattern="4.[0-9]+"
-if [[ "$T5CI_VERSION" =~ $pattern ]]; then
-  source $HOME/golang-1.20
+# Set go version
+if [[ "$T5CI_VERSION" == "4.12" ]] || [[ "$T5CI_VERSION" == "4.13" ]]; then
+    source $HOME/golang-1.19
+elif [[ "$T5CI_VERSION" == "4.14" ]] || [[ "$T5CI_VERSION" == "4.15" ]]; then
+    source $HOME/golang-1.20
+elif [[ "$T5CI_VERSION" == "4.16" ]]; then
+    source $HOME/golang-1.21.11
+else
+    source $HOME/golang-1.22.4
 fi
 
 temp_dir=$(mktemp -d -t cnf-XXXXX)
