@@ -342,18 +342,28 @@ function upgrade() {
 
 # Monitor the upgrade status
 function check_upgrade_status() {
-    local wait_upgrade="${TIMEOUT}" out avail progress cluster_version stat oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|\s+|\n'
+    local wait_upgrade="${TIMEOUT}" interval=1 out avail progress cluster_version stat_cmd stat='empty' oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of|\s+|\n'
     if [[ -n "${1:-}" ]]; then
         cluster_version="$1"
     else
         cluster_version="${TARGET_VERSION}"
     fi
     echo "Starting the upgrade checking on $(date "+%F %T")"
+    # print once to log (including full messages)
+    oc adm upgrade || true
+    # log oc adm upgrade (excluding garbage messages)
+    stat_cmd="oc adm upgrade | grep -vE 'Upstream is unset|Upstream: https|available channels|No updates available|^$'"
+    # if available (version 4.16+) log "upgrade status" instead
+    if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+        stat_cmd="env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 | grep -vE 'no token is currently in use|for additional description and links'"
+    fi
     while (( wait_upgrade > 0 )); do
-        sleep 5m
-        wait_upgrade=$(( wait_upgrade - 5 ))
-        if ! ( run_command "oc adm upgrade" ); then
-            continue
+        sleep ${interval}m
+        wait_upgrade=$(( wait_upgrade - interval ))
+        # if output is different from previous (ignoring irrelevant time/percentage difference), write to log
+        if stat="$(eval "${stat_cmd}")" && [ -n "$stat" ] && ! diff -qw <(sed -zE "s/${filter}//g" <<< "${stat}") <(sed -zE "s/${filter}//g" <<< "${oldstat}") >/dev/null ; then
+            echo -e "=== Upgrade Status $(date "+%T") ===\n${stat}\n\n\n\n"
+            oldstat=${stat}
         fi
         if ! out="$(oc get clusterversion --no-headers || false)"; then
             echo "Error occurred when getting clusterversion"
@@ -369,18 +379,6 @@ function check_upgrade_status() {
             UPGRADE_RHEL_WORKER_BEFOREHAND="triggered"
             echo -e "Upgrade stuck at updating RHEL worker, need to run the RHEL worker upgrade later...\n\n"
             return 0
-        fi
-        # assuming oc to equal TARGET_MINOR_VERSION, log abnormal "upgrade status" if available (version 4.16+)
-        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
-            # capture "update health" section of status, ignoring the title and the last line
-            # whenever an error is present, "Run with --details=health" is the last line we should remove.
-            # with no error, it'll remove "Update is proceeding well" resulting in empty $stat that we simply ignore
-            stat="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 | sed -ne "/= Update Health =/,$ p" | sed '2d;$d' || true)"
-            # if update health messages exist, and the mesage is different from previous (ignoring time difference using $filter), dump "Update Health" to log
-            if [ -n "$stat" ] && ! diff -qw <(sed -zE "s/${filter}//g" <<< "${stat}") <(sed -zE "s/${filter}//g" <<< "${oldstat}") >/dev/null ; then
-                echo "${stat}"
-                oldstat=${stat}
-            fi
         fi
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
