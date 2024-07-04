@@ -53,7 +53,8 @@ fi
   --base-domain=${BASEDOMAIN} \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
   --image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml" \
-  --ssh-key="${SHARED_DIR}/id_rsa.pub"
+  --ssh-key="${SHARED_DIR}/id_rsa.pub" \
+  --release-image ${RELEASE_IMAGE}
 ### workaround for https://issues.redhat.com/browse/DPTP-4024
 ### --release-image ${RELEASE_IMAGE} use default release-image
 
