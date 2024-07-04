@@ -26,8 +26,6 @@ else
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
-set -x
-
 list_vnet_tags="${SHARED_DIR}/list_azure_existing_vnet_tags.sh"
 if [ -f "${list_vnet_tags}" ]; then
     sh -x "${list_vnet_tags}"

@@ -18,6 +18,7 @@ set -x
 echo "Creating resource group for the aks cluster"
 RESOURCEGROUP="${RESOURCE_NAME_PREFIX}-aks-rg"
 az group create --name "$RESOURCEGROUP" --location "$AZURE_LOCATION"
+echo "$RESOURCEGROUP" > "${SHARED_DIR}/resourcegroup_aks"
 
 echo "Building up the aks create command"
 CLUSTER="${RESOURCE_NAME_PREFIX}-aks-cluster"
@@ -42,7 +43,6 @@ fi
 echo "Creating AKS cluster"
 eval "${AKE_CREATE_COMMAND[*]}"
 echo "$CLUSTER" > "${SHARED_DIR}/cluster-name"
-echo "$RESOURCEGROUP" > "${SHARED_DIR}/resourcegroup_aks"
 
 echo "Building up the aks get-credentials command"
 AKS_GET_CREDS_COMMAND=(
