@@ -155,7 +155,7 @@ interfaces:
 echo "[INFO] Configuring the provisioning network in the provisioning host via the NMState specs: "
 echo "${NMSTATE_CONFIG}" | tee "${ARTIFACT_DIR}/nmstate-provisioning-net-config.yaml"
 
-timeout -s 9 10m ssh "${SSHOPTS[@]}" -p "$(<"${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")" "root@${AUX_HOST}" bash -s -- \
+timeout -s 9 10m ssh "${SSHOPTS[@]}" -p "$(sed 's/^[%]\?\([0-9]*\)[%]\?$/\1/' < "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")" "root@${AUX_HOST}" bash -s -- \
   "'${NMSTATE_CONFIG}'" "br-${CLUSTER_NAME: -12}"  << 'EOF'
 
 echo "$1" | nmstatectl apply -
