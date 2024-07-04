@@ -133,7 +133,7 @@ rhel_image_name     = "CentOS-Stream-9"
 rhcos_import_image              = true
 rhcos_import_image_filename     = "${COREOS_NAME}"
 rhcos_import_image_storage_type = "tier1"
-system_type         = "s1022"
+system_type         = "s922"
 cluster_domain      = "${CLUSTER_DOMAIN}"
 cluster_id_prefix   = "rh-ci"
 bastion   = { memory = "16", processors = "1", "count" = 1 }
@@ -162,7 +162,7 @@ function create_upi_powervs_cluster() {
   # Dev Note: https://github.com/ocp-power-automation/openshift-install-power/blob/devel/openshift-install-powervs#L767C1-L767C145
   # May trigger the redaction
   OUTPUT="yes"
-  ./openshift-install-powervs create -ignore-os-checks -var-file var-mac-upi.tfvars -verbose | sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d; /Login to the console with user/d' | \
+  ./openshift-install-powervs create -var-file var-mac-upi.tfvars -verbose | sed '/.*client-certificate-data*/d; /.*token*/d; /.*client-key-data*/d; /- name: /d; /Login to the console with user/d' | \
     while read LINE
     do
         if [[ "${LINE}" == *"BEGIN RSA PRIVATE KEY"* ]]
