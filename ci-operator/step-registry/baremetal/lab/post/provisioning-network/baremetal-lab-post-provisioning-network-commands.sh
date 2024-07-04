@@ -110,7 +110,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 echo "[INFO] Rolling back the provisioning network configuration via the NMState specs"
-timeout -s 9 10m ssh "${SSHOPTS[@]}" -p "$(<"${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")" "root@${AUX_HOST}" bash -s -- \
+timeout -s 9 10m ssh "${SSHOPTS[@]}" -p "$(sed 's/^[%]\?\([0-9]*\)[%]\?$/\1/' < "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")" "root@${AUX_HOST}" bash -s -- \
   "'${NMSTATE_CONFIG}'"  << 'EOF'
 echo "$1" | nmstatectl apply -
 EOF
