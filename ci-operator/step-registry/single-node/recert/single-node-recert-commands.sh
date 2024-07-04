@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+sleep 3h
+
 function info {
   echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*"
 }

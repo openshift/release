@@ -24,6 +24,12 @@ images:
 - dockerfile_path: Dockerfile
   to: recert
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.15"
   latest:
     candidate:
       product: ocp
@@ -113,6 +119,28 @@ tests:
     - ref: baremetalds-sno-rename
     - ref: baremetalds-sno-test
     workflow: baremetalds-sno
+- as: e2e-baremetal-pxe-sno-agent-ipv4-fips-recert
+  cluster: build05
+  cron: '@weekly'
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Disruptive&;~Serial&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      architecture: arm64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "1"
+      workers: "0"
+    test:
+    - ref: ssh-bastion
+    - ref: single-node-recert
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-agent-install-pxe
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
