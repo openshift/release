@@ -38,6 +38,6 @@ EOF
 
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
 set +e
-ansible-playbook -i "${SHARED_DIR}/ansible-hosts" scaleup-pre-hook-ibmcloud.yaml -vvv || return true
+ansible-playbook -i "${SHARED_DIR}/ansible-hosts" scaleup-pre-hook-ibmcloud.yaml -vvv || true
 echo "debug...."
 sleep 3h
