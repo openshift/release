@@ -5,7 +5,7 @@ set -euxo pipefail
 CERTIFIED_OPERATOR_INDEX_REPO="registry.redhat.io/redhat/certified-operator-index"
 COMMUNITY_OPERATOR_INDEX_REPO="registry.redhat.io/redhat/community-operator-index"
 REDHAT_MARKETPLACE_INDEX_REPO="registry.redhat.io/redhat/redhat-marketplace-index"
-REDHAT_OPERATOR_INDEX_REPO="registry.redhat.io/redhat/redhat-marketplace-index"
+REDHAT_OPERATOR_INDEX_REPO="registry.redhat.io/redhat/redhat-operator-index"
 
 echo "Retrieving hash for the multi-arch index images"
 CERTIFIED_OPERATOR_INDEX_HASH="$(oc image info "$CERTIFIED_OPERATOR_INDEX_REPO:v${HYPERSHIFT_HC_VERSION}" \
