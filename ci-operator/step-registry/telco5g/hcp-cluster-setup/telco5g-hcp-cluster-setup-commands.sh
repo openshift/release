@@ -193,6 +193,7 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e pre_step_mgmt_cluster=false \
     -e hcphost=$CLUSTER_NAME \
     -e virtual_worker_count=2 \
+    -e hide_sensitive_log=true \
     -e hostedbm_working_root_dir=/home/kni/hcp-jobs \
     -e tag=$T5CI_VERSION \
     -e ansible_host=${HYPERV_IP} -e ansible_ssh_user=kni -e ansible_ssh_private_key_file="${SSH_PKEY}" \
