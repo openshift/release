@@ -108,13 +108,25 @@ prow-config: message
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" quay-proxy.ci.openshift.org/openshift/ci:ci_determinize-prow-config_latest --prow-config-dir /config --sharded-prow-config-base-dir /config --sharded-plugin-config-base-dir /config
 
 acknowledge-critical-fixes-only: message
+	@if [ -z "$(RELEASE)" ]; then \
+		echo "RELEASE is not specified. Please specify RELEASE=x.y"; \
+		exit 1; \
+	fi
 	./hack/generate-acknowledge-critical-fixes-repo-list.sh
+	# ocp-build-data is special
+	./hack/acknowledge_critical_fix_repos_single_repo.py openshift-eng/ocp-build-data openshift-$(RELEASE) --apply
 	$(eval REPOS ?= ./hack/acknowledge-critical-fix-repos.txt)
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_tide-config-manager_latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(REPOS):/repos" quay-proxy.ci.openshift.org/openshift/ci:ci_tide-config-manager_latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase acknowledge-critical-fixes-only --repos-guarded-by-ack-critical-fixes /repos
 	$(MAKE) prow-config
 
 revert-acknowledge-critical-fixes-only: message
+	@if [ -z "$(RELEASE)" ]; then \
+		echo "RELEASE is not specified. Please specify RELEASE=x.y"; \
+		exit 1; \
+	fi
+	# ocp-build-data is special
+	./hack/acknowledge_critical_fix_repos_single_repo.py openshift-eng/ocp-build-data openshift-$(RELEASE) --revert
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay-proxy.ci.openshift.org/openshift/ci:ci_tide-config-manager_latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" quay-proxy.ci.openshift.org/openshift/ci:ci_tide-config-manager_latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase revert-critical-fixes-only
 	$(MAKE) prow-config
