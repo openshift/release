@@ -143,6 +143,7 @@ fi
 
 # configure environment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
+sleep 14400
 case "${CLUSTER_TYPE}" in
 gcp)
     export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
