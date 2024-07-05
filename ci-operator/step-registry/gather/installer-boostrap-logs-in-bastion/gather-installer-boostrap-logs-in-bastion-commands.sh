@@ -122,6 +122,12 @@ run_scp_from_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "/tmp/gather
 run_scp_from_remote "${ssh_key}" ${bastion_user} ${bastion_dns} "/tmp/installer/log-bundle-*.tar.gz" "${ARTIFACT_DIR}/"
 
 echo "Gathering log-bundle from private cluster - Done"
+
+# add post fix to the latest log-bundle.
+old_name=$(ls ${ARTIFACT_DIR}/log-bundle-* | sort -r | head -n 1)
+new_name=$(echo $old_name | sed 's/.tar.gz/-latest.tar.gz/g')
+mv $old_name $new_name
+
 echo "log-bundle logs has been saved:"
 ls ${ARTIFACT_DIR}/log-bundle-*
 
