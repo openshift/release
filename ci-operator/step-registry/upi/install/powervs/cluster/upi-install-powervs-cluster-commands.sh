@@ -179,11 +179,11 @@ function create_upi_powervs_cluster() {
         fi
     done || true
   cp "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/automation/terraform.tfstate "${SHARED_DIR}"/terraform-mac-upi.tfstate
-  ./openshift-install-powervs output -ignore-os-checks > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
-  ./openshift-install-powervs access-info -ignore-os-checks > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
+  ./openshift-install-powervs output > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
+  ./openshift-install-powervs access-info > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
   # Dev Note: the following two lines may be causing the redaction routine to remove the log
-  ./openshift-install-powervs output -ignore-os-checks bastion_private_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
-  ./openshift-install-powervs output -ignore-os-checks bastion_public_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
+  ./openshift-install-powervs output bastion_private_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
+  ./openshift-install-powervs output bastion_public_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
 
   BASTION_PUBLIC_IP=$(<"${SHARED_DIR}/BASTION_PUBLIC_IP")
   echo "BASTION_PUBLIC_IP:- $BASTION_PUBLIC_IP"
