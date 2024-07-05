@@ -8,7 +8,7 @@ AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 
 CLUSTER="$(<"${SHARED_DIR}/cluster-name")"
-RESOURCEGROUP="$(<"${SHARED_DIR}/resourcegroup")"
+RESOURCEGROUP="$(<"${SHARED_DIR}/resourcegroup_aks")"
 
 az --version
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
