@@ -21,29 +21,32 @@ fi
 
 echo "# Printing the jobs-to-trigger JSON:"
 jq -c '.[]' "$WEEKLY_JOBS"
-
 echo ""
-echo "# Test to make sure gangway api is up and running."
-max_retries=60
-retry_interval=60  # 60 seconds = 1 minute
 
-for ((retry_count=1; retry_count<=$max_retries; retry_count++)); do
-  response=$(curl -s -X GET -d '{"job_execution_type": "1"}' -H "Authorization: Bearer ${GANGWAY_API_TOKEN}" "${URL}/v1/executions/${PROW_JOB_ID}" -w "%{http_code}\n" -o /dev/null)
+if [ "$SKIP_HEALTH_CHECK" = "false" ]; then
 
-  if [ "$response" -eq 200 ]; then
-    echo "Endpoint is up and returning HTTP status code 200 (OK)."
-    break  # Exit the loop if successful response received
-  else
-    echo "Endpoint is not available or returned an error (HTTP status code $response). Retrying..."
+  echo "# Test to make sure gangway api is up and running."
+  max_retries=60
+  retry_interval=60  # 60 seconds = 1 minute
+
+  for ((retry_count=1; retry_count<=$max_retries; retry_count++)); do
+    response=$(curl -s -X GET -d '{"job_execution_type": "1"}' -H "Authorization: Bearer ${GANGWAY_API_TOKEN}" "${URL}/v1/executions/${PROW_JOB_ID}" -w "%{http_code}\n" -o /dev/null)
+
+    if [ "$response" -eq 200 ]; then
+      echo "Endpoint is up and returning HTTP status code 200 (OK)."
+      break  # Exit the loop if successful response received
+    else
+      echo "Endpoint is not available or returned an error (HTTP status code $response). Retrying..."
+    fi
+
+    # Sleep for the specified interval before the next retry
+    sleep $retry_interval
+  done
+
+  if [ "$response" -ne 200 ]; then
+    echo "Endpoint is still not available after $max_retries retries. Aborting."
+    exit 1
   fi
-
-  # Sleep for the specified interval before the next retry
-  sleep $retry_interval
-done
-
-if [ "$response" -ne 200 ]; then
-  echo "Endpoint is still not available after $max_retries retries. Aborting."
-  exit 1
 fi
 
 max_retries=3
