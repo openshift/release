@@ -37,7 +37,7 @@ BASEDOMAIN=$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")
 echo "extract secret/pull-secret"
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 echo "check HYPERSHIFT_HC_RELEASE_IMAGE, if not set, use mgmt-cluster playload image"
-#RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
+RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 
 IP_STACK_COMMAND=""
 if [[ "${IP_STACK}" == "v4v6" ]]; then
@@ -53,9 +53,8 @@ fi
   --base-domain=${BASEDOMAIN} \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
   --image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml" \
-  --ssh-key="${SHARED_DIR}/id_rsa.pub"
-### workaround for https://issues.redhat.com/browse/DPTP-4024
-### --release-image ${RELEASE_IMAGE} use default release-image
+  --ssh-key="${SHARED_DIR}/id_rsa.pub" \
+  --release-image ${RELEASE_IMAGE}
 
 if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
   echo "MCE version is less than 2.4"
