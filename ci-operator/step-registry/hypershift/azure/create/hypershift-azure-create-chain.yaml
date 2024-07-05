@@ -39,6 +39,15 @@ chain:
       default: "false"
       documentation: |-
         If true, create hosted cluster infrastructure in the resource group specified in "${SHARED_DIR}/resourcegroup".
+    - name: HYPERSHIFT_CUSTOM_VNET
+      default: "false"
+      documentation: "If true, use BYO VNET specified in ${SHARED_DIR}/azure_vnet_id"
+    - name: HYPERSHIFT_CUSTOM_SUBNET
+      default: "false"
+      documentation: "If true, use BYO SUBNET specified in ${SHARED_DIR}/azure_subnet_id"
+    - name: HYPERSHIFT_CUSTOM_NSG
+      default: "false"
+      documentation: "If true, use BYO NSG specified in ${SHARED_DIR}/azure_nsg_id"
     - name: EXTRA_ARGS
       default: ""
       documentation: "Extra arguments to pass to the hypershift create cluster azure command."
@@ -80,6 +89,21 @@ chain:
         RESOURCE_GROUP_NAME="$(cat "${SHARED_DIR}/resourcegroup")"
       fi
       
+      VNET_ID=""
+      if [[ $HYPERSHIFT_CUSTOM_VNET == "true" ]]; then
+        VNET_ID="$(cat "${SHARED_DIR}/azure_vnet_id")"
+      fi
+      
+      SUBNET_ID=""
+      if [[ $HYPERSHIFT_CUSTOM_SUBNET == "true" ]]; then
+        SUBNET_ID="$(cat "${SHARED_DIR}/azure_subnet_id")"
+      fi
+      
+      NSG_ID=""
+      if [[ $HYPERSHIFT_CUSTOM_NSG == "true" ]]; then
+        NSG_ID="$(cat "${SHARED_DIR}/azure_nsg_id")"
+      fi
+      
       HC_ANNOTATIONS_FILE="${SHARED_DIR}/hypershift_hc_annotations"
       if [[ -f "$HC_ANNOTATIONS_FILE" ]]; then
         while read -r line; do
@@ -100,7 +124,10 @@ chain:
         --release-image ${RELEASE_IMAGE} \
         --encryption-key-id=${ENCRYPTION_KEY_ID} \
         --disk-encryption-set-id=${DISK_ENCRYPTION_SET_ID} \
-        --resource-group-name=${RESOURCE_GROUP_NAME}
+        --resource-group-name=${RESOURCE_GROUP_NAME} \
+        --vnet-id=${VNET_ID} \
+        --subnet-id=${SUBNET_ID} \
+        --network-security-group-id=${NSG_ID}
 
       # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
       echo "Waiting for cluster to become available"
