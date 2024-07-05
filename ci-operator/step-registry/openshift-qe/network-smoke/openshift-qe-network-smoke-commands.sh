@@ -4,6 +4,18 @@ set -o nounset
 set -o pipefail
 set -x
 cat /etc/os-release
+if [ ${BAREMETAL} == "true" ]; then
+  bastion="$(cat /bm/address)"
+  # Copy over the kubeconfig
+  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cat ~/bm/kubeconfig" > /tmp/kubeconfig
+  # Setup socks proxy
+  sshpass -p "$(cat /bm/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion -fNT -D 12345
+  export KUBECONFIG=/tmp/kubeconfig
+  export https_proxy=socks5://localhost:12345
+  export http_proxy=socks5://localhost:12345
+  oc --kubeconfig=/tmp/kubeconfig config set-cluster bm --proxy-url=socks5://localhost:12345
+  cd /tmp
+fi
 oc config view
 oc projects
 python --version
@@ -22,3 +34,8 @@ oc delete ns netperf --wait=true --ignore-not-found=true
 
 # Smoke Test
 ./run.sh
+
+if [ ${BAREMETAL} == "true" ]; then
+  # kill the ssh tunnel so the job completes
+  pkill ssh
+fi
