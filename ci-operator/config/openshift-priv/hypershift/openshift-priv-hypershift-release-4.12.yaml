@@ -1,12 +1,12 @@
 base_images:
-  base:
-    name: 4.12-priv
-    namespace: ocp-private
-    tag: base
   cli:
     name: 4.12-priv
     namespace: ocp-private
     tag: cli
+  ocp_4.12_base:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: base
   ocp_builder_rhel-8-golang-1.18-openshift-4.12:
     name: builder
     namespace: ocp
@@ -20,15 +20,16 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/hypershift
 images:
-- from: base
-  inputs:
+- inputs:
     openshift_release_golang-1.18:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.18
   to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
-  from: base
   inputs:
+    ocp_4.12_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.12:base
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
@@ -79,8 +80,6 @@ tests:
   skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: hypershift
-    env:
-      DISABLE_PKI_RECONCILIATION: "true"
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-metrics
   optional: true
@@ -101,6 +100,7 @@ tests:
       MANAGED_CLUSTER_TYPE: iks
       MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/iks-release.kubeconfig
       TEST_TYPE: release
+      VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
     workflow: hypershift-ibmcloud-e2e-release
 - as: e2e-ibmcloud-roks
   optional: true
@@ -111,6 +111,7 @@ tests:
       MANAGED_CLUSTER_TYPE: openshift
       MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/roks-release.kubeconfig
       TEST_TYPE: release
+      VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
     workflow: hypershift-ibmcloud-e2e-release
 zz_generated_metadata:
   branch: release-4.12

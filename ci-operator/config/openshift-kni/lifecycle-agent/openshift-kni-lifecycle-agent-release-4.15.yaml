@@ -83,6 +83,28 @@ tests:
   container:
     from: test-bin
   run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^.markdown.*)$
+- as: ibu-e2e-flow
+  cluster: build02
+  optional: true
+  skip_if_only_changed: ^docs/|LICENSE|OWNERS|\.md$|^hack$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+    env:
+      OCP_BASE_VERSION: "4.15"
+      OCP_IMAGE_SOURCE: release
+      SEED_IMAGE_TAG_FORMAT: release
+    workflow: openshift-image-based-upgrade-presubmit
+  timeout: 4h0m0s
+- as: security
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: lifecycle-agent
+      SNYK_CODE_ADDITIONAL_ARGS: --policy-path=.snyk
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-kni

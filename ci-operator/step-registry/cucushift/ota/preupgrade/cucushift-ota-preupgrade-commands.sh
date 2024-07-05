@@ -3,27 +3,10 @@
 set -o nounset
 set -o pipefail
 
-# Default oc on OCP 4.16 not support OpenSSL 1.x
-function extract_oc(){
-    echo -e "Extracting oc\n"
-    local minor_version retry=5 binary='oc'
-    tmp_oc="/tmp/client"
-    mkdir -p ${tmp_oc}
-    minor_version=$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" --output=json | jq -r '.metadata.version' | cut -f2 -d.)
-    if (( minor_version > 15 )) && (openssl version | grep -q "OpenSSL 1") ; then
-        binary='oc.rhel8'
-    fi
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=${binary} --to=${tmp_oc} ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE});
-    do
-        echo >&2 "Failed to extract oc binary, retry..."
-        (( retry -= 1 ))
-        if (( retry < 0 )); then return 1; fi
-        sleep 60
-    done
-    mv ${tmp_oc}/oc /tmp -f
-    export PATH="$PATH"
-    which oc
-    oc version --client
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
 }
 
 function get_tp_operator(){
@@ -36,7 +19,7 @@ function get_tp_operator(){
     tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
     ;;
     "4.16")
-    tp_operator=("cluster-api" "platform-operators-aggregated" "olm")
+    tp_operator=("cluster-api" "olm")
     ;;
     *)
     tp_operator=()
@@ -114,7 +97,6 @@ function pre-OCP-66839(){
     fi
 
     echo "Test Start: ${FUNCNAME[0]}"
-    extract_oc || return 1
     # Extract all manifests from live cluster with --included
     manifestsDir="/tmp/pre-include-manifest"
     mkdir "${manifestsDir}"
@@ -125,7 +107,7 @@ function pre-OCP-66839(){
 
     # There should be only enabled cap annotaion in all extracted manifests
     curCap=$(grep -rh "capability.openshift.io/name:" "${manifestsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-    expectedCap=$(echo ${ADDITIONAL_ENABLED_CAPABILITIES} | sort -u|xargs)
+    expectedCap=$(echo ${EXPECTED_CAPABILITIES_IN_MANIFEST} | tr ' ' '\n'|sort -u|xargs)
     if [[ "${curCap}" != "${expectedCap}" ]]; then
         echo "Caps in extracted manifests found: ${curCap}, but expected ${expectedCap}"
         return 1
@@ -155,17 +137,11 @@ function pre-OCP-66839(){
         return 1
     fi
 
-    if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "" ]]; then
-        curCapInCR=$(grep -rh "capability.openshift.io/name:" "${preCredsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-        if [[ "${curCapInCR}" != "${expectedCap}" ]]; then
-            echo "Extracted CRs has cap annotation: ${curCapInCR}, but expected ${expectedCap}"
-            return 1
-        fi
-    else
-        if grep -r "capability.openshift.io/name:" "${preCredsDir}"; then
-            echo "Extracted CRs has cap annotation, but expected nothing"
-            return 1
-        fi
+    curCapInCR=$(grep -rh "capability.openshift.io/name:" "${preCredsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
+    expectedCapCRPre=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_PRE} | tr ' ' '\n'|sort -u|xargs)
+    if [[ "${curCapInCR}" != "${expectedCapCRPre}" ]]; then
+        echo "Extracted CRs has cap annotation: ${curCapInCR}, but expected ${expectedCapCRPre}"
+        return 1
     fi
 
     # Extract all CRs from tobe upgrade release payload with --included
@@ -174,9 +150,9 @@ function pre-OCP-66839(){
         return 1
     fi
     tobecap=$(grep -rh "capability.openshift.io/name:" "${tobeCredsDir}"|awk -F": " '{print $NF}'|sort -u|xargs)
-    expectedCapCR=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST} | sort -u|xargs)
-    if [[ "${tobecap}" != "${expectedCapCR}" ]]; then
-        echo "CRs with cap annotation: ${tobecap}, but expected: ${expectedCapCR}"
+    expectedCapCRPost=$(echo ${EXPECTED_CAPABILITIES_IN_CREDENTIALREQUEST_POST} | tr ' ' '\n'|sort -u|xargs)
+    if [[ "${tobecap}" != "${expectedCapCRPost}" ]]; then
+        echo "CRs with cap annotation: ${tobecap}, but expected: ${expectedCapCRPost}"
         return 1
     fi
     echo "Test Passed: ${FUNCNAME[0]}"
@@ -344,7 +320,6 @@ function pre-OCP-69948(){
     return 0
 }
 
-
 function pre-OCP-56083(){
     echo "Pre Test Start: OCP-56083"
     echo "Unset the upgrade channel"
@@ -400,9 +375,10 @@ if [[ "${ENABLE_OTA_TEST}" == "false" ]]; then
 fi
 
 report_file="${ARTIFACT_DIR}/ota-test-result.txt"
-export PATH=/tmp:${PATH}
-which oc
-oc version --client
+# oc cli is injected from release:target
+run_command "which oc"
+run_command "oc version --client"
+
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi

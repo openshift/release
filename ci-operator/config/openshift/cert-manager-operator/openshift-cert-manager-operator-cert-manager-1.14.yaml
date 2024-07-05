@@ -1,21 +1,13 @@
 base_images:
-  cert-manager-cainjector:
-    name: cert-manager-cainjector
-    namespace: ci
-    tag: v1.14.4
-  cert-manager-controller:
-    name: cert-manager-controller
-    namespace: ci
-    tag: v1.14.4
-  cert-manager-webhook:
-    name: cert-manager-webhook
-    namespace: ci
-    tag: v1.14.4
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.30.0
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+  fips-check-payload:
+    name: check-payload
+    namespace: ci
+    tag: latest
+  ocp-golang-builder:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.21-openshift-4.16
@@ -30,10 +22,17 @@ images:
 - dockerfile_path: images/ci/Dockerfile
   from: ubi
   inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    ocp-golang-builder:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cert-manager-operator
+- dockerfile_path: images/ci/operand.Dockerfile
+  from: ubi
+  inputs:
+    ocp-golang-builder:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+  to: cert-manager
 operator:
   bundles:
   - as: cert-manager-operator-bundle
@@ -41,12 +40,12 @@ operator:
   substitutions:
   - pullspec: openshift.io/cert-manager-operator:latest
     with: pipeline:cert-manager-operator
-  - pullspec: quay.io/jetstack/cert-manager-controller:v1.14.4
-    with: cert-manager-controller
-  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.14.4
-    with: cert-manager-webhook
-  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.14.4
-    with: cert-manager-cainjector
+  - pullspec: quay.io/jetstack/cert-manager-controller:v1.14.5
+    with: pipeline:cert-manager
+  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.14.5
+    with: pipeline:cert-manager
+  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.14.5
+    with: pipeline:cert-manager
 releases:
   initial:
     integration:
@@ -78,12 +77,45 @@ tests:
     make test --warn-undefined-variables
   container:
     from: src
+- as: fips-image-scan
+  steps:
+    test:
+    - as: check-payload
+      commands: |
+        declare -A SCAN_IMAGES
+        SCAN_IMAGES=( ["cert-manager-operator"]="$CI_OPERATOR_IMAGE" ["cert-manager"]="$CI_OPERAND_IMAGE")
+
+        export REGISTRY_AUTH_FILE=/var/secrets/registry-pull-secret/.dockerconfigjson
+        for image_k in "${!SCAN_IMAGES[@]}"
+        do
+          mkdir -p /tmp/oci-images
+          skopeo copy --remove-signatures docker://"${SCAN_IMAGES[$image_k]}" oci:/tmp/oci-images:"$image_k":latest
+          mkdir -p /tmp/unpacked-images/"$image_k"
+          umoci raw unpack --rootless --image /tmp/oci-images:"$image_k":latest /tmp/unpacked-images/"$image_k"
+          mkdir -p "$ARTIFACT_DIR"/"$image_k"
+          /check-payload scan local --path=/tmp/unpacked-images/"$image_k" --output-file=$ARTIFACT_DIR/$image_k/check-payload-report.txt
+        done
+      credentials:
+      - mount_path: /var/secrets/registry-pull-secret
+        name: registry-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: CI_OPERATOR_IMAGE
+        name: cert-manager-operator
+      - env: CI_OPERAND_IMAGE
+        name: cert-manager
+      from: fips-check-payload
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
 - as: e2e-operator
   steps:
     cluster_profile: aws
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
+      FIPS_ENABLED: "true"
       OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: cert-manager-operator
       OO_SECURITY_CONTEXT: restricted
@@ -96,6 +128,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - ref: fips-check-fips-or-die
     - as: test
       cli: latest
       commands: make test-e2e

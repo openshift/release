@@ -7,19 +7,28 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: rhel-8-release-golang-1.22-openshift-4.17
 canonical_go_repository: github.com/jaegertracing/jaeger-operator
 images:
-- context_dir: .
-  dockerfile_path: Dockerfile.asserts
-  to: jaeger-tests-asserts-e2e
 - context_dir: .
   dockerfile_path: tests/Dockerfile
   to: jaeger-tests-runner
 releases:
-  latest:
+  arm64-latest:
     candidate:
       architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.14"
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.14"
+  target:
+    candidate:
+      architecture: multi
       product: ocp
       stream: nightly
       version: "4.14"
@@ -30,16 +39,14 @@ resources:
       memory: 200Mi
 tests:
 - as: jaeger-stage-tests
-  cluster_claim:
-    architecture: arm64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 3h0m0s
-    version: "4.14"
   cron: 0 6 1 10 *
   steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      OCP_ARCH: arm64
       OPERATORS: |
         [
             {"name": "elasticsearch-operator", "source": "dt-catalogsource", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespace": "", "operator_group": "openshift-operators-redhat"},
@@ -48,10 +55,11 @@ tests:
             {"name": "opentelemetry-product", "source": "dt-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"}
         ]
     test:
+    - ref: idp-htpasswd
     - ref: enable-stage-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-jaeger
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

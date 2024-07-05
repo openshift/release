@@ -95,28 +95,6 @@ if [[ -z ${MCE} ]] ; then
   jq -s '.[0] * .[1]' /home/pull-secret /tmp/.dockerconfigjson > /home/pull-secret-mirror
   oc image -a /home/pull-secret-mirror mirror registry.ci.openshift.org/ocp/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt ${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt
   echo "${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt" > /home/capi_provider_kubevirt_image
-  ###
-
-  ### workaround for https://issues.redhat.com/browse/OCPBUGS-32765
-  echo "workaround for https://issues.redhat.com/browse/OCPBUGS-32765"
-  # please remember to keep it consistent when the image reference on
-  # https://github.com/openshift/hypershift/blob/94092458fd77a0ae7f5d5126aa45fc03f9b74323/cmd/install/install.go#L51-L55
-  # gets bumped
-  oc image mirror --keep-manifest-list=true registry.redhat.io/edo/external-dns-rhel8@sha256:638fb6b5fc348f5cf52b9800d3d8e9f5315078fc9b1e57e800cb0a4a50f1b4b9 ${mirror_registry}/${LOCALIMAGES}/external-dns-rhel8
-  oc apply -f - <<EOF2
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
-metadata:
-  name: external-dns-rhel8
-spec:
-  imageDigestMirrors:
-  - mirrors:
-    - ${mirror_registry}/${LOCALIMAGES}/external-dns-rhel8
-    source: registry.redhat.io/edo/external-dns-rhel8
-EOF2
-  sleep 180
-  oc delete pods -n hypershift -l=name=external-dns
-  ###
 fi
 
 

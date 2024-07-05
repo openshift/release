@@ -29,15 +29,15 @@ function createMTOJunit() {
         cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="${testsuite}" failures="0" errors="0" skipped="0" tests="1" time="1">
-  <testcase name="OCP-00001:lwan:Installing Multiarch Tuning Operator and PodPlacement should succeed"/>
+  <testcase name="OCP-00001:lwan:Installing Multiarch Tuning Operator and ClusterPodPlacementConfig should succeed"/>
 </testsuite>
 EOF
     else
         cat >"${ARTIFACT_DIR}/${filename}.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="${testsuite}" failures="1" errors="0" skipped="0" tests="1" time="1">
-  <testcase name="OCP-00001:lwan:Installing Multiarch Tuning Operator and PodPlacement should succeed">
-    <failure message=""Installing Multiarch Tuning Operator or PodPlacement failed</failure>
+  <testcase name="OCP-00001:lwan:Installing Multiarch Tuning Operator and ClusterPodPlacementConfig should succeed">
+    <failure message="">Installing Multiarch Tuning Operator or ClusterPodPlacementConfig failed</failure>
   </testcase>
 </testsuite>
 EOF
@@ -61,7 +61,7 @@ oc wait pods -n ${NAMESPACE} \
 # Deploy Pod Placement operand
 oc create -f - <<EOF
 apiVersion: multiarch.openshift.io/v1alpha1
-kind: PodPlacementConfig
+kind: ClusterPodPlacementConfig
 metadata:
   name: cluster
 spec:

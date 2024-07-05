@@ -29,6 +29,14 @@ chain:
   - as: run-e2e-external
     cli: latest
     commands: |-
+        function cleanup() {
+          for child in $( jobs -p ); do
+            kill "${child}"
+          done
+          wait
+        }
+        trap cleanup EXIT
+
         if [ "${RUN_EXTERNAL_INFRA_TEST}" == "false" ]
         then
           echo "External infra test suite is not supported in this version and skipped."
@@ -53,8 +61,10 @@ chain:
         echo "Permissions of this user on ${EXTERNAL_INFRA_NS} namespace on the external infra cluster:
         oc --kubeconfig "${RESTRICTED_INFRA_KUBECONFIG}" auth can-i --list --namespace ${EXTERNAL_INFRA_NS}
       
+        export EVENTUALLY_VERBOSE="false"
+        
         # run external infra e2e test
-        bin/test-e2e \
+        hack/ci-test-e2e.sh \
                   --test.v \
                   --test.timeout=0 \
                   --test.run='^TestCreateCluster$|TestAutoscaling' \

@@ -3,29 +3,30 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-9-base-openshift-4.16:
+  ocp_builder_rhel-9-base-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-base-openshift-4.16
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    tag: rhel-9-base-openshift-4.17
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.openshift
   inputs:
-    ocp_builder_rhel-9-base-openshift-4.16:
+    ocp_builder_rhel-9-base-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.16
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.17
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: metallb
 promotion:
   to:
-  - name: "4.17"
+  - disabled: true
+    name: "4.17"
     namespace: ocp
 releases:
   initial:
@@ -68,6 +69,13 @@ tests:
       E2E_TESTS_CONFIG: |
         IP_STACK=v4
     workflow: baremetalds-metallb-e2e
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: metallb
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

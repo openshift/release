@@ -47,4 +47,36 @@ function wait_for_operator_to_be_progressing {
   fi
 }
 
+check_annotation_on_nodes() {
+    local annotation=\$1
+    local key=\$2
+    local cidr=\$3
+    local cidr_matches=0
+
+    nodes=\$(oc get nodes -o name)
+
+    while IFS= read -r node; do
+        output=\$(oc describe "\$node" | grep "\$annotation")
+        if [ -n "\$output" ]; then
+            value=\$(echo "\$output" | grep -oP '(?<="'\$key'":")[^"]+')
+
+            # Check if the value matches the CIDR subnet
+            if [[ ! \$value =~ ^\$cidr ]]; then
+                echo "Node \$node: \$annotation:\$key \$value does not match \$cidr"
+                oc describe "\$node"
+                cidr_matches=1
+            fi
+        else
+            echo "Node \$node: Annotation \$annotation not found"
+            oc describe "\$node"
+            cidr_matches=1
+        fi
+    done < <(echo "\$nodes")
+
+    if [ \$cidr_matches -eq 1 ]; then
+        echo "At least one node did not have the proper annotation for \$annotation:\$key. exiting"
+        exit 1
+    fi
+}
+
 EOF

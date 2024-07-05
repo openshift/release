@@ -88,6 +88,8 @@ required_permissions="""
 \"Microsoft.Authorization/roleAssignments/read\",
 \"Microsoft.Authorization/roleAssignments/write\",
 \"Microsoft.Compute/availabilitySets/read\",
+\"Microsoft.Compute/availabilitySets/write\",
+\"Microsoft.Compute/availabilitySets/delete\",
 \"Microsoft.Compute/disks/beginGetAccess/action\",
 \"Microsoft.Compute/disks/delete\",
 \"Microsoft.Compute/disks/read\",
@@ -191,12 +193,13 @@ required_permissions="""
 \"Microsoft.Storage/storageAccounts/listKeys/action\"
 """
 
-if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "IPI" ]]; then
-    required_permissions="""
-\"Microsoft.Compute/availabilitySets/write\",
+# optional permission to gather bootstrap bundle log
+required_permissions="""
+\"Microsoft.Compute/virtualMachines/retrieveBootDiagnosticsData/action\",
 ${required_permissions}
 """
-elif [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "UPI" ]]; then
+
+if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "UPI" ]]; then
     required_permissions="""
 \"Microsoft.Compute/images/read\",
 \"Microsoft.Compute/images/write\",
@@ -209,9 +212,6 @@ elif [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "UPI" ]]; then
 \"Microsoft.Resources/deployments/operationstatuses/read\",
 ${required_permissions}
 """
-else
-    echo "Unsupported cluster type ${CLUSTER_TYPE_MIN_PERMISSOIN}!"
-    exit 1
 fi
 
 if [[ "${ENABLE_MIN_PERMISSION_FOR_MARKETPLACE}" == "true" ]]; then

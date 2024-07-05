@@ -46,6 +46,22 @@ skopeo login registry.redhat.io -u "${REGISTRY_REDHAT_IO_USER}" -p "${REGISTRY_R
 set -x
 
 echo "3: skopeo copy docker://${MCE_INDEX_IMAGE} oci:///home/mce-local-catalog --remove-signatures"
+
+#### workaround for https://issues.redhat.com/browse/OCPBUGS-31536 when executed on RHEL8 hosts
+# TODO: remove this only once https://issues.redhat.com/browse/OCPBUGS-31536 is properly fixed
+# replace the opm tool in the index image with the latest upstream one which is statically linked
+cat <<END |tee "/home/Dockerfile.mce_index_image_static_opm"
+FROM ${MCE_INDEX_IMAGE}
+USER root
+RUN curl -L "https://github.com/operator-framework/operator-registry/releases/latest/download/linux-$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')-opm" -o /tmp/opm && chmod +x /tmp/opm && mv /tmp/opm /usr/bin/opm && opm version
+USER 1001
+END
+
+MCE_INDEX_IMAGE="${mirror_registry}/acm-d/iib:mce"
+podman build -f /home/Dockerfile.mce_index_image_static_opm -t ${MCE_INDEX_IMAGE}
+podman push ${MCE_INDEX_IMAGE}
+####
+
 skopeo copy "docker://${MCE_INDEX_IMAGE}" "oci:///home/mce-local-catalog" --remove-signatures
 
 echo "4: get oc-mirror from stable clients"
@@ -126,6 +142,8 @@ mirror:
 END
 
 pushd /home
+# cleanup leftovers from previous executions
+rm -rf oc-mirror-workspace
 /home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
 /home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
 /home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
@@ -274,8 +292,12 @@ oc wait --timeout=5m --for=condition=ManagedClusterImportSucceeded -n local-clus
 oc wait --timeout=5m --for=condition=ManagedClusterConditionAvailable -n local-cluster ManagedCluster/local-cluster
 oc wait --timeout=5m --for=condition=ManagedClusterJoined -n local-cluster ManagedCluster/local-cluster
 echo "MCE local-cluster is ready!"
+echo "Disable HIVE component in MCE"
+oc patch mce multiclusterengine-sample --type=merge -p '{"spec":{"overrides":{"components":[{"name":"hive","enabled": false}]}}}'
 
 set -x
 EOF
 
-oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]' | head -n 1 | cut -d '/' -f 1 > "${SHARED_DIR}/mirror_registry_url"
+if [ ! -f "${SHARED_DIR}/mirror_registry_url" ] ; then
+  oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]' | head -n 1 | cut -d '/' -f 1 > "${SHARED_DIR}/mirror_registry_url"
+fi

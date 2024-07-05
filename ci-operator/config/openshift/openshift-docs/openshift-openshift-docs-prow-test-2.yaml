@@ -12,7 +12,8 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
-- as: deploy-preview
+- always_run: true
+  as: deploy-preview
   steps:
     env:
       DISTROS: openshift-enterprise openshift-rosa openshift-dedicated microshift
@@ -20,18 +21,21 @@ tests:
     test:
     - ref: openshift-docs-build-docs
     - ref: openshift-docs-preview-comment-pages
-- as: validate-asciidoc
+    - ref: openshift-docs-jira-links
+- always_run: false
+  as: validate-asciidoc
   steps:
     test:
     - ref: openshift-docs-asciidoctor
     - ref: openshift-docs-lint-topicmaps
     - ref: openshift-docs-vale-review
-- as: validate-portal
+- always_run: false
+  as: validate-portal
   steps:
     env:
       BUILD: build_for_portal.py
       DISTROS: openshift-enterprise openshift-rosa openshift-dedicated microshift
-      VERSION: "4.15"
+      VERSION: "4.16"
     test:
     - ref: openshift-docs-portal
 zz_generated_metadata:

@@ -12,12 +12,10 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey")
 
-PULL_SECRET_FILE="/var/run/pull-secret/.dockerconfigjson"
-PULL_SECRET=$(cat ${PULL_SECRET_FILE})
-BACKUP_SECRET_FILE="/var/run/ibu-backup-secret/.backup-secret"
-BACKUP_SECRET=$(cat ${BACKUP_SECRET_FILE})
-SEED_VM_NAME="seed"
 remote_workdir=$(cat ${SHARED_DIR}/remote_workdir)
+PULL_SECRET_FILE=$(cat ${SHARED_DIR}/pull_secret_file)
+BACKUP_SECRET_FILE=$(cat ${SHARED_DIR}/backup_secret_file)
+SEED_VM_NAME="seed"
 instance_ip=$(cat ${SHARED_DIR}/public_address)
 host=$(cat ${SHARED_DIR}/ssh_user)
 ssh_host_ip="$host@$instance_ip"
@@ -45,14 +43,14 @@ esac
 SEED_VERSION="$(echo ${seed_base_info} | cut -d " " -f 1)"
 RELEASE_IMAGE="$(echo ${seed_base_info} | cut -d " " -f 2)"
 
-# Save off the seed version and the recipient version for upgrades
+# Save off the seed version and the target version for upgrades
 echo "${SEED_VERSION}" > "${SHARED_DIR}/seed_version"
 
-recipient_version="$(echo ${release_base_info} | cut -d " " -f 1)"
-recipient_image="$(echo ${release_base_info} | cut -d " " -f 2)"
+target_version="$(echo ${release_base_info} | cut -d " " -f 1)"
+target_image="$(echo ${release_base_info} | cut -d " " -f 2)"
 
-echo "${recipient_version}" > "${SHARED_DIR}/recipient_version"
-echo "${recipient_image}" > "${SHARED_DIR}/recipient_image"
+echo "${target_version}" > "${SHARED_DIR}/target_version"
+echo "${target_image}" > "${SHARED_DIR}/target_image"
 
 # Calculate the tag for the seed
 SEED_IMAGE_TAG="unknown"
@@ -78,6 +76,11 @@ case $SEED_IMAGE_TAG_FORMAT in
     ;;
 esac
 
+# Add a prefix if necessary
+if [[ ! -z "${SEED_IMAGE_TAG_PREFIX}" ]]; then
+  SEED_IMAGE_TAG="${SEED_IMAGE_TAG_PREFIX}-${SEED_IMAGE_TAG}"
+fi
+
 echo "${SEED_IMAGE_TAG}" > "${SHARED_DIR}/seed_tag"
 echo "${SEED_VM_NAME}" > "${SHARED_DIR}/seed_vm_name"
 
@@ -86,8 +89,8 @@ cat <<EOF > ${SHARED_DIR}/create_seed.sh
 #!/bin/bash
 set -euo pipefail
 
-export PULL_SECRET='${PULL_SECRET}'
-export BACKUP_SECRET='${BACKUP_SECRET}'
+export PULL_SECRET=\$(<${PULL_SECRET_FILE})
+export BACKUP_SECRET=\$(<${BACKUP_SECRET_FILE})
 export SEED_VM_NAME="${SEED_VM_NAME}"
 export SEED_VERSION="${SEED_VERSION}"
 export LCA_IMAGE="${LCA_PULL_REF}"

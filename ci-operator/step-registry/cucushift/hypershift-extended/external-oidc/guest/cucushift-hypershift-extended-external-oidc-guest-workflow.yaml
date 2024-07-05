@@ -1,0 +1,19 @@
+workflow:
+  as: cucushift-hypershift-extended-external-oidc-guest
+  steps:
+    pre:
+    - chain: cucushift-hypershift-extended-external-oidc-provision
+    - ref: cucushift-hypershift-extended-enable-guest
+    - ref: openshift-extended-web-tests-ext-oidc-cli-login
+    - ref: cucushift-hypershift-extended-external-oidc-grant-user-role
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    post:
+    - ref: cucushift-hypershift-extended-disable-guest
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-deprovision
+  documentation: |-
+    This workflow creates and later destroy a public Hypershift hosted cluster on AWS using external OIDC. 
+    oc commands issued during the tests will be executed as an external user and will target the hosted cluster.
+    Note that it is impossible to run Cucushift test cases against such a hosted cluster 
+    as it can only have one (external) user.

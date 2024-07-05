@@ -31,6 +31,32 @@ cat <<EOF > ${SHARED_DIR}/install.sh
 #!/bin/bash
 set -euo pipefail
 
+function dnf_install_retry {
+  packages=(\$@)
+  echo "Installing packages with retry"
+
+  for _ in \$(seq 3) ; do
+    sudo dnf clean -y all # clean the cache
+
+    # shellcheck disable=SC2086
+    sudo dnf install -y \${packages[*]} && return 0
+     
+    rc=\$? # save the return code
+
+    if [ \$rc -ne 0 ]
+    then
+      echo "Failed to run dnf install, retrying"
+    fi
+  done
+
+  if [ \$rc -ne 0 ]
+  then
+    echo "Failed to run dnf install after 3 attempts"
+  fi
+
+  return "\${rc}"
+}
+
 sudo subscription-manager config --rhsm.manage_repos=1 --rhsmcertd.disable=redhat-access-insights
 
 if ! sudo subscription-manager status >&/dev/null; then
@@ -47,12 +73,18 @@ sudo subscription-manager repos \
 cd ${remote_workdir}
 
 sudo dnf -y copr enable nmstate/nmstate-git
-sudo dnf -y install nmstate virt-install virt-manager libvirt-nss openshift-clients cockpit-machines golang jq sos podman
+dnf_install_retry nmstate virt-install virt-manager libvirt-nss openshift-clients cockpit-machines golang jq sos podman
 
 sudo systemctl start libvirtd
 sudo systemctl enable libvirtd
 
 sudo usermod -a -G libvirt ec2-user
+
+# Check for git
+if ! command -v git &> /dev/null
+then
+    dnf_install_retry git
+fi
 
 git clone https://github.com/rh-ecosystem-edge/ib-orchestrate-vm.git
 cd ib-orchestrate-vm && git checkout ${IB_ORCHESTRATE_VM_REF}
@@ -173,3 +205,23 @@ EOF
 scp "${SSHOPTS[@]}" ${SHARED_DIR}/nsswitch.conf $ssh_host_ip:${remote_workdir}/nsswitch.conf
 
 ssh "${SSHOPTS[@]}" $ssh_host_ip "sudo mv ${remote_workdir}/nsswitch.conf /etc/nsswitch.conf"
+
+# Upload the pull secrets
+LCA_PULL_SECRET_FILE="/var/run/pull-secret/.dockerconfigjson"
+CLUSTER_PULL_SECRET_FILE="${CLUSTER_PROFILE_DIR}/pull-secret"
+PULL_SECRET=$(cat ${CLUSTER_PULL_SECRET_FILE} ${LCA_PULL_SECRET_FILE} | jq -cs '.[0] * .[1]') # Merge the pull secrets to get everything we need
+BACKUP_SECRET_FILE="/var/run/ibu-backup-secret/.backup-secret"
+BACKUP_SECRET=$(jq -c . ${BACKUP_SECRET_FILE})
+
+# Save the pull secrets
+echo -n "${PULL_SECRET}" > ${SHARED_DIR}/.pull_secret.json
+echo -n "${BACKUP_SECRET}" > ${SHARED_DIR}/.backup_secret.json
+
+echo "Transferring pull secrets..."
+scp "${SSHOPTS[@]}" ${SHARED_DIR}/.pull_secret.json $ssh_host_ip:$remote_workdir
+scp "${SSHOPTS[@]}" ${SHARED_DIR}/.backup_secret.json $ssh_host_ip:$remote_workdir
+
+rm ${SHARED_DIR}/.pull_secret.json ${SHARED_DIR}/.backup_secret.json
+
+echo "${remote_workdir}/.pull_secret.json" >> "${SHARED_DIR}/pull_secret_file"
+echo "${remote_workdir}/.backup_secret.json" >> "${SHARED_DIR}/backup_secret_file"

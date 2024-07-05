@@ -383,19 +383,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-serial
-- as: e2e-openstack-ovn-techpreview
-  interval: 168h
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      FEATURE_SET: TechPreviewNoUpgrade
-      TEST_SUITE: experimental/reliability/minimal
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-openstack-ipi
 - as: e2e-nutanix-ovn-techpreview
   cluster: build01
   interval: 168h
@@ -584,13 +571,27 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-sdn-crun
 - as: e2e-vsphere-ovn-upgrade
-  interval: 168h
+  interval: 24h
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere-elastic
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-vsphere
+- as: e2e-external-aws
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-external-aws
+  timeout: 6h0m0s
+- as: e2e-external-aws-ccm
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
+    workflow: openshift-e2e-external-aws
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

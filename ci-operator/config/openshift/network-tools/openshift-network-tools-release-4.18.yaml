@@ -1,0 +1,58 @@
+base_images:
+  ocp_4.17_ovn-kubernetes:
+    name: "4.18"
+    namespace: ocp
+    tag: ovn-kubernetes
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+  tools:
+    name: "4.18"
+    namespace: ocp
+    tag: tools
+binary_build_commands: '"make build --warn-undefined-variables"'
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: tools
+  inputs:
+    ocp_4.17_ovn-kubernetes:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:ovn-kubernetes
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: network-tools
+promotion:
+  to:
+  - name: "4.18"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: '"make build GO_BUILD_FLAGS:=''-race'' --warn-undefined-variables"'
+tests:
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.18
+  org: openshift
+  repo: network-tools

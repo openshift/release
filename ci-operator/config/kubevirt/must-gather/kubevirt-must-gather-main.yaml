@@ -106,6 +106,20 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - as: test-all-images
+      cli: latest
+      commands: |
+        oc annotate --overwrite -n kubevirt-hyperconverged $(oc get csv -n kubevirt-hyperconverged -l operators.coreos.com/community-kubevirt-hyperconverged.kubevirt-hyperconverged -o name) operators.openshift.io/must-gather-image=${KMG_IMAGE}
+        oc adm must-gather --all-images --dest-dir=${ARTIFACT_DIR}/must-gather-output
+        mkdir -p ${ARTIFACT_DIR}/junit
+        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} /go/bin/must-gather.test --ginkgo.label-filter=level:product --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v --ginkgo.skip "should validate inspect and node-logs parameters usage on all the relevant logged commands" )
+      dependencies:
+      - env: KMG_IMAGE
+        name: kubevirt-must-gather
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
     workflow: ipi-azure
 - as: kubevirt-must-gather-e2e-gcp
   steps:
@@ -167,6 +181,20 @@ tests:
         oc adm must-gather --since-time=$(date -d '-10 minutes' +%Y-%m-%dT%T.%9N%:z ) --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- /usr/bin/gather --vms_details --images
         mkdir -p ${ARTIFACT_DIR}/junit
         (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} /go/bin/must-gather.test --ginkgo.label-filter=level:workloads --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
+      dependencies:
+      - env: KMG_IMAGE
+        name: kubevirt-must-gather
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-all-images
+      cli: latest
+      commands: |
+        oc annotate --overwrite -n kubevirt-hyperconverged $(oc get csv -n kubevirt-hyperconverged -l operators.coreos.com/community-kubevirt-hyperconverged.kubevirt-hyperconverged -o name) operators.openshift.io/must-gather-image=${KMG_IMAGE}
+        oc adm must-gather --all-images --dest-dir=${ARTIFACT_DIR}/must-gather-output
+        mkdir -p ${ARTIFACT_DIR}/junit
+        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} /go/bin/must-gather.test --ginkgo.label-filter=level:product --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v --ginkgo.skip "should validate inspect and node-logs parameters usage on all the relevant logged commands" )
       dependencies:
       - env: KMG_IMAGE
         name: kubevirt-must-gather

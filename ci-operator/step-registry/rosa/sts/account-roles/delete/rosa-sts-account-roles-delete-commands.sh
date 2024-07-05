@@ -41,7 +41,7 @@ else
 fi
 
 # If the account roles exist, do deletion.
-ACCOUNT_ROLES_PREFIX_FILE="${SHARED_DIR}/account-roles-prefix"
+ACCOUNT_ROLES_PREFIX_FILE="${SHARED_DIR}/cluster-prefix"
 if [[ -e "${ACCOUNT_ROLES_PREFIX_FILE}" ]]; then
   ACCOUNT_ROLES_PREFIX=$(cat "${ACCOUNT_ROLES_PREFIX_FILE}")
 

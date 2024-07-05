@@ -1,12 +1,12 @@
 base_images:
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+  ocp_builder_rhel-8-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
+    tag: rhel-8-golang-1.22-openshift-4.17
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.22-openshift-4.17
   os:
     name: builder
     namespace: ocp
@@ -21,29 +21,26 @@ images:
 - dockerfile_path: ci/dockerfiles/builder.Dockerfile
   from: root
   to: osdk-builder
-- dockerfile_path: release/ansible/Dockerfile.rhel8
+- dockerfile_path: release/ansible/Dockerfile.ocp
   from: os
   inputs:
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
   to: ansible-operator
 - dockerfile_path: release/helm/Dockerfile
   from: os-minimal
   inputs:
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-8-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.22-openshift-4.17
   to: helm-operator
 - dockerfile_path: release/sdk/Dockerfile
   from: os-minimal
   inputs:
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: operator-sdk
 - dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
   from: ansible-operator
@@ -65,7 +62,8 @@ images:
   to: osdk-helm-e2e
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - osdk-builder
     - osdk-ansible-e2e
     - osdk-ansible-full-e2e

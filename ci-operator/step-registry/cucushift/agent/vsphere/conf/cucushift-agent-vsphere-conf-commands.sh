@@ -26,13 +26,20 @@ fi
 }
 
 export HOME=/tmp
-SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+    SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+fi
 
 declare vlanid
 declare primaryrouterhostname
 declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 declare vsphere_url
 declare GOVC_USERNAME

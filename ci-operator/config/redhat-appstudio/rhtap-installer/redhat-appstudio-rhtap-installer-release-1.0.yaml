@@ -1,3 +1,8 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
 build_root:
   project_image:
     dockerfile_path: ci/Dockerfile
@@ -5,11 +10,16 @@ images:
 - dockerfile_path: ci/Dockerfile
   from: src
   to: rhtap-installer
-promotion:
-  to:
-  - disabled: true
-    name: redhat-appstudio
-    namespace: ci
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-oc
 releases:
   latest:
     release:
@@ -24,29 +34,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: rhtap-installer-shellcheck
-  commands: |
-    #!/usr/bin/env bash
-    set -o errexit
-    set -o nounset
-    set -o pipefail
-    find . -type f -name "*.sh" -print0 | xargs -r -0 shellcheck
-  container:
-    from: rhtap-installer
-- as: rhtap-installer-yamllint
-  commands: |
-    #!/usr/bin/env bash
-    set -o errexit
-    set -o nounset
-    set -o pipefail
-
-    CONFIG_FILE="ci/config/yamllint.yaml"
-
-    yamllint -c "$CONFIG_FILE" .
-  container:
-    from: rhtap-installer
-  optional: true
-- as: rhtap-installer-e2e
+- as: pre-gitops-rhtap-installer-e2e-nightly
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -56,31 +44,13 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.14"
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^tests/release/pipelines/|^tests/load-tests/|^cmd/loadTests.go$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  cron: 0 0 30 6 *
   steps:
     env:
-      RHTAP_ENABLE_TPA: "false"
+      RHTAP_ENABLE_TPA: "true"
     test:
     - ref: redhat-appstudio-rhtap-installer-e2e-test
-    workflow: redhat-appstudio-rhtap-installer
-- as: rhtap-installer-e2e-postsubmit
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: rhtap
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.14"
-  postsubmit: true
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^tests/release/pipelines/|^tests/load-tests/|^cmd/loadTests.go$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-  steps:
-    env:
-      RHTAP_ENABLE_TPA: "false"
-    test:
-    - ref: redhat-appstudio-rhtap-installer-e2e-test
-    workflow: redhat-appstudio-rhtap-installer
+    workflow: redhat-appstudio-rhtap-installer-gitops-prerelease
 zz_generated_metadata:
   branch: release-1.0
   org: redhat-appstudio

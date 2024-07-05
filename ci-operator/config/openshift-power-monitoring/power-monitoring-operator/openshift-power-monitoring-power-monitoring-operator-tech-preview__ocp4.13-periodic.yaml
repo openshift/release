@@ -45,11 +45,17 @@ resources:
       memory: 400Mi
 tests:
 - as: power-monitoring-operator-e2e-aws
-  cron: 0 6 * * 1,3,5
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs-powermon
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  cron: 0 2 * * 1,3,5
   steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
     test:
     - as: install
       cli: latest
@@ -64,9 +70,9 @@ tests:
           cpu: 200m
           memory: 400Mi
     - ref: openshift-power-monitoring-tests-power-monitoring-operator
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: generic-claim
 - as: power-monitoring-operator-e2e-gcp
-  cron: 0 6 * * 1,3,5
+  cron: 0 2 * * 1,3,5
   steps:
     cluster_profile: gcp-qe
     test:

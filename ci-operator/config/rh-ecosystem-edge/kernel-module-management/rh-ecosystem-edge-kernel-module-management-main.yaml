@@ -2,13 +2,13 @@ base_images:
   go-builder:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.14
+    tag: rhel-9-golang-1.21-openshift-4.16
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.53.1
+    tag: v1.54.2
   operator-sdk:
-    name: "4.14"
+    name: "4.16"
     namespace: origin
     tag: operator-sdk
 binary_build_commands: make manager
@@ -16,7 +16,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.20
+    tag: golang-1.21
 images:
 - build_args:
   - name: TARGET
@@ -32,7 +32,7 @@ images:
   inputs:
     ubi9-minimal-entitled:
       as:
-      - registry.access.redhat.com/ubi9/ubi-minimal:9.3
+      - registry.access.redhat.com/ubi9/ubi-minimal:9.4
   to: kernel-module-management-signimage
 - dockerfile_path: Dockerfile.must-gather
   to: kernel-module-management-must-gather
@@ -41,9 +41,9 @@ images:
 - dockerfile_path: Dockerfile.worker
   to: kernel-module-management-worker
 - dockerfile_literal: |
-    FROM ubi9-minimal
+    FROM ubi9-minimal:9.4
     RUN rm -rf /etc/yum.repos.d/*
-    RUN curl http://base-4-14-rhel9.ocp.svc > /etc/yum.repos.d/base-4-14-rhel9.repo
+    RUN curl http://base-4-16-rhel94.ocp.svc > /etc/yum.repos.d/base-4-16-rhel94.repo
   to: ubi9-minimal-entitled
 - dockerfile_literal: |
     FROM src
@@ -94,7 +94,7 @@ releases:
   latest:
     release:
       channel: fast
-      version: "4.14"
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -174,7 +174,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.15"
   steps:
     test:
     - as: install
@@ -209,7 +209,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.13"
+    version: "4.15"
   steps:
     test:
     - as: run-test
@@ -242,7 +242,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.15"
   optional: true
   steps:
     test:
