@@ -4,15 +4,27 @@ import os
 import sys
 import json
 
-cluster_profile_name = os.environ["CLUSTER_PROFILE_NAME"]
-leased_resource = os.environ["LEASED_RESOURCE"]
-shared_dir = os.environ["SHARED_DIR"]
+try:
+    from pylint.lint import Run
+    file_path = os.path.realpath(__file__)
+    Run([file_path], exit=False)
+except ImportError:
+    print("linter not available, run outside of CI")
+
+
+cluster_profile_name = os.environ.get("CLUSTER_PROFILE_NAME")
+leased_resource = os.environ.get("LEASED_RESOURCE")
+shared_dir = os.environ.get("SHARED_DIR")
+
+if cluster_profile_name is None:
+    print("CLUSTER_PROFILE_NAME is undefined")
+    sys.exit(1)
 
 if cluster_profile_name != "vsphere-elastic":
     print("using legacy sibling of this step")
     sys.exit(0)
 
-if leased_resource == "":
+if leased_resource is None:
     print("failed to acquire lease")
     sys.exit(1)
 
