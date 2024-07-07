@@ -6,6 +6,7 @@ workflow:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
     post:
+    - ref: wait
     - chain: hypershift-mce-agent-destroy
     - chain: baremetalds-ipi-post
     test:
@@ -17,11 +18,14 @@ workflow:
     - ref: enable-qe-catalogsource-disconnected
     - ref: hypershift-mce-install
     - chain: hypershift-mce-agent-lvm
-    - chain: hypershift-mce-agent-disconnected-create
+    - ref: hypershift-mce-agent-create-agentserviceconfig
+    - ref: hypershift-agent-create-config-dns
+    - ref: hypershift-mce-agent-disconnected-create-hostedcluster
+    - ref: hypershift-agent-create-proxy
+    - ref: hypershift-agent-create-add-worker-metal3
     env:
       DISCONNECTED: "true"
       LVM_OPERATOR_SUB_SOURCE: qe-app-registry
-      METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
       MCE_QE_CATALOG: "true"
       IP_STACK: v6
       PACKET_OS: rocky_9
