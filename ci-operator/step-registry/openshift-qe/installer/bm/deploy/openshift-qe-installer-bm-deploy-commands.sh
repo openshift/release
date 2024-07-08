@@ -51,13 +51,11 @@ envsubst < /tmp/all.yml > /tmp/all-updated.yml
 sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /tmp/all-updated.yml root@${bastion}:~/jetlag/ansible/vars/all.yml
 sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /secret/inventory root@${bastion}:~/jetlag/ansible/inventory/telco.inv
 
-run_in_bastion='sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion}'
-
 # Clean up previous attempts
-${run_in_bastion[@]} ./clean-resources.sh
+sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} ./clean-resources.sh
 
 # Setup Bastion
-${run_in_bastion[@]} "
+sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
    cd jetlag
    if [[ -n $JETLAG_PR ]]; then
      git fetch origin pull/$JETLAG_PR/head:dev
@@ -69,7 +67,7 @@ ${run_in_bastion[@]} "
    ansible-playbook -i ansible/inventory/telco.inv ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
 
 # Attempt Deployment
-${run_in_bastion[@]} "
+sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
    cd jetlag
    source bootstrap.sh
    ansible-playbook -i ansible/inventory/telco.inv ansible/bm-deploy.yml -v | tee /tmp/ansible-setup-bastion-$(date +%s)"
