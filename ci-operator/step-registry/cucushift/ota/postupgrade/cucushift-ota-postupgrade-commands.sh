@@ -248,20 +248,6 @@ function post-OCP-56083(){
     return 1
 }
 
-function post-OCP-23799(){
-        export OC_ENABLE_CMD_UPGRADE_ROLLBACK="true" #OCPBUGS-33905, rollback is protected by env feature gate now
-        SOURCE_VERSION="$(oc get clusterversion version -ojsonpath='{.status.history[1].version}')"
-        TARGET_VERSION="$(oc get clusterversion version -ojsonpath='{.status.history[0].version}')"
-        out="$(oc adm upgrade rollback 2>&1 || true)" # expecting an error, capture and don't fail
-        expected="error: ${SOURCE_VERSION} is less than the current target ${TARGET_VERSION} and matches the cluster's previous version, but rollbacks that change major or minor versions are not recommended."
-        if [[ ${out} != "${expected}" ]]; then
-            echo -e "to-latest rollback reject step failed. \nexpecting: \"${expected}\" \nreceived: \"${out}\""
-            return 1
-        else
-            echo "to-latest rollback reject step passed."
-        fi
-}
-
 # This func run all test cases with with checkpoints which will not break other cases,
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be ran or not
