@@ -17,19 +17,26 @@ fi
 
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
-mkdir -p "${SHARED_DIR}/securitygroups"
+CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
 
-case ${ADDITIONAL_SECURITY_GROUP_RULES} in
-
-	netperf)
-		sg_id="$(openstack security group create netperf --description "Security group for running network-perf test on the Worker Nodes" -f value -c id)"
-		openstack security group rule create "$sg_id" --protocol tcp --dst-port 12865:12865 --remote-ip 0.0.0.0/0
-		printf '%s' "$sg_id" > "${SHARED_DIR}/securitygroups/netperf"
-    ;;
-
-	*)
-    	echo "None security group was set"
-		exit 1
-    ;;
-
-esac
+if [[ -n "$ADDITIONAL_SECURITY_GROUP_RULES" ]]; then
+	mkdir -p "${SHARED_DIR}/securitygroups"
+	sg_name='additional_workers'
+	sg_id="$(openstack security group create "$sg_name" --description "${CLUSTER_NAME}: additional security group for the compute nodes" -f value -c id)"
+	printf '%s' "$sg_id" > "${SHARED_DIR}/securitygroups/${sg_name}"
+	(
+		IFS=','
+		for service in $ADDITIONAL_SECURITY_GROUP_RULES; do
+			case $service in
+				netperf)
+					echo "Adding ${service} rule to security group ${sg_id}" 
+					openstack security group rule create "$sg_id" --protocol tcp --dst-port 12865:12865 --remote-ip 0.0.0.0/0
+					;;
+				*)
+					echo "No known security group rule matches service '$service'. Exiting."
+					exit 1
+					;;
+			esac
+		done
+	)
+fi
