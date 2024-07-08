@@ -85,7 +85,7 @@ echo "${sc_cluster_id}" > "${SHARED_DIR}/osd-fm-sc-id"
 
 # Check if Service Cluster is ready
 echo "Waiting for Service Cluster ready..."
-wait_for_cluster 30
+wait_for_cluster 29
 
 # patch SC to maintenance status 
 echo '{"status": "maintenance"}' | ocm patch /api/osd_fleet_mgmt/v1/service_clusters/"$sc_cluster_id"
