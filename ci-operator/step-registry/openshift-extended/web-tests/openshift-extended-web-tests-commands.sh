@@ -4,6 +4,13 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+## set yarn proxy
+#env | grep -i proxy
+#yarn config set proxy $HTTP_PROXY
+#yarn config set https-proxy $HTTP_PROXY
+#yarn config set 'strict_ssl' false
+#yarn config list
+
 pwd && ls -ltr
 cd frontend || exit 0
 pwd && ls -ltr
