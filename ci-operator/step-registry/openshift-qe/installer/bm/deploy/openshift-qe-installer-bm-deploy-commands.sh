@@ -58,6 +58,7 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
    cd jetlag
    if [[ -n $JETLAG_PR ]]; then
+     echo "New PR to test"
      git fetch origin pull/$JETLAG_PR/head:dev
      git checkout dev
    else
