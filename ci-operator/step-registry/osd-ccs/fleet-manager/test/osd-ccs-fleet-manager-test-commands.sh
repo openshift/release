@@ -2045,6 +2045,56 @@ function check_cluster_size() {
 
 ##################################################################
 
+###### [OCM-9168] Update environments to ACM 2.8.7 (OCM-9361) ######
+
+function test_acm_addon_version () {
+  echo "[OCM-9361] Update environments to ACM 2.8.7"
+  TEST_PASSED=true
+  sc_cluster_id=$(cat "${SHARED_DIR}"/osd-fm-sc-id)
+
+  ADDON_HREF="/api/addons_mgmt/v1/clusters/$sc_cluster_id/addons/advanced-cluster-management"
+
+  ACM_ADDON_VERSION=""
+
+  echo "Attempting to obtain acm addon version for SC with ocm mgmt ID: '$sc_cluster_id'"
+
+  ACM_ADDON_VERSION=$(ocm get "$ADDON_HREF" | jq -r .addon_version.id) || true
+
+  if [ "$ACM_ADDON_VERSION" == "" ]; then
+    echo "[ERROR] - unable to get ACM addon version"
+    TEST_PASSED=false
+  else
+    echo "found acm addon version: '$ACM_ADDON_VERSION'"
+    echo "Splitting the acm addon version into components"
+    IFS='.' read -ra VERSION_COMP <<< "$ACM_ADDON_VERSION"
+    ACM_VERSION_COMP_LENGTH=${#VERSION_COMP[@]}
+    if [[ $ACM_VERSION_COMP_LENGTH -lt 3 ]]; then
+      echo "[ERROR] - unexpected number of version components found (less than 3)"
+      TEST_PASSED=false
+    else
+      echo "Confirming that the ACM addon version is at least 3.8.7"
+      MAJOR=${VERSION_COMP[0]}
+      MINOR=${VERSION_COMP[1]}
+      PATCH=${VERSION_COMP[2]}
+      IFS='-' read -ra PATCH_SPLIT <<< "$PATCH"
+      if [[ $MAJOR -eq 3 ]] && [[ $MINOR -ge 8 ]]; then
+        if [[ $MINOR -eq 8 ]] && [[ ${PATCH_SPLIT[0]} -lt 7 ]]; then
+          echo "[ERROR] - unexpected acm addon patch version found"
+          TEST_PASSED=false
+        fi
+      else
+        echo "[ERROR] - unexpected acm addon major and minor version found"
+        TEST_PASSED=false
+      fi
+    fi
+  fi
+  update_results "OCM-9361" $TEST_PASSED
+}
+
+###### [OCM-9168] end of Update environments to ACM 2.8.7 (OCM-9361) ######
+
+##################################################################
+
 # Test all cases and print results
 
 test_monitoring_disabled
@@ -2096,6 +2146,8 @@ test_shard_topology
 check_managedcluster_connection
 
 check_cluster_size
+
+test_acm_addon_version
 
 test_delete_sc
 
