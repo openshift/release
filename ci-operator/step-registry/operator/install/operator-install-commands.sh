@@ -6,12 +6,16 @@ set -o pipefail
 set -o verbose
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
-
+operator_configs=$(env | grep -E '^OPERATOR[0-9]+_CONFIG' | sort --version-sort)
 RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py --action install --kubeconfig ${KUBECONFIG} "
-
 OPERATORS_CMD=""
-for operator_value in $(env | grep -E '^OPERATOR[0-9]+_CONFIG' | sort  --version-sort); do
-    operator_value=$(echo "$operator_value" | sed -E  's/^OPERATOR[0-9]+_CONFIG=//')
+
+extract_operator_config() {
+    echo "$1" | sed -E 's/^OPERATOR[0-9]+_CONFIG=//'
+}
+
+for operator_value in $operator_configs; do
+    operator_value=$(extract_operator_config "$operator_value")
     if  [ "${operator_value}" ]; then
       OPERATORS_CMD+=" --operator ${operator_value} "
     fi
@@ -47,3 +51,12 @@ if [ "${INSTALL_FROM_IIB}" = "true" ]; then
 fi
 
 ${RUN_COMMAND}
+
+for operator_value in $operator_configs; do
+    operator_value=$(extract_operator_config "$operator_value")
+    if [ "${operator_config}" ]; then
+        name=$(echo $operator_config | sed -E 's/.*name=([^;]+);.*/\1/')
+        version=$(oc get csv -o json | jq -r --arg NAME_VALUE "$name" '.items[] | select(.metadata.name | contains($NAME_VALUE)) | .spec.version')
+        echo "$name-v$version" >> "${SHARED_DIR}/operator-versions"
+    fi
+done
