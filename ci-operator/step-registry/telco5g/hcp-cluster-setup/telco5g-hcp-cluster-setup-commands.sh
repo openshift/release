@@ -60,7 +60,7 @@ ping ${BASTION_IP} -c 10 || true
 echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
 MGMT_CLUSTER="cnfdr15"
-CLUSTER_NAME="cnfdr16"
+CLUSTER_NAME="cnfdr17"
 MGMT_CLUSTER_API_IP="10.1.104.33"
 CLUSTER_API_PORT=6443
 CLUSTER_ENV="internalbos"
@@ -171,9 +171,6 @@ echo "Change the host to hypervisor to ${HYPERV_HOST}"
 cd $SHARED_DIR/repos/ansible-automation
 sed -i "s/- hosts: localhost/- hosts: ${HYPERV_HOST}/g" playbooks/hosted_bm_cluster.yaml
 sed -i "s/- hosts: localhost/- hosts: ${HYPERV_HOST}/g" playbooks/remove_bm_cluster.yaml
-
-# Until new image is coming
-pip3 install -U jmespath jsonpatch openshift kubernetes
 
 # Run the playbook to remove any cluster that exists now
 echo "Run the playbook to remove any cluster that exists now"

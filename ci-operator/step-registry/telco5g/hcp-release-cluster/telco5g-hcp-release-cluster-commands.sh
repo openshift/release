@@ -34,9 +34,6 @@ cd $SHARED_DIR/repos/ansible-automation
 
 sed -i "s/- hosts: localhost/- hosts: ${HYPERV_HOST}/g"  playbooks/remove_bm_cluster.yaml
 
-# Until new image is coming
-pip3 install -U jmespath jsonpatch openshift kubernetes
-
 status=0
 ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
     playbooks/remove_bm_cluster.yaml \

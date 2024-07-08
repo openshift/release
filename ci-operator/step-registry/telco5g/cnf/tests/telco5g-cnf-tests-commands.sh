@@ -87,6 +87,16 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
 
 EOF
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+EOF
+
+fi
 }
 
 function create_tests_temp_skip_list_17 {
@@ -100,23 +110,57 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
 
 EOF
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+EOF
+fi
 }
 
 function is_bm_node {
     node=$1
 
-    machine=$(oc get "${node}" -o json | jq '.metadata.annotations' | grep "machine.openshift.io/machine" | cut -d ":" -f2 | tr -d '", ')
-    machine_ns=$(echo "${machine}" | cut -d "/" -f1)
-    machine_name=$(echo "${machine}" | cut -d "/" -f2)
-    bmh=$(oc get machine -n "${machine_ns}" "${machine_name}" -o json | jq '.metadata.annotations' | grep "metal3.io/BareMetalHost" | cut -d ":" -f2 | tr -d '", ')
-    bmh_ns=$(echo "${bmh}" | cut -d "/" -f1)
-    bmh_name=$(echo "${bmh}" | cut -d "/" -f2)
-    manufacturer=$(oc get bmh -n "${bmh_ns}" "${bmh_name}" -o json | jq '.status.hardware.systemVendor.manufacturer')
-    # if the system manufacturer is not Red Hat, that's a BM node
-    if [[ "${manufacturer}" != *"Red Hat"* ]]; then
-        return 0
+    if [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
+        # Define thresholds
+        CPU_THRESHOLD=80
+        MEMORY_THRESHOLD=81920  # in Mi (80 GB = 81920 Mi)
+
+        echo "Checking if node $node is baremetal or virtual"
+
+        # Get the CPU and memory capacity
+        cpu=$(oc get $node -o jsonpath='{.status.capacity.cpu}')
+        memory=$(oc get $node -o jsonpath='{.status.capacity.memory}')
+
+        # Convert memory from Ki to Mi
+        memory=${memory%Ki}
+        memory=$((memory / 1024))
+
+        # Check if the node meets the criteria
+        if [[ $cpu -gt $CPU_THRESHOLD && $memory -gt $MEMORY_THRESHOLD ]]; then
+            echo "$node is a baremetal node with $cpu CPUs and $memory Mi of memory."
+            return 0
+        else
+            echo "$node is a virtual node with $cpu CPUs and $memory Mi of memory."
+            return 1
+        fi
+    else
+        machine=$(oc get "${node}" -o json | jq '.metadata.annotations' | grep "machine.openshift.io/machine" | cut -d ":" -f2 | tr -d '", ')
+        machine_ns=$(echo "${machine}" | cut -d "/" -f1)
+        machine_name=$(echo "${machine}" | cut -d "/" -f2)
+        bmh=$(oc get machine -n "${machine_ns}" "${machine_name}" -o json | jq '.metadata.annotations' | grep "metal3.io/BareMetalHost" | cut -d ":" -f2 | tr -d '", ')
+        bmh_ns=$(echo "${bmh}" | cut -d "/" -f1)
+        bmh_name=$(echo "${bmh}" | cut -d "/" -f2)
+        manufacturer=$(oc get bmh -n "${bmh_ns}" "${bmh_name}" -o json | jq '.status.hardware.systemVendor.manufacturer')
+        # if the system manufacturer is not Red Hat, that's a BM node
+        if [[ "${manufacturer}" != *"Red Hat"* ]]; then
+            return 0
+        fi
+        return 1
     fi
-    return 1
 }
 
 function get_skip_tests {
@@ -254,12 +298,19 @@ fi
 
 echo "Go version: $(go version)"
 
+export FEATURES_ENVIRONMENT=ci
+export HYPERSHIFT_ENVIRONMENT=false
+
 # if set - to run tests and/or validations
 export RUN_TESTS="${RUN_TESTS:-true}"
 export RUN_VALIDATIONS="${RUN_VALIDATIONS:-true}"
 
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
     export FEATURES="${FEATURES:-performance sriov sctp}"
+elif [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
+    export FEATURES="${FEATURES:-sriov}"
+    export HYPERSHIFT_ENVIRONMENT=true
+    export FEATURES_ENVIRONMENT=hypershift-ci
 else
     export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni}"
 fi
@@ -414,7 +465,7 @@ fi
 # if RUN_VALIDATIONS set, run validations
 if $RUN_VALIDATIONS; then
     echo "************ Running validations ************"
-    PULL_URL="${PULL_URL-}" PR_URLS="${PR_URLS-}" FEATURES=$VALIDATIONS_FEATURES FEATURES_ENVIRONMENT="ci" stdbuf -o0 make feature-deploy-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-validations-run.log ${ARTIFACT_DIR}/saved-cnf-validations.log || val_status=$?
+    PULL_URL="${PULL_URL-}" PR_URLS="${PR_URLS-}" FEATURES=$VALIDATIONS_FEATURES stdbuf -o0 make feature-deploy-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-validations-run.log ${ARTIFACT_DIR}/saved-cnf-validations.log || val_status=$?
 fi
 # set overall status to fail if validations failed
 if [[ ${val_status} -ne 0 ]]; then
@@ -422,19 +473,22 @@ if [[ ${val_status} -ne 0 ]]; then
     status=${val_status}
 fi
 
-echo "Wait until number of nodes matches number of machines"
-# Wait until number of nodes matches number of machines
-# Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
-for _ in $(seq 30); do
-    nodes="$(oc get nodes --no-headers | wc -l)"
-    machines="$(oc get machines -A --no-headers | wc -l)"
-    [ "$machines" -le "$nodes" ] && break
-    sleep 30
-done
+if [[ "$T5CI_JOB_TYPE" != "hcp-cnftests" ]]; then
+    echo "Wait until number of nodes matches number of machines"
+    # Wait until number of nodes matches number of machines
+    # Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
+    for _ in $(seq 30); do
+        nodes="$(oc get nodes --no-headers | wc -l)"
+        machines="$(oc get machines -A --no-headers | wc -l)"
+        [ "$machines" -le "$nodes" ] && break
+        sleep 30
+    done
 
-echo "Check if nodes amount '$nodes' equal to machines '$machines'"
-[ "$machines" -le "$nodes" ]
 
+    echo "Check if nodes amount '$nodes' equal to machines '$machines'"
+    [ "$machines" -le "$nodes" ]
+
+fi
 echo "Wait for nodes to be up and ready"
 # Wait for nodes to be ready
 # Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
@@ -448,7 +502,7 @@ oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 # if validations passed and RUN_TESTS set, run the tests
 if [[ ${val_status} -eq 0 ]] && $RUN_TESTS; then
     echo "************ Running e2e tests ************"
-    FEATURES=$TEST_RUN_FEATURES FEATURES_ENVIRONMENT="ci" stdbuf -o0 make functests 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log ${ARTIFACT_DIR}/saved-cnf-tests-run.log || status=$?
+    FEATURES=$TEST_RUN_FEATURES stdbuf -o0 make functests 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log ${ARTIFACT_DIR}/saved-cnf-tests-run.log || status=$?
 fi
 popd
 
