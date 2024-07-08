@@ -67,15 +67,24 @@ index_metadata(){
   fi
 }
 
+calculate_total_install(){
+  start_time=$(jq -r '.timers.global_start' "${1}")
+  end_time=$(jq -r '.timers.global_end' "${1}")
+  echo $(( ${end_time} - ${start_time} ))
+}
+
 
 if [[ "${INDEX_ENABLED}" == "true" ]] ; then
   ES_SERVER=$(cat "/secret/host")
   if is_valid_es "${ES_SERVER}" "${ES_INDEX}" && is_valid_json "${SHARED_DIR}/${METADATA_FILE}" ; then
     install_ready=$(calculate_install_ready ${SHARED_DIR}/${METADATA_FILE})
+    echo "Install Ready: ${install_ready}"
     cluster_ready=$(calculate_cluster_ready $install_ready ${SHARED_DIR}/${METADATA_FILE})
-    echo $cluster_ready
+    echo "Cluster Ready: ${cluster_ready}"
+    total_install_time=$(calculate_total_install ${SHARED_DIR}/${METADATA_FILE})
+    echo "Total Install: ${total_install_time}"
     jq --arg uuid "$(uuidgen)" '. + { "uuid": $uuid }' "${SHARED_DIR}/${METADATA_FILE}" > "${SHARED_DIR}/${METADATA_FILE}_1"
-    jq --arg install_ready $install_ready --arg cluster_ready $cluster_ready '.timers += { "install_ready": $install_ready, "cluster_ready": $cluster_ready }' "${SHARED_DIR}/${METADATA_FILE}_1" > "${SHARED_DIR}/${METADATA_FILE}_2"
+    jq --arg install_ready $install_ready --arg cluster_ready $cluster_ready --arg total_install_time $total_install_time '.timers += { "install_ready": $install_ready, "cluster_ready": $cluster_ready, "total_install_time": $total_install_time }' "${SHARED_DIR}/${METADATA_FILE}_1" > "${SHARED_DIR}/${METADATA_FILE}_2"
     cat "${SHARED_DIR}/${METADATA_FILE}_2" | jq 'to_entries | map(select(.key | contains("AWS") | not)) | from_entries | .timestamp |= (now | strftime("%Y-%m-%dT%H:%M:%SZ"))' > "${SHARED_DIR}/${METADATA_FILE}_3"
     index_metadata "${SHARED_DIR}/${METADATA_FILE}_3" "${ES_SERVER}" "${ES_INDEX}"
   fi
