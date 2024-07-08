@@ -63,11 +63,13 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
    else
      git switch main
    fi
+   git branch
    source bootstrap.sh
    ansible-playbook -i ansible/inventory/telco.inv ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
 
 # Attempt Deployment
 sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "
    cd jetlag
+   git branch
    source bootstrap.sh
    ansible-playbook -i ansible/inventory/telco.inv ansible/bm-deploy.yml -v | tee /tmp/ansible-setup-bastion-$(date +%s)"
