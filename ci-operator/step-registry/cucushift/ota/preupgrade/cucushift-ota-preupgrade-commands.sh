@@ -89,6 +89,18 @@ function check_manifest_annotations(){
     done
     return 0
 }
+
+function verify_output(){
+    local out message="${1}" cmd="${2}" expected="${3}"
+    if ! out=$(eval "${cmd}" 2>&1); then
+        echo >&2 "Failed to execute \"${cmd}\" while verifying ${message}, received \"${out}\", exiting" && return 1
+    fi
+    if ! [[ "${out}" == *"${expected}"* ]]; then
+        echo >&2 "Failed verifying ${message} contains \"${expected}\": unexpected \"${out}\", exiting" && return 1
+    fi
+    echo "passed verifying ${message}"
+}
+
 # Define the checkpoints/steps needed for the specific case
 function pre-OCP-66839(){
     if [[ "${BASELINE_CAPABILITY_SET}" != "None" ]]; then
@@ -335,6 +347,103 @@ function pre-OCP-56083(){
     cat "${tmp_log}" 
     return 1
 }
+
+function verify_nonhetero(){
+    echo "checking cvo image pre-transition is non-hetero"
+    verify_output \
+    "cvo image is non-hetero" \
+    "skopeo inspect --raw docker://$(oc get -n openshift-cluster-version pod -o jsonpath='{.items[0].spec.containers[0].image}') | jq .mediaType" "application/vnd.docker.distribution.manifest.v2+json" \
+    "application/vnd.docker.distribution.manifest.v2+json"
+}
+
+function verify_retrieved_updates(){
+    echo "checking RetrievedUpdates condition is True"
+    verify_output \
+    "RetrievedUpdates status=true" \
+    "oc get clusterversion/version -o jsonpath='{.status.conditions[?(@.type==\"RetrievedUpdates\")].status}'" \
+    "True"
+}
+
+function pre-OCP-60396(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    # verify cvo image non-hetero
+    verify_nonhetero
+
+    # set chan candidate
+
+    # check RetrievedUpdates=True
+    verify_retrieved_updates
+
+    # --to-image <some pullspec> --to-multi-arch - error
+    verify_output \
+    "proper error trying to image with to multi arch" \
+    "oc adm upgrade --allow-explicit-upgrade --to-image quay.io/openshift-release-dev/ocp-release@sha256:f44f1570d0b88a75034da9109211bb39672bc1a5d063133a50dcda7c12469ca7 --to-multi-arch" \
+    "--to-multi-arch may not be used with --to or --to-image"
+
+
+    # --to <some version> --to-multi-arch -error
+    verify_output \
+    "proper error trying to image with to multi arch" \
+    "oc adm upgrade --to 4.10.0 --to-multi-arch" \
+    "--to-multi-arch may not be used with --to or --to-image"
+
+    # verify not progressing.
+    verify_output \
+    "Cluster progressing=false" \
+    "oc get clusterversion/version -o jsonpath='{.status.conditions[?(@.type==\"Progressing\")].status}'" \
+    "False"
+
+    # create Invalid=True by applying invalid .spec.desiredUpdate
+    verify_output \
+    "patching cvo for invalid=true" \
+    "oc patch clusterversion/version --type=merge --patch '{\"spec\":{\"desiredUpdate\":{\"force\":true} }}'" \
+    "clusterversion.config.openshift.io/version patched"
+
+    # wait for cvo condition
+    sleep 10s
+
+    # check cvo invalid=true 
+    verify_output \
+    "check cvo invalid=true" \
+    "oc get clusterversion/version -o jsonpath='{.status.conditions[?(@.type==\"Invalid\")].status}'" \
+    "True"
+
+    # apply to-multi-arch -error 
+    verify_output \
+    "to-multi-arch error is received mentioning Invalid condition" \
+    "oc adm upgrade --to-multi-arch" \
+    "InvalidClusterVersion"
+
+    # verify not progressing.
+    verify_output \
+    "Cluster progressing=false" \
+    "oc get clusterversion/version -o jsonpath='{.status.conditions[?(@.type==\"Progressing\")].status}'" \
+    "False"
+}
+
+function pre-OCP-60397(){
+    echo "Test Start: ${FUNCNAME[0]}"
+    # verify cvo image non-hetero
+    verify_nonhetero
+
+    # preserve graph
+
+    # set testing graph
+
+    # wait no more progressing
+
+    # check cluster architecture is still arm64
+    verify_output \
+    "cluster architecture is still arm64" \
+    "oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type==\"ReleaseAccepted\")].message}'" \
+    "architecture=\"arm64\""
+
+    # restore graph, set chan candidate
+
+    # check RetrievedUpdates=True
+    verify_retrieved_updates
+}
+
 # This func run all test cases with checkpoints which will not break other cases, 
 # which means the case func called in this fun can be executed in the same cluster
 # Define if the specified case should be run or not
