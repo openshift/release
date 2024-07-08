@@ -32,7 +32,7 @@ export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-if [[ "${USE_HORREUM_POC}" == "true" ]]; then
+if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
 EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
@@ -45,7 +45,7 @@ folder_name=$(ls -t -d /tmp/*/ | head -1)
 jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
 
 
-if [[ "${USE_HORREUM_POC}" == "true" ]]; then
+if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
     cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
 fi
