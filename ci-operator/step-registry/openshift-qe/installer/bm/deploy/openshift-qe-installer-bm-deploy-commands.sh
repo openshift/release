@@ -59,9 +59,9 @@ sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHost
    cd jetlag
    if [[ -n $JETLAG_PR ]]; then
      git fetch origin pull/$JETLAG_PR/head:dev
-     git switch dev
+     git checkout dev
    else
-     git switch main
+     git checkout main
    fi
    git branch
    source bootstrap.sh
