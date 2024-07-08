@@ -54,10 +54,10 @@ sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownH
 run_in_bastion='sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion}'
 
 # Clean up previous attempts
-"${run_in_bastion[@]}" ./clean-resources.sh
+${run_in_bastion[@]} ./clean-resources.sh
 
 # Setup Bastion
-"${run_in_bastion[@]}" "
+${run_in_bastion[@]} "
    cd jetlag
    if [[ -n $JETLAG_PR ]]; then
      git fetch origin pull/$JETLAG_PR/head:dev
@@ -69,7 +69,7 @@ run_in_bastion='sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no
    ansible-playbook -i ansible/inventory/telco.inv ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
 
 # Attempt Deployment
-"${run_in_bastion[@]}" "
+${run_in_bastion[@]} "
    cd jetlag
    source bootstrap.sh
    ansible-playbook -i ansible/inventory/telco.inv ansible/bm-deploy.yml -v | tee /tmp/ansible-setup-bastion-$(date +%s)"
