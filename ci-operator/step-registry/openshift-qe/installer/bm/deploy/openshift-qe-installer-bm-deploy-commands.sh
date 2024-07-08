@@ -19,8 +19,8 @@ cluster_type: $TYPE
 worker_node_count: $NUM_WORKER_NODES
 sno_node_count:
 public_vlan: false
-ocp_release_image: $OCP_RELEASE_IMAGE
-openshift_version: "$OCP_VERSION_SHORT"
+ocp_version: $OCP_VERSION
+ocp_build: $OCP_BUILD
 networktype: OVNKubernetes
 enable_fips: $FIPS
 ssh_private_key_file: ~/.ssh/id_rsa
@@ -51,11 +51,25 @@ envsubst < /tmp/all.yml > /tmp/all-updated.yml
 sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /tmp/all-updated.yml root@${bastion}:~/jetlag/ansible/vars/all.yml
 sshpass -p "$(cat /secret/login)" scp -q -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null /secret/inventory root@${bastion}:~/jetlag/ansible/inventory/telco.inv
 
+export run_in_bastion='sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion}'
+
 # Clean up previous attempts
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "./clean-resources.sh"
+$run_in_bastion ./clean-resources.sh
 
 # Setup Bastion
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "cd jetlag; source bootstrap.sh; ansible-playbook -i ansible/inventory/telco.inv ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
+$run_in_bastion "
+   cd jetlag
+   if [[ -n "$JETLAG_PR" ]]; then
+     git fetch origin pull/"$JETLAG_PR"/head:dev
+     git switch dev
+   else
+     git switch main
+   fi
+   source bootstrap.sh
+   ansible-playbook -i ansible/inventory/telco.inv ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)"
 
 # Attempt Deployment
-sshpass -p "$(cat /secret/login)" ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@${bastion} "cd jetlag; source bootstrap.sh; ansible-playbook -i ansible/inventory/telco.inv ansible/bm-deploy.yml -v | tee /tmp/ansible-deploy-$(date +%s)"
+$run_in_bastion "
+   cd jetlag
+   source bootstrap.sh
+   ansible-playbook -i ansible/inventory/telco.inv ansible/bm-deploy.yml -v | tee /tmp/ansible-setup-bastion-$(date +%s)"
