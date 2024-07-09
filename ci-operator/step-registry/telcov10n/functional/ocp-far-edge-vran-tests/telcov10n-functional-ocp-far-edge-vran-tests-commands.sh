@@ -35,8 +35,8 @@ PARAMS=$(echo "$PARAMS" | tr -d '\n')
 ansible-playbook playbooks/launch-jenkins-job.yaml -i inventory \
  -e username=$JENKINS_USER_NAME \
  -e token=$JENKINS_USER_TOKEN \
- -e jjl_job_params="$PARAMS" -e jjl_job_url="https://auto-jenkins-csb-kniqe.apps.ocp-c1.prod.psi.redhat.com/job/ocp-far-edge-vran-tests/" -vv | tee ${SHARED_DIR}/reporting.txt || exit 1
+ -e jjl_job_params="$PARAMS" -e jjl_job_url="https://auto-jenkins-csb-kniqe.apps.ocp-c1.prod.psi.redhat.com/job/ocp-far-edge-vran-tests/" -vvv | tee ${SHARED_DIR}/reporting.txt || exit 1
 
 # extract vran-tests jenkins job build number for vran-reporting job.
-cat ${SHARED_DIR}/reporting.txt | grep -o '"displayName": "#[0-9]*' | awk -F '#' '{print $2}' > ${SHARED_DIR}/vran-tests-build-number.txt
+cat ${SHARED_DIR}/reporting.txt | grep -o '"displayName": "#[0-9]*' | awk -F '#' 'NR==1 {print $2}' > ${SHARED_DIR}/vran-tests-build-number.txt
 
