@@ -12,7 +12,9 @@ cat > "${DEFAULT_PRIVATE_ENDPOINTS}" << EOF
     "DNSServices": "https://api.private.dns-svcs.cloud.ibm.com/v1",
     "COS": "https://s3.direct.${REGION}.cloud-object-storage.appdomain.cloud",
     "GlobalSearch": "https://api.private.global-search-tagging.cloud.ibm.com",
-    "GlobalTagging": "https://tags.private.global-search-tagging.cloud.ibm.com"
+    "GlobalTagging": "https://tags.private.global-search-tagging.cloud.ibm.com",
+    "GlobalCatalog": "https://private.globalcatalog.cloud.ibm.com",
+    "COSConfig": "https://config.private.cloud-object-storage.cloud.ibm.com/v1"
 }
 EOF
 
@@ -58,4 +60,10 @@ if [ -n "$SERVICE_ENDPOINT_GlobalSearch" ]; then
 fi
 if [ -n "$SERVICE_ENDPOINT_GlobalTagging" ]; then
   patch_endpoint "GlobalTagging" $SERVICE_ENDPOINT_GlobalTagging
+fi
+if [ -n "$SERVICE_ENDPOINT_GlobalCatalog" ]; then
+  patch_endpoint "GlobalCatalog" $SERVICE_ENDPOINT_GlobalCatalog
+fi
+if [ -n "$SERVICE_ENDPOINT_COSConfig" ]; then
+  patch_endpoint "COSConfig" $SERVICE_ENDPOINT_COSConfig
 fi
