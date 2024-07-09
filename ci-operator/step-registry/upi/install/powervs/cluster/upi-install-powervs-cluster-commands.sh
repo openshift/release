@@ -182,8 +182,8 @@ function create_upi_powervs_cluster() {
   ./openshift-install-powervs output > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-output
   ./openshift-install-powervs access-info > "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/mac-upi-access-info
   cd automation/ || true
-  ../terraform output -raw -no-color output bastion_private_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
-  ../terraform output -raw -no-color output bastion_public_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
+  ../terraform output -raw -no-color bastion_private_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PRIVATE_IP
+  ../terraform output -raw -no-color bastion_public_ip | tr -d '"' > "${SHARED_DIR}"/BASTION_PUBLIC_IP
   cd .. || true
 
   BASTION_PUBLIC_IP=$(<"${SHARED_DIR}/BASTION_PUBLIC_IP")
