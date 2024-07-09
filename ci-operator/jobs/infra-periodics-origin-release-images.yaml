@@ -138,6 +138,32 @@ periodics:
   labels:
     ci.openshift.io/role: infra
   max_concurrency: 1
+  name: periodic-build-origin-release-image-origin-release-golang-1.22
+  spec:
+    containers:
+    - args:
+      - --namespace=ci
+      - start-build
+      - origin-release-golang-1.22
+      - --wait=true
+      command:
+      - oc
+      image: registry.ci.openshift.org/ocp/4.14:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+    serviceAccountName: origin-release-images-builder
+- agent: kubernetes
+  cluster: build01
+  cron: 0 1 * * 1
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  labels:
+    ci.openshift.io/role: infra
+  max_concurrency: 1
   name: periodic-build-origin-release-image-origin-release-nodejs-8
   spec:
     containers:
