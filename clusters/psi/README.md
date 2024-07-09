@@ -2,7 +2,7 @@
 
 [The mp+ cluster](https://console-openshift-console.apps.prod-stable-spoke1-dc-iad2.itup.redhat.com/k8s/cluster/projects/ocp-test-platform--runtime-int) is hosted inside the Red Hat network.
 
-Namespaces (Article in [Source](https://redhat.service-now.com/help?id=kb_article_view&sysparm_article=KB0015964)):
+Namespaces:
  -   --config - A tenant config namespace is where you manage most tenant resources. You should not deploy any workloads there.
  -   --pipeline - The build tenant namespace is where you create BuildConfigs and pipelines. It includes build entitlements and provides means to integrate your tenant across clusters. For security reasons, those entitlements and integrations should not be made available to your applications running in the runtime namespaces.
  -   --runtime-int -The runtime for applications running in the internal network security zone.
