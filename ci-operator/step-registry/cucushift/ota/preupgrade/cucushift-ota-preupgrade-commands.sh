@@ -101,6 +101,46 @@ function verify_output(){
     echo "passed verifying ${message}"
 }
 
+function switch_channel() {
+    local SOURCE_XY_VERSION
+    SOURCE_XY_VERSION="$(cut -f1,2 -d. <<< "${SOURCE_VERSION}")"
+    echo "Switch upgrade channel to candidate-""${SOURCE_XY_VERSION}""..."
+    oc adm upgrade channel "candidate-""${SOURCE_XY_VERSION}"
+    ret=$(oc get clusterversion/version -ojson | jq -r '.spec.channel')
+    if [[ "${ret}" != "candidate-${SOURCE_XY_VERSION}" ]]; then
+        echo >&2 "Failed to switch channel, exiting" && return 1
+    fi
+}
+
+function preserve_graph(){
+    if ! upstream=$(oc get clusterversion version -o jsonpath='{.spec.upstream}'); then
+        echo >&2 "Failed to execute get spec upstream, exiting" && return 1
+    fi
+    if [[ -n "${upstream}" ]]; then
+        upstream="empty"
+    else
+        retcode=$(curl --head --silent --write-out "%{http_code}" --output /dev/null "${upstream}")
+        if [[ $retcode -ne 200 ]]; then
+            echo >&2 "Failed get valid accessable upstream graph, received: \"${retcode}\" for \"${upstream}\", exiting" && return 1
+        fi
+    fi
+    export upstream
+}
+
+function set_upstream_graph(){
+    if [[ "${1}" == "empty" ]]; then
+        verify_output \
+        "previous upstream url empty, removing" \
+        "oc patch clusterversion/version --type=json --patch='[{\"op\": \"remove\", \"path\": \"/spec/upstream\"}]'" \
+        "clusterversion.config.openshift.io/version patched"
+    else
+        verify_output \
+        "set back production graph with multi-arch payload available" \
+        "oc patch clusterversion/version --type=merge --patch '{\"spec\":{\"upstream\":\"${1}\"}}'" \
+        "clusterversion.config.openshift.io/version patched"
+    fi
+}
+
 # Define the checkpoints/steps needed for the specific case
 function pre-OCP-66839(){
     if [[ "${BASELINE_CAPABILITY_SET}" != "None" ]]; then
@@ -370,6 +410,7 @@ function pre-OCP-60396(){
     verify_nonhetero
 
     # set chan candidate
+    switch_channel
 
     # check RetrievedUpdates=True
     verify_retrieved_updates
@@ -427,10 +468,25 @@ function pre-OCP-60397(){
     verify_nonhetero
 
     # preserve graph
+    preserve_graph # exports "upstream"
 
     # set testing graph
+    verify_output \
+    "set internal upstream graph with no multi-arch payload available" \
+    "oc patch clusterversion/version --type=merge --patch '{\"spec\":{\"upstream\":\"https://arm64.ocp.releases.ci.openshift.org/graph\"}}'" \
+    "clusterversion.config.openshift.io/version patched"
+
+    # check RetrievedUpdates=True
+    verify_retrieved_updates
+
+    # apply to-multi-arch command
+    verify_output \
+    "try multiarch command while on a single-arch graph" \
+    "oc adm upgrade --to-multi-arch" \
+    "Requested update to multi cluster architecture"
 
     # wait no more progressing
+    sleep 60
 
     # check cluster architecture is still arm64
     verify_output \
@@ -438,7 +494,17 @@ function pre-OCP-60397(){
     "oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type==\"ReleaseAccepted\")].message}'" \
     "architecture=\"arm64\""
 
-    # restore graph, set chan candidate
+    # verify cvo image still non-hetero
+    verify_nonhetero
+
+    # restore graph
+    set_upstream_graph "${upstream}"
+    
+    # set chan candidate
+    switch_channel
+
+    # wait no more progressing
+    sleep 60
 
     # check RetrievedUpdates=True
     verify_retrieved_updates
