@@ -3,7 +3,7 @@ SHELL=/usr/bin/env bash -o errexit
 .PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update template-allowlist release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen message
 
 message:
-	@printf '\e[1mThis Makefile was recently migrated to use QCI as respository of images. Please make sure you are logged in to QCI before executing targets. Copy the token from https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/ and run `oc registry login`\e[0m\n'
+	@printf '\e[1mThis Makefile was recently migrated to use QCI as respository of images. Please make sure you are logged in to QCI before executing targets. Copy the token from https://oauth-openshift.apps.ci.l2s4.p1.openshiftapps.com/oauth/token/request and run `oc login`\e[0m\n'
 	@printf '\e[1mTo login, use your container engine, example for podman: podman login -u=$$(oc whoami) -p=$$(oc whoami -t) quay-proxy.ci.openshift.org\e[0m\n'
 	@printf '\n\e[1mMore info: https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/\e[0m\n\n'
 
