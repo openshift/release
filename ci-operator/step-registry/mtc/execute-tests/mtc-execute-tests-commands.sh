@@ -43,6 +43,9 @@ TARGET_KUBEADMIN_PASSWORD=$(cat $TARGET_KUBEADMIN_PASSWORD_FILE)
 API_URL=$(oc whoami --show-server)
 oc login ${API_URL} -u ${TEST_USER} -p ${TARGET_KUBEADMIN_PASSWORD}
 
+# Update admin permission for migration-controller service account
+oc adm policy add-cluster-role-to-user cluster-admin -z migration-controller -n openshift-migration
+
 # Define archive-results function
 function archive-results() {
     if [[ -f "${RESULTS_FILE}" ]] && [[ ! -f "${ARTIFACT_DIR}/junit_mtc_interop_results.xml" ]]; then
