@@ -662,16 +662,18 @@ function admin_ack() {
 # Upgrade the cluster to target release
 function upgrade() {
     set_channel $TARGET_VERSION
-    local retry=3 unrecommened_conditional_updates
+    local retry=5 unrecommended_conditional_updates
     while (( retry > 0 )); do
-        unrecommened_conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True")) | .release.version' | xargs)
-        if [[ -z "${unrecommened_conditional_updates}" ]]; then
+        unrecommended_conditional_updates=$(oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True")) | .release.version' | xargs)
+        echo "Not recommended conditions: "
+        echo "${unrecommended_conditional_updates}"
+        if [[ -z "${unrecommended_conditional_updates}" ]]; then
             retry=$((retry - 1))
             sleep 60
             echo "No conditionalUpdates update available! Retry..."
         else
             #shellcheck disable=SC2076
-            if [[ " $unrecommened_conditional_updates " =~ " $TARGET_VERSION " ]]; then
+            if [[ " $unrecommended_conditional_updates " =~ " $TARGET_VERSION " ]]; then
                 echo "Error: $TARGET_VERSION is not recommended, for details please refer:"
                 oc get clusterversion version -o json | jq -r '.status.conditionalUpdates[]? | select((.conditions[].type == "Recommended") and (.conditions[].status != "True"))'
                 exit 1
@@ -684,28 +686,25 @@ function upgrade() {
     echo "Upgrading cluster to ${TARGET} gets started..."
 }
 
-# Log abnormal cluster status
-function dump_status_if_unexpected() {
-    # expecting oc to equal TARGET_MINOR_VERSION, skip if less than .16
-        if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
-            local out; out="$(env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 || true)"
-            # if upgrading, and not progressing well, dump status to log
-            # "resource name may not be empty" is a known issue, remove once OCPBUGS-32682 is fixed
-            if ! grep -qE 'The cluster version is not updating|Upgrade is proceeding well|resource name may not be empty' <<< "${out}" ; then
-                echo "${out}"
-            fi
-        fi
-}
-
 # Monitor the upgrade status
 function check_upgrade_status() {
-    local wait_upgrade="${TIMEOUT}" out avail progress
+    local wait_upgrade="${TIMEOUT}" interval=1 out avail progress stat_cmd stat='empty' oldstat='empty' filter='[0-9]+h|[0-9]+m|[0-9]+s|[0-9]+%|[0-9]+.[0-9]+s|[0-9]+ of|\s+|\n'
     echo "Starting the upgrade checking on $(date "+%F %T")"
+    # print once to log (including full messages)
+    oc adm upgrade || true
+    # log oc adm upgrade (excluding garbage messages)
+    stat_cmd="oc adm upgrade | grep -vE 'Upstream is unset|Upstream: https|available channels|No updates available|^$'"
+    # if available (version 4.16+) log "upgrade status" instead
+    if [[ -n "${TARGET_MINOR_VERSION}" ]] && [[ "${TARGET_MINOR_VERSION}" -ge "16" ]] ; then
+        stat_cmd="env OC_ENABLE_CMD_UPGRADE_STATUS=true oc adm upgrade status 2>&1 | grep -vE 'no token is currently in use|for additional description and links'"
+    fi
     while (( wait_upgrade > 0 )); do
-        sleep 5m
-        wait_upgrade=$(( wait_upgrade - 5 ))
-        if ! ( run_command "oc get clusterversion" ); then
-            continue
+        sleep ${interval}m
+        wait_upgrade=$(( wait_upgrade - interval ))
+        # if output is different from previous (ignoring irrelevant time/percentage difference), write to log
+        if stat="$(eval "${stat_cmd}")" && [ -n "$stat" ] && ! diff -qw <(sed -zE "s/${filter}//g" <<< "${stat}") <(sed -zE "s/${filter}//g" <<< "${oldstat}") >/dev/null ; then
+            echo -e "=== Upgrade Status $(date "+%T") ===\n${stat}\n\n\n\n"
+            oldstat=${stat}
         fi
         if ! out="$(oc get clusterversion --no-headers || false)"; then
             echo "Error occurred when getting clusterversion"
@@ -722,7 +721,6 @@ function check_upgrade_status() {
             echo -e "Upgrade stuck at updating RHEL worker, run the RHEL worker upgrade now...\n\n"
             return 0
         fi
-        dump_status_if_unexpected
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
         echo -e "Upgrade timeout on $(date "+%F %T"), exiting\n" && return 1
