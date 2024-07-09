@@ -8,6 +8,11 @@ images:
     FROM src
     SHELL ["/bin/bash", "-c"]
 
+    # Workaround to resolve mirrorlist issue from broken links
+    RUN sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/*.repo
+    RUN sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/*.repo
+    RUN sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/*.repo
+
     # Install tools
     RUN yum install -y httpd-tools parallel
     RUN curl -Lso /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.7.1/jq-linux64 && chmod +x /usr/local/bin/jq
