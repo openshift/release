@@ -5,7 +5,7 @@ build_root:
     tag: latest
 images:
 - dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-azure-415
+  to: ocp-qe-perfscale-ci-azure-417
 promotion:
   to:
   - namespace: ci
@@ -15,24 +15,25 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.17"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: control-plane-ipsec-24nodes
+- as: control-plane-ipsec-120nodes
+  cron: 0 4 11,25 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_REPLICAS: "120"
       COMPUTE_NODE_TYPE: Standard_D4s_v5
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D16s_v3
       CUSTOM_AZURE_REGION: centralus
+      PROFILE_TYPE: reporting
     test:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
@@ -48,18 +49,33 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4s_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
       CUSTOM_AZURE_REGION: centralus
+      PROFILE_TYPE: reporting
     test:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
   timeout: 5h0m0s
+- as: data-path-ipsec-9nodes
+  cron: 0 2 8,22 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: Standard_D8s_v3
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
+    test:
+    - chain: openshift-qe-data-path-tests
+    - ref: openshift-qe-perfscale-azu-data-path-nsg
+    workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
+  timeout: 7h0m0s
 - always_run: false
   as: data-path-9nodes
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D8s_v3
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
-      OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE: Standard_D32s_v3
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "9"
     post:
@@ -72,22 +88,8 @@ tests:
     - ref: openshift-qe-perfscale-azu-data-path-nsg
     - chain: openshift-qe-data-path-tests
   timeout: 7h0m0s
-- as: data-path-ipsec-9nodes
-  cron: 0 20 8,22 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "9"
-      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D16s_v3
-      OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE: Standard_D32s_v3
-    test:
-    - chain: openshift-qe-data-path-tests
-    - ref: openshift-qe-perfscale-azu-data-path-nsg
-    workflow: openshift-qe-installer-azure-ipi-ovn-ipsec
-  timeout: 7h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-qe
   repo: ocp-qe-perfscale-ci
-  variant: azure-4.15-nightly-x86
+  variant: azure-4.17-nightly-x86
