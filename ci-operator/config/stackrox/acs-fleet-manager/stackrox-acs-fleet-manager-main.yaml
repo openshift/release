@@ -1,12 +1,12 @@
 base_images:
-  openshift_release_golang-1.21:
-    name: release
-    namespace: openshift
-    tag: golang-1.21
   ocp-4:
     name: automation-flavors
     namespace: stackrox
     tag: openshift-4-0.10.0
+  openshift_release_golang-1.21:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
 build_root:
   image_stream_tag:
     name: release
@@ -44,8 +44,6 @@ resources:
     requests:
       cpu: 2000m
       memory: 6000Mi
-# The workflow to use infra clusters requires a test-bin image.
-# We don't build a test-bin image for this config, thus we use this placeholder
 test_binary_build_commands: echo 'Placeholder for building test-bin image'
 tests:
 - as: e2e
@@ -53,10 +51,6 @@ tests:
     env:
       OCP_VERSION: ocp/fast-4.14
     test:
-    # Important: This makes images build in this config public.
-    # This is the default step used in "generic-claim" workflow to allow
-    # clusters under test to access images build for a CI config on the 
-    # OSCI build cluster.
     - ref: ipi-install-rbac
     - as: test
       commands: |
