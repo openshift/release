@@ -23,5 +23,6 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
   --e2e.base-domain=hypershift.azure.devcluster.openshift.com \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
+  --e2e.external-dns-domain=service.hypershift.azure.devcluster.openshift.com \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
 wait $!
