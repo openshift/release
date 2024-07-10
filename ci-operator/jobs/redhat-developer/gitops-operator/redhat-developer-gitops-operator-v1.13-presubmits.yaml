@@ -1,29 +1,30 @@
-postsubmits:
-  openshift/loki:
+presubmits:
+  redhat-developer/gitops-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.7$
-    cluster: build10
+    - ^v1\.13$
+    - ^v1\.13-
+    cluster: build03
+    context: ci/prow/gitops-ocp4.17-lp-interop-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cluster: build10
-      ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/variant: gitops-ocp4.17-lp-interop
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-openshift-loki-release-5.7-images
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-developer-gitops-operator-v1.13-gitops-ocp4.17-lp-interop-images
+    rerun_command: /test gitops-ocp4.17-lp-interop-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=loki-operator-bundle
+        - --variant=gitops-ocp4.17-lp-interop
         command:
         - ci-operator
         image: ci-operator:latest
@@ -42,9 +43,6 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -56,9 +54,7 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )gitops-ocp4.17-lp-interop-images,?($|\s.*)
