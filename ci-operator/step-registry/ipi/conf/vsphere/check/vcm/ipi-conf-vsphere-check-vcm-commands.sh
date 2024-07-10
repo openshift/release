@@ -9,6 +9,10 @@ if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
   exit 0
 fi
 
+function log() {
+  echo "$(date -u --rfc-3339=seconds) - " + "$1"
+}
+
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - failed to acquire lease"
@@ -23,6 +27,24 @@ declare vsphere_cluster
 declare vsphere_url
 declare VCENTER_AUTH_PATH
 
+
+
+declare MULTI_TENANT_CAPABLE_WORKFLOWS
+# shellcheck source=/dev/null
+source "/var/run/vault/vsphere-ibmcloud-config/multi-capable-workflows.sh"
+
+DEFAULT_NETWORK_TYPE="single-tenant"
+for workflow in ${MULTI_TENANT_CAPABLE_WORKFLOWS}; do
+  if [ "${workflow}" == "${JOB_NAME_SAFE}" ]; then
+    log "workflow ${JOB_NAME_SAFE} is multi-tenant capable. will request a multi-tenant network if there is no override in the job yaml."
+    DEFAULT_NETWORK_TYPE="multi-tenant"
+    break
+  fi
+done
+
+NETWORK_TYPE=${NETWORK_TYPE:-${DEFAULT_NETWORK_TYPE}}
+
+log "job will run with network type ${NETWORK_TYPE}"
 
 function networkToSubnetsJson() {
   local NETWORK_CACHE_PATH=$1
@@ -46,9 +68,7 @@ function networkToSubnetsJson() {
 }
 
 
-function log() {
-  echo "$(date -u --rfc-3339=seconds) - " + "$1"
-}
+
 
 log "add jq plugin for converting json to yaml"
 # this snippet enables jq to convert json to yaml
@@ -183,6 +203,7 @@ metadata:
 spec:
   vcpus: 0
   memory: 0
+  network-type: \"${NETWORK_TYPE}\"
   networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
 
   i=$((i + 1))
@@ -207,10 +228,10 @@ metadata:
 spec:
   vcpus: 0
   memory: 0
+  network-type: \"${NETWORK_TYPE}\"
   requiresPool: \"${VSPHERE_BASTION_LEASED_RESOURCE}\"
   networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
 fi
-
 
 POOLS=${POOLS:-}
 IFS=" " read -r -a pools <<< "${POOLS}"
@@ -253,6 +274,7 @@ metadata:
 spec:
   vcpus: ${OPENSHIFT_REQUIRED_CORES}
   memory: ${OPENSHIFT_REQUIRED_MEMORY}
+  network-type: \"${NETWORK_TYPE}\"
   ${requiredPool}
   networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
 done
