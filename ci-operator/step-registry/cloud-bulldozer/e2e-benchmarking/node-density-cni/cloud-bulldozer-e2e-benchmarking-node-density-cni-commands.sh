@@ -12,7 +12,9 @@ pushd /tmp
 if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] && [[ "$REPO_NAME" = "e2e-benchmarking" ]]; then
     git clone https://github.com/${REPO_OWNER}/${REPO_NAME}
     pushd ${REPO_NAME}
-    git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER}
+    git config --global user.email "ocp-perfscale@redhat.com"
+    git config --global user.name "ocp-perfscale"
+    git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
     git switch ${PULL_NUMBER}
     pushd workloads/kube-burner-ocp-wrapper
     export WORKLOAD=node-density-cni
