@@ -14,7 +14,13 @@ echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..
 # shellcheck source=/dev/null
 declare cloud_where_run
 declare vsphere_portgroup
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc.sh"
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
@@ -135,7 +141,6 @@ function collect_diagnostic_data {
   net.usage.average
   sys.uptime.latest"
 
-  source "${SHARED_DIR}/govc.sh"
   vcenter_state="${ARTIFACT_DIR}/vcenter_state"
   mkdir "${vcenter_state}"
   unset GOVC_DATACENTER

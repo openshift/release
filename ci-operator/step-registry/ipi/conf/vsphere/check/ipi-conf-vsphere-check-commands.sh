@@ -42,6 +42,8 @@ declare vsphere_url
 # notes: jcallen: split the LEASED_RESOURCE e.g. bcr01a.dal10.1153
 # into: primary router hostname, datacenter and vlan id
 
+cp ${SUBNETS_CONFIG} "${SHARED_DIR}"
+
 router=$(awk -F. '{print $1}' <(echo "${LEASED_RESOURCE}"))
 phydc=$(awk -F. '{print $2}' <(echo "${LEASED_RESOURCE}"))
 vlanid=$(awk -F. '{print $3}' <(echo "${LEASED_RESOURCE}"))

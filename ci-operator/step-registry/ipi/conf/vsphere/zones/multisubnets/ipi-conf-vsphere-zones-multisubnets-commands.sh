@@ -17,9 +17,13 @@ declare vsphere_url
 declare vsphere_portgroup
 declare vsphere_extra_portgroup_1
 declare vsphere_extra_portgroup_2
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 declare -a vips
 mapfile -t vips < "${SHARED_DIR}"/vips.txt
 

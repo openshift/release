@@ -23,6 +23,8 @@ function run_tests() {
         openshift-tests run -o ${ARTIFACT_DIR}/e2e.log \
         --junit-dir ${ARTIFACT_DIR}/reports -f -
 }
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
 
 case "${CLUSTER_TYPE}" in
     vsphere)
