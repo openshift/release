@@ -27,6 +27,26 @@ base_images:
     name: govc
     namespace: ci
     tag: v0.29.0
+  tests:
+    name: "4.16"
+    namespace: ocp
+    tag: tests
+  tests-4.12:
+    name: "4.12"
+    namespace: ocp
+    tag: tests
+  tests-4.13:
+    name: "4.13"
+    namespace: ocp
+    tag: tests
+  tests-4.14:
+    name: "4.14"
+    namespace: ocp
+    tag: tests
+  tests-4.15:
+    name: "4.15"
+    namespace: ocp
+    tag: tests
   upi-installer:
     name: "4.15"
     namespace: ocp
@@ -128,19 +148,12 @@ tests:
         DISK_ENCRYPTION_MODE=tang
     workflow: assisted-baremetal
 - always_run: false
-  as: e2e-metal-assisted-4-11
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.11
-    workflow: assisted-baremetal
-- always_run: false
   as: e2e-metal-assisted-4-12
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.12
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.12
@@ -150,6 +163,8 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.13
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.13
@@ -159,6 +174,8 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.14
@@ -168,6 +185,8 @@ tests:
   cron: 00 02 */1 * 0,3
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.12
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.12
@@ -177,6 +196,8 @@ tests:
   cron: 00 02 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.13
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.13
@@ -186,6 +207,8 @@ tests:
   cron: 00 03 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.14
@@ -196,6 +219,8 @@ tests:
   cron: 00 03 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.15
@@ -206,6 +231,8 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.15
@@ -215,6 +242,8 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
@@ -229,6 +258,8 @@ tests:
   cron: 15 02 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
@@ -273,6 +304,8 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
@@ -317,6 +350,8 @@ tests:
   cron: 30 02 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
@@ -474,6 +509,8 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         PLATFORM=external
@@ -620,6 +657,8 @@ tests:
   cron: 30 04 */1 * 0
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         STATIC_IPS=true
@@ -632,6 +671,8 @@ tests:
   cron: 45 03 */1 * 0
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         IS_BONDED=true
@@ -644,6 +685,8 @@ tests:
   as: e2e-metal-assisted-static-ip-suite-4-14
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         STATIC_IPS=true
@@ -656,6 +699,8 @@ tests:
   as: e2e-metal-assisted-bond-4-14
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         IS_BONDED=true
@@ -669,10 +714,29 @@ tests:
   steps:
     cluster_profile: packet-sno
     workflow: baremetalds-sno
+- always_run: false
+  as: e2e-metal-single-node-live-iso-4-15
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: packet-sno
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
+    workflow: baremetalds-sno
 - as: e2e-metal-single-node-with-worker-live-iso
   run_if_changed: .*bootstrap_in_place.*
   steps:
     cluster_profile: packet-sno
+    env:
+      PACKET_PLAN: c3.medium.x86
+      TEST_FUNC: test_bip_add_worker
+    workflow: baremetalds-sno
+- always_run: false
+  as: e2e-metal-single-node-with-worker-live-iso-4-15
+  run_if_changed: .*bootstrap_in_place.*
+  steps:
+    cluster_profile: packet-sno
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
@@ -703,6 +767,8 @@ tests:
   optional: true
   steps:
     cluster_profile: vsphere-2
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.12
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -715,6 +781,8 @@ tests:
   optional: true
   steps:
     cluster_profile: vsphere-2
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.13
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -727,6 +795,8 @@ tests:
   optional: true
   steps:
     cluster_profile: vsphere-2
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -846,6 +916,8 @@ tests:
   optional: true
   steps:
     cluster_profile: nutanix
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.13
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -861,6 +933,8 @@ tests:
   optional: true
   steps:
     cluster_profile: nutanix
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -876,6 +950,8 @@ tests:
   optional: true
   steps:
     cluster_profile: nutanix
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -903,6 +979,8 @@ tests:
   interval: 48h
   steps:
     cluster_profile: nutanix
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -917,6 +995,8 @@ tests:
   interval: 24h
   steps:
     cluster_profile: nutanix
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.15
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -989,6 +1069,8 @@ tests:
   optional: true
   steps:
     cluster_profile: oci-assisted
+    dependencies:
+      OPENSHIFT_TESTS_IMAGE: tests-4.14
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.14
