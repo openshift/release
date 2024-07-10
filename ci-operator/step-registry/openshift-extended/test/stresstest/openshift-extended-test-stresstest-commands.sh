@@ -298,8 +298,18 @@ function run {
     fi
 
     echo "final scenarios: ${test_scenarios}"
+    ret_grep=0
     extended-platform-tests run all --dry-run | \
-        grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
+        grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected || ret_grep=$?
+    if [ "W${ret_grep}W" != "W0W" ]; then
+        echo "fail to select case. possible no case, and please check it"
+        if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
+            echo "do not force success exit"
+            exit 1
+        fi
+            echo "force success exit"
+            exit 0
+    fi
 
     test_filters="${hardcoded_filters};${TEST_FILTERS_STRESSTEST}"
     if [[ -n "${FILTERS_ADDITIONAL_STRESSTEST:-}" ]]; then
@@ -358,24 +368,28 @@ function run {
 
     # summarize test results
     echo "Summarizing test results..."
-    failures=0 errors=0 skipped=0 tests=0
     [[ -e "${ARTIFACT_DIR}" ]] || exit 0
-    grep -r -E -h -o 'testsuite.*tests="[0-9]+"' "${ARTIFACT_DIR}" | tr -d '[A-Za-z=\"_]' > /tmp/zzz-tmp.log
-    while read -a row ; do
-        # if the last ARG of command `let` evaluates to 0, `let` returns 1
-        let errors+=${row[0]} failures+=${row[1]} skipped+=${row[2]} tests+=${row[3]} || true
+    declare -A results=([failures]='0' [errors]='0' [skipped]='0' [tests]='0')
+    grep -r -E -h -o 'testsuite.*tests="[0-9]+"[^>]+' "${ARTIFACT_DIR}" > /tmp/zzz-tmp.log
+    while read row ; do
+	for ctype in "${!results[@]}" ; do
+            count="$(sed -E "s/.*$ctype=\"([0-9]+)\".*/\1/" <<< $row)"
+            if [[ -n $count ]] ; then
+                let results[$ctype]+=count || true
+            fi
+        done
     done < /tmp/zzz-tmp.log
 
     TEST_RESULT_FILE="${ARTIFACT_DIR}/test-results.yaml"
     cat > "${TEST_RESULT_FILE}" <<- EOF
 openshift-extended-test-stresstest:
-  total: $tests
-  failures: $failures
-  errors: $errors
-  skipped: $skipped
+  total: ${results[tests]}
+  failures: ${results[failures]}
+  errors: ${results[errors]}
+  skipped: ${results[skipped]}
 EOF
 
-    if [ $((failures)) != 0 ] ; then
+    if [ ${results[failures]} != 0 ] ; then
         echo '  failingScenarios:' >> "${TEST_RESULT_FILE}"
         readarray -t failingscenarios < <(grep -h -r -E '^failed:' "${ARTIFACT_DIR}/.." | awk -v n=4 '{ for (i=n; i<=NF; i++) printf "%s%s", $i, (i<NF ? OFS : ORS)}' | sort --unique)
         for (( i=0; i<${#failingscenarios[@]}; i++ )) ; do

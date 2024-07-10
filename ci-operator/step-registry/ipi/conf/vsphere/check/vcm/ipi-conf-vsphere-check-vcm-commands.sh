@@ -9,6 +9,10 @@ if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
   exit 0
 fi
 
+function log() {
+  echo "$(date -u --rfc-3339=seconds) - " + "$1"
+}
+
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - failed to acquire lease"
@@ -23,6 +27,24 @@ declare vsphere_cluster
 declare vsphere_url
 declare VCENTER_AUTH_PATH
 
+
+
+declare MULTI_TENANT_CAPABLE_WORKFLOWS
+# shellcheck source=/dev/null
+source "/var/run/vault/vsphere-ibmcloud-config/multi-capable-workflows.sh"
+
+DEFAULT_NETWORK_TYPE="single-tenant"
+for workflow in ${MULTI_TENANT_CAPABLE_WORKFLOWS}; do
+  if [ "${workflow}" == "${JOB_NAME_SAFE}" ]; then
+    log "workflow ${JOB_NAME_SAFE} is multi-tenant capable. will request a multi-tenant network if there is no override in the job yaml."
+    DEFAULT_NETWORK_TYPE="multi-tenant"
+    break
+  fi
+done
+
+NETWORK_TYPE=${NETWORK_TYPE:-${DEFAULT_NETWORK_TYPE}}
+
+log "job will run with network type ${NETWORK_TYPE}"
 
 function networkToSubnetsJson() {
   local NETWORK_CACHE_PATH=$1
@@ -46,9 +68,7 @@ function networkToSubnetsJson() {
 }
 
 
-function log() {
-  echo "$(date -u --rfc-3339=seconds) - " + "$1"
-}
+
 
 log "add jq plugin for converting json to yaml"
 # this snippet enables jq to convert json to yaml
@@ -183,6 +203,7 @@ metadata:
 spec:
   vcpus: 0
   memory: 0
+  network-type: \"${NETWORK_TYPE}\"
   networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
 
   i=$((i + 1))
@@ -207,10 +228,10 @@ metadata:
 spec:
   vcpus: 0
   memory: 0
+  network-type: \"${NETWORK_TYPE}\"
   requiresPool: \"${VSPHERE_BASTION_LEASED_RESOURCE}\"
   networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
 fi
-
 
 POOLS=${POOLS:-}
 IFS=" " read -r -a pools <<< "${POOLS}"
@@ -226,6 +247,9 @@ else
   OPENSHIFT_REQUIRED_CORES=$((OPENSHIFT_REQUIRED_CORES / ${#pools[@]}))
   OPENSHIFT_REQUIRED_MEMORY=$((OPENSHIFT_REQUIRED_MEMORY / ${#pools[@]}))
 fi
+
+
+cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
 # create a lease for each pool
 for POOL in "${pools[@]}"; do
@@ -244,16 +268,36 @@ metadata:
   namespace: \"vsphere-infra-helpers\"
   annotations: {}
   labels:
+    cluster-id: \"${cluster_name}\"
     boskos-lease-id: \"${LEASED_RESOURCE}\"
     job-name: \"${JOB_NAME_SAFE}\"
 spec:
   vcpus: ${OPENSHIFT_REQUIRED_CORES}
   memory: ${OPENSHIFT_REQUIRED_MEMORY}
+  network-type: \"${NETWORK_TYPE}\"
   ${requiredPool}
   networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -f -
 done
 
 log "waiting for lease to be fulfilled..."
+
+n=0
+until [ "$n" -ge 5 ]
+do
+  if oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}" -o json | jq -e '.items[].status?'; then
+    break
+  fi
+
+  n=$((n+1))
+  sleep 15
+done
+
+if [ "$n" -ge 5 ]; then
+  log "status was never available for lease, exit 1"
+  oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}" -o yaml
+  exit 1
+fi
+
 oc wait leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" --timeout=120m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers -l boskos-lease-id="${LEASED_RESOURCE}"
 
 declare -A vcenter_portgroups
