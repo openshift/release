@@ -4,12 +4,8 @@ build_root:
     namespace: ci
     tag: latest
 images:
-- dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-gcp-415-arm
-promotion:
-  to:
-  - namespace: ci
-    tag: latest
+- dockerfile_path: prow/Dockerfile_test
+  to: ocp-qe-perfscale-ci
 releases:
   arm64-latest:
     candidate:
@@ -28,6 +24,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: test
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    test:
+    - ref: openshift-qe-test
+  timeout: 1h0m0s
 - always_run: false
   as: control-plane-arm-3nodes
   steps:
